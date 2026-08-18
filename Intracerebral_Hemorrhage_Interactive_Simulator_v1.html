@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#071b3a">
+<title>Intracerebral Hemorrhage Interactive Simulator V1</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f7fb;color:#152033;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}.app{max-width:920px;margin:auto;padding:14px}
+.hero{background:linear-gradient(135deg,#071b3a,#7b1e2b);color:#fff;border-radius:24px;padding:24px 20px;margin-bottom:12px}.hero h1{margin:0;font-size:clamp(28px,7vw,43px);line-height:1.05}.hero p{color:#f4dfe2;line-height:1.45}
+.tabs{display:flex;gap:7px;overflow:auto;padding:4px 0 12px}.tabs button{white-space:nowrap;border:1px solid #d1dae7;background:#fff;border-radius:13px;padding:11px 14px;font-weight:850;color:#7b1e2b}.tabs button.active{background:#071b3a;color:#fff}
+.panel{display:none;background:#fff;border:1px solid #d5deea;border-radius:20px;overflow:hidden}.panel.active{display:block}.panel h2{margin:0;padding:18px 20px;border-bottom:1px solid #dbe3ed;font-size:23px}.body{padding:18px 20px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}@media(max-width:600px){.grid{grid-template-columns:1fr}}
+label{display:block;font-size:13px;font-weight:850;color:#647083;margin-bottom:6px}input,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;font-size:17px}
+.action{border:0;border-radius:12px;background:#7b1e2b;color:#fff;font-weight:850;padding:13px 16px;font-size:16px;margin-top:13px;width:100%}
+.result{margin-top:15px;padding:14px;border-left:5px solid #18853b;background:#f6fbf7;border-radius:12px;line-height:1.48}.warn{border-left-color:#b86b00;background:#fff9ed}.danger{border-left-color:#bd2635;background:#fff5f6}.info{border-left-color:#1457a6;background:#f4f8ff}.result strong{display:block;font-size:17px;margin-bottom:5px}
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:12px}.metrics div{border:1px solid #dce4ed;border-radius:11px;padding:10px;background:#f8fafc}.metrics b{display:block;font-size:24px;color:#7b1e2b}
+.check{display:flex;gap:9px;align-items:flex-start;padding:11px;border:1px solid #dbe3ed;border-radius:11px;margin:8px 0;background:#fafbfd}.check input{width:20px;margin-top:2px}.check span{font-size:14px;line-height:1.35}.note{background:#fff7e5;border:1px solid #efd18a;border-radius:12px;padding:12px;line-height:1.5;font-size:13px}.small{font-size:12px;color:#647083;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="hero"><h1>Intracerebral Hemorrhage<br>Interactive Simulator</h1><p>Acute spontaneous ICH assessment: ICH Score, hematoma volume, BP pathway, anticoagulant reversal, hydrocephalus/ICP and surgical escalation.</p></header>
+
+<nav class="tabs">
+<button class="active" data-tab="clinical">Clinical</button>
+<button data-tab="score">ICH Score</button>
+<button data-tab="bp">BP</button>
+<button data-tab="reversal">Reversal</button>
+<button data-tab="surgery">Surgery / ICP</button>
+<button data-tab="decision">Final Decision</button>
+</nav>
+
+<section id="clinical" class="panel active"><h2>1. Clinical & CT entry</h2><div class="body">
+<div class="note"><b>Educational decision-support tool.</b> This simulator is based primarily on the 2022 AHA/ASA spontaneous ICH guideline. It does not replace neurocritical-care/neurosurgical assessment or local protocol.</div>
+<div class="grid" style="margin-top:13px">
+<div><label>GCS</label><input id="gcs" type="number" min="3" max="15" value="12"></div>
+<div><label>Age (years)</label><input id="age" type="number" min="1" value="65"></div>
+<div><label>SBP (mmHg)</label><input id="sbp" type="number" value="190"></div>
+<div><label>DBP (mmHg)</label><input id="dbp" type="number" value="105"></div>
+<div><label>CT length A (cm)</label><input id="a" type="number" step=".1" value="5"></div>
+<div><label>CT width B (cm)</label><input id="b" type="number" step=".1" value="3"></div>
+<div><label>CT slices with hemorrhage C</label><input id="c" type="number" step=".1" value="4"></div>
+<div><label>Slice thickness / factor (cm)</label><input id="d" type="number" step=".1" value="1"></div>
+</div>
+<div class="check"><input id="ivh" type="checkbox"><span><b>Intraventricular hemorrhage present</b></span></div>
+<div class="check"><input id="infra" type="checkbox"><span><b>Infratentorial hemorrhage</b> (cerebellar/brainstem)</span></div>
+<div class="check"><input id="hydro" type="checkbox"><span><b>Hydrocephalus / ventricular obstruction</b></span></div>
+<div class="check"><input id="deteriorate" type="checkbox"><span><b>Neurological deterioration / clinical mass effect</b></span></div>
+<button class="action" onclick="updateAll()">RUN / UPDATE</button>
+<div id="clinicalOut"></div>
+</div></section>
+
+<section id="score" class="panel"><h2>2. Automatic ICH Score</h2><div class="body"><div id="scoreOut"></div><div class="small">ICH Score components: GCS, age ≥80, ICH volume ≥30 mL, IVH, and infratentorial origin. The score is a severity communication tool and should not be used alone to determine treatment limitation or prognosis.</div></div></section>
+
+<section id="bp" class="panel"><h2>3. Acute blood-pressure pathway</h2><div class="body"><div id="bpOut"></div><div class="small">For mild-to-moderate spontaneous ICH with SBP 150–220 mmHg, the 2022 AHA/ASA guideline supports smooth, sustained BP control with a target of about 140 mmHg and maintenance in the 130–150 mmHg range; lowering below 130 mmHg is potentially harmful. Markedly elevated SBP &gt;220 mmHg requires individualized intensive treatment and close monitoring.</div></div></section>
+
+<section id="reversal" class="panel"><h2>4. Antithrombotic reversal</h2><div class="body">
+<div class="grid">
+<div><label>Antithrombotic</label><select id="drug" onchange="reversal()"><option value="none">None / unknown</option><option value="warfarin">Warfarin / VKA</option><option value="dabigatran">Dabigatran</option><option value="fxa">Factor Xa inhibitor (apixaban/rivaroxaban/edoxaban)</option><option value="heparin">Unfractionated heparin</option><option value="lmwh">LMWH</option><option value="antiplatelet">Antiplatelet agent</option></select></div>
+<div><label>Last dose / exposure</label><select id="recent"><option>Recent / clinically relevant</option><option>Remote / uncertain</option></select></div>
+</div>
+<div id="revOut"></div>
+<div class="small">Exact dosing and eligibility for reversal agents require drug-specific timing, laboratory data, renal function and local formulary/protocol review.</div>
+</div></section>
+
+<section id="surgery" class="panel"><h2>5. Surgery, hydrocephalus & ICP</h2><div class="body"><div id="surgOut"></div>
+<div class="check"><input id="brainstem" type="checkbox"><span><b>Brainstem compression / severe posterior-fossa effect</b></span></div>
+<div class="check"><input id="ventricular" type="checkbox"><span><b>Ventricular obstruction requiring CSF diversion consideration</b></span></div>
+<button class="action" onclick="surgery()">Update surgical pathway</button>
+<div class="small">Cerebellar ICH ≥15 mL, neurological deterioration, brainstem compression or obstructive hydrocephalus are important triggers for urgent surgical evaluation. EVD is considered when hydrocephalus contributes to reduced consciousness. Supratentorial minimally invasive evacuation may reduce mortality in selected patients; functional benefit remains uncertain.</div>
+</div></section>
+
+<section id="decision" class="panel"><h2>6. Final ICH decision</h2><div class="body"><button class="action" onclick="updateAll();document.getElementById('decisionOut').scrollIntoView({behavior:'smooth'})">Generate final pathway</button><div id="decisionOut"></div></div></section>
+
+<div class="small" style="padding:18px 3px;text-align:center">Guideline anchor: Greenberg et al., 2022 AHA/ASA Guideline for Management of Patients With Spontaneous ICH. Verify all treatment decisions against the current guideline, local protocol and specialist assessment.</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id), n=id=>Number($(id).value)||0;
+document.querySelectorAll('.tabs button').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));btn.classList.add('active');$(btn.dataset.tab).classList.add('active');window.scrollTo(0,0)}));
+
+function volume(){return n('a')*n('b')*n('c')*n('d')/2}
+function score(){
+let g=n('gcs'),age=n('age'),v=volume(),s=0;
+if(g>=3&&g<=4)s+=2;else if(g>=5&&g<=12)s+=1;
+if(age>=80)s++;if(v>=30)s++;if($('ivh').checked)s++;if($('infra').checked)s++;
+return {s,v}
+}
+function updateAll(){
+let x=score(),v=x.v,g=n('gcs'),a=n('age'),s=x.s;
+$('clinicalOut').innerHTML=`<div class="result info"><strong>Current CT/clinical state</strong>Estimated ICH volume = ${v.toFixed(1)} mL. ICH Score = ${s}. Continue full neurocritical assessment.</div>`;
+$('scoreOut').innerHTML=`<div class="result ${s>=3?'warn':''}"><strong>ICH Score = ${s}</strong><div class="metrics"><div><b>${g<=4?2:g<=12?1:0}</b>GCS</div><div><b>${a>=80?1:0}</b>Age ≥80</div><div><b>${v>=30?1:0}</b>Volume ≥30 mL</div></div><div class="metrics"><div><b>${$('ivh').checked?1:0}</b>IVH</div><div><b>${$('infra').checked?1:0}</b>Infratentorial</div><div><b>${v.toFixed(1)}</b>mL volume</div></div></div>`;
+bp();
+reversal();
+surgery();
+decision(x);
+}
+function bp(){
+let sbp=n('sbp'),html='';
+if(sbp>220)html=`<div class="result warn"><strong>Markedly elevated SBP &gt;220</strong>Use continuous IV antihypertensive treatment with close BP monitoring and individualized reduction. Avoid abrupt excessive lowering.</div>`;
+else if(sbp>=150&&sbp<=220)html=`<div class="result"><strong>Target pathway: SBP ≈140 mmHg</strong>For mild-to-moderate spontaneous ICH, use smooth, sustained BP control; maintain approximately 130–150 mmHg. Avoid reducing SBP below 130 mmHg.</div>`;
+else html=`<div class="result info"><strong>SBP ${sbp} mmHg</strong>No acute ICH-specific BP reduction trigger from the simplified 150–220 pathway. Continue individualized monitoring and treat other indications.</div>`;
+$('bpOut').innerHTML=html;
+}
+function reversal(){
+let d=$('drug').value,html='';
+if(d==='warfarin')html=`<div class="result danger"><strong>VKA-associated ICH: urgent reversal pathway</strong>Vitamin K antagonist reversal should be initiated promptly; 4-factor PCC is preferred to FFP for rapid reversal when appropriate, with IV vitamin K as part of reversal.</div>`;
+else if(d==='dabigatran')html=`<div class="result danger"><strong>Dabigatran-associated ICH</strong>Consider idarucizumab for rapid reversal when clinically appropriate.</div>`;
+else if(d==='fxa')html=`<div class="result danger"><strong>Factor Xa inhibitor-associated ICH</strong>Consider andexanet alfa when appropriate; if unavailable or unsuitable, a PCC-based reversal strategy may be considered according to local protocol.</div>`;
+else if(d==='heparin')html=`<div class="result danger"><strong>UFH-associated ICH</strong>Stop heparin and consider protamine reversal when clinically indicated.</div>`;
+else if(d==='lmwh')html=`<div class="result warn"><strong>LMWH-associated ICH</strong>Stop LMWH; protamine provides incomplete reversal and use depends on agent, timing and dose.</div>`;
+else if(d==='antiplatelet')html=`<div class="result warn"><strong>Antiplatelet-associated ICH</strong>Routine platelet transfusion is potentially harmful outside specific settings such as emergency surgery or severe thrombocytopenia. Discuss individualized management with neurosurgery/hematology as appropriate.</div>`;
+else html=`<div class="result info"><strong>No antithrombotic selected</strong>No reversal agent indicated from this simplified screen.</div>`;
+$('revOut').innerHTML=html;
+}
+function surgery(){
+let v=volume(),infra=$('infra').checked,hydro=$('hydro').checked,deter=$('deteriorate').checked,bs=$('brainstem').checked,vent=$('ventricular').checked;
+let urgent=(infra&&(v>=15||hydro||deter||bs))||(hydro&&gcsLow());
+let h=urgent?`<div class="result danger"><strong>URGENT neurosurgical evaluation</strong>Posterior-fossa ICH with important volume/clinical effect and/or obstructive hydrocephalus may require immediate evacuation ± EVD.</div>`:`<div class="result info"><strong>No automatic surgical trigger in this simplified screen</strong>Continue serial neurological examination, repeat imaging as indicated and specialist review.</div>`;
+if(hydro||vent)h+=`<div class="result warn"><strong>Hydrocephalus / ventricular obstruction</strong>Consider EVD/CSF diversion when hydrocephalus contributes to decreased consciousness.</div>`;
+$('surgOut').innerHTML=h;
+}
+function gcsLow(){return n('gcs')<=8}
+function decision(x){
+let sbp=n('sbp'),d=$('drug').value,infra=$('infra').checked,hydro=$('hydro').checked,v=x.v;
+let arr=[];
+arr.push(`<div class="result info"><strong>ICH Score ${x.s} • Estimated volume ${v.toFixed(1)} mL</strong>Do not use the score alone to make decisions about limiting life-sustaining treatment.</div>`);
+if(sbp>=150)arr.push(`<div class="result ${sbp>220?'warn':''}"><strong>BP pathway</strong>${sbp>220?'Markedly elevated SBP: individualized continuous IV treatment and close monitoring.':'Smooth sustained BP control; target around 140 mmHg and maintain 130–150 mmHg when appropriate.'}</div>`);
+if(d!=='none')arr.push(`<div class="result danger"><strong>Reversal</strong>Antithrombotic-associated ICH selected: activate the drug-specific reversal pathway urgently.</div>`);
+if(infra&&v>=15||hydro)arr.push(`<div class="result danger"><strong>Neurosurgical priority</strong>Posterior fossa / hydrocephalus features require urgent specialist evaluation and consideration of evacuation and/or CSF diversion.</div>`);
+arr.push(`<div class="result"><strong>General ICU priorities</strong>Frequent neurological monitoring, repeat CT when clinically indicated, airway/ventilation support when required, temperature/glucose management, seizure treatment when seizures occur, and prevention of medical complications.</div>`);
+$('decisionOut').innerHTML=arr.join('');
+}
+</script>
+</body>
+</html>
