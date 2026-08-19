@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1f3a">
+<title>Subarachnoid Hemorrhage Interactive Simulator</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  background:#f4f7fb;
+  color:#17233c;
+}
+
+.app{
+  max-width:900px;
+  margin:auto;
+}
+
+.hero{
+  padding:28px 20px;
+  color:white;
+  background:linear-gradient(135deg,#0b1f3a,#174d8c,#8d1e35);
+}
+
+.hero h1{
+  margin:0 0 10px;
+  font-size:30px;
+  line-height:1.15;
+}
+
+.hero p{
+  margin:0;
+  font-size:15px;
+  line-height:1.55;
+  opacity:.95;
+}
+
+.tabs{
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  padding:12px;
+  background:white;
+  position:sticky;
+  top:0;
+  z-index:5;
+  border-bottom:1px solid #dbe2ec;
+}
+
+.tabs button{
+  border:1px solid #ccd6e4;
+  background:white;
+  color:#7a2034;
+  border-radius:12px;
+  padding:12px 16px;
+  font-weight:700;
+  white-space:nowrap;
+}
+
+.tabs button.active{
+  background:#0b1f3a;
+  color:white;
+}
+
+.panel{
+  display:none;
+  padding:18px;
+}
+
+.panel.active{
+  display:block;
+}
+
+.card{
+  background:white;
+  border:1px solid #d9e1eb;
+  border-radius:18px;
+  padding:18px;
+  margin-bottom:16px;
+  box-shadow:0 3px 12px rgba(20,40,70,.06);
+}
+
+.card h2{
+  margin:0 0 14px;
+  font-size:22px;
+}
+
+.card h3{
+  margin:18px 0 8px;
+}
+
+label{
+  display:block;
+  font-weight:700;
+  color:#68758a;
+  margin:14px 0 7px;
+}
+
+input,select{
+  width:100%;
+  padding:14px;
+  border:1px solid #cbd6e3;
+  border-radius:12px;
+  font-size:17px;
+  background:white;
+}
+
+.check{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding:13px;
+  border:1px solid #d8e0ea;
+  border-radius:12px;
+  margin:9px 0;
+  font-weight:600;
+}
+
+.check input{
+  width:22px;
+  height:22px;
+  margin-top:1px;
+}
+
+.primary{
+  width:100%;
+  border:0;
+  border-radius:13px;
+  padding:16px;
+  background:#0b1f3a;
+  color:white;
+  font-size:17px;
+  font-weight:800;
+  margin-top:16px;
+}
+
+.secondary{
+  width:100%;
+  border:0;
+  border-radius:13px;
+  padding:14px;
+  background:#e9eef6;
+  color:#174d8c;
+  font-weight:800;
+  margin-top:9px;
+}
+
+.result{
+  margin-top:16px;
+  padding:16px;
+  border-left:5px solid #1769aa;
+  background:#f0f6ff;
+  border-radius:12px;
+  line-height:1.55;
+}
+
+.warning{
+  padding:14px;
+  border-left:5px solid #d38b00;
+  background:#fff8df;
+  border-radius:10px;
+  margin:12px 0;
+}
+
+.danger{
+  padding:14px;
+  border-left:5px solid #a31d35;
+  background:#fff0f2;
+  border-radius:10px;
+  margin:12px 0;
+}
+
+.good{
+  padding:14px;
+  border-left:5px solid #18794e;
+  background:#effaf4;
+  border-radius:10px;
+  margin:12px 0;
+}
+
+.metric{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.metric div{
+  padding:13px;
+  background:#f6f8fb;
+  border-radius:12px;
+}
+
+.metric b{
+  display:block;
+  font-size:20px;
+  margin-top:4px;
+}
+
+.footer{
+  text-align:center;
+  padding:24px 18px 40px;
+  color:#6c788c;
+  font-size:13px;
+  line-height:1.6;
+}
+
+.small{
+  font-size:13px;
+  color:#6c788c;
+  line-height:1.5;
+}
+
+@media(max-width:600px){
+  .hero h1{font-size:26px}
+  .panel{padding:12px}
+  .metric{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+<header class="hero">
+  <h1>Subarachnoid Hemorrhage<br>Interactive Simulator</h1>
+  <p>
+    Acute aneurysmal SAH assessment, grading, blood-pressure strategy,
+    aneurysm treatment, nimodipine, DCI/vasospasm, hydrocephalus,
+    seizures and neurocritical-care escalation.
+  </p>
+</header>
+
+<nav class="tabs">
+  <button class="active" onclick="showTab('clinical',this)">Clinical</button>
+  <button onclick="showTab('grading',this)">Grading</button>
+  <button onclick="showTab('diagnosis',this)">Diagnosis</button>
+  <button onclick="showTab('bp',this)">BP</button>
+  <button onclick="showTab('aneurysm',this)">Aneurysm</button>
+  <button onclick="showTab('dci',this)">DCI</button>
+  <button onclick="showTab('icu',this)">ICU</button>
+</nav>
+
+<!-- CLINICAL -->
+<section id="clinical" class="panel active">
+
+<div class="card">
+<h2>1. Clinical Entry</h2>
+
+<div class="warning">
+<b>Educational decision-support tool.</b>
+This simulator is designed for teaching and rapid bedside revision.
+It does not replace specialist neurocritical-care, neurosurgical,
+neurointerventional or local protocol decisions.
+</div>
+
+<label>Age (years)</label>
+<input id="age" type="number" value="55">
+
+<label>GCS</label>
+<input id="gcs" type="number" min="3" max="15" value="14">
+
+<label>SBP (mmHg)</label>
+<input id="sbp" type="number" value="170">
+
+<label>Time from symptom onset (hours)</label>
+<input id="onset" type="number" value="4">
+
+<div class="check">
+<input id="thunder" type="checkbox" checked>
+<div>Thunderclap / sudden severe headache</div>
+</div>
+
+<div class="check">
+<input id="meningism" type="checkbox" checked>
+<div>Meningeal irritation / neck stiffness</div>
+</div>
+
+<div class="check">
+<input id="deficit" type="checkbox">
+<div>Focal neurological deficit</div>
+</div>
+
+<div class="check">
+<input id="seizure" type="checkbox">
+<div>Seizure at presentation</div>
+</div>
+
+<button class="primary" onclick="runClinical()">RUN / UPDATE</button>
+
+<div id="clinicalResult"></div>
+</div>
+
+</section>
+
+<!-- GRADING -->
+<section id="grading" class="panel">
+
+<div class="card">
+<h2>2. Clinical Grading</h2>
+
+<label>GCS</label>
+<input id="gradeGcs" type="number" min="3" max="15" value="14">
+
+<label>Focal neurological deficit</label>
+<select id="gradeDeficit">
+<option value="no">No</option>
+<option value="yes">Yes</option>
+</select>
+
+<button class="primary" onclick="runGrading()">CALCULATE CLINICAL GRADE</button>
+
+<div id="gradingResult"></div>
+</div>
+
+<div class="card">
+<h2>Severity Framework</h2>
+<p class="small">
+Clinical grading systems such as Hunt-Hess and WFNS are useful for
+communication, prognostication and treatment planning. They should
+be interpreted together with imaging, aneurysm anatomy and the overall
+clinical picture.
+</p>
+</div>
+
+</section>
+
+<!-- DIAGNOSIS -->
+<section id="diagnosis" class="panel">
+
+<div class="card">
+<h2>3. Diagnostic Pathway</h2>
+
+<label>Noncontrast CT result</label>
+<select id="ctResult">
+<option value="positive">Blood compatible with SAH</option>
+<option value="negative">No SAH identified</option>
+<option value="equivocal">Equivocal / uncertain</option>
+</select>
+
+<label>Clinical suspicion</label>
+<select id="suspicion">
+<option value="high">High</option>
+<option value="moderate">Moderate</option>
+<option value="low">Low</option>
+</select>
+
+<div class="check">
+<input id="cta" type="checkbox">
+<div>CTA performed / aneurysm evaluation available</div>
+</div>
+
+<div class="check">
+<input id="dsa" type="checkbox">
+<div>DSA available / considered</div>
+</div>
+
+<button class="primary" onclick="runDiagnosis()">RUN DIAGNOSTIC PATHWAY</button>
+
+<div id="diagnosisResult"></div>
+</div>
+
+</section>
+
+<!-- BP -->
+<section id="bp" class="panel">
+
+<div class="card">
+<h2>4. Pre-Aneurysm-Securing BP</h2>
+
+<label>Current SBP (mmHg)</label>
+<input id="bpValue" type="number" value="175">
+
+<label>Neurological status</label>
+<select id="bpNeuro">
+<option value="stable">Stable</option>
+<option value="deteriorating">Deteriorating</option>
+</select>
+
+<button class="primary" onclick="runBP()">RUN BP PATHWAY</button>
+
+<div id="bpResult"></div>
+</div>
+
+<div class="card">
+<h2>Principles</h2>
+<ul>
+<li>Avoid severe hypertension and large BP variability.</li>
+<li>Avoid hypotension and compromised cerebral perfusion.</li>
+<li>Use a titratable IV strategy when clinically indicated.</li>
+<li>After aneurysm securing, BP goals become individualized according to
+neurological status and complications such as DCI.</li>
+</ul>
+</div>
+
+</section>
+
+<!-- ANEURYSM -->
+<section id="aneurysm" class="panel">
+
+<div class="card">
+<h2>5. Aneurysm Treatment</h2>
+
+<label>Ruptured aneurysm identified?</label>
+<select id="aneurysmFound">
+<option value="yes">Yes</option>
+<option value="no">No</option>
+</select>
+
+<label>Treatment strategy</label>
+<select id="aneurysmTreatment">
+<option value="coiling">Endovascular treatment / coiling</option>
+<option value="clipping">Microsurgical clipping</option>
+<option value="uncertain">Not yet determined</option>
+</select>
+
+<label>Hours since onset</label>
+<input id="aneurysmTime" type="number" value="6">
+
+<button class="primary" onclick="runAneurysm()">RUN ANEURYSM PATHWAY</button>
+
+<div id="aneurysmResult"></div>
+</div>
+
+<div class="card">
+<h2>Key Principle</h2>
+
+<div class="good">
+<b>Do not delay definitive treatment unnecessarily.</b><br>
+Once the ruptured aneurysm is identified, prompt treatment is central
+to reducing the risk of rebleeding. The 2023 AHA/ASA guideline recommends
+treatment preferably within 24 hours when feasible.
+</div>
+</div>
+
+</section>
+
+<!-- DCI -->
+<section id="dci" class="panel">
+
+<div class="card">
+<h2>6. Delayed Cerebral Ischemia</h2>
+
+<label>Days after hemorrhage</label>
+<input id="dciDay" type="number" value="7">
+
+<div class="check">
+<input id="newDeficit" type="checkbox">
+<div>New focal neurological deficit</div>
+</div>
+
+<div class="check">
+<input id="dropGcs" type="checkbox">
+<div>Unexplained reduction in consciousness</div>
+</div>
+
+<div class="check">
+<input id="vasospasm" type="checkbox">
+<div>Imaging suggests cerebral vasospasm</div>
+</div>
+
+<div class="check">
+<input id="euvolemia" type="checkbox" checked>
+<div>Euvolemia maintained</div>
+</div>
+
+<button class="primary" onclick="runDCI()">ASSESS DCI</button>
+
+<div id="dciResult"></div>
+</div>
+
+<div class="card">
+<h2>Prevention / Management Principles</h2>
+
+<div class="good">
+<b>Nimodipine:</b> early enteral nimodipine is recommended for patients
+with aSAH to reduce DCI and improve functional outcome.
+</div>
+
+<div class="warning">
+Routine prophylactic hypervolemia is not recommended. Maintain
+euvolemia and monitor closely for neurological deterioration.
+</div>
+
+<div class="danger">
+For symptomatic DCI, hemodynamic augmentation may be considered under
+specialist neurocritical-care supervision after excluding other causes.
+</div>
+
+</div>
+
+</section>
+
+<!-- ICU -->
+<section id="icu" class="panel">
+
+<div class="card">
+<h2>7. Neurocritical-Care Bundle</h2>
+
+<div class="check">
+<input id="nimodipine" type="checkbox">
+<div>Nimodipine started</div>
+</div>
+
+<div class="check">
+<input id="neuroobs" type="checkbox">
+<div>Frequent neurological assessment</div>
+</div>
+
+<div class="check">
+<input id="volume" type="checkbox">
+<div>Euvolemia / hemodynamic monitoring</div>
+</div>
+
+<div class="check">
+<input id="hydro" type="checkbox">
+<div>Hydrocephalus assessed</div>
+</div>
+
+<div class="check">
+<input id="eeg" type="checkbox">
+<div>EEG considered when clinically appropriate</div>
+</div>
+
+<div class="check">
+<input id="vte" type="checkbox">
+<div>VTE prevention strategy addressed</div>
+</div>
+
+<div class="check">
+<input id="rehab" type="checkbox">
+<div>Early rehabilitation / recovery planning</div>
+</div>
+
+<button class="primary" onclick="runICU()">RUN ICU CHECKLIST</button>
+
+<div id="icuResult"></div>
+</div>
+
+<div class="card">
+<h2>Hydrocephalus & Seizures</h2>
+
+<p>
+Acute symptomatic hydrocephalus requires urgent neurocritical and
+neurosurgical assessment and CSF diversion when indicated.
+</p>
+
+<p>
+New-onset seizures after aSAH are treated when present. Routine
+prophylactic antiseizure medication is not recommended for every patient,
+but selected high-risk patients may warrant consideration.
+</p>
+
+<p>
+Phenytoin should generally be avoided for seizure prophylaxis because of
+its association with excess morbidity.
+</p>
+
+</div>
+
+</section>
+
+<div class="footer">
+<b>Subarachnoid Hemorrhage Interactive Simulator</b><br>
+Educational tool • Verify treatment decisions against current guidelines,
+local protocols and specialist assessment.<br><br>
+Guideline anchor: Hoh BL et al. 2023 AHA/ASA Guideline for the Management
+of Patients With Aneurysmal Subarachnoid Hemorrhage.
+</div>
+
+</div>
+
+<script>
+
+function showTab(id,button){
+  document.querySelectorAll(".panel").forEach(function(p){
+    p.classList.remove("active");
+  });
+
+  document.querySelectorAll(".tabs button").forEach(function(b){
+    b.classList.remove("active");
+  });
+
+  document.getElementById(id).classList.add("active");
+  button.classList.add("active");
+
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function box(type,title,text){
+  return '<div class="'+type+'"><b>'+title+'</b><br>'+text+'</div>';
+}
+
+function runClinical(){
+
+  const gcs=Number(document.getElementById("gcs").value);
+  const sbp=Number(document.getElementById("sbp").value);
+  const onset=Number(document.getElementById("onset").value);
+
+  let html="";
+
+  if(gcs<=8){
+    html+=box("danger","High clinical severity",
+      "GCS ≤8 indicates markedly impaired consciousness and should trigger immediate neurocritical-care escalation.");
+  }else if(gcs<=12){
+    html+=box("warning","Moderate–severe neurological impairment",
+      "Frequent neurological reassessment and specialist neurocritical-care management are required.");
+  }else{
+    html+=box("good","Relatively preserved consciousness",
+      "Continue structured neurological assessment and urgent definitive diagnostic evaluation.");
+  }
+
+  if(sbp>=160){
+    html+=box("warning","Elevated SBP",
+      "Avoid severe hypertension while avoiding hypotension and excessive BP variability before the aneurysm is secured.");
+  }
+
+  if(onset<=24){
+    html+=box("good","Early presentation",
+      "Prompt aneurysm identification and definitive treatment are priorities.");
+  }
+
+  document.getElementById("clinicalResult").innerHTML=html;
+}
+
+function runGrading(){
+
+  const gcs=Number(document.getElementById("gradeGcs").value);
+  const deficit=document.getElementById("gradeDeficit").value;
+
+  let wfns="";
+
+  if(gcs===15 && deficit==="no") wfns="WFNS 1";
+  else if(gcs===13 || gcs===14) wfns="WFNS 2";
+  else if(gcs===13 && deficit==="yes") wfns="WFNS 3";
+  else if(gcs>=7 && gcs<=12) wfns="WFNS 4";
+  else if(gcs<=6) wfns="WFNS 5";
+  else wfns="Use clinical judgement and verify grading criteria.";
+
+  document.getElementById("gradingResult").innerHTML=
+    box("result","Clinical grade estimate",wfns+
+    "<br><span class='small'>This is a simplified educational grading aid. Apply the formal grading system and clinical examination in practice.</span>");
+}
+
+function runDiagnosis(){
+
+  const ct=document.getElementById("ctResult").value;
+  const suspicion=document.getElementById("suspicion").value;
+  const cta=document.getElementById("cta").checked;
+
+  let html="";
+
+  if(ct==="positive"){
+    html+=box("good","SAH pathway activated",
+      "CT findings compatible with SAH should lead to urgent aneurysm-source evaluation and specialist management.");
+  }else if(ct==="equivocal"){
+    html+=box("warning","Further diagnostic evaluation required",
+      "Do not dismiss SAH when clinical suspicion remains significant. Use an appropriate diagnostic pathway.");
+  }else{
+    if(suspicion==="high"){
+      html+=box("warning","High clinical suspicion despite negative CT",
+        "Further evaluation may be required depending on timing, CT quality, expertise and the clinical scenario.");
+    }else{
+      html+=box("good","No SAH identified on current pathway",
+        "Interpret imaging in the context of clinical presentation and timing.");
+    }
+  }
+
+  if(cta){
+    html+=box("result","Vascular imaging",
+      "CTA information is available for aneurysm-source assessment.");
+  }
+
+  document.getElementById("diagnosisResult").innerHTML=html;
+}
+
+function runBP(){
+
+  const sbp=Number(document.getElementById("bpValue").value);
+  let html="";
+
+  if(sbp>=180){
+    html+=box("danger","Marked hypertension",
+      "Use a controlled, titratable BP strategy and avoid abrupt excessive reductions.");
+  }else if(sbp>=160){
+    html+=box("warning","Elevated BP",
+      "Consider controlled BP management while avoiding hypotension and large BP fluctuations.");
+  }else if(sbp<100){
+    html+=box("danger","Potential hypotension",
+      "Avoid hypotension and evaluate cerebral and systemic perfusion immediately.");
+  }else{
+    html+=box("good","No marked BP abnormality",
+      "Continue close monitoring and individualized BP management.");
+  }
+
+  document.getElementById("bpResult").innerHTML=html;
+}
+
+function runAneurysm(){
+
+  const found=document.getElementById("aneurysmFound").value;
+  const treatment=document.getElementById("aneurysmTreatment").value;
+  const time=Number(document.getElementById("aneurysmTime").value);
+
+  let html="";
+
+  if(found==="yes"){
+    html+=box("good","Ruptured aneurysm identified",
+      "Urgent multidisciplinary assessment for definitive aneurysm occlusion is indicated.");
+
+    if(time<=24){
+      html+=box("good","Within the preferred early-treatment window",
+        "The 2023 AHA/ASA guideline recommends prompt treatment, preferably within 24 hours when feasible.");
+    }
+
+    if(treatment==="coiling"){
+      html+=box("result","Endovascular strategy selected",
+        "Confirm suitability with the neurointerventional team and aneurysm anatomy.");
+    }else if(treatment==="clipping"){
+      html+=box("result","Microsurgical strategy selected",
+        "Confirm suitability with the neurosurgical team and aneurysm anatomy.");
+    }else{
+      html+=box("warning","Definitive strategy not selected",
+        "Treatment choice should be determined by experienced multidisciplinary specialists.");
+    }
+  }else{
+    html+=box("warning","Aneurysm source not yet identified",
+      "Continue appropriate vascular imaging and specialist evaluation.");
+  }
+
+  document.getElementById("aneurysmResult").innerHTML=html;
+}
+
+function runDCI(){
+
+  const deficit=document.getElementById("newDeficit").checked;
+  const gcs=document.getElementById("dropGcs").checked;
+  const vasospasm=document.getElementById("vasospasm").checked;
+  const euvolemia=document.getElementById("euvolemia").checked;
+
+  let html="";
+
+  if(deficit || gcs || vasospasm){
+    html+=box("danger","Possible DCI / vasospasm",
+      "Urgently assess for DCI and alternative causes of neurological deterioration. Consider appropriate cerebral imaging and specialist management.");
+  }else{
+    html+=box("good","No current DCI trigger selected",
+      "Continue frequent neurological monitoring because DCI can develop after the initial hemorrhage.");
+  }
+
+  if(!euvolemia){
+    html+=box("warning","Volume status requires attention",
+      "Avoid hypovolemia and routine prophylactic hypervolemia; goal-directed euvolemia is preferred.");
+  }
+
+  document.getElementById("dciResult").innerHTML=html;
+}
+
+function runICU(){
+
+  const checks=[
+    ["nimodipine","Nimodipine"],
+    ["neuroobs","Neurological monitoring"],
+    ["volume","Euvolemia / hemodynamic monitoring"],
+    ["hydro","Hydrocephalus assessment"],
+    ["eeg","EEG assessment"],
+    ["vte","VTE prevention"],
+    ["rehab","Recovery / rehabilitation planning"]
+  ];
+
+  let completed=0;
+
+  checks.forEach(function(item){
+    if(document.getElementById(item[0]).checked) completed++;
+  });
+
+  let html="";
+
+  if(completed===checks.length){
+    html+=box("good","ICU bundle completed",
+      "All educational checklist items have been addressed.");
+  }else{
+    html+=box("warning","ICU bundle incomplete",
+      completed+" of "+checks.length+
+      " checklist items addressed. Review the remaining items before proceeding.");
+  }
+
+  document.getElementById("icuResult").innerHTML=html;
+}
+
+runClinical();
+
+</script>
+
+</body>
+</html>
