@@ -633,7 +633,216 @@ function startSimulation(){
 /* =========================================================
    CLINICAL CALCULATIONS
 ========================================================= */
+function interpretCSF(){
 
+  const wbc = Number(get("csfWbc").value) || 0;
+  const neut = Number(get("csfNeut").value) || 0;
+  const lymph = Number(get("csfLymph").value) || 0;
+  const glucose = Number(get("csfGlucose").value) || 0;
+  const serum = Number(get("serumGlucose").value) || 0;
+  const protein = Number(get("csfProtein").value) || 0;
+  const opening = Number(get("openingPressure").value) || 0;
+  const rbc = Number(get("csfRbc").value) || 0;
+
+  const gram = get("gramStain").value;
+  const crag = get("crag").value;
+  const tb = get("tbTest").value;
+
+  let ratio = null;
+
+  if(serum > 0){
+    ratio = glucose / serum;
+  }
+
+  let findings = [];
+  let diagnoses = [];
+
+  /* Basic CSF abnormalities */
+
+  if(wbc > 5){
+    findings.push("CSF pleocytosis");
+  }
+
+  if(neut >= 50 && wbc > 5){
+    findings.push("neutrophil-predominant inflammation");
+  }
+
+  if(lymph >= 50 && wbc > 5){
+    findings.push("lymphocyte-predominant inflammation");
+  }
+
+  if(glucose < 40){
+    findings.push("low CSF glucose");
+  }
+
+  if(ratio !== null && ratio < 0.40){
+    findings.push(
+      "low CSF/serum glucose ratio (" +
+      ratio.toFixed(2) + ")"
+    );
+  }
+
+  if(protein > 0.45){
+    findings.push("elevated CSF protein");
+  }
+
+  if(opening >= 25){
+    findings.push("raised opening pressure");
+  }
+
+  /* Pattern recognition */
+
+  if(
+    wbc > 100 &&
+    neut >= 50 &&
+    (glucose < 40 || (ratio !== null && ratio < 0.40))
+  ){
+    diagnoses.push("Strongly supports an acute bacterial meningitis pattern.");
+  }
+
+  if(
+    wbc > 5 &&
+    lymph >= 50 &&
+    glucose >= 40 &&
+    (ratio === null || ratio >= 0.40)
+  ){
+    diagnoses.push(
+      "Pattern is compatible with viral meningitis/encephalitis, " +
+      "although clinical context and PCR are required."
+    );
+  }
+
+  if(
+    wbc > 5 &&
+    lymph >= 50 &&
+    glucose < 40 &&
+    protein > 1
+  ){
+    diagnoses.push(
+      "Consider TB/fungal meningitis or other chronic meningitis."
+    );
+  }
+
+  if(crag === "positive"){
+    diagnoses.push(
+      "Positive cryptococcal antigen: evaluate for cryptococcal CNS infection."
+    );
+  }
+
+  if(tb === "positive"){
+    diagnoses.push(
+      "TB testing is positive/suggestive: evaluate for tuberculous meningitis."
+    );
+  }
+
+  if(gram === "gpc"){
+    diagnoses.push(
+      "Gram-positive cocci detected — correlate with Gram-positive bacterial meningitis."
+    );
+  }
+
+  if(gram === "gnb"){
+    diagnoses.push(
+      "Gram-negative bacilli detected — consider Gram-negative bacterial meningitis."
+    );
+  }
+
+  if(rbc > 500){
+    findings.push("significant CSF RBC contamination/hemorrhage — correlate clinically");
+  }
+
+  if(findings.length === 0){
+    findings.push("No major CSF abnormality identified from entered values.");
+  }
+
+  if(diagnoses.length === 0){
+    diagnoses.push(
+      "No single pattern is diagnostic. Interpret with clinical presentation, imaging, microbiology and PCR."
+    );
+  }
+
+  let ratioText =
+    ratio === null
+      ? "Not calculated"
+      : ratio.toFixed(2);
+
+  const result = get("csfResult");
+
+  result.classList.remove("hidden");
+
+  result.innerHTML = `
+    <h3>CSF Interpretation</h3>
+
+    <div class="metric">
+
+      <div>
+        <strong>${wbc}</strong>
+        WBC/µL
+      </div>
+
+      <div>
+        <strong>${neut}%</strong>
+        Neutrophils
+      </div>
+
+      <div>
+        <strong>${lymph}%</strong>
+        Lymphocytes
+      </div>
+
+      <div>
+        <strong>${glucose}</strong>
+        CSF glucose
+      </div>
+
+      <div>
+        <strong>${protein}</strong>
+        Protein g/L
+      </div>
+
+      <div>
+        <strong>${opening}</strong>
+        Opening pressure
+      </div>
+
+      <div>
+        <strong>${ratioText}</strong>
+        CSF/serum glucose
+      </div>
+
+      <div>
+        <strong>${rbc}</strong>
+        RBC/µL
+      </div>
+
+    </div>
+
+    <h3>Key Findings</h3>
+
+    <ul>
+      ${findings.map(x => `<li>${x}</li>`).join("")}
+    </ul>
+
+    <h3>Clinical Pattern</h3>
+
+    <div class="good">
+      ${diagnoses.map(x => `<div>• ${x}</div>`).join("")}
+    </div>
+
+    <div class="warning">
+      <strong>Clinical reminder:</strong><br>
+      CSF interpretation is pattern-based and must be integrated with
+      clinical presentation, neuroimaging, microbiology and molecular
+      testing. Do not delay time-critical antimicrobial therapy when
+      bacterial meningitis is suspected.
+    </div>
+  `;
+
+  result.scrollIntoView({
+    behavior:"smooth",
+    block:"start"
+  });
+}
 function calculateCrCl(){
 
   let result =
@@ -1077,16 +1286,89 @@ function bacterialMeningitis(){
 
     html = `
 
-    <h2>🧪 CSF Interpretation</h2>
+    <h2>🧪 Interactive CSF Interpretation</h2>
 
-    <div class="metric">
+<div class="info">
+<strong>Enter the actual CSF results.</strong><br>
+The simulator will interpret the pattern and highlight findings
+suggestive of bacterial, viral, TB/fungal or other inflammatory CNS infection.
+</div>
 
-      <div><strong>780</strong>WBC/µL</div>
-      <div><strong>91%</strong>Neutrophils</div>
-      <div><strong>18</strong>Glucose</div>
-      <div><strong>3.8</strong>Protein</div>
-      <div><strong>31</strong>Opening pressure</div>
-      <div><strong>0.29</strong>CSF/serum glucose</div>
+<div class="grid">
+
+<div>
+<label>CSF WBC /µL</label>
+<input id="csfWbc" type="number" min="0" placeholder="e.g. 780">
+</div>
+
+<div>
+<label>Neutrophils %</label>
+<input id="csfNeut" type="number" min="0" max="100" placeholder="e.g. 90">
+</div>
+
+<div>
+<label>Lymphocytes %</label>
+<input id="csfLymph" type="number" min="0" max="100" placeholder="e.g. 10">
+</div>
+
+<div>
+<label>CSF Glucose mg/dL</label>
+<input id="csfGlucose" type="number" min="0" step="0.1" placeholder="e.g. 18">
+</div>
+
+<div>
+<label>Serum Glucose mg/dL</label>
+<input id="serumGlucose" type="number" min="0" step="0.1" placeholder="e.g. 100">
+</div>
+
+<div>
+<label>CSF Protein g/L</label>
+<input id="csfProtein" type="number" min="0" step="0.1" placeholder="e.g. 3.8">
+</div>
+
+<div>
+<label>Opening Pressure cmH₂O</label>
+<input id="openingPressure" type="number" min="0" step="0.1" placeholder="e.g. 31">
+</div>
+
+<div>
+<label>CSF RBC /µL</label>
+<input id="csfRbc" type="number" min="0" placeholder="0">
+</div>
+
+</div>
+
+<h3>Microbiology</h3>
+
+<label>Gram stain</label>
+<select id="gramStain">
+<option value="notdone">Not done / pending</option>
+<option value="negative">Negative</option>
+<option value="gpc">Gram-positive cocci</option>
+<option value="gpb">Gram-positive bacilli</option>
+<option value="gnb">Gram-negative bacilli</option>
+<option value="other">Other organism</option>
+</select>
+
+<label>Cryptococcal antigen</label>
+<select id="crag">
+<option value="notdone">Not done</option>
+<option value="negative">Negative</option>
+<option value="positive">Positive</option>
+</select>
+
+<label>TB testing</label>
+<select id="tbTest">
+<option value="notdone">Not done</option>
+<option value="negative">Negative</option>
+<option value="positive">Positive / suggestive</option>
+</select>
+
+<button class="primary" onclick="interpretCSF()">
+INTERPRET CSF →
+</button>
+
+<div id="csfResult" class="info hidden"></div>
 
     </div>
 
