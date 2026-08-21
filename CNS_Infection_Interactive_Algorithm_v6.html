@@ -1721,7 +1721,473 @@ function showMRI(){
     show("mri");
     window.scrollTo(0,0);
 }
+/* =====================================================
+V6 DIAGNOSTIC LOOP-PROOF ENGINE
+LP → CT/MRI → MRI → FINAL WORK-UP
+===================================================== */
 
+let diagnosticHistory = {
+    lp:false,
+    ct:false,
+    mri:false
+};
+
+function resetDiagnosticHistory(){
+    diagnosticHistory = {
+        lp:false,
+        ct:false,
+        mri:false
+    };
+}
+
+
+/* Remember investigations already performed */
+
+const _originalGoToRoute = goToRoute;
+
+goToRoute = function(){
+    resetDiagnosticHistory();
+    return _originalGoToRoute.apply(this,arguments);
+};
+
+
+const _originalAnalyzeCSF = analyzeCSF;
+
+analyzeCSF = function(){
+    diagnosticHistory.lp = true;
+    return _originalAnalyzeCSF.apply(this,arguments);
+};
+
+
+const _originalAnalyzeCT = analyzeCT;
+
+analyzeCT = function(){
+    diagnosticHistory.ct = true;
+    return _originalAnalyzeCT.apply(this,arguments);
+};
+
+
+const _originalAnalyzeMRI = analyzeMRI;
+
+analyzeMRI = function(){
+    diagnosticHistory.mri = true;
+    return _originalAnalyzeMRI.apply(this,arguments);
+};
+
+
+/* =====================================================
+LOOP-PROOF NEXT-STEP ENGINE
+===================================================== */
+
+function buildNextStep(diagnosis,source){
+
+/* ---------- DISEASE-SPECIFIC DIAGNOSIS ---------- */
+
+if(diagnosis==="bacterial"){
+return`
+<div class="good">
+<h3>DIAGNOSIS: BACTERIAL MENINGITIS</h3>
+<strong>Proceed directly to disease-specific management.</strong>
+</div>
+
+<button class="primary" onclick="openManagement('bacterial')">
+OPEN BACTERIAL MENINGITIS MANAGEMENT →
+</button>`;
+}
+
+
+if(diagnosis==="tb"){
+return`
+<div class="good">
+<h3>DIAGNOSIS: TUBERCULOUS MENINGITIS</h3>
+<strong>Proceed directly to disease-specific management.</strong>
+</div>
+
+<button class="primary" onclick="openManagement('tb')">
+OPEN TB MENINGITIS MANAGEMENT →
+</button>`;
+}
+
+
+if(diagnosis==="crypto"){
+return`
+<div class="good">
+<h3>DIAGNOSIS: CRYPTOCOCCAL MENINGITIS</h3>
+<strong>Proceed directly to disease-specific management.</strong>
+</div>
+
+<button class="primary" onclick="openManagement('crypto')">
+OPEN CRYPTOCOCCAL MENINGITIS MANAGEMENT →
+</button>`;
+}
+
+
+if(diagnosis==="hsv"){
+return`
+<div class="good">
+<h3>DIAGNOSIS: HSV ENCEPHALITIS</h3>
+<strong>Proceed directly to disease-specific management.</strong>
+</div>
+
+<button class="primary" onclick="openManagement('hsv')">
+OPEN HSV MANAGEMENT →
+</button>`;
+}
+
+
+if(diagnosis==="abscess"){
+return`
+<div class="good">
+<h3>DIAGNOSIS: BRAIN ABSCESS</h3>
+<strong>Proceed directly to disease-specific management.</strong>
+</div>
+
+<button class="primary" onclick="openManagement('abscess')">
+OPEN BRAIN ABSCESS MANAGEMENT →
+</button>`;
+}
+
+
+if(diagnosis==="ventriculitis"){
+return`
+<div class="good">
+<h3>DIAGNOSIS: VENTRICULITIS</h3>
+<strong>Proceed directly to disease-specific management.</strong>
+</div>
+
+<button class="primary" onclick="openManagement('ventriculitis')">
+OPEN VENTRICULITIS MANAGEMENT →
+</button>`;
+}
+
+
+/* =====================================================
+CSF INDETERMINATE
+===================================================== */
+
+if(source==="CSF"){
+
+if(!diagnosticHistory.ct && !diagnosticHistory.mri){
+
+return`
+<div class="warning">
+
+<h3>CSF INDETERMINATE</h3>
+
+The CSF profile does not establish a specific CNS infection.
+
+<strong>Guideline-directed next investigation:</strong>
+
+<ul>
+<li>Proceed to neuroimaging.</li>
+<li>CT head when rapid structural assessment is required.</li>
+<li>MRI brain when more sensitive structural/inflammatory assessment is required.</li>
+<li>Review microbiological and molecular testing according to clinical phenotype.</li>
+</ul>
+
+</div>
+
+<button class="primary" onclick="chooseImagingFromResult()">
+CONTINUE TO CT / MRI →
+</button>`;
+}
+
+
+if(diagnosticHistory.ct && !diagnosticHistory.mri){
+
+return`
+<div class="warning">
+
+<h3>CSF INDETERMINATE + CT COMPLETED</h3>
+
+LP has already been performed and CT has already been reviewed.
+
+<strong>Next investigation → MRI brain</strong>
+
+</div>
+
+<button class="primary" onclick="showMRIFromResult()">
+CONTINUE TO MRI →
+</button>`;
+}
+
+
+/* LP + CT + MRI already completed */
+
+return finalDiagnosticWorkup();
+}
+
+
+/* =====================================================
+CT INDETERMINATE
+===================================================== */
+
+if(source==="CT"){
+
+if(!diagnosticHistory.mri){
+
+return`
+<div class="warning">
+
+<h3>CT INDETERMINATE</h3>
+
+The CT findings do not establish a specific CNS infection.
+
+A normal or nonspecific CT does not exclude meningitis or encephalitis.
+
+<strong>Next investigation → MRI brain</strong>
+
+</div>
+
+<button class="primary" onclick="showMRIFromResult()">
+CONTINUE TO MRI →
+</button>`;
+}
+
+
+/* CT + MRI completed */
+
+if(!diagnosticHistory.lp){
+
+return`
+<div class="warning">
+
+<h3>CT + MRI INDETERMINATE</h3>
+
+Neuroimaging has not established a specific diagnosis.
+
+If LP has not yet been performed and is clinically safe:
+
+<strong>Next investigation → LP / CSF study</strong>
+
+</div>
+
+<button class="primary" onclick="chooseLPFromResult()">
+CONTINUE TO LP / CSF →
+</button>`;
+}
+
+
+return finalDiagnosticWorkup();
+}
+
+
+/* =====================================================
+MRI INDETERMINATE
+===================================================== */
+
+if(source==="MRI"){
+
+/* LP has NOT yet been done */
+
+if(!diagnosticHistory.lp){
+
+return`
+<div class="warning">
+
+<h3>MRI INDETERMINATE</h3>
+
+MRI has not established a disease-specific CNS infection.
+
+If clinically safe and CSF has not yet been obtained:
+
+<strong>Next investigation → LP / CSF study</strong>
+
+</div>
+
+<button class="primary" onclick="chooseLPFromResult()">
+CONTINUE TO LP / CSF →
+</button>`;
+}
+
+
+/* LP already done → STOP THE LOOP */
+
+return finalDiagnosticWorkup();
+}
+
+
+/* ---------- FALLBACK ---------- */
+
+return finalDiagnosticWorkup();
+
+}
+
+
+/* =====================================================
+FINAL FURTHER DIAGNOSTIC WORK-UP
+TERMINAL NODE — NO DIAGNOSTIC LOOP
+===================================================== */
+
+function finalDiagnosticWorkup(){
+
+return`
+
+<div class="warning">
+
+<h2>FINAL FURTHER DIAGNOSTIC WORK-UP</h2>
+
+<strong>
+LP and appropriate neuroimaging have not established a disease-specific
+CNS infection.
+</strong>
+
+<p>
+The diagnostic pathway is now complete. Do not automatically restart the
+LP → CT/MRI → LP cycle.
+</p>
+
+</div>
+
+
+<div class="card">
+
+<h3>1. METABOLIC / SYSTEMIC WORK-UP</h3>
+
+<ul>
+<li>Blood glucose</li>
+<li>Serum sodium, potassium, calcium and magnesium</li>
+<li>Urea and creatinine</li>
+<li>Liver function tests</li>
+<li>ABG/VBG when clinically indicated</li>
+<li>Serum osmolality when appropriate</li>
+<li>Ammonia when unexplained encephalopathy is present</li>
+<li>TSH ± free T4 when clinically appropriate</li>
+<li>Vitamin B12/folate when clinically appropriate</li>
+</ul>
+
+</div>
+
+
+<div class="card">
+
+<h3>2. INFECTIOUS WORK-UP</h3>
+
+<ul>
+<li>CBC with differential</li>
+<li>CRP ± procalcitonin</li>
+<li>Blood cultures</li>
+<li>HIV testing when appropriate</li>
+<li>Syphilis serology when appropriate</li>
+<li>Targeted bacterial testing according to clinical syndrome</li>
+<li>Targeted viral testing according to clinical syndrome</li>
+<li>Fungal investigations when immunocompromised or clinically indicated</li>
+<li>TB testing according to epidemiology and clinical phenotype</li>
+<li>Expanded CSF molecular/microbiological testing when indicated</li>
+<li>Repeat CSF examination only when clinically justified and safe</li>
+</ul>
+
+</div>
+
+
+<div class="card">
+
+<h3>3. NEUROLOGICAL / STRUCTURAL WORK-UP</h3>
+
+<ul>
+<li>Neurology consultation</li>
+<li>EEG for seizures, altered consciousness or suspected encephalitis</li>
+<li>Repeat MRI brain ± contrast when clinically warranted</li>
+<li>MRA/MRV when vascular disease or cerebral venous thrombosis is suspected</li>
+<li>CTA/CTV when appropriate</li>
+<li>Spinal imaging when the clinical syndrome suggests spinal/meningeal involvement</li>
+</ul>
+
+</div>
+
+
+<div class="card">
+
+<h3>4. AUTOIMMUNE / INFLAMMATORY WORK-UP</h3>
+
+<ul>
+<li>Autoimmune encephalitis antibody panel when clinically appropriate</li>
+<li>ANA/ENA when systemic autoimmune disease is suspected</li>
+<li>ANCA and vasculitis evaluation when indicated</li>
+<li>Complement levels when appropriate</li>
+<li>Other systemic inflammatory/autoimmune investigations guided by phenotype</li>
+</ul>
+
+</div>
+
+
+<div class="card">
+
+<h3>5. OTHER DIFFERENTIAL DIAGNOSES</h3>
+
+<ul>
+<li>Drug/toxin exposure</li>
+<li>Drug withdrawal or intoxication</li>
+<li>Hypoxic-ischaemic injury</li>
+<li>Seizure/post-ictal state</li>
+<li>Non-convulsive status epilepticus</li>
+<li>PRES</li>
+<li>Primary metabolic encephalopathy</li>
+<li>Cerebrovascular disease</li>
+<li>Cerebral venous sinus thrombosis</li>
+<li>Neoplastic/infiltrative disease</li>
+<li>Other systemic causes of altered mental status</li>
+</ul>
+
+</div>
+
+
+<div class="danger">
+
+<h3>6. DETERIORATION OR PERSISTENT UNEXPLAINED NEUROLOGICAL SYNDROME</h3>
+
+<ul>
+<li>Immediate repeat neurological assessment</li>
+<li>Repeat CT/MRI if clinical deterioration or new focal deficit occurs</li>
+<li>EEG when seizure or non-convulsive status is possible</li>
+<li>Repeat LP/CSF only when clinically indicated and safe</li>
+<li>Repeat or expanded CSF microbiology/molecular testing</li>
+<li>MRA/MRV/CTA/CTV according to suspected vascular pathology</li>
+<li>Neurology ± infectious-disease consultation</li>
+<li>Autoimmune/paraneoplastic evaluation when appropriate</li>
+<li>Neurosurgical consultation for mass lesion, hydrocephalus, abscess or other structural pathology</li>
+<li>Consider tissue diagnosis/brain biopsy in selected persistent unexplained infiltrative, neoplastic or inflammatory lesions after multidisciplinary discussion</li>
+</ul>
+
+</div>
+
+
+<div class="good">
+
+<h3>DIAGNOSTIC PATHWAY COMPLETE</h3>
+
+<strong>
+No automatic return to LP or repeat imaging.
+Further investigations should be targeted to the evolving clinical phenotype.
+</strong>
+
+</div>
+
+`;
+}
+
+
+/* =====================================================
+HELPER NAVIGATION
+===================================================== */
+
+function chooseImagingFromResult(){
+    hideAll();
+    show("imagingChoice");
+    window.scrollTo(0,0);
+}
+
+function showMRIFromResult(){
+    hideAll();
+    show("mri");
+    window.scrollTo(0,0);
+}
+
+function chooseLPFromResult(){
+    hideAll();
+    show("csf");
+    window.scrollTo(0,0);
+}
 </script>
   </body>
 </html>
