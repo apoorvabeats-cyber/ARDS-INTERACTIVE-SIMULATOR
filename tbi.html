@@ -1,0 +1,2804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TBI Simulator | Critical Care Hub</title>
+
+<style>
+:root{
+  --bg:#f5f7fb;
+  --card:#ffffff;
+  --text:#172033;
+  --muted:#64748b;
+  --border:#d9e1ec;
+  --blue:#155eef;
+  --green:#15803d;
+  --amber:#b45309;
+  --red:#b91c1c;
+  --navy:#10233f;
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+}
+
+header{
+  background:var(--navy);
+  color:#fff;
+  padding:24px 16px;
+  text-align:center;
+}
+
+header h1{
+  margin:0;
+  font-size:26px;
+}
+
+header p{
+  margin:6px 0 0;
+  opacity:.85;
+}
+
+.container{
+  max-width:1100px;
+  margin:auto;
+  padding:18px;
+}
+
+.phase{
+  display:none;
+}
+
+.phase.active{
+  display:block;
+}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:20px;
+  margin-bottom:16px;
+  box-shadow:0 2px 8px rgba(15,23,42,.05);
+}
+
+h2{
+  margin:0 0 15px;
+}
+
+h3{
+  margin:0 0 12px;
+}
+
+h4{
+  margin:18px 0 10px;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  gap:12px;
+}
+
+label{
+  display:block;
+  font-weight:700;
+  margin-bottom:5px;
+}
+
+input,
+select,
+textarea{
+  width:100%;
+  padding:11px;
+  border:1px solid #bcc8d8;
+  border-radius:8px;
+  font-size:15px;
+  background:#fff;
+}
+
+button{
+  width:100%;
+  border:0;
+  border-radius:9px;
+  padding:14px;
+  margin-top:12px;
+  font-size:16px;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.calculate{
+  background:var(--blue);
+  color:white;
+}
+
+.continue{
+  background:var(--blue);
+  color:white;
+}
+
+.back{
+  background:#e6ebf2;
+  color:var(--text);
+}
+
+.result{
+  margin-top:13px;
+  padding:16px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:#f8fafc;
+}
+
+.result.green{
+  background:#f0fdf4;
+  border-color:#86efac;
+}
+
+.result.amber{
+  background:#fffbeb;
+  border-color:#fcd34d;
+}
+
+.result.red{
+  background:#fef2f2;
+  border-color:#fca5a5;
+}
+
+.gcs-result{
+  text-align:center;
+  font-size:22px;
+  font-weight:800;
+}
+
+.checkbox-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(270px,1fr));
+  gap:9px;
+}
+
+.checkbox-item{
+  display:flex;
+  gap:8px;
+  align-items:flex-start;
+  padding:10px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:#fafcff;
+}
+
+.checkbox-item input{
+  width:auto;
+  margin-top:4px;
+}
+
+.summary{
+  white-space:pre-line;
+}
+
+.badge{
+  display:inline-block;
+  padding:5px 10px;
+  border-radius:20px;
+  background:#e7eefc;
+  color:#174ea6;
+  font-size:12px;
+  font-weight:800;
+  margin-bottom:10px;
+}
+
+.hidden{
+  display:none;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+}
+
+th,td{
+  padding:9px;
+  border:1px solid var(--border);
+  text-align:left;
+}
+
+th{
+  background:#f1f5f9;
+}
+
+.nav-buttons{
+  margin-top:15px;
+}
+
+.small{
+  color:var(--muted);
+  font-size:13px;
+}
+
+.highlight{
+  font-weight:800;
+}
+
+@media(max-width:600px){
+  .container{padding:10px}
+  .card{padding:15px}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>TRAUMATIC BRAIN INJURY</h1>
+  <p>Critical Care Hub — Interactive Clinical Simulator</p>
+</header>
+
+<div class="container">
+
+<!-- ========================================================= -->
+<!-- PHASE 1 -->
+<!-- ========================================================= -->
+
+<section id="phase1" class="phase active">
+
+<div class="card">
+<span class="badge">PHASE 1</span>
+<h2>Initial Resuscitation &amp; Stabilization</h2>
+<p class="small">
+Enter the clinical findings. The simulator interprets A, B, C, D and E.
+GCS has a separate calculation button.
+</p>
+</div>
+
+<!-- A -->
+
+<div class="card">
+
+<h3>A — Airway + C-Spine</h3>
+
+<div class="grid">
+
+<div>
+<label>Airway</label>
+<select id="airway">
+<option value="">Select</option>
+<option value="secured">Secured</option>
+<option value="unsecured">Unsecured</option>
+</select>
+</div>
+
+<div>
+<label>C-spine</label>
+<select id="cspine">
+<option value="">Select</option>
+<option value="stabilized">Stabilized</option>
+<option value="unstabilized">Unstabilized</option>
+</select>
+</div>
+
+<div>
+<label>Facial trauma</label>
+<select id="facialTrauma">
+<option value="">Select</option>
+<option value="present">Present</option>
+<option value="absent">Absent</option>
+</select>
+</div>
+
+</div>
+
+<h4>Glasgow Coma Score</h4>
+
+<div class="grid">
+
+<div>
+<label>Eye — E</label>
+<select id="gcsE">
+<option value="">Select</option>
+<option value="4">E4 — Spontaneous</option>
+<option value="3">E3 — To speech</option>
+<option value="2">E2 — To pressure</option>
+<option value="1">E1 — None</option>
+</select>
+</div>
+
+<div>
+<label>Verbal — V</label>
+<select id="gcsV">
+<option value="">Select</option>
+<option value="5">V5 — Oriented</option>
+<option value="4">V4 — Confused</option>
+<option value="3">V3 — Inappropriate words</option>
+<option value="2">V2 — Incomprehensible sounds</option>
+<option value="1">V1 — None</option>
+<option value="NT">V-NT — Not testable</option>
+</select>
+</div>
+
+<div>
+<label>Motor — M</label>
+<select id="gcsM">
+<option value="">Select</option>
+<option value="6">M6 — Obeys commands</option>
+<option value="5">M5 — Localizes</option>
+<option value="4">M4 — Withdraws</option>
+<option value="3">M3 — Abnormal flexion</option>
+<option value="2">M2 — Extension</option>
+<option value="1">M1 — None</option>
+</select>
+</div>
+
+</div>
+
+<button class="calculate" onclick="calculateGCS()">
+CALCULATE GCS
+</button>
+
+<div id="gcsResult" class="result gcs-result">
+GCS not calculated
+</div>
+
+<h4>Pupils</h4>
+
+<div class="grid">
+
+<div>
+<label>Right pupil size (mm)</label>
+<input id="rightPupilSize" type="number" step="0.5">
+</div>
+
+<div>
+<label>Right pupil reactivity</label>
+<select id="rightPupil">
+<option value="">Select</option>
+<option>Reactive</option>
+<option>Sluggish</option>
+<option>Fixed</option>
+</select>
+</div>
+
+<div>
+<label>Left pupil size (mm)</label>
+<input id="leftPupilSize" type="number" step="0.5">
+</div>
+
+<div>
+<label>Left pupil reactivity</label>
+<select id="leftPupil">
+<option value="">Select</option>
+<option>Reactive</option>
+<option>Sluggish</option>
+<option>Fixed</option>
+</select>
+</div>
+
+</div>
+
+<div id="aInterpretation" class="result summary">
+<strong>A — Interpretation &amp; What to Do</strong>
+
+Calculate combined ABCDE to generate the interpretation.
+</div>
+
+</div>
+
+<!-- B -->
+
+<div class="card">
+
+<h3>B — Breathing</h3>
+
+<div class="grid">
+
+<div>
+<label>Spontaneously breathing?</label>
+<select id="spontaneous">
+<option value="">Select</option>
+<option>Yes</option>
+<option>No</option>
+</select>
+</div>
+
+<div>
+<label>SpO₂ (%)</label>
+<input id="spo2" type="number">
+</div>
+
+<div>
+<label>PaO₂ (mmHg)</label>
+<input id="pao2" type="number">
+</div>
+
+<div>
+<label>PaCO₂ (mmHg)</label>
+<input id="paco2" type="number">
+</div>
+
+<div>
+<label>pH</label>
+<input id="ph" type="number" step="0.01">
+</div>
+
+<div>
+<label>Respiratory rate (/min)</label>
+<input id="rr" type="number">
+</div>
+
+<div>
+<label>Respiratory support</label>
+<select id="respSupport">
+<option value="">Select</option>
+<option>Room air</option>
+<option>Supplemental oxygen</option>
+<option>HFNC</option>
+<option>NIV</option>
+<option>Mechanical ventilation</option>
+</select>
+</div>
+
+</div>
+
+<div id="bInterpretation" class="result summary">
+<strong>B — Interpretation &amp; What to Do</strong>
+
+Calculate combined ABCDE to generate the interpretation.
+</div>
+
+</div>
+
+<!-- C -->
+
+<div class="card">
+
+<h3>C — Circulation</h3>
+
+<div class="grid">
+
+<div>
+<label>Age (years)</label>
+<input id="age" type="number">
+</div>
+
+<div>
+<label>SBP (mmHg)</label>
+<input id="sbp" type="number">
+</div>
+
+<div>
+<label>MAP (mmHg)</label>
+<input id="map" type="number">
+</div>
+
+<div>
+<label>Heart rate (/min)</label>
+<input id="heartRate" type="number">
+</div>
+
+</div>
+
+<div id="cInterpretation" class="result summary">
+<strong>C — Interpretation &amp; What to Do</strong>
+
+Calculate combined ABCDE to generate the interpretation.
+</div>
+
+</div>
+
+<!-- D -->
+
+<div class="card">
+
+<h3>D — Disability</h3>
+
+<div class="grid">
+
+<div>
+<label>Right motor response</label>
+<select id="rightMotor">
+<option value="">Select</option>
+<option value="6">M6</option>
+<option value="5">M5</option>
+<option value="4">M4</option>
+<option value="3">M3</option>
+<option value="2">M2</option>
+<option value="1">M1</option>
+</select>
+</div>
+
+<div>
+<label>Left motor response</label>
+<select id="leftMotor">
+<option value="">Select</option>
+<option value="6">M6</option>
+<option value="5">M5</option>
+<option value="4">M4</option>
+<option value="3">M3</option>
+<option value="2">M2</option>
+<option value="1">M1</option>
+</select>
+</div>
+
+<div>
+<label>Blood glucose (mg/dL)</label>
+<input id="glucose" type="number">
+</div>
+
+<div>
+<label>Seizure</label>
+<select id="seizure">
+<option value="">Select</option>
+<option>Yes</option>
+<option>No</option>
+</select>
+</div>
+
+<div>
+<label>Focal neurological deficit</label>
+<select id="focalDeficit">
+<option value="">Select</option>
+<option>Present</option>
+<option>Absent</option>
+</select>
+</div>
+
+</div>
+
+<div id="dInterpretation" class="result summary">
+<strong>D — Interpretation &amp; What to Do</strong>
+
+Calculate combined ABCDE to generate the interpretation.
+</div>
+
+</div>
+
+<!-- E -->
+
+<div class="card">
+
+<h3>E — Exposure</h3>
+
+<div class="grid">
+
+<div>
+<label>Core body temperature (°C)</label>
+<input id="temperature" type="number" step="0.1">
+</div>
+
+</div>
+
+<div id="eInterpretation" class="result summary">
+<strong>E — Interpretation &amp; What to Do</strong>
+
+Calculate combined ABCDE to generate the interpretation.
+</div>
+
+</div>
+
+<!-- COMBINED -->
+
+<div class="card">
+
+<h3>Combined ABCDE Assessment</h3>
+
+<button class="calculate" onclick="calculateABCDE()">
+CALCULATE COMBINED ABCDE
+</button>
+
+<div id="combinedResult" class="result summary">
+Combined ABCDE not calculated.
+</div>
+
+</div>
+
+<div class="card">
+
+<button class="continue" onclick="goToPhase(2)">
+UPDATE &amp; CONTINUE → PHASE 2
+</button>
+
+<button class="back" disabled>
+← BACK TO PREVIOUS PHASE
+</button>
+
+</div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- PHASE 2 -->
+<!-- ========================================================= -->
+
+<section id="phase2" class="phase">
+
+<div class="card">
+
+<span class="badge">PHASE 2</span>
+
+<h2>Clinical Triage &amp; Risk Categorization</h2>
+
+<p>
+The simulator automatically classifies TBI severity from the calculated GCS.
+The user does not select Mild, Moderate or Severe.
+</p>
+
+<div id="triageResult" class="result gcs-result">
+Awaiting GCS
+</div>
+
+<div class="grid">
+
+<div class="result">
+<strong>MILD TBI</strong><br>
+GCS 13–15
+</div>
+
+<div class="result">
+<strong>MODERATE TBI</strong><br>
+GCS 9–12
+</div>
+
+<div class="result">
+<strong>SEVERE TBI</strong><br>
+GCS 3–8
+</div>
+
+</div>
+
+</div>
+
+<div class="card">
+
+<button class="continue" onclick="goToPhase(3)">
+UPDATE &amp; CONTINUE → PHASE 3
+</button>
+
+<button class="back" onclick="goToPhase(1)">
+← BACK TO PHASE 1
+</button>
+
+</div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- PHASE 3 -->
+<!-- ========================================================= -->
+
+<section id="phase3" class="phase">
+
+<div class="card">
+
+<span class="badge">PHASE 3</span>
+
+<h2>Immediate Diagnostic Workup &amp; Reversal</h2>
+
+</div>
+
+<!-- CT BRAIN -->
+
+<div class="card">
+
+<h3>CT Brain — Non-Contrast</h3>
+
+<div class="checkbox-grid">
+
+<label class="checkbox-item">
+<input type="checkbox" id="ctNormal">
+No acute intracranial abnormality
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ctEDH">
+Epidural hematoma
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ctSDH">
+Subdural hematoma
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ctSAH">
+Traumatic SAH
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ctContusion">
+Cerebral contusion
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ctIPH">
+Intraparenchymal hematoma
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ctIVH">
+Intraventricular hemorrhage
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ctEdema">
+Diffuse cerebral edema
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ctShift">
+Midline shift
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ctCistern">
+Basal cistern compression/effacement
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ctHydro">
+Hydrocephalus
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ctHerniation">
+Herniation
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ctDepressed">
+Depressed skull fracture
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ctOpen">
+Open skull fracture
+</label>
+
+</div>
+
+<h4>Quantitative CT findings</h4>
+
+<div class="grid">
+
+<div>
+<label>EDH volume (cm³)</label>
+<input id="edhVolume" type="number" step="0.1">
+</div>
+
+<div>
+<label>EDH maximum thickness (mm)</label>
+<input id="edhThickness" type="number" step="0.1">
+</div>
+
+<div>
+<label>EDH midline shift (mm)</label>
+<input id="edhShift" type="number" step="0.1">
+</div>
+
+<div>
+<label>SDH volume (cm³)</label>
+<input id="sdhVolume" type="number" step="0.1">
+</div>
+
+<div>
+<label>SDH maximum thickness (mm)</label>
+<input id="sdhThickness" type="number" step="0.1">
+</div>
+
+<div>
+<label>SDH midline shift (mm)</label>
+<input id="sdhShift" type="number" step="0.1">
+</div>
+
+<div>
+<label>Parenchymal lesion volume (cm³)</label>
+<input id="parenchymalVolume" type="number" step="0.1">
+</div>
+
+<div>
+<label>Parenchymal lesion midline shift (mm)</label>
+<input id="parenchymalShift" type="number" step="0.1">
+</div>
+
+</div>
+
+</div>
+
+
+<!-- OTHER CT -->
+
+<div class="card">
+
+<h3>CT C-Spine</h3>
+
+<div class="checkbox-grid">
+
+<label class="checkbox-item">
+<input type="checkbox" id="cspineNormal">
+No acute injury
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="cspineFracture">
+Cervical fracture
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="cspineDislocation">
+Subluxation/dislocation
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="cspineCord">
+Cord compression/major finding
+</label>
+
+</div>
+
+<h3>CT Chest</h3>
+
+<div class="checkbox-grid">
+
+<label class="checkbox-item">
+<input type="checkbox" id="chestNormal">
+No acute injury
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="pneumothorax">
+Pneumothorax
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="hemothorax">
+Hemothorax
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="pulmonaryContusion">
+Pulmonary contusion
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ribFractures">
+Rib fractures
+</label>
+
+</div>
+
+<h3>CT Abdomen</h3>
+
+<div class="checkbox-grid">
+
+<label class="checkbox-item">
+<input type="checkbox" id="abdomenNormal">
+No acute injury
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="liverInjury">
+Liver injury
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="splenicInjury">
+Splenic injury
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="renalInjury">
+Renal injury
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="retroperitonealBleed">
+Retroperitoneal bleeding
+</label>
+
+</div>
+
+<h3>CT Pelvis</h3>
+
+<div class="checkbox-grid">
+
+<label class="checkbox-item">
+<input type="checkbox" id="pelvisNormal">
+No acute injury
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="pelvicFracture">
+Pelvic fracture
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="pelvicHematoma">
+Pelvic/retroperitoneal hematoma
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="activePelvicBleeding">
+Active bleeding
+</label>
+
+</div>
+
+</div>
+
+
+<!-- LABS -->
+
+<div class="card">
+
+<h3>Laboratory Abnormalities</h3>
+
+<h4>CBC</h4>
+
+<div class="grid">
+
+<div>
+<label>Hemoglobin (g/dL)</label>
+<input id="hemoglobin" type="number" step="0.1">
+</div>
+
+<div>
+<label>TLC (/µL)</label>
+<input id="tlc" type="number">
+</div>
+
+<div>
+<label>Platelet (/µL)</label>
+<input id="platelet" type="number">
+</div>
+
+</div>
+
+<h4>KFT / Electrolytes</h4>
+
+<div class="grid">
+
+<div>
+<label>Urea (mg/dL)</label>
+<input id="urea" type="number">
+</div>
+
+<div>
+<label>Creatinine (mg/dL)</label>
+<input id="creatinine" type="number" step="0.1">
+</div>
+
+<div>
+<label>Sodium (mEq/L)</label>
+<input id="sodium" type="number">
+</div>
+
+<div>
+<label>Potassium (mEq/L)</label>
+<input id="potassium" type="number" step="0.1">
+</div>
+
+</div>
+
+<h4>LFT</h4>
+
+<div class="grid">
+
+<div>
+<label>SGOT / AST (U/L)</label>
+<input id="ast" type="number">
+</div>
+
+<div>
+<label>SGPT / ALT (U/L)</label>
+<input id="alt" type="number">
+</div>
+
+<div>
+<label>Total bilirubin (mg/dL)</label>
+<input id="bilirubin" type="number" step="0.1">
+</div>
+
+<div>
+<label>Albumin (g/dL)</label>
+<input id="albumin" type="number" step="0.1">
+</div>
+
+</div>
+
+<h4>Coagulation</h4>
+
+<div class="grid">
+
+<div>
+<label>PT (seconds)</label>
+<input id="pt" type="number" step="0.1">
+</div>
+
+<div>
+<label>INR</label>
+<input id="inr" type="number" step="0.01">
+</div>
+
+<div>
+<label>Fibrinogen (mg/dL)</label>
+<input id="fibrinogen" type="number">
+</div>
+
+</div>
+
+</div>
+
+
+<!-- ANTICOAGULATION -->
+
+<div class="card">
+
+<h3>Anticoagulant / Antiplatelet Status</h3>
+
+<div class="grid">
+
+<div>
+<label>Patient on anticoagulant/antiplatelet?</label>
+<select id="onAntithrombotic" onchange="toggleDrugBox()">
+<option value="">Select</option>
+<option value="no">No</option>
+<option value="yes">Yes</option>
+</select>
+</div>
+
+</div>
+
+<div id="drugBox" class="hidden">
+
+<h4>Anticoagulant</h4>
+
+<div class="grid">
+
+<div>
+<label>Agent</label>
+
+<select id="anticoagulant">
+<option value="">Select</option>
+<option>Warfarin</option>
+<option>UFH</option>
+<option>LMWH / Enoxaparin</option>
+<option>Dabigatran</option>
+<option>Apixaban</option>
+<option>Rivaroxaban</option>
+<option>Edoxaban</option>
+<option>Fondaparinux</option>
+<option>Other</option>
+</select>
+
+</div>
+
+<div>
+<label>Last dose / timing</label>
+<input id="lastDose" type="text">
+</div>
+
+</div>
+
+<h4>Antiplatelet</h4>
+
+<div class="checkbox-grid">
+
+<label class="checkbox-item">
+<input type="checkbox" id="aspirin">
+Aspirin
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="clopidogrel">
+Clopidogrel
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="prasugrel">
+Prasugrel
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="ticagrelor">
+Ticagrelor
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" id="dualAntiplatelet">
+Dual antiplatelet therapy
+</label>
+
+</div>
+
+</div>
+
+<div id="reversalResult" class="result">
+Anticoagulant/reversal result will appear after Phase 3 calculation.
+</div>
+
+</div>
+
+
+<div class="card">
+
+<button class="calculate" onclick="calculatePhase3()">
+CALCULATE DIAGNOSTIC WORKUP &amp; REVERSAL
+</button>
+
+<div id="phase3Summary" class="result summary">
+Not calculated.
+</div>
+
+</div>
+
+<div class="card">
+
+<button class="continue" onclick="goToPhase(4)">
+UPDATE &amp; CONTINUE → PHASE 4
+</button>
+
+<button class="back" onclick="goToPhase(2)">
+← BACK TO PHASE 2
+</button>
+
+</div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- PHASE 4 -->
+<!-- ========================================================= -->
+
+<section id="phase4" class="phase">
+
+<div class="card">
+
+<span class="badge">PHASE 4</span>
+
+<h2>Raised ICP Assessment &amp; Tiered Management</h2>
+
+<p>
+There is deliberately no initial “ICP raised: Yes/No” question.
+The simulator first evaluates the selected clinical and CT criteria.
+</p>
+
+</div>
+
+
+<!-- CLINICAL -->
+
+<div class="card">
+
+<h3>STEP 1 — Clinical Criteria for Raised ICP</h3>
+
+<div class="checkbox-grid">
+
+<label class="checkbox-item">
+<input type="checkbox" class="clinicalICP" value="Declining GCS / neurological deterioration">
+Declining GCS / neurological deterioration
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="clinicalICP" value="GCS ≤8 with concerning neurological findings">
+GCS ≤8 with concerning neurological findings
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="clinicalICP" value="New focal neurological deficit or motor asymmetry">
+New focal neurological deficit / motor asymmetry
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="clinicalICP" value="New anisocoria">
+New anisocoria
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="clinicalICP" value="Unilateral fixed/dilated pupil">
+Unilateral fixed/dilated pupil
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="clinicalICP" value="Bilateral fixed/dilated pupils">
+Bilateral fixed/dilated pupils
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="clinicalICP" value="Progressive loss of pupillary reactivity">
+Progressive loss of pupillary reactivity
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="clinicalICP" value="Abnormal flexor/extensor posturing">
+Abnormal flexor/extensor posturing
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="clinicalICP" value="Clinical signs of cerebral herniation">
+Clinical signs of cerebral herniation
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="clinicalICP" value="Cushing response">
+Cushing response
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="clinicalICP" value="Recurrent vomiting with neurological deterioration">
+Recurrent vomiting with neurological deterioration
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="clinicalICP" value="Seizure with neurological deterioration">
+Seizure with neurological deterioration
+</label>
+
+</div>
+
+</div>
+
+
+<!-- CT -->
+
+<div class="card">
+
+<h3>STEP 2 — CT Criteria for Raised ICP</h3>
+
+<div class="checkbox-grid">
+
+<label class="checkbox-item">
+<input type="checkbox" class="ctICP" value="Compressed/effaced basal cisterns">
+Compressed/effaced basal cisterns
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="ctICP" value="Diffuse cerebral edema">
+Diffuse cerebral edema
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="ctICP" value="Significant mass effect">
+Significant mass effect
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="ctICP" value="Midline shift">
+Midline shift
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="ctICP" value="Large epidural hematoma">
+Large epidural hematoma
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="ctICP" value="Large subdural hematoma">
+Large subdural hematoma
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="ctICP" value="Large contusion/intraparenchymal hematoma">
+Large contusion/intraparenchymal hematoma
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="ctICP" value="Ventricular compression">
+Ventricular compression
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="ctICP" value="Obstructive hydrocephalus">
+Obstructive hydrocephalus
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="ctICP" value="Herniation">
+Herniation
+</label>
+
+<label class="checkbox-item">
+<input type="checkbox" class="ctICP" value="Other significant intracranial mass effect">
+Other significant intracranial mass effect
+</label>
+
+</div>
+
+</div>
+
+
+<div class="card">
+
+<button class="calculate" onclick="calculateICP()">
+CALCULATE ICP STATUS
+</button>
+
+<div id="icpResult" class="result gcs-result">
+Awaiting selected criteria.
+</div>
+
+<div id="icpExplanation" class="result summary">
+Select the applicable criteria first.
+</div>
+
+</div>
+
+
+<!-- TIERS -->
+
+<div id="tier1" class="card hidden">
+
+<h3>TIER 1 — FUNDAMENTAL NEUROPROTECTION</h3>
+
+<table>
+
+<tr>
+<th>Intervention</th>
+<th>Target / Action</th>
+</tr>
+
+<tr>
+<td>Head position</td>
+<td>Head of bed approximately 30°, head and neck neutral.</td>
+</tr>
+
+<tr>
+<td>Oxygenation</td>
+<td>Avoid hypoxemia; practical target SpO₂ ≥94%, PaO₂ generally ≥80 mmHg.</td>
+</tr>
+
+<tr>
+<td>Ventilation</td>
+<td>PaCO₂ approximately 35–40 mmHg. Avoid routine prophylactic hyperventilation.</td>
+</tr>
+
+<tr>
+<td>Blood pressure</td>
+<td>Avoid hypotension and maintain adequate cerebral perfusion.</td>
+</tr>
+
+<tr>
+<td>Temperature</td>
+<td>Maintain normothermia, approximately 36–37.5°C.</td>
+</tr>
+
+<tr>
+<td>Glucose</td>
+<td>Avoid hypoglycemia and severe hyperglycemia.</td>
+</tr>
+
+<tr>
+<td>Analgesia / sedation</td>
+<td>Propofol or midazolam according to hemodynamics and clinical context, with adequate analgesia.</td>
+</tr>
+
+<tr>
+<td>CSF drainage</td>
+<td>EVD drainage if present and appropriate.</td>
+</tr>
+
+</table>
+
+<button class="calculate" onclick="activateTier2()">
+ICP STILL NOT CONTROLLED → TIER 2
+</button>
+
+<button class="continue" onclick="goToPhase(5)">
+ICP CONTROLLED → PHASE 5
+</button>
+
+</div>
+
+
+<div id="tier2" class="card hidden">
+
+<h3>TIER 2 — SECONDARY ICP CONTROL</h3>
+
+<table>
+
+<tr>
+<th>Therapy</th>
+<th>Example</th>
+</tr>
+
+<tr>
+<td>3% Hypertonic saline</td>
+<td>Common adult bolus approach: approximately 150–250 mL IV, guided by local protocol and sodium/osmolality monitoring.</td>
+</tr>
+
+<tr>
+<td>Mannitol 20%</td>
+<td>0.25–1 g/kg IV bolus with monitoring of renal function, volume status and osmolality.</td>
+</tr>
+
+<tr>
+<td>CSF drainage</td>
+<td>EVD drainage according to neurosurgical protocol.</td>
+</tr>
+
+<tr>
+<td>Neuromuscular blockade</td>
+<td>Selected patients with ventilator dyssynchrony, shivering or other contributors to ICP elevation; ensure adequate sedation.</td>
+</tr>
+
+<tr>
+<td>Repeat CT</td>
+<td>If neurological deterioration or concern for expanding/surgical lesion.</td>
+</tr>
+
+</table>
+
+<button class="calculate" onclick="activateTier3()">
+ICP STILL REFRACTORY → TIER 3
+</button>
+
+<button class="continue" onclick="goToPhase(5)">
+ICP CONTROLLED → PHASE 5
+</button>
+
+</div>
+
+
+<div id="tier3" class="card hidden">
+
+<h3>TIER 3 — REFRACTORY ICP</h3>
+
+<table>
+
+<tr>
+<th>Therapy</th>
+<th>Options</th>
+</tr>
+
+<tr>
+<td>Deep sedation</td>
+<td>Propofol or midazolam according to hemodynamics and ICU protocol.</td>
+</tr>
+
+<tr>
+<td>Neuromuscular blockade</td>
+<td>Cisatracurium, rocuronium or vecuronium when clinically indicated, with adequate sedation/analgesia.</td>
+</tr>
+
+<tr>
+<td>Barbiturate therapy</td>
+<td>Pentobarbital or thiopental in selected refractory cases with appropriate hemodynamic and EEG monitoring.</td>
+</tr>
+
+<tr>
+<td>Decompressive surgery</td>
+<td>Consider decompressive craniectomy in selected refractory cases with neurosurgical input.</td>
+</tr>
+
+</table>
+
+<div class="result red">
+<strong>REFRACTORY ICP</strong><br>
+Urgent neurocritical-care and neurosurgical escalation.
+</div>
+
+<button class="continue" onclick="goToPhase(5)">
+CONTINUE → PHASE 5
+</button>
+
+</div>
+
+
+<div class="card">
+
+<button class="back" onclick="goToPhase(3)">
+← BACK TO PHASE 3
+</button>
+
+</div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- PHASE 5 -->
+<!-- ========================================================= -->
+
+<section id="phase5" class="phase">
+
+<div class="card">
+
+<span class="badge">PHASE 5</span>
+
+<h2>Surgical Escalation &amp; Final Decision</h2>
+
+<p>
+Quantitative lesion measurements are entered here and the simulator determines whether surgical escalation is indicated.
+</p>
+
+</div>
+
+
+<!-- EDH -->
+
+<div class="card">
+
+<h3>Epidural Hematoma — EDH</h3>
+
+<div class="grid">
+
+<div>
+<label>EDH present?</label>
+<select id="surgicalEDH">
+<option value="">Select</option>
+<option value="no">No</option>
+<option value="yes">Yes</option>
+</select>
+</div>
+
+<div>
+<label>Volume (cm³)</label>
+<input id="surgicalEDHVolume" type="number" step="0.1">
+</div>
+
+<div>
+<label>Maximum thickness (mm)</label>
+<input id="surgicalEDHThickness" type="number" step="0.1">
+</div>
+
+<div>
+<label>Midline shift (mm)</label>
+<input id="surgicalEDHShift" type="number" step="0.1">
+</div>
+
+</div>
+
+</div>
+
+
+<!-- SDH -->
+
+<div class="card">
+
+<h3>Subdural Hematoma — SDH</h3>
+
+<div class="grid">
+
+<div>
+<label>SDH present?</label>
+<select id="surgicalSDH">
+<option value="">Select</option>
+<option value="no">No</option>
+<option value="yes">Yes</option>
+</select>
+</div>
+
+<div>
+<label>Volume (cm³)</label>
+<input id="surgicalSDHVolume" type="number" step="0.1">
+</div>
+
+<div>
+<label>Maximum thickness (mm)</label>
+<input id="surgicalSDHThickness" type="number" step="0.1">
+</div>
+
+<div>
+<label>Midline shift (mm)</label>
+<input id="surgicalSDHShift" type="number" step="0.1">
+</div>
+
+</div>
+
+</div>
+
+
+<!-- PARENCHYMAL -->
+
+<div class="card">
+
+<h3>Parenchymal Lesion / Contusion</h3>
+
+<div class="grid">
+
+<div>
+<label>Lesion present?</label>
+<select id="surgicalParenchymal">
+<option value="">Select</option>
+<option value="no">No</option>
+<option value="yes">Yes</option>
+</select>
+</div>
+
+<div>
+<label>Volume (cm³)</label>
+<input id="surgicalParVolume" type="number" step="0.1">
+</div>
+
+<div>
+<label>Midline shift (mm)</label>
+<input id="surgicalParShift" type="number" step="0.1">
+</div>
+
+<div>
+<label>Basal cistern compression</label>
+<select id="surgicalCistern">
+<option value="">Select</option>
+<option value="no">No</option>
+<option value="yes">Yes</option>
+</select>
+</div>
+
+</div>
+
+</div>
+
+
+<!-- SKULL -->
+
+<div class="card">
+
+<h3>Depressed Skull Fracture</h3>
+
+<div class="grid">
+
+<div>
+<label>Depressed fracture?</label>
+<select id="surgicalFracture">
+<option value="">Select</option>
+<option value="no">No</option>
+<option value="yes">Yes</option>
+</select>
+</div>
+
+<div>
+<label>Open / compound?</label>
+<select id="surgicalOpen">
+<option value="">Select</option>
+<option value="no">No</option>
+<option value="yes">Yes</option>
+</select>
+</div>
+
+<div>
+<label>Depression depth (mm)</label>
+<input id="surgicalDepth" type="number" step="0.1">
+</div>
+
+<div>
+<label>Dural tear / contamination</label>
+<select id="surgicalDura">
+<option value="">Select</option>
+<option value="no">No</option>
+<option value="yes">Yes</option>
+</select>
+</div>
+
+</div>
+
+</div>
+
+
+<div class="card">
+
+<h3>Final Surgical Decision</h3>
+
+<div class="result">
+<strong>GCS carried forward:</strong>
+<span id="surgicalGCS">Not calculated</span>
+</div>
+
+<button class="calculate" onclick="calculateSurgery()">
+CALCULATE FINAL SURGICAL DECISION
+</button>
+
+<div id="surgeryResult" class="result gcs-result">
+Not calculated.
+</div>
+
+<div id="surgeryReasons" class="result summary">
+The simulator will display the criteria responsible for the decision.
+</div>
+
+</div>
+
+
+<div class="card">
+
+<button class="back" onclick="goToPhase(4)">
+← BACK TO PHASE 4
+</button>
+
+</div>
+
+</section>
+
+</div>
+
+
+<script>
+
+/* =========================================================
+   GLOBAL STATE
+========================================================= */
+
+const TBI = {
+  gcs: null,
+  abcdeCalculated: false,
+  phase3Calculated: false,
+  icpRaised: false
+};
+
+
+/* =========================================================
+   BASIC HELPERS
+========================================================= */
+
+function value(id){
+  return document.getElementById(id).value;
+}
+
+function number(id){
+  const v = parseFloat(document.getElementById(id).value);
+  return Number.isFinite(v) ? v : null;
+}
+
+function checkedValues(className){
+  return Array.from(
+    document.querySelectorAll("." + className + ":checked")
+  ).map(x => x.value);
+}
+
+
+/* =========================================================
+   PHASE NAVIGATION
+========================================================= */
+
+function goToPhase(number){
+
+  if(number === 2 && TBI.gcs === null){
+    alert("Please calculate the GCS first.");
+    return;
+  }
+
+  document.querySelectorAll(".phase").forEach(
+    p => p.classList.remove("active")
+  );
+
+  document.getElementById("phase" + number)
+    .classList.add("active");
+
+  if(number === 2){
+    calculateTriage();
+  }
+
+  if(number === 5){
+    document.getElementById("surgicalGCS").textContent =
+      TBI.gcs !== null ? TBI.gcs + "/15" : "Not calculated";
+  }
+
+  window.scrollTo(0,0);
+}
+
+
+/* =========================================================
+   GCS ENGINE
+========================================================= */
+
+function calculateGCS(){
+
+  const e = parseInt(value("gcsE"),10);
+  const vRaw = value("gcsV");
+  const m = parseInt(value("gcsM"),10);
+
+  if(
+    !Number.isFinite(e) ||
+    !Number.isFinite(m) ||
+    (vRaw !== "NT" && !Number.isFinite(parseInt(vRaw,10)))
+  ){
+
+    TBI.gcs = null;
+
+    document.getElementById("gcsResult").className =
+      "result gcs-result red";
+
+    document.getElementById("gcsResult").innerHTML =
+      "<strong>Please select E, V and M.</strong>";
+
+    return;
+  }
+
+  const v =
+    vRaw === "NT"
+      ? null
+      : parseInt(vRaw,10);
+
+  /*
+    For an NT verbal component, this simulator displays
+    the component as NT and calculates the numeric GCS
+    from the available components only.
+    For standard assessable GCS, E+V+M gives 3–15.
+  */
+
+  TBI.gcs = e + (v === null ? 0 : v) + m;
+
+  let category = "";
+
+  if(TBI.gcs >= 13){
+    category = "MILD TBI RANGE";
+  }
+  else if(TBI.gcs >= 9){
+    category = "MODERATE TBI RANGE";
+  }
+  else{
+    category = "SEVERE TBI RANGE";
+  }
+
+  const box = document.getElementById("gcsResult");
+
+  box.className =
+    "result gcs-result " +
+    (TBI.gcs <= 8 ? "red" :
+     TBI.gcs <= 12 ? "amber" : "green");
+
+  box.innerHTML =
+    "<strong>GCS = " + TBI.gcs + "/15</strong><br>" +
+    "E" + e +
+    " + V" + (v === null ? "NT" : v) +
+    " + M" + m +
+    "<br><span class='small'>" + category + "</span>";
+}
+
+
+/* =========================================================
+   PHASE 1 — ABCDE ENGINE
+========================================================= */
+
+function calculateABCDE(){
+
+  TBI.abcdeCalculated = true;
+
+  /* ---------- A ---------- */
+
+  const airway = value("airway");
+  const cspine = value("cspine");
+  const facial = value("facialTrauma");
+
+  let aProblems = [];
+
+  if(airway === "unsecured" && TBI.gcs !== null && TBI.gcs <= 8){
+    aProblems.push("GCS ≤8 with an unsecured airway");
+  }
+
+  if(cspine === "unstabilized"){
+    aProblems.push("C-spine is not stabilized");
+  }
+
+  if(facial === "present"){
+    aProblems.push("Significant facial trauma is present");
+  }
+
+  let aText;
+
+  if(aProblems.length){
+
+    aText =
+      "<strong>A — INTERPRETATION</strong><br>" +
+      "Airway/C-spine risk identified." +
+      "<br><br><strong>Findings:</strong><br>" +
+      aProblems.join("<br>") +
+      "<br><br><strong>WHAT TO DO:</strong><br>" +
+      (TBI.gcs !== null && TBI.gcs <= 8 && airway === "unsecured"
+        ? "Secure a definitive airway with cervical-spine precautions. Optimize oxygenation and ventilation."
+        : "Maintain airway protection, cervical-spine precautions and reassess urgently.");
+  }
+  else{
+
+    aText =
+      "<strong>A — INTERPRETATION</strong><br>" +
+      "No major immediate airway trigger identified from the entered findings." +
+      "<br><br><strong>WHAT TO DO:</strong><br>" +
+      "Continue airway protection and cervical-spine precautions with serial reassessment.";
+  }
+
+  document.getElementById("aInterpretation").innerHTML = aText;
+
+
+  /* ---------- B ---------- */
+
+  const spont = value("spontaneous");
+  const spo2 = number("spo2");
+  const pao2 = number("pao2");
+  const paco2 = number("paco2");
+  const pH = number("ph");
+
+  let bProblems = [];
+
+  if(spont === "No"){
+    bProblems.push("Patient is not spontaneously breathing");
+  }
+
+  if(spo2 !== null && spo2 < 94){
+    bProblems.push("SpO₂ below target");
+  }
+
+  if(pao2 !== null && pao2 < 80){
+    bProblems.push("PaO₂ below target");
+  }
+
+  if(paco2 !== null && (paco2 < 35 || paco2 > 40)){
+    bProblems.push("PaCO₂ outside the target 35–40 mmHg range");
+  }
+
+  if(pH !== null && (pH < 7.30 || pH > 7.50)){
+    bProblems.push("Abnormal pH");
+  }
+
+  let bText;
+
+  if(bProblems.length){
+
+    bText =
+      "<strong>B — INTERPRETATION</strong><br>" +
+      "Breathing abnormality identified." +
+      "<br><br><strong>Findings:</strong><br>" +
+      bProblems.join("<br>") +
+      "<br><br><strong>WHAT TO DO:</strong><br>" +
+      "Correct hypoxemia or ventilatory failure, maintain normocapnia when possible, and avoid routine prophylactic hyperventilation.";
+  }
+  else{
+
+    bText =
+      "<strong>B — INTERPRETATION</strong><br>" +
+      "No major respiratory abnormality identified from the entered values." +
+      "<br><br><strong>WHAT TO DO:</strong><br>" +
+      "Maintain normoxia and normocapnia with continuous reassessment.";
+  }
+
+  document.getElementById("bInterpretation").innerHTML = bText;
+
+
+  /* ---------- C ---------- */
+
+  const age = number("age");
+  const sbp = number("sbp");
+  const map = number("map");
+
+  let cProblems = [];
+
+  if(map !== null && map < 65){
+    cProblems.push("MAP <65 mmHg");
+  }
+
+  let ageSBPTarget = null;
+
+  if(age !== null){
+
+    if(age >= 15 && age <= 49){
+      ageSBPTarget = 110;
+    }
+    else if(age >= 50 && age <= 69){
+      ageSBPTarget = 100;
+    }
+    else if(age >= 70){
+      ageSBPTarget = 110;
+    }
+
+  }
+
+  if(
+    sbp !== null &&
+    ageSBPTarget !== null &&
+    sbp < ageSBPTarget
+  ){
+    cProblems.push(
+      "SBP below the age-specific TBI target of " +
+      ageSBPTarget + " mmHg"
+    );
+  }
+
+  let cText;
+
+  if(cProblems.length){
+
+    cText =
+      "<strong>C — INTERPRETATION</strong><br>" +
+      "HEMODYNAMICALLY UNSTABLE / INADEQUATE PERFUSION." +
+      "<br><br><strong>Findings:</strong><br>" +
+      cProblems.join("<br>") +
+      "<br><br><strong>WHAT TO DO:</strong><br>" +
+      "Resuscitate promptly, identify and control hemorrhage or another cause of hypotension, and restore adequate cerebral/systemic perfusion.";
+  }
+  else{
+
+    cText =
+      "<strong>C — INTERPRETATION</strong><br>" +
+      "Hemodynamics are acceptable from the entered MAP/SBP values." +
+      "<br><br><strong>WHAT TO DO:</strong><br>" +
+      "Avoid hypotension and maintain adequate cerebral perfusion.";
+  }
+
+  document.getElementById("cInterpretation").innerHTML = cText;
+
+
+  /* ---------- D ---------- */
+
+  const rightMotor = parseInt(value("rightMotor"),10);
+  const leftMotor = parseInt(value("leftMotor"),10);
+  const glucose = number("glucose");
+  const seizure = value("seizure");
+  const focal = value("focalDeficit");
+
+  let dProblems = [];
+
+  if(TBI.gcs !== null && TBI.gcs <= 8){
+    dProblems.push("GCS ≤8");
+  }
+
+  if(
+    Number.isFinite(rightMotor) &&
+    Number.isFinite(leftMotor) &&
+    Math.abs(rightMotor-leftMotor) >= 2
+  ){
+    dProblems.push("Motor asymmetry");
+  }
+
+  if(glucose !== null && glucose < 70){
+    dProblems.push("Hypoglycemia");
+  }
+
+  if(seizure === "Yes"){
+    dProblems.push("Seizure");
+  }
+
+  if(focal === "Present"){
+    dProblems.push("Focal neurological deficit");
+  }
+
+  let dText;
+
+  if(dProblems.length){
+
+    dText =
+      "<strong>D — INTERPRETATION</strong><br>" +
+      "Neurological high-risk finding(s) identified." +
+      "<br><br><strong>Findings:</strong><br>" +
+      dProblems.join("<br>") +
+      "<br><br><strong>WHAT TO DO:</strong><br>" +
+      "Repeat neurological assessment, correct reversible secondary insults and proceed to urgent neuroimaging/neurosurgical assessment when indicated.";
+  }
+  else{
+
+    dText =
+      "<strong>D — INTERPRETATION</strong><br>" +
+      "No major disability red flag identified from the entered findings." +
+      "<br><br><strong>WHAT TO DO:</strong><br>" +
+      "Continue serial neurological examination and correct metabolic abnormalities.";
+  }
+
+  document.getElementById("dInterpretation").innerHTML = dText;
+
+
+  /* ---------- E ---------- */
+
+  const temperature = number("temperature");
+
+  let eText;
+
+  if(temperature === null){
+
+    eText =
+      "<strong>E — INTERPRETATION</strong><br>" +
+      "Core temperature not entered." +
+      "<br><br><strong>WHAT TO DO:</strong><br>" +
+      "Enter core temperature and maintain normothermia.";
+
+  }
+  else if(temperature < 36){
+
+    eText =
+      "<strong>E — INTERPRETATION</strong><br>" +
+      "HYPOTHERMIA." +
+      "<br><br><strong>WHAT TO DO:</strong><br>" +
+      "Correct hypothermia and investigate the cause.";
+
+  }
+  else if(temperature > 37.5){
+
+    eText =
+      "<strong>E — INTERPRETATION</strong><br>" +
+      "HYPERTHERMIA." +
+      "<br><br><strong>WHAT TO DO:</strong><br>" +
+      "Identify and treat the cause and actively maintain normothermia.";
+
+  }
+  else{
+
+    eText =
+      "<strong>E — INTERPRETATION</strong><br>" +
+      "NORMOTHERMIA." +
+      "<br><br><strong>WHAT TO DO:</strong><br>" +
+      "Maintain normothermia and continue monitoring.";
+  }
+
+  document.getElementById("eInterpretation").innerHTML = eText;
+
+
+  /* ---------- COMBINED ---------- */
+
+  document.getElementById("combinedResult").innerHTML =
+
+    "<strong>OVERALL ABCDE SUMMARY</strong><br><br>" +
+
+    "A: " +
+    (aProblems.length
+      ? "Airway/C-spine abnormality requiring attention."
+      : "No major airway trigger identified.") +
+
+    "<br>B: " +
+    (bProblems.length
+      ? "Respiratory abnormality requiring attention."
+      : "No major respiratory abnormality identified.") +
+
+    "<br>C: " +
+    (cProblems.length
+      ? "Hemodynamic instability/insufficient perfusion identified."
+      : "Hemodynamics acceptable from entered values.") +
+
+    "<br>D: " +
+    (dProblems.length
+      ? "Neurological high-risk finding identified."
+      : "No major disability red flag identified.") +
+
+    "<br>E: " +
+    (temperature === null
+      ? "Temperature not entered."
+      : temperature < 36
+        ? "Hypothermia."
+        : temperature > 37.5
+          ? "Hyperthermia."
+          : "Normothermia.") +
+
+    "<br><br><strong>OVERALL PRIORITY:</strong><br>" +
+
+    (
+      aProblems.length ||
+      bProblems.length ||
+      cProblems.length ||
+      dProblems.length
+        ? "Address the highest-acuity ABCDE abnormality immediately and prevent secondary brain injury."
+        : "Continue neuroprotective stabilization and proceed with diagnostic triage."
+    );
+}
+
+
+/* =========================================================
+   PHASE 2
+========================================================= */
+
+function calculateTriage(){
+
+  const result = document.getElementById("triageResult");
+
+  if(TBI.gcs === null){
+
+    result.className = "result gcs-result red";
+
+    result.innerHTML =
+      "<strong>GCS not calculated.</strong>";
+
+    return;
+  }
+
+  let category;
+  let explanation;
+
+  if(TBI.gcs >= 13){
+
+    category = "MILD TBI";
+    explanation =
+      "GCS 13–15: Mild TBI pathway.";
+
+  }
+  else if(TBI.gcs >= 9){
+
+    category = "MODERATE TBI";
+    explanation =
+      "GCS 9–12: Moderate TBI pathway.";
+
+  }
+  else{
+
+    category = "SEVERE TBI";
+    explanation =
+      "GCS 3–8: Severe TBI pathway.";
+  }
+
+  result.className =
+    "result gcs-result " +
+    (TBI.gcs <= 8
+      ? "red"
+      : TBI.gcs <= 12
+        ? "amber"
+        : "green");
+
+  result.innerHTML =
+    "<strong>" + category + "</strong><br>" +
+    "GCS " + TBI.gcs + "/15<br>" +
+    "<span class='small'>" + explanation + "</span>";
+}
+
+
+/* =========================================================
+   PHASE 3
+========================================================= */
+
+function toggleDrugBox(){
+
+  const yes =
+    value("onAntithrombotic") === "yes";
+
+  document.getElementById("drugBox")
+    .classList.toggle("hidden",!yes);
+}
+
+
+function calculatePhase3(){
+
+  TBI.phase3Calculated = true;
+
+  const brain = [];
+
+  if(document.getElementById("ctNormal").checked)
+    brain.push("No acute intracranial abnormality");
+
+  if(document.getElementById("ctEDH").checked)
+    brain.push("EDH");
+
+  if(document.getElementById("ctSDH").checked)
+    brain.push("SDH");
+
+  if(document.getElementById("ctSAH").checked)
+    brain.push("Traumatic SAH");
+
+  if(document.getElementById("ctContusion").checked)
+    brain.push("Cerebral contusion");
+
+  if(document.getElementById("ctIPH").checked)
+    brain.push("Intraparenchymal hematoma");
+
+  if(document.getElementById("ctIVH").checked)
+    brain.push("IVH");
+
+  if(document.getElementById("ctEdema").checked)
+    brain.push("Diffuse cerebral edema");
+
+  if(document.getElementById("ctShift").checked)
+    brain.push("Midline shift");
+
+  if(document.getElementById("ctCistern").checked)
+    brain.push("Basal cistern compression");
+
+  if(document.getElementById("ctHydro").checked)
+    brain.push("Hydrocephalus");
+
+  if(document.getElementById("ctHerniation").checked)
+    brain.push("Herniation");
+
+  if(document.getElementById("ctDepressed").checked)
+    brain.push("Depressed skull fracture");
+
+  if(document.getElementById("ctOpen").checked)
+    brain.push("Open skull fracture");
+
+
+  /* ---------- REVERSAL ---------- */
+
+  const onDrug = value("onAntithrombotic");
+  const agent = value("anticoagulant");
+
+  let reversal =
+    "No anticoagulant reversal pathway activated.";
+
+  if(onDrug === "yes"){
+
+    if(agent === "Warfarin"){
+
+      reversal =
+        "<strong>WARFARIN</strong><br>" +
+        "For life-threatening intracranial bleeding: " +
+        "4-factor PCC + IV vitamin K. " +
+        "Rapid reversal is required in major/life-threatening bleeding.";
+
+    }
+
+    else if(agent === "UFH"){
+
+      reversal =
+        "<strong>UNFRACTIONATED HEPARIN</strong><br>" +
+        "Protamine sulfate is the specific reversal agent.";
+
+    }
+
+    else if(agent === "LMWH / Enoxaparin"){
+
+      reversal =
+        "<strong>LMWH / ENOXAPARIN</strong><br>" +
+        "Protamine provides partial reversal.";
+
+    }
+
+    else if(agent === "Dabigatran"){
+
+      reversal =
+        "<strong>DABIGATRAN</strong><br>" +
+        "Idarucizumab 5 g IV is the specific reversal agent for life-threatening/uncontrolled bleeding.";
+
+    }
+
+    else if(
+      agent === "Apixaban" ||
+      agent === "Rivaroxaban" ||
+      agent === "Edoxaban"
+    ){
+
+      reversal =
+        "<strong>" + agent + "</strong><br>" +
+        "Andexanet alfa may be considered where appropriate/available; " +
+        "4-factor PCC is an alternative when andexanet is unavailable or unsuitable.";
+
+    }
+
+    else if(agent === "Fondaparinux"){
+
+      reversal =
+        "<strong>FONDAPARINUX</strong><br>" +
+        "No specific widely established antidote. " +
+        "Specialist-guided management is required; PCC/aPCC may be considered in life-threatening bleeding.";
+
+    }
+
+    else if(agent === "Other"){
+
+      reversal =
+        "<strong>OTHER ANTICOAGULANT</strong><br>" +
+        "Use agent-specific reversal guidance based on the drug, timing, renal function and bleeding severity.";
+
+    }
+
+  }
+
+  document.getElementById("reversalResult").innerHTML =
+    reversal;
+
+
+  /* ---------- SUMMARY ---------- */
+
+  document.getElementById("phase3Summary").innerHTML =
+
+    "<strong>DIAGNOSTIC WORKUP SUMMARY</strong><br><br>" +
+
+    "<strong>CT Brain:</strong><br>" +
+    (brain.length
+      ? brain.join("<br>")
+      : "No CT Brain findings selected.") +
+
+    "<br><br><strong>EDH:</strong> " +
+    (number("edhVolume") !== null
+      ? number("edhVolume") + " cm³"
+      : "Volume not entered") +
+
+    "<br><strong>SDH:</strong> " +
+    (number("sdhVolume") !== null
+      ? number("sdhVolume") + " cm³"
+      : "Volume not entered") +
+
+    "<br><br><strong>Laboratory values:</strong><br>" +
+
+    "Hb: " + (number("hemoglobin") ?? "—") +
+    " g/dL | TLC: " + (number("tlc") ?? "—") +
+    " | Platelet: " + (number("platelet") ?? "—") +
+
+    "<br>Urea: " + (number("urea") ?? "—") +
+    " | Creatinine: " + (number("creatinine") ?? "—") +
+    " | Na: " + (number("sodium") ?? "—") +
+    " | K: " + (number("potassium") ?? "—") +
+
+    "<br>AST: " + (number("ast") ?? "—") +
+    " | ALT: " + (number("alt") ?? "—") +
+    " | Bilirubin: " + (number("bilirubin") ?? "—") +
+    " | Albumin: " + (number("albumin") ?? "—") +
+
+    "<br>PT: " + (number("pt") ?? "—") +
+    " | INR: " + (number("inr") ?? "—") +
+    " | Fibrinogen: " + (number("fibrinogen") ?? "—") +
+
+    "<br><br><strong>Anticoagulant:</strong> " +
+    (onDrug === "yes"
+      ? (agent || "Yes — agent not selected")
+      : onDrug === "no"
+        ? "No"
+        : "Not entered");
+}
+
+
+/* =========================================================
+   PHASE 4 — ICP ENGINE
+========================================================= */
+
+function calculateICP(){
+
+  const clinical =
+    checkedValues("clinicalICP");
+
+  const ct =
+    checkedValues("ctICP");
+
+
+  /*
+    The engine does NOT simply count every checkbox equally.
+
+    High-specificity findings such as herniation,
+    fixed/dilated pupils, effaced cisterns and hydrocephalus
+    strongly support activation of the raised-ICP pathway.
+
+    Other findings contribute to the overall clinical/radiological
+    picture.
+  */
+
+  const strongClinical = [
+
+    "Clinical signs of cerebral herniation",
+    "Unilateral fixed/dilated pupil",
+    "Bilateral fixed/dilated pupils",
+    "Progressive loss of pupillary reactivity"
+
+  ].some(x => clinical.includes(x));
+
+
+  const strongCT = [
+
+    "Compressed/effaced basal cisterns",
+    "Herniation",
+    "Obstructive hydrocephalus",
+    "Significant mass effect"
+
+  ].some(x => ct.includes(x));
+
+
+  const multipleClinical =
+    clinical.length >= 2;
+
+  const multipleCT =
+    ct.length >= 2;
+
+
+  TBI.icpRaised =
+    strongClinical ||
+    strongCT ||
+    (multipleClinical && ct.length >= 1) ||
+    (multipleCT && clinical.length >= 1);
+
+
+  const result =
+    document.getElementById("icpResult");
+
+  const explanation =
+    document.getElementById("icpExplanation");
+
+
+  if(TBI.icpRaised){
+
+    result.className =
+      "result gcs-result red";
+
+    result.innerHTML =
+      "<strong>SIMULATED RESULT: RAISED ICP / HIGH ICP RISK</strong>";
+
+    explanation.innerHTML =
+      "<strong>WHY?</strong><br><br>" +
+
+      "<strong>Clinical criteria selected:</strong><br>" +
+
+      (clinical.length
+        ? clinical.join("<br>")
+        : "None") +
+
+      "<br><br><strong>CT criteria selected:</strong><br>" +
+
+      (ct.length
+        ? ct.join("<br>")
+        : "None") +
+
+      "<br><br>" +
+
+      "<strong>Interpretation:</strong> " +
+      "The selected clinical and/or radiological findings support activation of the raised-ICP management pathway.";
+
+    document.getElementById("tier1")
+      .classList.remove("hidden");
+
+  }
+
+  else{
+
+    result.className =
+      "result gcs-result green";
+
+    result.innerHTML =
+      "<strong>SIMULATED RESULT: NO STRONG EVIDENCE OF RAISED ICP</strong>";
+
+    explanation.innerHTML =
+      "<strong>WHY?</strong><br><br>" +
+
+      "The selected clinical and CT criteria do not provide sufficient evidence to activate the raised-ICP pathway." +
+
+      "<br><br><strong>DECISION:</strong><br>" +
+
+      "Proceed directly to Phase 5.";
+
+    document.getElementById("tier1")
+      .classList.add("hidden");
+
+    document.getElementById("tier2")
+      .classList.add("hidden");
+
+    document.getElementById("tier3")
+      .classList.add("hidden");
+
+  }
+
+}
+
+
+function activateTier2(){
+
+  document.getElementById("tier2")
+    .classList.remove("hidden");
+
+  document.getElementById("tier2")
+    .scrollIntoView({
+      behavior:"smooth",
+      block:"start"
+    });
+}
+
+
+function activateTier3(){
+
+  document.getElementById("tier3")
+    .classList.remove("hidden");
+
+  document.getElementById("tier3")
+    .scrollIntoView({
+      behavior:"smooth",
+      block:"start"
+    });
+}
+
+
+/* =========================================================
+   PHASE 5 — SURGICAL ENGINE
+========================================================= */
+
+function calculateSurgery(){
+
+  const reasons = [];
+
+
+  /* EDH */
+
+  if(value("surgicalEDH") === "yes"){
+
+    const volume =
+      number("surgicalEDHVolume");
+
+    const thickness =
+      number("surgicalEDHThickness");
+
+    const shift =
+      number("surgicalEDHShift");
+
+
+    if(volume !== null && volume > 30){
+
+      reasons.push(
+        "EDH volume >30 cm³"
+      );
+
+    }
+
+
+    /*
+      Classic BTF surgical criterion:
+      EDH >30 cm³ regardless of GCS.
+    */
+
+  }
+
+
+  /* SDH */
+
+  if(value("surgicalSDH") === "yes"){
+
+    const thickness =
+      number("surgicalSDHThickness");
+
+    const shift =
+      number("surgicalSDHShift");
+
+
+    if(
+      thickness !== null &&
+      thickness > 10
+    ){
+
+      reasons.push(
+        "SDH thickness >10 mm"
+      );
+
+    }
+
+
+    if(
+      shift !== null &&
+      shift > 5
+    ){
+
+      reasons.push(
+        "SDH midline shift >5 mm"
+      );
+
+    }
+
+
+    if(
+      TBI.gcs !== null &&
+      TBI.gcs < 9 &&
+      thickness !== null &&
+      thickness <= 10 &&
+      shift !== null &&
+      shift <= 5
+    ){
+
+      reasons.push(
+        "SDH with severe neurological status — urgent neurosurgical assessment required"
+      );
+
+    }
+
+  }
+
+
+  /* PARENCHYMAL */
+
+  if(value("surgicalParenchymal") === "yes"){
+
+    const volume =
+      number("surgicalParVolume");
+
+    const shift =
+      number("surgicalParShift");
+
+    const cistern =
+      value("surgicalCistern");
+
+
+    if(
+      volume !== null &&
+      volume > 20 &&
+      shift !== null &&
+      shift >= 5
+    ){
+
+      reasons.push(
+        "Parenchymal lesion >20 cm³ with midline shift ≥5 mm"
+      );
+
+    }
+
+
+    if(
+      volume !== null &&
+      volume > 20 &&
+      cistern === "yes"
+    ){
+
+      reasons.push(
+        "Parenchymal lesion >20 cm³ with basal cistern compression"
+      );
+
+    }
+
+  }
+
+
+  /* DEPRESSED FRACTURE */
+
+  if(value("surgicalFracture") === "yes"){
+
+    if(value("surgicalOpen") === "yes"){
+
+      reasons.push(
+        "Open/compound depressed skull fracture"
+      );
+
+    }
+
+    if(value("surgicalDura") === "yes"){
+
+      reasons.push(
+        "Depressed fracture with dural tear/contamination"
+      );
+
+    }
+
+  }
+
+
+  const result =
+    document.getElementById("surgeryResult");
+
+  const why =
+    document.getElementById("surgeryReasons");
+
+
+  if(reasons.length){
+
+    result.className =
+      "result gcs-result red";
+
+    result.innerHTML =
+      "<strong>SURGERY / URGENT NEUROSURGICAL ESCALATION INDICATED</strong>";
+
+    why.innerHTML =
+      "<strong>FINAL DECISION — WHY?</strong><br><br>" +
+
+      reasons
+        .map(x => "• " + x)
+        .join("<br>") +
+
+      "<br><br><strong>GCS:</strong> " +
+      (TBI.gcs !== null
+        ? TBI.gcs + "/15"
+        : "Not calculated") +
+
+      "<br><br>" +
+
+      "Urgent neurosurgical evaluation is indicated.";
+
+  }
+
+  else{
+
+    result.className =
+      "result gcs-result green";
+
+    result.innerHTML =
+      "<strong>NO IMMEDIATE SURGICAL TRIGGER IDENTIFIED</strong>";
+
+    why.innerHTML =
+      "<strong>FINAL DECISION</strong><br><br>" +
+
+      "No quantitative surgical criterion was triggered from the entered values." +
+
+      "<br><br><strong>GCS:</strong> " +
+
+      (TBI.gcs !== null
+        ? TBI.gcs + "/15"
+        : "Not calculated") +
+
+      "<br><br>" +
+
+      "Continue close neurological monitoring and neurosurgical reassessment as clinically indicated.";
+
+  }
+
+}
+
+</script>
+
+</body>
+</html>
