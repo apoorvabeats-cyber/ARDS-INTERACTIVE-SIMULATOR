@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#071b3a">
+<title>CNS Infection Interactive Algorithm V7</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#f4f7fb;color:#172033}
+.container{max-width:1050px;margin:auto;padding:12px}
+.hero{background:linear-gradient(135deg,#071b3a,#1457a6);color:#fff;padding:26px 20px;border-radius:24px;margin-bottom:15px}
+.hero h1{margin:0 0 8px;font-size:32px}
+.hero p{margin:0;color:#dceaff;line-height:1.5}
+.card{background:#fff;border:1px solid #d8e1ec;border-radius:20px;padding:18px;margin-bottom:14px}
+h2{margin:0 0 15px;font-size:25px}
+h3{color:#1457a6;margin-top:20px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(max-width:650px){.grid{grid-template-columns:1fr}}
+label{display:block;font-weight:700;margin:8px 0 5px}
+input,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:12px;font-size:16px;background:#fff}
+.check{display:flex;align-items:center;gap:8px;margin:9px 0}
+.check input{width:auto}
+button{width:100%;border-radius:14px;padding:15px;font-size:16px;font-weight:800;margin-top:10px;cursor:pointer}
+.primary{background:#1457a6;color:#fff;border:0}
+.secondary{background:#fff;color:#1457a6;border:1px solid #ccd6e3}
+.option{background:#fff;color:#172033;border:1px solid #d4ddea;text-align:left}
+.route{border:2px solid #1457a6;background:#eef5ff}
+.info,.good,.warning,.danger{padding:14px;border-radius:14px;margin:12px 0;line-height:1.5}
+.info{background:#eef5ff;border:1px solid #b8d0ef}
+.good{background:#edf9f0;border:1px solid #abd6b5}
+.warning{background:#fff8e8;border:1px solid #efc66f}
+.danger{background:#fff0f0;border:1px solid #e2a1a1}
+.badge{display:inline-block;background:#e9f2ff;color:#1457a6;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:800}
+.hidden{display:none!important}
+.small{font-size:13px;color:#66758c;line-height:1.5}
+.dose{background:#f3f6fa;border:1px solid #dbe3ec;border-radius:13px;padding:14px;margin:12px 0;line-height:1.55}
+.footer{text-align:center;color:#718096;font-size:12px;line-height:1.5;padding:20px 5px}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<header class="hero">
+<h1>🧠 CNS Infection</h1>
+<p>Master Diagnostic Engine V7 • LP • CT • MRI • Loop-Proof Integrated Diagnostic Reasoning</p>
+</header>
+
+<section id="presentation" class="card">
+<span class="badge">STEP 1 • CLINICAL PRESENTATION</span>
+<h2>Suspected CNS Infection</h2>
+
+<div class="info">
+<strong>Clinical assessment first.</strong><br>
+Select the major presenting features before choosing LP or imaging.
+</div>
+
+<div class="grid">
+<label class="check"><input id="fever" type="checkbox" checked>Fever</label>
+<label class="check"><input id="headache" type="checkbox" checked>Headache</label>
+<label class="check"><input id="neck" type="checkbox" checked>Neck stiffness</label>
+<label class="check"><input id="altered" type="checkbox" checked>Altered mental status</label>
+<label class="check"><input id="seizure" type="checkbox">New-onset seizure</label>
+<label class="check"><input id="focal" type="checkbox">Focal neurological deficit</label>
+<label class="check"><input id="pap" type="checkbox">Papilloedema</label>
+<label class="check"><input id="cranial" type="checkbox">Cranial-nerve deficit</label>
+<label class="check"><input id="immuno" type="checkbox">Severe immunocompromise</label>
+<label class="check"><input id="neurosurgery" type="checkbox">Recent neurosurgery/EVD/shunt</label>
+<label class="check"><input id="shock" type="checkbox">Shock/hemodynamic instability</label>
+</div>
+
+<div class="grid">
+<div>
+<label>Duration</label>
+<select id="duration">
+<option value="acute">Acute ≤7 days</option>
+<option value="subacute">Subacute 8–28 days</option>
+<option value="chronic">Chronic &gt;28 days</option>
+</select>
+</div>
+
+<div>
+<label>Patient weight (kg)</label>
+<input id="weight" type="number" value="70" min="1">
+</div>
+</div>
+
+<button class="primary" onclick="goRoute()">CONTINUE TO DIAGNOSTIC PATHWAY →</button>
+</section>
+
+<section id="route" class="card hidden">
+<span class="badge">STEP 2 • INITIAL DIAGNOSTIC ROUTE</span>
+<h2>Choose Investigation</h2>
+
+<div id="routeMsg"></div>
+
+<div class="info">
+<strong>Choose one initial route.</strong><br>
+LP/CSF is the main diagnostic test for meningitis when clinically safe.
+Imaging is selected when structural assessment is needed or LP is deferred.
+</div>
+
+<button class="option route" onclick="show('csf')">
+🧪 LUMBAR PUNCTURE / CSF STUDY<br>
+<span class="small">Enter CSF and microbiology findings.</span>
+</button>
+
+<button class="option route" onclick="show('imagingChoice')">
+🧠 IMAGING<br>
+<span class="small">Choose CT head or MRI brain.</span>
+</button>
+</section>
+
+<section id="imagingChoice" class="card hidden">
+<span class="badge">STEP 3 • IMAGING</span>
+<h2>Select Imaging</h2>
+
+<button class="option" onclick="show('ct')">
+🩻 CT HEAD<br>
+<span class="small">Enter reported CT findings.</span>
+</button>
+
+<button class="option" onclick="show('mri')">
+🧠 MRI BRAIN<br>
+<span class="small">Enter reported MRI findings.</span>
+</button>
+
+<button class="secondary" onclick="show('route')">← BACK</button>
+</section>
+
+<section id="csf" class="card hidden">
+<span class="badge">STEP 3 • CSF DIAGNOSTIC ENGINE</span>
+<h2>Lumbar Puncture / CSF Study</h2>
+
+<div class="grid">
+
+<div>
+<label>Opening pressure (cm H₂O)</label>
+<input id="opening" type="number" value="20">
+</div>
+
+<div>
+<label>CSF appearance</label>
+<select id="appearance">
+<option>Clear</option>
+<option>Turbid</option>
+<option>Xanthochromic</option>
+</select>
+</div>
+
+<div>
+<label>CSF WBC (/µL)</label>
+<input id="wbc" type="number" value="250">
+</div>
+
+<div>
+<label>Neutrophils (%)</label>
+<input id="neut" type="number" value="30">
+</div>
+
+<div>
+<label>Lymphocytes (%)</label>
+<input id="lymph" type="number" value="70">
+</div>
+
+<div>
+<label>CSF protein (mg/dL)</label>
+<input id="protein" type="number" value="150">
+</div>
+
+<div>
+<label>CSF glucose (mg/dL)</label>
+<input id="csfG" type="number" value="35">
+</div>
+
+<div>
+<label>Serum glucose (mg/dL)</label>
+<input id="serumG" type="number" value="100">
+</div>
+
+</div>
+
+<h3>Microbiology</h3>
+
+<div class="grid">
+<label class="check"><input id="gp" type="checkbox">Gram-positive bacteria</label>
+<label class="check"><input id="gn" type="checkbox">Gram-negative bacteria</label>
+<label class="check"><input id="culture" type="checkbox">CSF culture positive</label>
+<label class="check"><input id="tb" type="checkbox">TB NAAT/PCR positive</label>
+<label class="check"><input id="crypto" type="checkbox">Cryptococcal antigen positive</label>
+<label class="check"><input id="hsv" type="checkbox">HSV PCR positive</label>
+</div>
+
+<button class="primary" onclick="analyzeCSF()">ANALYZE CSF →</button>
+<button class="secondary" onclick="show('route')">← BACK</button>
+</section>
+
+<section id="ct" class="card hidden">
+<span class="badge">CT DIAGNOSTIC ENGINE</span>
+<h2>CT Head Findings</h2>
+
+<div class="grid">
+<label class="check"><input id="ctNormal" type="checkbox">Normal CT</label>
+<label class="check"><input id="ctEdema" type="checkbox">Diffuse cerebral edema</label>
+<label class="check"><input id="ctHydro" type="checkbox">Hydrocephalus</label>
+<label class="check"><input id="ctBasal" type="checkbox">Basal meningeal enhancement</label>
+<label class="check"><input id="ctTub" type="checkbox">Tuberculoma / granulomatous lesion</label>
+<label class="check"><input id="ctInf" type="checkbox">Cerebral infarction</label>
+<label class="check"><input id="ctRing" type="checkbox">Ring-enhancing lesion</label>
+<label class="check"><input id="ctMass" type="checkbox">Mass effect / midline shift</label>
+<label class="check"><input id="ctVent" type="checkbox">Intraventricular debris</label>
+<label class="check"><input id="ctEpend" type="checkbox">Ependymal enhancement</label>
+<label class="check"><input id="ctTemp" type="checkbox">Temporal lobe abnormality</label>
+</div>
+
+<button class="primary" onclick="analyzeCT()">ANALYZE CT →</button>
+<button class="secondary" onclick="show('imagingChoice')">← BACK</button>
+</section>
+
+<section id="mri" class="card hidden">
+<span class="badge">MRI DIAGNOSTIC ENGINE</span>
+<h2>MRI Brain Findings</h2>
+
+<div class="grid">
+<label class="check"><input id="mriNormal" type="checkbox">Normal MRI</label>
+<label class="check"><input id="mriTemp" type="checkbox">Temporal lobe T2/FLAIR abnormality</label>
+<label class="check"><input id="mriIns" type="checkbox">Insular involvement</label>
+<label class="check"><input id="mriHem" type="checkbox">Hemorrhagic temporal abnormality</label>
+<label class="check"><input id="mriBasal" type="checkbox">Basal meningeal enhancement</label>
+<label class="check"><input id="mriHydro" type="checkbox">Hydrocephalus</label>
+<label class="check"><input id="mriTub" type="checkbox">Tuberculomas</label>
+<label class="check"><input id="mriInf" type="checkbox">Multifocal/perforator infarcts</label>
+<label class="check"><input id="mriRing" type="checkbox">Ring-enhancing lesion</label>
+<label class="check"><input id="mriRestrict" type="checkbox">Central diffusion restriction</label>
+<label class="check"><input id="mriVent" type="checkbox">Intraventricular debris</label>
+<label class="check"><input id="mriEpend" type="checkbox">Ependymal enhancement</label>
+<label class="check"><input id="mriPseudo" type="checkbox">Gelatinous pseudocyst/perivascular-space pattern</label>
+</div>
+
+<button class="primary" onclick="analyzeMRI()">ANALYZE MRI →</button>
+<button class="secondary" onclick="show('imagingChoice')">← BACK</button>
+</section>
+
+<section id="result" class="card hidden">
+<span class="badge">DIAGNOSTIC OUTPUT</span>
+<div id="resultContent"></div>
+</section>
+
+<section id="management" class="card hidden">
+<span class="badge">DISEASE-SPECIFIC MANAGEMENT</span>
+<div id="managementContent"></div>
+</section>
+
+<div class="footer">
+Educational clinical decision-support tool. Verify patient-specific treatment,
+contraindications, microbiology, renal/hepatic adjustment, local resistance
+patterns and institutional protocols before clinical use.
+</div>
+
+</div>
+
+<script>
+const state={lp:false,ct:false,mri:false};
+
+const $=id=>document.getElementById(id);
+
+function show(id){
+document.querySelectorAll('section').forEach(x=>x.classList.add('hidden'));
+$(id).classList.remove('hidden');
+window.scrollTo(0,0);
+}
+
+function dose(mgkg,max){
+let d=(Number($('weight').value)||70)*mgkg;
+return Math.round(Math.min(d,max||Infinity));
+}
+
+function goRoute(){
+state.lp=state.ct=state.mri=false;
+
+$('routeMsg').innerHTML=
+($('focal').checked||$('pap').checked||$('seizure').checked||$('neurosurgery').checked)
+?
+'<div class="warning"><strong>Imaging may be required before LP.</strong> Assess contraindications and clinical safety before LP.</div>'
+:'';
+
+show('route');
+}
+
+function result(html){
+show('result');
+$('resultContent').innerHTML=html;
+}
+
+function diag(type,title,text){
+return `
+<div class="good">
+<h2>${title}</h2>
+<strong>Diagnostic pathway automatically selected ${title.toLowerCase()}.</strong>
+<p>${text}</p>
+</div>
+
+<button class="primary" onclick="openManagement('${type}')">
+OPEN ${title.toUpperCase()} MANAGEMENT →
+</button>`;
+}
+
+function analyzeCSF(){
+
+state.lp=true;
+
+let w=+$('wbc').value||0;
+let n=+$('neut').value||0;
+let p=+$('protein').value||0;
+let g=+$('csfG').value||0;
+let sg=+$('serumG').value||100;
+let r=g/sg;
+
+if($('gp').checked||$('gn').checked||$('culture').checked)
+return result(diag(
+'bacterial',
+'Bacterial meningitis',
+'CSF microbiology supports bacterial meningitis. Do not delay appropriate antimicrobial therapy.'
+));
+
+if($('crypto').checked)
+return result(diag(
+'crypto',
+'Cryptococcal meningitis',
+'Positive cryptococcal antigen supports cryptococcal CNS disease. Assess opening pressure and immune status.'
+));
+
+if($('tb').checked)
+return result(diag(
+'tb',
+'Tuberculous meningitis',
+'Positive TB NAAT/PCR supports TB meningitis in the appropriate clinical setting.'
+));
+
+if($('hsv').checked)
+return result(diag(
+'hsv',
+'HSV encephalitis',
+'Positive HSV PCR supports HSV encephalitis in the appropriate syndrome.'
+));
+
+if(w>=1000&&n>=50&&r<0.4&&p>100)
+return result(diag(
+'bacterial',
+'Bacterial meningitis',
+'Marked neutrophilic pleocytosis with low CSF glucose ratio and high protein strongly favors bacterial meningitis.'
+));
+
+if(w>5&&n<50&&r<0.5&&p>100&&$('duration').value!=='acute')
+return result(diag(
+'tb',
+'Tuberculous meningitis',
+'Subacute/chronic lymphocytic CSF with low glucose ratio and high protein is compatible with TB meningitis; seek microbiological confirmation.'
+));
+
+if(w>5&&n<50&&r<0.5&&p>100&&+$('opening').value>25)
+return result(diag(
+'crypto',
+'Cryptococcal meningitis',
+'Lymphocytic CSF with low glucose ratio, high protein and raised opening pressure can suggest cryptococcal meningitis, especially with immunosuppression.'
+));
+
+if(w>5&&n<50&&r>=0.5&&p<150)
+return result(diag(
+'viral',
+'Viral meningitis/encephalitis',
+'The CSF pattern is more compatible with a viral process, but no specific virus is established by these inputs.'
+));
+
+result(next('CSF'));
+}
+
+function analyzeCT(){
+
+state.ct=true;
+
+if($('ctTub').checked&&($('ctBasal').checked||$('ctHydro').checked||$('ctInf').checked))
+return result(diag(
+'tb',
+'Tuberculous meningitis',
+'Basal meningeal disease with hydrocephalus, infarction and/or tuberculoma supports TB meningitis.'
+));
+
+if($('ctRing').checked&&$('ctMass').checked)
+return result(diag(
+'abscess',
+'Brain abscess',
+'A ring-enhancing lesion with mass effect is suggestive of brain abscess; neoplasm and other infections remain differentials.'
+));
+
+if($('ctTemp').checked)
+return result(diag(
+'hsv',
+'HSV encephalitis',
+'Temporal lobe abnormality can support HSV encephalitis; MRI and CSF HSV PCR are preferred for confirmation.'
+));
+
+if($('ctVent').checked||$('ctEpend').checked)
+return result(diag(
+'ventriculitis',
+'Healthcare-associated ventriculitis',
+'Intraventricular debris or ependymal enhancement can support ventriculitis in the appropriate device/neurosurgical context.'
+));
+
+result(next('CT'));
+}
+
+function analyzeMRI(){
+
+state.mri=true;
+
+if($('mriTemp').checked&&($('mriIns').checked||$('mriHem').checked))
+return result(diag(
+'hsv',
+'HSV encephalitis',
+'Temporal/insular abnormalities with possible hemorrhage are a characteristic MRI pattern in the appropriate syndrome.'
+));
+
+if($('mriTub').checked||($('mriBasal').checked&&$('mriHydro').checked))
+return result(diag(
+'tb',
+'Tuberculous meningitis',
+'Basal meningeal disease with hydrocephalus and/or tuberculomas supports TB meningitis.'
+));
+
+if($('mriRing').checked&&$('mriRestrict').checked)
+return result(diag(
+'abscess',
+'Brain abscess',
+'Ring enhancement with central diffusion restriction strongly supports pyogenic abscess in the correct setting.'
+));
+
+if($('mriVent').checked||$('mriEpend').checked)
+return result(diag(
+'ventriculitis',
+'Healthcare-associated ventriculitis',
+'Intraventricular debris and/or ependymal enhancement supports ventriculitis when the clinical context fits.'
+));
+
+if($('mriPseudo').checked)
+return result(diag(
+'crypto',
+'Cryptococcal CNS disease',
+'Gelatinous pseudocyst/perivascular-space abnormalities can occur with cryptococcal disease, especially in immunocompromised patients.'
+));
+
+result(next('MRI'));
+}
+
+function next(source){
+
+if(source==='CSF'&&!state.ct&&!state.mri)
+return `
+<div class="warning">
+<h2>CSF INDETERMINATE</h2>
+<p>No disease-specific diagnosis was established.</p>
+<strong>Next investigation:</strong> CT head or MRI brain according to clinical indication.
+</div>
+
+<button class="primary" onclick="show('imagingChoice')">
+CONTINUE TO CT / MRI →
+</button>`;
+
+if(source==='CT'&&!state.mri)
+return `
+<div class="warning">
+<h2>CT INDETERMINATE / NON-SPECIFIC</h2>
+<p>CT has not established a disease-specific diagnosis.</p>
+<strong>Next investigation → MRI brain</strong>
+</div>
+
+<button class="primary" onclick="show('mri')">
+CONTINUE TO MRI →
+</button>`;
+
+if(source==='MRI'&&!state.lp)
+return `
+<div class="warning">
+<h2>MRI INDETERMINATE / NON-SPECIFIC</h2>
+<p>MRI has not established a disease-specific diagnosis and LP has not yet been performed.</p>
+<strong>Next investigation → LP/CSF when clinically safe.</strong>
+</div>
+
+<button class="primary" onclick="show('csf')">
+CONTINUE TO LP / CSF →
+</button>`;
+
+return finalWorkup();
+}
+
+function finalWorkup(){
+
+return `
+<div class="warning">
+<h2>FINAL FURTHER DIAGNOSTIC WORK-UP</h2>
+<strong>LP and appropriate neuroimaging remain non-diagnostic.</strong>
+<p>Do not restart the LP → CT/MRI cycle. Proceed to phenotype-directed secondary evaluation.</p>
+</div>
+
+<h3>1. Metabolic / systemic</h3>
+<ul>
+<li>Glucose, Na⁺, K⁺, Ca²⁺, Mg²⁺</li>
+<li>Urea/creatinine and LFT</li>
+<li>ABG/VBG and osmolality when appropriate</li>
+<li>Ammonia for unexplained encephalopathy</li>
+<li>TSH/free T4 and B12/folate when clinically appropriate</li>
+</ul>
+
+<h3>2. Infectious</h3>
+<ul>
+<li>Blood cultures and inflammatory markers</li>
+<li>HIV and syphilis testing when appropriate</li>
+<li>Targeted bacterial, viral, fungal and TB testing</li>
+<li>Expanded CSF molecular/microbiological testing or repeat CSF only when clinically justified and safe</li>
+</ul>
+
+<h3>3. Neurological / structural</h3>
+<ul>
+<li>Neurology review</li>
+<li>EEG for seizures/non-convulsive status</li>
+<li>Repeat MRI ± contrast when warranted</li>
+<li>MRA/MRV or CTA/CTV for vascular/CVST concern</li>
+<li>Spinal imaging when clinically indicated</li>
+</ul>
+
+<h3>4. Autoimmune / inflammatory</h3>
+<ul>
+<li>Autoimmune encephalitis panel when phenotype is appropriate</li>
+<li>ANA/ENA, ANCA, complement and other targeted tests when indicated</li>
+</ul>
+
+<h3>5. Other differential diagnoses</h3>
+<ul>
+<li>Drug/toxin exposure or withdrawal</li>
+<li>Hypoxic-ischaemic injury</li>
+<li>Seizure/post-ictal state</li>
+<li>PRES</li>
+<li>Cerebrovascular disease/CVST</li>
+<li>Neoplastic/infiltrative disease</li>
+<li>Other systemic encephalopathies</li>
+</ul>
+
+<div class="danger">
+<h3>6. Deterioration / persistent unexplained neurological syndrome</h3>
+<ul>
+<li>Immediate repeat neurological assessment</li>
+<li>Repeat CT/MRI for deterioration or new focal deficit</li>
+<li>EEG if seizure is possible</li>
+<li>Repeat/expanded CSF testing only when safe and indicated</li>
+<li>Neurology + infectious-disease consultation</li>
+<li>Neurosurgical review for hydrocephalus, mass, abscess or device complication</li>
+<li>Consider autoimmune/paraneoplastic work-up and tissue diagnosis in selected cases</li>
+</ul>
+</div>`;
+}
+
+function openManagement(type){
+show('management');
+$('managementContent').innerHTML=stage1(type);
+}
+
+function stage1(t){
+
+let name={
+bacterial:'Bacterial Meningitis',
+tb:'Tuberculous Meningitis',
+crypto:'Cryptococcal Meningitis',
+hsv:'HSV Encephalitis',
+abscess:'Brain Abscess',
+ventriculitis:'Healthcare-Associated Ventriculitis'
+}[t]||'CNS Infection';
+
+let intro={
+bacterial:'Start appropriate empiric parenteral antibiotics promptly; obtain microbiology without harmful delay and consider adjunctive dexamethasone when indicated.',
+tb:'Start multidrug anti-tubercular therapy using weight-based dosing and adjunctive corticosteroid therapy with guideline-directed taper.',
+crypto:'Assess opening pressure, neurological status and immune status; begin guideline-directed antifungal induction therapy and actively manage symptomatic raised ICP.',
+hsv:'Start IV acyclovir promptly when HSV encephalitis is suspected; adjust for renal function and monitor seizures and cerebral edema.',
+abscess:'Start appropriate antimicrobial therapy and obtain urgent neurosurgical/source-control assessment when indicated.',
+ventriculitis:'Obtain appropriate CSF/blood cultures and start empiric therapy based on healthcare-associated CNS infection guidance and local susceptibility patterns.'
+}[t];
+
+let doses=t==='tb'?`
+<div class="dose">
+<strong>Isoniazid</strong><br>
+5 mg/kg/day PO<br>
+Calculated dose: ${dose(5,300)} mg/day
+</div>
+
+<div class="dose">
+<strong>Rifampicin</strong><br>
+10 mg/kg/day PO<br>
+Calculated dose: ${dose(10,600)} mg/day
+</div>
+
+<div class="dose">
+<strong>Pyrazinamide</strong><br>
+25 mg/kg/day PO<br>
+Calculated dose: ${dose(25,2000)} mg/day
+</div>
+
+<div class="dose">
+<strong>Ethambutol</strong><br>
+15 mg/kg/day PO<br>
+Calculated dose: ${dose(15,1200)} mg/day
+</div>`:'';
+
+return `
+<h2>${name}</h2>
+
+<div class="good">
+<strong>Diagnostic pathway automatically selected ${name}.</strong>
+<p>${intro}</p>
+</div>
+
+${doses}
+
+<h3>Immediate priorities</h3>
+<ul>
+<li>Assess airway, circulation and neurological status.</li>
+<li>Review microbiology, renal/hepatic function and drug interactions.</li>
+<li>Monitor for raised ICP, seizures and other complications.</li>
+</ul>
+
+<button class="primary" onclick="continueManagement('${t}')">
+CONTINUE TO ${name.toUpperCase()} MANAGEMENT →
+</button>`;
+}
+
+function continueManagement(t){
+show('management');
+$('managementContent').innerHTML=stage2(t);
+}
+
+function stage2(t){
+
+if(t==='bacterial')
+return `
+<h2>🦠 Bacterial Meningitis — Further Management</h2>
+<h3>Definitive treatment</h3>
+<ul>
+<li>Tailor antibiotics to organism and susceptibility.</li>
+<li>Continue indicated adjunctive dexamethasone according to the applicable guideline.</li>
+<li>Assess source such as otitis, sinusitis, pneumonia or endocarditis when appropriate.</li>
+<li>Monitor neurological status, cerebral edema/raised ICP, hydrocephalus, seizures, infarction, empyema and septic shock.</li>
+<li>Repeat imaging/CSF evaluation only when clinically indicated.</li>
+</ul>`;
+
+if(t==='crypto')
+return `
+<h2>🍄 Cryptococcal Meningitis — Further Management</h2>
+<h3>Induction → Consolidation → Maintenance</h3>
+<ul>
+<li>Continue guideline-directed amphotericin-based induction therapy with the appropriate companion antifungal.</li>
+<li>Monitor renal function, potassium, magnesium and blood counts.</li>
+<li>Measure CSF opening pressure and use therapeutic LP for symptomatic raised ICP when indicated.</li>
+<li>Assess HIV/other immunosuppression and plan ART timing according to current guidance.</li>
+<li>Transition to consolidation and maintenance therapy when criteria are met; reassess for persistent infection, relapse or IRIS when clinically indicated.</li>
+</ul>`;
+
+if(t==='tb')
+return `
+<h2>🫁 Tuberculous Meningitis — Further Management</h2>
+<h3>Continuation and complications</h3>
+<ul>
+<li>Continue multidrug ATT and adjunctive corticosteroid therapy with guideline-directed taper.</li>
+<li>Monitor liver function and drug toxicity.</li>
+<li>Assess hydrocephalus, raised ICP, cerebral infarction/vasculopathy and tuberculoma.</li>
+<li>Consider paradoxical reaction or treatment failure when clinically suspected.</li>
+</ul>`;
+
+if(t==='hsv')
+return `
+<h2>🧠 HSV Encephalitis — Further Management</h2>
+<h3>Ongoing antiviral and neurological care</h3>
+<ul>
+<li>Continue IV acyclovir with renal adjustment and hydration.</li>
+<li>EEG for seizures/non-convulsive status.</li>
+<li>Manage cerebral edema and raised ICP when present.</li>
+<li>Repeat MRI or CSF HSV PCR when the course is atypical or deteriorating.</li>
+</ul>`;
+
+if(t==='abscess')
+return `
+<h2>🎯 Brain Abscess — Further Management</h2>
+<h3>Antibiotics + source control</h3>
+<ul>
+<li>Continue targeted antimicrobial therapy.</li>
+<li>Urgent neurosurgical assessment for aspiration/drainage when indicated.</li>
+<li>Send drainage material for bacterial and targeted fungal/TB testing according to host factors.</li>
+<li>Monitor mass effect, hydrocephalus and neurological deterioration; repeat imaging according to clinical response.</li>
+</ul>`;
+
+return `
+<h2>🧪 Healthcare-Associated Ventriculitis — Further Management</h2>
+<h3>Antimicrobial therapy + device/source control</h3>
+<ul>
+<li>Continue targeted therapy based on cultures and susceptibility.</li>
+<li>Review EVD/VP shunt/device infection and coordinate removal or exchange with neurosurgery when indicated.</li>
+<li>For resistant gram-negative infection, use susceptibility-directed agents with good CNS activity.</li>
+<li>Monitor CSF and clinical response; repeat imaging if deterioration or hydrocephalus occurs.</li>
+</ul>`;
+}
+</script>
+</body>
+</html>
