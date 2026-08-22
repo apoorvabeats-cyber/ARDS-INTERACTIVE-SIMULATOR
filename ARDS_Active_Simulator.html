@@ -29,12 +29,14 @@ button:disabled{opacity:.4;cursor:not-allowed}.num{text-align:center;font-weight
 .metric .name{font-size:12px;color:#9fb2bd}.metric .val{font-size:18px;font-weight:850}
 .pfBox{padding:14px;margin:10px 0;border-radius:13px;border:2px solid #d98b39;background:#241d16;text-align:center}
 .pfBox .name{font-size:12px;color:#d9c4a1;text-transform:uppercase;letter-spacing:.08em}.pfBox .val{font-size:42px;line-height:1.05;font-weight:900}.pfBox .unit{font-size:12px;color:#c8b79e}
-.wave{height:112px;background:#071820;border:1px solid #203943;border-radius:10px;margin-top:10px;overflow:hidden}.wave svg{width:100%;height:100%}
+.pulseStrip{height:74px;background:#071820;border:1px solid #203943;border-radius:10px;margin-top:10px;overflow:hidden;position:relative}.pulseStrip svg{width:100%;height:100%}.pulseTrack{animation:pulseMove 2.2s linear infinite}@keyframes pulseMove{from{transform:translateX(0)}to{transform:translateX(-160px)}}
 .nav{display:flex;justify-content:space-between;gap:10px;margin:12px 0;position:sticky;bottom:8px;z-index:15}.nav button{min-width:145px;background:#132b37;box-shadow:0 4px 14px #0008}
 .flash{animation:flash 1s ease 3}@keyframes flash{50%{box-shadow:0 0 0 5px #d98b39}}
 #clinicalDecision{scroll-margin-top:80px}.decisionGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
 .decision{border:1px solid #2a4653;border-radius:10px;padding:10px;background:#0a1b24}.decision.active{border:2px solid #d98b39;background:#30251a}
-.decision h3{font-size:14px;margin:0 0 4px}.decision p{font-size:12px;color:#b8c8cf;margin:0;line-height:1.4}
+ .decision h3{font-size:14px;margin:0 0 4px}.decision p{font-size:12px;color:#b8c8cf;margin:0;line-height:1.4}
+.positionCue{margin-top:10px;padding:10px;border:1px solid #2a4653;border-radius:10px;background:#0a1b24}.positionCue h4{margin:0 0 5px;font-size:13px}.footView{display:flex;align-items:center;justify-content:center;gap:18px;min-height:92px}.foot{width:38px;height:70px;border:2px solid #8fa7b4;border-radius:20px 20px 10px 10px;position:relative;background:#132b37;transform-origin:center}.foot:before{content:"";position:absolute;left:7px;right:7px;top:8px;height:20px;border-radius:50%;border:1px solid #5f7884}.foot .toe{position:absolute;left:50%;top:-10px;transform:translateX(-50%);font-size:18px;color:#d9e8ee}.foot .heel{position:absolute;left:50%;bottom:-10px;transform:translateX(-50%);font-size:18px;color:#d9e8ee}.supine .foot{transform:rotate(0deg)}.proneCue .foot{transform:rotate(180deg)}.orientationBadge{display:inline-block;padding:3px 7px;border-radius:999px;border:1px solid #34515f;font-size:11px;color:#d7e4ea}.positionCue .small{margin-top:5px}
+
 .footerAudio{display:flex;gap:8px;flex-wrap:wrap}.audioState{font-size:12px;color:#9fb2bd;padding-top:7px}
 @media(max-width:850px){.top,.main{grid-template-columns:1fr}.decisionGrid{grid-template-columns:1fr}}
 @media(max-width:480px){.app{padding:8px 10px 24px}header{align-items:flex-start}.control{grid-template-columns:1fr 42px 68px 42px}.actions{grid-template-columns:1fr}.pfBox .val{font-size:48px}.nav button{min-width:0;flex:1}}
@@ -60,8 +62,10 @@ button:disabled{opacity:.4;cursor:not-allowed}.num{text-align:center;font-weight
 
 <section class="card" id="vitals">
  <div class="label">Live vitals</div>
- <div class="metric" id="mHR"><div class="name">HR</div><div class="val"><span id="hr">112</span> bpm</div></div>
+ <div class="metric" id="mBP"><div class="name">BP</div><div class="val"><span id="bp">104/59</span> mmHg</div></div>
  <div class="metric" id="mMAP"><div class="name">MAP</div><div class="val"><span id="map">74</span> mmHg</div></div>
+ <div class="metric" id="mHR"><div class="name">Heart rate</div><div class="val"><span id="hr">112</span> bpm</div></div>
+ <div class="metric" id="mPulse"><div class="name">Pulse</div><div class="val"><span id="pulse">110</span> bpm</div></div>
  <div class="metric" id="mSpO2"><div class="name">SpO₂</div><div class="val"><span id="spo2">89</span>%</div></div>
  <div class="metric" id="mRR"><div class="name">Respiratory rate</div><div class="val"><span id="rrLive">30</span>/min</div></div>
 </section>
@@ -99,7 +103,16 @@ button:disabled{opacity:.4;cursor:not-allowed}.num{text-align:center;font-weight
   <button id="prone" class="primary">Prone</button><button id="recruit">Recruitment Maneuver</button>
   <button id="rescue" class="warn">Rescue Therapies</button>
  </div>
- <div class="wave"><svg viewBox="0 0 600 110" preserveAspectRatio="none"><polyline fill="none" stroke="#5fd3ee" stroke-width="3" points="0,82 30,82 48,22 70,82 120,82 138,22 160,82 210,82 228,22 250,82 300,82 318,22 340,82 390,82 408,22 430,82 480,82 498,22 520,82 570,82 588,22 600,82"/></svg></div>
+ <div class="positionCue supine" id="positionCue" aria-live="polite">
+  <h4>Patient position — foot-end orientation cue <span class="orientationBadge" id="positionBadge">SUPINE</span></h4>
+  <div class="footView" aria-label="Foot orientation schematic from the foot end">
+   <div class="foot"><span class="toe">▲</span><span class="heel">●</span></div>
+   <div class="small" id="positionCueText"><strong>Supine:</strong> soles/plantar surfaces face upward. Toes point toward the head; heels remain at the lower end.</div>
+   <div class="foot"><span class="toe">▲</span><span class="heel">●</span></div>
+  </div>
+  <div class="small">Foot-end bedside cue only — use the patient's overall position and landmarks rather than this schematic for clinical positioning.</div>
+ </div>
+ <div class="pulseStrip" aria-label="Moving monitor pulse waveform"><svg viewBox="0 0 600 70" preserveAspectRatio="none"><g class="pulseTrack"><polyline fill="none" stroke="#5fd3ee" stroke-width="3" points="0,48 45,48 58,48 70,14 82,48 125,48 138,48 150,14 162,48 205,48 218,48 230,14 242,48 285,48 298,48 310,14 322,48 365,48 378,48 390,14 402,48 445,48 458,48 470,14 482,48 525,48 538,48 550,14 562,48 600,48"/></g></svg></div>
 </section>
 </div>
 
@@ -107,10 +120,10 @@ button:disabled{opacity:.4;cursor:not-allowed}.num{text-align:center;font-weight
  <div class="label">Clinical Decision Tree</div>
  <div id="alert" class="alert"><strong>⚠️ Persistent severe hypoxemia</strong><span>P/F 78. Review lung-protective ventilation and consider prone positioning.</span></div>
  <div class="row"><span>ARDS severity</span><strong id="severity">Severe</strong></div><div class="decisionGrid">
-  <div class="decision" id="decOxy"><h3>Oxygenation</h3><p id="decOxyText">Target SpO₂ 88–95% and reassess P/F.</p></div>
-  <div class="decision" id="decLung"><h3>Lung protection</h3><p id="decLungText">Target Vt 4–8 mL/kg PBW; Pplat &lt;30.</p></div>
-  <div class="decision" id="decProne"><h3>Prone positioning</h3><p id="decProneText">Consider prolonged prone positioning when P/F ≤150.</p></div>
-  <div class="decision" id="decRescue"><h3>Rescue / escalation</h3><p id="decRescueText">If refractory, reassess reversible causes, rescue therapies and VV-ECMO referral.</p></div>
+  <div class="decision" id="decOxy"><h3>1. Oxygenation</h3><p id="decOxyText">Target SpO₂ 88–95%. If improving, reduce FiO₂ stepwise first.</p></div>
+  <div class="decision" id="decLung"><h3>2. Lung protection / PEEP</h3><p id="decLungText">Maintain Vt 4–8 mL/kg PBW and Pplat &lt;30; after FiO₂ is low, reassess PEEP.</p></div>
+  <div class="decision" id="decProne"><h3>3. Prone positioning</h3><p id="decProneText">For P/F ≤150, consider prolonged prone positioning (typically ≥16 h/session).</p></div>
+  <div class="decision" id="decRescue"><h3>4. Liberation / rescue</h3><p id="decRescueText">If refractory: rescue/ECMO pathway. If improving with low FiO₂/PEEP: assess SBT/extubation readiness.</p></div>
  </div>
  <div id="suggestion" class="alert good"><strong>How to go ahead</strong><span>Continue lung-protective ventilation and reassess.</span></div>
  <div class="small" style="margin-top:8px">The simulator identifies the problem and suggests the clinical direction. The user decides the intervention.</div>
@@ -205,8 +218,8 @@ function setDecision(kind,title,msg,suggest,targets,alarmNeeded=true){
  $('suggestion').innerHTML='<strong>How to go ahead</strong><span>'+suggest+'</span>';
  ['decOxy','decLung','decProne','decRescue'].forEach(id=>$(id).classList.remove('active'));
  if(kind)$(kind).classList.add('active');
- $('feedbackText').textContent=msg+' The relevant parameter and clinical decision tree are highlighted.';
- if(alarmNeeded){alarmSound();autoNavigate(targets);}
+ $('feedbackText').textContent=msg+' The relevant parameter(s) and clinical decision tree are highlighted.';
+ if(alarmNeeded){alarmSound();autoNavigate(targets);} else if(targets.includes('clinicalDecision')){setTimeout(()=>{const cd=$('clinicalDecision');cd.scrollIntoView({behavior:'smooth',block:'center'});highlight('clinicalDecision',false);},250);}
 }
 function render(){
  const s=state(),p=pbw(),ratio=s.vt/p,comp=clamp(35-(ratio-6)*2,20,45);
@@ -225,45 +238,101 @@ function simulate(reason='ventilator'){
  let co2=48+(9.6-s.vt*s.rr/1000)*3;co2=clamp(co2,30,90);
  let ph=7.40-(co2-40)*.008, pao2=pf*s.fio2, spo2=clamp(84+pf/18,75,99);
  let map=clamp(78-Math.max(0,s.peep-10)*1.4-Math.max(0,ratio-8)*2,48,90);
+ // Simulated cardiovascular response to hypoxemia, hypercapnia and excessive intrathoracic pressure.
+ let hr=clamp(112 + Math.max(0,100-pf)*0.22 + Math.max(0,co2-45)*0.35 - (proned?8:0) - Math.max(0,s.peep-14)*1.5,60,175);
+ if(pf>180 && co2<50) hr=clamp(hr-12,60,175);
+ let pulse=clamp(hr-(map<60?5:0),50,175);
+ let sbp=clamp(map+30,65,150), dbp=clamp(map-15,35,95);
+ const old={hr:+$('hr').textContent||112,pulse:+$('pulse').textContent||110,map:+$('map').textContent||74,spo2:+$('spo2').textContent||89};
  $('pco2').textContent=co2.toFixed(0);$('ph').textContent=ph.toFixed(2);$('pao2').textContent=pao2.toFixed(0);$('pf').textContent=pf.toFixed(0);
- $('spo2').textContent=spo2.toFixed(0);$('map').textContent=map.toFixed(0);$('rrLive').textContent=s.rr;
+ $('spo2').textContent=spo2.toFixed(0);$('map').textContent=map.toFixed(0);$('bp').textContent=sbp.toFixed(0)+'/'+dbp.toFixed(0);$('hr').textContent=hr.toFixed(0);$('pulse').textContent=pulse.toFixed(0);$('rrLive').textContent=s.rr;
  $('severity').textContent=pf<=100?'Severe':pf<=200?'Moderate':pf<=300?'Mild':'No ARDS range';
- let kind='decOxy',title='✅ Current physiology acceptable',msg='No major new deterioration detected.',suggest='Continue lung-protective ventilation and reassess after the next intervention.',targets=[],alarmNeeded=false;
- if(ratio>8){kind='decLung';title='🚨 Excessive tidal volume';msg='Vt is above 8 mL/kg PBW.';suggest='Reduce Vt toward 4–8 mL/kg PBW, generally around 6 mL/kg, and reassess plateau pressure.';targets=['vent','mPpeak'];alarmNeeded=true;}
- else if(map<60){kind='decOxy';title='🚨 Hemodynamic deterioration';msg='MAP has fallen below 60 mmHg after the ventilator change.';suggest='Reassess PEEP, overdistension, preload and right-ventricular tolerance; treat shock as appropriate.';targets=['mMAP'];alarmNeeded=true;}
- else if(pf<=100 && !proned){kind='decProne';title='🚨 Severe refractory hypoxemia';msg='P/F is ≤100 despite current support.';suggest='Confirm lung-protective ventilation, assess PEEP response, prone for a prolonged session and consider rescue therapies/VV-ECMO referral if refractory.';targets=['mPF','abg'];alarmNeeded=true;}
- else if(pf<=150 && !proned){kind='decProne';title='⚠️ Persistent moderate–severe hypoxemia';msg='P/F is ≤150.';suggest='Optimize Vt/PEEP/FiO₂ and strongly consider prolonged prone positioning (≥16 h/session).';targets=['mPF','abg'];alarmNeeded=true;}
- else if(ph<7.20){kind='decOxy';title='🚨 Significant respiratory acidosis';msg='pH is below 7.20.';suggest='Reassess minute ventilation, dead space and synchrony while preserving lung-protective Vt; escalate if safe ventilation cannot maintain acceptable pH.';targets=['mph','mpco2'];alarmNeeded=true;}
- else if(s.fio2>=.8&&spo2>=96){kind='decOxy';title='⚠️ High oxygen exposure';msg='SpO₂ is higher than required while FiO₂ is ≥0.80.';suggest='Once stable, titrate FiO₂ down while maintaining the target oxygenation range.';targets=['mSpO2'];alarmNeeded=true;}
- if(reason==='prone'&&proned){kind=pf<=150?'decProne':'decOxy';targets=['mPF','abg'];title=pf<=150?'⚠️ Oxygenation reassessment after prone':'✅ Oxygenation improved after prone';msg='The patient has been placed prone and the simulated physiology has changed.';suggest=pf<=150?'Reassess P/F and continue prolonged prone positioning if clinically indicated.':'Continue monitoring the oxygenation response and reassess readiness to return supine.';alarmNeeded=true;}
+ const vitalTargets=[];
+ if(Math.abs(map-old.map)>=5 || map<60 || map>90){vitalTargets.push('mMAP','mBP');}
+ if(Math.abs(hr-old.hr)>=8 || hr>=140 || hr<55){vitalTargets.push('mHR');}
+ if(Math.abs(pulse-old.pulse)>=8 || pulse>=140 || pulse<55){vitalTargets.push('mPulse');}
+ if(Math.abs(spo2-old.spo2)>=3 || spo2<88 || spo2>95){vitalTargets.push('mSpO2');}
+ let kind='decOxy',title='✅ Current physiology acceptable',msg='No major new deterioration detected.',suggest='Continue lung-protective ventilation and reassess after the next intervention.',targets=[...vitalTargets],alarmNeeded=false;
+ if(map<60){
+   kind='decLung';title='🚨 Hemodynamic deterioration';msg='BP/MAP has fallen after the ventilator change, with cardiovascular response detected.';
+   suggest='Reassess PEEP, overdistension, preload and right-ventricular tolerance. Check BP, MAP, HR and pulse before making the next ventilator change; treat shock as appropriate.';
+   targets=[...new Set(['mBP','mMAP','mHR','mPulse',...vitalTargets])];alarmNeeded=true;
+ } else if(hr>=140 || pulse>=140){
+   kind='decOxy';title='⚠️ Cardiovascular stress detected';msg='Heart rate/pulse has increased significantly with the simulated respiratory deterioration.';
+   suggest='Look at the vital signs before escalating ventilator support: reassess hypoxemia, hypercapnia, pain/agitation, volume status and PEEP tolerance.';
+   targets=[...new Set(['mHR','mPulse','mBP','mMAP',...vitalTargets])];alarmNeeded=true;
+ } else if(pf<=100 && !proned){
+   kind='decProne';title='🚨 Severe refractory hypoxemia';msg='P/F is ≤100 despite current support.';
+   suggest='Confirm lung-protective ventilation, assess PEEP response, prone for a prolonged session and consider rescue therapies/VV-ECMO referral if refractory.';
+   targets=[...new Set(['mPF','abg',...vitalTargets])];alarmNeeded=true;
+ } else if(pf<=150 && !proned){
+   kind='decProne';title='⚠️ Persistent moderate–severe hypoxemia';msg='P/F is ≤150.';
+   suggest='Optimize Vt/PEEP/FiO₂ and strongly consider prolonged prone positioning (≥16 h/session).';
+   targets=[...new Set(['mPF','abg',...vitalTargets])];alarmNeeded=true;
+ } else if(ph<7.20){
+   kind='decOxy';title='🚨 Significant respiratory acidosis';msg='pH is below 7.20.';
+   suggest='Reassess minute ventilation, dead space and synchrony while preserving lung-protective Vt; escalate if safe ventilation cannot maintain acceptable pH.';
+   targets=[...new Set(['mph','mpco2',...vitalTargets])];alarmNeeded=true;
+ } else if(s.fio2>=.8&&spo2>=96){
+   kind='decOxy';title='⚠️ High oxygen exposure';msg='SpO₂ is higher than required while FiO₂ is ≥0.80.';
+   suggest='Once stable, titrate FiO₂ down while maintaining the target oxygenation range.';
+   targets=[...new Set(['mSpO2','mPF',...vitalTargets])];alarmNeeded=true;
+ }
+ if(reason==='prone'&&proned){
+   kind=pf<=150?'decProne':'decOxy';targets=[...new Set(['mPF','mSpO2','mHR','mBP','mMAP','mPulse',...vitalTargets])];
+   title=pf<=150?'⚠️ Oxygenation + hemodynamic reassessment after prone':'✅ Oxygenation improved after prone';
+   msg='The patient has been placed prone and both oxygenation and cardiovascular response have been reassessed.';
+   suggest=pf<=150?'Review P/F together with BP, MAP, HR and pulse. Continue prolonged prone positioning if clinically indicated and stop/reassess if hemodynamics deteriorate.':'Continue monitoring P/F and vital signs. Reassess readiness to return supine based on the full clinical state.';
+   alarmNeeded=true;
+ }
+ if(!alarmNeeded && pf>150){
+   if(s.fio2>0.40){
+     kind='decOxy';title='✅ Oxygenation improving — next step: wean FiO₂';msg='P/F is improving and the patient is within a safer oxygenation range.';
+     suggest='Reduce FiO₂ in small steps (e.g., 0.05 at a time) while keeping SpO₂ 88–95%. After each change, reassess SpO₂, P/F, BP, MAP, HR and pulse.';
+     targets=[...new Set(['mSpO2','mPF',...vitalTargets,'clinicalDecision'])];
+   } else if(s.peep>5){
+     kind='decLung';title='✅ FiO₂ now reduced — next step: reassess PEEP';msg='FiO₂ is ≤0.40 with improving oxygenation.';
+     suggest='If oxygenation remains stable, consider gradual PEEP reduction while maintaining SpO₂ 88–95%. Reassess P/F AND BP/MAP/HR/pulse after each change.';
+     targets=[...new Set(['mPF','mSpO2','mBP','mMAP','mHR','mPulse','clinicalDecision'])];
+   } else {
+     kind='decRescue';title='✅ Oxygenation stable — next step: assess ventilator liberation';msg='Low FiO₂ and PEEP requirements with improving gas exchange.';
+     suggest='Assess mental status, hemodynamic stability, spontaneous breathing ability and readiness for an SBT/extubation pathway. Continue monitoring BP, MAP, HR and pulse.';
+     targets=[...new Set(['mBP','mMAP','mHR','mPulse','clinicalDecision'])];
+   }
+ }
  setDecision(kind,title,msg,suggest,targets,alarmNeeded);render();
 }
 root.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',()=>{
- startAudio();const id=b.dataset.d,el=$(id);let v=parseFloat(el.textContent)+parseFloat(b.dataset.step);
+const id=b.dataset.d,el=$(id);let v=parseFloat(el.textContent)+parseFloat(b.dataset.step);
  if(id==='fio2')v=clamp(v,.21,1);if(id==='vt')v=clamp(v,200,800);if(id==='setrr')v=clamp(v,8,40);if(id==='peep')v=clamp(v,0,24);
  el.textContent=id==='fio2'?v.toFixed(2):String(v);plat=null;total=null;render();
 }));
-$('apply').addEventListener('click',()=>{startAudio();plat=null;total=null;simulate('ventilator');});
+$('apply').addEventListener('click',()=>{plat=null;total=null;simulate('ventilator');});
 $('height').addEventListener('input',()=>{render();$('feedbackText').textContent='Height changed. PBW and the Vt/PBW target have been recalculated.';});
 $('weight').addEventListener('input',()=>{$('feedbackText').textContent='Actual body weight changed. PBW remains based on height and sex.';});
 $('sex').addEventListener('change',()=>{render();$('feedbackText').textContent='Sex changed. PBW has been recalculated from height and sex.';});
-$('insp').addEventListener('click',()=>{
- startAudio();const s=state(),comp=clamp(35-(s.vt/pbw()-6)*2,20,45);plat=s.peep+s.vt/comp;render();highlight('mPplat');
+$('insp').addEventListener('click',()=>{const s=state(),comp=clamp(35-(s.vt/pbw()-6)*2,20,45);plat=s.peep+s.vt/comp;render();highlight('mPplat');
  if(plat>30)setDecision('decLung','🚨 Plateau pressure >30 cmH₂O','Pplat is above the lung-protective threshold.','Reduce Vt and reassess mechanics while maintaining adequate gas exchange.',['mPplat','mDrive'],true);
  else setDecision('decLung','Pplat measured','Pplat is '+plat.toFixed(0)+' cmH₂O.','Interpret Pplat together with PEEP and driving pressure.',['mPplat','clinicalDecision'],false);
 });
-$('exp').addEventListener('click',()=>{
- startAudio();const s=state(),auto=s.rr>30?Math.min(6,(s.rr-30)*.8):0;total=s.peep+auto;render();highlight('mTotalPEEP');highlight('mAutoPEEP');
+$('exp').addEventListener('click',()=>{const s=state(),auto=s.rr>30?Math.min(6,(s.rr-30)*.8):0;total=s.peep+auto;render();highlight('mTotalPEEP');highlight('mAutoPEEP');
  if(auto>=3)setDecision('decLung','⚠️ Intrinsic PEEP detected','Auto-PEEP is '+auto.toFixed(0)+' cmH₂O.','Reassess expiratory time, RR and dynamic hyperinflation before further increasing minute ventilation.',['mAutoPEEP','mTotalPEEP'],true);
  else setDecision('decLung','Total PEEP measured','Total PEEP is '+total.toFixed(0)+' cmH₂O.','Compare total PEEP with set PEEP and calculate driving pressure when Pplat is available.',['mTotalPEEP'],false);
 });
-$('prone').addEventListener('click',()=>{startAudio();proned=!proned;$('prone').textContent=proned?'Return Supine':'Prone';simulate('prone');});
-$('recruit').addEventListener('click',()=>{startAudio();recruitUsed=!recruitUsed;simulate('recruit');$('feedbackText').textContent='Recruitment maneuver simulated. Observe oxygenation and hemodynamic consequences; prolonged/aggressive recruitment is not routine ARDS care.';});
-$('rescue').addEventListener('click',()=>{startAudio();rescueUsed=!rescueUsed;simulate('rescue');$('feedbackText').textContent='Rescue pathway activated: reassess optimized ventilation, prone positioning and reversible causes; inhaled pulmonary vasodilator may be considered as a bridge, with VV-ECMO referral for refractory severe ARDS when appropriate.';});
+$('prone').addEventListener('click',()=>{
+ proned=!proned;$('prone').textContent=proned?'Return Supine':'Prone';
+ const cue=$('positionCue'),badge=$('positionBadge'),txt=$('positionCueText');
+ cue.classList.toggle('supine',!proned);cue.classList.toggle('proneCue',proned);
+ badge.textContent=proned?'PRONE':'SUPINE';
+ txt.innerHTML=proned?'<strong>Prone:</strong> the plantar surfaces/soles face downward; from the foot end, the heels are the prominent posterior landmark.':'<strong>Supine:</strong> soles/plantar surfaces face upward. Toes point toward the head; heels remain at the lower end.';
+ simulate('prone');
+});
+$('recruit').addEventListener('click',()=>{recruitUsed=!recruitUsed;simulate('recruit');$('feedbackText').textContent='Recruitment maneuver simulated. Observe oxygenation and hemodynamic consequences; prolonged/aggressive recruitment is not routine ARDS care.';});
+$('rescue').addEventListener('click',()=>{rescueUsed=!rescueUsed;simulate('rescue');$('feedbackText').textContent='Rescue pathway activated: reassess optimized ventilation, prone positioning and reversible causes; inhaled pulmonary vasodilator may be considered as a bridge, with VV-ECMO referral for refractory severe ARDS when appropriate.';});
 $('audioBtn').addEventListener('click',()=>{if(audioOn){audioOn=false;clearTimeout(pulseTimer);clearTimeout(breathTimer);clearInterval(alarmTimer);$('audioBtn').textContent='🔊 Start Monitor Audio';$('audioState').textContent='Monitor audio muted.';}else startAudio();});
 $('up').addEventListener('click',()=>window.scrollBy({top:-window.innerHeight*.78,behavior:'smooth'}));
 $('down').addEventListener('click',()=>window.scrollBy({top:window.innerHeight*.78,behavior:'smooth'}));
-$('hr').textContent='112';$('map').textContent='74';$('spo2').textContent='89';$('rrLive').textContent='30';
+$('hr').textContent='112';$('pulse').textContent='110';$('map').textContent='74';$('bp').textContent='104/59';$('spo2').textContent='89';$('rrLive').textContent='30';
 render();
 })();
 </script>
