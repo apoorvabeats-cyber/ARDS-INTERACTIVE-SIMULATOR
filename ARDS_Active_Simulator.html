@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARDS Active Simulator</title>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eaf2f7;background:#07131b}
+*{box-sizing:border-box}body{margin:0;background:#07131b}.app{max-width:1100px;margin:auto;padding:14px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 4px}
+h1{font-size:20px;margin:0}.sub{font-size:12px;color:#9fb2bd}
+.grid{display:grid;gap:12px}.top{grid-template-columns:1fr 1fr 1fr}.main{grid-template-columns:1fr 1.2fr 1fr}
+.card{background:#0d202b;border:1px solid #27404d;border-radius:14px;padding:14px}
+.label{font-size:11px;color:#8fa7b4;text-transform:uppercase;letter-spacing:.08em}
+.row{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #203641}
+.row:last-child{border-bottom:0}.big{font-size:24px;font-weight:800}.unit{color:#9fb2bd;font-size:11px}
+.control{display:grid;grid-template-columns:1fr 46px 74px 46px;gap:6px;align-items:center;margin:9px 0}
+button{min-height:42px;border:1px solid #34515f;border-radius:9px;background:#102a36;color:#eaf2f7;font-weight:750;cursor:pointer}
+button.primary{background:#0d6f87;border-color:#1694b2}button.warn{background:#4b2525;border-color:#b55353}
+button:disabled{opacity:.4;cursor:not-allowed}.num{text-align:center;font-weight:800}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.alert{margin-top:12px;padding:13px;border-radius:11px;background:#392126;border:1px solid #9a4b56}
+.alert.good{background:#143027;border-color:#2d8062}.alert strong{display:block;margin-bottom:4px}
+.wave{height:110px;background:#071820;border:1px solid #203943;border-radius:10px;margin-top:10px;position:relative;overflow:hidden}
+.wave svg{width:100%;height:100%}.small{font-size:12px;color:#9fb2bd;line-height:1.45}
+.nav{display:flex;justify-content:center;gap:10px;margin:12px 0}.nav button{min-width:130px}
+.flash{animation:flash .9s ease 2}@keyframes flash{50%{box-shadow:0 0 0 4px #d98b39}}
+@media(max-width:850px){.top,.main{grid-template-columns:1fr}.actions{grid-template-columns:1fr 1fr 1fr}.app{padding:10px}}
+@media(max-width:480px){header{align-items:flex-start}.control{grid-template-columns:1fr 42px 68px 42px}.actions{grid-template-columns:1fr}.nav{position:sticky;bottom:8px;background:#07131b;padding:7px;border-radius:12px}}
+</style>
+</head>
+<body>
+<div class="app" id="sim">
+<header><div><h1>ARDS ACTIVE SIMULATOR</h1><div class="sub">Training simulation • single-patient closed-loop physiology</div></div><button id="mute">🔊 Audio ON</button></header>
+
+<div class="grid top" id="topSection">
+<section class="card" id="patient"><div class="label">Patient</div><div class="big">ARDS Case</div><div class="small">Pneumonia-associated acute hypoxemic respiratory failure</div><div class="row"><span>Height</span><strong>170 cm</strong></div><div class="row"><span>Sex</span><select id="sex" style="width:110px;padding:7px;border:1px solid #34515f;border-radius:8px;background:#102a36;color:#eaf2f7"><option value="male">Male</option><option value="female">Female</option></select></div><div class="row"><span>Weight</span><strong>70 kg</strong></div><div class="row"><span>PBW</span><strong id="pbw">66.9 kg</strong></div></section>
+<section class="card" id="vitals"><div class="label">Live vitals</div><div class="row"><span>HR</span><strong id="hr">112</strong> bpm</div><div class="row"><span>MAP</span><strong id="map">74</strong> mmHg</div><div class="row"><span>SpO₂</span><strong id="spo2">89</strong>%</div><div class="row"><span>RR</span><strong id="rrLive">30</strong>/min</div></section>
+<section class="card" id="abg"><div class="label">Live ABG</div><div class="row"><span>pH</span><strong id="ph">7.28</strong></div><div class="row"><span>PaCO₂</span><strong id="pco2">55</strong> mmHg</div><div class="row"><span>PaO₂</span><strong id="pao2">62</strong> mmHg</div><div class="row"><span>HCO₃⁻</span><strong>25</strong> mmol/L</div><div class="row"><span>P/F</span><strong id="pf">78</strong></div></section>
+</div>
+
+<div class="grid main" style="margin-top:12px">
+<section class="card" id="vent">
+<div class="label">Only user-editable ventilator controls</div>
+<div class="control"><span>Vt (mL)</span><button data-d="vt" data-step="-20">−</button><span class="num" id="vt">400</span><button data-d="vt" data-step="20">+</button></div>
+<div class="control"><span>RR (/min)</span><button data-d="setrr" data-step="-1">−</button><span class="num" id="setrr">24</span><button data-d="setrr" data-step="1">+</button></div>
+<div class="control"><span>FiO₂</span><button data-d="fio2" data-step="-0.05">−</button><span class="num" id="fio2">0.80</span><button data-d="fio2" data-step="0.05">+</button></div>
+<div class="control"><span>PEEP</span><button data-d="peep" data-step="-1">−</button><span class="num" id="peep">10</span><button data-d="peep" data-step="1">+</button></div>
+<button id="apply" class="primary" style="width:100%;margin-top:8px">APPLY VENTILATOR CHANGE</button>
+<div class="small" style="margin-top:8px">No direct editing of ABG, pressures or calculated physiology.</div>
+</section>
+
+<section class="card" id="measure">
+<div class="label">Ventilator measurements</div>
+<div class="row"><span>Ppeak</span><strong id="ppeak">28</strong> cmH₂O</div>
+<div class="row"><span>Pplat</span><strong id="pplat">—</strong></div>
+<div class="row"><span>Total PEEP</span><strong id="totalpeep">—</strong></div>
+<div class="row"><span>Auto-PEEP</span><strong id="autopeep">—</strong></div>
+<div class="row"><span>Driving pressure</span><strong id="drive">—</strong></div>
+<div class="row"><span>Minute ventilation</span><strong id="mv">9.6</strong> L/min</div>
+<div class="actions">
+<button id="insp">Inspiratory Hold</button>
+<button id="exp">Expiratory Hold</button>
+<button id="prone" class="primary">Prone</button>
+<button id="recruit">Recruitment Maneuver</button>
+<button id="rescue" class="warn">Rescue Therapies</button>
+</div>
+<div class="wave"><svg viewBox="0 0 600 110" preserveAspectRatio="none"><polyline id="wave" fill="none" stroke="#5fd3ee" stroke-width="3" points="0,82 30,82 48,22 70,82 120,82 138,22 160,82 210,82 228,22 250,82 300,82 318,22 340,82 390,82 408,22 430,82 480,82 498,22 520,82 570,82 588,22 600,82"/></svg></div>
+<div class="small" style="margin-top:8px">Pplat appears only after Inspiratory Hold. Total PEEP and Auto-PEEP appear only after Expiratory Hold.</div>
+</section>
+
+<section class="card" id="clinical">
+<div class="label">Clinical decision engine</div>
+<div id="alert" class="alert"><strong>⚠️ Persistent severe hypoxemia</strong><span>P/F 78. Optimize lung-protective ventilation and consider prone positioning.</span></div>
+<div class="row"><span>ARDS severity</span><strong id="severity">Severe</strong></div>
+<div class="row"><span>Vt target</span><strong>4–8 mL/kg PBW</strong></div>
+<div class="row"><span>Pplat target</span><strong>&lt;30 cmH₂O</strong></div>
+<div class="row"><span>Oxygen target</span><strong>SpO₂ 88–95%</strong></div>
+<div class="row"><span>Driving pressure</span><strong>Preferably &lt;15</strong></div>
+<div class="small" style="margin-top:10px">The simulator identifies deterioration and suggests the next clinical direction; the user decides the intervention.</div><div id="suggestion" class="alert good" style="margin-top:10px"><strong>Suggested approach</strong><span>Continue lung-protective ventilation and reassess.</span></div>
+</section>
+</div>
+
+<section class="card" id="feedback" style="margin-top:12px"><div class="label">Simulator feedback</div><div class="small" id="feedbackText">Change Vt, RR, FiO₂ or PEEP and apply the change. The virtual patient will respond.</div></section>
+<div class="nav"><button id="up">↑ SCROLL UP</button><button id="down">↓ SCROLL DOWN</button></div>
+</div>
+
+<script>
+(()=> {
+const root=document.getElementById('sim');
+let plat=null,total=null,proned=false,audioOn=true,audioCtx=null,rescueUsed=false,recruitUsed=false;
+const $=id=>document.getElementById(id);
+function clamp(x,a,b){return Math.max(a,Math.min(b,x));}
+function pbw(){const h=170;return $('sex').value==='male'?(50+0.91*(h-152.4)):(45.5+0.91*(h-152.4));}
+function beep(freq=900,dur=.055,delay=0){if(!audioOn)return;try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.value=freq;o.type='sine';g.gain.setValueAtTime(.0001,audioCtx.currentTime+delay);g.gain.exponentialRampToValueAtTime(.055,audioCtx.currentTime+delay+.008);g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+delay+dur);o.connect(g);g.connect(audioCtx.destination);o.start(audioCtx.currentTime+delay);o.stop(audioCtx.currentTime+delay+dur+.01);}catch(e){}}
+function alarm(){beep(620,.08,0);beep(620,.08,.13);beep(620,.08,.26);beep(620,.08,.39);}
+function focus(id){const el=$(id);if(!el)return;el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}
+function state(){return {vt:+$('vt').textContent,rr:+$('setrr').textContent,fio2:+$('fio2').textContent,peep:+$('peep').textContent};}
+function render(){
+ const s=state(),p=pbw(),ratio=s.vt/p,comp=clamp(35-(ratio-6)*2,20,45),ppeak=s.peep+s.vt/comp+4;
+ $('pbw').textContent=p.toFixed(1)+' kg';
+ $('ppeak').textContent=ppeak.toFixed(0);
+ $('mv').textContent=(s.vt*s.rr/1000).toFixed(1);
+ if(plat!==null)$('pplat').textContent=plat.toFixed(0)+' cmH₂O';
+ if(total!==null){$('totalpeep').textContent=total.toFixed(0)+' cmH₂O';$('autopeep').textContent=Math.max(0,total-s.peep).toFixed(0)+' cmH₂O';if(plat!==null)$('drive').textContent=(plat-total).toFixed(0)+' cmH₂O';}
+}
+function setAlert(title,msg,suggest,target,critical){
+ $('alert').innerHTML='<strong>'+title+'</strong><span>'+msg+'</span>';
+ $('suggestion').innerHTML='<strong>How to go ahead</strong><span>'+suggest+'</span>';
+ $('feedbackText').textContent=msg+' Review the highlighted area and choose the next action.';
+ if(critical){alarm();focus(target);}
+}
+function simulate(){
+ const s=state(),p=pbw(),ratio=s.vt/p;
+ let pf=55+s.peep*3+(ratio<=7?10:0)+(proned?45:0);
+ if(recruitUsed) pf+=15;
+ if(rescueUsed) pf+=25;
+ pf=clamp(pf,45,420);
+ let co2=48+(9.6-s.vt*s.rr/1000)*3;
+ co2=clamp(co2,30,90);
+ let ph=7.40-(co2-40)*.008;
+ let pao2=pf*s.fio2,spo2=clamp(84+pf/18,75,99);
+ let map=clamp(78-Math.max(0,s.peep-10)*1.4-Math.max(0,ratio-8)*2,48,90);
+ $('pco2').textContent=co2.toFixed(0);$('ph').textContent=ph.toFixed(2);$('pao2').textContent=pao2.toFixed(0);$('pf').textContent=pf.toFixed(0);$('spo2').textContent=spo2.toFixed(0);$('map').textContent=map.toFixed(0);$('rrLive').textContent=s.rr;
+ const sev=pf<=100?'Severe':pf<=200?'Moderate':pf<=300?'Mild':'No ARDS range';$('severity').textContent=sev;
+
+ if(ratio>8){
+   setAlert('🚨 Excessive tidal volume','Vt is above the lung-protective range.','Reduce Vt toward 4–8 mL/kg PBW, generally starting around 6 mL/kg, and reassess Pplat.', 'vent', true);
+ } else if(map<60){
+   setAlert('🚨 Hemodynamic deterioration','MAP has fallen after the ventilator change.','Reassess PEEP, overdistension, preload and right-ventricular tolerance; correct shock as appropriate.','vitals',true);
+ } else if(pf<=100 && !proned){
+   setAlert('🚨 Severe refractory hypoxemia','P/F remains ≤100. The patient is deteriorating despite current support.','Confirm lung-protective ventilation, assess PEEP response, initiate prolonged prone positioning and consider rescue therapies/ECMO referral if hypoxemia remains refractory.','abg',true);
+ } else if(pf<=150 && !proned){
+   setAlert('⚠️ Persistent moderate–severe hypoxemia','P/F remains ≤150.','Optimize Vt/PEEP/FiO₂, then strongly consider early prolonged prone positioning (≥16 h/session).','abg',true);
+ } else if(ph<7.20){
+   setAlert('🚨 Significant respiratory acidosis','pH is below 7.20.','Reassess minute ventilation, dead space and synchrony while preserving lung-protective Vt; consider escalation if safe ventilation cannot maintain acceptable pH.','abg',true);
+ } else if(s.fio2>=.8 && spo2>=96){
+   setAlert('⚠️ High oxygen exposure','Oxygenation is more than required.','Once stable, titrate FiO₂ down while maintaining the target SpO₂/PaO₂ range.','vitals',true);
+ } else {
+   setAlert('✅ No major new deterioration','Current simulated physiology is acceptable.','Continue lung-protective ventilation and reassess after each change; use holds when you need measured mechanics.','clinical',false);
+ }
+ render();
+}
+root.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',()=>{
+ let id=b.dataset.d,el=$(id),v=parseFloat(el.textContent),step=parseFloat(b.dataset.step);
+ v+=step;if(id==='fio2')v=clamp(v,.21,1);if(id==='vt')v=clamp(v,200,800);if(id==='setrr')v=clamp(v,8,40);if(id==='peep')v=clamp(v,0,24);
+ el.textContent=id==='fio2'?v.toFixed(2):String(v);plat=null;total=null;render();
+}));
+$('apply').addEventListener('click',()=>{plat=null;total=null;simulate();});
+$('sex').addEventListener('change',()=>{render();$('feedbackText').textContent='Sex updated. Predicted body weight has been recalculated automatically from height and sex.';});
+$('insp').addEventListener('click',()=>{
+ const s=state(),comp=clamp(35-(s.vt/pbw()-6)*2,20,45);plat=s.peep+s.vt/comp;
+ render();beep(1000,.08);$('feedbackText').textContent='Inspiratory hold completed. Plateau pressure has been measured.';focus('measure');
+ if(plat>30)setAlert('🚨 High plateau pressure','Pplat is above 30 cmH₂O.','Reduce Vt and reassess mechanics while maintaining adequate gas exchange.', 'measure', true);
+});
+$('exp').addEventListener('click',()=>{
+ const s=state(),auto=s.rr>30?Math.min(6,(s.rr-30)*.8):0;total=s.peep+auto;
+ render();beep(800,.08);$('feedbackText').textContent='Expiratory hold completed. Total PEEP and Auto-PEEP have been measured.';focus('measure');
+ if(auto>=3)setAlert('⚠️ Intrinsic PEEP detected','Auto-PEEP is elevated.','Reassess expiratory time, respiratory rate and flow demand; avoid simply escalating minute ventilation without considering dynamic hyperinflation.','measure',true);
+});
+$('prone').addEventListener('click',()=>{proned=!proned;$('prone').textContent=proned?'Return Supine':'Prone';simulate();$('feedbackText').textContent=proned?'Patient is now prone; oxygenation response has been simulated.':'Patient returned supine.';});
+$('recruit').addEventListener('click',()=>{
+ recruitUsed=!recruitUsed;
+ if(recruitUsed){beep(700,.07);$('feedbackText').textContent='A recruitment maneuver has been simulated. Observe oxygenation and hemodynamic consequences; aggressive/prolonged recruitment is not routine ARDS care.';simulate();focus('clinical');}
+});
+$('rescue').addEventListener('click',()=>{
+ rescueUsed=!rescueUsed;
+ if(rescueUsed){beep(550,.07);$('feedbackText').textContent='Rescue therapy pathway activated: reassess optimized ventilation, prone positioning and reversible causes; inhaled pulmonary vasodilator may be considered as a bridge, with VV-ECMO referral for refractory severe ARDS when appropriate.';simulate();focus('clinical');}
+});
+$('mute').addEventListener('click',()=>{audioOn=!audioOn;$('mute').textContent=audioOn?'🔊 Audio ON':'🔇 Audio OFF';});
+$('up').addEventListener('click',()=>window.scrollBy({top:-window.innerHeight*.75,behavior:'smooth'}));
+$('down').addEventListener('click',()=>window.scrollBy({top:window.innerHeight*.75,behavior:'smooth'}));
+render();
+})();
+</script>
+</body>
+</html>
