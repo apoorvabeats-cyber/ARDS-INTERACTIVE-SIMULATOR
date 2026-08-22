@@ -67,8 +67,7 @@ button:disabled{opacity:.4;cursor:not-allowed}.num{text-align:center;font-weight
  <div class="metric" id="mBP"><div class="name">BP</div><div class="val"><span id="bp">104/59</span> mmHg</div></div>
  <div class="metric" id="mMAP"><div class="name">MAP</div><div class="val"><span id="map">74</span> mmHg</div></div>
  <div class="metric" id="mHR"><div class="name">Heart rate</div><div class="val"><span id="hr">112</span> bpm</div></div>
- <div class="metric" id="mPulse"><div class="name">Pulse</div><div class="val"><span id="pulse">110</span> bpm</div></div>
- <div class="metric" id="mSpO2"><div class="name">SpO₂</div><div class="val"><span id="spo2">89</span>%</div></div>
+<div class="metric" id="mSpO2"><div class="name">SpO₂</div><div class="val"><span id="spo2">89</span>%</div></div>
  <div class="metric" id="mRR"><div class="name">Respiratory rate</div><div class="val"><span id="rrLive">30</span>/min</div></div>
 </section>
 
@@ -232,7 +231,7 @@ function highlight(id,problem=true){
 function autoNavigate(targets){
  const list=[...new Set(targets.filter(Boolean))];
  if(!list.length)return;
- const vitalIds=['mBP','mMAP','mHR','mPulse','mSpO2','mRR'];
+ const vitalIds=['mBP','mMAP','mHR','mSpO2','mRR'];
  const vital=list.filter(id=>vitalIds.includes(id));
  const ordered=[...vital,...list.filter(id=>!vitalIds.includes(id))];
  const first=$(ordered[0]);
@@ -252,7 +251,7 @@ function setDecision(kind,title,msg,suggest,targets,alarmNeeded=true){
  ['decOxy','decLung','decProne','decRescue'].forEach(id=>$(id).classList.remove('active'));
  if(kind)$(kind).classList.add('active');
  $('feedbackText').textContent=msg+' The relevant parameter(s) and clinical decision tree are highlighted.';
- if(alarmNeeded){alarmSound();autoNavigate(targets);} else if(targets.includes('clinicalDecision')){setTimeout(()=>{const cd=$('clinicalDecision');cd.scrollIntoView({behavior:'smooth',block:'center'});highlight('clinicalDecision',false);},250);}
+ if(targets.length){if(alarmNeeded)alarmSound();autoNavigate(targets);}
 }
 function render(){
  const s=state(),p=pbw(),ratio=s.vt/p,comp=clamp(35-(ratio-6)*2,20,45);
@@ -290,18 +289,17 @@ function simulate(reason='ventilator'){
  let sbp=clamp(map+30,65,150), dbp=clamp(map-15,35,95);
  const old={hr:+$('hr').textContent||112,pulse:+$('pulse').textContent||110,map:+$('map').textContent||74,spo2:+$('spo2').textContent||89};
  $('pco2').textContent=co2.toFixed(0);$('ph').textContent=ph.toFixed(2);$('pao2').textContent=pao2.toFixed(0);$('pf').textContent=pf.toFixed(0);
- $('spo2').textContent=spo2.toFixed(0);$('map').textContent=map.toFixed(0);$('bp').textContent=sbp.toFixed(0)+'/'+dbp.toFixed(0);$('hr').textContent=hr.toFixed(0);$('pulse').textContent=pulse.toFixed(0);$('rrLive').textContent=s.rr;
+ $('spo2').textContent=spo2.toFixed(0);$('map').textContent=map.toFixed(0);$('bp').textContent=sbp.toFixed(0)+'/'+dbp.toFixed(0);$('hr').textContent=hr.toFixed(0);$('rrLive').textContent=s.rr;
  $('severity').textContent=pf<=100?'Severe':pf<=200?'Moderate':pf<=300?'Mild':'No ARDS range';
  const vitalTargets=[];
- if(Math.abs(map-old.map)>=5 || map<60 || map>90){vitalTargets.push('mMAP','mBP');}
- if(Math.abs(hr-old.hr)>=8 || hr>=140 || hr<55){vitalTargets.push('mHR');}
- if(Math.abs(pulse-old.pulse)>=8 || pulse>=140 || pulse<55){vitalTargets.push('mPulse');}
- if(Math.abs(spo2-old.spo2)>=3 || spo2<88 || spo2>95){vitalTargets.push('mSpO2');}
+ if(map<=65){vitalTargets.push('mMAP','mBP');}
+ if(hr<50 || hr>100){vitalTargets.push('mHR');} if(rr>18 || rr<8){vitalTargets.push('mRR');}
+ if(Math.abs(spo2-old.spo2)>=3 || spo2<=88 || spo2>95){vitalTargets.push('mSpO2');}
  let kind='decOxy',title='✅ Current physiology acceptable',msg='No major new deterioration detected.',suggest='Continue lung-protective ventilation and reassess after the next intervention.',targets=[...vitalTargets],alarmNeeded=false;
  if(map<60){
    kind='decLung';title='🚨 Hemodynamic deterioration';msg='BP/MAP has fallen after the ventilator change, with cardiovascular response detected.';
-   suggest='Reassess PEEP, overdistension, preload and right-ventricular tolerance. Check BP, MAP, HR and pulse before making the next ventilator change; treat shock as appropriate.';
-   targets=[...new Set(['mBP','mMAP','mHR','mPulse',...vitalTargets])];alarmNeeded=true;
+   suggest='Reassess PEEP, overdistension, preload and right-ventricular tolerance. Check BP, MAP and HR before making the next ventilator change; treat shock as appropriate.';
+   targets=[...new Set(['mBP','mMAP','mHR',...vitalTargets])];alarmNeeded=true;
  } else if(hr>=140 || pulse>=140){
    kind='decOxy';title='⚠️ Cardiovascular stress detected';msg='Heart rate/pulse has increased significantly with the simulated respiratory deterioration.';
    suggest='Look at the vital signs before escalating ventilator support: reassess hypoxemia, hypercapnia, pain/agitation, volume status and PEEP tolerance.';
@@ -324,25 +322,25 @@ function simulate(reason='ventilator'){
    targets=[...new Set(['mSpO2','mPF',...vitalTargets])];alarmNeeded=true;
  }
  if(reason==='prone'&&proned){
-   kind=pf<=150?'decProne':'decOxy';targets=[...new Set(['mPF','mSpO2','mHR','mBP','mMAP','mPulse',...vitalTargets])];
+   kind=pf<=150?'decProne':'decOxy';targets=[...new Set(['mPF','mSpO2','mHR','mBP','mMAP',...vitalTargets])];
    title=pf<=150?'⚠️ Oxygenation + hemodynamic reassessment after prone':'✅ Oxygenation improved after prone';
    msg='The patient has been placed prone and both oxygenation and cardiovascular response have been reassessed.';
-   suggest=pf<=150?'Review P/F together with BP, MAP, HR and pulse. Continue prolonged prone positioning if clinically indicated and stop/reassess if hemodynamics deteriorate.':'Continue monitoring P/F and vital signs. Reassess readiness to return supine based on the full clinical state.';
+   suggest=pf<=150?'Review P/F together with BP, MAP and HR. Continue prolonged prone positioning if clinically indicated and stop/reassess if hemodynamics deteriorate.':'Continue monitoring P/F and vital signs. Reassess readiness to return supine based on the full clinical state.';
    alarmNeeded=true;
  }
  if(!alarmNeeded && pf>150){
    if(s.fio2>0.40){
      kind='decOxy';title='✅ Oxygenation improving — next step: wean FiO₂';msg='P/F is improving and the patient is within a safer oxygenation range.';
-     suggest='Reduce FiO₂ in small steps (e.g., 0.05 at a time) while keeping SpO₂ 88–95%. After each change, reassess SpO₂, P/F, BP, MAP, HR and pulse.';
+     suggest='Reduce FiO₂ in small steps (e.g., 0.05 at a time) while keeping SpO₂ 88–95%. After each change, reassess SpO₂, P/F, BP, MAP and HR.';
      targets=[...new Set(['mSpO2','mPF',...vitalTargets,'clinicalDecision'])];
    } else if(s.peep>5){
      kind='decLung';title='✅ FiO₂ now reduced — next step: reassess PEEP';msg='FiO₂ is ≤0.40 with improving oxygenation.';
-     suggest='If oxygenation remains stable, consider gradual PEEP reduction while maintaining SpO₂ 88–95%. Reassess P/F AND BP/MAP/HR/pulse after each change.';
-     targets=[...new Set(['mPF','mSpO2','mBP','mMAP','mHR','mPulse','clinicalDecision'])];
+     suggest='If oxygenation remains stable, consider gradual PEEP reduction while maintaining SpO₂ 88–95%. Reassess P/F AND BP/MAP/HR after each change.';
+     targets=[...new Set(['mPF','mSpO2','mBP','mMAP','mHR','clinicalDecision'])];
    } else {
      kind='decRescue';title='✅ Oxygenation stable — next step: assess ventilator liberation';msg='Low FiO₂ and PEEP requirements with improving gas exchange.';
-     suggest='Assess mental status, hemodynamic stability, spontaneous breathing ability and readiness for an SBT/extubation pathway. Continue monitoring BP, MAP, HR and pulse.';
-     targets=[...new Set(['mBP','mMAP','mHR','mPulse','clinicalDecision'])];
+     suggest='Assess mental status, hemodynamic stability, spontaneous breathing ability and readiness for an SBT/extubation pathway. Continue monitoring BP, MAP and HR.';
+     targets=[...new Set(['mBP','mMAP','mHR','clinicalDecision'])];
    }
  }
  if(vitalTargets.length){ targets=[...new Set([...vitalTargets,...targets])]; } updateTrajectory(pf,s,ph,map,hr); setDecision(kind,title,msg,suggest,targets,alarmNeeded);render();
@@ -384,7 +382,7 @@ $('audioBtn').addEventListener('click',async()=>{
 });
 $('up').addEventListener('click',()=>window.scrollBy({top:-window.innerHeight*.78,behavior:'smooth'}));
 $('down').addEventListener('click',()=>window.scrollBy({top:window.innerHeight*.78,behavior:'smooth'}));
-$('hr').textContent='112';$('pulse').textContent='110';$('map').textContent='74';$('bp').textContent='104/59';$('spo2').textContent='89';$('rrLive').textContent='30';
+$('hr').textContent='112';$('map').textContent='74';$('bp').textContent='104/59';$('spo2').textContent='89';$('rrLive').textContent='30';
 render();
 })();
 </script>
