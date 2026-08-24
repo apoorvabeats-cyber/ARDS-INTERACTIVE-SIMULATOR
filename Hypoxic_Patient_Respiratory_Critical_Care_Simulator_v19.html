@@ -412,9 +412,15 @@ calculatePhase1MAP();
 function calculateABG(){
  let ph=+$('ph').value,pao2=+$('pao2').value,paco2=+$('paco2').value,fio2=+$('abgFio2').value,patm=+$('patm').value;
  let PAO2=fio2*(patm-47)-paco2/0.8,aa=PAO2-pao2,pf=pao2/fio2;
+let aaInterpretation =
+  aa<=20
+  ? 'A–a gradient is not significantly elevated — pure alveolar hypoventilation / low inspired oxygen is more likely.'
+  : aa<=40
+  ? 'A–a gradient is elevated — consider V/Q mismatch, early shunt or diffusion impairment.'
+  : 'A–a gradient is markedly elevated — significant V/Q mismatch, shunt or diffusion impairment is likely.';
  let type=paco2>45&&pao2<60?(aa>20?'Mixed Type 1 + Type 2 RF':'Type 2 RF'):(pao2<60&&aa>20?'Type 1 RF':'No classic Type 1/2 RF');
  state={ph,pao2,paco2,fio2,aa,pf,hco3:+$('hco3').value,lactate:+$('lactate').value,type};
- box('abgOut','ABG + A–a GRADIENT','PAO₂ = <b>'+PAO2.toFixed(1)+' mmHg</b><br>A–a gradient = <b>'+aa.toFixed(1)+' mmHg</b><br>P/F ratio = <b>'+pf.toFixed(0)+'</b><br><br><b>CLASSIFICATION:</b> '+type,'warn');classify();showBookPage('classification')
+ box('abgOut','ABG + A–a GRADIENT','PAO₂ = <b>'+PAO2.toFixed(1)+' mmHg</b><br>PaO₂ = <b>'+pao2.toFixed(1)+' mmHg</b><br>A–a gradient = <b>'+aa.toFixed(1)+' mmHg</b><br>P/F ratio = <b>'+pf.toFixed(0)+'</b><br><br><b>A–a INTERPRETATION:</b> '+aaInterpretation+'<br><br><b>CLASSIFICATION:</b> '+type,'warn');classify();showBookPage('classification')
 }
 function classify(){
  let t=state.type;
@@ -457,7 +463,50 @@ function classify(){
 function goType1(){ showBookPage('type1'); }
 function goType2(){ showBookPage('type2'); }
 function goMixed(){ showBookPage('mixed'); }
-function reassessConventional(){let s=+$('t1spo2').value,rr=+$('t1rr').value,w=$('t1wob').value,ok=s>=88&&rr<30&&w==='Low';box('t1out','10–15 MIN REASSESSMENT','SpO₂ '+s+'%; RR '+rr+'/min; HR '+$('t1hr').value+'/min; WOB '+w+'.<br><br><b>INTERPRETATION:</b> '+(ok?'Conventional oxygen appears adequate.':'Conventional oxygen is inadequate or work of breathing remains concerning.')+'<br><br><b>WHAT TO DO:</b> '+(ok?'Continue current oxygen and move to etiology.':'Escalate to HFNC or NIV.'),ok?'good':'warn');if(!ok)$('t1Choices').classList.remove('hidden')}
+function reassessConventional(){
+  let s=+$('t1spo2').value,
+      rr=+$('t1rr').value,
+      w=$('t1wob').value,
+      ok=s>=88&&rr<30&&w==='Low';
+
+  box(
+    't1out',
+    '10–15 MIN REASSESSMENT',
+    'SpO₂ '+s+'%; RR '+rr+'/min; HR '+$('t1hr').value+'/min; WOB '+w+
+    '.<br><br><b>INTERPRETATION:</b> '+
+    (ok
+      ? 'Conventional oxygen appears adequate and the patient is stabilized.'
+      : 'Conventional oxygen is inadequate or work of breathing remains concerning.'
+    )+
+    '<br><br><b>WHAT TO DO:</b> '+
+    (ok
+      ? 'Continue current oxygen support and proceed to etiology.'
+      : 'Escalate to HFNC or NIV.'
+    ),
+    ok?'good':'warn'
+  );
+
+  if(ok){
+    let old=$('oxygenEtiologyButton');
+    if(old)old.remove();
+
+    let b=document.createElement('button');
+    b.id='oxygenEtiologyButton';
+    b.className='btn green';
+    b.textContent='GO TO ETIOLOGY →';
+    b.onclick=function(){
+      showBookPage('etiology');
+      setTimeout(function(){
+        let e=$('etiology');
+        if(e)e.scrollIntoView({behavior:'smooth',block:'start'});
+      },100);
+    };
+
+    $('t1out').appendChild(b);
+  }else{
+    $('t1Choices').classList.remove('hidden');
+  }
+}
 function openHFNC(){ showBookPage('hfnc'); }
 function openNIV(){ showBookPage('niv'); }
 function assessHFNC(){let s=+$('hfSpo2').value,f=+$('hfFio2').value,rr=+$('hfRR').value,rox=(s/f)/rr,map=+$('hfMAP').value,w=$('hfWob').value,c=$('hfCons').value;let danger=c!=='Awake'||w==='Exhaustion'||map<65||s<88||rr>=35;let favorable=rox>=4.88&&w==='Low'&&map>=65&&s>=88&&c==='Awake';box('hfOut','HFNC RESPONSE','ROX = <b>'+rox.toFixed(2)+'</b><br>SpO₂ '+s+'%; RR '+rr+'; HR '+$('hfHR').value+'; MAP '+map+'; WOB '+w+'; consciousness '+c+'.<br><br><b>INTERPRETATION:</b> '+(danger?'Clinical deterioration/unsafe status overrides ROX.':favorable?'Favorable HFNC response.':'Indeterminate/concerning response.')+'<br><br><b>WHAT TO DO:</b> '+(danger?'Assess for intubation; do not delay definitive airway for NIV.':favorable?'Continue HFNC and reassess trajectory.':'Reassess frequently and consider NIV/intubation according to trajectory.'),danger?'bad':favorable?'good':'warn')}
