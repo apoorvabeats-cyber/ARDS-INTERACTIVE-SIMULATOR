@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hemodynamic Shock State Machine Simulator</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --accent-blue: #38bdf8;
+      --accent-green: #4ade80;
+      --accent-red: #f87171;
+      --accent-amber: #fbbf24;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      padding: 2rem 1rem;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 1rem;
+    }
+
+    h1 { font-size: 1.8rem; font-weight: 700; color: var(--text-main); }
+    p.subtitle { color: var(--text-muted); font-size: 0.95rem; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (min-width: 768px) {
+      .grid { grid-template-columns: 2fr 1fr; }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--accent-blue);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    button {
+      background: #2d3748;
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    button:hover {
+      background: #4a5568;
+      border-color: var(--accent-blue);
+    }
+
+    button.active {
+      background: var(--accent-blue);
+      color: var(--bg-dark);
+      border-color: var(--accent-blue);
+    }
+
+    button.btn-action {
+      border-color: var(--accent-green);
+    }
+    button.btn-action:hover {
+      background: #166534;
+      color: #fff;
+    }
+
+    .vitals-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 1rem;
+    }
+
+    .vital-box {
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .vital-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; }
+    .vital-value { font-size: 1.6rem; font-weight: 700; color: var(--accent-green); margin: 0.25rem 0; }
+    .vital-unit { font-size: 0.75rem; color: var(--text-muted); }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 0.5rem;
+    }
+
+    .badge-normal { background: rgba(74, 222, 128, 0.2); color: var(--accent-green); }
+    .badge-danger { background: rgba(248, 113, 113, 0.2); color: var(--accent-red); }
+
+    .diagnostic-panel {
+      font-family: monospace;
+      font-size: 0.9rem;
+      background: #090d16;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 1rem;
+      color: #a7f3d0;
+      max-height: 450px;
+      overflow-y: auto;
+    }
+
+    .log-item { margin-bottom: 0.4rem; border-bottom: 1px dashed #1e293b; padding-bottom: 0.2rem; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Hemodynamic Shock State Machine Simulator</h1>
+    <p class="subtitle">Interactive physiological engine evaluating Cardiogenic Shock vs. Cardiac Tamponade</p>
+  </header>
+
+  <div class="grid">
+    <!-- Main Controls & Vitals -->
+    <div>
+      <!-- Scenario Selector -->
+      <div class="card">
+        <div class="card-title">1. Select Shock Scenario</div>
+        <div class="btn-group" id="scenarioBtns">
+          <button class="active" onclick="selectScenario('NORMAL')">Baseline Normal</button>
+          <button onclick="selectScenario('CARDIOGENIC_PUMP_FAILURE')">Acute Cardiogenic Shock</button>
+          <button onclick="selectScenario('CARDIAC_TAMPONADE')">Cardiac Tamponade</button>
+        </div>
+      </div>
+
+      <!-- Interventions -->
+      <div class="card">
+        <div class="card-title">2. Apply Clinical Interventions</div>
+        <div class="btn-group">
+          <button class="btn-action" onclick="applyIntervention('INOTROPE_DOBUTAMINE')">Dobutamine Infusion</button>
+          <button class="btn-action" onclick="applyIntervention('PERICARDIOCENTESIS')">Pericardiocentesis</button>
+          <button class="btn-action" onclick="applyIntervention('FLUID_BOLUS')">IV Fluid Bolus (500mL)</button>
+        </div>
+      </div>
+
+      <!-- Real-time Vital Sign Monitor -->
+      <div class="card">
+        <div class="card-title">3. Real-Time Monitor & Hemodynamics</div>
+        <div class="vitals-grid">
+          <div class="vital-box">
+            <div class="vital-label">Heart Rate</div>
+            <div class="vital-value" id="val-HR">75</div>
+            <div class="vital-unit">bpm</div>
+          </div>
+          <div class="vital-box">
+            <div class="vital-label">BP (MAP)</div>
+            <div class="vital-value" id="val-BP">120/80</div>
+            <div class="vital-unit" id="val-MAP">(93 mmHg)</div>
+          </div>
+          <div class="vital-box">
+            <div class="vital-label">CVP</div>
+            <div class="vital-value" id="val-CVP">5</div>
+            <div class="vital-unit">mmHg</div>
+          </div>
+          <div class="vital-box">
+            <div class="vital-label">PCWP</div>
+            <div class="vital-value" id="val-PCWP">10</div>
+            <div class="vital-unit">mmHg</div>
+          </div>
+          <div class="vital-box">
+            <div class="vital-label">Cardiac Output</div>
+            <div class="vital-value" id="val-CO">3.15</div>
+            <div class="vital-unit">L/min</div>
+          </div>
+          <div class="vital-box">
+            <div class="vital-label">LVEF</div>
+            <div class="vital-value" id="val-EF">60%</div>
+            <div class="vital-unit">Ejection Frac</div>
+          </div>
+        </div>
+
+        <!-- Real-Time Waveform Display -->
+        <div style="margin-top: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+            <span class="vital-label" style="color: var(--accent-blue);">Red: Arterial Line (ART)</span>
+            <span class="vital-label" style="color: var(--accent-green);">Green: Central Venous Pressure (CVP)</span>
+          </div>
+          <canvas id="waveformCanvas" width="700" height="200" 
+                  style="width: 100%; height: 200px; background: #070a12; border: 1px solid var(--card-border); border-radius: 6px;">
+          </canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Diagnostic Panel -->
+    <div>
+      <div class="card" style="height: calc(100% - 1.5rem);">
+        <div class="card-title">Physiological State Log</div>
+        <div id="statusBadgeContainer">
+          <span class="status-badge badge-normal" id="statusBadge">HEMODYNAMICALLY STABLE</span>
+        </div>
+        <div style="margin-top: 1rem;">
+          <div class="diagnostic-panel" id="logPanel"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- STATE MACHINE ENGINE ---
+const SHOCK_PROFILES = {
+  NORMAL: {
+    id: 'NORMAL',
+    name: 'Baseline / Normal',
+    baseParams: { HR: 75, SBP: 120, DBP: 80, CVP: 5, PCWP: 10, LVEF: 0.60, SVR: 1100, SpO2: 98 },
+    modifiers: (state) => {
+      const CO = (state.HR * (state.LVEF * 70)) / 1000;
+      const MAP = state.DBP + (state.SBP - state.DBP) / 3;
+      return {
+        ...state,
+        CO: parseFloat(CO.toFixed(2)),
+        MAP: Math.round(MAP),
+        statusText: 'HEMODYNAMICALLY STABLE',
+        statusClass: 'badge-normal',
+        flags: ['Normal contractility & ventricular filling']
+      };
+    }
+  },
+
+  CARDIOGENIC_PUMP_FAILURE: {
+    id: 'CARDIOGENIC_PUMP_FAILURE',
+    name: 'Acute Cardiogenic Shock (LV Failure)',
+    baseParams: { HR: 110, SBP: 82, DBP: 55, CVP: 14, PCWP: 24, LVEF: 0.20, SVR: 1800, SpO2: 88 },
+    modifiers: (state) => {
+      const CO = (state.HR * (state.LVEF * 70)) / 1000;
+      const MAP = state.DBP + (state.SBP - state.DBP) / 3;
+      const flags = ['Primary pump failure (Severely reduced EF)'];
+      
+      if (state.PCWP > 18) flags.push('ALERT: High PCWP -> Pulmonary Congestion/Edema Risk');
+      if (CO < 2.2) flags.push('ALERT: Severe Cardiac Index/Output deficit');
+
+      return {
+        ...state,
+        CO: parseFloat(CO.toFixed(2)),
+        MAP: Math.round(MAP),
+        statusText: 'CARDIOGENIC SHOCK (PUMP FAILURE)',
+        statusClass: 'badge-danger',
+        flags
+      };
+    }
+  },
+
+  CARDIAC_TAMPONADE: {
+    id: 'CARDIAC_TAMPONADE',
+    name: 'Cardiac Tamponade (Obstructive Shock)',
+    baseParams: { HR: 125, SBP: 84, DBP: 62, CVP: 18, PCWP: 18, LVEF: 0.45, SVR: 1900, SpO2: 92 },
+    modifiers: (state) => {
+      const CO = (state.HR * (state.LVEF * 50)) / 1000;
+      const MAP = state.DBP + (state.SBP - state.DBP) / 3;
+      const pressureEquilibrated = Math.abs(state.CVP - state.PCWP) <= 2;
+      
+      const flags = [
+        'Extrinsic chamber compression (Diastolic filling restricted)',
+        'Beck\'s Triad: Hypotension + Elevated CVP + Muffled Sounds'
+      ];
+
+      if (pressureEquilibrated) {
+        flags.push('HALLMARK: Equalization of Diastolic Pressures (CVP ~ PCWP)');
+      }
+
+      return {
+        ...state,
+        CO: parseFloat(CO.toFixed(2)),
+        MAP: Math.round(MAP),
+        statusText: 'CARDIAC TAMPONADE (OBSTRUCTIVE)',
+        statusClass: 'badge-danger',
+        flags
+      };
+    }
+  }
+};
+
+class HemodynamicStateMachine {
+  constructor(initialScenario = 'NORMAL') {
+    this.currentScenarioKey = initialScenario;
+    this.state = SHOCK_PROFILES[initialScenario].modifiers({ ...SHOCK_PROFILES[initialScenario].baseParams });
+    this.listeners = [];
+  }
+
+  setScenario(scenarioKey) {
+    if (!SHOCK_PROFILES[scenarioKey]) return;
+    this.currentScenarioKey = scenarioKey;
+    const profile = SHOCK_PROFILES[scenarioKey];
+    this.state = profile.modifiers({ ...profile.baseParams });
+    this.notify(`Scenario set to: ${profile.name}`);
+  }
+
+  applyIntervention(interventionType) {
+    let logMsg = '';
+    const state = { ...this.state };
+
+    switch (interventionType) {
+      case 'INOTROPE_DOBUTAMINE':
+        logMsg = 'Administered Dobutamine infusion.';
+        if (this.currentScenarioKey === 'CARDIOGENIC_PUMP_FAILURE') {
+          state.LVEF = Math.min(0.40, state.LVEF + 0.10);
+          state.SBP += 12;
+          state.PCWP = Math.max(14, state.PCWP - 4);
+          logMsg += ' -> Contractility increased, PCWP reduced.';
+        } else if (this.currentScenarioKey === 'CARDIAC_TAMPONADE') {
+          state.HR += 10;
+          logMsg += ' -> Tachycardia worsened; contractility gain limited by pericardial restriction.';
+        }
+        break;
+
+      case 'PERICARDIOCENTESIS':
+        logMsg = 'Performed Pericardiocentesis.';
+        if (this.currentScenarioKey === 'CARDIAC_TAMPONADE') {
+          state.CVP = 7;
+          state.PCWP = 10;
+          state.SBP = 114;
+          state.DBP = 74;
+          state.HR = 88;
+          logMsg += ' -> Pericardial fluid drained! Diastolic pressures normalized.';
+        } else {
+          logMsg += ' -> No pericardial effusion present. No physiological benefit.';
+        }
+        break;
+
+      case 'FLUID_BOLUS':
+        logMsg = 'Administered 500mL IV Fluid Bolus.';
+        if (this.currentScenarioKey === 'CARDIAC_TAMPONADE') {
+          state.SBP += 6;
+          state.CVP += 2;
+          logMsg += ' -> Temporarily increased right heart filling pressure to maintain cardiac output.';
+        } else if (this.currentScenarioKey === 'CARDIOGENIC_PUMP_FAILURE') {
+          state.PCWP += 5;
+          logMsg += ' -> WARNING: Fluid overload! PCWP increased, worsening pulmonary edema risk.';
+        } else {
+          state.SBP += 4;
+        }
+        break;
+    }
+
+    const profile = SHOCK_PROFILES[this.currentScenarioKey];
+    this.state = profile.modifiers(state);
+    this.notify(logMsg);
+  }
+
+  subscribe(listener) {
+    this.listeners.push(listener);
+  }
+
+  notify(eventSummary = '') {
+    this.listeners.forEach((fn) => fn(this.state, this.currentScenarioKey, eventSummary));
+  }
+}
+
+// --- UI DRIVER & RENDERER ---
+const engine = new HemodynamicStateMachine('NORMAL');
+
+function logEvent(msg) {
+  const logPanel = document.getElementById('logPanel');
+  const timestamp = new Date().toLocaleTimeString().split(' ')[0];
+  const item = document.createElement('div');
+  item.className = 'log-item';
+  item.innerHTML = `<span style="color:#64748b;">[${timestamp}]</span> ${msg}`;
+  logPanel.insertBefore(item, logPanel.firstChild);
+}
+
+function renderUI(state, scenarioKey, eventSummary) {
+  document.getElementById('val-HR').innerText = state.HR;
+  document.getElementById('val-BP').innerText = `${state.SBP}/${state.DBP}`;
+  document.getElementById('val-MAP').innerText = `(${state.MAP} mmHg)`;
+  document.getElementById('val-CVP').innerText = state.CVP;
+  document.getElementById('val-PCWP').innerText = state.PCWP;
+  document.getElementById('val-CO').innerText = state.CO;
+  document.getElementById('val-EF').innerText = `${Math.round(state.LVEF * 100)}%`;
+
+  const badge = document.getElementById('statusBadge');
+  badge.className = `status-badge ${state.statusClass}`;
+  badge.innerText = state.statusText;
+
+  if (eventSummary) logEvent(eventSummary);
+  if (state.flags && state.flags.length > 0) {
+    state.flags.forEach(flag => logEvent(`<i>Physiologic State: ${flag}</i>`));
+  }
+}
+
+function selectScenario(key) {
+  const btns = document.querySelectorAll('#scenarioBtns button');
+  btns.forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+  engine.setScenario(key);
+}
+
+function applyIntervention(type) {
+  engine.applyIntervention(type);
+}
+
+// --- CANVAS DUAL WAVEFORM RENDER ENGINE ---
+const canvas = document.getElementById('waveformCanvas');
+const ctx = canvas.getContext('2d');
+
+let sweepX = 0;
+const sweepSpeed = 2;
+let time = 0;
+
+function drawWaveforms() {
+  const currentState = engine.state;
+  const currentScenario = engine.currentScenarioKey;
+
+  // Clear vertical sweep front
+  ctx.fillStyle = '#070a12';
+  ctx.fillRect(sweepX, 0, 15, canvas.height);
+
+  const mapBPToY = (bp) => canvas.height - ((bp - 0) / (160 - 0)) * canvas.height;
+
+  const cycleDuration = (60 / currentState.HR) * 60;
+  const phase = (time % cycleDuration) / cycleDuration;
+
+  let sbp = currentState.SBP;
+  let dbp = currentState.DBP;
+
+  // Pulsus Paradoxus simulation in Tamponade
+  if (currentScenario === 'CARDIAC_TAMPONADE') {
+    const respPhase = Math.sin(time * 0.05);
+    if (respPhase > 0) sbp -= 14 * respPhase;
+  }
+
+  // 1. Calculate Arterial Waveform (ART)
+  let artBP = dbp;
+  if (phase < 0.15) {
+    artBP = dbp + (sbp - dbp) * Math.sin((phase / 0.15) * (Math.PI / 2));
+  } else if (phase < 0.35) {
+    artBP = sbp - (sbp - dbp) * 0.3 * Math.sin(((phase - 0.15) / 0.20) * Math.PI);
+  } else if (phase < 0.42) {
+    const notch = currentScenario === 'CARDIOGENIC_PUMP_FAILURE' ? 0.05 : 0.15;
+    artBP = sbp - (sbp - dbp) * (0.3 + notch * Math.sin(((phase - 0.35) / 0.07) * Math.PI));
+  } else {
+    const endSys = sbp - (sbp - dbp) * 0.35;
+    artBP = endSys - (endSys - dbp) * Math.pow((phase - 0.42) / 0.58, 0.8);
+  }
+
+  // 2. Calculate CVP Waveform (a, c, v waves)
+  let cvpVal = currentState.CVP;
+  if (phase < 0.1) cvpVal += 3 * Math.sin((phase / 0.1) * Math.PI); // a wave
+  else if (phase < 0.2) cvpVal += 1.5 * Math.sin(((phase - 0.1) / 0.1) * Math.PI); // c wave
+  else if (phase < 0.5) cvpVal += 2.5 * Math.sin(((phase - 0.2) / 0.3) * Math.PI); // v wave
+
+  // Draw ART (Red Trace)
+  const artY = mapBPToY(artBP);
+  ctx.beginPath();
+  ctx.strokeStyle = '#f87171';
+  ctx.lineWidth = 2;
+  ctx.moveTo(sweepX - sweepSpeed, canvas.lastArtY || artY);
+  ctx.lineTo(sweepX, artY);
+  ctx.stroke();
+  canvas.lastArtY = artY;
+
+  // Draw CVP (Green Trace)
+  const cvpY = mapBPToY(cvpVal);
+  ctx.beginPath();
+  ctx.strokeStyle = '#4ade80';
+  ctx.lineWidth = 2;
+  ctx.moveTo(sweepX - sweepSpeed, canvas.lastCvpY || cvpY);
+  ctx.lineTo(sweepX, cvpY);
+  ctx.stroke();
+  canvas.lastCvpY = cvpY;
+
+  sweepX += sweepSpeed;
+  if (sweepX >= canvas.width) sweepX = 0;
+
+  time++;
+  requestAnimationFrame(drawWaveforms);
+}
+
+// Initialize & Start Simulation
+engine.subscribe(renderUI);
+engine.notify('System initialized in baseline state.');
+drawWaveforms();
+</script>
+</body>
+</html>
