@@ -1296,15 +1296,61 @@ function chooseMixed(x){
 }
 
 function assessMixedO2(){
-  const s=+$('mO2spo2').value, rr=+$('mO2rr').value, hr=+$('mO2hr').value,
-        map=+$('mO2map').value, c=$('mO2cons').value, w=$('mO2wob').value;
-  const stable=s>=88&&s<=92&&rr<30&&map>=65&&c==='Awake'&&w==='Low';
-  box('mO2out','MIXED RF — OXYGEN REASSESSMENT',
-    'Device <b>'+$('mO2device').value+'</b>; SpO₂ <b>'+s+'%</b>; RR <b>'+rr+'</b>; HR <b>'+hr+
-    '</b>; MAP <b>'+map+'</b>; consciousness <b>'+c+'</b>; WOB <b>'+w+'</b>.'+
-    '<br><br><b>INTERPRETATION:</b> '+(stable?'Controlled oxygen appears adequate at this reassessment.':'Conventional oxygen is inadequate or the patient is clinically unstable.')+
-    '<br><br><b>WHAT TO DO:</b> '+(stable?'Continue controlled oxygen and proceed to etiology when the underlying cause is addressed.':'Escalate to HFNC, NIV/BiPAP or intubation according to the clinical picture.'),
-    stable?'good':'warn');
+  const s=+$('mO2spo2').value,
+        rr=+$('mO2rr').value,
+        map=+$('mO2map').value,
+        c=$('mO2cons').value;
+
+  const stable =
+    s>=88 &&
+    rr<24 &&
+    map>=65 &&
+    c==='Awake';
+
+  box(
+    'mO2out',
+    'MIXED RF — OXYGEN REASSESSMENT',
+    'Device <b>'+$('mO2device').value+
+    '</b>; SpO₂ <b>'+s+
+    '%</b>; RR <b>'+rr+
+    '/min</b>; MAP <b>'+map+
+    '</b>; consciousness <b>'+c+
+    '</b>.'+
+    '<br><br><b>INTERPRETATION:</b> '+
+    (stable
+      ? 'Controlled oxygen appears adequate at this reassessment.'
+      : 'Controlled oxygen is inadequate or the patient remains physiologically unstable.')+
+    '<br><br><b>WHAT TO DO:</b> '+
+    (stable
+      ? 'Continue controlled oxygen and proceed to etiology.'
+      : 'Escalate respiratory support and reassess.'),
+    stable?'good':'warn'
+  );
+
+  if(stable){
+    let old=$('mixedOxygenEtiologyButton');
+    if(old)old.remove();
+
+    let b=document.createElement('button');
+    b.id='mixedOxygenEtiologyButton';
+    b.className='btn green';
+    b.textContent='GO TO ETIOLOGY →';
+
+    b.onclick=function(){
+      buildEtiology();
+      showBookPage('etiology');
+      setTimeout(function(){
+        let e=$('etiology');
+        if(e)e.scrollIntoView({
+          behavior:'smooth',
+          block:'start'
+        });
+      },100);
+    };
+
+    $('mO2out').appendChild(b);
+  }
+}
 }
 
 function decideType2(){
