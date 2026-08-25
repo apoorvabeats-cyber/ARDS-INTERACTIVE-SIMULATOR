@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Hypotensive Patient Simulation | Critical Care Hub</title>
+<style>
+:root{
+  --bg:#071018;--panel:#0d1822;--panel2:#111f2b;--text:#eef6fb;--muted:#9db0bd;
+  --accent:#27d3a2;--danger:#ff5d6c;--warn:#ffc857;--blue:#58a6ff;--border:#203340;
+}
+*{box-sizing:border-box} body{margin:0;background:linear-gradient(135deg,#050b10,#0a151e);color:var(--text);
+font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.45}
+.app{max-width:1100px;margin:auto;padding:18px}
+header{position:relative;background:rgba(7,16,24,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:14px 0}
+h1{margin:0;font-size:clamp(24px,5vw,42px);letter-spacing:.03em} h2{margin:8px 0 6px} h3{margin:0 0 8px}
+.subtitle{color:var(--muted);font-size:14px}.stagebar{display:flex;gap:6px;overflow:auto;margin-top:12px;padding-bottom:3px}
+.stage{min-width:74px;padding:7px 10px;border:1px solid var(--border);border-radius:10px;text-align:center;font-size:12px;color:var(--muted)}
+.stage.active{background:rgba(39,211,162,.13);border-color:var(--accent);color:var(--accent)}
+.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:16px}@media(max-width:800px){.grid{grid-template-columns:1fr}}
+.card{background:linear-gradient(180deg,var(--panel),#09131c);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.vitals{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}@media(max-width:520px){.vitals{grid-template-columns:repeat(2,1fr)}}
+.vital{background:var(--panel2);border-radius:10px;padding:10px}.vital b{display:block;font-size:18px}.label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.alert{border-left:4px solid var(--danger);background:rgba(255,93,108,.08);padding:12px;border-radius:8px;margin:12px 0}
+.info{border-left:4px solid var(--blue);background:rgba(88,166,255,.08);padding:12px;border-radius:8px;margin:12px 0}
+.choice{width:100%;text-align:left;background:#12222e;color:var(--text);border:1px solid #2b4353;border-radius:12px;padding:14px;margin:7px 0;cursor:pointer;transition:.18s}
+.choice:hover{transform:translateY(-1px);border-color:var(--accent);background:#152b38}
+.choice strong{color:var(--accent)} .choice:disabled{opacity:.55;cursor:default}
+.feedback{margin-top:12px;padding:14px;border-radius:12px;border:1px solid var(--border);background:#0b151e}
+.good{border-color:rgba(39,211,162,.5);background:rgba(39,211,162,.08)} .bad{border-color:rgba(255,93,108,.5);background:rgba(255,93,108,.08)}
+.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.metric{background:#0b1720;padding:9px;border-radius:9px}.metric span{display:block;color:var(--muted);font-size:11px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.btn{border:0;border-radius:10px;padding:11px 15px;font-weight:700;cursor:pointer}
+.primary{background:var(--accent);color:#03120e}.secondary{background:#1b2d39;color:var(--text)}
+.hidden{display:none}.score{font-size:28px;font-weight:800;color:var(--accent)}
+.small{font-size:12px;color:var(--muted)} ul{padding-left:20px}.debrief li{margin:7px 0}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{border-bottom:1px solid var(--border);padding:8px;text-align:left}th{color:var(--muted)}
+footer{color:var(--muted);font-size:11px;margin:18px 0;text-align:center}
+.book-page{min-height:720px;display:flex;flex-direction:column}
+.page-content{flex:1}
+.book-nav{display:flex;justify-content:space-between;gap:12px;margin-top:24px;padding-top:16px;border-top:1px solid var(--border)}
+.book-nav .btn{min-width:130px}
+.page-number{text-align:center;color:var(--muted);font-size:12px;margin-top:8px}
+@media(max-width:600px){.book-page{min-height:620px}.book-nav .btn{min-width:110px;padding:10px 12px}}
+
+#scenario,#choices,#feedback{scroll-margin-top:115px}
+.vital.abnormal{border:1px solid var(--danger);background:rgba(255,45,65,.14);box-shadow:0 0 0 1px rgba(255,45,65,.12),0 0 16px rgba(255,45,65,.12)}
+.vital.abnormal b{color:#ff7a86}
+.vital.changed{animation:paramFlash .9s ease-in-out 2}
+.alarm-banner{display:flex;align-items:center;gap:10px;background:rgba(255,45,65,.14);border:1px solid var(--danger);color:#ff7a86;border-radius:10px;padding:10px 12px;margin:10px 0;font-weight:800;letter-spacing:.04em}
+.alarm-dot{width:10px;height:10px;border-radius:50%;background:var(--danger);box-shadow:0 0 12px var(--danger);animation:blink .7s infinite}
+@keyframes blink{50%{opacity:.25}}
+@keyframes paramFlash{0%,100%{box-shadow:0 0 0 rgba(255,45,65,0)}50%{box-shadow:0 0 20px rgba(255,45,65,.6)}}
+
+.choice:focus-visible,.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+</style>
+</head>
+<body>
+<header>
+<div class="app">
+<h1>HYPOTENSIVE PATIENT SIMULATION</h1>
+<div class="subtitle">Critical Care Hub • Interactive ICU decision simulator • Adult septic shock with evolving respiratory and hemodynamic failure</div>
+<div class="stagebar" id="stagebar"></div>
+</div>
+</header>
+
+<main class="app">
+<div class="grid">
+<section class="card book-page">
+<div class="page-content">
+<div id="scenario"></div>
+<div id="choices"></div>
+<div id="feedback" aria-live="polite"></div>
+</div>
+<div class="book-nav">
+<button class="btn secondary" id="prevBtn" onclick="previousStage()">← Previous</button>
+<div>
+<button class="btn secondary" id="voiceBtn" onclick="toggleVoice()">🔊 Voice: ON</button>
+<div class="page-number" id="pageNumber"></div>
+</div>
+<button class="btn primary" id="nextBtn" onclick="nextStage()">Next →</button>
+</div>
+</section>
+
+<aside class="card">
+<h3>ICU Monitor</h3>
+<div class="vitals" id="monitor"></div>
+<div class="info"><b>Primary objective</b><br><span id="objective"></span></div>
+<div class="small">Educational simulation only. Drug doses and interventions should be adapted to local protocols, patient characteristics, antimicrobial resistance patterns, and senior critical-care judgment.</div>
+</aside>
+</div>
+</main>
+
+<footer>
+Built for Critical Care Hub • Guideline framework updated to the 2026 Surviving Sepsis Campaign adult recommendations.
+</footer>
+
+<script>
+const stages=[
+{
+title:"STAGE 1 — IMMEDIATE RESUSCITATION & TRIAGE",
+objective:"Restore perfusion while identifying the shock phenotype and likely source.",
+v:{HR:"128 bpm",BP:"74/42 mmHg",MAP:"52",SpO2:"88% RA",RR:"28/min",Temp:"38.9°C"},
+intro:`An approximately 65-year-old man is lethargic, pale, diaphoretic and poorly responsive. Extremities are cool and clammy. Radial pulses are weak and thready; carotid pulses are palpable. This is overt shock with altered mentation and severe hypotension.`,
+choices:[
+["A","Give oxygen, obtain two large-bore IVs, draw cultures/lactate and urgent labs, begin balanced crystalloid resuscitation with frequent reassessment, and prepare early norepinephrine if hypotension persists or is immediately life-threatening.","good",`Correct direction. In 2026 SSC, initial crystalloid resuscitation remains appropriate, but the simulator now emphasizes reassessment rather than treating 30 mL/kg as an automatic unmonitored bolus. In unstable shock, fluids and vasopressors may be started concurrently.`],
+["B","Start peripheral norepinephrine at 0.05 mcg/kg/min and wait for central access before giving fluid.","bad",`Incomplete. Peripheral norepinephrine is appropriate when shock is unstable and central access would delay treatment, but fluid assessment/resuscitation should occur concurrently when indicated. Do not wait for a central line.`],
+["C","Wait for FOCUS and IVC assessment before providing hemodynamic treatment.","bad",`Incorrect. Ultrasound is useful, but diagnostic imaging must not delay treatment of profound shock. Use bedside ultrasound alongside resuscitation.`]
+],
+result:`After oxygen, IV access, cultures and initial balanced crystalloid, labs return: lactate 4.8 mmol/L; WBC 18,500/µL with 12% bands; ABG pH 7.24 / PaCO2 28 / HCO3 14; CXR shows right lower-lobe consolidation with air bronchograms. After 1.5 L, BP is 82/48 (MAP 59), HR 112, SpO2 95% on 6 L NC. Septic shock from CAP is strongly suspected.`
+},
+{
+title:"STAGE 2 — VASOPRESSOR + ANTIMICROBIAL CONTROL",
+objective:"Maintain an initial MAP around 65 mmHg, treat infection rapidly, and reassess perfusion.",
+v:{HR:"112 bpm",BP:"82/48 mmHg",MAP:"59",SpO2:"95% / 6L",RR:"26/min",Temp:"38.9°C"},
+intro:`The patient remains hypotensive after initial fluid. Lactate is elevated and the chest radiograph supports pneumonia. Choose the next step.`,
+choices:[
+["1","Start/titrate norepinephrine promptly (peripheral access is acceptable initially), target an initial MAP around 65 mmHg, obtain arterial monitoring when indicated, and administer appropriate broad-spectrum antibiotics promptly after cultures without delaying therapy.","good",`Optimal. Norepinephrine is first-line. In unstable shock, vasopressors should not be delayed for central access. Antibiotics should be administered immediately/within the recommended emergency window, with source control and later de-escalation.`],
+["2","Give another full 30 mL/kg rapidly without vasopressor support and continue until the lactate normalizes.","bad",`Incorrect. The 2026 guideline supports at least 30 mL/kg in the first 3 hours for septic hypoperfusion, but explicitly requires individualized reassessment and does not recommend continuing fluids simply until lactate normalizes. Persistent vasoplegia requires norepinephrine.`],
+["3","Give hydrocortisone as primary therapy before vasopressor support or antibiotics.","bad",`Incorrect. Corticosteroids are adjunctive therapy in septic shock with ongoing vasopressor requirement; they do not replace antibiotics, fluids when indicated, or vasopressor support.`]
+],
+result:`Norepinephrine restores MAP to 68–72 mmHg and antibiotics are administered promptly. Serial lactate and clinical perfusion markers are followed. Over the next two hours, however, vasopressor requirements rise and pulmonary congestion begins to limit further blind fluid administration.`
+},
+{
+title:"STAGE 3 — PERSISTENT VASOPLEGIA & FLUID SAFETY",
+objective:"Recognize persistent vasoplegia, avoid unguided fluid loading, and escalate vasopressor support appropriately.",
+v:{HR:"118 bpm",BP:"84/46 mmHg",MAP:"58",SpO2:"93% / 6L",RR:"26/min",Temp:"38.2°C"},
+intro:`Norepinephrine is now 0.22 mcg/kg/min. Lactate has risen to 5.6 mmol/L and urine output is poor. FOCUS shows hyperdynamic LV; IVC is not obviously collapsible. Lung ultrasound shows bilateral B-lines. Further blind fluid is unsafe.`,
+choices:[
+["A","Add vasopressin 0.03 units/min to norepinephrine and consider IV hydrocortisone 200 mg/day because vasopressor-dependent septic shock persists.","good",`Optimal. The 2026 SSC suggests adding vasopressin when norepinephrine is escalating. IV corticosteroids are reasonable in ongoing vasopressor-dependent septic shock. Continue close perfusion and fluid-status reassessment.`],
+["B","Give another 2 L normal saline under pressure to raise CVP above 12 mmHg.","bad",`Incorrect. CVP is not a target for routine fluid resuscitation, and B-lines plus persistent shock do not justify blind loading. Use dynamic measures and the overall clinical picture.`],
+["C","Replace norepinephrine with high-dose epinephrine monotherapy and give 20% albumin solely to raise oncotic pressure.","bad",`Not preferred. Norepinephrine should remain first-line; vasopressin is the preferred adjunct when norepinephrine is escalating. Epinephrine is a later option if MAP remains inadequate despite norepinephrine plus vasopressin. Albumin is not routinely required.`]
+],
+result:`With vasopressin added and hydrocortisone started, MAP stabilizes around 68–72 mmHg and norepinephrine requirements fall. The patient develops worsening work of breathing and is subsequently intubated for respiratory failure/encephalopathy.`
+},
+{
+title:"STAGE 4 — LUNG-PROTECTIVE VENTILATION & ORGAN SUPPORT",
+objective:"Prevent ventilator-induced lung injury while supporting failing organs and maintaining perfusion.",
+v:{HR:"104 bpm",BP:"96/58 mmHg",MAP:"71",SpO2:"94% / FiO2 0.50",RR:"18 vent",Temp:"38.0°C"},
+intro:`The patient is intubated. The clinical picture is compatible with evolving sepsis-associated acute lung injury/ARDS. Renal function is deteriorating with severe metabolic acidosis and oliguria.`,
+choices:[
+["1","Use lung-protective ventilation with Vt about 6 mL/kg predicted body weight, titrate PEEP/FiO2 to oxygenation and severity, monitor plateau pressure, reassess perfusion dynamically, and evaluate for renal replacement therapy if standard indications persist.","good",`Optimal. Avoid fixed assumptions: tidal volume is based on predicted body weight, plateau pressure should be monitored, and PEEP is individualized. CRRT is considered for standard indications such as refractory acidemia, severe electrolyte abnormalities, or persistent fluid/solute problems—not simply because urine output is low.`],
+["2","Give repeated high-dose furosemide immediately despite ongoing shock and dual vasopressors.","bad",`Incorrect. Diuresis should not be used to force urine production during active hypoperfusion. Once shock is controlled and fluid accumulation is clinically important, de-resuscitation can be considered.`],
+["3","Stop vasopressin immediately because MAP has reached 65 mmHg.","bad",`Incorrect. Avoid abrupt de-escalation while shock remains unstable. Wean vasopressors systematically after sustained hemodynamic recovery.`]
+],
+result:`Lung-protective ventilation is established. The patient remains on norepinephrine plus vasopressin with improving oxygenation and acid-base status. The next challenge is whether additional fluid or an inotrope is needed.`
+},
+{
+title:"STAGE 5 — ADVANCED HEMODYNAMIC REASSESSMENT",
+objective:"Use dynamic evidence of flow and fluid responsiveness rather than chasing a single monitor number.",
+v:{HR:"96 bpm",BP:"88/52 mmHg",MAP:"64",SpO2:"96% / FiO2 0.40",RR:"18 vent",Temp:"37.8°C"},
+intro:`At T+6 h, CRT is 4.5 s and mottling is present. CI is 2.1 L/min/m², ScvO2 58%, and veno-arterial CO2 gap 8.2 mmHg. SVV is 16% under controlled ventilation. EVLWI is 8.5 mL/kg. The picture suggests persistent flow limitation with potential fluid responsiveness.`,
+choices:[
+["A","Give a 250 mL balanced-crystalloid mini-challenge over about 10 minutes and reassess stroke volume/CI, perfusion markers and pulmonary tolerance immediately.","good",`Optimal for this simulated dataset. Dynamic response is the key—not the absolute IVC, CVP or ScvO2 value alone. A positive response with no meaningful rise in lung water supports a small additional bolus.`],
+["B","Start dobutamine immediately without addressing possible preload limitation or ensuring adequate arterial pressure.","bad",`Not first choice here. Inotropy is considered when cardiac dysfunction with persistent hypoperfusion remains after adequate volume status and arterial pressure. It is added to—not substituted for—vasopressor support when needed.`],
+["C","Increase norepinephrine solely to force MAP above 75–80 mmHg.","bad",`Incorrect. The usual initial MAP target is about 65 mmHg. Higher targets may be individualized, but escalating vasoconstriction without evidence of benefit can worsen afterload and peripheral perfusion.`]
+],
+result:`After the 250 mL challenge, CI rises from 2.1 to 2.6 L/min/m², SVV falls to 9%, EVLWI remains stable at 8.8 mL/kg, CRT improves to 2.5 s, and norepinephrine falls to 0.06 mcg/kg/min. This supports a true dynamic response.`
+},
+{
+title:"STAGE 6 — DE-ESCALATION / UNLOADING",
+objective:"Stop unnecessary positive fluid balance and wean vasoactive support as shock resolves.",
+v:{HR:"82 bpm",BP:"106/66 mmHg",MAP:"79",SpO2:"97% / FiO2 0.35",RR:"18 vent",Temp:"37.4°C"},
+intro:`At T+18 h, CI is 2.7 L/min/m², lactate 1.2 mmol/L, ScvO2 73%, and perfusion is clinically improved. Vasopressor requirements are now low.`,
+choices:[
+["1","Move to restrictive fluid management, avoid routine maintenance fluid excess, and wean norepinephrine first while reassessing MAP, perfusion and fluid status. Consider gentle de-resuscitation only when clinically appropriate.","good",`Optimal. Once shock has resolved, continued fluid loading is harmful. De-escalation should be guided by the patient's trajectory and objective evidence rather than a fixed infusion rate.`],
+["2","Abruptly stop vasopressin while norepinephrine is still required.","bad",`Not preferred. Wean vasoactive agents deliberately after sustained stability; abrupt withdrawal can precipitate recurrent hypotension in some patients.`],
+["3","Continue maintenance IV fluid at 150 mL/hr regardless of fluid status.","bad",`Incorrect. Fixed maintenance fluid can create avoidable positive balance. Fluid therapy should remain individualized.`]
+],
+result:`Vasopressors are progressively weaned, fluid balance becomes neutral/negative as appropriate, and the patient continues to recover without recurrent shock.`
+},
+{
+title:"STAGE 7 — WEANING & EXTUBATION",
+objective:"Confirm readiness for liberation from mechanical ventilation and provide appropriate post-extubation support.",
+v:{HR:"78 bpm",BP:"118/72 mmHg",MAP:"87",SpO2:"98% / FiO2 0.30",RR:"16/min",Temp:"37.0°C"},
+intro:`ICU Day 3. The patient is awake, follows commands, has a strong cough, minimal secretions and has been off vasopressors for 18 hours. SBT on PSV 5/PEEP 5 for 30 minutes: RSBI 38, Vt 460 mL, pH 7.41, PaCO2 38, PaO2 92, lactate 0.9.`,
+choices:[
+["A","Proceed with extubation after standard airway/readiness assessment; use HFNC or other appropriate prophylactic support according to risk and local practice, and mobilize early.","good",`Optimal. The patient has passed an SBT with favorable gas exchange, mental status and airway protection. Post-extubation support should be individualized; HFNC is reasonable in a patient at risk of post-extubation respiratory failure.`],
+["B","Delay extubation 24 hours and restart vasopressors prophylactically.","bad",`Incorrect. Prolonged ventilation without a current indication adds risk. Hemodynamics should be observed, not treated prophylactically.`],
+["C","Extubate directly to room air regardless of risk.","bad",`Not ideal. Oxygen/respiratory support should be selected based on oxygen requirement and risk of post-extubation failure. Room air is not a mandatory test.`]
+],
+result:`The patient is extubated successfully and remains stable on HFNC, later transitioning to low-flow oxygen. Renal function and peripheral perfusion continue to recover.`
+},
+{
+title:"STAGE 8 — STEP-DOWN & ANTIMICROBIAL DE-ESCALATION",
+objective:"Complete source-directed treatment, mobilization and safe transition out of ICU.",
+v:{HR:"72 bpm",BP:"122/76 mmHg",MAP:"91",SpO2:"98% / 2L NC",RR:"16/min",Temp:"37.0°C"},
+intro:`ICU Day 4. The patient is eating, conversing and mobilizing to a chair. Blood/sputum microbiology identifies Streptococcus pneumoniae susceptible to the selected narrow-spectrum regimen. No ongoing shock or respiratory failure is present.`,
+choices:[
+["1","De-escalate antibiotics to the narrowest appropriate agent based on cultures, clinical response and source; complete an individualized duration and transfer to step-down care.","good",`Optimal. The 2026 SSC emphasizes antimicrobial stewardship, source control and shorter courses when clinically appropriate. Route and duration should follow the infection, susceptibility, source control and local guidance.`],
+["2","Continue broad-spectrum IV antibiotics for a fixed prolonged course despite clinical improvement and susceptibilities.","bad",`Incorrect. Unnecessary broad-spectrum exposure increases toxicity and antimicrobial resistance. De-escalation is preferred when safe.`],
+["3","Keep the patient in ICU solely because the original lactate was 4.8 mmol/L.","bad",`Incorrect. Disposition should be based on current organ support, monitoring needs and clinical stability—not the historical lactate alone.`]
+],
+result:`The patient is transferred to step-down care after resolution of septic shock and respiratory failure. Final diagnosis: septic shock secondary to community-acquired pneumonia, with resolved sepsis-associated acute lung injury/ARDS.`
+}
+];
+
+let stage=0,score=0,answered=false,voiceEnabled=true;
+const synth = window.speechSynthesis;
+function speak(text){
+  if(!voiceEnabled || !('speechSynthesis' in window)) return;
+  synth.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='en-IN';
+  u.rate=0.92;
+  u.pitch=1.0;
+  synth.speak(u);
+}
+function scrollToElement(id){
+  const el=document.getElementById(id);
+  if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function toggleVoice(){
+  voiceEnabled=!voiceEnabled;
+  document.getElementById('voiceBtn').textContent=voiceEnabled?'🔊 Voice: ON':'🔇 Voice: OFF';
+  if(!voiceEnabled && 'speechSynthesis' in window) synth.cancel();
+}
+
+
+function render(){
+ const s=stages[stage];
+ document.getElementById("stagebar").innerHTML=stages.map((x,i)=>`<div class="stage ${i===stage?'active':''}">STAGE ${i+1}</div>`).join("");
+ document.getElementById("scenario").innerHTML=`<h2>${s.title}</h2><div class="alert">${s.intro}</div><div class="info"><b>Decision point:</b> Choose the best next action.</div>`;
+ const abnormalKeys=new Set(["HR","BP","MAP","SpO2","RR","Temp"]);
+document.getElementById("monitor").innerHTML=Object.entries(s.v).map(([k,v])=>{
+  let abnormal=false;
+  if(k==="HR") abnormal=parseFloat(v)>100;
+  if(k==="BP") abnormal=true;
+  if(k==="MAP") abnormal=parseFloat(v)<65;
+  if(k==="SpO2") abnormal=parseFloat(v)<94;
+  if(k==="RR") abnormal=parseFloat(v)>22;
+  if(k==="Temp") abnormal=parseFloat(v)>=38;
+  return `<div class="vital ${abnormal?'abnormal':''}" data-param="${k}"><span class="label">${k}</span><b>${v}</b></div>`;
+}).join("");
+const alarmNeeded=parseFloat(s.v.MAP)<65 || parseFloat(s.v.SpO2)<94 || parseFloat(s.v.HR)>100 || parseFloat(s.v.RR)>22 || parseFloat(s.v.Temp)>=38;
+document.getElementById("monitor").insertAdjacentHTML("beforebegin",alarmNeeded?`<div class="alarm-banner"><span class="alarm-dot"></span> ICU ALARM — ABNORMAL PHYSIOLOGY DETECTED</div>`:"");
+ document.getElementById("objective").textContent=s.objective;
+ document.getElementById("pageNumber").textContent=`Page ${stage+1} of ${stages.length}`;
+ document.getElementById("prevBtn").disabled=stage===0;
+ document.getElementById("prevBtn").style.opacity=stage===0?".45":"1";
+ document.getElementById("nextBtn").classList.remove("hidden");
+ document.getElementById("nextBtn").textContent=stage===stages.length-1?"Finish →":"Next →";
+ document.getElementById("feedback").innerHTML="";
+ document.getElementById("nextBtn").classList.remove("hidden");
+ document.getElementById("nextBtn").textContent="Finish";
+ document.getElementById("choices").innerHTML=s.choices.map((c,i)=>`<button class="choice" onclick="choose(${i})"><strong>${c[0]}</strong> — ${c[1]}</button>`).join("");
+ answered=false;
+ setTimeout(()=>scrollToElement('scenario'),80);
+}
+
+function renderMonitorOnly(){
+ const s=stages[stage];
+ document.getElementById("monitor").innerHTML=Object.entries(s.v).map(([k,v])=>{
+  let abnormal=false;
+  if(k==="HR") abnormal=parseFloat(v)>100;
+  if(k==="BP") abnormal=true;
+  if(k==="MAP") abnormal=parseFloat(v)<65;
+  if(k==="SpO2") abnormal=parseFloat(v)<94;
+  if(k==="RR") abnormal=parseFloat(v)>22;
+  if(k==="Temp") abnormal=parseFloat(v)>=38;
+  return `<div class="vital ${abnormal?'abnormal':''}" data-param="${k}"><span class="label">${k}</span><b>${v}</b></div>`;
+ }).join("");
+ const alarmNeeded=parseFloat(s.v.MAP)<65 || parseFloat(s.v.SpO2)<94 || parseFloat(s.v.HR)>100 || parseFloat(s.v.RR)>22 || parseFloat(s.v.Temp)>=38;
+ const old=document.querySelector(".alarm-banner");
+ if(old) old.remove();
+ document.getElementById("monitor").insertAdjacentHTML("beforebegin",alarmNeeded?`<div class="alarm-banner"><span class="alarm-dot"></span> ICU ALARM — ABNORMAL PHYSIOLOGY DETECTED</div>`:"");
+}
+function choose(i){
+ if(answered)return;
+ answered=true;
+ const s=stages[stage],c=s.choices[i],ok=c[2]==="good";
+ if(ok)score++;
+ document.querySelectorAll(".choice").forEach(b=>b.disabled=true);
+
+ const verdict=ok
+   ? "Right answer. Excellent decision."
+   : "Wrong answer. Reassess the patient's physiology and choose the safer evidence-based approach.";
+
+ document.getElementById("feedback").innerHTML=
+   `<div class="${ok?'good':'bad'}">
+      <b>${ok?'✓ RIGHT ANSWER':'✕ WRONG ANSWER'}</b>
+      <p>${c[3]}</p>
+      <hr>
+      <b>Clinical progression:</b><p>${s.result}</p>
+    </div>`;
+
+ document.getElementById("nextBtn").classList.remove("hidden");
+ document.getElementById("nextBtn").textContent=stage===stages.length-1?"Finish →":"Next →";
+
+ // Move the screen to the answer/feedback automatically.
+ setTimeout(()=>scrollToElement('feedback'),100);
+
+ // Wrong choices create a visible physiologic deterioration in the monitor.
+ if(!ok){
+   const monitor=document.getElementById("monitor");
+   const current=stages[stage].v;
+   if(stage===0){current.MAP="48 mmHg";current.HR="134 bpm";current.SpO2="84% RA";}
+   if(stage===1){current.MAP="54 mmHg";current.SpO2="91% / 6L";current.RR="30/min";}
+   if(stage===2){current.SpO2="81% / 6L";current.RR="34/min";current.MAP="52";}
+   if(stage===3){current.SpO2="88% / FiO2 0.50";current.MAP="58";current.RR="24 vent";}
+   if(stage===4){current.MAP="78 mmHg";current.HR="112 bpm";current.SpO2="95% / FiO2 0.40";}
+   if(stage===5){current.MAP="58 mmHg";current.HR="104 bpm";}
+   if(stage===6){current.RR="32/min";current.SpO2="89% / FiO2 0.30";}
+   if(stage===7){current.RR="22/min";current.SpO2="95% / 2L NC";}
+   renderMonitorOnly();
+   setTimeout(()=>document.querySelectorAll('.vital.abnormal').forEach(x=>x.classList.add('changed')),80);
+   setTimeout(()=>speak("Alarm. The patient's condition has worsened after that decision."),500);
+ }
+ // Voice-over explicitly says RIGHT or WRONG.
+ speak(verdict + " " + (ok
+   ? "The selected intervention is the optimal choice for this stage."
+   : "This choice is suboptimal. " + c[3]));
+}
+function previousStage(){
+ if(stage>0){
+   stage--;
+   render();
+   setTimeout(()=>scrollToElement('scenario'),120);
+   speak("Previous page. Stage " + (stage+1) + ". " + stages[stage].title.replace("—","").trim());
+ }
+}
+function nextStage(){
+ if(stage<stages.length-1){
+   stage++;
+   render();
+   setTimeout(()=>scrollToElement('scenario'),120);
+   speak("Next page. Stage " + (stage+1) + ". " + stages[stage].title.replace("—","").trim());
+ }else{
+   showDebrief();
+ }
+}
+function showDebrief(){
+ if('speechSynthesis' in window) synth.cancel();
+ document.getElementById("stagebar").innerHTML="";
+ document.getElementById("scenario").innerHTML=`<h2>SIMULATION COMPLETE</h2>
+ <div class="info"><span class="score">${score}/${stages.length}</span><br>Decision performance score</div>
+ <div class="debrief"><h3>Final performance</h3>
+ <ul>
+ <li>Recognized severe hypotension and tissue hypoperfusion early.</li>
+ <li>Used balanced crystalloids with frequent reassessment rather than unbounded fluid loading.</li>
+ <li>Used norepinephrine as first-line vasopressor and did not delay treatment for central access.</li>
+ <li>Added vasopressin for escalating norepinephrine requirement.</li>
+ <li>Used corticosteroid therapy as an adjunct in vasopressor-dependent shock.</li>
+ <li>Applied dynamic assessment before additional fluid and avoided CVP/IVC-only decisions.</li>
+ <li>Used lung-protective ventilation and appropriate organ-support evaluation.</li>
+ <li>Transitioned to de-resuscitation and systematic vasopressor weaning after shock resolution.</li>
+ <li>Extubated after successful SBT and de-escalated antimicrobial therapy after microbiologic clarification.</li>
+ </ul>
+ <h3>Final trajectory</h3>
+ <table><tr><th>Time</th><th>Status</th></tr>
+ <tr><td>T+0 h</td><td>MAP 52, lactate 4.8, septic shock suspected</td></tr>
+ <tr><td>T+2 h</td><td>Norepinephrine + antibiotics; persistent vasoplegia</td></tr>
+ <tr><td>T+6 h</td><td>Dynamic hemodynamic reassessment and targeted fluid challenge</td></tr>
+ <tr><td>T+18 h</td><td>Perfusion restored; de-escalation begins</td></tr>
+ <tr><td>T+48 h</td><td>Successful SBT and extubation</td></tr>
+ <tr><td>T+72 h</td><td>Step-down transfer and antibiotic de-escalation</td></tr></table>
+ </div>`;
+ document.getElementById("choices").innerHTML="";
+ document.getElementById("feedback").innerHTML=`<div class="good"><b>Patient outcome:</b> Hemodynamic stabilization, lactate clearance, renal recovery and liberation from mechanical ventilation.</div>`;
+ document.getElementById("nextBtn").classList.remove("hidden");
+ document.getElementById("nextBtn").textContent="Finish";
+ document.getElementById("pageNumber").textContent="Simulation complete";
+}
+function restart(){
+ if('speechSynthesis' in window) synth.cancel();
+ stage=0;score=0;answered=false;render();
+ setTimeout(()=>scrollToElement('scenario'),120);
+}
+render();
+</script>
+</body>
+</html>
