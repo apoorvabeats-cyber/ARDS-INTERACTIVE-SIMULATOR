@@ -178,7 +178,7 @@ function sound(f,d=.1,g=.04){
     o.start(t); o.stop(t+d+.02);
   }catch(e){}
 }
-function correctSound() {sound(740,.1,.04);setTimeout(()=>sound(980,.16,.04),110)} function wrongSound(){sound(180,.25,.05)} function speak(t,done){
+function monitorBeep(){try{const ctx=ensureAudio();if(!ctx)return;const t=ctx.currentTime;const o1=ctx.createOscillator(),a1=ctx.createGain();o1.type='sine';o1.frequency.setValueAtTime(880,t);a1.gain.setValueAtTime(.0001,t);a1.gain.exponentialRampToValueAtTime(.06,t+.006);a1.gain.exponentialRampToValueAtTime(.0001,t+.065);o1.connect(a1);a1.connect(ctx.destination);o1.start(t);o1.stop(t+.09);const o2=ctx.createOscillator(),a2=ctx.createGain();o2.type='sine';o2.frequency.setValueAtTime(1200,t+.08);a2.gain.setValueAtTime(.0001,t+.08);a2.gain.exponentialRampToValueAtTime(.025,t+.088);a2.gain.exponentialRampToValueAtTime(.0001,t+.14);o2.connect(a2);a2.connect(ctx.destination);o2.start(t+.08);o2.stop(t+.16);}catch(e){}} function correctSound() {sound(740,.1,.04);setTimeout(()=>sound(980,.16,.04),110)} function wrongSound(){sound(180,.25,.05)} function speak(t,done){
   const finish=()=>{if(done){const cb=done;done=null;cb();}};
   if(!S.voice){finish();return}
   if(!window.speechSynthesis||!window.SpeechSynthesisUtterance){finish();return}
@@ -204,7 +204,7 @@ function correctSound() {sound(740,.1,.04);setTimeout(()=>sound(980,.16,.04),110
     synth.resume();
     synth.speak(u);
   }catch(e){finish()}
-} function stopPulse(){clearTimeout(pulseTimer);pulseTimer=null} function pulsePeriod(){ if(!S.pulse||S.pulsePaused|| ['ASYSTOLE','VF','PVT','PEA'].includes(S.rhythm))return null; let p=60000/Math.max(S.hr,30); if(S.rhythm==='AF')p*=.55+Math.random()*1.0; if(S.rhythm==='SINUS_ARR')p*=.8+Math.random()*.4; if(S.rhythm==='PVC'&&Math.random()<.18)p*=.55; return Math.max(240,Math.min(1900,p)) } function pulse() {if(!S.started||S.pulsePaused||!S.pulse)return;if(['ASYSTOLE','VF','PVT','PEA'].includes(S.rhythm)) {stopPulse();return}sound(880,.07,.04);pulseTimer=setTimeout(pulse,pulsePeriod( ))} function startPulse(){stopPulse();if(S.pulse&&!S.pulsePaused)pulse()} function stopAlarm() {if(alarmTimer)clearInterval(alarmTimer);alarmTimer=null;$('alarmBanner').classList.add('hidden')} function startAlarm() {stopAlarm();if(S.rhythm!=='ASYSTOLE')return;$('alarmBanner').classList.remove('hidden');const a=()=>{if(S.rhythm!=='ASYSTOLE') {stopAlarm();return}sound(520,.22,.045);setTimeout(()=> {if(S.rhythm==='ASYSTOLE')sound(680,.22,.045)},230)};a();alarmTimer=setInterval( a,700)} function setRhythm(r){ S.rhythm=r; const c=r==='ASYSTOLE'?asystoleCase:rhythmCases.find(x=>x.key===r); S.hr=r==='ROSC'?92:(c?.v.hr||0); stopPulse();stopAlarm(); if(r==='ASYSTOLE')startAlarm();else if(! ['VF','PVT','PEA'].includes(r))startPulse(); } function buildGrid(){
+} function stopPulse(){clearTimeout(pulseTimer);pulseTimer=null} function pulsePeriod(){ if(!S.pulse||S.pulsePaused|| ['ASYSTOLE','VF','PVT','PEA'].includes(S.rhythm))return null; let p=60000/Math.max(S.hr,30); if(S.rhythm==='AF')p*=.55+Math.random()*1.0; if(S.rhythm==='SINUS_ARR')p*=.8+Math.random()*.4; if(S.rhythm==='PVC'&&Math.random()<.18)p*=.55; return Math.max(240,Math.min(1900,p)) } function pulse() {} function startPulse(){stopPulse();if(S.pulse&&!S.pulsePaused)pulse()} function stopAlarm() {if(alarmTimer)clearInterval(alarmTimer);alarmTimer=null;$('alarmBanner').classList.add('hidden')} function startAlarm() {stopAlarm();if(S.rhythm!=='ASYSTOLE')return;$('alarmBanner').classList.remove('hidden');const a=()=>{if(S.rhythm!=='ASYSTOLE') {stopAlarm();return}sound(520,.22,.045);setTimeout(()=> {if(S.rhythm==='ASYSTOLE')sound(680,.22,.045)},230)};a();alarmTimer=setInterval( a,700)} function setRhythm(r){ S.rhythm=r; const c=r==='ASYSTOLE'?asystoleCase:rhythmCases.find(x=>x.key===r); S.hr=r==='ROSC'?92:(c?.v.hr||0); _lastBeepOffset=offset; stopPulse();stopAlarm(); if(r==='ASYSTOLE')startAlarm(); } function buildGrid(){
   let d='';
   for(let x=0;x<=1000;x+=25)d+=`M${x} 0V220 `;
   for(let y=0;y<=220;y+=22)d+=`M0 ${y}H1000 `;
@@ -323,12 +323,22 @@ function correctSound() {sound(740,.1,.04);setTimeout(()=>sound(980,.16,.04),110
   let y=110-7*gauss(ph,.18,.035)+55*gauss(ph,.31,.018)-28*gauss(ph,.35,.014)-27*gauss(ph,.57,.07);
   if(r==='PVC'&&Math.floor(t/per)%5===3){let z=(ph-.26)/.16;y=110+58*Math.exp(-z*z)*Math.sin(z*3.14159)-18*Math.exp(-Math.pow((ph-.52)/.09,2))}
   return y;
-} function animate(){
+} let _lastBeepOffset=0;
+function animate(){
   if(S.ecgPaused)return;
-  offset+=7;
+  const spd=Math.max(4,Math.min(14,7*Math.max(S.hr,30)/78));
+  offset+=spd;
   let d='';
   for(let x=0;x<=1000;x+=2)d+=(x?'L':'M')+x+' '+ecgY(S.rhythm,(x+offset)*2.1)+' ';
   $('trace').setAttribute('d',d);
+  if(S.pulse&&!S.pulsePaused&&S.started&&!['ASYSTOLE','VF','PVT','PEA'].includes(S.rhythm)){
+    const probe=ecgY(S.rhythm,(10+offset)*2.1);
+    const thr=['PVC','AIVR','IDIO','HYPERK_SEVERE'].includes(S.rhythm)?90:82;
+    if(probe<thr&&(offset-_lastBeepOffset)>180){
+      _lastBeepOffset=offset;
+      monitorBeep();
+    }
+  }
   raf=requestAnimationFrame(animate);
 } function focus(id) {setTimeout(()=>$(id)?.scrollIntoView({behavior:'smooth',block:'center'}),60)} function vitals(c,ov={}){let v={...c.v,...ov};$('vitals').innerHTML=[['Heart rate',v.hr+' bpm','hr'],['Blood pressure',v.bp,'bp'],['Respiratory rate',v.rr+'/min','rr'],['SpO₂',v.spo2+' %','spo2']].map(a=>`<div class="vital ${a[2] in ov?'blink':''}"><b>${a[0]}</b><span>${a[1]}</span></div>`).join('')} function hideCause(){ $('roscCard').classList.add('hidden');$('abgCard').classList.add('hidden');$('postRoscCard').classList.add('hidden') } function startCase(i){ cancelAnimationFrame(raf);stopPulse();stopAlarm();S.case=i;S.arrestPath= [];S.arrestStep=0;S.ecgPaused=false;S.pulsePaused=false;S.abgGood=true; const c=i===39?asystoleCase:rhythmCases[S.caseOrder[i]];setRhythm(c.key);vitals(c); $('caseNo').textContent=`Case ${i+1} / 40`;$('stage').textContent='• Rhythm recognition';$('scenario').textContent=c.text; $('ecgTitle').textContent='ECG Monitor';$('rhythmReveal').classList.add('hidden');$('rhythmReveal').textContent =''; $('arrestCard').classList.add('hidden');hideCause();$('question').textContent='What is the rhythm?';$('stepLabel').textContent='STEP 1 — RHYTHM';$('feedback').className='feedback';$('feedback').textContent='Interpret the ECG and select the best answer.'; const opts=shuffle(c.opts);
 $('options').innerHTML='';
@@ -539,12 +549,12 @@ $('pauseECG').addEventListener('click',()=>{
 
 $('resumeECG').addEventListener('click',()=>{
   S.ecgPaused=false;
+  _lastBeepOffset=offset; // reset so beep doesn't fire immediately on resume
   $('pauseECG').disabled=false;
   $('resumeECG').disabled=true;
   animate();
   if(S.pulse&&!['ASYSTOLE','VF','PVT','PEA'].includes(S.rhythm)){
     S.pulsePaused=false;
-    startPulse();
   }
 });
 
