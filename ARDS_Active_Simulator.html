@@ -7,6 +7,16 @@
 <style>
 :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eaf2f7;background:#07131b}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#07131b}
+.debrief{display:none;position:fixed;inset:0;z-index:100;background:#07131bcc;align-items:center;justify-content:center;padding:16px}
+.debrief.show{display:flex}
+.debrief-box{background:#0d202b;border:2px solid #2d8062;border-radius:18px;padding:24px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto}
+.debrief-box h2{margin:0 0 6px;font-size:22px;color:#5fd3ee}
+.debrief-box .sub{font-size:13px;color:#9fb2bd;margin-bottom:16px}
+.debrief-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #203641;font-size:14px}
+.debrief-row:last-of-type{border-bottom:0}
+.debrief-row span:last-child{font-weight:800;color:#eaf2f7}
+.debrief-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.debrief-actions button{flex:1;min-width:120px}
 .app{max-width:1120px;margin:auto;padding:12px 14px 28px}
 header{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 2px 14px;position:sticky;top:0;z-index:20;background:#07131b}
 h1{font-size:20px;margin:0}.sub{font-size:12px;color:#9fb2bd}
@@ -48,13 +58,24 @@ button:disabled{opacity:.4;cursor:not-allowed}.num{text-align:center;font-weight
 <div class="app" id="sim">
 <header>
  <div><h1>ARDS ACTIVE SIMULATOR</h1><div class="sub">Closed-loop ARDS physiology • training simulation</div></div>
- <button id="audioBtn">🔊 Start Monitor Audio</button>
+ <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <a href="index.html" style="text-decoration:none"><button style="background:#132b37;border-color:#34515f;font-size:13px;min-height:36px;padding:0 12px">← Hub</button></a>
+  <button id="audioBtn">🔊 Start Monitor Audio</button>
+ </div>
 </header>
 
 <div class="grid top" id="topSection">
 <section class="card" id="patient">
- <div class="label">Patient</div><div class="big">ARDS Case</div>
- <div class="small">Pneumonia-associated acute hypoxemic respiratory failure</div>
+ <div class="label">Patient</div>
+ <div class="row"><span>Case</span>
+  <select id="caseSelect" style="width:auto;flex:1;margin-left:8px">
+   <option value="pneumonia">Pneumonia-associated ARDS</option>
+   <option value="covid">COVID-19 ARDS</option>
+   <option value="aspiration">Aspiration ARDS</option>
+   <option value="sepsis">Sepsis-associated ARDS</option>
+  </select>
+ </div>
+ <div class="small" id="caseDesc">Lobar pneumonia progressing to bilateral infiltrates; moderate–severe hypoxemia. P/F 78, severe ARDS.</div>
  <div class="row"><span>Height</span><input id="height" type="number" min="100" max="220" value="170"></div>
  <div class="row"><span>Sex</span><select id="sex"><option value="male">Male</option><option value="female">Female</option></select></div>
  <div class="row"><span>Actual weight</span><input id="weight" type="number" min="20" max="250" value="70"></div>
@@ -98,24 +119,13 @@ button:disabled{opacity:.4;cursor:not-allowed}.num{text-align:center;font-weight
  <div class="metric" id="mPplat"><div class="name">Pplat — Inspiratory hold required</div><div class="val" id="pplat">—</div></div>
  <div class="metric" id="mTotalPEEP"><div class="name">Total PEEP — Expiratory hold required</div><div class="val" id="totalpeep">—</div></div>
  <div class="metric" id="mAutoPEEP"><div class="name">Auto-PEEP</div><div class="val"><span id="autopeep">—</span> cmH₂O</div></div>
- <div class="metric" id="mDrive"><div class="name">Driving pressure</div><div class="val"><span id="drive">—</span> cmH₂O</div></div>
+ <div class="metric" id="mDrive"><div class="name">Driving pressure <span id="driveEst" style="font-size:11px;color:#d98b39"></span></div><div class="val"><span id="drive">—</span> cmH₂O</div></div>
  <div class="row"><span>Minute ventilation</span><strong><span id="mv">9.6</span> L/min</strong></div>
  <div class="actions">
   <button id="insp">Inspiratory Hold</button><button id="exp">Expiratory Hold</button>
   <button id="prone" class="primary">Prone</button><button id="recruit">Recruitment Maneuver</button>
-  <button id="rescue" class="warn">Rescue Therapies</button>
+ <button id="rescue" class="warn">Rescue Therapies</button>
  </div>
- <div class="rescuePanel">
-  <strong>Rescue therapies — names to know</strong>
-  <ul>
-   <li><b>Prone positioning:</b> prolonged sessions, especially when P/F ≤150.</li>
-   <li><b>Inhaled pulmonary vasodilator:</b> iNO or inhaled epoprostenol as a temporary rescue/bridge for refractory hypoxemia.</li>
-   <li><b>Neuromuscular blockade:</b> selected patients with severe dyssynchrony or inability to achieve protective ventilation; not routine for every patient.</li>
-   <li><b>VV-ECMO:</b> consider referral for refractory severe hypoxemia/hypercapnic acidosis despite optimized management.</li>
-   <li><b>Recruitment maneuvers:</b> not routine; use only selectively and cautiously because of hemodynamic/overdistension risk.</li>
-  </ul>
- </div>
- <div class="pulseStrip" aria-label="Moving monitor pulse waveform"><svg viewBox="0 0 600 70" preserveAspectRatio="none"><g class="pulseTrack"><polyline fill="none" stroke="#5fd3ee" stroke-width="3" points="0,48 45,48 58,48 70,14 82,48 125,48 138,48 150,14 162,48 205,48 218,48 230,14 242,48 285,48 298,48 310,14 322,48 365,48 378,48 390,14 402,48 445,48 458,48 470,14 482,48 525,48 538,48 550,14 562,48 600,48"/></g></svg></div>
 </section>
 </div>
 
@@ -152,13 +162,72 @@ button:disabled{opacity:.4;cursor:not-allowed}.num{text-align:center;font-weight
 <div class="nav"><button id="up">↑ SCROLL UP</button><button id="down">↓ SCROLL DOWN</button></div>
 </div>
 
+<!-- Debrief modal -->
+<div class="debrief" id="debriefModal">
+ <div class="debrief-box">
+  <h2>🎓 Session Debrief</h2>
+  <div class="sub">Patient successfully liberated from mechanical ventilation</div>
+  <div class="debrief-row"><span>Case</span><span id="db_case">—</span></div>
+  <div class="debrief-row"><span>Final Vt (mL/kg PBW)</span><span id="db_vt">—</span></div>
+  <div class="debrief-row"><span>Final PEEP (cmH₂O)</span><span id="db_peep">—</span></div>
+  <div class="debrief-row"><span>Final FiO₂</span><span id="db_fio2">—</span></div>
+  <div class="debrief-row"><span>Final P/F ratio</span><span id="db_pf">—</span></div>
+  <div class="debrief-row"><span>Final pH</span><span id="db_ph">—</span></div>
+  <div class="debrief-row"><span>Final MAP (mmHg)</span><span id="db_map">—</span></div>
+  <div class="debrief-row"><span>Prone positioning used</span><span id="db_prone">—</span></div>
+  <div class="debrief-row"><span>Recruitment maneuver used</span><span id="db_recruit">—</span></div>
+  <div class="debrief-row"><span>Rescue therapies used</span><span id="db_rescue">—</span></div>
+  <div class="debrief-row"><span>Clinical reasoning score</span><span id="db_score">—</span></div>
+  <div class="debrief-actions">
+   <button class="primary" onclick="resetCase()">↺ New Case</button>
+   <a href="index.html" style="text-decoration:none;flex:1"><button style="width:100%">← Back to Hub</button></a>
+  </div>
+ </div>
+</div>
+
 <script>
 (()=> {
 const root=document.getElementById('sim');
-let plat=null,total=null,proned=false,rescueUsed=false,recruitUsed=false;
+let plat=null,total=null,proned=false,rescueUsed=false,recruitUsed=false,recruitDone=false;
 let audioOn=false,audioCtx=null,pulseTimer=null,breathTimer=null,alarmTimer=null;
 const $=id=>document.getElementById(id);
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+
+/* ---- Case definitions ---- */
+const CASES={
+  pneumonia:{label:'Pneumonia-associated ARDS',desc:'Lobar pneumonia progressing to bilateral infiltrates; moderate–severe hypoxemia. P/F 78, severe ARDS.',pfBase:55,co2Base:48,mapBase:78,hrBase:112,spo2Init:89,vtInit:400,rrInit:24,fio2Init:0.80,peepInit:10,bpInit:'104/59'},
+  covid:{label:'COVID-19 ARDS',desc:'SARS-CoV-2 pneumonia with L-phenotype ARDS; high compliance but profound hypoxemia. P/F 85, severe ARDS.',pfBase:62,co2Base:44,mapBase:80,hrBase:108,spo2Init:90,vtInit:440,rrInit:22,fio2Init:0.75,peepInit:8,bpInit:'108/61'},
+  aspiration:{label:'Aspiration ARDS',desc:'Witnessed aspiration event; chemical pneumonitis with bilateral infiltrates and severe shunt physiology. P/F 65, severe ARDS.',pfBase:48,co2Base:52,mapBase:74,hrBase:118,spo2Init:87,vtInit:380,rrInit:26,fio2Init:0.85,peepInit:12,bpInit:'100/57'},
+  sepsis:{label:'Sepsis-associated ARDS',desc:'Abdominal sepsis with ARDS; vasopressor-dependent, highly tenuous hemodynamics. P/F 70, severe ARDS.',pfBase:50,co2Base:50,mapBase:68,hrBase:122,spo2Init:88,vtInit:400,rrInit:24,fio2Init:0.80,peepInit:10,bpInit:'95/54'}
+};
+let currentCase=CASES.pneumonia;
+let recruitMapPenalty=0;
+
+function loadCase(key){
+  currentCase=CASES[key]||CASES.pneumonia;
+  $('caseDesc').textContent=currentCase.desc;
+  $('vt').textContent=String(currentCase.vtInit);
+  $('setrr').textContent=String(currentCase.rrInit);
+  $('fio2').textContent=currentCase.fio2Init.toFixed(2);
+  $('peep').textContent=String(currentCase.peepInit);
+  plat=null;total=null;proned=false;rescueUsed=false;recruitUsed=false;recruitDone=false;recruitMapPenalty=0;
+  $('prone').textContent='Prone';
+  $('recruit').textContent='Recruitment Maneuver';
+  $('recruit').disabled=false;
+  $('hr').textContent=String(currentCase.hrBase);
+  $('pulse').textContent=String(currentCase.hrBase-2);
+  $('map').textContent=String(currentCase.mapBase);
+  $('bp').textContent=currentCase.bpInit;
+  $('spo2').textContent=String(currentCase.spo2Init);
+  $('rrLive').textContent=String(currentCase.rrInit);
+  $('ph').textContent='7.28';$('pco2').textContent=String(currentCase.co2Base);
+  $('pao2').textContent=String((currentCase.pfBase*currentCase.fio2Init).toFixed(0));
+  $('pf').textContent=String(currentCase.pfBase);
+  $('pplat').textContent='—';$('totalpeep').textContent='—';$('autopeep').textContent='—';$('drive').textContent='—';
+  $('driveEst').textContent='';
+  render();
+}
+
 function pbw(){
  const h=parseFloat($('height').value)||170;
  return $('sex').value==='male' ? 50+0.91*(h-152.4) : 45.5+0.91*(h-152.4);
@@ -254,6 +323,20 @@ function setDecision(kind,title,msg,suggest,targets,alarmNeeded=true){
  $('feedbackText').textContent=msg+' The relevant parameter(s) and clinical decision tree are highlighted.';
  if(alarmNeeded){alarmSound();autoNavigate(targets);} else if(targets.includes('clinicalDecision')){setTimeout(()=>{const cd=$('clinicalDecision');cd.scrollIntoView({behavior:'smooth',block:'center'});highlight('clinicalDecision',false);},250);}
 }
+
+/* ---- Driving pressure estimate ---- */
+function updateDriveEstimate(){
+ const s=state(),p=pbw(),ratio=s.vt/p;
+ const comp=clamp(35-(ratio-6)*2,20,45);
+ const estimatedPlat=s.peep+s.vt/comp;
+ const dp=estimatedPlat-s.peep; // = Vt/Crs estimate
+ const dpEl=$('driveEst');
+ if(dpEl){
+   dpEl.textContent='(est. ~'+dp.toFixed(0)+' cmH₂O'+(dp>15?' ⚠️':'')+')';
+   dpEl.style.color=dp>15?'#d98b39':'#9fb2bd';
+ }
+}
+
 function render(){
  const s=state(),p=pbw(),ratio=s.vt/p,comp=clamp(35-(ratio-6)*2,20,45);
  $('pbw').textContent=p.toFixed(1)+' kg';
@@ -262,8 +345,10 @@ function render(){
  $('pf').style.color='';
  if(plat!==null)$('pplat').textContent=plat.toFixed(0)+' cmH₂O';
  if(total!==null){$('totalpeep').textContent=total.toFixed(0)+' cmH₂O';$('autopeep').textContent=Math.max(0,total-s.peep).toFixed(0)+' cmH₂O';if(plat!==null)$('drive').textContent=(plat-total).toFixed(0)+' cmH₂O';}
+ updateDriveEstimate();
  if(audioOn){clearTimeout(pulseTimer);clearTimeout(breathTimer);scheduleAudio();}
 }
+
 function updateTrajectory(pf,s,ph,map,hr){
  let phase=1,score=0,next='Optimize lung-protective ventilation and reassess Pplat, driving pressure, oxygenation and hemodynamics.';
  const ratio=s.vt/pbw();
@@ -275,20 +360,43 @@ function updateTrajectory(pf,s,ph,map,hr){
  $('phaseBadge').textContent=['','INITIAL STABILIZATION','OXYGENATION OPTIMIZATION','DE-ESCALATION','LIBERATION'][phase];
  for(let i=1;i<=4;i++){const e=$('t'+i);e.classList.toggle('active',i===phase);e.classList.toggle('done',i<phase);}
  $('nextAction').textContent=next;$('score').textContent=Math.min(100,score)+' / 100';
+ return {phase,score};
 }
+
+/* ---- Debrief ---- */
+function showDebrief(pf,s,ph,map,score){
+ const p=pbw();
+ $('db_case').textContent=currentCase.label;
+ $('db_vt').textContent=(s.vt/p).toFixed(1)+' mL/kg';
+ $('db_peep').textContent=s.peep;
+ $('db_fio2').textContent=s.fio2.toFixed(2);
+ $('db_pf').textContent=pf.toFixed(0);
+ $('db_ph').textContent=ph.toFixed(2);
+ $('db_map').textContent=map.toFixed(0);
+ $('db_prone').textContent=proned?'Yes':'No';
+ $('db_recruit').textContent=recruitDone?'Yes':'No';
+ $('db_rescue').textContent=rescueUsed?'Yes':'No';
+ $('db_score').textContent=Math.min(100,score)+' / 100';
+ $('debriefModal').classList.add('show');
+}
+
+window.resetCase=function(){
+ $('debriefModal').classList.remove('show');
+ loadCase($('caseSelect').value);
+};
+
 function simulate(reason='ventilator'){
  const s=state(),p=pbw(),ratio=s.vt/p;
- let pf=55+s.peep*3+(ratio<=7?10:0)+(proned?45:0);
+ let pf=currentCase.pfBase+s.peep*3+(ratio<=7?10:0)+(proned?45:0);
  if(recruitUsed)pf+=15;if(rescueUsed)pf+=25;pf=clamp(pf,45,420);
- let co2=48+(9.6-s.vt*s.rr/1000)*3;co2=clamp(co2,30,90);
+ let co2=currentCase.co2Base+(9.6-s.vt*s.rr/1000)*3;co2=clamp(co2,30,90);
  let ph=7.40-(co2-40)*.008, pao2=pf*s.fio2, spo2=clamp(84+pf/18,75,99);
- let map=clamp(78-Math.max(0,s.peep-10)*1.4-Math.max(0,ratio-8)*2,48,90);
- // Simulated cardiovascular response to hypoxemia, hypercapnia and excessive intrathoracic pressure.
- let hr=clamp(112 + Math.max(0,100-pf)*0.22 + Math.max(0,co2-45)*0.35 - (proned?8:0) - Math.max(0,s.peep-14)*1.5,60,175);
+ let map=clamp(currentCase.mapBase-Math.max(0,s.peep-10)*1.4-Math.max(0,ratio-8)*2-recruitMapPenalty,48,90);
+ let hr=clamp(currentCase.hrBase + Math.max(0,100-pf)*0.22 + Math.max(0,co2-45)*0.35 - (proned?8:0) - Math.max(0,s.peep-14)*1.5,60,175);
  if(pf>180 && co2<50) hr=clamp(hr-12,60,175);
  let pulse=clamp(hr-(map<60?5:0),50,175);
  let sbp=clamp(map+30,65,150), dbp=clamp(map-15,35,95);
- const old={hr:+$('hr').textContent||112,pulse:+$('pulse').textContent||110,map:+$('map').textContent||74,spo2:+$('spo2').textContent||89};
+ const old={hr:+$('hr').textContent||currentCase.hrBase,pulse:+$('pulse').textContent||(currentCase.hrBase-2),map:+$('map').textContent||currentCase.mapBase,spo2:+$('spo2').textContent||currentCase.spo2Init};
  $('pco2').textContent=co2.toFixed(0);$('ph').textContent=ph.toFixed(2);$('pao2').textContent=pao2.toFixed(0);$('pf').textContent=pf.toFixed(0);
  $('spo2').textContent=spo2.toFixed(0);$('map').textContent=map.toFixed(0);$('bp').textContent=sbp.toFixed(0)+'/'+dbp.toFixed(0);$('hr').textContent=hr.toFixed(0);$('pulse').textContent=pulse.toFixed(0);$('rrLive').textContent=s.rr;
  $('severity').textContent=pf<=100?'Severe':pf<=200?'Moderate':pf<=300?'Mild':'No ARDS range';
@@ -345,8 +453,16 @@ function simulate(reason='ventilator'){
      targets=[...new Set(['mBP','mMAP','mHR','mPulse','clinicalDecision'])];
    }
  }
- if(vitalTargets.length){ targets=[...new Set([...vitalTargets,...targets])]; } updateTrajectory(pf,s,ph,map,hr); setDecision(kind,title,msg,suggest,targets,alarmNeeded);render();
+ if(vitalTargets.length){ targets=[...new Set([...vitalTargets,...targets])]; }
+ const {phase,score}=updateTrajectory(pf,s,ph,map,hr);
+ setDecision(kind,title,msg,suggest,targets,alarmNeeded);
+ render();
+ // Show debrief when liberation phase reached
+ if(phase===4){
+   setTimeout(()=>showDebrief(pf,s,ph,map,score),1200);
+ }
 }
+
 root.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',()=>{
 const id=b.dataset.d,el=$(id);let v=parseFloat(el.textContent)+parseFloat(b.dataset.step);
  if(id==='fio2')v=clamp(v,.21,1);if(id==='vt')v=clamp(v,200,800);if(id==='setrr')v=clamp(v,8,40);if(id==='peep')v=clamp(v,0,24);
@@ -362,13 +478,34 @@ $('insp').addEventListener('click',()=>{const s=state(),comp=clamp(35-(s.vt/pbw(
 });
 $('exp').addEventListener('click',()=>{const s=state(),auto=s.rr>30?Math.min(6,(s.rr-30)*.8):0;total=s.peep+auto;render();highlight('mTotalPEEP');highlight('mAutoPEEP');
  if(auto>=3)setDecision('decLung','⚠️ Intrinsic PEEP detected','Auto-PEEP is '+auto.toFixed(0)+' cmH₂O.','Reassess expiratory time, RR and dynamic hyperinflation before further increasing minute ventilation.',['mAutoPEEP','mTotalPEEP'],true);
- else setDecision('decLung','Total PEEP measured','Total PEEP is '+total.toFixed(0)+' cmH₂O.','Compare total PEEP with set PEEP and calculate driving pressure when Pplat is available.',['mTotalPEEP'],false);
+ else{
+  let driveMsg='Total PEEP is '+total.toFixed(0)+' cmH₂O.';
+  if(plat!==null){
+    const dp=plat-total;
+    driveMsg+=' Driving pressure: '+dp.toFixed(0)+' cmH₂O'+(dp>15?' — above 15 cmH₂O; consider reducing Vt.':'.');
+  }
+  setDecision('decLung','Total PEEP measured',driveMsg,'Compare total PEEP with set PEEP and calculate driving pressure when Pplat is available.',['mTotalPEEP'],false);
+ }
 });
 $('prone').addEventListener('click',()=>{
  proned=!proned;$('prone').textContent=proned?'Supine':'Prone';
  simulate('prone');
 });
-$('recruit').addEventListener('click',()=>{recruitUsed=!recruitUsed;simulate('recruit');$('feedbackText').textContent='Recruitment maneuver simulated. Observe oxygenation and hemodynamic consequences; prolonged/aggressive recruitment is not routine ARDS care.';});
+$('recruit').addEventListener('click',()=>{
+ if(recruitDone){
+   $('feedbackText').textContent='Recruitment maneuver has already been performed. It is a one-time intervention in this session.';
+   return;
+ }
+ recruitDone=true;recruitUsed=true;
+ // Brief MAP drop as hemodynamic penalty
+ recruitMapPenalty=6;
+ $('recruit').textContent='✓ Recruitment Done';
+ $('recruit').disabled=true;
+ simulate('recruit');
+ // Resolve MAP penalty after brief period
+ setTimeout(()=>{recruitMapPenalty=0;},3000);
+ $('feedbackText').textContent='Recruitment maneuver performed (one-time). A transient hemodynamic consequence has been applied. Observe oxygenation and MAP response; prolonged/aggressive recruitment is not routine ARDS care.';
+});
 $('rescue').addEventListener('click',()=>{rescueUsed=!rescueUsed;simulate('rescue');$('feedbackText').textContent='Rescue pathway activated: reassess optimized ventilation, prone positioning and reversible causes; inhaled pulmonary vasodilator may be considered as a bridge, with VV-ECMO referral for refractory severe ARDS when appropriate.';});
 $('audioBtn').addEventListener('click',async()=>{
  if(audioOn){
@@ -384,8 +521,10 @@ $('audioBtn').addEventListener('click',async()=>{
 });
 $('up').addEventListener('click',()=>window.scrollBy({top:-window.innerHeight*.78,behavior:'smooth'}));
 $('down').addEventListener('click',()=>window.scrollBy({top:window.innerHeight*.78,behavior:'smooth'}));
-$('hr').textContent='112';$('pulse').textContent='110';$('map').textContent='74';$('bp').textContent='104/59';$('spo2').textContent='89';$('rrLive').textContent='30';
-render();
+$('caseSelect').addEventListener('change',()=>loadCase($('caseSelect').value));
+
+// Initial load
+loadCase('pneumonia');
 })();
 </script>
 </body>

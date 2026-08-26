@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ABG Photo Interpreter</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eaf2f7;background:#07131b}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#07131b}
+.app{max-width:820px;margin:auto;padding:14px 14px 40px}
+header{position:sticky;top:0;z-index:30;background:#07131bf5;backdrop-filter:blur(10px);border-bottom:1px solid #1e3540;padding:10px 0;margin-bottom:12px}
+.head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.brand{font-size:18px;font-weight:850}.sub{font-size:11px;color:#8ea3ad}
+button{font:inherit;min-height:44px;border:1px solid #35505d;background:#102532;color:#eaf2f7;border-radius:10px;padding:9px 14px;font-weight:700;cursor:pointer}
+button.primary{background:#0b718b;border-color:#168ba7}
+button.success{background:#0d5c38;border-color:#1a8f5b}
+button.warn{background:#5c3a0d;border-color:#c47a1e}
+button.danger{background:#5c1520;border-color:#a93244}
+button:disabled{opacity:.4;cursor:not-allowed}
+.card{background:#0c202b;border:1px solid #27424e;border-radius:14px;padding:14px;margin:12px 0}
+.card-title{font-size:11px;letter-spacing:.09em;color:#9db1ba;text-transform:uppercase;font-weight:850;margin-bottom:10px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:11px;color:#9db1ba}
+.field input,.field select{background:#0a1c27;color:#eaf2f7;border:1px solid #2e4d5c;border-radius:8px;padding:9px;font-size:15px;width:100%}
+.field input:focus,.field select:focus{outline:none;border-color:#2ba5c8}
+.context-btn{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.context-btn button{flex:1;min-width:90px;font-size:13px;min-height:38px;padding:6px 10px}
+.context-btn button.active{border:2px solid #55c7df;background:#103847}
+/* camera */
+#cameraWrap{position:relative;background:#000;border-radius:12px;overflow:hidden;margin:10px 0;display:none}
+#videoEl{width:100%;display:block;max-height:52vmax}
+#captureOverlay{position:absolute;inset:0;pointer-events:none;border:3px solid #2ba5c855;border-radius:12px}
+.cam-controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.cam-controls button{flex:1}
+#previewWrap{display:none;margin:10px 0}
+#previewImg{width:100%;border-radius:12px;border:1px solid #2e4d5c}
+/* ocr status */
+.ocr-status{padding:10px 12px;border-radius:10px;border:1px solid #2e4d5c;background:#091820;font-size:13px;margin:8px 0;display:none}
+.ocr-status.running{border-color:#2ba5c8;color:#7dd9f0}
+.ocr-status.done{border-color:#1a8f5b;color:#5dd89d}
+.ocr-status.err{border-color:#a93244;color:#f07090}
+/* results */
+.result-section{margin-top:18px}
+.badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;margin:2px 3px}
+.badge.acid{background:#5c1520;color:#f07090;border:1px solid #a93244}
+.badge.alk{background:#0d4050;color:#7dd9f0;border:1px solid #1a8f5b}
+.badge.norm{background:#142d1a;color:#5dd89d;border:1px solid #1a8f5b}
+.badge.warn{background:#5c3a0d;border:1px solid #c47a1e;color:#f0c36e}
+.badge.info{background:#0b3048;border:1px solid #2ba5c8;color:#7dd9f0}
+.diag-card{padding:14px;border-radius:12px;margin:8px 0;border:1px solid}
+.diag-card.acid{background:#2a0e14;border-color:#a93244}
+.diag-card.alk{background:#08232d;border-color:#1a8f5b}
+.diag-card.mixed{background:#2a2408;border-color:#c47a1e}
+.diag-card.norm{background:#0a1f14;border-color:#1a8f5b}
+.diag-card h3{margin:0 0 8px;font-size:15px}
+.diag-card p{margin:4px 0;font-size:13px;color:#b8c8d4;line-height:1.5}
+ul.abnorm{padding:0 0 0 16px;margin:6px 0}
+ul.abnorm li{font-size:13px;line-height:1.6;color:#c8d8e0}
+ul.abnorm li b{color:#eaf2f7}
+.mgmt-item{padding:10px 12px;border-radius:10px;border-left:3px solid #2ba5c8;background:#091820;margin:7px 0}
+.mgmt-item strong{display:block;font-size:13px;color:#7dd9f0;margin-bottom:3px}
+.mgmt-item p{font-size:12px;color:#a8bec9;margin:0;line-height:1.5}
+/* tooltip */
+.tip{cursor:help;border-bottom:1px dashed #4a7a8a;position:relative}
+.tip-box{display:none;position:absolute;left:0;top:120%;z-index:50;background:#0d2535;border:1px solid #2ba5c8;border-radius:8px;padding:8px 10px;font-size:11px;color:#b0d0df;white-space:normal;min-width:180px;max-width:240px;line-height:1.45}
+.tip:hover .tip-box,.tip:focus .tip-box{display:block}
+/* serial trend */
+.trend-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.trend-cell{background:#091820;border:1px solid #2e4d5c;border-radius:8px;padding:8px;font-size:11px;text-align:center}
+.trend-cell .tv{font-size:18px;font-weight:850;display:block;margin-top:2px}
+.trend-cell .tl{color:#9db1ba}
+/* export */
+#exportBox{display:none;background:#041017;border:1px solid #2e4d5c;border-radius:10px;padding:12px;font-size:12px;white-space:pre-wrap;color:#9db1ba;margin-top:10px;max-height:200px;overflow-y:auto}
+@media(max-width:560px){.row3{grid-template-columns:1fr 1fr}.trend-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="head">
+    <div>
+      <div class="brand">ABG PHOTO INTERPRETER</div>
+      <div class="sub">Photograph or enter ABG values • Instant interpretation & management</div>
+    </div>
+    <a href="index.html" style="text-decoration:none"><button style="font-size:13px;min-height:36px;padding:0 12px">← Hub</button></a>
+  </div>
+</header>
+
+<!-- Step 1: Context -->
+<section class="card">
+  <div class="card-title">Step 1 — Clinical Context</div>
+  <p style="font-size:13px;color:#9db1ba;margin:0 0 6px">Select the clinical setting to tailor management priorities.</p>
+  <div class="context-btn">
+    <button id="ctxICU" class="active" onclick="setCtx('ICU',this)">🏥 ICU</button>
+    <button id="ctxED" onclick="setCtx('ED',this)">🚨 Emergency</button>
+    <button id="ctxWard" onclick="setCtx('Ward',this)">🛏 Ward</button>
+  </div>
+</section>
+
+<!-- Step 2: Input -->
+<section class="card">
+  <div class="card-title">Step 2 — ABG Input</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <button class="primary" onclick="startCamera()" id="camBtn">📷 Photograph ABG Report</button>
+    <button onclick="showManual()" id="manBtn">✏️ Enter Manually</button>
+  </div>
+
+  <!-- Camera section -->
+  <div id="cameraWrap">
+    <video id="videoEl" autoplay playsinline muted></video>
+    <div id="captureOverlay"></div>
+    <canvas id="capCanvas" style="display:none"></canvas>
+  </div>
+  <div class="cam-controls" id="camControls" style="display:none">
+    <button class="primary" onclick="capturePhoto()" id="snapBtn">📸 Capture</button>
+    <button onclick="flipCamera()" id="flipBtn">🔄 Flip Camera</button>
+    <button onclick="stopCamera()" class="danger">✕ Cancel</button>
+  </div>
+
+  <!-- Preview captured image -->
+  <div id="previewWrap">
+    <div style="font-size:12px;color:#9db1ba;margin-bottom:4px">Captured image — OCR scanning…</div>
+    <img id="previewImg" alt="Captured ABG">
+  </div>
+
+  <!-- OCR status -->
+  <div id="ocrStatus" class="ocr-status"></div>
+
+  <!-- Manual / review form -->
+  <div id="manualForm" style="display:none;margin-top:10px">
+    <div class="row3" style="margin-bottom:8px">
+      <div class="field">
+        <label><span class="tip">pH<span class="tip-box">Normal 7.35–7.45. Below 7.35 = acidaemia; above 7.45 = alkalaemia.</span></span></label>
+        <input id="fpH" type="number" step="0.01" min="6.5" max="8.0" placeholder="7.35–7.45">
+      </div>
+      <div class="field">
+        <label><span class="tip">PaCO₂ (mmHg)<span class="tip-box">Normal 35–45 mmHg. Raised in respiratory acidosis; low in respiratory alkalosis or metabolic compensation.</span></span></label>
+        <input id="fPaCO2" type="number" step="0.1" min="1" max="150" placeholder="35–45">
+      </div>
+      <div class="field">
+        <label><span class="tip">PaO₂ (mmHg)<span class="tip-box">Normal >80 mmHg on air. Used to calculate P/F ratio and A-a gradient.</span></span></label>
+        <input id="fPaO2" type="number" step="0.1" min="1" max="700" placeholder=">80">
+      </div>
+    </div>
+    <div class="row3" style="margin-bottom:8px">
+      <div class="field">
+        <label><span class="tip">HCO₃⁻ (mmol/L)<span class="tip-box">Normal 22–26 mmol/L. Primary change in metabolic disorders; secondary compensation in respiratory disorders.</span></span></label>
+        <input id="fHCO3" type="number" step="0.1" min="1" max="60" placeholder="22–26">
+      </div>
+      <div class="field">
+        <label><span class="tip">Base Excess (mmol/L)<span class="tip-box">Normal ±2 mmol/L. Negative (base deficit) indicates metabolic acidosis.</span></span></label>
+        <input id="fBE" type="number" step="0.1" min="-30" max="30" placeholder="±2">
+      </div>
+      <div class="field">
+        <label><span class="tip">FiO₂ (0.21–1.0)<span class="tip-box">Fraction of inspired oxygen. Room air = 0.21. Required for P/F ratio and A-a gradient.</span></span></label>
+        <input id="fFiO2" type="number" step="0.01" min="0.21" max="1" placeholder="0.21">
+      </div>
+    </div>
+    <div class="row3" style="margin-bottom:8px">
+      <div class="field">
+        <label><span class="tip">Na⁺ (mmol/L)<span class="tip-box">Normal 135–145. Required for anion gap calculation.</span></span></label>
+        <input id="fNa" type="number" step="0.1" min="100" max="180" placeholder="135–145">
+      </div>
+      <div class="field">
+        <label><span class="tip">Cl⁻ (mmol/L)<span class="tip-box">Normal 98–106. Required for anion gap = Na – (Cl + HCO₃).</span></span></label>
+        <input id="fCl" type="number" step="0.1" min="70" max="130" placeholder="98–106">
+      </div>
+      <div class="field">
+        <label><span class="tip">K⁺ (mmol/L)<span class="tip-box">Normal 3.5–5.0. Hypokalaemia common in alkalosis; hyperkalaemia in acidosis.</span></span></label>
+        <input id="fK" type="number" step="0.1" min="1" max="10" placeholder="3.5–5.0">
+      </div>
+    </div>
+    <div class="row3" style="margin-bottom:8px">
+      <div class="field">
+        <label><span class="tip">Lactate (mmol/L)<span class="tip-box">Normal <2 mmol/L. ≥2 = hyperlactataemia; ≥4 = severe lactic acidosis.</span></span></label>
+        <input id="fLactate" type="number" step="0.1" min="0" max="30" placeholder="<2">
+      </div>
+      <div class="field">
+        <label><span class="tip">SpO₂ (%)<span class="tip-box">Pulse oximetry oxygen saturation. Cross-check with PaO₂.</span></span></label>
+        <input id="fSpO2" type="number" step="0.1" min="50" max="100" placeholder="94–100">
+      </div>
+      <div class="field">
+        <label>Temperature (°C) <span style="font-size:10px;color:#9db1ba">(for correction)</span></label>
+        <input id="fTemp" type="number" step="0.1" min="30" max="42" placeholder="37">
+      </div>
+    </div>
+    <button class="primary" style="width:100%;margin-top:6px" onclick="interpretABG()">🔬 INTERPRET ABG</button>
+  </div>
+</section>
+
+<!-- Results -->
+<div id="resultsSection" style="display:none">
+
+  <!-- Diagnosis -->
+  <section class="card result-section">
+    <div class="card-title">Diagnosis</div>
+    <div id="diagPanel"></div>
+  </section>
+
+  <!-- Abnormalities -->
+  <section class="card result-section">
+    <div class="card-title">Detected Abnormalities</div>
+    <ul class="abnorm" id="abnormList"></ul>
+  </section>
+
+  <!-- Management -->
+  <section class="card result-section">
+    <div class="card-title">Management & Treatment</div>
+    <div id="mgmtPanel"></div>
+  </section>
+
+  <!-- Serial tracking -->
+  <section class="card result-section">
+    <div class="card-title">Serial ABG Trend (up to 4 timepoints)</div>
+    <div id="trendGrid" class="trend-grid"></div>
+    <button onclick="addToTrend()" class="success" style="margin-top:8px;width:100%">+ Add Current ABG to Trend</button>
+    <button onclick="clearTrend()" style="margin-top:6px;width:100%;font-size:12px;min-height:36px">Clear Trend</button>
+  </section>
+
+  <!-- Export -->
+  <section class="card result-section">
+    <div class="card-title">Export / Share</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button onclick="exportSummary()" class="success" style="flex:1">📋 Copy Summary Text</button>
+      <button onclick="toggleExportBox()" style="flex:1">👁 Preview Summary</button>
+    </div>
+    <div id="exportBox"></div>
+  </section>
+
+  <button onclick="resetAll()" style="width:100%;margin-top:8px">↺ New ABG</button>
+</div>
+
+</div><!-- .app -->
+
+<!-- Tesseract.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+<script>
+'use strict';
+/* ============================================================
+   State
+   ============================================================ */
+let ctx='ICU';
+let stream=null,facingMode='environment';
+let lastResult=null;
+let trendData=[];
+
+function setCtx(c,btn){
+  ctx=c;
+  document.querySelectorAll('.context-btn button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* ============================================================
+   Camera
+   ============================================================ */
+async function startCamera(){
+  try{
+    if(stream){stopStream();}
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode,width:{ideal:1920},height:{ideal:1080}},audio:false});
+    const v=document.getElementById('videoEl');
+    v.srcObject=stream;
+    document.getElementById('cameraWrap').style.display='block';
+    document.getElementById('camControls').style.display='flex';
+    document.getElementById('manualForm').style.display='none';
+    document.getElementById('previewWrap').style.display='none';
+  }catch(e){
+    alert('Camera not available: '+e.message+'\nPlease use manual entry instead.');
+    showManual();
+  }
+}
+
+async function flipCamera(){
+  facingMode=facingMode==='environment'?'user':'environment';
+  await startCamera();
+}
+
+function stopStream(){
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+}
+
+function stopCamera(){
+  stopStream();
+  document.getElementById('cameraWrap').style.display='none';
+  document.getElementById('camControls').style.display='none';
+}
+
+function capturePhoto(){
+  const v=document.getElementById('videoEl');
+  const c=document.getElementById('capCanvas');
+  c.width=v.videoWidth;c.height=v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0);
+  const img=document.getElementById('previewImg');
+  img.src=c.toDataURL('image/jpeg',0.92);
+  document.getElementById('previewWrap').style.display='block';
+  stopCamera();
+  runOCR(img.src);
+}
+
+/* ============================================================
+   OCR via Tesseract.js
+   ============================================================ */
+function setOCRStatus(msg,cls){
+  const el=document.getElementById('ocrStatus');
+  el.textContent=msg;el.className='ocr-status '+cls;el.style.display='block';
+}
+
+async function runOCR(dataURL){
+  setOCRStatus('⏳ Scanning image with OCR… this may take 10–30 seconds','running');
+  try{
+    const result=await Tesseract.recognize(dataURL,'eng',{logger:m=>{
+      if(m.status==='recognizing text'){
+        setOCRStatus('⏳ Recognizing text: '+Math.round(m.progress*100)+'%','running');
+      }
+    }});
+    const text=result.data.text;
+    setOCRStatus('✅ OCR complete. Review extracted values below and correct any errors.','done');
+    extractValues(text);
+    showManual();
+  }catch(e){
+    setOCRStatus('⚠️ OCR failed: '+e.message+'. Please enter values manually.','err');
+    showManual();
+  }
+}
+
+function extractValues(text){
+  // Patterns: look for label followed by number
+  const patterns={
+    fpH:      [/\bpH\s*[=:]\s*([\d.]+)/i,      /\bpH\b[\s\S]{0,10}?\b(7\.\d{2})\b/],
+    fPaCO2:   [/Pa?CO2?\s*[=:]\s*([\d.]+)/i,    /CO2?\s+([\d.]+)/i],
+    fPaO2:    [/Pa?O2?\s*[=:]\s*([\d.]+)/i,     /PO2?\s+([\d.]+)/i],
+    fHCO3:    [/HCO3?\s*[=:]\s*([\d.]+)/i,      /BICARB\s+([\d.]+)/i],
+    fBE:      [/BE\s*[=:]\s*(-?[\d.]+)/i,        /Base\s+(?:Excess|Def)\s*[=:]\s*(-?[\d.]+)/i],
+    fFiO2:    [/FiO2?\s*[=:]\s*([\d.]+)/i,      /FIO2?\s+([\d.]+)/i],
+    fNa:      [/Na\+?\s*[=:]\s*([\d.]+)/i,       /Sodium\s+([\d.]+)/i],
+    fCl:      [/Cl-?\s*[=:]\s*([\d.]+)/i,        /Chloride\s+([\d.]+)/i],
+    fK:       [/K\+?\s*[=:]\s*([\d.]+)/i,        /Potassium\s+([\d.]+)/i],
+    fLactate: [/Lactate?\s*[=:]\s*([\d.]+)/i,    /LAC\s+([\d.]+)/i],
+    fSpO2:    [/SpO2?\s*[=:]\s*([\d.]+)/i,       /SAT\s+([\d.]+)/i],
+    fTemp:    [/Temp\s*[=:]\s*([\d.]+)/i,        /Temperature\s+([\d.]+)/i],
+  };
+  for(const [id,pats] of Object.entries(patterns)){
+    for(const pat of pats){
+      const m=text.match(pat);
+      if(m&&m[1]){
+        const el=document.getElementById(id);
+        if(el && !el.value) el.value=m[1];
+        break;
+      }
+    }
+  }
+}
+
+/* ============================================================
+   Manual form
+   ============================================================ */
+function showManual(){
+  document.getElementById('manualForm').style.display='block';
+  document.getElementById('cameraWrap').style.display='none';
+  document.getElementById('camControls').style.display='none';
+}
+
+function v(id){const el=document.getElementById(id);return el&&el.value!==''?parseFloat(el.value):null;}
+
+/* ============================================================
+   ABG Interpretation Engine
+   ============================================================ */
+function interpretABG(){
+  const pH=v('fpH'),pco2=v('fPaCO2'),pao2=v('fPaO2'),hco3=v('fHCO3'),be=v('fBE');
+  const fio2=v('fFiO2')||0.21,na=v('fNa'),cl=v('fCl'),k=v('fK'),lactate=v('fLactate'),spo2=v('fSpO2');
+
+  if(pH===null||pco2===null||hco3===null){
+    alert('Please enter at least pH, PaCO₂, and HCO₃⁻ to interpret.');return;
+  }
+
+  const res={pH,pco2,pao2,hco3,be,fio2,na,cl,k,lactate,spo2,abnorm:[],mgmt:[],context:ctx};
+
+  /* --- Step 1: pH classification --- */
+  res.phStatus = pH<7.35?'Acidaemia':pH>7.45?'Alkalaemia':'Normal pH';
+  res.phSeverity= pH<7.2||pH>7.6?'Severe':pH<7.3||pH>7.55?'Moderate':pH<7.35||pH>7.45?'Mild':'Normal';
+
+  /* --- Step 2: Primary disorder --- */
+  // Respiratory: PaCO2 drives pH in same direction as disorder
+  // Metabolic: HCO3 drives pH in same direction
+  res.primary='Undetermined';
+  res.primaryType='';
+
+  if(pH<7.35){
+    // Acidaemia
+    if(pco2>45&&hco3<=26){res.primary='Respiratory Acidosis';res.primaryType='resp';}
+    else if(hco3<22&&pco2<=45){res.primary='Metabolic Acidosis';res.primaryType='met';}
+    else if(pco2>45&&hco3<22){res.primary='Mixed Respiratory + Metabolic Acidosis';res.primaryType='mixed';}
+    else{res.primary='Metabolic Acidosis (compensated)';res.primaryType='met';}
+  } else if(pH>7.45){
+    // Alkalaemia
+    if(pco2<35&&hco3>=22){res.primary='Respiratory Alkalosis';res.primaryType='resp';}
+    else if(hco3>26&&pco2>=35){res.primary='Metabolic Alkalosis';res.primaryType='met';}
+    else if(pco2<35&&hco3>26){res.primary='Mixed Respiratory + Metabolic Alkalosis';res.primaryType='mixed';}
+    else{res.primary='Metabolic Alkalosis (compensated)';res.primaryType='met';}
+  } else {
+    // Normal pH — could be compensated or mixed
+    if(pco2>45&&hco3>26){res.primary='Mixed / Compensated (normal pH with raised CO₂ & HCO₃)';res.primaryType='mixed';}
+    else if(pco2<35&&hco3<22){res.primary='Mixed / Compensated (normal pH with low CO₂ & HCO₃)';res.primaryType='mixed';}
+    else{res.primary='Normal ABG';res.primaryType='normal';}
+  }
+
+  /* --- Step 3: Compensation adequacy --- */
+  res.comp='Not calculated';
+  res.compAdequate=null;
+  if(res.primaryType==='resp'&&pH<7.35){
+    // Resp acidosis: acute HCO3 rises 1 per 10 CO2; chronic 3.5 per 10
+    const acuteHCO3=24+(pco2-40)/10;
+    const chronHCO3=24+(pco2-40)*3.5/10;
+    if(hco3>=chronHCO3-2&&hco3<=chronHCO3+2){res.comp='Chronic (fully compensated)';res.compAdequate=true;}
+    else if(hco3>=acuteHCO3-2&&hco3<=acuteHCO3+2){res.comp='Acute (inadequate metabolic compensation)';res.compAdequate=false;}
+    else if(hco3<acuteHCO3-2){res.comp='Under-compensated or superimposed metabolic acidosis';res.compAdequate=false;}
+    else{res.comp='Over-compensated (metabolic alkalosis component)';res.compAdequate=false;}
+  } else if(res.primaryType==='resp'&&pH>7.45){
+    // Resp alkalosis: HCO3 falls 2 per 10 CO2 acute; 5 per 10 chronic
+    const acuteHCO3=24-(40-pco2)*2/10;
+    const chronHCO3=24-(40-pco2)*5/10;
+    if(hco3<=chronHCO3+2&&hco3>=chronHCO3-2){res.comp='Chronic';res.compAdequate=true;}
+    else if(hco3<=acuteHCO3+2&&hco3>=acuteHCO3-2){res.comp='Acute';res.compAdequate=false;}
+    else{res.comp='Partially compensated';res.compAdequate=false;}
+  } else if(res.primaryType==='met'&&pH<7.35){
+    // Winter's formula: expected PaCO2 = 1.5×HCO3 + 8 ±2
+    const expCO2min=1.5*hco3+6,expCO2max=1.5*hco3+10;
+    if(pco2>=expCO2min&&pco2<=expCO2max){res.comp='Adequate respiratory compensation';res.compAdequate=true;}
+    else if(pco2>expCO2max){res.comp='Insufficient respiratory compensation (co-existing resp acidosis)';res.compAdequate=false;}
+    else{res.comp='Excessive compensation (co-existing resp alkalosis)';res.compAdequate=false;}
+  } else if(res.primaryType==='met'&&pH>7.45){
+    // Expected PaCO2 = 0.7×(HCO3−24)+40 ±5
+    const expCO2=0.7*(hco3-24)+40;
+    if(Math.abs(pco2-expCO2)<=5){res.comp='Adequate respiratory compensation';res.compAdequate=true;}
+    else{res.comp='Incomplete/abnormal compensation';res.compAdequate=false;}
+  }
+
+  /* --- Step 4: Oxygenation --- */
+  if(pao2!==null){
+    res.pf=pao2/fio2;
+    // A-a gradient: PAO2 = (FiO2 × (760-47)) - PaCO2/0.8
+    const pao2_alv=fio2*(760-47)-pco2/0.8;
+    res.aaGrad=pao2_alv-pao2;
+    const expectedAA=2.5+0.21*25; // rough age-adjusted: ~7.5 at age 25
+    res.aaHigh=res.aaGrad>15;
+    // Hypoxaemia classification
+    if(pao2<55||res.pf<100){res.hypoxSev='Severe hypoxaemia';}
+    else if(pao2<70||res.pf<200){res.hypoxSev='Moderate hypoxaemia';}
+    else if(pao2<80||res.pf<300){res.hypoxSev='Mild hypoxaemia';}
+    else{res.hypoxSev='Normal oxygenation';}
+  }
+
+  /* --- Step 5: Anion gap & delta-delta --- */
+  if(na!==null&&cl!==null){
+    res.ag=na-(cl+hco3);
+    const agCorrected=(k!==null)?na+k-(cl+hco3):res.ag;
+    res.agHigh=res.ag>12;
+    if(res.agHigh){
+      // Delta-delta ratio = (AG-12)/(24-HCO3)
+      res.deltaDelta=hco3<24?(res.ag-12)/(24-hco3):null;
+      if(res.deltaDelta!==null){
+        if(res.deltaDelta<1){res.ddInterp='Concomitant NAGMA (HAGMA + normal anion gap acidosis)';}
+        else if(res.deltaDelta>2){res.ddInterp='Concomitant metabolic alkalosis (HAGMA + met alkalosis)';}
+        else{res.ddInterp='Pure HAGMA';}
+      }
+    }
+  }
+
+  /* --- Step 6: Lactate --- */
+  if(lactate!==null){
+    if(lactate>=4){res.lactateSev='Severe hyperlactataemia (≥4 mmol/L)';}
+    else if(lactate>=2){res.lactateSev='Hyperlactataemia (2–4 mmol/L)';}
+    else{res.lactateSev='Normal lactate';}
+  }
+
+  /* --- Electrolyte abnormalities --- */
+  if(k!==null){
+    if(k<3.0){res.kStatus='Severe hypokalaemia';}
+    else if(k<3.5){res.kStatus='Mild-moderate hypokalaemia';}
+    else if(k>5.5){res.kStatus='Hyperkalaemia';}
+    else{res.kStatus='Normal potassium';}
+  }
+
+  /* --- Build abnormality list --- */
+  if(res.phStatus!=='Normal pH') res.abnorm.push({sev:res.phSeverity,text:res.phStatus+' (pH '+pH.toFixed(2)+')'});
+  if(pco2>45) res.abnorm.push({sev:pco2>65?'Severe':pco2>55?'Moderate':'Mild',text:'Hypercapnia (PaCO₂ '+pco2+')'});
+  if(pco2<35) res.abnorm.push({sev:pco2<25?'Severe':'Mild',text:'Hypocapnia (PaCO₂ '+pco2+')'});
+  if(hco3<22) res.abnorm.push({sev:hco3<15?'Severe':hco3<18?'Moderate':'Mild',text:'Low bicarbonate (HCO₃ '+hco3+')'});
+  if(hco3>26) res.abnorm.push({sev:hco3>35?'Severe':'Mild',text:'Elevated bicarbonate (HCO₃ '+hco3+')'});
+  if(be!==null&&be<-2) res.abnorm.push({sev:be<-10?'Severe':be<-5?'Moderate':'Mild',text:'Base deficit (BE '+be+')'});
+  if(be!==null&&be>2) res.abnorm.push({sev:'Mild',text:'Base excess (BE '+be+')'});
+  if(pao2!==null&&res.hypoxSev!=='Normal oxygenation') res.abnorm.push({sev:res.hypoxSev.split(' ')[0],text:res.hypoxSev+' (PaO₂ '+pao2+', P/F '+res.pf.toFixed(0)+')'});
+  if(res.aaHigh) res.abnorm.push({sev:'Moderate',text:'Elevated A-a gradient ('+res.aaGrad.toFixed(1)+' mmHg) — suggests parenchymal cause'});
+  if(res.agHigh) res.abnorm.push({sev:'Moderate',text:'High anion gap ('+res.ag.toFixed(0)+') — HAGMA'});
+  if(res.ddInterp&&res.ddInterp!=='Pure HAGMA') res.abnorm.push({sev:'Moderate',text:'Delta-delta: '+res.ddInterp});
+  if(lactate!==null&&lactate>=2) res.abnorm.push({sev:lactate>=4?'Severe':'Moderate',text:res.lactateSev+' ('+lactate+' mmol/L)'});
+  if(k!==null&&res.kStatus!=='Normal potassium') res.abnorm.push({sev:k<3.0||k>5.5?'Severe':'Mild',text:res.kStatus+' (K⁺ '+k+')'});
+  if(!res.compAdequate&&res.comp!=='Not calculated') res.abnorm.push({sev:'Moderate',text:'Compensation: '+res.comp});
+
+  /* --- Management points --- */
+  buildMgmt(res);
+
+  lastResult=res;
+  renderResults(res);
+}
+
+/* ============================================================
+   Management builder
+   ============================================================ */
+function buildMgmt(res){
+  const c=res.context;
+  const add=(title,text)=>res.mgmt.push({title,text});
+
+  // pH management
+  if(res.phStatus==='Acidaemia'&&res.phSeverity==='Severe'){
+    add('Severe Acidaemia (pH <7.20) — Urgent Action','Consider urgent respiratory support (NIV/intubation) if respiratory; IV sodium bicarbonate only in life-threatening metabolic acidosis (pH <7.10) as a bridge to definitive therapy. Avoid excessive alkali in lactic acidosis.');
+  }
+
+  // Respiratory acidosis
+  if(res.primary.includes('Respiratory Acidosis')){
+    add('Respiratory Acidosis','Identify and treat the cause: COPD exacerbation, neuromuscular failure, sedation/opioid effect, pneumothorax, severe pneumonia. '+
+      (c==='ICU'?'In ICU: consider NIV (BiPAP) first for COPD/NMD; intubate if NIV fails or contraindicated. Target pH >7.35, PaCO₂ per patient baseline.':
+       c==='ED'?'In ED: assess work of breathing, GCS and gas exchange trend. Start NIV early in COPD. Prepare for intubation if deteriorating.':
+       'In ward: escalate urgently. Order chest X-ray, ECG. Start controlled oxygen. Early NIV referral if COPD; escalate to HDU/ICU if deteriorating.'));
+  }
+
+  // Respiratory alkalosis
+  if(res.primary.includes('Respiratory Alkalosis')){
+    add('Respiratory Alkalosis','Common causes: anxiety/pain, pulmonary embolism, sepsis, pregnancy, liver failure, altitude, iatrogenic over-ventilation. Treat the underlying cause. If mechanically ventilated: reduce RR or Vt. Supplement O₂ if hypoxic. Consider PE if unexplained.');
+  }
+
+  // Metabolic acidosis
+  if(res.primary.includes('Metabolic Acidosis')){
+    if(res.agHigh){
+      add('High Anion Gap Metabolic Acidosis (HAGMA)','Mnemonic MUDPILES: Methanol, Uraemia, DKA, Propylene glycol, Isoniazid, Lactic acidosis, Ethylene glycol, Salicylates. '+
+        (res.lactateSev&&res.lactateSev.includes('hyperlact')?'Elevated lactate — assess for sepsis, shock, tissue hypoperfusion, metformin toxicity. Fluid resuscitation, treat source.':'')+
+        ' Treat the underlying cause. In DKA: insulin + fluids + electrolyte replacement. In lactic acidosis: optimise oxygen delivery.');
+    } else {
+      add('Normal Anion Gap Metabolic Acidosis (NAGMA)','Causes: diarrhoea/GI losses, renal tubular acidosis, acetazolamide, early renal failure, hyperchloraemic states. Check urine anion gap to distinguish renal vs GI cause. Oral/IV bicarbonate replacement may be indicated.');
+    }
+  }
+
+  // Metabolic alkalosis
+  if(res.primary.includes('Metabolic Alkalosis')){
+    add('Metabolic Alkalosis','Common causes: vomiting, NG tube losses, diuretics, hyperaldosteronism, hypokalaemia, contraction alkalosis. Correct volume depletion with IV 0.9% NaCl. Replace potassium. Stop offending agent. Acetazolamide in refractory cases. Avoid over-correcting.');
+  }
+
+  // Oxygenation
+  if(res.pf!==undefined&&res.hypoxSev!=='Normal oxygenation'){
+    const pfGrade=res.pf<100?'Severe ARDS (P/F <100)':res.pf<200?'Moderate ARDS (P/F 100–200)':res.pf<300?'Mild ARDS / significant hypoxaemia':'Mild hypoxaemia';
+    add('Hypoxaemia — '+pfGrade,'Target SpO₂ 94–98% (88–92% in COPD risk). '+(res.pf<200?'Consider HFNC, NIV or intubation based on work of breathing and trajectory. For ARDS: lung-protective ventilation (Vt 4–8 mL/kg PBW, Pplat <30), PEEP individualisation, prone positioning if P/F ≤150.':'Increase FiO₂, position upright, treat cause (PE, pneumonia, atelectasis, pulmonary oedema).'));
+    if(res.aaHigh) add('Raised A-a Gradient','Elevated A-a gradient suggests parenchymal or pulmonary vascular cause (pneumonia, pulmonary oedema, PE, ARDS). Low A-a gradient with hypoxaemia suggests hypoventilation or low FiO₂.');
+  }
+
+  // High AG causes detail
+  if(res.agHigh){
+    add('Anion Gap '+res.ag.toFixed(0)+' (High)','Normal AG 8–12. Elevated AG indicates unmeasured anions. '+(res.ddInterp?'Delta-delta ratio: '+res.ddInterp+'. ':'')+'Screen: serum lactate, ketones, renal function, osmolar gap (for toxic alcohol), salicylate level where indicated.');
+  }
+
+  // Lactate
+  if(res.lactateSev&&!res.lactateSev.includes('Normal')){
+    add('Hyperlactataemia','Severity: '+res.lactateSev+'. Type A: tissue hypoperfusion (sepsis, shock, cardiac arrest). Type B: metformin, hepatic failure, thiamine deficiency, mitochondrial disease. Treat underlying cause. Lactate clearance is a resuscitation target: recheck at 2 hours. Serial lactate guides resuscitation adequacy.');
+  }
+
+  // Potassium
+  if(res.kStatus&&!res.kStatus.includes('Normal')){
+    if(res.kStatus.includes('hypo')){
+      add('Hypokalaemia (K⁺ '+res.k+')',
+        (parseFloat(res.k)<3.0?'Severe: aggressive replacement required. IV KCl via central or peripheral line (max 20 mmol/hr peripherally). Continuous cardiac monitoring. ':'Moderate: oral/IV replacement. ')
+        +'Identify cause: diuretics, diarrhoea, alkalosis, hyperaldosteronism. Recheck after each dose. Concurrent hypomagnesaemia is common — check Mg²⁺.');
+    } else {
+      add('Hyperkalaemia (K⁺ '+res.k+')',
+        (parseFloat(res.k)>6.0?'Severe: ECG urgently. IV calcium gluconate 10 mL 10% for membrane stabilisation. Insulin-dextrose. Salbutamol nebulisation. Consider dialysis.':'Moderate: treat cause, repeat ECG, calcium resonium or patiromer, consider fludrocortisone if adrenal cause.'));
+    }
+  }
+
+  // Compensation incomplete
+  if(res.compAdequate===false){
+    add('Incomplete Compensation / Mixed Disorder',''+res.comp+'. Consider whether a second primary process is present. Review clinical context carefully.');
+  }
+
+  // Context-specific add-ons
+  if(c==='ICU'){
+    add('ICU — General Principles','Continuous monitoring: arterial line for serial ABGs, SpO₂, ETCO₂ if intubated. Reassess ABG 30–60 min after any intervention. Document SOFA/APACHE score. Nutritional and fluid management guided by metabolic state.');
+  } else if(c==='ED'){
+    add('ED — Immediate Priorities','Ensure airway is secure. High-flow O₂ if hypoxic. IV access × 2, bloods, ECG. Point-of-care lactate. Resuscitation fluids if in shock. Early senior review and disposition decision.');
+  } else {
+    add('Ward — Escalation Criteria','Escalate to HDU/ICU if: pH <7.25, rising PaCO₂ with fatigue, P/F <200, SpO₂ <90% on ≥40% O₂, lactate ≥4 or rising, altered GCS. Contact outreach/MET team early.');
+  }
+}
+
+/* ============================================================
+   Render results
+   ============================================================ */
+function renderResults(res){
+  // Diagnosis card
+  const diagEl=document.getElementById('diagPanel');
+  const cls=res.phStatus==='Acidaemia'?'acid':res.phStatus==='Alkalaemia'?'alk':res.primaryType==='mixed'?'mixed':'norm';
+  const sevBadge=s=>`<span class="badge ${s==='Severe'?'acid':s==='Moderate'?'warn':'info'}">${s}</span>`;
+  let dHTML=`<div class="diag-card ${cls}">
+    <h3>${res.primary}</h3>
+    <p><b>pH Status:</b> ${res.phStatus} ${sevBadge(res.phSeverity)} (pH ${res.pH.toFixed(2)})</p>
+    <p><b>Compensation:</b> ${res.comp}</p>`;
+  if(res.pf!==undefined) dHTML+=`<p><b>Oxygenation:</b> ${res.hypoxSev} — P/F ${res.pf.toFixed(0)}, A-a gradient ${res.aaGrad.toFixed(1)} mmHg</p>`;
+  if(res.agHigh) dHTML+=`<p><b>Anion Gap:</b> ${res.ag.toFixed(0)} (HIGH) — ${res.ddInterp||'HAGMA'}</p>`;
+  if(res.lactateSev) dHTML+=`<p><b>Lactate:</b> ${res.lactateSev}</p>`;
+  dHTML+=`</div>`;
+  diagEl.innerHTML=dHTML;
+
+  // Abnormalities
+  const abnEl=document.getElementById('abnormList');
+  if(res.abnorm.length===0){
+    abnEl.innerHTML='<li>No significant abnormalities detected.</li>';
+  } else {
+    abnEl.innerHTML=res.abnorm.map(a=>{
+      const col=a.sev==='Severe'?'#f07090':a.sev==='Moderate'?'#f0c36e':'#5dd89d';
+      return `<li><b style="color:${col}">[${a.sev}]</b> ${a.text}</li>`;
+    }).join('');
+  }
+
+  // Management
+  const mgmtEl=document.getElementById('mgmtPanel');
+  mgmtEl.innerHTML=res.mgmt.map(m=>`
+    <div class="mgmt-item">
+      <strong>${m.title}</strong>
+      <p>${m.text}</p>
+    </div>`).join('');
+
+  document.getElementById('resultsSection').style.display='block';
+  document.getElementById('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* ============================================================
+   Serial trend
+   ============================================================ */
+function addToTrend(){
+  if(!lastResult){return;}
+  if(trendData.length>=4){trendData.shift();}
+  trendData.push({label:'T'+(trendData.length+1),pH:lastResult.pH,pco2:lastResult.pco2,hco3:lastResult.hco3,pf:lastResult.pf||null});
+  renderTrend();
+}
+
+function clearTrend(){trendData=[];renderTrend();}
+
+function renderTrend(){
+  const g=document.getElementById('trendGrid');
+  if(!trendData.length){g.innerHTML='<div style="font-size:12px;color:#9db1ba;grid-column:1/-1">No trend data yet. Click "Add Current ABG to Trend" after each interpretation.</div>';return;}
+  g.innerHTML=trendData.map(t=>`
+    <div class="trend-cell">
+      <div class="tl">${t.label}</div>
+      <span class="tv" style="color:${t.pH<7.35?'#f07090':t.pH>7.45?'#7dd9f0':'#5dd89d'}">${t.pH.toFixed(2)}</span>
+      <div class="tl">pH</div>
+      <span class="tv" style="color:#e0a15f">${t.pco2}</span>
+      <div class="tl">PaCO₂</div>
+      <span class="tv" style="color:#7dd9f0">${t.hco3}</span>
+      <div class="tl">HCO₃</div>
+      ${t.pf?`<span class="tv" style="color:#8edb9a">${Math.round(t.pf)}</span><div class="tl">P/F</div>`:''}
+    </div>`).join('');
+}
+renderTrend(); // init empty
+
+/* ============================================================
+   Export
+   ============================================================ */
+function buildExportText(){
+  if(!lastResult) return '';
+  const r=lastResult;
+  let txt=`ABG INTERPRETATION SUMMARY\n`;
+  txt+=`Context: ${r.context} | ${new Date().toLocaleString()}\n`;
+  txt+=`─────────────────────────────\n`;
+  txt+=`pH: ${r.pH.toFixed(2)}  PaCO₂: ${r.pco2}  HCO₃: ${r.hco3}  BE: ${r.be??'—'}\n`;
+  if(r.pao2) txt+=`PaO₂: ${r.pao2}  FiO₂: ${r.fio2}  P/F: ${r.pf?.toFixed(0)??'—'}  A-a: ${r.aaGrad?.toFixed(1)??'—'}\n`;
+  if(r.na&&r.cl) txt+=`Na: ${r.na}  Cl: ${r.cl}  K: ${r.k??'—'}  AG: ${r.ag?.toFixed(0)??'—'}\n`;
+  if(r.lactate) txt+=`Lactate: ${r.lactate}\n`;
+  txt+=`─────────────────────────────\n`;
+  txt+=`PRIMARY: ${r.primary}\n`;
+  txt+=`Compensation: ${r.comp}\n`;
+  if(r.hypoxSev) txt+=`Oxygenation: ${r.hypoxSev}\n`;
+  txt+=`─────────────────────────────\n`;
+  txt+=`ABNORMALITIES:\n`;
+  r.abnorm.forEach(a=>txt+=` • [${a.sev}] ${a.text}\n`);
+  txt+=`─────────────────────────────\n`;
+  txt+=`MANAGEMENT:\n`;
+  r.mgmt.forEach(m=>txt+=` • ${m.title}: ${m.text.substring(0,120)}…\n`);
+  return txt;
+}
+
+function exportSummary(){
+  const txt=buildExportText();
+  if(!txt){alert('No result to export yet.');return;}
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(txt).then(()=>alert('Summary copied to clipboard!')).catch(()=>fallbackCopy(txt));
+  } else {fallbackCopy(txt);}
+}
+
+function fallbackCopy(txt){
+  const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('Summary copied!');
+}
+
+function toggleExportBox(){
+  const b=document.getElementById('exportBox');
+  if(b.style.display==='block'){b.style.display='none';return;}
+  b.textContent=buildExportText();
+  b.style.display='block';
+}
+
+/* ============================================================
+   Reset
+   ============================================================ */
+function resetAll(){
+  ['fpH','fPaCO2','fPaO2','fHCO3','fBE','fFiO2','fNa','fCl','fK','fLactate','fSpO2','fTemp'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('resultsSection').style.display='none';
+  document.getElementById('ocrStatus').style.display='none';
+  document.getElementById('previewWrap').style.display='none';
+  lastResult=null;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+</script>
+</body>
+</html>

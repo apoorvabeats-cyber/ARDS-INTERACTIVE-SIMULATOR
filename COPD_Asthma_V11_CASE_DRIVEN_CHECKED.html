@@ -29,7 +29,7 @@ button,input,select{font:inherit}button{min-height:44px;border:1px solid #35505d
 </head>
 <body>
 <div class="app">
-<header><div class="head"><div><div class="brand">COPD & ASTHMA • Active Simulator V7</div><div class="sub">Clinical flow • NIV / invasive ventilation • dynamic physiology</div></div><button id="audioBtn" class="primary">🔊 Start Loud Monitor Audio</button></div></header>
+<header><div class="head"><div><div class="brand">COPD & ASTHMA • Active Simulator V7</div><div class="sub">Clinical flow • NIV / invasive ventilation • dynamic physiology</div></div><div style="display:flex;gap:8px;align-items:center"><a href="index.html" style="text-decoration:none"><button style="background:#102532;border-color:#35505d;font-size:13px;min-height:36px;padding:0 12px">← Hub</button></a><button id="audioBtn" class="primary">🔊 Start Loud Monitor Audio</button></div></div></header>
 
 <section class="card" id="disease">
 <div class="title">01 • Clinical Case / Etiology</div>
@@ -421,22 +421,133 @@ function bg(ctx,w,h){ctx.fillStyle="#041017";ctx.fillRect(0,0,w,h);ctx.strokeSty
 function draw(){
  phase+=.025;drawPulse();drawResp();drawFlow();drawPressure();requestAnimationFrame(draw)
 }
-function drawPulse(){const[c,w,h]=fit($("pulseCanvas"));bg(c,w,h);c.strokeStyle="#63d4e8";c.lineWidth=2.4;c.beginPath();for(let x=0;x<w;x++){const t=x/w*12+phase*(s.hr/50),q=t%1;let y=h*.56;if(q<.08)y-=Math.sin(q/.08*Math.PI)*h*.08;else if(q<.13)y-=Math.sin((q-.08)/.05*Math.PI)*h*.40;else if(q<.18)y+=Math.sin((q-.13)/.05*Math.PI)*h*.22;else if(q<.28)y-=Math.sin((q-.18)/.10*Math.PI)*h*.12;x?c.lineTo(x,y):c.moveTo(x,y)}c.stroke()}
-function drawResp(){
-  const[c,w,h]=fit($("respCanvas"));bg(c,w,h);
-  c.strokeStyle="#8edb9a";c.lineWidth=2.4;c.beginPath();
-  const cycles=Math.max(1,s.rr)/8;
-  for(let x=0;x<w;x++){
-    const q=((x/w*cycles+phase*.45)%1);
-    let y=h*.55;
-    if(q<.42)y=h*.55-Math.sin(q/.42*Math.PI)*h*.27;
-    else y=h*.55+Math.sin((q-.42)/.58*Math.PI)*h*.08;
-    x?c.lineTo(x,y):c.moveTo(x,y);
-  }
-  c.stroke();
+
+/* ECG/Pulse — QRS speed proportional to HR; realistic PQRST morphology */
+function drawPulse(){
+ const[c,w,h]=fit($("pulseCanvas"));bg(c,w,h);
+ c.strokeStyle="#63d4e8";c.lineWidth=2.4;c.beginPath();
+ const cycles=Math.max(1,s.hr)/60*3; // beats visible across width
+ for(let x=0;x<w;x++){
+   const t=(x/w*cycles+phase*(s.hr/60)*.08)%1;
+   let y=h*.58;
+   // P wave
+   if(t<.10)y-=Math.sin(t/.10*Math.PI)*h*.07;
+   // PR segment flat
+   else if(t<.15)y=h*.58;
+   // Q dip
+   else if(t<.18)y+=Math.sin((t-.15)/.03*Math.PI)*h*.06;
+   // R spike
+   else if(t<.22)y-=Math.sin((t-.18)/.04*Math.PI)*h*.42;
+   // S dip
+   else if(t<.26)y+=Math.sin((t-.22)/.04*Math.PI)*h*.14;
+   // ST segment
+   else if(t<.34)y=h*.58;
+   // T wave
+   else if(t<.48)y-=Math.sin((t-.34)/.14*Math.PI)*h*.11;
+   // baseline
+   x?c.lineTo(x,y):c.moveTo(x,y);
+ }
+ c.stroke();
 }
-function drawFlow(){const[c,w,h]=fit($("flowCanvas"));bg(c,w,h);c.strokeStyle="#70e09a";c.lineWidth=2.4;c.beginPath();const speed=Math.max(1,s.rate)/18;for(let x=0;x<w;x++){const q=((x/w+phase*speed*.015)%1);let y=h*.53;if(q<.36)y=h*.53-Math.sin(q/.36*Math.PI)*h*.32;else{const e=(q-.36)/.64;y=h*.53+Math.sin(e*Math.PI)*h*.27;if(e>.72&&s.auto>7)y=h*.53+(e-.72)/.28*h*.28}x?c.lineTo(x,y):c.moveTo(x,y)}c.stroke();if(s.auto>10){c.fillStyle="#ff6574";c.font="bold 12px sans-serif";c.fillText("AIR TRAPPING",12,22)}}
-function drawPressure(){const[c,w,h]=fit($("pressureCanvas"));bg(c,w,h);c.strokeStyle="#e0a15f";c.lineWidth=2.4;c.beginPath();for(let x=0;x<w;x++){const q=((x/w+phase*.02)%1);let y=h*.72;if(q<.16)y=h*.72-Math.sin(q/.16*Math.PI)*h*.48;else if(q<.36)y=h*.24+Math.sin((q-.16)/.20*Math.PI)*h*.10;else y=h*.34+Math.sin((q-.36)/.64*Math.PI)*h*.12;x?c.lineTo(x,y):c.moveTo(x,y)}c.stroke()}
+
+/* Respiration — I:E 1:3 for COPD (prolonged expiration), speed tied to s.rr */
+function drawResp(){
+ const[c,w,h]=fit($("respCanvas"));bg(c,w,h);
+ c.strokeStyle="#8edb9a";c.lineWidth=2.4;c.beginPath();
+ // I:E 1:3 for COPD/obstruction; normal ~1:2
+ const ieRatio=(s.auto>8)?0.22:0.30; // inspiration fraction of cycle
+ const cycles=Math.max(1,s.rr)/60*4;
+ for(let x=0;x<w;x++){
+   const q=((x/w*cycles+phase*(s.rr/60)*.06)%1);
+   let y=h*.55;
+   if(q<ieRatio){
+     // Inspiration — smooth rise
+     y=h*.55-Math.sin(q/ieRatio*Math.PI)*h*.32;
+   } else {
+     // Expiration — prolonged, incomplete for obstruction
+     const ep=(q-ieRatio)/(1-ieRatio);
+     const expAmplitude=s.auto>8?0.10:0.06; // incomplete expiration when air trapped
+     y=h*.55+Math.sin(ep*Math.PI)*h*expAmplitude;
+   }
+   x?c.lineTo(x,y):c.moveTo(x,y);
+ }
+ c.stroke();
+}
+
+/* Flow-time — obstructive "shark fin": rapid inspiratory rise, slow concave expiration
+   Incomplete expiratory return when auto-PEEP is high (air trapping) */
+function drawFlow(){
+ const[c,w,h]=fit($("flowCanvas"));bg(c,w,h);
+ // zero-flow line
+ c.strokeStyle="#263f4b";c.lineWidth=1;c.beginPath();c.moveTo(0,h*.50);c.lineTo(w,h*.50);c.stroke();
+ c.strokeStyle="#70e09a";c.lineWidth=2.4;c.beginPath();
+ const cycles=Math.max(1,s.rr)/60*3.5;
+ const ieFrac=s.auto>8?0.22:0.30;
+ const expReturn=Math.max(0,Math.min(1,1-(s.auto/30))); // how much flow returns to 0
+ for(let x=0;x<w;x++){
+   const q=((x/w*cycles+phase*(s.rr/60)*.05)%1);
+   let y=h*.50;
+   if(q<ieFrac){
+     // Inspiratory: rapid peak then slight taper (normal)
+     const it=q/ieFrac;
+     y=h*.50-Math.sin(it*Math.PI)*h*.36;
+   } else {
+     // Expiratory: shark-fin — fast rise then concave slow decay (obstructed)
+     const et=(q-ieFrac)/(1-ieFrac);
+     const peakFrac=0.08; // expiratory peak very early
+     if(et<peakFrac){
+       y=h*.50+Math.sin(et/peakFrac*Math.PI*.5)*h*.30;
+     } else {
+       // Concave decay — slower for higher auto-PEEP
+       const decay=1-Math.pow((et-peakFrac)/(1-peakFrac),0.4+s.auto/30);
+       y=h*.50+decay*h*.30*expReturn;
+     }
+   }
+   x?c.lineTo(x,y):c.moveTo(x,y);
+ }
+ c.stroke();
+ if(s.auto>10){c.fillStyle="#ff6574";c.font="bold 11px sans-serif";c.fillText("AIR TRAPPING",12,20);}
+}
+
+/* Pressure-time — Ppeak plateau then slow return toward PEEP for obstruction
+   Scaled by s.ppeak and s.pplat from physiology */
+function drawPressure(){
+ const[c,w,h]=fit($("pressureCanvas"));bg(c,w,h);
+ // Ppeak and PEEP as fractions of canvas height
+ const peep=5; // cmH2O baseline reference
+ const maxP=Math.max(s.ppeak||35,peep+5);
+ const pkFrac=(s.ppeak||35-peep)/(maxP-peep);
+ const platFrac=(s.pplat||22-peep)/(maxP-peep);
+ c.strokeStyle="#e0a15f";c.lineWidth=2.4;c.beginPath();
+ const cycles=Math.max(1,s.rr)/60*3.5;
+ const ieFrac=s.auto>8?0.22:0.30;
+ for(let x=0;x<w;x++){
+   const q=((x/w*cycles+phase*(s.rr/60)*.05)%1);
+   // map pressure to canvas: PEEP = h*0.85, maxP = h*0.10
+   const pToPx=(frac)=>h*0.85 - frac*(h*0.75);
+   let y=pToPx(0); // baseline/PEEP
+   if(q<0.04){
+     // Rapid pressure rise to Ppeak
+     y=pToPx(Math.sin(q/0.04*Math.PI*.5)*pkFrac);
+   } else if(q<ieFrac-0.02){
+     // Plateau at Pplat (slightly below Ppeak)
+     const blend=(q-0.04)/(ieFrac-0.06);
+     y=pToPx(pkFrac-(pkFrac-platFrac)*Math.min(1,blend*3));
+   } else if(q<ieFrac){
+     y=pToPx(platFrac);
+   } else {
+     // Expiratory pressure return — slow for obstruction
+     const et=(q-ieFrac)/(1-ieFrac);
+     const slowness=0.3+s.auto/40; // more obstructed = slower return
+     y=pToPx(platFrac*Math.pow(1-et,slowness));
+   }
+   x?c.lineTo(x,y):c.moveTo(x,y);
+ }
+ c.stroke();
+ // Label Ppeak
+ c.fillStyle="#e0a15f";c.font="10px sans-serif";c.fillText("Ppeak "+(s.ppeak||"—"),8,16);
+ c.fillText("Pplat "+(s.pplat||"—"),8,28);
+}
 
 
 window.resetSupportUI=clearSupportUI;
