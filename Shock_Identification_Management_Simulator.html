@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shock Identification &amp; Management Simulator</title>
+<style>
+:root{
+  --bg:#06101a;--panel:#0c1b27;--panel2:#122636;--text:#eaf6ff;--muted:#9cb4c6;
+  --accent:#36d4a7;--blue:#67b2ff;--warn:#f6c453;--danger:#ff6d7c;--border:#244157;
+}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(145deg,#040b12,#091827);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+.app{max-width:1120px;margin:auto;padding:16px}
+header{padding:12px 0 10px;border-bottom:1px solid var(--border)}
+h1{margin:0;font-size:clamp(22px,4vw,34px)}
+.subtitle{margin-top:6px;color:var(--muted);font-size:13px}
+.stagebar{display:flex;gap:8px;overflow:auto;margin-top:12px}
+.stage{padding:7px 10px;border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:12px;white-space:nowrap}
+.stage.active{border-color:var(--accent);color:var(--accent);background:rgba(54,212,167,.13)}
+.grid{display:grid;grid-template-columns:1.3fr .7fr;gap:14px;margin-top:14px}
+@media(max-width:920px){.grid{grid-template-columns:1fr}}
+.card{background:linear-gradient(180deg,var(--panel),#081522);border:1px solid var(--border);border-radius:16px;padding:14px}
+h2{margin:0 0 10px;font-size:20px}
+h3{margin:14px 0 8px;font-size:16px;color:var(--blue)}
+.small{font-size:12px;color:var(--muted)}
+.section{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:12px;margin:10px 0}
+.inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media(max-width:640px){.inputs{grid-template-columns:1fr}}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+input{width:100%;padding:9px;border-radius:8px;border:1px solid #38556b;background:#0b1823;color:var(--text)}
+.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.metric{background:#0a1722;border:1px solid var(--border);border-radius:10px;padding:9px}
+.metric b{display:block;font-size:16px;color:var(--accent)}
+.metric span{font-size:11px;color:var(--muted)}
+.tag{display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid var(--border);font-size:11px;color:var(--muted);margin-right:6px;margin-bottom:6px}
+.diag{border-left:4px solid var(--blue);background:rgba(103,178,255,.08);padding:12px;border-radius:10px}
+.warn{border-left:4px solid var(--warn);background:rgba(246,196,83,.08);padding:12px;border-radius:10px}
+.danger{border-left:4px solid var(--danger);background:rgba(255,109,124,.09);padding:12px;border-radius:10px}
+.good{border-left:4px solid var(--accent);background:rgba(54,212,167,.08);padding:12px;border-radius:10px}
+.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+.btn.primary{background:var(--accent);color:#022117}
+.btn.secondary{background:#183146;color:var(--text);border:1px solid #2b4a61}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.book-nav{display:flex;justify-content:space-between;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
+.button-grid{display:grid;grid-template-columns:1fr;gap:8px}
+.mgmt-btn{width:100%;text-align:left;background:#132837;color:var(--text);border:1px solid #2f5067;border-radius:11px;padding:12px;cursor:pointer}
+.mgmt-btn.rec{border-color:var(--accent);box-shadow:0 0 0 1px rgba(54,212,167,.4) inset;background:rgba(54,212,167,.12)}
+.mgmt-btn.active{border-color:var(--blue);background:rgba(103,178,255,.16)}
+.page-num{margin-top:8px;text-align:center;color:var(--muted);font-size:12px}
+ul{padding-left:19px;margin:8px 0}
+li{margin:5px 0}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:7px;border-bottom:1px solid var(--border);text-align:left}
+th{color:var(--muted)}
+footer{margin-top:10px;color:var(--muted);font-size:11px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="app">
+    <h1>Shock Identification &amp; Management Simulator</h1>
+    <div class="subtitle">Educational critical-care simulation • Dynamic case physiology • Not for direct clinical decision making</div>
+    <div id="stagebar" class="stagebar"></div>
+  </div>
+  ${c.invalidInput ? `<div class="danger">One or more key inputs are non-physiologic (for example height/weight/HR/SV ≤ 0). Calculations may be unreliable until corrected.</div>` : ''}
+</header>
+
+<main class="app">
+  <div class="grid">
+    <section class="card">
+      <div id="pageContent"></div>
+      <div id="navArea"></div>
+    </section>
+    <aside class="card">
+      <h3>Case Snapshot</h3>
+      <div id="snapshot" class="small"></div>
+      <div class="section small">
+        <b>Note:</b> Educational simulator. Always verify with bedside exam, validated monitoring, and local protocols.
+      </div>
+    </aside>
+  </div>
+  <footer>Final flow: Page 1 Inputs → Page 2 Calculations/Echo → Page 3 Diagnosis/Initial Management → Page 4 Shock-Specific Management → Page 5 TPTD → Page 6 TPTD Conclusions + Mixed-Shock Management → Go to First Page</footer>
+</main>
+
+<script>
+const PAGES = [
+  'PAGE 1 — USER INPUTS',
+  'PAGE 2 — AUTO CALCULATIONS + ECHO',
+  'PAGE 3 — INITIAL SHOCK DIAGNOSIS',
+  'PAGE 4 — SHOCK-SPECIFIC MANAGEMENT',
+  'PAGE 5 — TRANSPULMONARY THERMODILUTION',
+  'PAGE 6 — TPTD CONCLUSIONS + FINAL MANAGEMENT'
+];
+
+const state = {
+  page: 1,
+  scenario: null,
+  echoReport: null,
+  inputs: {},
+  calculations: null,
+  diagnosis: null,
+  selectedManagement: null,
+  tptdRuns: [],
+  tptd: null,
+  tptdInterpretation: []
+};
+
+function rand(min,max,dec=0){
+  const n = min + Math.random()*(max-min);
+  return Number(n.toFixed(dec));
+}
+
+function choose(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+function generateScenario(){
+  const scenarios = [
+    {
+      key:'hypovolemic', name:'Hypovolemic shock',
+      inputs:{sbp:82,dbp:48,hr:124,height:172,weight:68,uo:18,sv:38,pcwp:7,ivc:1.7,coll:64,ph:7.30,pao2:72,paco2:31,hco3:16,be:-8,lactate:4.6,scvo2:57,pvco2:40},
+      echo:()=>({
+        lvef: rand(58,68,0)+'%',
+        lv:'Hyperdynamic LV with small cavity',
+        lvot: rand(13,16,1)+' cm',
+        tapse: rand(19,24,0)+' mm',
+        rv:'Preserved RV function',
+        rvsp: rand(24,32,0)+' mmHg',
+        ivc:'Small IVC with marked inspiratory collapse',
+        blines:'Scattered or absent B-lines',
+        pleura:'No pleural effusion',
+        pericardium:'No effusion',
+        valves:'No major valvular lesion',
+        wall:'No regional wall-motion abnormality'
+      })
+    },
+    {
+      key:'cardiogenic', name:'Cardiogenic shock',
+      inputs:{sbp:78,dbp:52,hr:118,height:170,weight:76,uo:15,sv:28,pcwp:24,ivc:2.4,coll:18,ph:7.25,pao2:65,paco2:34,hco3:15,be:-9,lactate:5.2,scvo2:50,pvco2:46},
+      echo:()=>({
+        lvef: rand(18,30,0)+'%',
+        lv:'Severely reduced LV systolic function',
+        lvot: rand(8,11,1)+' cm',
+        tapse: rand(13,17,0)+' mm',
+        rv:'Mild-moderate RV dysfunction',
+        rvsp: rand(35,50,0)+' mmHg',
+        ivc:'Dilated IVC with poor collapsibility',
+        blines:'Diffuse bilateral B-lines',
+        pleura:'Small bilateral pleural effusions',
+        pericardium:'No tamponade signs',
+        valves:'Possible functional MR',
+        wall:'Global hypokinesia with reduced stroke volume'
+      })
+    },
+    {
+      key:'distributive', name:'Distributive shock',
+      inputs:{sbp:84,dbp:46,hr:122,height:168,weight:71,uo:22,sv:62,pcwp:10,ivc:2.0,coll:55,ph:7.33,pao2:78,paco2:30,hco3:17,be:-7,lactate:4.0,scvo2:72,pvco2:36},
+      echo:()=>({
+        lvef: rand(55,70,0)+'%',
+        lv:'Hyperdynamic LV with high contractility',
+        lvot: rand(16,20,1)+' cm',
+        tapse: rand(18,24,0)+' mm',
+        rv:'Preserved RV function',
+        rvsp: rand(22,34,0)+' mmHg',
+        ivc:'Variable IVC with respiratory variation',
+        blines:'Mild interstitial lines only',
+        pleura:'No significant pleural fluid',
+        pericardium:'No effusion',
+        valves:'No severe structural valvular disease',
+        wall:'No regional wall-motion abnormalities'
+      })
+    },
+    {
+      key:'obstructive', name:'Obstructive shock',
+      inputs:{sbp:76,dbp:50,hr:128,height:174,weight:74,uo:14,sv:30,pcwp:11,ivc:2.3,coll:12,ph:7.28,pao2:61,paco2:37,hco3:16,be:-8,lactate:5.0,scvo2:54,pvco2:47},
+      echo:()=>({
+        lvef: rand(48,60,0)+'%',
+        lv:'Underfilled LV with septal shift',
+        lvot: rand(14,17,1)+' cm',
+        tapse: rand(11,16,0)+' mm',
+        rv:'RV dilation with pressure overload',
+        rvsp: rand(50,68,0)+' mmHg',
+        ivc:'Dilated IVC with minimal collapse',
+        blines:'Few B-lines unless concomitant edema',
+        pleura:'Possible unilateral pleural finding',
+        pericardium:'Assess for tamponade vs PE physiology',
+        valves:'Functional TR may be present',
+        wall:'RV strain pattern; LV relatively preserved'
+      })
+    },
+    {
+      key:'mixed', name:'Mixed shock (distributive + cardiogenic)',
+      inputs:{sbp:80,dbp:48,hr:126,height:169,weight:73,uo:16,sv:34,pcwp:20,ivc:2.2,coll:24,ph:7.23,pao2:64,paco2:36,hco3:14,be:-10,lactate:5.8,scvo2:52,pvco2:48},
+      echo:()=>({
+        lvef: rand(28,40,0)+'%',
+        lv:'Moderately reduced LV systolic function with vasoplegic context',
+        lvot: rand(10,13,1)+' cm',
+        tapse: rand(13,18,0)+' mm',
+        rv:'Mild RV dysfunction',
+        rvsp: rand(38,55,0)+' mmHg',
+        ivc:'Borderline-dilated IVC with poor collapse',
+        blines:'Moderate bilateral B-lines',
+        pleura:'Small bilateral pleural effusions',
+        pericardium:'No major pericardial effusion',
+        valves:'Functional MR/TR may coexist',
+        wall:'Global hypokinesia plus high-perfusion demand mismatch'
+      })
+    }
+  ];
+  const chosen = choose(scenarios);
+  return {
+    key: chosen.key,
+    name: chosen.name,
+    inputs: { ...chosen.inputs },
+    echo: chosen.echo
+  };
+}
+
+function resetSimulation(){
+  state.page = 1;
+  state.scenario = generateScenario();
+  state.echoReport = state.scenario.echo();
+  state.inputs = { ...state.scenario.inputs };
+  state.calculations = null;
+  state.diagnosis = null;
+  state.selectedManagement = null;
+  state.tptdRuns = [];
+  state.tptd = null;
+  state.tptdInterpretation = [];
+  render();
+}
+
+function rapFromIvc(ivc,collapse){
+  if(ivc <= 2.1 && collapse >= 50) return 3;
+  if(ivc <= 2.1 && collapse < 50) return 8;
+  if(ivc > 2.1 && collapse >= 50) return 8;
+  return 15;
+}
+
+function calculate(){
+  const i = state.inputs;
+  const validAnthro = i.height > 0 && i.weight > 0;
+  const validFlow = i.hr > 0 && i.sv > 0;
+  const map = (i.sbp + (2*i.dbp))/3;
+  const bsa = validAnthro ? Math.sqrt((i.height*i.weight)/3600) : 0;
+  const co = validFlow ? (i.hr * i.sv)/1000 : 0;
+  const ci = bsa > 0 ? (co / bsa) : 0;
+  const rap = rapFromIvc(i.ivc, i.coll);
+  const svri = ci > 0 ? (80 * (map - rap)) / ci : 0;
+  const dpco2 = i.pvco2 - i.paco2;
+  const uokg = i.weight > 0 ? (i.uo / i.weight) : 0;
+  state.calculations = {
+    map: Number(map.toFixed(1)),
+    bsa: Number(bsa.toFixed(2)),
+    co: Number(co.toFixed(2)),
+    ci: Number(ci.toFixed(2)),
+    rap,
+    svri: Number(svri.toFixed(0)),
+    dpco2: Number(dpco2.toFixed(1)),
+    uokg: Number(uokg.toFixed(2)),
+    lactate: i.lactate,
+    scvo2: i.scvo2,
+    invalidInput: !(validAnthro && validFlow)
+  };
+}
+
+function diagnoseShock(){
+  if(!state.calculations) calculate();
+  const c = state.calculations;
+  const i = state.inputs;
+  const scores = {hypovolemic:0, cardiogenic:0, distributive:0, obstructive:0};
+  const evidence = [];
+
+  if(c.ci < 2.2){ scores.cardiogenic+=2; scores.hypovolemic+=1; scores.obstructive+=1; evidence.push('Low CI suggests impaired flow state.'); }
+  if(c.svri < 1500){ scores.distributive+=3; evidence.push('Low SVRI supports vasoplegia/distributive physiology.'); }
+  if(c.svri > 2500){ scores.cardiogenic+=1; scores.hypovolemic+=2; evidence.push('High SVRI indicates compensatory vasoconstriction.'); }
+  if(i.pcwp > 18){ scores.cardiogenic+=3; evidence.push('High filling pressure (PCWP) supports cardiogenic component.'); }
+  if(i.pcwp < 10){ scores.hypovolemic+=2; evidence.push('Low filling pressure supports preload depletion.'); }
+  if(c.rap >= 12){ scores.obstructive+=2; scores.cardiogenic+=1; evidence.push('High RAP/CVP may indicate obstructive or congestive physiology.'); }
+  if(c.rap <= 5){ scores.hypovolemic+=2; evidence.push('Low RAP favors hypovolemia.'); }
+  if(c.dpco2 > 6){ scores.cardiogenic+=1; scores.obstructive+=1; scores.hypovolemic+=1; evidence.push('Elevated ΔPCO₂ suggests low-flow component.'); }
+  if(i.scvo2 < 60){ scores.cardiogenic+=1; scores.hypovolemic+=1; evidence.push('Low ScvO₂ suggests oxygen delivery deficit.'); }
+  if(i.scvo2 > 70 && c.svri < 1500){ scores.distributive+=1; evidence.push('High/normal ScvO₂ with low SVRI supports distributive pattern.'); }
+  if(c.uokg < 0.5){ Object.keys(scores).forEach(k=>scores[k]+=1); evidence.push('Low urine output indicates end-organ hypoperfusion.'); }
+  if(i.lactate >= 4){ Object.keys(scores).forEach(k=>scores[k]+=1); evidence.push('High lactate indicates severe shock/perfusion deficit.'); }
+  if(i.ivc > 2.1 && i.coll < 30){ scores.obstructive+=2; scores.cardiogenic+=1; evidence.push('Dilated poorly collapsible IVC supports high right-sided pressure state.'); }
+  if(i.ivc < 2.1 && i.coll >= 50){ scores.hypovolemic+=2; evidence.push('Small collapsible IVC supports low preload state.'); }
+
+  const ranked = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const top = ranked[0];
+  const second = ranked[1];
+  const mixed = (top[1] - second[1] <= 1);
+
+  let diagnosis;
+  let predominant = top[0];
+  let secondary = [];
+
+  if(mixed){
+    diagnosis = 'Mixed shock';
+    secondary = ranked.slice(1,3).map(x=>x[0]);
+  } else {
+    const map = {
+      hypovolemic:'Hypovolemic shock',
+      cardiogenic:'Cardiogenic shock',
+      distributive:'Distributive shock',
+      obstructive:'Obstructive shock'
+    };
+    diagnosis = map[top[0]];
+  }
+
+  state.diagnosis = {
+    scores, ranked, diagnosis, mixed, predominant,
+    secondary,
+    evidence
+  };
+
+  if(!state.selectedManagement){
+    state.selectedManagement = mixed ? 'tptd' : predominant;
+  }
+}
+
+function generateTptd(){
+  if(!state.calculations) calculate();
+  const c = state.calculations;
+  const key = state.scenario.key;
+  const baseCO = c.co;
+
+  const runs = [1,2,3].map(()=>({
+    co: Number((baseCO * rand(0.94,1.06,3)).toFixed(2)),
+    mtt: rand(28,44,1),
+    dst: rand(13,24,1)
+  }));
+
+  const meanCO = runs.reduce((s,r)=>s+r.co,0)/runs.length;
+  const maxDev = Math.max(...runs.map(r=>Math.abs((r.co-meanCO)/meanCO)*100));
+
+  const profile = {
+    hypovolemic:{gedvi:[540,670],elwi:[5.5,8.5],pvpi:[1.4,2.2],ciMul:[0.92,1.04]},
+    cardiogenic:{gedvi:[850,1020],elwi:[11,17],pvpi:[2.0,3.2],ciMul:[0.88,1.02]},
+    distributive:{gedvi:[680,820],elwi:[6.5,10],pvpi:[1.6,2.8],ciMul:[0.95,1.12]},
+    obstructive:{gedvi:[700,870],elwi:[6,10],pvpi:[1.8,2.9],ciMul:[0.88,1.01]},
+    mixed:{gedvi:[760,980],elwi:[11,18],pvpi:[2.8,4.2],ciMul:[0.85,1.0]}
+  }[key];
+
+  const ciTd = Number((c.ci * rand(profile.ciMul[0],profile.ciMul[1],3)).toFixed(2));
+  const gedvi = rand(profile.gedvi[0],profile.gedvi[1],0);
+  const bsa = c.bsa > 0 ? c.bsa : 1.8;
+  const gedv = Math.round(gedvi * bsa);
+  const itbv = Math.round(gedv * 1.25);
+  const ittv = Math.round(itbv + rand(450,820,0));
+  const ptv = Math.round(ittv - itbv);
+  const elwi = rand(profile.elwi[0],profile.elwi[1],1);
+  const evlw = Math.round(elwi * state.inputs.weight);
+  const pvpi = rand(profile.pvpi[0],profile.pvpi[1],1);
+  const cfi = Number(((ciTd*1000)/gedvi).toFixed(1));
+  const sv = (meanCO*1000)/(state.inputs.hr||100);
+  const rawGef = ((4*sv)/(gedv||1))*100;
+  const gefRanges = {
+    hypovolemic:[18,28],
+    cardiogenic:[10,20],
+    distributive:[22,35],
+    obstructive:[16,26],
+    mixed:[12,22]
+  };
+  const [gMin,gMax] = gefRanges[key];
+  const gef = Number(Math.max(gMin, Math.min(gMax, rawGef)).toFixed(1));
+
+  state.tptdRuns = runs;
+  state.tptd = {
+    reproducible: maxDev <= 10,
+    maxDeviation: Number(maxDev.toFixed(1)),
+    meanCO: Number(meanCO.toFixed(2)),
+    ciTd, gedv, gedvi, ittv, ptv, itbv, evlw, elwi, pvpi, cfi, gef
+  };
+}
+
+function interpretTptd(){
+  if(!state.tptd) generateTptd();
+  const t = state.tptd;
+  const notes = [];
+  let abnormalCount = 0;
+
+  if(t.gedvi < 680){ notes.push('Low preload (GEDVI low).'); abnormalCount++; }
+  else if(t.gedvi > 850){ notes.push('High preload/congestive filling (GEDVI high).'); abnormalCount++; }
+  else notes.push('Preload appears in intermediate range.');
+
+  if(t.ciTd < 2.4){ notes.push('Low cardiac output state persists (CI-TD low).'); abnormalCount++; }
+  else notes.push('CI-TD suggests acceptable forward flow.');
+
+  if(t.cfi < 4.2 || t.gef < 20){ notes.push('Cardiac function markers (CFI/GEF) suggest myocardial dysfunction.'); abnormalCount++; }
+  else notes.push('CFI/GEF do not show major pump failure severity.');
+
+  if(t.elwi > 10){ notes.push('Lung water is increased (ELWI elevated).'); abnormalCount++; }
+  else notes.push('No major excess lung water signal.');
+
+  if(t.pvpi > 3.0){ notes.push('Pulmonary permeability is increased (PVPI elevated).'); abnormalCount++; }
+  else notes.push('PVPI does not strongly indicate high permeability injury.');
+
+  if(state.calculations && state.calculations.svri < 1500){ notes.push('Persistent vasoplegia remains likely (SVRI low).'); abnormalCount++; }
+  if(abnormalCount >= 2) notes.push('Overall pattern is mixed physiology and should be treated in parallel components.');
+
+  state.tptdInterpretation = notes;
+}
+
+function updateInput(key, val){
+  const n = Number(val);
+  state.inputs[key] = Number.isFinite(n) ? n : 0;
+  state.calculations = null;
+  state.diagnosis = null;
+  state.tptdRuns = [];
+  state.tptd = null;
+  state.tptdInterpretation = [];
+}
+
+function gotoPage(n){
+  state.page = Math.max(1, Math.min(6, n));
+  render();
+}
+
+function nextPage(){
+  if(state.page === 1){ calculate(); }
+  if(state.page === 2){ diagnoseShock(); }
+  if(state.page === 4){ if(!state.tptd) generateTptd(); }
+  if(state.page === 5){ interpretTptd(); }
+  gotoPage(state.page+1);
+}
+
+function prevPage(){ gotoPage(state.page-1); }
+
+function gotoTptd(){
+  if(!state.calculations) calculate();
+  if(!state.diagnosis) diagnoseShock();
+  if(!state.tptd) generateTptd();
+  gotoPage(5);
+}
+
+function selectManagement(type){
+  state.selectedManagement = type;
+  if(type === 'tptd') return gotoTptd();
+  render();
+}
+
+function renderStageBar(){
+  document.getElementById('stagebar').innerHTML = PAGES.map((p,idx)=>`<div class="stage ${state.page===idx+1?'active':''}">${p.replace('PAGE ','P')}</div>`).join('');
+}
+
+function renderSnapshot(){
+  if(!state.calculations) calculate();
+  const c = state.calculations;
+  const d = state.diagnosis;
+  document.getElementById('snapshot').innerHTML = `
+    <div class="tag">Scenario seed: ${state.scenario.name}</div>
+    <div class="tag">MAP ${c.map} mmHg</div>
+    <div class="tag">CI ${c.ci} L/min/m²</div>
+    <div class="tag">SVRI ${c.svri}</div>
+    <div class="tag">RAP ${c.rap} mmHg</div>
+    <div class="tag">ΔPCO₂ ${c.dpco2} mmHg</div>
+    <div class="tag">UO ${c.uokg} mL/kg/hr</div>
+    ${d ? `<div class="section"><b>Current diagnosis:</b><br>${d.diagnosis}</div>` : ''}
+  `;
+}
+
+function renderNav(){
+  const nav = document.getElementById('navArea');
+  if(state.page === 1){
+    nav.innerHTML = `
+      <div class="book-nav">
+        <button class="btn secondary" disabled>← Previous</button>
+        <button class="btn primary" onclick="nextPage()">Next →</button>
+      </div>
+      <div class="page-num">Page 1 of 6</div>
+    `;
+    return;
+  }
+  if(state.page === 6){
+    nav.innerHTML = `
+      <div class="book-nav" style="justify-content:center">
+        <button class="btn primary" onclick="resetSimulation()">GO TO FIRST PAGE</button>
+      </div>
+      <div class="page-num">Page 6 of 6 — Final page</div>
+    `;
+    return;
+  }
+  nav.innerHTML = `
+    <div class="book-nav">
+      <button class="btn secondary" onclick="prevPage()">← Previous</button>
+      <button class="btn secondary" onclick="gotoTptd()">TPTD</button>
+      <button class="btn primary" onclick="nextPage()">Next →</button>
+    </div>
+    <div class="page-num">Page ${state.page} of 6</div>
+  `;
+}
+
+function renderPage1(){
+  const i = state.inputs;
+  const content = `
+    <h2>PAGE 1 — Parameters to be filled by user</h2>
+    <div class="section">
+      <h3>Clinical parameters</h3>
+      <div class="inputs">
+        ${inputField('SBP (mmHg)','sbp',i.sbp)}
+        ${inputField('DBP (mmHg)','dbp',i.dbp)}
+        ${inputField('Heart rate (bpm)','hr',i.hr)}
+        ${inputField('Height (cm)','height',i.height)}
+        ${inputField('Weight (kg)','weight',i.weight)}
+        ${inputField('Urine output (mL/hour)','uo',i.uo)}
+      </div>
+    </div>
+    <div class="section">
+      <h3>2D Echo inputs</h3>
+      <div class="inputs">
+        ${inputField('Stroke volume (mL)','sv',i.sv)}
+        ${inputField('PCWP / estimated filling pressure (mmHg)','pcwp',i.pcwp)}
+        ${inputField('IVC diameter (cm)','ivc',i.ivc)}
+        ${inputField('IVC collapsibility (%)','coll',i.coll)}
+      </div>
+    </div>
+    <div class="section">
+      <h3>Arterial ABG</h3>
+      <div class="inputs">
+        ${inputField('pH','ph',i.ph)}
+        ${inputField('PaO₂ (mmHg)','pao2',i.pao2)}
+        ${inputField('PaCO₂ (mmHg)','paco2',i.paco2)}
+        ${inputField('HCO₃⁻ (mmol/L)','hco3',i.hco3)}
+        ${inputField('Base excess (mmol/L)','be',i.be)}
+        ${inputField('Lactate (mmol/L)','lactate',i.lactate)}
+      </div>
+    </div>
+    <div class="section">
+      <h3>Central VBG</h3>
+      <div class="inputs">
+        ${inputField('ScvO₂ (%)','scvo2',i.scvo2)}
+        ${inputField('PvCO₂ (mmHg)','pvco2',i.pvco2)}
+      </div>
+    </div>
+  `;
+  document.getElementById('pageContent').innerHTML = content;
+}
+
+function inputField(label,key,val){
+  return `<div><label>${label}</label><input type="number" step="any" value="${val}" oninput="updateInput('${key}',this.value)"></div>`;
+}
+
+function renderPage2(){
+  calculate();
+  const c = state.calculations;
+  const e = state.echoReport;
+
+  document.getElementById('pageContent').innerHTML = `
+    <h2>PAGE 2 — Automatic calculations + Dynamic Echo/POCUS</h2>
+    <div class="kv">
+      <div class="metric"><span>MAP</span><b>${c.map} mmHg</b></div>
+      <div class="metric"><span>BSA</span><b>${c.bsa} m²</b></div>
+      <div class="metric"><span>Cardiac Output</span><b>${c.co} L/min</b></div>
+      <div class="metric"><span>Cardiac Index</span><b>${c.ci} L/min/m²</b></div>
+      <div class="metric"><span>Estimated CVP/RAP</span><b>${c.rap} mmHg</b></div>
+      <div class="metric"><span>SVRI</span><b>${c.svri} dyn·s·cm⁻⁵·m²</b></div>
+      <div class="metric"><span>ΔPCO₂ (PvCO₂ − PaCO₂)</span><b>${c.dpco2} mmHg</b></div>
+      <div class="metric"><span>Urine output (mL/kg/hr)</span><b>${c.uokg}</b></div>
+      <div class="metric"><span>Lactate</span><b>${c.lactate} mmol/L</b></div>
+      <div class="metric"><span>ScvO₂</span><b>${c.scvo2}%</b></div>
+    </div>
+    <div class="section">
+      <h3>Formula references</h3>
+      <ul>
+        <li>MAP = (SBP + 2 × DBP) / 3</li>
+        <li>CO = HR × Stroke volume</li>
+        <li>CI = CO / BSA</li>
+        <li>SVRI = 80 × (MAP − RAP) / CI</li>
+        <li>ΔPCO₂ = PvCO₂ − PaCO₂</li>
+      </ul>
+    </div>
+    <div class="diag">
+      <h3>Dynamic Echo / POCUS report</h3>
+      <ul>
+        <li><b>LVEF:</b> ${e.lvef}</li>
+        <li><b>LV systolic function:</b> ${e.lv}</li>
+        <li><b>LVOT VTI:</b> ${e.lvot}</li>
+        <li><b>Stroke volume:</b> ${state.inputs.sv} mL</li>
+        <li><b>CO / CI:</b> ${c.co} L/min / ${c.ci} L/min/m²</li>
+        <li><b>Filling pressure:</b> PCWP ${state.inputs.pcwp} mmHg</li>
+        <li><b>TAPSE:</b> ${e.tapse}</li>
+        <li><b>RV function:</b> ${e.rv}</li>
+        <li><b>RVSP/PASP:</b> ${e.rvsp}</li>
+        <li><b>IVC:</b> ${e.ivc}</li>
+        <li><b>B-lines:</b> ${e.blines}</li>
+        <li><b>Pleural findings:</b> ${e.pleura}</li>
+        <li><b>Pericardium:</b> ${e.pericardium}</li>
+        <li><b>Valve findings:</b> ${e.valves}</li>
+        <li><b>Regional/global wall motion:</b> ${e.wall}</li>
+      </ul>
+    </div>
+  `;
+}
+
+function renderPage3(){
+  diagnoseShock();
+  const d = state.diagnosis;
+  const mapName = {
+    hypovolemic:'Hypovolemic Shock',
+    cardiogenic:'Cardiogenic Shock',
+    distributive:'Distributive Shock',
+    obstructive:'Obstructive Shock',
+    tptd:'Proceed to Transpulmonary Thermodilution (TPTD)'
+  };
+  const shockName = (key) => mapName[key] || key;
+
+  const recButton = d.mixed ? 'tptd' : d.predominant;
+  const mgmtButtons = ['cardiogenic','obstructive','hypovolemic','distributive','tptd'];
+
+  document.getElementById('pageContent').innerHTML = `
+    <h2>PAGE 3 — Initial shock diagnosis</h2>
+    <div class="${d.mixed ? 'warn':'diag'}">
+      <b>Integrated diagnosis:</b> ${d.diagnosis}
+      ${d.mixed ? `<div class="small" style="margin-top:6px">Predominant component: <b>${shockName(d.predominant)}</b><br>Secondary component(s): <b>${d.secondary.map(x=>shockName(x)).join(', ')}</b></div>`:''}
+    </div>
+    <div class="section">
+      <h3>Reasoning/evidence</h3>
+      <ul>${d.evidence.map(e=>`<li>${e}</li>`).join('')}</ul>
+    </div>
+    <div class="section">
+      <h3>Immediate stabilization and first management</h3>
+      <ul>
+        <li>Airway and mental-status reassessment; protect airway when indicated.</li>
+        <li>Breathing and oxygenation support with escalation to ventilation when required.</li>
+        <li>Perfusion assessment: MAP, capillary refill, skin perfusion, lactate trend, urine output.</li>
+        <li>Continuous monitoring: ECG, SpO₂, blood pressure, urine output, serial blood gases.</li>
+        <li>Identify and treat cause while performing dynamic fluid responsiveness assessment.</li>
+        <li>Avoid inappropriate fluid loading; reassess with physiology and ultrasound trends.</li>
+      </ul>
+    </div>
+    <div class="section">
+      <h3>Management pathways</h3>
+      <div class="button-grid">
+        ${mgmtButtons.map(k=>{
+          const label = k==='tptd' ? mapName[k] : `Management of ${mapName[k]}`;
+          const cls = `mgmt-btn ${recButton===k?'rec':''} ${state.selectedManagement===k?'active':''}`;
+          return `<button class="${cls}" onclick="selectManagement('${k}')">${label}${recButton===k?'  • Recommended':''}</button>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderPage4(){
+  if(!state.diagnosis) diagnoseShock();
+  const mode = state.selectedManagement && state.selectedManagement !== 'tptd' ? state.selectedManagement : (state.diagnosis?.predominant || 'distributive');
+  const blocks = {
+    cardiogenic: `
+      <h3>Cardiogenic Shock Management</h3>
+      <ul>
+        <li>Stabilization and immediate perfusion targets with invasive monitoring.</li>
+        <li>Fluid strategy: conservative, dynamically reassessed to avoid congestion.</li>
+        <li>Vasopressors for MAP support; inotropes for low-output state when indicated.</li>
+        <li>Treat pulmonary congestion and optimize oxygenation/ventilation.</li>
+        <li>Address arrhythmias, ACS/revascularization pathways, RV failure, and mechanical complications.</li>
+        <li>Consider mechanical circulatory support in refractory shock and reassess with serial Echo/hemodynamics.</li>
+        <li>De-escalate as perfusion recovers.</li>
+      </ul>`,
+    hypovolemic: `
+      <h3>Hypovolemic Shock Management</h3>
+      <ul>
+        <li>Identify source and stop blood/fluid loss immediately.</li>
+        <li>Hemorrhage control and major hemorrhage pathway when indicated.</li>
+        <li>Blood products for hemorrhagic causes; crystalloid for selected non-hemorrhagic causes.</li>
+        <li>Use dynamic fluid-responsiveness strategy; avoid over-resuscitation.</li>
+        <li>Add vasopressors only when appropriate after preload strategy.</li>
+        <li>Frequent reassessment and structured de-escalation.</li>
+      </ul>`,
+    distributive: `
+      <h3>Distributive Shock Management</h3>
+      <ul>
+        <li>Differentiate septic vs non-septic distributive causes.</li>
+        <li>Cultures/diagnostics, early antimicrobials, and source control.</li>
+        <li>Crystalloid with dynamic fluid assessment rather than blind boluses.</li>
+        <li>Norepinephrine first-line; vasopressin/additional vasoactive support as required.</li>
+        <li>Hydrocortisone for persistent vasopressor-dependent shock when indicated.</li>
+        <li>Serial lactate/perfusion reassessment and planned de-resuscitation.</li>
+        <li>Screen for septic-cardiogenic mixed shock physiology.</li>
+      </ul>`,
+    obstructive: `
+      <h3>Obstructive Shock Management</h3>
+      <ul>
+        <li><b>Pulmonary embolism:</b> risk stratification, RV support, anticoagulation where appropriate, reperfusion strategy (thrombolysis/catheter/surgery as indicated).</li>
+        <li><b>Cardiac tamponade:</b> rapid recognition and urgent pericardial drainage.</li>
+        <li><b>Tension pneumothorax:</b> immediate decompression and definitive drainage.</li>
+        <li>Reassess Echo, RV function, CO, blood pressure, lactate, and perfusion after intervention.</li>
+      </ul>`
+  };
+
+  const safeMode = blocks[mode] ? mode : 'distributive';
+  document.getElementById('pageContent').innerHTML = `
+    <h2>PAGE 4 — Shock-specific management</h2>
+    <div class="diag"><b>Selected pathway:</b> ${safeMode.charAt(0).toUpperCase()+safeMode.slice(1)} shock</div>
+    <div class="section">${blocks[safeMode]}</div>
+  `;
+}
+
+function renderPage5(){
+  if(!state.tptd) generateTptd();
+  const t = state.tptd;
+  const vols = [10,15,20].map(v=>`${v} mL`).join(' / ');
+
+  document.getElementById('pageContent').innerHTML = `
+    <h2>PAGE 5 — Transpulmonary Thermodilution (TPTD)</h2>
+    <div class="warn"><b>Educational Transpulmonary Thermodilution simulation</b><br>This is an educational model and not a replacement for a validated clinical monitor.</div>
+    <div class="section">
+      <h3>TPTD procedure</h3>
+      <ol>
+        <li>Distal central venous catheter selected for injectate delivery.</li>
+        <li>Injectate: cold saline educational bolus.</li>
+        <li>Possible injectate volumes: ${vols}.</li>
+        <li>Arterial thermistor line receives dilution-temperature curve.</li>
+        <li>Thermodilution calculation engine computes three runs.</li>
+      </ol>
+    </div>
+    <div class="section">
+      <h3>Three measurements</h3>
+      <table>
+        <tr><th>Run</th><th>CO (L/min)</th><th>Mean transit time (s)</th><th>Down-slope time (s)</th></tr>
+        ${state.tptdRuns.map((r,idx)=>`<tr><td>${idx+1}</td><td>${r.co}</td><td>${r.mtt}</td><td>${r.dst}</td></tr>`).join('')}
+      </table>
+      <div class="small" style="margin-top:8px">Reproducibility check: ${t.reproducible ? 'Acceptable' : 'Borderline'} (max CO deviation ${t.maxDeviation}%).</div>
+    </div>
+    <div class="section">
+      <h3>TPTD calculations</h3>
+      <div class="kv">
+        <div class="metric"><span>CI-TD</span><b>${t.ciTd} L/min/m²</b></div>
+        <div class="metric"><span>GEDV</span><b>${t.gedv} mL</b></div>
+        <div class="metric"><span>GEDVI</span><b>${t.gedvi} mL/m²</b></div>
+        <div class="metric"><span>ITTV</span><b>${t.ittv} mL</b></div>
+        <div class="metric"><span>PTV</span><b>${t.ptv} mL</b></div>
+        <div class="metric"><span>ITBV</span><b>${t.itbv} mL</b></div>
+        <div class="metric"><span>EVLW</span><b>${t.evlw} mL</b></div>
+        <div class="metric"><span>ELWI</span><b>${t.elwi} mL/kg</b></div>
+        <div class="metric"><span>PVPI</span><b>${t.pvpi}</b></div>
+        <div class="metric"><span>CFI</span><b>${t.cfi} min⁻¹</b></div>
+        <div class="metric"><span>GEF</span><b>${t.gef}%</b></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderPage6(){
+  if(!state.calculations) calculate();
+  if(!state.diagnosis) diagnoseShock();
+  if(!state.tptdInterpretation.length) interpretTptd();
+  const t = state.tptd;
+  const notes = state.tptdInterpretation;
+
+  const mgmt = [];
+  if(t.gedvi < 680) mgmt.push('Low GEDVI with likely fluid responsiveness: use targeted fluid strategy with immediate reassessment.');
+  if(t.gedvi > 850 && t.elwi > 10) mgmt.push('High GEDVI + high ELWI: avoid unnecessary additional fluid; consider decongestion when appropriate.');
+  if(t.ciTd < 2.4 && (t.cfi < 4.2 || t.gef < 20)) mgmt.push('Low CI with impaired cardiac function: treat cardiogenic component and consider inotropic/escalation pathway.');
+  if(t.elwi > 10 && t.pvpi > 3.0) mgmt.push('High ELWI + high PVPI: treat lung injury/permeability phenotype with lung-protective strategy.');
+  if(state.calculations.svri < 1500) mgmt.push('Persistent low SVRI: treat vasoplegia with appropriate vasopressor strategy.');
+  if(state.diagnosis.mixed || mgmt.length >= 2) mgmt.push('Mixed physiology: treat both components simultaneously with serial hemodynamic reassessment.');
+
+  document.getElementById('pageContent').innerHTML = `
+    <h2>PAGE 6 — TPTD conclusions + final mixed-shock management</h2>
+    <div class="section">
+      <h3>TPTD interpretation</h3>
+      <ul>${notes.map(n=>`<li>${n}</li>`).join('')}</ul>
+    </div>
+    <div class="section">
+      <h3>TPTD-based Mixed-Shock Management</h3>
+      <div class="small">Integrated from shock diagnosis, echo, ABG/VBG, perfusion, CI-TD, GEDVI, ELWI, PVPI, CFI and GEF.</div>
+      <ul>${mgmt.map(m=>`<li>${m}</li>`).join('')}</ul>
+    </div>
+    <div class="good"><b>End of simulator.</b> Press <b>GO TO FIRST PAGE</b> to start a new, different simulation scenario.</div>
+  `;
+}
+
+function render(){
+  renderStageBar();
+  if(state.page === 1) renderPage1();
+  if(state.page === 2) renderPage2();
+  if(state.page === 3) renderPage3();
+  if(state.page === 4) renderPage4();
+  if(state.page === 5) renderPage5();
+  if(state.page === 6) renderPage6();
+  renderNav();
+  renderSnapshot();
+}
+
+resetSimulation();
+</script>
+</body>
+</html>
