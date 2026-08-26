@@ -52,7 +52,120 @@ function correctSound() {sound(740,.1,.04);setTimeout(()=>sound(980,.16,.04),110
   for(let y=0;y<=220;y+=22)d+=`M0 ${y}H1000 `;
   $('gridPath').setAttribute('d',d);
   $('trace').setAttribute('d','M0 110 L1000 110');
-} function gauss(x,c,w){return Math.exp(-Math.pow((x-c)/w,2))} function ecgY(r,t){ if(r==='ASYSTOLE')return 110; if(r==='VF')return 110+26*Math.sin(t*.19)+13*Math.sin(t*.53)+8*Math.sin(t*.91); if(r==='PVT')return 110+40*Math.sin(t*.12)+12*Math.sin(t*.31); if(r==='VT'||r==='TORSADES'){let ph=(t% (60000/Math.max(S.hr,100)))/(60000/Math.max(S.hr,100));let a=r==='TORSADES'? 18+30*(.5+.5*Math.sin(t*.018)):46;return 110+a*Math.sin(ph*2*Math.PI* (r==='TORSADES'?2.2:1))} if(r==='AF'){let per=60000/Math.max(S.hr,100),ph=(t%per)/per;return 110+3*Math.sin(t*.4)+2*Math.sin(t*.9)+55*gauss(ph,.34,.018)-28*gauss(ph,.38,.014 )-27*gauss(ph,.62,.07)} if(r==='FLUTTER'){let per=60000/150,ph=(t%per)/per,saw=(ph*6%1)-.5;return 110+saw*14+55*gauss(ph,.58,.018)-27*gauss(ph,.62,.014)-27*gauss(ph,.8,.07)} if(r==='SVT'){let per=60000/Math.max(S.hr,150),ph=(t%per)/per;return 110+55*gauss(ph,.31,.018)-28*gauss(ph,.35,.014)-27*gauss(ph,.58,.07)} if(r==='FIRST'){let per=60000/S.hr,ph=(t%per)/per;return 110-7*gauss(ph,.25,.035)+55*gauss(ph,.40,.018)-28*gauss(ph,.44,.014)-27*gauss(ph,.64 ,.07)} if(r==='MOBITZ1'||r==='MOBITZ2'){let per=60000/S.hr,beat=Math.floor(t/per),ph= (t%per)/per,drop=r==='MOBITZ1'?beat%4===3:beat%4===2;if(drop)return 110-7*gauss(ph,.18,.035);let pr=r==='MOBITZ1'?.18+(beat%4)*.035:.18;return 110-7*gauss(ph,pr,.035)+55*gauss(ph,pr+.12,.018)-28*gauss(ph,pr+.16,.014)-27*gauss(ph,pr+.38,.07)} if(r==='COMPLETE'){let vp=(t%(60000/34))/(60000/34),ap=(t% (60000/58))/(60000/58);return 110-7*gauss(ap,.2,.035)+55*gauss(vp,.36,.018)-28*gauss(vp,.4,.014)-27*gauss(vp,.63,.07)} if(['STEMI','NSTEMI','STDEP','INVERTED_T','TALL_T','PERICARDITIS','ST_ELEV_DIFF' ,'EARLYREP'].includes(r)){ let per=60000/Math.max(S.hr,40),ph=(t%per)/per; let y=110-7*gauss(ph,.18,.035)+55*gauss(ph,.31,.018)-28*gauss(ph,.35,.014)-27*gauss(ph,.57 ,.07); let lead=($('leadSelect')?.value)||'II'; if(r==='STEMI' && ['V2','V3','V4'].includes(lead)) y-=24; if(r==='NSTEMI'||r==='STDEP') y+=12; if(r==='INVERTED_T') y+=24*gauss(ph,.57,.07); if(r==='TALL_T') y-=18*gauss(ph,.57,.07); if(r==='PERICARDITIS'||r==='ST_ELEV_DIFF'||r==='EARLYREP') y-=12; return y; } let per=60000/Math.max(S.hr,40);if(r==='SINUS_ARR')per=600+140*Math.sin(t*.006);let ph=(t%per)/per;let y=110-7*gauss(ph,.18,.035)+55*gauss(ph,.31,.018)-28*gauss(ph,.35,.014)-27*gauss(ph,.57 ,.07);if(r==='PVC'&&Math.floor(t/per)%5===3){let z= (ph-.26)/.16;y=110+58*Math.exp(-z*z)*Math.sin(z*3.14159)-18*Math.exp(-Math.pow((ph-.52)/.09,2))}return y } function animate(){
+} function gauss(x,c,w){return Math.exp(-Math.pow((x-c)/w,2))} function ecgY(r,t){
+  if(r==='ASYSTOLE')return 110;
+  if(r==='VF')return 110+26*Math.sin(t*.19)+13*Math.sin(t*.53)+8*Math.sin(t*.91);
+  if(r==='PVT')return 110+40*Math.sin(t*.12)+12*Math.sin(t*.31);
+  /* VT: Gaussian-modulated wide complex — distinct R and S, not a plain sine */
+  if(r==='VT'||r==='TORSADES'){
+    let per=60000/Math.max(S.hr,100),ph=(t%per)/per;
+    let amp=r==='TORSADES'?(22+28*(.5+.5*Math.sin(t*.018))):46;
+    let z=(ph-.35)/.18;
+    return 110+amp*Math.exp(-z*z)*Math.sin(z*2.2)-amp*.4*gauss(ph,.65,.11);
+  }
+  /* AF: phase-modulated QRS creates visually irregular R-R; no discrete P waves */
+  if(r==='AF'){
+    let f=Math.max(S.hr,100)/60000;
+    let base=t*f*2*Math.PI;
+    let ph=((base+0.38*Math.sin(base*0.07)+0.25*Math.sin(base*0.13))%(2*Math.PI))/(2*Math.PI);
+    ph=((ph%1)+1)%1;
+    let noise=5*Math.sin(t*.42)+3*Math.sin(t*.89)+2*Math.sin(t*1.31);
+    return 110+noise+52*gauss(ph,.34,.018)-26*gauss(ph,.38,.014)-25*gauss(ph,.62,.07);
+  }
+  if(r==='FLUTTER'){let per=60000/150,ph=(t%per)/per,saw=(ph*6%1)-.5;return 110+saw*14+55*gauss(ph,.58,.018)-27*gauss(ph,.62,.014)-27*gauss(ph,.8,.07)}
+  if(r==='SVT'){let per=60000/Math.max(S.hr,150),ph=(t%per)/per;return 110+55*gauss(ph,.31,.018)-28*gauss(ph,.35,.014)-27*gauss(ph,.58,.07)}
+  /* FIRST: P moved to 0.10 so PR = 0.30×per ≈ 280 ms at 64 bpm (clearly prolonged) */
+  if(r==='FIRST'){let per=60000/S.hr,ph=(t%per)/per;return 110-7*gauss(ph,.10,.035)+55*gauss(ph,.40,.018)-28*gauss(ph,.44,.014)-27*gauss(ph,.64,.07)}
+  if(r==='MOBITZ1'||r==='MOBITZ2'){
+    let per=60000/S.hr,beat=Math.floor(t/per),ph=(t%per)/per;
+    let drop=r==='MOBITZ1'?beat%4===3:beat%3===2;
+    if(drop)return 110-7*gauss(ph,.12,.035);
+    let pr=r==='MOBITZ1'?.12+(beat%4)*.045:.12;
+    return 110-7*gauss(ph,pr,.035)+55*gauss(ph,pr+.16,.018)-28*gauss(ph,pr+.20,.014)-27*gauss(ph,pr+.42,.07);
+  }
+  if(r==='COMPLETE'){let vp=(t%(60000/34))/(60000/34),ap=(t%(60000/58))/(60000/58);return 110-7*gauss(ap,.2,.035)+55*gauss(vp,.36,.018)-28*gauss(vp,.4,.014)-27*gauss(vp,.63,.07)}
+  /* Junctional: narrow QRS, no ante-grade P wave, small retrograde P after QRS */
+  if(r==='JUNCTIONAL'){let per=60000/Math.max(S.hr,40),ph=(t%per)/per;return 110+52*gauss(ph,.31,.018)-26*gauss(ph,.35,.014)-22*gauss(ph,.55,.065)+5*gauss(ph,.46,.022)}
+  /* AIVR / IDIO: wide ventricular escape complex, no P */
+  if(r==='AIVR'||r==='IDIO'){
+    let per=60000/Math.max(S.hr,20),ph=(t%per)/per;
+    let amp=r==='AIVR'?58:52;
+    let z=(ph-.33)/.14; return 110+amp*Math.exp(-z*z)*Math.sin(z*2.7)-amp*.35*gauss(ph,.60,.11);
+  }
+  /* PAC: sinus beats with every 4th beat a premature atrial beat (earlier P, narrow QRS) */
+  if(r==='PAC'){
+    let per=60000/Math.max(S.hr,40),beatN=Math.floor(t/per),ph=(t%per)/per;
+    if(beatN%4===2) return 110+6*gauss(ph,.14,.025)+46*gauss(ph,.26,.018)-23*gauss(ph,.30,.014)-21*gauss(ph,.48,.06);
+    return 110-7*gauss(ph,.18,.035)+52*gauss(ph,.31,.018)-26*gauss(ph,.35,.014)-24*gauss(ph,.57,.07);
+  }
+  /* PAC bigeminy: alternating normal / PAC */
+  if(r==='PAC_BIGEMINY'){
+    let per=60000/Math.max(S.hr,40),beatN=Math.floor(t/per),ph=(t%per)/per;
+    if(beatN%2===1) return 110+6*gauss(ph,.14,.025)+46*gauss(ph,.26,.018)-23*gauss(ph,.30,.014)-21*gauss(ph,.48,.06);
+    return 110-7*gauss(ph,.18,.035)+52*gauss(ph,.31,.018)-26*gauss(ph,.35,.014)-24*gauss(ph,.57,.07);
+  }
+  /* PVC bigeminy: alternating normal / PVC */
+  if(r==='PVC_BIGEMINY'){
+    let per=60000/Math.max(S.hr,40),beatN=Math.floor(t/per),ph=(t%per)/per;
+    if(beatN%2===1){let z=(ph-.28)/.16;return 110+56*Math.exp(-z*z)*Math.sin(z*3.14)-18*Math.exp(-Math.pow((ph-.54)/.09,2));}
+    return 110-7*gauss(ph,.18,.035)+52*gauss(ph,.31,.018)-26*gauss(ph,.35,.014)-24*gauss(ph,.57,.07);
+  }
+  /* WPW: short PR (P at 0.18, delta-slurred QRS at 0.26) + normal T */
+  if(r==='WPW'){let per=60000/Math.max(S.hr,40),ph=(t%per)/per;return 110-6*gauss(ph,.18,.03)+38*gauss(ph,.30,.030)-19*gauss(ph,.37,.018)-22*gauss(ph,.56,.07)}
+  /* RBBB: RSR' morphology — initial r, deep S, terminal R' */
+  if(r==='RBBB'){let per=60000/Math.max(S.hr,40),ph=(t%per)/per;return 110-6*gauss(ph,.18,.03)+34*gauss(ph,.31,.015)-14*gauss(ph,.37,.011)+28*gauss(ph,.43,.014)-23*gauss(ph,.49,.010)-22*gauss(ph,.63,.07)}
+  /* LBBB: broad notched R in lateral morphology */
+  if(r==='LBBB'){
+    let per=60000/Math.max(S.hr,40),ph=(t%per)/per;
+    let z=(ph-.36)/.09;
+    let rW=48*Math.exp(-z*z)*(.5+.5*Math.cos(z*3.14));
+    return 110-5*gauss(ph,.18,.03)+rW-20*gauss(ph,.58,.05)-14*gauss(ph,.66,.07);
+  }
+  /* Brugada: coved ST elevation at V1 + T inversion */
+  if(r==='BRUGADA'){let per=60000/Math.max(S.hr,40),ph=(t%per)/per;let y=110-6*gauss(ph,.18,.03)+52*gauss(ph,.31,.018)-24*gauss(ph,.35,.014);y-=20*gauss(ph,.45,.05);y+=26*gauss(ph,.57,.07);return y;}
+  /* Long QT: T wave shifted right to 0.78 */
+  if(r==='LONGQT'){let per=60000/Math.max(S.hr,40),ph=(t%per)/per;return 110-7*gauss(ph,.18,.035)+52*gauss(ph,.31,.018)-26*gauss(ph,.35,.014)-30*gauss(ph,.78,.09)}
+  /* Short QT: tall narrow T very close to QRS end */
+  if(r==='SHORTQT'){let per=60000/Math.max(S.hr,40),ph=(t%per)/per;return 110-7*gauss(ph,.18,.035)+52*gauss(ph,.31,.018)-26*gauss(ph,.35,.014)-38*gauss(ph,.42,.038)}
+  /* Hypokalemia: flattened T + prominent U wave after T */
+  if(r==='HYPOK'){let per=60000/Math.max(S.hr,40),ph=(t%per)/per;return 110-7*gauss(ph,.18,.035)+52*gauss(ph,.31,.018)-26*gauss(ph,.35,.014)-12*gauss(ph,.53,.065)-16*gauss(ph,.69,.033)}
+  /* Hypomagnesemia: prolonged QT + occasional ectopic beat every 6th cycle */
+  if(r==='HYPOMAG'){
+    let per=60000/Math.max(S.hr,40),beatN=Math.floor(t/per),ph=(t%per)/per;
+    if(beatN%6===4){let z=(ph-.24)/.15;return 110+50*Math.exp(-z*z)*Math.sin(z*3)-16*Math.exp(-Math.pow((ph-.50)/.09,2));}
+    return 110-7*gauss(ph,.18,.035)+52*gauss(ph,.31,.018)-26*gauss(ph,.35,.014)-26*gauss(ph,.76,.09);
+  }
+  /* Severe hyperkalemia: very wide QRS + tall peaked T, no P waves (sine-wave pattern) */
+  if(r==='HYPERK_SEVERE'){let per=60000/Math.max(S.hr,40),ph=(t%per)/per;let z=(ph-.35)/.22;return 110+50*Math.exp(-z*z)*Math.sin(z*2.4)-24*gauss(ph,.62,.10)}
+  /* Low voltage: normal morphology scaled to ~28% amplitude */
+  if(r==='LOWVOLT'){let per=60000/Math.max(S.hr,40),ph=(t%per)/per;let n=110-7*gauss(ph,.18,.035)+52*gauss(ph,.31,.018)-26*gauss(ph,.35,.014)-27*gauss(ph,.57,.07);return 110+(n-110)*.28}
+  /* Electrical alternans: QRS amplitude alternates beat-to-beat */
+  if(r==='ELECTRICAL_ALTERNANS'){
+    let per=60000/Math.max(S.hr,40),beatN=Math.floor(t/per),ph=(t%per)/per;
+    let qa=beatN%2===0?1.0:0.42;
+    return 110-7*gauss(ph,.18,.035)+qa*(52*gauss(ph,.31,.018)-26*gauss(ph,.35,.014))-24*gauss(ph,.57,.07);
+  }
+  /* Ischaemic morphologies with lead-specific modifications */
+  if(['STEMI','NSTEMI','STDEP','INVERTED_T','TALL_T','PERICARDITIS','ST_ELEV_DIFF','EARLYREP'].includes(r)){
+    let per=60000/Math.max(S.hr,40),ph=(t%per)/per;
+    let y=110-7*gauss(ph,.18,.035)+55*gauss(ph,.31,.018)-28*gauss(ph,.35,.014)-27*gauss(ph,.57,.07);
+    let lead=($('leadSelect')?.value)||'II';
+    if(r==='STEMI'&&['V2','V3','V4'].includes(lead))y-=24;
+    if(r==='NSTEMI'||r==='STDEP')y+=12;
+    /* INVERTED_T: add enough to overcome the −27×gauss T wave and clearly flip it */
+    if(r==='INVERTED_T')y+=60*gauss(ph,.57,.07);
+    if(r==='TALL_T')y-=20*gauss(ph,.57,.07);
+    if(r==='PERICARDITIS'||r==='ST_ELEV_DIFF'||r==='EARLYREP')y-=12;
+    return y;
+  }
+  /* Default: sinus family (NSR, BRADY, TACHY, SINUS_ARR, PVC) */
+  let per=60000/Math.max(S.hr,40);
+  if(r==='SINUS_ARR')per=600+140*Math.sin(t*.006);
+  let ph=(t%per)/per;
+  let y=110-7*gauss(ph,.18,.035)+55*gauss(ph,.31,.018)-28*gauss(ph,.35,.014)-27*gauss(ph,.57,.07);
+  if(r==='PVC'&&Math.floor(t/per)%5===3){let z=(ph-.26)/.16;y=110+58*Math.exp(-z*z)*Math.sin(z*3.14159)-18*Math.exp(-Math.pow((ph-.52)/.09,2))}
+  return y;
+} function animate(){
   if(S.ecgPaused)return;
   offset+=7;
   let d='';
