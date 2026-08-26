@@ -63,7 +63,6 @@ footer{margin-top:10px;color:var(--muted);font-size:11px;text-align:center}
     <div class="subtitle">Educational critical-care simulation • Dynamic case physiology • Not for direct clinical decision making</div>
     <div id="stagebar" class="stagebar"></div>
   </div>
-  ${c.invalidInput ? `<div class="danger">One or more key inputs are non-physiologic (for example height/weight/HR/SV ≤ 0). Calculations may be unreliable until corrected.</div>` : ''}
 </header>
 
 <main class="app">
@@ -204,6 +203,42 @@ function generateScenario(){
         valves:'Functional MR/TR may coexist',
         wall:'Global hypokinesia plus high-perfusion demand mismatch'
       })
+    },
+    {
+      key:'cardiogenic', name:'Cardiogenic shock (RV-LV biventricular failure pattern)',
+      inputs:{sbp:74,dbp:46,hr:122,height:171,weight:80,uo:12,sv:24,pcwp:22,ivc:2.5,coll:10,ph:7.21,pao2:60,paco2:38,hco3:14,be:-11,lactate:6.1,scvo2:48,pvco2:49},
+      echo:()=>({
+        lvef: rand(16,26,0)+'%',
+        lv:'Severe biventricular pump dysfunction',
+        lvot: rand(7,10,1)+' cm',
+        tapse: rand(10,14,0)+' mm',
+        rv:'Moderate-severe RV dysfunction',
+        rvsp: rand(45,62,0)+' mmHg',
+        ivc:'Plethoric IVC with minimal inspiratory collapse',
+        blines:'Dense bilateral B-lines',
+        pleura:'Moderate bilateral pleural effusions',
+        pericardium:'No large pericardial effusion',
+        valves:'Functional MR/TR with low forward flow',
+        wall:'Global severe hypokinesia'
+      })
+    },
+    {
+      key:'mixed', name:'Mixed shock (distributive + obstructive phenotype)',
+      inputs:{sbp:78,dbp:44,hr:130,height:173,weight:75,uo:13,sv:31,pcwp:14,ivc:2.4,coll:14,ph:7.24,pao2:58,paco2:39,hco3:15,be:-10,lactate:6.0,scvo2:56,pvco2:50},
+      echo:()=>({
+        lvef: rand(40,52,0)+'%',
+        lv:'Underfilled LV with preserved-to-mildly reduced contractility',
+        lvot: rand(10,14,1)+' cm',
+        tapse: rand(10,15,0)+' mm',
+        rv:'RV pressure overload and dysfunction',
+        rvsp: rand(52,72,0)+' mmHg',
+        ivc:'Dilated IVC with minimal collapse',
+        blines:'Patchy bilateral B-lines',
+        pleura:'Small pleural fluid with asymmetric findings',
+        pericardium:'No tamponade-level effusion',
+        valves:'Functional TR likely',
+        wall:'RV strain with interventricular septal flattening'
+      })
     }
   ];
   const chosen = choose(scenarios);
@@ -288,7 +323,13 @@ function diagnoseShock(){
   const ranked = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
   const top = ranked[0];
   const second = ranked[1];
-  const mixed = (top[1] - second[1] <= 1);
+  const strongDualSignal = scores.distributive >= 4 && (
+    scores.cardiogenic >= 4 || scores.obstructive >= 4 || scores.hypovolemic >= 4
+  );
+  const mixed = strongDualSignal || (top[1] >= 5 && second[1] >= 4 && (top[1] - second[1] <= 1));
+  const scoreTotal = ranked.reduce((sum,[,v])=>sum+v,0) || 1;
+  const topShare = Math.round((top[1] / scoreTotal) * 100);
+  const confidence = topShare >= 45 ? 'High' : topShare >= 34 ? 'Moderate' : 'Low';
 
   let diagnosis;
   let predominant = top[0];
@@ -310,7 +351,9 @@ function diagnoseShock(){
   state.diagnosis = {
     scores, ranked, diagnosis, mixed, predominant,
     secondary,
-    evidence
+    evidence,
+    topShare,
+    confidence
   };
 
   if(!state.selectedManagement){
@@ -406,6 +449,7 @@ function updateInput(key, val){
   state.inputs[key] = Number.isFinite(n) ? n : 0;
   state.calculations = null;
   state.diagnosis = null;
+  state.selectedManagement = null;
   state.tptdRuns = [];
   state.tptd = null;
   state.tptdInterpretation = [];
@@ -559,6 +603,7 @@ function renderPage2(){
       <div class="metric"><span>Lactate</span><b>${c.lactate} mmol/L</b></div>
       <div class="metric"><span>ScvO₂</span><b>${c.scvo2}%</b></div>
     </div>
+    ${c.invalidInput ? `<div class="danger">One or more key inputs are non-physiologic (for example height/weight/HR/SV ≤ 0). Calculations may be unreliable until corrected.</div>` : ''}
     <div class="section">
       <h3>Formula references</h3>
       <ul>
@@ -612,6 +657,7 @@ function renderPage3(){
     <div class="${d.mixed ? 'warn':'diag'}">
       <b>Integrated diagnosis:</b> ${d.diagnosis}
       ${d.mixed ? `<div class="small" style="margin-top:6px">Predominant component: <b>${shockName(d.predominant)}</b><br>Secondary component(s): <b>${d.secondary.map(x=>shockName(x)).join(', ')}</b></div>`:''}
+      <div class="small" style="margin-top:6px">Diagnostic confidence: <b>${d.confidence}</b> (${d.topShare}% weighted support)</div>
     </div>
     <div class="section">
       <h3>Reasoning/evidence</h3>
