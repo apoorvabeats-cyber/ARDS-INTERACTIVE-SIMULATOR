@@ -245,6 +245,46 @@ let ctx='ICU';
 let stream=null,facingMode='environment';
 let lastResult=null;
 let trendData=[];
+let ocrWorker=null;
+let ocrWorkerReady=false;
+let ocrBusy=false;
+let ocrInitializing=false;
+
+async function initOCR(){
+  if(ocrWorkerReady || ocrInitializing) return;
+
+  ocrInitializing=true;
+
+  try{
+    setOCRStatus('Preparing OCR…','running');
+
+    ocrWorker=await Tesseract.createWorker({
+      logger:m=>{
+        if(m.status==='recognizing text'){
+          setOCRStatus(
+            'Reading ABG: '+Math.round(m.progress*100)+'%',
+            'running'
+          );
+        }
+      }
+    });
+
+    await ocrWorker.loadLanguage('eng');
+    await ocrWorker.initialize('eng');
+
+    await ocrWorker.setParameters({
+      tessedit_pageseg_mode:Tesseract.PSM.SINGLE_BLOCK
+    });
+
+    ocrWorkerReady=true;
+
+  }catch(e){
+    console.error('OCR initialization failed:',e);
+    ocrWorker=null;
+  }finally{
+    ocrInitializing=false;
+  }
+}
 
 function setCtx(c,btn){
   ctx=c;
@@ -258,7 +298,14 @@ function setCtx(c,btn){
 async function startCamera(){
   try{
     if(stream){stopStream();}
-    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode,width:{ideal:1920},height:{ideal:1080}},audio:false});
+    stream=await navigator.mediaDevices.getUserMedia({
+  video:{
+    facingMode,
+    width:{ideal:1280,max:1600},
+    height:{ideal:720,max:1200}
+  },
+  audio:false
+});
     const v=document.getElementById('videoEl');
     v.srcObject=stream;
     document.getElementById('cameraWrap').style.display='block';
@@ -289,13 +336,31 @@ function stopCamera(){
 function capturePhoto(){
   const v=document.getElementById('videoEl');
   const c=document.getElementById('capCanvas');
-  c.width=v.videoWidth;c.height=v.videoHeight;
-  c.getContext('2d').drawImage(v,0,0);
+
+  const MAX_W=1400;
+  const scale=Math.min(1,MAX_W/v.videoWidth);
+
+  c.width=Math.round(v.videoWidth*scale);
+  c.height=Math.round(v.videoHeight*scale);
+
+  const ctx=c.getContext('2d',{willReadFrequently:true});
+
+  ctx.drawImage(
+    v,
+    0,0,
+    c.width,c.height
+  );
+
+  const preview=c.toDataURL('image/jpeg',0.82);
+
   const img=document.getElementById('previewImg');
-  img.src=c.toDataURL('image/jpeg',0.92);
+  img.src=preview;
+
   document.getElementById('previewWrap').style.display='block';
+
   stopCamera();
-  runOCR(img.src);
+
+  runOCR(c);
 }
 
 /* ============================================================
@@ -306,21 +371,111 @@ function setOCRStatus(msg,cls){
   el.textContent=msg;el.className='ocr-status '+cls;el.style.display='block';
 }
 
-async function runOCR(dataURL){
-  setOCRStatus('⏳ Scanning image with OCR… this may take 10–30 seconds','running');
+async function runOCR(canvas){
+
+  if(ocrBusy){
+    setOCRStatus('OCR is already running…','running');
+    return;
+  }
+
+  ocrBusy=true;
+
   try{
-    const result=await Tesseract.recognize(dataURL,'eng',{logger:m=>{
-      if(m.status==='recognizing text'){
-        setOCRStatus('⏳ Recognizing text: '+Math.round(m.progress*100)+'%','running');
-      }
-    }});
-    const text=result.data.text;
-    setOCRStatus('✅ OCR complete. Review extracted values below and correct any errors.','done');
+
+    if(!ocrWorkerReady){
+      setOCRStatus('Preparing OCR…','running');
+      await initOCR();
+    }
+
+    if(!ocrWorkerReady || !ocrWorker){
+      throw new Error('OCR engine unavailable');
+    }
+
+    setOCRStatus('Reading ABG report…','running');
+
+    const ocrCanvas=document.createElement('canvas');
+
+    const MAX_OCR_WIDTH=1200;
+
+    const scale=Math.min(
+      1,
+      MAX_OCR_WIDTH/canvas.width
+    );
+
+    ocrCanvas.width=Math.round(canvas.width*scale);
+    ocrCanvas.height=Math.round(canvas.height*scale);
+
+    const ctx=ocrCanvas.getContext('2d',{
+      willReadFrequently:true
+    });
+
+    ctx.drawImage(
+      canvas,
+      0,0,
+      ocrCanvas.width,
+      ocrCanvas.height
+    );
+
+    const imageData=ctx.getImageData(
+      0,0,
+      ocrCanvas.width,
+      ocrCanvas.height
+    );
+
+    const data=imageData.data;
+
+    for(let i=0;i<data.length;i+=4){
+
+      const gray=
+        0.299*data[i]+
+        0.587*data[i+1]+
+        0.114*data[i+2];
+
+      const enhanced=
+        Math.max(0,Math.min(255,
+          (gray-128)*1.35+128
+        ));
+
+      data[i]=enhanced;
+      data[i+1]=enhanced;
+      data[i+2]=enhanced;
+    }
+
+    ctx.putImageData(imageData,0,0);
+
+    const result=await ocrWorker.recognize(ocrCanvas);
+
+    const text=result.data.text || '';
+
+    console.log('ABG OCR:',text);
+
+    if(!text.trim()){
+      throw new Error('No readable text detected');
+    }
+
+    setOCRStatus(
+      '✓ OCR complete. Review the extracted values below.',
+      'done'
+    );
+
     extractValues(text);
     showManual();
+
   }catch(e){
-    setOCRStatus('⚠️ OCR failed: '+e.message+'. Please enter values manually.','err');
+
+    console.error('OCR error:',e);
+
+    setOCRStatus(
+      '⚠ OCR could not reliably read the report. Please review or enter values manually.',
+      'err'
+    );
+
     showManual();
+
+  }finally{
+
+    ocrBusy=false;
+
   }
 }
 
@@ -341,11 +496,75 @@ function extractValues(text){
     fTemp:    [/Temp\s*[=:]\s*([\d.]+)/i,        /Temperature\s+([\d.]+)/i],
   };
   for(const [id,pats] of Object.entries(patterns)){
-    for(const pat of pats){
-      const m=text.match(pat);
-      if(m&&m[1]){
+
+  for(const pat of pats){
+
+    const m=text.match(pat);
+
+    if(m&&m[1]){
+
+      let value=parseFloat(
+        String(m[1]).replace(',', '.')
+      );
+
+      let valid=true;
+
+      if(id==='fpH'){
+        valid=value>=6.80 && value<=7.80;
+      }
+
+      if(id==='fPaCO2'){
+        valid=value>=10 && value<=150;
+      }
+
+      if(id==='fPaO2'){
+        valid=value>=20 && value<=700;
+      }
+
+      if(id==='fHCO3'){
+        valid=value>=3 && value<=60;
+      }
+
+      if(id==='fBE'){
+        valid=value>=-40 && value<=40;
+      }
+
+      if(id==='fFiO2'){
+        valid=value>=0.21 && value<=100;
+      }
+
+      if(id==='fNa'){
+        valid=value>=100 && value<=180;
+      }
+
+      if(id==='fCl'){
+        valid=value>=70 && value<=140;
+      }
+
+      if(id==='fK'){
+        valid=value>=1 && value<=10;
+      }
+
+      if(id==='fLactate'){
+        valid=value>=0 && value<=30;
+      }
+
+      if(id==='fSpO2'){
+        valid=value>=50 && value<=100;
+      }
+
+      if(id==='fTemp'){
+        valid=value>=30 && value<=45;
+      }
+
+      if(valid){
+
         const el=document.getElementById(id);
-        if(el && !el.value) el.value=m[1];
+
+        if(el && !el.value){
+          el.value=value;
+        }
+
         break;
       }
     }
@@ -658,6 +877,7 @@ function renderTrend(){
       ${t.pf?`<span class="tv" style="color:#8edb9a">${Math.round(t.pf)}</span><div class="tl">P/F</div>`:''}
     </div>`).join('');
 }
+setTimeout(initOCR,500);
 renderTrend(); // init empty
 
 /* ============================================================
