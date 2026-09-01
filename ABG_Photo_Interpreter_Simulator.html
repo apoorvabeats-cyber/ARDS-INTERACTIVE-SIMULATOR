@@ -104,8 +104,10 @@ ul.abnorm li b{color:#eaf2f7}
   <div class="card-title">Step 2 — ABG Input</div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
     <button class="primary" onclick="startCamera()" id="camBtn">📷 Photograph ABG Report</button>
+    <button onclick="document.getElementById('fileUploadInput').click()" id="uploadBtn">📁 Upload from Files</button>
     <button onclick="showManual()" id="manBtn">✏️ Enter Manually</button>
   </div>
+  <input type="file" id="fileUploadInput" accept="image/*" style="display:none" onchange="handleFileUpload(event)">
 
   <!-- Camera section -->
   <div id="cameraWrap">
@@ -121,8 +123,8 @@ ul.abnorm li b{color:#eaf2f7}
 
   <!-- Preview captured image -->
   <div id="previewWrap">
-    <div style="font-size:12px;color:#9db1ba;margin-bottom:4px">Captured image — OCR scanning…</div>
-    <img id="previewImg" alt="Captured ABG">
+    <div id="previewLabel" style="font-size:12px;color:#9db1ba;margin-bottom:4px">Captured image — OCR scanning…</div>
+    <img id="previewImg" alt="ABG image">
   </div>
 
   <!-- OCR status -->
@@ -334,6 +336,38 @@ function stopCamera(){
   document.getElementById('camControls').style.display='none';
 }
 
+function handleFileUpload(e){
+  const file=e.target.files&&e.target.files[0];
+  // reset so the same file can be re-selected
+  e.target.value='';
+  if(!file||!file.type.startsWith('image/'))return;
+
+  stopCamera();
+
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    const img=new Image();
+    img.onload=function(){
+      const c=document.getElementById('capCanvas');
+      const MAX_W=1400;
+      const scale=Math.min(1,MAX_W/img.naturalWidth);
+      c.width=Math.round(img.naturalWidth*scale);
+      c.height=Math.round(img.naturalHeight*scale);
+      const cx=c.getContext('2d',{willReadFrequently:true});
+      cx.drawImage(img,0,0,c.width,c.height);
+
+      document.getElementById('previewImg').src=c.toDataURL('image/jpeg',0.82);
+      document.getElementById('previewLabel').textContent='Uploaded image — OCR scanning…';
+      document.getElementById('previewWrap').style.display='block';
+      document.getElementById('manualForm').style.display='none';
+
+      runOCR(c);
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function capturePhoto(){
   const v=document.getElementById('videoEl');
   const c=document.getElementById('capCanvas');
@@ -356,6 +390,7 @@ function capturePhoto(){
 
   const img=document.getElementById('previewImg');
   img.src=preview;
+  document.getElementById('previewLabel').textContent='Captured image — OCR scanning…';
 
   document.getElementById('previewWrap').style.display='block';
 
