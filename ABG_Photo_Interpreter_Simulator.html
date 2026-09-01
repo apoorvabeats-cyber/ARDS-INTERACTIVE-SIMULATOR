@@ -349,6 +349,8 @@ function handleFileUpload(e){
     const img=new Image();
     img.onload=function(){
       const c=document.getElementById('capCanvas');
+      // Pre-scale to 1400px max for preview quality (same cap as capturePhoto);
+      // runOCR will further downscale to 640px for fast recognition.
       const MAX_W=1400;
       const scale=Math.min(1,MAX_W/img.naturalWidth);
       c.width=Math.round(img.naturalWidth*scale);
@@ -451,14 +453,10 @@ async function runOCR(canvas){
       ocrTimeoutHandle=setTimeout(()=>reject(new Error('OCR timeout')),8000);
     });
 
-    let result;
-    try{
-      result=await Promise.race([ocrWorker.recognize(ocrCanvas),ocrTimeout]);
-    }finally{
-      clearTimeout(ocrTimeoutHandle);
-    }
+    const result=await Promise.race([ocrWorker.recognize(ocrCanvas),ocrTimeout])
+      .finally(()=>clearTimeout(ocrTimeoutHandle));
 
-    const text=result.data.text || '';
+    const text=(result&&result.data&&result.data.text)||'';
 
     console.log('ABG OCR:',text);
 
