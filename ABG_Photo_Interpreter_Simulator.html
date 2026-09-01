@@ -396,55 +396,26 @@ async function runOCR(canvas){
 
     const ocrCanvas=document.createElement('canvas');
 
-    const MAX_OCR_WIDTH=800;
+    const MAX_OCR_WIDTH=640;
 
-    const scale=Math.min(
-      1,
-      MAX_OCR_WIDTH/canvas.width
-    );
+    const scale=Math.min(1,MAX_OCR_WIDTH/canvas.width);
 
     ocrCanvas.width=Math.round(canvas.width*scale);
     ocrCanvas.height=Math.round(canvas.height*scale);
 
-    const ctx=ocrCanvas.getContext('2d',{
-      willReadFrequently:true
-    });
+    const ocrCtx=ocrCanvas.getContext('2d');
 
-    ctx.drawImage(
-      canvas,
-      0,0,
-      ocrCanvas.width,
-      ocrCanvas.height
+    // GPU-accelerated grayscale + contrast via CSS filter (replaces slow JS pixel loop)
+    ocrCtx.filter='grayscale(1) contrast(1.5)';
+    ocrCtx.drawImage(canvas,0,0,ocrCanvas.width,ocrCanvas.height);
+    ocrCtx.filter='none';
+
+    // 8-second timeout watchdog: if OCR stalls, fall through to manual entry
+    const ocrTimeout=new Promise((_,reject)=>
+      setTimeout(()=>reject(new Error('OCR timeout')),8000)
     );
 
-    const imageData=ctx.getImageData(
-      0,0,
-      ocrCanvas.width,
-      ocrCanvas.height
-    );
-
-    const data=imageData.data;
-
-    for(let i=0;i<data.length;i+=4){
-
-      const gray=
-        0.299*data[i]+
-        0.587*data[i+1]+
-        0.114*data[i+2];
-
-      const enhanced=
-        Math.max(0,Math.min(255,
-          (gray-128)*1.35+128
-        ));
-
-      data[i]=enhanced;
-      data[i+1]=enhanced;
-      data[i+2]=enhanced;
-    }
-
-    ctx.putImageData(imageData,0,0);
-
-    const result=await ocrWorker.recognize(ocrCanvas);
+    const result=await Promise.race([ocrWorker.recognize(ocrCanvas),ocrTimeout]);
 
     const text=result.data.text || '';
 
