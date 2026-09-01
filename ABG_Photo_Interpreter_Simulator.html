@@ -104,8 +104,10 @@ ul.abnorm li b{color:#eaf2f7}
   <div class="card-title">Step 2 — ABG Input</div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
     <button class="primary" onclick="startCamera()" id="camBtn">📷 Photograph ABG Report</button>
+    <button onclick="document.getElementById('fileUploadInput').click()" id="uploadBtn">📁 Upload from Files</button>
     <button onclick="showManual()" id="manBtn">✏️ Enter Manually</button>
   </div>
+  <input type="file" id="fileUploadInput" accept="image/*" style="display:none" onchange="handleFileUpload(event)">
 
   <!-- Camera section -->
   <div id="cameraWrap">
@@ -121,8 +123,8 @@ ul.abnorm li b{color:#eaf2f7}
 
   <!-- Preview captured image -->
   <div id="previewWrap">
-    <div style="font-size:12px;color:#9db1ba;margin-bottom:4px">Captured image — OCR scanning…</div>
-    <img id="previewImg" alt="Captured ABG">
+    <div id="previewLabel" style="font-size:12px;color:#9db1ba;margin-bottom:4px">Captured image — OCR scanning…</div>
+    <img id="previewImg" alt="ABG image">
   </div>
 
   <!-- OCR status -->
@@ -270,10 +272,11 @@ async function initOCR(){
     });
 
     await ocrWorker.loadLanguage('eng');
-    await ocrWorker.initialize('eng');
+    await ocrWorker.initialize('eng', Tesseract.OEM.TESSERACT_ONLY);
 
     await ocrWorker.setParameters({
-      tessedit_pageseg_mode:Tesseract.PSM.SINGLE_BLOCK
+      tessedit_pageseg_mode:Tesseract.PSM.AUTO,
+      tessedit_char_whitelist:'0123456789.-+/:=, \nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
     });
 
     ocrWorkerReady=true;
@@ -333,6 +336,40 @@ function stopCamera(){
   document.getElementById('camControls').style.display='none';
 }
 
+function handleFileUpload(e){
+  const file=e.target.files&&e.target.files[0];
+  // reset so the same file can be re-selected
+  e.target.value='';
+  if(!file||!file.type.startsWith('image/'))return;
+
+  stopCamera();
+
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    const img=new Image();
+    img.onload=function(){
+      const c=document.getElementById('capCanvas');
+      // Pre-scale to 1400px max for preview quality (same cap as capturePhoto);
+      // runOCR will further downscale to 640px for fast recognition.
+      const MAX_W=1400;
+      const scale=Math.min(1,MAX_W/img.naturalWidth);
+      c.width=Math.round(img.naturalWidth*scale);
+      c.height=Math.round(img.naturalHeight*scale);
+      const cx=c.getContext('2d',{willReadFrequently:true});
+      cx.drawImage(img,0,0,c.width,c.height);
+
+      document.getElementById('previewImg').src=c.toDataURL('image/jpeg',0.82);
+      document.getElementById('previewLabel').textContent='Uploaded image — OCR scanning…';
+      document.getElementById('previewWrap').style.display='block';
+      document.getElementById('manualForm').style.display='none';
+
+      runOCR(c);
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function capturePhoto(){
   const v=document.getElementById('videoEl');
   const c=document.getElementById('capCanvas');
@@ -355,6 +392,7 @@ function capturePhoto(){
 
   const img=document.getElementById('previewImg');
   img.src=preview;
+  document.getElementById('previewLabel').textContent='Captured image — OCR scanning…';
 
   document.getElementById('previewWrap').style.display='block';
 
@@ -383,93 +421,90 @@ async function runOCR(canvas){
   try{
 
     if(!ocrWorkerReady){
-      setOCRStatus('Preparing OCR…','running');
+      setOCRStatus('Preparing OCR engine…','running');
       await initOCR();
     }
 
     if(!ocrWorkerReady || !ocrWorker){
-      throw new Error('OCR engine unavailable');
+      // Engine unavailable (CDN blocked, etc.) — open form so user can still work
+      setOCRStatus('⚠ OCR engine could not load. Please enter values below.','err');
+      showManual();
+      return;
     }
 
-    setOCRStatus('Reading ABG report…','running');
+    // --- Build 3 image variants to maximise extraction chances ---
+    // Each variant tries a different filter for different ABG printout styles
+    const variants=[
+      // 1. High-contrast greyscale (white paper, black text — most common printouts)
+      {label:'Pass 1/3 — high contrast',  filter:'grayscale(1) contrast(2) brightness(1.1)'},
+      // 2. Inverted colours (dark/colour displays, some thermal printers)
+      {label:'Pass 2/3 — inverted image', filter:'grayscale(1) invert(1) contrast(1.8)'},
+      // 3. Gentle greyscale (faded printouts, low-contrast labels)
+      {label:'Pass 3/3 — gentle contrast',filter:'grayscale(1) contrast(1.2)'},
+    ];
 
-    const ocrCanvas=document.createElement('canvas');
+    const MAX_OCR_WIDTH=640;
+    const scale=Math.min(1,MAX_OCR_WIDTH/canvas.width);
+    const w=Math.round(canvas.width*scale);
+    const h=Math.round(canvas.height*scale);
 
-    const MAX_OCR_WIDTH=1200;
+    let bestText='';
+    let bestCount=0;
 
-    const scale=Math.min(
-      1,
-      MAX_OCR_WIDTH/canvas.width
-    );
+    for(const variant of variants){
+      setOCRStatus('🔍 '+variant.label+'…','running');
 
-    ocrCanvas.width=Math.round(canvas.width*scale);
-    ocrCanvas.height=Math.round(canvas.height*scale);
+      const ocrCanvas=document.createElement('canvas');
+      ocrCanvas.width=w;
+      ocrCanvas.height=h;
+      const ocrCtx=ocrCanvas.getContext('2d',{willReadFrequently:true});
+      ocrCtx.filter=variant.filter;
+      ocrCtx.drawImage(canvas,0,0,w,h);
+      ocrCtx.filter='none';
 
-    const ctx=ocrCanvas.getContext('2d',{
-      willReadFrequently:true
-    });
+      let ocrTimeoutHandle;
+      const ocrTimeout=new Promise((_,reject)=>{
+        ocrTimeoutHandle=setTimeout(()=>reject(new Error('OCR timeout')),15000);
+      });
 
-    ctx.drawImage(
-      canvas,
-      0,0,
-      ocrCanvas.width,
-      ocrCanvas.height
-    );
+      let result;
+      try{
+        result=await Promise.race([ocrWorker.recognize(ocrCanvas),ocrTimeout])
+          .finally(()=>clearTimeout(ocrTimeoutHandle));
+      }catch(passErr){
+        console.warn('OCR pass failed:',variant.label,passErr.message);
+        continue; // try next variant
+      }
 
-    const imageData=ctx.getImageData(
-      0,0,
-      ocrCanvas.width,
-      ocrCanvas.height
-    );
+      const text=(result&&result.data&&result.data.text)||'';
+      console.log('ABG OCR '+variant.label+':',text);
 
-    const data=imageData.data;
+      // Count how many ABG value patterns this pass matched
+      const matchCount=countMatches(text);
+      if(matchCount>bestCount){
+        bestCount=matchCount;
+        bestText=text;
+      }
 
-    for(let i=0;i<data.length;i+=4){
-
-      const gray=
-        0.299*data[i]+
-        0.587*data[i+1]+
-        0.114*data[i+2];
-
-      const enhanced=
-        Math.max(0,Math.min(255,
-          (gray-128)*1.35+128
-        ));
-
-      data[i]=enhanced;
-      data[i+1]=enhanced;
-      data[i+2]=enhanced;
+      // Good enough — stop early if we matched pH + at least 2 more values
+      if(bestCount>=3) break;
     }
 
-    ctx.putImageData(imageData,0,0);
-
-    const result=await ocrWorker.recognize(ocrCanvas);
-
-    const text=result.data.text || '';
-
-    console.log('ABG OCR:',text);
-
-    if(!text.trim()){
-      throw new Error('No readable text detected');
+    // Always proceed — even if 0 matches, open the form (never leave user stranded)
+    if(bestCount>0){
+      setOCRStatus('✓ OCR complete — '+bestCount+' value(s) detected. Review below.','done');
+    } else {
+      setOCRStatus('⚠ OCR ran but could not read values clearly. Please check and fill in below.','err');
     }
 
-    setOCRStatus(
-      '✓ OCR complete. Review the extracted values below.',
-      'done'
-    );
-
-    extractValues(text);
+    extractValues(bestText);
     showManual();
 
   }catch(e){
 
-    console.error('OCR error:',e);
-
-    setOCRStatus(
-      '⚠ OCR could not reliably read the report. Please review or enter values manually.',
-      'err'
-    );
-
+    // Unexpected error — still open the form, never block the user
+    console.error('OCR unexpected error:',e);
+    setOCRStatus('⚠ OCR encountered an error. Please enter values below.','err');
     showManual();
 
   }finally{
@@ -477,6 +512,22 @@ async function runOCR(canvas){
     ocrBusy=false;
 
   }
+}
+
+/* Count how many ABG value patterns are found in OCR text (used to pick best pass) */
+function countMatches(text){
+  const probes=[
+    /\bpH\s*[=:]\s*[\d.]+/i,
+    /Pa?CO2?\s*[=:]\s*[\d.]+/i,
+    /Pa?O2?\s*[=:]\s*[\d.]+/i,
+    /HCO3?\s*[=:]\s*[\d.]+/i,
+    /\bBE\s*[=:]\s*-?[\d.]+/i,
+    /FiO2?\s*[=:]\s*[\d.]+/i,
+    /Na\+?\s*[=:]\s*[\d.]+/i,
+    /K\+?\s*[=:]\s*[\d.]+/i,
+    /Lactates?\s*[=:]\s*[\d.]+/i,
+  ];
+  return probes.reduce((n,p)=>n+(p.test(text)?1:0),0);
 }
 
 function extractValues(text){
@@ -568,6 +619,7 @@ function extractValues(text){
         break;
       }
     }
+  }
   }
 }
 
@@ -877,7 +929,7 @@ function renderTrend(){
       ${t.pf?`<span class="tv" style="color:#8edb9a">${Math.round(t.pf)}</span><div class="tl">P/F</div>`:''}
     </div>`).join('');
 }
-setTimeout(initOCR,500);
+setTimeout(initOCR,0);
 renderTrend(); // init empty
 
 /* ============================================================
