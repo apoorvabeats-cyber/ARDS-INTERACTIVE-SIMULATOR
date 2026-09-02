@@ -465,15 +465,20 @@ async function runOCR(canvas){
     // --- Build multiple image variants to maximise extraction chances ---
     // Each variant tries a different filter for different ABG printout styles
     const variants=[
-      {label:'Pass 1/5 — high contrast',filter:'grayscale(1) contrast(2.2) brightness(1.12)',maxWidth:1800,psm:Tesseract.PSM.SPARSE_TEXT},
-      {label:'Pass 2/5 — thresholded',filter:'grayscale(1) contrast(2.6) brightness(1.18)',threshold:168,maxWidth:1800,psm:Tesseract.PSM.SPARSE_TEXT},
-      {label:'Pass 3/5 — balanced grayscale',filter:'grayscale(1) contrast(1.55) brightness(1.08)',maxWidth:1500,psm:Tesseract.PSM.AUTO},
-      {label:'Pass 4/5 — original colours',filter:'contrast(1.4) saturate(0.85) brightness(1.05)',maxWidth:1500,psm:Tesseract.PSM.AUTO},
-      {label:'Pass 5/5 — inverted image',filter:'grayscale(1) invert(1) contrast(1.9)',maxWidth:1500,psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 1/9 — high contrast',filter:'grayscale(1) contrast(2.2) brightness(1.12)',maxWidth:1800,psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 2/9 — thresholded',filter:'grayscale(1) contrast(2.6) brightness(1.18)',threshold:168,maxWidth:1800,psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 3/9 — balanced grayscale',filter:'grayscale(1) contrast(1.55) brightness(1.08)',maxWidth:1500,psm:Tesseract.PSM.AUTO},
+      {label:'Pass 4/9 — rotated right',filter:'grayscale(1) contrast(2.1) brightness(1.1)',maxWidth:1700,rotate:90,psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 5/9 — rotated left',filter:'grayscale(1) contrast(2.1) brightness(1.1)',maxWidth:1700,rotate:-90,psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 6/9 — center crop',filter:'grayscale(1) contrast(2.2) brightness(1.12)',maxWidth:1700,crop:{x:0.08,y:0.12,w:0.84,h:0.76},psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 7/9 — top crop',filter:'grayscale(1) contrast(2.2) brightness(1.12)',maxWidth:1700,crop:{x:0.04,y:0.02,w:0.92,h:0.52},psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 8/9 — lower crop',filter:'grayscale(1) contrast(2.2) brightness(1.1)',maxWidth:1700,crop:{x:0.04,y:0.30,w:0.92,h:0.62},psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 9/9 — inverted image',filter:'grayscale(1) invert(1) contrast(1.9)',maxWidth:1500,psm:Tesseract.PSM.SPARSE_TEXT},
     ];
 
     let bestText='';
-    let bestCount=0;
+    let bestValues={};
+    let bestScore=0;
 
     for(const variant of variants){
       setOCRStatus('🔍 '+variant.label+'…','running');
@@ -501,25 +506,26 @@ async function runOCR(canvas){
       const text=(result&&result.data&&result.data.text)||'';
       console.log('ABG OCR '+variant.label+':',text);
 
-      // Count how many ABG value patterns this pass matched
-      const matchCount=countMatches(text);
-      if(matchCount>bestCount){
-        bestCount=matchCount;
+      const values=extractABGMap(text);
+      const score=scoreExtractedValues(values);
+      if(score>bestScore){
+        bestScore=score;
         bestText=text;
+        bestValues=values;
       }
 
-      // Good enough — stop early if we matched pH + at least 2 more values
-      if(bestCount>=3) break;
+      if(values.fpH!==undefined && values.fPaCO2!==undefined && values.fHCO3!==undefined && score>=8) break;
     }
 
     // Always proceed — even if 0 matches, open the form (never leave user stranded)
-    if(bestCount>0){
-      setOCRStatus('✓ OCR complete — '+bestCount+' value(s) detected. Review below.','done');
+    if(bestScore>0){
+      setOCRStatus('✓ OCR complete — '+Object.keys(bestValues).length+' value(s) detected. Review below.','done');
     } else {
       setOCRStatus('⚠ OCR ran but could not read values clearly. Please check and fill in below.','err');
     }
 
-    extractValues(bestText);
+    applyExtractedValues(bestValues);
+    if(bestScore===0) extractValues(bestText);
     showManual();
 
   }catch(e){
@@ -541,10 +547,35 @@ function countMatches(text){
   return Object.keys(extractABGMap(text)).length;
 }
 
+function scoreExtractedValues(values){
+  let score=0;
+  if(values.fpH!==undefined) score+=3;
+  if(values.fPaCO2!==undefined) score+=3;
+  if(values.fHCO3!==undefined) score+=3;
+  if(values.fPaO2!==undefined) score+=2;
+  if(values.fBE!==undefined) score+=1;
+  if(values.fFiO2!==undefined) score+=1;
+  if(values.fLactate!==undefined) score+=1;
+  if(values.fNa!==undefined) score+=1;
+  if(values.fCl!==undefined) score+=1;
+  if(values.fK!==undefined) score+=1;
+  return score;
+}
+
 function buildOCRVariantCanvas(sourceCanvas,variant){
-  const scale=Math.min(1,(variant.maxWidth||1600)/sourceCanvas.width);
-  const w=Math.max(1,Math.round(sourceCanvas.width*scale));
-  const h=Math.max(1,Math.round(sourceCanvas.height*scale));
+  const crop=variant.crop||{x:0,y:0,w:1,h:1};
+  const sx=Math.max(0,Math.round(sourceCanvas.width*crop.x));
+  const sy=Math.max(0,Math.round(sourceCanvas.height*crop.y));
+  const sw=Math.max(1,Math.round(sourceCanvas.width*crop.w));
+  const sh=Math.max(1,Math.round(sourceCanvas.height*crop.h));
+  const rotate=((variant.rotate||0)%360+360)%360;
+  const rotated=rotate===90||rotate===270;
+  const srcLong=Math.max(sw,sh);
+  const scale=Math.min(1,(variant.maxWidth||1600)/srcLong);
+  const dw=Math.max(1,Math.round(sw*scale));
+  const dh=Math.max(1,Math.round(sh*scale));
+  const w=rotated?dh:dw;
+  const h=rotated?dw:dh;
   const ocrCanvas=document.createElement('canvas');
   ocrCanvas.width=w;
   ocrCanvas.height=h;
@@ -554,7 +585,14 @@ function buildOCRVariantCanvas(sourceCanvas,variant){
   ocrCtx.imageSmoothingEnabled=true;
   ocrCtx.imageSmoothingQuality='high';
   ocrCtx.filter=variant.filter||'none';
-  ocrCtx.drawImage(sourceCanvas,0,0,w,h);
+  if(rotate){
+    ocrCtx.translate(w/2,h/2);
+    ocrCtx.rotate((rotate*Math.PI)/180);
+    ocrCtx.drawImage(sourceCanvas,sx,sy,sw,sh,-dw/2,-dh/2,dw,dh);
+    ocrCtx.setTransform(1,0,0,1,0,0);
+  }else{
+    ocrCtx.drawImage(sourceCanvas,sx,sy,sw,sh,0,0,dw,dh);
+  }
   ocrCtx.filter='none';
 
   if(variant.threshold){
@@ -589,6 +627,9 @@ function normalizeOCRText(text){
     .replace(/\bPCOZ\b/gi,'PCO2')
     .replace(/\bPOZ\b/gi,'PO2')
     .replace(/\bHC0?3\b/gi,'HCO3')
+    .replace(/\bFI02\b/gi,'FiO2')
+    .replace(/\bPA02\b/gi,'PaO2')
+    .replace(/\bPAC02\b/gi,'PaCO2')
     .replace(/\bS0?2\b/gi,'SO2');
 }
 
@@ -678,15 +719,60 @@ function extractABGMap(text){
     }
   }
 
+  const lineValues=extractABGMapFromLines(normalized);
+  for(const [id,value] of Object.entries(lineValues)){
+    if(out[id]===undefined) out[id]=value;
+  }
+
   return out;
 }
 
-function extractValues(text){
-  const values=extractABGMap(text);
+function extractABGMapFromLines(text){
+  const out={};
+  const aliases={
+    fpH:['PH'],
+    fPaCO2:['PACO2','PCO2','CO2'],
+    fPaO2:['PAO2','PO2','O2'],
+    fHCO3:['HCO3','BICARB','BICARBONATE','CHCO3'],
+    fBE:['BE','SBE','BEECF','BASEEXCESS','BASEDEFICIT'],
+    fFiO2:['FIO2','O2CONCENTRATION'],
+    fNa:['NA','SODIUM'],
+    fCl:['CL','CHLORIDE'],
+    fK:['K','POTASSIUM'],
+    fLactate:['LACTATE','LACT','LAC'],
+    fSpO2:['SPO2','SO2','SAT','O2SAT'],
+    fTemp:['TEMP','TEMPERATURE']
+  };
+  const lines=text.split('\n').map(line=>line.trim()).filter(Boolean);
+
+  for(const line of lines){
+    const normalizedLine=line.toUpperCase().replace(/[^A-Z0-9.+\-\s]/g,' ').replace(/\s+/g,' ').trim();
+    if(!normalizedLine) continue;
+    for(const [id,names] of Object.entries(aliases)){
+      if(out[id]!==undefined) continue;
+      const alias=names.find(name=>normalizedLine.includes(name));
+      if(!alias) continue;
+      const idx=normalizedLine.indexOf(alias);
+      const after=normalizedLine.slice(idx+alias.length);
+      const before=normalizedLine.slice(Math.max(0,idx-10),idx);
+      const nearby=(after+' '+before).match(/-?\d+(?:[.,]\d+)?/);
+      const value=nearby?parseExtractedValue(id,nearby[0]):null;
+      if(value!==null) out[id]=value;
+    }
+  }
+
+  return out;
+}
+
+function applyExtractedValues(values){
   for(const [id,value] of Object.entries(values)){
     const el=document.getElementById(id);
     if(el && !el.value) el.value=value;
   }
+}
+
+function extractValues(text){
+  applyExtractedValues(extractABGMap(text));
 }
 
 /* ============================================================
