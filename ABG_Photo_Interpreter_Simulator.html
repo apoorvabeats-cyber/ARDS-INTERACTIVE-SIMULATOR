@@ -251,6 +251,7 @@ let ocrWorker=null;
 let ocrWorkerReady=false;
 let ocrBusy=false;
 let ocrInitializing=false;
+const OCR_TARGET_FIELDS=['fpH','fPaCO2','fPaO2','fHCO3','fBE','fFiO2','fNa','fCl','fK','fLactate','fSpO2','fTemp'];
 
 async function initOCR(){
   if(ocrWorkerReady || ocrInitializing) return;
@@ -476,8 +477,7 @@ async function runOCR(canvas){
       {label:'Pass 9/9 — inverted image',filter:'grayscale(1) invert(1) contrast(1.9)',maxWidth:1500,psm:Tesseract.PSM.SPARSE_TEXT},
     ];
 
-    let bestText='';
-    let bestValues={};
+    let mergedValues={};
     let bestScore=0;
 
     for(const variant of variants){
@@ -507,25 +507,20 @@ async function runOCR(canvas){
       console.log('ABG OCR '+variant.label+':',text);
 
       const values=extractABGMap(text);
-      const score=scoreExtractedValues(values);
-      if(score>bestScore){
-        bestScore=score;
-        bestText=text;
-        bestValues=values;
-      }
+      mergeExtractedValues(mergedValues,values);
+      bestScore=Math.max(bestScore,scoreExtractedValues(mergedValues));
 
-      if(values.fpH!==undefined && values.fPaCO2!==undefined && values.fHCO3!==undefined && score>=8) break;
+      if(OCR_TARGET_FIELDS.every(id=>mergedValues[id]!==undefined)) break;
     }
 
     // Always proceed — even if 0 matches, open the form (never leave user stranded)
     if(bestScore>0){
-      setOCRStatus('✓ OCR complete — '+Object.keys(bestValues).length+' value(s) detected. Review below.','done');
+      setOCRStatus('✓ OCR complete — '+Object.keys(mergedValues).length+' value(s) detected. Review below.','done');
     } else {
       setOCRStatus('⚠ OCR ran but could not read values clearly. Please check and fill in below.','err');
     }
 
-    applyExtractedValues(bestValues);
-    if(bestScore===0) extractValues(bestText);
+    applyExtractedValues(mergedValues);
     showManual();
 
   }catch(e){
@@ -560,6 +555,12 @@ function scoreExtractedValues(values){
   if(values.fCl!==undefined) score+=1;
   if(values.fK!==undefined) score+=1;
   return score;
+}
+
+function mergeExtractedValues(target,source){
+  for(const [id,value] of Object.entries(source||{})){
+    if(target[id]===undefined && value!==undefined && value!==null) target[id]=value;
+  }
 }
 
 function buildOCRVariantCanvas(sourceCanvas,variant){
@@ -732,7 +733,7 @@ function extractABGMapFromLines(text){
   const aliases={
     fpH:['PH'],
     fPaCO2:['PACO2','PCO2','CO2'],
-    fPaO2:['PAO2','PO2','O2'],
+    fPaO2:['PAO2','PO2'],
     fHCO3:['HCO3','BICARB','BICARBONATE','CHCO3'],
     fBE:['BE','SBE','BEECF','BASEEXCESS','BASEDEFICIT'],
     fFiO2:['FIO2','O2CONCENTRATION'],
@@ -750,10 +751,10 @@ function extractABGMapFromLines(text){
     if(!normalizedLine) continue;
     for(const [id,names] of Object.entries(aliases)){
       if(out[id]!==undefined) continue;
-      const alias=names.find(name=>normalizedLine.includes(name));
-      if(!alias) continue;
-      const idx=normalizedLine.indexOf(alias);
-      const after=normalizedLine.slice(idx+alias.length);
+      const aliasMatch=names.map(name=>({name,match:normalizedLine.match(new RegExp('(^|\\s)'+name+'(?=\\s|$)'))})).find(entry=>entry.match);
+      if(!aliasMatch) continue;
+      const idx=aliasMatch.match.index + aliasMatch.match[1].length;
+      const after=normalizedLine.slice(idx+aliasMatch.name.length);
       const before=normalizedLine.slice(Math.max(0,idx-10),idx);
       const nearby=(after+' '+before).match(/-?\d+(?:[.,]\d+)?/);
       const value=nearby?parseExtractedValue(id,nearby[0]):null;
