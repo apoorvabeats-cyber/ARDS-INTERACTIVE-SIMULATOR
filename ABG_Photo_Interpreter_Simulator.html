@@ -276,7 +276,8 @@ async function initOCR(){
 
     await ocrWorker.setParameters({
       tessedit_pageseg_mode:Tesseract.PSM.AUTO,
-      tessedit_char_whitelist:'0123456789.-+/:=, \nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+      preserve_interword_spaces:'1',
+      tessedit_char_whitelist:'0123456789.-+/%():=, \nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
     });
 
     ocrWorkerReady=true;
@@ -336,27 +337,65 @@ function stopCamera(){
   document.getElementById('camControls').style.display='none';
 }
 
-function handleFileUpload(e){
+function isLikelyImageFile(file){
+  return !!(file && (
+    (file.type && file.type.startsWith('image/')) ||
+    /\.(png|jpe?g|webp|gif|bmp|heic|heif)$/i.test(file.name||'')
+  ));
+}
+
+async function loadImageSource(file){
+  if(window.createImageBitmap){
+    try{
+      return await createImageBitmap(file,{imageOrientation:'from-image'});
+    }catch(_err){
+      try{return await createImageBitmap(file);}catch(_err2){}
+    }
+  }
+
+  return await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=()=>reject(new Error('File could not be read.'));
+    reader.onload=function(ev){
+      const img=new Image();
+      img.onload=()=>resolve(img);
+      img.onerror=()=>reject(new Error('Image could not be opened.'));
+      img.src=ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function drawSourceToCanvas(source,canvas,maxWidth){
+  const srcW=source.naturalWidth||source.videoWidth||source.width||0;
+  const srcH=source.naturalHeight||source.videoHeight||source.height||0;
+  const safeMax=Math.max(1200,maxWidth||1800);
+  const scale=srcW?safeMax/srcW:1;
+  const finalScale=Math.min(1,scale);
+  canvas.width=Math.max(1,Math.round(srcW*finalScale));
+  canvas.height=Math.max(1,Math.round(srcH*finalScale));
+  const cx=canvas.getContext('2d',{willReadFrequently:true});
+  cx.fillStyle='#fff';
+  cx.fillRect(0,0,canvas.width,canvas.height);
+  cx.imageSmoothingEnabled=true;
+  cx.imageSmoothingQuality='high';
+  cx.drawImage(source,0,0,canvas.width,canvas.height);
+}
+
+async function handleFileUpload(e){
   const file=e.target.files&&e.target.files[0];
   // reset so the same file can be re-selected
   e.target.value='';
-  if(!file||!file.type.startsWith('image/'))return;
+  if(!isLikelyImageFile(file))return;
 
   stopCamera();
 
-  const reader=new FileReader();
-  reader.onload=function(ev){
-    const img=new Image();
-    img.onload=function(){
+  try{
+    setOCRStatus('Preparing uploaded image…','running');
+    const imgSource=await loadImageSource(file);
+    try{
       const c=document.getElementById('capCanvas');
-      // Pre-scale to 1400px max for preview quality (same cap as capturePhoto);
-      // runOCR will further downscale to 640px for fast recognition.
-      const MAX_W=1400;
-      const scale=Math.min(1,MAX_W/img.naturalWidth);
-      c.width=Math.round(img.naturalWidth*scale);
-      c.height=Math.round(img.naturalHeight*scale);
-      const cx=c.getContext('2d',{willReadFrequently:true});
-      cx.drawImage(img,0,0,c.width,c.height);
+      drawSourceToCanvas(imgSource,c,1800);
 
       document.getElementById('previewImg').src=c.toDataURL('image/jpeg',0.82);
       document.getElementById('previewLabel').textContent='Uploaded image — OCR scanning…';
@@ -364,29 +403,20 @@ function handleFileUpload(e){
       document.getElementById('manualForm').style.display='none';
 
       runOCR(c);
-    };
-    img.src=ev.target.result;
-  };
-  reader.readAsDataURL(file);
+    }finally{
+      if(imgSource && typeof imgSource.close==='function') imgSource.close();
+    }
+  }catch(err){
+    console.error('Upload read failed:',err);
+    setOCRStatus('⚠ Could not open that image. Please try another photo or enter values manually.','err');
+    showManual();
+  }
 }
 
 function capturePhoto(){
   const v=document.getElementById('videoEl');
   const c=document.getElementById('capCanvas');
-
-  const MAX_W=1400;
-  const scale=Math.min(1,MAX_W/v.videoWidth);
-
-  c.width=Math.round(v.videoWidth*scale);
-  c.height=Math.round(v.videoHeight*scale);
-
-  const ctx=c.getContext('2d',{willReadFrequently:true});
-
-  ctx.drawImage(
-    v,
-    0,0,
-    c.width,c.height
-  );
+  drawSourceToCanvas(v,c,1800);
 
   const preview=c.toDataURL('image/jpeg',0.82);
 
@@ -432,39 +462,36 @@ async function runOCR(canvas){
       return;
     }
 
-    // --- Build 3 image variants to maximise extraction chances ---
+    // --- Build multiple image variants to maximise extraction chances ---
     // Each variant tries a different filter for different ABG printout styles
     const variants=[
-      // 1. High-contrast greyscale (white paper, black text — most common printouts)
-      {label:'Pass 1/3 — high contrast',  filter:'grayscale(1) contrast(2) brightness(1.1)'},
-      // 2. Inverted colours (dark/colour displays, some thermal printers)
-      {label:'Pass 2/3 — inverted image', filter:'grayscale(1) invert(1) contrast(1.8)'},
-      // 3. Gentle greyscale (faded printouts, low-contrast labels)
-      {label:'Pass 3/3 — gentle contrast',filter:'grayscale(1) contrast(1.2)'},
+      {label:'Pass 1/9 — high contrast',filter:'grayscale(1) contrast(2.2) brightness(1.12)',maxWidth:1800,psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 2/9 — thresholded',filter:'grayscale(1) contrast(2.6) brightness(1.18)',threshold:168,maxWidth:1800,psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 3/9 — balanced grayscale',filter:'grayscale(1) contrast(1.55) brightness(1.08)',maxWidth:1500,psm:Tesseract.PSM.AUTO},
+      {label:'Pass 4/9 — rotated right',filter:'grayscale(1) contrast(2.1) brightness(1.1)',maxWidth:1700,rotate:90,psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 5/9 — rotated left',filter:'grayscale(1) contrast(2.1) brightness(1.1)',maxWidth:1700,rotate:-90,psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 6/9 — center crop',filter:'grayscale(1) contrast(2.2) brightness(1.12)',maxWidth:1700,crop:{x:0.08,y:0.12,w:0.84,h:0.76},psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 7/9 — top crop',filter:'grayscale(1) contrast(2.2) brightness(1.12)',maxWidth:1700,crop:{x:0.04,y:0.02,w:0.92,h:0.52},psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 8/9 — lower crop',filter:'grayscale(1) contrast(2.2) brightness(1.1)',maxWidth:1700,crop:{x:0.04,y:0.30,w:0.92,h:0.62},psm:Tesseract.PSM.SPARSE_TEXT},
+      {label:'Pass 9/9 — inverted image',filter:'grayscale(1) invert(1) contrast(1.9)',maxWidth:1500,psm:Tesseract.PSM.SPARSE_TEXT},
     ];
 
-    const MAX_OCR_WIDTH=640;
-    const scale=Math.min(1,MAX_OCR_WIDTH/canvas.width);
-    const w=Math.round(canvas.width*scale);
-    const h=Math.round(canvas.height*scale);
-
     let bestText='';
-    let bestCount=0;
+    let bestValues={};
+    let bestScore=0;
 
     for(const variant of variants){
       setOCRStatus('🔍 '+variant.label+'…','running');
 
-      const ocrCanvas=document.createElement('canvas');
-      ocrCanvas.width=w;
-      ocrCanvas.height=h;
-      const ocrCtx=ocrCanvas.getContext('2d',{willReadFrequently:true});
-      ocrCtx.filter=variant.filter;
-      ocrCtx.drawImage(canvas,0,0,w,h);
-      ocrCtx.filter='none';
+      const ocrCanvas=buildOCRVariantCanvas(canvas,variant);
+      await ocrWorker.setParameters({
+        tessedit_pageseg_mode:variant.psm||Tesseract.PSM.AUTO,
+        preserve_interword_spaces:'1'
+      });
 
       let ocrTimeoutHandle;
       const ocrTimeout=new Promise((_,reject)=>{
-        ocrTimeoutHandle=setTimeout(()=>reject(new Error('OCR timeout')),15000);
+        ocrTimeoutHandle=setTimeout(()=>reject(new Error('OCR timeout')),20000);
       });
 
       let result;
@@ -479,25 +506,26 @@ async function runOCR(canvas){
       const text=(result&&result.data&&result.data.text)||'';
       console.log('ABG OCR '+variant.label+':',text);
 
-      // Count how many ABG value patterns this pass matched
-      const matchCount=countMatches(text);
-      if(matchCount>bestCount){
-        bestCount=matchCount;
+      const values=extractABGMap(text);
+      const score=scoreExtractedValues(values);
+      if(score>bestScore){
+        bestScore=score;
         bestText=text;
+        bestValues=values;
       }
 
-      // Good enough — stop early if we matched pH + at least 2 more values
-      if(bestCount>=3) break;
+      if(values.fpH!==undefined && values.fPaCO2!==undefined && values.fHCO3!==undefined && score>=8) break;
     }
 
     // Always proceed — even if 0 matches, open the form (never leave user stranded)
-    if(bestCount>0){
-      setOCRStatus('✓ OCR complete — '+bestCount+' value(s) detected. Review below.','done');
+    if(bestScore>0){
+      setOCRStatus('✓ OCR complete — '+Object.keys(bestValues).length+' value(s) detected. Review below.','done');
     } else {
       setOCRStatus('⚠ OCR ran but could not read values clearly. Please check and fill in below.','err');
     }
 
-    extractValues(bestText);
+    applyExtractedValues(bestValues);
+    if(bestScore===0) extractValues(bestText);
     showManual();
 
   }catch(e){
@@ -516,111 +544,235 @@ async function runOCR(canvas){
 
 /* Count how many ABG value patterns are found in OCR text (used to pick best pass) */
 function countMatches(text){
-  const probes=[
-    /\bpH\s*[=:]\s*[\d.]+/i,
-    /Pa?CO2?\s*[=:]\s*[\d.]+/i,
-    /Pa?O2?\s*[=:]\s*[\d.]+/i,
-    /HCO3?\s*[=:]\s*[\d.]+/i,
-    /\bBE\s*[=:]\s*-?[\d.]+/i,
-    /FiO2?\s*[=:]\s*[\d.]+/i,
-    /Na\+?\s*[=:]\s*[\d.]+/i,
-    /K\+?\s*[=:]\s*[\d.]+/i,
-    /Lactates?\s*[=:]\s*[\d.]+/i,
-  ];
-  return probes.reduce((n,p)=>n+(p.test(text)?1:0),0);
+  return Object.keys(extractABGMap(text)).length;
 }
 
-function extractValues(text){
-  // Patterns: look for label followed by number
-  const patterns={
-    fpH:      [/\bpH\s*[=:]\s*([\d.]+)/i,      /\bpH\b[\s\S]{0,10}?\b(7\.\d{2})\b/],
-    fPaCO2:   [/Pa?CO2?\s*[=:]\s*([\d.]+)/i,    /CO2?\s+([\d.]+)/i],
-    fPaO2:    [/Pa?O2?\s*[=:]\s*([\d.]+)/i,     /PO2?\s+([\d.]+)/i],
-    fHCO3:    [/HCO3?\s*[=:]\s*([\d.]+)/i,      /BICARB\s+([\d.]+)/i],
-    fBE:      [/BE\s*[=:]\s*(-?[\d.]+)/i,        /Base\s+(?:Excess|Def)\s*[=:]\s*(-?[\d.]+)/i],
-    fFiO2:    [/FiO2?\s*[=:]\s*([\d.]+)/i,      /FIO2?\s+([\d.]+)/i],
-    fNa:      [/Na\+?\s*[=:]\s*([\d.]+)/i,       /Sodium\s+([\d.]+)/i],
-    fCl:      [/Cl-?\s*[=:]\s*([\d.]+)/i,        /Chloride\s+([\d.]+)/i],
-    fK:       [/K\+?\s*[=:]\s*([\d.]+)/i,        /Potassium\s+([\d.]+)/i],
-    fLactate: [/Lactate?\s*[=:]\s*([\d.]+)/i,    /LAC\s+([\d.]+)/i],
-    fSpO2:    [/SpO2?\s*[=:]\s*([\d.]+)/i,       /SAT\s+([\d.]+)/i],
-    fTemp:    [/Temp\s*[=:]\s*([\d.]+)/i,        /Temperature\s+([\d.]+)/i],
+function scoreExtractedValues(values){
+  let score=0;
+  if(values.fpH!==undefined) score+=3;
+  if(values.fPaCO2!==undefined) score+=3;
+  if(values.fHCO3!==undefined) score+=3;
+  if(values.fPaO2!==undefined) score+=2;
+  if(values.fBE!==undefined) score+=1;
+  if(values.fFiO2!==undefined) score+=1;
+  if(values.fLactate!==undefined) score+=1;
+  if(values.fNa!==undefined) score+=1;
+  if(values.fCl!==undefined) score+=1;
+  if(values.fK!==undefined) score+=1;
+  return score;
+}
+
+function buildOCRVariantCanvas(sourceCanvas,variant){
+  const crop=variant.crop||{x:0,y:0,w:1,h:1};
+  const sx=Math.max(0,Math.round(sourceCanvas.width*crop.x));
+  const sy=Math.max(0,Math.round(sourceCanvas.height*crop.y));
+  const sw=Math.max(1,Math.round(sourceCanvas.width*crop.w));
+  const sh=Math.max(1,Math.round(sourceCanvas.height*crop.h));
+  const rotate=((variant.rotate||0)%360+360)%360;
+  const rotated=rotate===90||rotate===270;
+  const srcLong=Math.max(sw,sh);
+  const scale=Math.min(1,(variant.maxWidth||1600)/srcLong);
+  const dw=Math.max(1,Math.round(sw*scale));
+  const dh=Math.max(1,Math.round(sh*scale));
+  const w=rotated?dh:dw;
+  const h=rotated?dw:dh;
+  const ocrCanvas=document.createElement('canvas');
+  ocrCanvas.width=w;
+  ocrCanvas.height=h;
+  const ocrCtx=ocrCanvas.getContext('2d',{willReadFrequently:true});
+  ocrCtx.fillStyle='#fff';
+  ocrCtx.fillRect(0,0,w,h);
+  ocrCtx.imageSmoothingEnabled=true;
+  ocrCtx.imageSmoothingQuality='high';
+  ocrCtx.filter=variant.filter||'none';
+  if(rotate){
+    ocrCtx.translate(w/2,h/2);
+    ocrCtx.rotate((rotate*Math.PI)/180);
+    ocrCtx.drawImage(sourceCanvas,sx,sy,sw,sh,-dw/2,-dh/2,dw,dh);
+    ocrCtx.setTransform(1,0,0,1,0,0);
+  }else{
+    ocrCtx.drawImage(sourceCanvas,sx,sy,sw,sh,0,0,dw,dh);
+  }
+  ocrCtx.filter='none';
+
+  if(variant.threshold){
+    const frame=ocrCtx.getImageData(0,0,w,h);
+    const d=frame.data;
+    for(let i=0;i<d.length;i+=4){
+      const lum=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2];
+      const out=lum>=variant.threshold?255:0;
+      d[i]=out;d[i+1]=out;d[i+2]=out;d[i+3]=255;
+    }
+    ocrCtx.putImageData(frame,0,0);
+  }
+
+  return ocrCanvas;
+}
+
+function normalizeOCRText(text){
+  return String(text||'')
+    .replace(/\r/g,'\n')
+    .replace(/[₀]/g,'0')
+    .replace(/[₁]/g,'1')
+    .replace(/[₂]/g,'2')
+    .replace(/[₃]/g,'3')
+    .replace(/[₄]/g,'4')
+    .replace(/[₅]/g,'5')
+    .replace(/[₆]/g,'6')
+    .replace(/[₇]/g,'7')
+    .replace(/[₈]/g,'8')
+    .replace(/[₉]/g,'9')
+    .replace(/[−–—]/g,'-')
+    .replace(/\bPH\b/g,'pH')
+    .replace(/\bPCOZ\b/gi,'PCO2')
+    .replace(/\bPOZ\b/gi,'PO2')
+    .replace(/\bHC0?3\b/gi,'HCO3')
+    .replace(/\bFI02\b/gi,'FiO2')
+    .replace(/\bPA02\b/gi,'PaO2')
+    .replace(/\bPAC02\b/gi,'PaCO2')
+    .replace(/\bS0?2\b/gi,'SO2');
+}
+
+function parseExtractedValue(id,raw){
+  if(raw===undefined||raw===null) return null;
+  let value=parseFloat(String(raw).replace(',', '.'));
+  if(!Number.isFinite(value)) return null;
+
+  if(id==='fFiO2' && value>1 && value<=100) value/=100;
+
+  const limits={
+    fpH:[6.8,7.8],
+    fPaCO2:[10,150],
+    fPaO2:[20,700],
+    fHCO3:[3,60],
+    fBE:[-40,40],
+    fFiO2:[0.21,1],
+    fNa:[100,180],
+    fCl:[70,140],
+    fK:[1,10],
+    fLactate:[0,30],
+    fSpO2:[50,100],
+    fTemp:[30,45]
   };
+  const [min,max]=limits[id]||[-Infinity,Infinity];
+  return value>=min&&value<=max?value:null;
+}
+
+function extractABGMap(text){
+  const normalized=normalizeOCRText(text);
+  const patterns={
+    fpH:[
+      /\bpH\b[\s:=-]*([7][.,]\d{2})\b/i,
+      /\bpH\b[\s\S]{0,18}?([7][.,]\d{2})\b/i
+    ],
+    fPaCO2:[
+      /\b(?:Pa?C[O0]2|PC[O0]2|pC[O0]2)\b[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i,
+      /\b(?:Pa?C[O0]2|PC[O0]2|pC[O0]2)\b[\s\S]{0,18}?([0-9]+(?:[.,][0-9]+)?)/i,
+      /\bC[O0]2\b[\s\S]{0,12}?([0-9]+(?:[.,][0-9]+)?)/i
+    ],
+    fPaO2:[
+      /\b(?:Pa?[O0]2|P[O0]2|p[O0]2)\b[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i,
+      /\b(?:Pa?[O0]2|P[O0]2|p[O0]2)\b[\s\S]{0,18}?([0-9]+(?:[.,][0-9]+)?)/i
+    ],
+    fHCO3:[
+      /\b(?:HC[O0]3|BICARB|cHC[O0]3|HC[O0]3-act|HC[O0]3-std)\b[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i,
+      /\b(?:HC[O0]3|BICARB|cHC[O0]3|HC[O0]3-act|HC[O0]3-std)\b[\s\S]{0,18}?([0-9]+(?:[.,][0-9]+)?)/i
+    ],
+    fBE:[
+      /\b(?:BE|SBE|BEecf|B\.?E\.?)\b[\s:=-]*(-?[0-9]+(?:[.,][0-9]+)?)/i,
+      /\bBase\s*(?:Excess|Def(?:icit)?)\b[\s:=-]*(-?[0-9]+(?:[.,][0-9]+)?)/i
+    ],
+    fFiO2:[
+      /\b(?:Fi[O0]2|FI[O0]2|[O0]2\s*conc(?:entration)?)\b[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i,
+      /\b(?:Fi[O0]2|FI[O0]2|[O0]2\s*conc(?:entration)?)\b[\s\S]{0,18}?([0-9]+(?:[.,][0-9]+)?)/i
+    ],
+    fNa:[
+      /\b(?:Na\+?|Sodium)\b[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i
+    ],
+    fCl:[
+      /\b(?:Cl-?|Chloride)\b[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i
+    ],
+    fK:[
+      /\b(?:K\+?|Potassium)\b[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i
+    ],
+    fLactate:[
+      /\b(?:Lactate|Lact|LAC)\b[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i,
+      /\b(?:Lactate|Lact|LAC)\b[\s\S]{0,14}?([0-9]+(?:[.,][0-9]+)?)/i
+    ],
+    fSpO2:[
+      /\b(?:Sp[O0]2|S[O0]2|SAT|[O0]2\s*Sat)\b[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i
+    ],
+    fTemp:[
+      /\b(?:Temp|Temperature)\b[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i
+    ]
+  };
+  const out={};
+
   for(const [id,pats] of Object.entries(patterns)){
-
-  for(const pat of pats){
-
-    const m=text.match(pat);
-
-    if(m&&m[1]){
-
-      let value=parseFloat(
-        String(m[1]).replace(',', '.')
-      );
-
-      let valid=true;
-
-      if(id==='fpH'){
-        valid=value>=6.80 && value<=7.80;
-      }
-
-      if(id==='fPaCO2'){
-        valid=value>=10 && value<=150;
-      }
-
-      if(id==='fPaO2'){
-        valid=value>=20 && value<=700;
-      }
-
-      if(id==='fHCO3'){
-        valid=value>=3 && value<=60;
-      }
-
-      if(id==='fBE'){
-        valid=value>=-40 && value<=40;
-      }
-
-      if(id==='fFiO2'){
-        valid=value>=0.21 && value<=100;
-      }
-
-      if(id==='fNa'){
-        valid=value>=100 && value<=180;
-      }
-
-      if(id==='fCl'){
-        valid=value>=70 && value<=140;
-      }
-
-      if(id==='fK'){
-        valid=value>=1 && value<=10;
-      }
-
-      if(id==='fLactate'){
-        valid=value>=0 && value<=30;
-      }
-
-      if(id==='fSpO2'){
-        valid=value>=50 && value<=100;
-      }
-
-      if(id==='fTemp'){
-        valid=value>=30 && value<=45;
-      }
-
-      if(valid){
-
-        const el=document.getElementById(id);
-
-        if(el && !el.value){
-          el.value=value;
-        }
-
+    for(const pat of pats){
+      const m=normalized.match(pat);
+      const value=m&&m[1]?parseExtractedValue(id,m[1]):null;
+      if(value!==null){
+        out[id]=value;
         break;
       }
     }
   }
+
+  const lineValues=extractABGMapFromLines(normalized);
+  for(const [id,value] of Object.entries(lineValues)){
+    if(out[id]===undefined) out[id]=value;
   }
+
+  return out;
+}
+
+function extractABGMapFromLines(text){
+  const out={};
+  const aliases={
+    fpH:['PH'],
+    fPaCO2:['PACO2','PCO2','CO2'],
+    fPaO2:['PAO2','PO2','O2'],
+    fHCO3:['HCO3','BICARB','BICARBONATE','CHCO3'],
+    fBE:['BE','SBE','BEECF','BASEEXCESS','BASEDEFICIT'],
+    fFiO2:['FIO2','O2CONCENTRATION'],
+    fNa:['NA','SODIUM'],
+    fCl:['CL','CHLORIDE'],
+    fK:['K','POTASSIUM'],
+    fLactate:['LACTATE','LACT','LAC'],
+    fSpO2:['SPO2','SO2','SAT','O2SAT'],
+    fTemp:['TEMP','TEMPERATURE']
+  };
+  const lines=text.split('\n').map(line=>line.trim()).filter(Boolean);
+
+  for(const line of lines){
+    const normalizedLine=line.toUpperCase().replace(/[^A-Z0-9.+\-\s]/g,' ').replace(/\s+/g,' ').trim();
+    if(!normalizedLine) continue;
+    for(const [id,names] of Object.entries(aliases)){
+      if(out[id]!==undefined) continue;
+      const alias=names.find(name=>normalizedLine.includes(name));
+      if(!alias) continue;
+      const idx=normalizedLine.indexOf(alias);
+      const after=normalizedLine.slice(idx+alias.length);
+      const before=normalizedLine.slice(Math.max(0,idx-10),idx);
+      const nearby=(after+' '+before).match(/-?\d+(?:[.,]\d+)?/);
+      const value=nearby?parseExtractedValue(id,nearby[0]):null;
+      if(value!==null) out[id]=value;
+    }
+  }
+
+  return out;
+}
+
+function applyExtractedValues(values){
+  for(const [id,value] of Object.entries(values)){
+    const el=document.getElementById(id);
+    if(el && !el.value) el.value=value;
+  }
+}
+
+function extractValues(text){
+  applyExtractedValues(extractABGMap(text));
 }
 
 /* ============================================================
