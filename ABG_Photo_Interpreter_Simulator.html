@@ -245,6 +245,7 @@ ul.abnorm li b{color:#eaf2f7}
    ============================================================ */
 let ctx='ICU';
 let stream=null,facingMode='environment';
+let cameraReady=false;
 let lastResult=null;
 let trendData=[];
 let ocrWorker=null;
@@ -302,6 +303,9 @@ function setCtx(c,btn){
 async function startCamera(){
   try{
     if(stream){stopStream();}
+    cameraReady=false;
+    const snapBtn=document.getElementById('snapBtn');
+    if(snapBtn) snapBtn.disabled=true;
     stream=await navigator.mediaDevices.getUserMedia({
   video:{
     facingMode,
@@ -316,7 +320,11 @@ async function startCamera(){
     document.getElementById('camControls').style.display='flex';
     document.getElementById('manualForm').style.display='none';
     document.getElementById('previewWrap').style.display='none';
+    await waitForVideoReady(v);
+    cameraReady=!!(v.videoWidth&&v.videoHeight);
+    if(snapBtn) snapBtn.disabled=!cameraReady;
   }catch(e){
+    stopStream();
     alert('Camera not available: '+e.message+'\nPlease use manual entry instead.');
     showManual();
   }
@@ -329,12 +337,51 @@ async function flipCamera(){
 
 function stopStream(){
   if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  cameraReady=false;
 }
 
 function stopCamera(){
   stopStream();
   document.getElementById('cameraWrap').style.display='none';
   document.getElementById('camControls').style.display='none';
+  const snapBtn=document.getElementById('snapBtn');
+  if(snapBtn) snapBtn.disabled=true;
+}
+
+async function waitForVideoReady(video){
+  if(video.readyState>=2 && video.videoWidth && video.videoHeight){
+    try{await video.play();}catch(_err){}
+    return;
+  }
+  await new Promise((resolve,reject)=>{
+    let settled=false;
+    const cleanup=()=>{
+      video.removeEventListener('loadedmetadata',tryResolve);
+      video.removeEventListener('loadeddata',tryResolve);
+      video.removeEventListener('canplay',tryResolve);
+      video.removeEventListener('error',fail);
+      clearTimeout(timeoutId);
+    };
+    const finish=(fn,arg)=>{
+      if(settled) return;
+      settled=true;
+      cleanup();
+      fn(arg);
+    };
+    const tryResolve=async ()=>{
+      if(video.videoWidth && video.videoHeight){
+        try{await video.play();}catch(_err){}
+        finish(resolve);
+      }
+    };
+    const fail=()=>finish(reject,new Error('Camera preview could not start.'));
+    const timeoutId=setTimeout(()=>finish(reject,new Error('Camera preview timed out.')),5000);
+    video.addEventListener('loadedmetadata',tryResolve);
+    video.addEventListener('loadeddata',tryResolve);
+    video.addEventListener('canplay',tryResolve);
+    video.addEventListener('error',fail);
+    tryResolve();
+  });
 }
 
 function isLikelyImageFile(file){
@@ -416,6 +463,10 @@ async function handleFileUpload(e){
 function capturePhoto(){
   const v=document.getElementById('videoEl');
   const c=document.getElementById('capCanvas');
+  if(!cameraReady || !v.videoWidth || !v.videoHeight){
+    setOCRStatus('⚠ Camera preview is not ready yet. Wait a moment and try capture again.','err');
+    return;
+  }
   drawSourceToCanvas(v,c,1800);
 
   const preview=c.toDataURL('image/jpeg',0.82);
@@ -630,12 +681,25 @@ function normalizeOCRText(text){
     .replace(/\bFI02\b/gi,'FiO2')
     .replace(/\bPA02\b/gi,'PaO2')
     .replace(/\bPAC02\b/gi,'PaCO2')
+    .replace(/\bP\s*H\b/gi,'pH')
+    .replace(/\bP\s*A\s*C\s*0?\s*2\b/gi,'PaCO2')
+    .replace(/\bP\s*A?\s*0?\s*2\b/gi,'PaO2')
+    .replace(/\bH\s*C\s*0?\s*3\b/gi,'HCO3')
+    .replace(/\bF\s*I\s*0?\s*2\b/gi,'FiO2')
+    .replace(/\bS\s*P\s*0?\s*2\b/gi,'SpO2')
+    .replace(/\bB\s*E\b/gi,'BE')
     .replace(/\bS0?2\b/gi,'SO2');
 }
 
 function parseExtractedValue(id,raw){
   if(raw===undefined||raw===null) return null;
-  let value=parseFloat(String(raw).replace(',', '.'));
+  const rawStr=String(raw).trim().replace(',', '.');
+  let value;
+  if(id==='fpH' && /^7\d{2}$/.test(rawStr)){
+    value=parseFloat(rawStr[0]+'.'+rawStr.slice(1));
+  }else{
+    value=parseFloat(rawStr);
+  }
   if(!Number.isFinite(value)) return null;
 
   if(id==='fFiO2' && value>1 && value<=100) value/=100;
@@ -660,10 +724,11 @@ function parseExtractedValue(id,raw){
 
 function extractABGMap(text){
   const normalized=normalizeOCRText(text);
+  const compact=normalized.toUpperCase().replace(/[^A-Z0-9.+-]/g,'');
   const patterns={
     fpH:[
-      /\bpH\b[\s:=-]*([7][.,]\d{2})\b/i,
-      /\bpH\b[\s\S]{0,18}?([7][.,]\d{2})\b/i
+      /\bpH\b[\s:=-]*([6-8][.,]\d{2})\b/i,
+      /\bpH\b[\s\S]{0,18}?([6-8][.,]\d{2})\b/i
     ],
     fPaCO2:[
       /\b(?:Pa?C[O0]2|PC[O0]2|pC[O0]2)\b[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i,
@@ -675,8 +740,8 @@ function extractABGMap(text){
       /\b(?:Pa?[O0]2|P[O0]2|p[O0]2)\b[\s\S]{0,18}?([0-9]+(?:[.,][0-9]+)?)/i
     ],
     fHCO3:[
-      /\b(?:HC[O0]3|BICARB|cHC[O0]3|HC[O0]3-act|HC[O0]3-std)\b[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i,
-      /\b(?:HC[O0]3|BICARB|cHC[O0]3|HC[O0]3-act|HC[O0]3-std)\b[\s\S]{0,18}?([0-9]+(?:[.,][0-9]+)?)/i
+      /\b(?:HC[O0]3|BICARB(?:ONATE)?|cHC[O0]3|HC[O0]3-act|HC[O0]3-std)\b[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i,
+      /\b(?:HC[O0]3|BICARB(?:ONATE)?|cHC[O0]3|HC[O0]3-act|HC[O0]3-std)\b[\s\S]{0,18}?([0-9]+(?:[.,][0-9]+)?)/i
     ],
     fBE:[
       /\b(?:BE|SBE|BEecf|B\.?E\.?)\b[\s:=-]*(-?[0-9]+(?:[.,][0-9]+)?)/i,
@@ -719,8 +784,35 @@ function extractABGMap(text){
     }
   }
 
+  const compactPatterns={
+    fpH:[/PH(7(?:[.,]\d{2}|\d{2}))(?:PACO2|PCO2|PAO2|PO2|HCO3|BE|$)/i],
+    fPaCO2:[/(?:PACO2|PCO2)([0-9]+(?:[.,][0-9]+)?)/i],
+    fPaO2:[/(?:PAO2|PO2)([0-9]+(?:[.,][0-9]+)?)/i],
+    fHCO3:[/(?:HCO3|BICARB(?:ONATE)?|CHCO3)([0-9]+(?:[.,][0-9]+)?)/i],
+    fBE:[/(?:BE|SBE|BEECF)(-?[0-9]+(?:[.,][0-9]+)?)/i],
+    fFiO2:[/(?:FIO2|O2CONCENTRATION)([0-9]+(?:[.,][0-9]+)?)/i],
+    fLactate:[/(?:LACTATE|LACT|LAC)([0-9]+(?:[.,][0-9]+)?)/i],
+    fSpO2:[/(?:SPO2|SO2|O2SAT)([0-9]+(?:[.,][0-9]+)?)/i]
+  };
+  for(const [id,pats] of Object.entries(compactPatterns)){
+    if(out[id]!==undefined) continue;
+    for(const pat of pats){
+      const m=compact.match(pat);
+      const value=m&&m[1]?parseExtractedValue(id,m[1]):null;
+      if(value!==null){
+        out[id]=value;
+        break;
+      }
+    }
+  }
+
   const lineValues=extractABGMapFromLines(normalized);
   for(const [id,value] of Object.entries(lineValues)){
+    if(out[id]===undefined) out[id]=value;
+  }
+
+  const sequenceValues=extractABGValueSequence(normalized);
+  for(const [id,value] of Object.entries(sequenceValues)){
     if(out[id]===undefined) out[id]=value;
   }
 
@@ -732,7 +824,7 @@ function extractABGMapFromLines(text){
   const aliases={
     fpH:['PH'],
     fPaCO2:['PACO2','PCO2','CO2'],
-    fPaO2:['PAO2','PO2','O2'],
+    fPaO2:['PAO2','PO2'],
     fHCO3:['HCO3','BICARB','BICARBONATE','CHCO3'],
     fBE:['BE','SBE','BEECF','BASEEXCESS','BASEDEFICIT'],
     fFiO2:['FIO2','O2CONCENTRATION'],
@@ -750,11 +842,16 @@ function extractABGMapFromLines(text){
     if(!normalizedLine) continue;
     for(const [id,names] of Object.entries(aliases)){
       if(out[id]!==undefined) continue;
-      const alias=names.find(name=>normalizedLine.includes(name));
+      const alias=names.find(name=>{
+        if(name.length<=2){
+          return new RegExp('(?:^|\\s)'+name+'(?:\\s|[-+:=]|$)').test(normalizedLine);
+        }
+        return normalizedLine.includes(name);
+      });
       if(!alias) continue;
       const idx=normalizedLine.indexOf(alias);
       const after=normalizedLine.slice(idx+alias.length);
-      const before=normalizedLine.slice(Math.max(0,idx-10),idx);
+      const before=normalizedLine.slice(Math.max(0,idx-12),idx);
       const nearby=(after+' '+before).match(/-?\d+(?:[.,]\d+)?/);
       const value=nearby?parseExtractedValue(id,nearby[0]):null;
       if(value!==null) out[id]=value;
@@ -762,6 +859,48 @@ function extractABGMapFromLines(text){
   }
 
   return out;
+}
+
+function extractABGValueSequence(text){
+  const sourceText=String(text||'');
+  const lines=sourceText.split('\n').map(line=>line.trim()).filter(Boolean);
+  const markerDefs=[
+    {id:'fpH',regex:/\bPH\b/g},
+    {id:'fPaCO2',regex:/\b(?:PACO2|PCO2)\b/g},
+    {id:'fPaO2',regex:/\b(?:PAO2|PO2)\b/g},
+    {id:'fHCO3',regex:/\b(?:HCO3|BICARB(?:ONATE)?)\b/g},
+    {id:'fBE',regex:/\b(?:BE|SBE)\b/g}
+  ];
+  for(let i=0;i<lines.length-1;i++){
+    const header=normalizeOCRText(lines[i]).toUpperCase().replace(/[^A-Z0-9+\-\s]/g,' ').replace(/\s+/g,' ').trim();
+    const valueLine=lines[i+1];
+    const markers=[];
+    for(const def of markerDefs){
+      for(const match of header.matchAll(def.regex)){
+        markers.push({id:def.id,index:match.index||0});
+      }
+    }
+    markers.sort((a,b)=>a.index-b.index);
+    const orderedIds=[];
+    for(const marker of markers){
+      if(!orderedIds.includes(marker.id)) orderedIds.push(marker.id);
+    }
+    if(!['fpH','fPaCO2','fPaO2','fHCO3'].every(id=>orderedIds.includes(id))) continue;
+    const nums=(String(valueLine).match(/-?\d+(?:[.,]\d+)?/g)||[]).slice(0,orderedIds.length+1);
+    if(nums.length<4) continue;
+    const out={};
+    for(let j=0;j<orderedIds.length && j<nums.length;j++){
+      const value=parseExtractedValue(orderedIds[j],nums[j]);
+      if(value!==null) out[orderedIds[j]]=value;
+    }
+    if(out.fpH===undefined||out.fPaCO2===undefined||out.fPaO2===undefined||out.fHCO3===undefined) continue;
+    if(out.fPaCO2<15||out.fPaCO2>100) continue;
+    if(out.fPaO2<30||out.fPaO2>250) continue;
+    if(out.fHCO3<8||out.fHCO3>45) continue;
+    if(out.fBE!==undefined && (out.fBE<-20||out.fBE>20)) delete out.fBE;
+    return out;
+  }
+  return {};
 }
 
 function applyExtractedValues(values){
