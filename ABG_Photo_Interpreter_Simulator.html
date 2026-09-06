@@ -245,6 +245,8 @@ ul.abnorm li b{color:#eaf2f7}
    ============================================================ */
 let ctx='ICU';
 let stream=null,facingMode='environment';
+let activeVideoTrack=null;
+let imageCapture=null;
 let cameraReady=false;
 let lastResult=null;
 let trendData=[];
@@ -273,7 +275,7 @@ async function initOCR(){
     });
 
     await ocrWorker.loadLanguage('eng');
-    await ocrWorker.initialize('eng', Tesseract.OEM.TESSERACT_ONLY);
+    await ocrWorker.initialize('eng', Tesseract.OEM.LSTM_ONLY);
 
     await ocrWorker.setParameters({
       tessedit_pageseg_mode:Tesseract.PSM.AUTO,
@@ -304,16 +306,11 @@ async function startCamera(){
   try{
     if(stream){stopStream();}
     cameraReady=false;
+    activeVideoTrack=null;
+    imageCapture=null;
     const snapBtn=document.getElementById('snapBtn');
     if(snapBtn) snapBtn.disabled=true;
-    stream=await navigator.mediaDevices.getUserMedia({
-  video:{
-    facingMode,
-    width:{ideal:1280,max:1600},
-    height:{ideal:720,max:1200}
-  },
-  audio:false
-});
+    stream=await openCameraStream();
     const v=document.getElementById('videoEl');
     v.srcObject=stream;
     document.getElementById('cameraWrap').style.display='block';
@@ -321,6 +318,18 @@ async function startCamera(){
     document.getElementById('manualForm').style.display='none';
     document.getElementById('previewWrap').style.display='none';
     await waitForVideoReady(v);
+    activeVideoTrack=stream.getVideoTracks?stream.getVideoTracks()[0]||null:null;
+    if(activeVideoTrack){
+      await configureVideoTrackForDocumentCapture(activeVideoTrack);
+      if(window.ImageCapture){
+        try{
+          imageCapture=new ImageCapture(activeVideoTrack);
+        }catch(_err){
+          imageCapture=null;
+        }
+      }
+    }
+    await settleCameraPreview();
     cameraReady=!!(v.videoWidth&&v.videoHeight);
     if(snapBtn) snapBtn.disabled=!cameraReady;
   }catch(e){
@@ -335,8 +344,60 @@ async function flipCamera(){
   await startCamera();
 }
 
+async function openCameraStream(){
+  const attempts=[
+    {
+      video:{
+        facingMode:{ideal:facingMode},
+        width:{ideal:1920,max:2560},
+        height:{ideal:1080,max:1440}
+      },
+      audio:false
+    },
+    {
+      video:{
+        facingMode:{ideal:facingMode},
+        width:{ideal:1600,max:1920},
+        height:{ideal:900,max:1200}
+      },
+      audio:false
+    },
+    {video:{facingMode:{ideal:facingMode}},audio:false},
+    {video:true,audio:false}
+  ];
+  let lastErr=null;
+  for(const constraints of attempts){
+    try{
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    }catch(err){
+      lastErr=err;
+    }
+  }
+  throw lastErr||new Error('Camera could not be started.');
+}
+
+async function configureVideoTrackForDocumentCapture(track){
+  if(!track || typeof track.applyConstraints!=='function') return;
+  try{
+    const caps=typeof track.getCapabilities==='function'?track.getCapabilities():{};
+    const next={};
+    if(caps.width && Number.isFinite(caps.width.max)) next.width=Math.min(caps.width.max,2560);
+    if(caps.height && Number.isFinite(caps.height.max)) next.height=Math.min(caps.height.max,1440);
+    const advanced=[];
+    if(Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) advanced.push({focusMode:'continuous'});
+    if(Array.isArray(caps.exposureMode) && caps.exposureMode.includes('continuous')) advanced.push({exposureMode:'continuous'});
+    if(Array.isArray(caps.whiteBalanceMode) && caps.whiteBalanceMode.includes('continuous')) advanced.push({whiteBalanceMode:'continuous'});
+    if(advanced.length) next.advanced=advanced;
+    if(Object.keys(next).length) await track.applyConstraints(next);
+  }catch(_err){}
+}
+
 function stopStream(){
+  const v=document.getElementById('videoEl');
+  if(v) v.srcObject=null;
   if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  activeVideoTrack=null;
+  imageCapture=null;
   cameraReady=false;
 }
 
@@ -382,6 +443,10 @@ async function waitForVideoReady(video){
     video.addEventListener('error',fail);
     tryResolve();
   });
+}
+
+async function settleCameraPreview(){
+  await new Promise(resolve=>setTimeout(resolve,450));
 }
 
 function isLikelyImageFile(file){
@@ -460,14 +525,37 @@ async function handleFileUpload(e){
   }
 }
 
-function capturePhoto(){
+async function capturePhoto(){
   const v=document.getElementById('videoEl');
   const c=document.getElementById('capCanvas');
   if(!cameraReady || !v.videoWidth || !v.videoHeight){
     setOCRStatus('⚠ Camera preview is not ready yet. Wait a moment and try capture again.','err');
     return;
   }
-  drawSourceToCanvas(v,c,1800);
+  setOCRStatus('Optimizing camera capture…','running');
+  try{
+    if(imageCapture && typeof imageCapture.takePhoto==='function'){
+      const blob=await imageCapture.takePhoto();
+      const imgSource=await loadImageSource(blob);
+      try{
+        drawSourceToCanvas(imgSource,c,2200);
+      }finally{
+        if(imgSource && typeof imgSource.close==='function') imgSource.close();
+      }
+    }else if(imageCapture && typeof imageCapture.grabFrame==='function'){
+      const frame=await imageCapture.grabFrame();
+      try{
+        drawSourceToCanvas(frame,c,2200);
+      }finally{
+        if(frame && typeof frame.close==='function') frame.close();
+      }
+    }else{
+      drawSourceToCanvas(v,c,2200);
+    }
+  }catch(err){
+    console.warn('High-resolution capture unavailable, using preview frame instead:',err);
+    drawSourceToCanvas(v,c,2200);
+  }
 
   const preview=c.toDataURL('image/jpeg',0.82);
 
