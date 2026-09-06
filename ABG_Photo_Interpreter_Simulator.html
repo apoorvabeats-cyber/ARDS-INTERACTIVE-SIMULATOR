@@ -766,6 +766,7 @@ function normalizeOCRText(text){
     .replace(/\bPCOZ\b/gi,'PCO2')
     .replace(/\bPOZ\b/gi,'PO2')
     .replace(/\bHC0?3\b/gi,'HCO3')
+    .replace(/\bH\s*C\s*[O0]\s*ACT\b/gi,'HCO3')
     .replace(/\bFI02\b/gi,'FiO2')
     .replace(/\bPA02\b/gi,'PaO2')
     .replace(/\bPAC02\b/gi,'PaCO2')
@@ -823,7 +824,7 @@ function extractABGMap(text){
   const normalized=normalizeOCRText(text);
   const compact=normalized.toUpperCase().replace(/[^A-Z0-9.+-]/g,'');
   const paoLabelPattern=hasPaOShorthandContext(normalized)
-    ? '(?:Pa?[O0]2|P[O0]2|p[O0]2|PAO)'
+    ? '(?:Pa?[O0]2|P[O0]2|p[O0]2|PAO|P[O0])'
     : '(?:Pa?[O0]2|P[O0]2|p[O0]2)';
   const patterns={
     fpH:[
@@ -840,8 +841,8 @@ function extractABGMap(text){
       new RegExp('\\b'+paoLabelPattern+'\\b[^\\r\\n]{0,18}?([0-9]+(?:[.,][0-9]+)?)','i')
     ],
     fHCO3:[
-      /\b(?:HC[O0]3-act|HC[O0]3-std|cHC[O0]3|HC[O0]3|BICARB(?:ONATE)?|HCO)\b[^\S\r\n:=-]*[:=-]?[^\S\r\n]*([0-9]+(?:[.,][0-9]+)?)/i,
-      /\b(?:HC[O0]3-act|HC[O0]3-std|cHC[O0]3|HC[O0]3|BICARB(?:ONATE)?|HCO)\b[^\r\n]{0,18}?([0-9]+(?:[.,][0-9]+)?)/i
+      /\b(?:HC[O0]3-act|HC[O0]3-std|cHC[O0]3|HC[O0]3|HC[O0]ACT|BICARB(?:ONATE)?|HCO)\b[^\S\r\n:=-]*[:=-]?[^\S\r\n]*([0-9]+(?:[.,][0-9]+)?)/i,
+      /\b(?:HC[O0]3-act|HC[O0]3-std|cHC[O0]3|HC[O0]3|HC[O0]ACT|BICARB(?:ONATE)?|HCO)\b[^\r\n]{0,18}?([0-9]+(?:[.,][0-9]+)?)/i
     ],
     fBE:[
       /\b(?:BE|SBE|BEecf|B\.?E\.?)\b[\s:=-]*(-?[0-9]+(?:[.,][0-9]+)?)/i,
@@ -898,9 +899,9 @@ function extractABGMap(text){
     fpH:[/PH(7(?:[.,]\d{2}|\d{2}))(?:PACO2|PCO2|PAO2|PO2|HCO3|BE|$)/i],
     fPaCO2:[/(?:PAC[O0]2|PC[O0]2|PC[O0])([0-9]+(?:[.,][0-9]+)?)/i],
     fPaO2:[hasPaOShorthandContext(normalized)
-      ? /(?:PA[O0]2|P[O0]2)([0-9]+(?:[.,][0-9]+)?)|PAO(?!2)([0-9]+(?:[.,][0-9]+)?)/i
+      ? /(?:PA[O0]2|P[O0]2)([0-9]+(?:[.,][0-9]+)?)|PAO(?!2)([0-9]+(?:[.,][0-9]+)?)|P[O0](?!2)([0-9]+(?:[.,][0-9]+)?)/i
       : /(?:PA[O0]2|P[O0]2)([0-9]+(?:[.,][0-9]+)?)/i],
-    fHCO3:[/(?:HC[O0]3|BICARB(?:ONATE)?|CHC[O0]3|HC[O0])([0-9]+(?:[.,][0-9]+)?)/i],
+    fHCO3:[/(?:HC[O0]3|HC[O0]ACT|BICARB(?:ONATE)?|CHC[O0]3|HC[O0])([0-9]+(?:[.,][0-9]+)?)/i],
     fBE:[/(?:BE|SBE|BEECF)(-?[0-9]+(?:[.,][0-9]+)?)/i],
     fFiO2:[/(?:FIO2|O2CONCENTRATION)([0-9]+(?:[.,][0-9]+)?)/i],
     fLactate:[/(?:LACTATE|LACT|LAC)([0-9]+(?:[.,][0-9]+)?)/i],
@@ -928,8 +929,8 @@ function extractABGMapFromLines(text){
   const aliases={
     fpH:['PH'],
     fPaCO2:['PACO2','PCO2','PCO','CO2'],
-    fPaO2:allowPaOShorthand?['PAO2','PO2','PAO']:['PAO2','PO2'],
-    fHCO3:['HCO3','HCO','BICARB','BICARBONATE','CHCO3'],
+    fPaO2:allowPaOShorthand?['PAO2','PO2','PAO','PO']:['PAO2','PO2'],
+    fHCO3:['HCO3','HCOACT','HCO','BICARB','BICARBONATE','CHCO3'],
     fBE:['BE','SBE','BEECF','BASEEXCESS','BASEDEFICIT'],
     fFiO2:['FIO2','O2CONCENTRATION'],
     fNa:['NA','SODIUM'],
