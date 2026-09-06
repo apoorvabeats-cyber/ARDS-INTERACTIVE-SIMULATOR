@@ -316,12 +316,12 @@ async function startCamera(){
 });
     const v=document.getElementById('videoEl');
     v.srcObject=stream;
-    await waitForVideoReady(v);
-    cameraReady=!!(v.videoWidth&&v.videoHeight);
     document.getElementById('cameraWrap').style.display='block';
     document.getElementById('camControls').style.display='flex';
     document.getElementById('manualForm').style.display='none';
     document.getElementById('previewWrap').style.display='none';
+    await waitForVideoReady(v);
+    cameraReady=!!(v.videoWidth&&v.videoHeight);
     if(snapBtn) snapBtn.disabled=!cameraReady;
   }catch(e){
     stopStream();
@@ -839,7 +839,6 @@ function extractABGMapFromLines(text){
 
   for(const line of lines){
     const normalizedLine=line.toUpperCase().replace(/[^A-Z0-9.+\-\s]/g,' ').replace(/\s+/g,' ').trim();
-    const compactLine=normalizedLine.replace(/\s+/g,'');
     if(!normalizedLine) continue;
     for(const [id,names] of Object.entries(aliases)){
       if(out[id]!==undefined) continue;
@@ -847,13 +846,12 @@ function extractABGMapFromLines(text){
         if(name.length<=2){
           return new RegExp('(?:^|\\s)'+name+'(?:\\s|[-+:=]|$)').test(normalizedLine);
         }
-        return compactLine.includes(name);
+        return normalizedLine.includes(name);
       });
       if(!alias) continue;
-      const haystack=alias.length<=2?normalizedLine:compactLine;
-      const idx=haystack.indexOf(alias);
-      const after=haystack.slice(idx+alias.length);
-      const before=haystack.slice(Math.max(0,idx-12),idx);
+      const idx=normalizedLine.indexOf(alias);
+      const after=normalizedLine.slice(idx+alias.length);
+      const before=normalizedLine.slice(Math.max(0,idx-12),idx);
       const nearby=(after+' '+before).match(/-?\d+(?:[.,]\d+)?/);
       const value=nearby?parseExtractedValue(id,nearby[0]):null;
       if(value!==null) out[id]=value;
@@ -865,30 +863,32 @@ function extractABGMapFromLines(text){
 
 function extractABGValueSequence(text){
   const sourceText=String(text||'');
-  const upper=sourceText.toUpperCase();
-  const compactUpper=upper.replace(/[^A-Z0-9.+-]/g,'');
-  const hasSpacedMarkers=/(?:\bPH\b|\bPACO2\b|\bPCO2\b|\bPAO2\b|\bPO2\b|\bHCO3\b|\bBICARB(?:ONATE)?\b|\bBE\b|\bSBE\b)/.test(upper);
-  const hasCompactMarkers=/(?:PH|PACO2|PCO2|PAO2|PO2|HCO3|BICARB(?:ONATE)?|SBE)/.test(compactUpper);
-  if(!hasSpacedMarkers && !hasCompactMarkers){
-    return {};
-  }
-  const nums=(sourceText.match(/-?\d+(?:[.,]\d+)?/g)||[]).slice(0,40);
-  for(let i=0;i<=nums.length-4;i++){
-    if(!/^[6-8](?:[.,]\d{2}|\d{2})$/.test(nums[i])) continue;
-    const fpH=parseExtractedValue('fpH',nums[i]);
-    const fPaCO2=parseExtractedValue('fPaCO2',nums[i+1]);
-    const fPaO2=parseExtractedValue('fPaO2',nums[i+2]);
-    const fHCO3=parseExtractedValue('fHCO3',nums[i+3]);
-    if(fpH===null||fPaCO2===null||fPaO2===null||fHCO3===null) continue;
-    if(fPaCO2<15||fPaCO2>100) continue;
-    if(fPaO2<30||fPaO2>250) continue;
-    if(fHCO3<8||fHCO3>45) continue;
-    const out={fpH,fPaCO2,fPaO2,fHCO3};
-    if(i+4<nums.length){
-      const be=parseExtractedValue('fBE',nums[i+4]);
-      if(be!==null && be>=-20 && be<=20) out.fBE=be;
+  const lines=sourceText.split('\n').map(line=>line.trim()).filter(Boolean);
+  const blocks=lines.length?lines.map((line,i)=>[line,lines[i+1]||''].filter(Boolean).join(' ')):[sourceText];
+  for(const block of blocks){
+    const blockUpper=block.toUpperCase();
+    const compactBlock=blockUpper.replace(/[^A-Z0-9.+-]/g,'');
+    const hasSpacedMarkers=/(?:\bPH\b|\bPACO2\b|\bPCO2\b|\bPAO2\b|\bPO2\b|\bHCO3\b|\bBICARB(?:ONATE)?\b|\bBE\b|\bSBE\b)/.test(blockUpper);
+    const hasCompactMarkers=/(?:PH|PACO2|PCO2|PAO2|PO2|HCO3|BICARB(?:ONATE)?|SBE)/.test(compactBlock);
+    if(!hasSpacedMarkers && !hasCompactMarkers) continue;
+    const nums=[...blockUpper.matchAll(/(?:^|[^A-Z0-9])(-?\d+(?:[.,]\d+)?)(?=$|[^A-Z])/g)].map(m=>m[1]).slice(0,12);
+    for(let i=0;i<=nums.length-4;i++){
+      if(!/^[6-8](?:[.,]\d{2}|\d{2})$/.test(nums[i])) continue;
+      const fpH=parseExtractedValue('fpH',nums[i]);
+      const fPaCO2=parseExtractedValue('fPaCO2',nums[i+1]);
+      const fPaO2=parseExtractedValue('fPaO2',nums[i+2]);
+      const fHCO3=parseExtractedValue('fHCO3',nums[i+3]);
+      if(fpH===null||fPaCO2===null||fPaO2===null||fHCO3===null) continue;
+      if(fPaCO2<15||fPaCO2>100) continue;
+      if(fPaO2<30||fPaO2>250) continue;
+      if(fHCO3<8||fHCO3>45) continue;
+      const out={fpH,fPaCO2,fPaO2,fHCO3};
+      if(i+4<nums.length){
+        const be=parseExtractedValue('fBE',nums[i+4]);
+        if(be!==null && be>=-20 && be<=20) out.fBE=be;
+      }
+      return out;
     }
-    return out;
   }
   return {};
 }
