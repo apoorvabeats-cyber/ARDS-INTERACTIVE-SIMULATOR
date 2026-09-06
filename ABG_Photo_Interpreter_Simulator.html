@@ -937,14 +937,15 @@ function extractABGMapFromLines(text){
     fTemp:['TEMP','TEMPERATURE']
   };
   const lines=text.split('\n').map(line=>line.trim()).filter(Boolean);
+  const matchesAliasToken=(normalizedLine,name)=>{
+    if(/^[A-Z0-9]+$/.test(name)){
+      return new RegExp('(?:^|\\s)'+name+'(?:\\s|[-+:=]|$)').test(normalizedLine);
+    }
+    return normalizedLine.includes(name);
+  };
   const lineHasKnownAlias=line=>{
     const normalizedLine=String(line||'').toUpperCase().replace(/[^A-Z0-9.+\-\s]/g,' ').replace(/\s+/g,' ').trim();
-    return Object.values(aliases).some(names=>names.some(name=>{
-      if(name.length<=2){
-        return new RegExp('(?:^|\\s)'+name+'(?:\\s|[-+:=]|$)').test(normalizedLine);
-      }
-      return normalizedLine.includes(name);
-    }));
+    return Object.values(aliases).some(names=>names.some(name=>matchesAliasToken(normalizedLine,name)));
   };
 
   for(let i=0;i<lines.length;i++){
@@ -953,12 +954,7 @@ function extractABGMapFromLines(text){
     if(!normalizedLine) continue;
     for(const [id,names] of Object.entries(aliases)){
       if(out[id]!==undefined) continue;
-      const alias=names.find(name=>{
-        if(name.length<=2){
-          return new RegExp('(?:^|\\s)'+name+'(?:\\s|[-+:=]|$)').test(normalizedLine);
-        }
-        return normalizedLine.includes(name);
-      });
+      const alias=names.find(name=>matchesAliasToken(normalizedLine,name));
       if(!alias) continue;
       const idx=normalizedLine.indexOf(alias);
       const after=normalizedLine.slice(idx+alias.length);
