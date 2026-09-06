@@ -766,17 +766,14 @@ function normalizeOCRText(text){
     .replace(/\bPCOZ\b/gi,'PCO2')
     .replace(/\bPOZ\b/gi,'PO2')
     .replace(/\bHC0?3\b/gi,'HCO3')
-    .replace(/\bPCO\b/gi,'PaCO2')
-    .replace(/\bPAO\b/gi,'PaO2')
-    .replace(/\bHCO\b/gi,'HCO3')
     .replace(/\bFI02\b/gi,'FiO2')
     .replace(/\bPA02\b/gi,'PaO2')
     .replace(/\bPAC02\b/gi,'PaCO2')
     .replace(/\bP\s*H\b/gi,'pH')
-    .replace(/\bP\s*C\s*O\b/gi,'PaCO2')
-    .replace(/\bP\s*A\s*O\b/gi,'PaO2')
     .replace(/\bP\s*A\s*C\s*0?\s*2\b/gi,'PaCO2')
     .replace(/\bP\s*A?\s*0?\s*2\b/gi,'PaO2')
+    .replace(/\bP\s*C\s*O\b/gi,'PaCO2')
+    .replace(/\bP\s*A\s*O\b/gi,'PaO2')
     .replace(/\bH\s*C\s*O\b/gi,'HCO3')
     .replace(/\bH\s*C\s*0?\s*3\b/gi,'HCO3')
     .replace(/\bF\s*I\s*0?\s*2\b/gi,'FiO2')
@@ -930,18 +927,11 @@ function extractABGMapFromLines(text){
     fTemp:['TEMP','TEMPERATURE']
   };
   const lines=text.split('\n').map(line=>line.trim()).filter(Boolean);
-  const allAliases=Object.values(aliases).flat();
 
   for(let i=0;i<lines.length;i++){
     const line=lines[i];
     const normalizedLine=line.toUpperCase().replace(/[^A-Z0-9.+\-\s]/g,' ').replace(/\s+/g,' ').trim();
     if(!normalizedLine) continue;
-    const aliasHits=allAliases.reduce((count,name)=>{
-      if(name.length<=2){
-        return count+(new RegExp('(?:^|\\s)'+name+'(?:\\s|[-+:=]|$)').test(normalizedLine)?1:0);
-      }
-      return count+(normalizedLine.includes(name)?1:0);
-    },0);
     for(const [id,names] of Object.entries(aliases)){
       if(out[id]!==undefined) continue;
       const alias=names.find(name=>{
@@ -956,10 +946,10 @@ function extractABGMapFromLines(text){
       const before=normalizedLine.slice(Math.max(0,idx-12),idx);
       const nearby=(after+' '+before).match(/-?\d+(?:[.,]\d+)?/);
       let candidate=nearby&&nearby[0]?nearby[0]:null;
-      if(!candidate && aliasHits===1 && i<lines.length-1){
+      if(!candidate && i<lines.length-1){
         const nextLine=lines[i+1].trim();
-        const nextValue=nextLine.match(/^-?\d+(?:[.,]\d+)?\b/);
-        if(nextValue) candidate=nextValue[0];
+        const nextValues=nextLine.match(/-?\d+(?:[.,]\d+)?/g)||[];
+        if(nextValues.length===1) candidate=nextValues[0];
       }
       const value=candidate?parseExtractedValue(id,candidate):null;
       if(value!==null) out[id]=value;
