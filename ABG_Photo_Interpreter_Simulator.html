@@ -784,7 +784,7 @@ function extractABGMap(text){
   }
 
   const compactPatterns={
-    fpH:[/\bPH(7(?:[.,]\d{2}|\d{2}))\b/i],
+    fpH:[/PH(7(?:[.,]\d{2}|\d{2}))(?:PACO2|PCO2|PAO2|PO2|HCO3|BE|$)/i],
     fPaCO2:[/(?:PACO2|PCO2)([0-9]+(?:[.,][0-9]+)?)/i],
     fPaO2:[/(?:PAO2|PO2)([0-9]+(?:[.,][0-9]+)?)/i],
     fHCO3:[/(?:HCO3|BICARB(?:ONATE)?|CHCO3)([0-9]+(?:[.,][0-9]+)?)/i],
@@ -842,11 +842,17 @@ function extractABGMapFromLines(text){
     if(!normalizedLine) continue;
     for(const [id,names] of Object.entries(aliases)){
       if(out[id]!==undefined) continue;
-      const alias=names.find(name=>compactLine.includes(name));
+      const alias=names.find(name=>{
+        if(name.length<=2){
+          return new RegExp('(?:^|\\s)'+name+'(?:\\s|[-+:=]|$)').test(normalizedLine);
+        }
+        return compactLine.includes(name);
+      });
       if(!alias) continue;
-      const idx=compactLine.indexOf(alias);
-      const after=compactLine.slice(idx+alias.length);
-      const before=compactLine.slice(Math.max(0,idx-12),idx);
+      const haystack=alias.length<=2?normalizedLine:compactLine;
+      const idx=haystack.indexOf(alias);
+      const after=haystack.slice(idx+alias.length);
+      const before=haystack.slice(Math.max(0,idx-12),idx);
       const nearby=(after+' '+before).match(/-?\d+(?:[.,]\d+)?/);
       const value=nearby?parseExtractedValue(id,nearby[0]):null;
       if(value!==null) out[id]=value;
@@ -859,14 +865,18 @@ function extractABGMapFromLines(text){
 function extractABGValueSequence(text){
   const nums=(text.match(/-?\d+(?:[.,]\d+)?/g)||[]).slice(0,40);
   for(let i=0;i<=nums.length-4;i++){
+    if(!/^[6-8][.,]\d{2}$/.test(nums[i])) continue;
     const fpH=parseExtractedValue('fpH',nums[i]);
     const fPaCO2=parseExtractedValue('fPaCO2',nums[i+1]);
     const fPaO2=parseExtractedValue('fPaO2',nums[i+2]);
     const fHCO3=parseExtractedValue('fHCO3',nums[i+3]);
     if(fpH===null||fPaCO2===null||fPaO2===null||fHCO3===null) continue;
+    if(fPaCO2<15||fPaCO2>100) continue;
+    if(fPaO2<30||fPaO2>250) continue;
+    if(fHCO3<8||fHCO3>45) continue;
     const out={fpH,fPaCO2,fPaO2,fHCO3};
     const be=parseExtractedValue('fBE',nums[i+4]);
-    if(be!==null) out.fBE=be;
+    if(be!==null && be>=-20 && be<=20) out.fBE=be;
     return out;
   }
   return {};
