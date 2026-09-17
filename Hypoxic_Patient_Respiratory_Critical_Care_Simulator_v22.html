@@ -151,6 +151,7 @@ input,select{width:100%;padding:10px;border:1px solid #c9d4e2;border-radius:10px
     <button class="btn" id="btnType1" onclick="goType1()">TYPE 1 RF → SELECT SUPPORT</button>
     <button class="btn" id="btnType2" onclick="goType2()">TYPE 2 RF → NIV / INTUBATION</button>
     <button class="btn red" id="btnMixed" onclick="goMixed()">MIXED RF → SELECT SUPPORT</button>
+    <button class="btn secondary" id="btnNoClassic" onclick="goNoClassic()">NO CLASSIC TYPE 1/2 RF → PROCEED TO MANAGEMENT</button>
   </div>
 </div>
 </section>
@@ -953,6 +954,9 @@ function getPathOrder(){
     if(state.selectedSupport==='NIV') return base.concat(['mixed','niv']);
     if(state.selectedSupport==='INTUBATION') return base.concat(['mixed','intubation']);
   }
+  if(t==='No classic Type 1/2 RF'){
+    return base.concat(['etiology']);
+  }
   return base;
 }
 
@@ -1033,6 +1037,13 @@ const etiologyByRF = {
     ['asthma','Severe Asthma'],
     ['pulmonary_edema','Massive / Cardiogenic Pulmonary Edema'],
     ['atelectasis','Atelectasis']
+  ],
+  'No classic Type 1/2 RF': [
+    ['early_hypoxemia','Early / Compensated Hypoxemic Process'],
+    ['mild_vq_mismatch','Mild V/Q Mismatch (Pre-ARDS / Early Pneumonia)'],
+    ['anxiety_hyperventilation','Anxiety-Related Hyperventilation'],
+    ['metabolic','Metabolic / Non-Respiratory Cause of Symptoms'],
+    ['observe','Continue Observation — No Acute Respiratory Failure']
   ]
 };
 
@@ -1232,10 +1243,19 @@ function calculateABG(){
         ? 'A–a gradient is elevated — consider V/Q mismatch, early shunt or diffusion impairment.'
         : 'A–a gradient is markedly elevated — significant V/Q mismatch, shunt or diffusion impairment is likely.';
 
+  /* Classification follows the standard ABG reference table:
+       Type 1 (Hypoxemic RF):        PaO2 <60         AND PaCO2 normal/low (<=50)
+       Type 2 (Hypercapnic RF):      PaO2 normal/low  AND PaCO2 >50
+       Mixed Type 1 + Type 2:        PaO2 <60         AND PaCO2 >50
+     Mixed is checked first since it is the intersection of the other two. */
   const type =
-    paco2>45 && pao2<60
-      ? (aa>20?'Mixed Type 1 + Type 2 RF':'Type 2 RF')
-      : (pao2<60 && aa>20?'Type 1 RF':'No classic Type 1/2 RF');
+    (paco2>50 && pao2<60)
+      ? 'Mixed Type 1 + Type 2 RF'
+      : paco2>50
+        ? 'Type 2 RF'
+        : pao2<60
+          ? 'Type 1 RF'
+          : 'No classic Type 1/2 RF';
 
   state={
     ph,pao2,paco2,fio2,aa,pf,
@@ -1245,13 +1265,28 @@ function calculateABG(){
     selectedSupport:''
   };
 
+  const rfTableHtml =
+    '<table class="etiology-treatment-table"><thead><tr>'+
+    '<th>Type</th><th>PaO₂</th><th>PaCO₂</th><th>Typical ABG</th></tr></thead><tbody>'+
+    '<tr'+(type==='Type 1 RF'?' style="background:#fff3cd;font-weight:600"':'')+'>'+
+      '<td>Type 1 — Hypoxemic RF</td><td>&lt;60 mmHg</td><td>Normal or low, usually ≤50</td>'+
+      '<td>↓PaO₂, normal/↓PaCO₂</td></tr>'+
+    '<tr'+(type==='Type 2 RF'?' style="background:#fff3cd;font-weight:600"':'')+'>'+
+      '<td>Type 2 — Hypercapnic RF</td><td>May be low or normal</td><td>&gt;50 mmHg</td>'+
+      '<td>↑PaCO₂, often ↓pH</td></tr>'+
+    '<tr'+(type==='Mixed Type 1 + Type 2 RF'?' style="background:#fff3cd;font-weight:600"':'')+'>'+
+      '<td>Mixed Type 1 + Type 2</td><td>&lt;60 mmHg</td><td>&gt;50 mmHg</td>'+
+      '<td>↓PaO₂ + ↑PaCO₂</td></tr>'+
+    '</tbody></table>';
+
   box('abgOut','ABG + A–a GRADIENT',
     'PAO₂ = <b>'+PAO2.toFixed(1)+' mmHg</b><br>'+
     'PaO₂ = <b>'+pao2.toFixed(1)+' mmHg</b><br>'+
     'A–a gradient = <b>'+aa.toFixed(1)+' mmHg</b><br>'+
     'P/F ratio = <b>'+pf.toFixed(0)+'</b><br><br>'+
     '<b>A–a INTERPRETATION:</b> '+aaInterpretation+
-    '<br><br><b>CLASSIFICATION:</b> '+type,
+    '<br><br><b>CLASSIFICATION:</b> '+type+
+    '<br><br>'+rfTableHtml,
     'warn');
 
   classify();
@@ -1277,6 +1312,7 @@ function classify(){
   $('btnType1').classList.toggle('hidden',t!=='Type 1 RF');
   $('btnType2').classList.toggle('hidden',t!=='Type 2 RF');
   $('btnMixed').classList.toggle('hidden',t!=='Mixed Type 1 + Type 2 RF');
+  $('btnNoClassic').classList.toggle('hidden',t!=='No classic Type 1/2 RF');
 
   if(t==='Type 2 RF'){
     $('type2Intro').innerHTML='<div class="result warn">pH = <b>'+state.ph+
@@ -1296,6 +1332,7 @@ function classify(){
 function goType1(){ state.selectedSupport=''; _v20ShowPage('type1'); }
 function goType2(){ state.selectedSupport=''; _v20ShowPage('type2'); }
 function goMixed(){ state.selectedSupport=''; _v20ShowPage('mixed'); }
+function goNoClassic(){ state.selectedSupport=''; _v20ShowPage('etiology'); }
 
 function selectSupport(path,support){
   state.selectedSupport=support;
