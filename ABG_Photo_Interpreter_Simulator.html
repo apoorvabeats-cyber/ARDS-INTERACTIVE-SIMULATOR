@@ -836,7 +836,32 @@ function parseExtractedValue(id,raw){
     fTemp:[30,45]
   };
   const [min,max]=limits[id]||[-Infinity,Infinity];
-  return value>=min&&value<=max?value:null;
+  if(value>=min&&value<=max) return value;
+
+  /* OCR on thermal-printer receipts frequently drops the decimal point
+     entirely on the acid-base block (e.g. "83.3" -> "833", "29.51" ->
+     "2951"), which then fails range validation and is lost. Before
+     giving up, try re-inserting a decimal point 1 or 2 digits from the
+     right and accept it if that lands back in range.
+     Deliberately scoped to only the core respiratory/acid-base fields
+     (pH, PaCO2, PaO2, HCO3, BE) where this specific failure has been
+     confirmed. NOT applied to electrolytes/metabolites: those sit in a
+     part of the printout prone to a different failure (OCR reading-order
+     scrambling between adjacent labels/values), so a wildly-out-of-range
+     number there is more likely a value from the wrong field entirely -
+     reinterpreting it with a decimal point would silently produce a
+     plausible-looking but wrong result instead of correctly returning
+     null. */
+  const decimalRecoveryFields=['fpH','fPaCO2','fPaO2','fHCO3','fBE'];
+  if(decimalRecoveryFields.includes(id) && /^\d+$/.test(rawStr) && rawStr.length>=3){
+    for(const decimalsFromRight of [1,2]){
+      const cut=rawStr.length-decimalsFromRight;
+      if(cut<1) continue;
+      const candidate=parseFloat(rawStr.slice(0,cut)+'.'+rawStr.slice(cut));
+      if(Number.isFinite(candidate) && candidate>=min && candidate<=max) return candidate;
+    }
+  }
+  return null;
 }
 
 function extractABGMap(text){
@@ -951,10 +976,10 @@ function extractABGMapFromLines(text){
   const aliases={
     fpH:['PH'],
     fPaCO2:['PACO2','PCO2','PCO','CO2'],
-    fPaO2:allowPaOShorthand?['PAO2','PO2','PAO']:['PAO2','PO2'],
+    fPaO2:allowPaOShorthand?['PAO2','PO2','PAO','PO']:['PAO2','PO2','PO'],
     fHCO3:['HCO3','HCO','BICARB','BICARBONATE','CHCO3'],
     fBE:['BE','SBE','BEECF','BASEEXCESS','BASEDEFICIT','CBASE','BASEECF','BASEB'],
-    fFiO2:['FIO2','O2CONCENTRATION'],
+    fFiO2:['FIO2','O2CONCENTRATION','FIO'],
     fNa:['NA','SODIUM','CNA'],
     fCl:['CL','CHLORIDE','CCL'],
     fK:['K','POTASSIUM','CK'],
@@ -1007,7 +1032,7 @@ function extractABGValueSequence(text){
   const markerDefs=[
     {id:'fpH',regex:/\bPH\b/g},
     {id:'fPaCO2',regex:/\b(?:PACO2|PCO2|PCO)\b/g},
-    {id:'fPaO2',regex:allowPaOShorthand?/\b(?:PAO2|PO2|PAO)\b/g:/\b(?:PAO2|PO2)\b/g},
+    {id:'fPaO2',regex:allowPaOShorthand?/\b(?:PAO2|PO2|PAO|PO)\b/g:/\b(?:PAO2|PO2|PO)\b/g},
     {id:'fHCO3',regex:/\b(?:HCO3|HCO|BICARB(?:ONATE)?)\b/g},
     {id:'fBE',regex:/\b(?:BE|SBE)\b/g}
   ];
