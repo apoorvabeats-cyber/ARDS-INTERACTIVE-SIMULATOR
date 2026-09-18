@@ -129,6 +129,10 @@ ul.abnorm li b{color:#eaf2f7}
 
   <!-- OCR status -->
   <div id="ocrStatus" class="ocr-status"></div>
+  <div id="ocrRawWrap" style="display:none;margin:6px 0">
+    <button type="button" onclick="toggleRawOCR()" id="rawOcrToggle" style="font-size:12px;padding:4px 8px">Show raw OCR text</button>
+    <textarea id="ocrRawText" readonly style="display:none;width:100%;min-height:140px;margin-top:6px;font-family:monospace;font-size:11px;white-space:pre-wrap;background:#0b1a20;color:#bcd4dc;border:1px solid #2e4d5c;border-radius:8px;padding:8px"></textarea>
+  </div>
 
   <!-- Manual / review form -->
   <div id="manualForm" style="display:none;margin-top:10px">
@@ -618,6 +622,7 @@ async function runOCR(canvas){
     let bestText='';
     let bestScore=0;
     const merged={};
+    const allPassText=[];
 
     for(const variant of variants){
       setOCRStatus('🔍 '+variant.label+'…','running');
@@ -644,6 +649,7 @@ async function runOCR(canvas){
 
       const text=(result&&result.data&&result.data.text)||'';
       console.log('ABG OCR '+variant.label+':',text);
+      allPassText.push('----- '+variant.label+' -----\n'+text);
 
       const values=extractABGMap(text);
       const score=scoreExtractedValues(values);
@@ -663,6 +669,12 @@ async function runOCR(canvas){
     }
 
     const bestValues=merged;
+    const rawWrap=document.getElementById('ocrRawWrap');
+    const rawBox=document.getElementById('ocrRawText');
+    if(rawWrap && rawBox){
+      rawBox.value=allPassText.join('\n\n');
+      rawWrap.style.display='block';
+    }
 
     // Always proceed — even if 0 matches, open the form (never leave user stranded)
     if(bestScore>0){
@@ -848,8 +860,9 @@ function extractABGMap(text){
       new RegExp('\\b'+paoLabelPattern+'\\b[^\\r\\n]{0,18}?([0-9]+(?:[.,][0-9]+)?)','i')
     ],
     fHCO3:[
+      /\b(?:c?HC[O0]3)-?\([^)]{0,10}\)c?[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i,
       /\b(?:HC[O0]3-act|HC[O0]3-std|cHC[O0]3|HC[O0]3|BICARB(?:ONATE)?|HCO)\b[^\S\r\n:=-]*[:=-]?[^\S\r\n]*([0-9]+(?:[.,][0-9]+)?)/i,
-      /\b(?:HC[O0]3-act|HC[O0]3-std|cHC[O0]3|HC[O0]3|BICARB(?:ONATE)?|HCO)\b[^\r\n]{0,18}?([0-9]+(?:[.,][0-9]+)?)/i
+      /\b(?:HC[O0]3-act|HC[O0]3-std|cHC[O0]3|HC[O0]3|BICARB(?:ONATE)?|HCO)\b[^\r\n]{0,26}?([0-9]+(?:[.,][0-9]+)?)/i
     ],
     fBE:[
       /\b(?:BE|SBE|BEecf)\s*\([^)]{0,10}\)[\s:=-]*(-?[0-9]+(?:[.,][0-9]+)?)/i,
@@ -1044,6 +1057,15 @@ function extractValues(text){
 /* ============================================================
    Manual form
    ============================================================ */
+function toggleRawOCR(){
+  const box=document.getElementById('ocrRawText');
+  const btn=document.getElementById('rawOcrToggle');
+  if(!box) return;
+  const showing=box.style.display!=='none';
+  box.style.display=showing?'none':'block';
+  if(btn) btn.textContent=showing?'Show raw OCR text':'Hide raw OCR text';
+}
+
 function showManual(){
   document.getElementById('manualForm').style.display='block';
   document.getElementById('cameraWrap').style.display='none';
