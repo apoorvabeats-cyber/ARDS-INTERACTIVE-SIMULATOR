@@ -616,8 +616,8 @@ async function runOCR(canvas){
     ];
 
     let bestText='';
-    let bestValues={};
     let bestScore=0;
+    const merged={};
 
     for(const variant of variants){
       setOCRStatus('🔍 '+variant.label+'…','running');
@@ -650,11 +650,19 @@ async function runOCR(canvas){
       if(score>bestScore){
         bestScore=score;
         bestText=text;
-        bestValues=values;
+      }
+      /* Merge this pass's fields into the running result: first successful
+         read of each field wins, so a field only this pass caught (even if
+         its overall score is lower than another pass) is still kept rather
+         than discarded when a different pass "wins" on total score. */
+      for(const [k,v] of Object.entries(values)){
+        if(merged[k]===undefined) merged[k]=v;
       }
 
-      if(values.fpH!==undefined && values.fPaCO2!==undefined && values.fHCO3!==undefined && score>=8) break;
+      if(merged.fpH!==undefined && merged.fPaCO2!==undefined && merged.fPaO2!==undefined && merged.fHCO3!==undefined) break;
     }
+
+    const bestValues=merged;
 
     // Always proceed — even if 0 matches, open the form (never leave user stranded)
     if(bestScore>0){
