@@ -194,7 +194,7 @@ ul.abnorm li b{color:#eaf2f7}
     </div>
     <div class="row3" style="margin-bottom:8px">
       <div class="field">
-        <label><span class="tip">Sample Type<span class="tip-box">Auto-detected from the report text ("Sample type: Arterial/Venous") when readable, otherwise estimated from sO₂ and PaO₂ together. P/F ratio and A-a gradient are only valid for arterial blood — override this if the detection looks wrong.</span></span></label>
+        <label><span class="tip">Sample Type<span class="tip-box">Estimated from sO₂ and PaO₂ together (not from the report's own printed "Sample type" label, which is often unreliable). P/F ratio and A-a gradient are only valid for arterial blood — override this if the estimate looks wrong.</span></span></label>
         <select id="fSampleType">
           <option value="arterial">Arterial</option>
           <option value="venous">Venous</option>
@@ -698,23 +698,18 @@ async function runOCR(canvas){
     if(bestScore===0) extractValues(bestText);
     showManual();
 
-    // Sample type: prefer an explicit label found anywhere across all passes;
-    // fall back to the sO2/PaO2 heuristic only if no label was read at all.
+    // Sample type: inferred purely from sO2/PaO2 values, not from the
+    // report's own printed "Sample type" label — that label is often
+    // wrong in practice, so it is deliberately not trusted here.
     const sampleTypeSel=document.getElementById('fSampleType');
     const sampleTypeNote=document.getElementById('sampleTypeNote');
     if(sampleTypeSel){
-      const explicitType=detectSampleTypeFromText(allPassText.join('\n'));
-      if(explicitType){
-        sampleTypeSel.value=explicitType;
-        if(sampleTypeNote) sampleTypeNote.textContent='Detected from report text: '+(explicitType==='venous'?'Venous':'Arterial')+'.';
-      } else {
-        const guess=suggestSampleTypeFromValues(bestValues.fPaO2!==undefined?bestValues.fPaO2:null,bestValues.fSpO2!==undefined?bestValues.fSpO2:null);
-        if(guess.type!=='unknown'){
-          sampleTypeSel.value=guess.type;
-          if(sampleTypeNote) sampleTypeNote.textContent=(guess.confidence==='likely'?'Estimated from values: ':'Uncertain — please verify: ')+guess.reason;
-        } else if(sampleTypeNote){
-          sampleTypeNote.textContent=guess.reason||'';
-        }
+      const guess=suggestSampleTypeFromValues(bestValues.fPaO2!==undefined?bestValues.fPaO2:null,bestValues.fSpO2!==undefined?bestValues.fSpO2:null);
+      if(guess.type!=='unknown'){
+        sampleTypeSel.value=guess.type;
+        if(sampleTypeNote) sampleTypeNote.textContent=(guess.confidence==='likely'?'Estimated from sO₂/PaO₂: ':'Uncertain — please verify: ')+guess.reason;
+      } else if(sampleTypeNote){
+        sampleTypeNote.textContent=guess.reason||'Could not estimate from sO₂/PaO₂ — please confirm manually.';
       }
     }
 
@@ -895,26 +890,10 @@ function parseExtractedValue(id,raw){
   return null;
 }
 
-/* Primary: look for an explicit "Sample type: Arterial/Venous" label, which
-   most blood gas analyzers (Radiometer, RAPIDPoint, etc.) print directly.
-   This is far more reliable than inferring from values, so it always wins
-   when present. Scans for VENOUS first since a false "arterial" default is
-   the more dangerous mistake (would validate a P/F ratio/A-a gradient that
-   isn't real). */
-function detectSampleTypeFromText(text){
-  if(!text) return null;
-  const compact=text.toUpperCase().replace(/[^A-Z\s]/g,' ').replace(/\s+/g,' ');
-  if(/\bVENOUS\b/.test(compact)) return 'venous';
-  if(/\bARTERIAL\b/.test(compact)) return 'arterial';
-  return null;
-}
-
-/* Fallback heuristic when no explicit label was read: infer likely sample
-   type from sO2 (measured directly on the same sample by co-oximetry) and
-   PaO2 together. Deliberately conservative — only flags "likely venous"
-   when BOTH values point the same way, since either one alone overlaps
-   too much between severe hypoxaemic arterial blood and normal venous
-   blood to be trusted in isolation. Returns {type, confidence, reason}. */
+/* Sample type is inferred purely from sO2/PaO2 values (see
+   suggestSampleTypeFromValues below) rather than from any "Sample type:
+   Arterial/Venous" label printed on the report — that printed label is
+   often wrong in practice and is deliberately not used as a signal here. */
 function suggestSampleTypeFromValues(pao2,spo2){
   if(pao2===null&&spo2===null) return {type:'unknown',confidence:'none',reason:''};
   if(pao2!==null&&spo2!==null){
