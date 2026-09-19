@@ -705,12 +705,8 @@ async function runOCR(canvas){
     const sampleTypeNote=document.getElementById('sampleTypeNote');
     if(sampleTypeSel){
       const guess=suggestSampleTypeFromValues(bestValues.fPaO2!==undefined?bestValues.fPaO2:null,bestValues.fSpO2!==undefined?bestValues.fSpO2:null);
-      if(guess.type!=='unknown'){
-        sampleTypeSel.value=guess.type;
-        if(sampleTypeNote) sampleTypeNote.textContent=(guess.confidence==='likely'?'Estimated from sO₂/PaO₂: ':'Uncertain — please verify: ')+guess.reason;
-      } else if(sampleTypeNote){
-        sampleTypeNote.textContent=guess.reason||'Could not estimate from sO₂/PaO₂ — please confirm manually.';
-      }
+      sampleTypeSel.value=guess.type;
+      if(sampleTypeNote) sampleTypeNote.textContent=(guess.confidence==='likely'?'Estimated from sO₂/PaO₂: ':guess.confidence==='none'?'':'Not confirmed — please verify: ')+guess.reason;
     }
 
   }catch(e){
@@ -893,9 +889,17 @@ function parseExtractedValue(id,raw){
 /* Sample type is inferred purely from sO2/PaO2 values (see
    suggestSampleTypeFromValues below) rather than from any "Sample type:
    Arterial/Venous" label printed on the report — that printed label is
-   often wrong in practice and is deliberately not used as a signal here. */
+   often wrong in practice and is deliberately not used as a signal here.
+   Always commits to arterial or venous rather than leaving it unresolved,
+   defaulting to arterial when the values don't clearly confirm either way
+   — arterial is both the overwhelmingly more common case for this tool
+   and the safer default: a wrong arterial call still computes P/F/A-a
+   with a visible "unconfirmed" caveat, whereas a wrong venous call would
+   silently suppress a real hypoxaemia finding instead. */
 function suggestSampleTypeFromValues(pao2,spo2){
-  if(pao2===null&&spo2===null) return {type:'unknown',confidence:'none',reason:''};
+  if(pao2===null&&spo2===null){
+    return {type:'arterial',confidence:'none',reason:'No PaO₂ or sO₂ value available to estimate from — defaulting to arterial.'};
+  }
   if(pao2!==null&&spo2!==null){
     if(pao2<50&&spo2<75){
       return {type:'venous',confidence:'likely',
@@ -905,17 +909,18 @@ function suggestSampleTypeFromValues(pao2,spo2){
       return {type:'arterial',confidence:'likely',
         reason:'PaO₂ '+pao2+' with sO₂ '+spo2+'% are consistent with an arterial sample.'};
     }
-    return {type:'unknown',confidence:'uncertain',
-      reason:'PaO₂ '+pao2+' with sO₂ '+spo2+'% is in a range that overlaps between hypoxaemic arterial and venous blood — please confirm the sample type from the report if possible.'};
+    return {type:'arterial',confidence:'uncertain',
+      reason:'PaO₂ '+pao2+' with sO₂ '+spo2+'% is in a range that overlaps between hypoxaemic arterial and venous blood — defaulting to arterial. Verify the sample source if this looks wrong.'};
   }
-  // Only one of the two available — weaker signal, wider margins
-  if(spo2!==null&&spo2<70){
-    return {type:'venous',confidence:'uncertain',reason:'sO₂ '+spo2+'% alone is more typical of venous than arterial blood.'};
+  // Only one of the two available — need a clearer signal before calling venous
+  if(spo2!==null&&spo2<65){
+    return {type:'venous',confidence:'uncertain',reason:'sO₂ '+spo2+'% alone is more typical of venous than arterial blood — verify if possible.'};
   }
   if(pao2!==null&&pao2<40){
-    return {type:'venous',confidence:'uncertain',reason:'PaO₂ '+pao2+' alone is more typical of venous than arterial blood.'};
+    return {type:'venous',confidence:'uncertain',reason:'PaO₂ '+pao2+' alone is more typical of venous than arterial blood — verify if possible.'};
   }
-  return {type:'unknown',confidence:'none',reason:''};
+  const which=pao2!==null?'PaO₂ '+pao2:'sO₂ '+spo2+'%';
+  return {type:'arterial',confidence:'uncertain',reason:which+' alone does not clearly confirm arterial vs venous — defaulting to arterial.'};
 }
 
 function extractABGMap(text){
@@ -1406,7 +1411,7 @@ function renderResults(res){
     <h3>${res.primary}</h3>
     <p><b>pH Status:</b> ${res.phStatus} ${sevBadge(res.phSeverity)} (pH ${res.pH.toFixed(2)})</p>
     <p><b>Compensation:</b> ${res.comp}</p>`;
-  if(res.venousSample) dHTML+=`<p><b>Oxygenation:</b> Not calculated — venous sample (PaO₂ ${pao2} reflects tissue extraction, not lung function)</p>`;
+  if(res.venousSample) dHTML+=`<p><b>Oxygenation:</b> Not calculated — venous sample (PaO₂ ${res.pao2} reflects tissue extraction, not lung function)</p>`;
   else if(res.pf!==undefined) dHTML+=`<p><b>Oxygenation:</b> ${res.hypoxSev} — P/F ${res.pf.toFixed(0)}, A-a gradient ${res.aaGrad.toFixed(1)} mmHg${res.sampleTypeUncertain?' <span style="color:#e0b04a">(sample type unconfirmed)</span>':''}</p>`;
   if(res.agHigh) dHTML+=`<p><b>Anion Gap:</b> ${res.ag.toFixed(0)} (HIGH) — ${res.ddInterp||'HAGMA'}</p>`;
   if(res.lactateSev) dHTML+=`<p><b>Lactate:</b> ${res.lactateSev}</p>`;
