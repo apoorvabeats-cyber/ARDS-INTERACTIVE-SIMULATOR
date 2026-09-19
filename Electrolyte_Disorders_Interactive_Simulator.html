@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Electrolyte Disorders — Critical Care Simulator</title>
+<style>
+  :root{
+    --bg:#0b1a20; --bg2:#0f2530; --card:#ffffff; --card-ink:#122733;
+    --line:#2e4d5c; --accent:#3fa9c9; --accent-dark:#1f6d8a;
+    --ink:#bcd4dc; --ink-dim:#7fa0ac;
+    --high:#c0392b; --high-bg:#fdecea;
+    --low:#1f6d8a; --low-bg:#e9f4f8;
+    --warn:#b8860b; --warn-bg:#fdf6e3;
+    --good:#1e7d4f; --good-bg:#e8f6ee;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--ink);padding-bottom:40px;
+  }
+  header{
+    padding:22px 16px 16px;text-align:center;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,var(--bg2),var(--bg));
+  }
+  header h1{margin:0 0 4px;font-size:20px;color:#fff;letter-spacing:.2px}
+  header p{margin:0;font-size:13px;color:var(--ink-dim)}
+  .wrap{max-width:760px;margin:0 auto;padding:16px}
+
+  /* Menu grid */
+  .menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+  @media (max-width:420px){.menu-grid{grid-template-columns:1fr}}
+  .menu-card{
+    background:var(--bg2);border:1px solid var(--line);border-radius:12px;
+    padding:14px;text-align:left;cursor:pointer;color:#fff;
+    display:flex;flex-direction:column;gap:4px;transition:border-color .15s;
+  }
+  .menu-card:active{border-color:var(--accent)}
+  .menu-card .tag{
+    font-size:10px;font-weight:700;letter-spacing:.4px;padding:2px 7px;
+    border-radius:20px;display:inline-block;width:fit-content;
+  }
+  .tag.high{background:var(--high-bg);color:var(--high)}
+  .tag.low{background:var(--low-bg);color:var(--low)}
+  .menu-card .name{font-size:15px;font-weight:600;margin-top:2px}
+  .menu-card .range{font-size:11.5px;color:var(--ink-dim)}
+
+  /* Detail view */
+  #detailView{display:none}
+  .backbtn{
+    background:none;border:1px solid var(--line);color:var(--ink);
+    padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;cursor:pointer;
+  }
+  .disorder-head{margin-bottom:14px}
+  .disorder-head .tag{
+    font-size:11px;font-weight:700;letter-spacing:.4px;padding:3px 9px;border-radius:20px;
+  }
+  .disorder-head h2{color:#fff;margin:8px 0 2px;font-size:21px}
+  .disorder-head .subtitle{font-size:13px;color:var(--ink-dim)}
+
+  .card{
+    background:var(--card);color:var(--card-ink);border-radius:12px;
+    padding:16px;margin-bottom:12px;border-left:4px solid var(--accent-dark);
+  }
+  .card h3{margin:0 0 10px;font-size:14.5px;letter-spacing:.2px;color:var(--accent-dark)}
+  .card p{margin:0 0 8px;font-size:14px;line-height:1.5}
+  .card p:last-child{margin-bottom:0}
+  .card ul{margin:0;padding-left:20px}
+  .card li{font-size:13.5px;line-height:1.55;margin-bottom:6px}
+  .card li:last-child{margin-bottom:0}
+  .severity-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+  .sev-chip{font-size:12px;padding:4px 10px;border-radius:20px;font-weight:600}
+  .sev-mild{background:var(--good-bg);color:var(--good)}
+  .sev-mod{background:var(--warn-bg);color:var(--warn)}
+  .sev-sev{background:var(--high-bg);color:var(--high)}
+
+  .mgmt-step{
+    border:1px solid #dfe6ea;border-radius:10px;padding:12px 14px;margin-bottom:10px;
+    background:#fbfdfe;
+  }
+  .mgmt-step:last-child{margin-bottom:0}
+  .mgmt-step .step-title{font-weight:700;font-size:13.5px;color:var(--card-ink);margin-bottom:4px}
+  .mgmt-step .step-body{font-size:13.5px;line-height:1.55;color:#3a4a52}
+  .mgmt-step.emergency{border-color:#e8b4ad;background:#fdf3f2}
+  .mgmt-step.emergency .step-title{color:var(--high)}
+  .mgmt-step.caution{border-color:#e6d190;background:#fdf9ee}
+  .mgmt-step.caution .step-title:before{content:"⚠ "}
+
+  .pearl-box{
+    background:#fff7e6;border:1px solid #f0d99a;border-radius:10px;
+    padding:12px 14px;font-size:13px;line-height:1.55;color:#6b4e0a;
+  }
+  .pearl-box b{color:#8a5a00}
+  .ref-note{font-size:11px;color:var(--ink-dim);text-align:center;margin-top:18px;padding:0 8px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Electrolyte Disorders</h1>
+  <p>Diagnosis &amp; guideline-based management — Critical Care Reference</p>
+</header>
+
+<div class="wrap">
+
+  <div id="menuGrid" class="menu-grid"></div>
+
+  <div id="detailView">
+    <button class="backbtn" onclick="showMenu()">← All disorders</button>
+    <div id="detailContent"></div>
+  </div>
+
+  <div class="ref-note">Reference guide only — always correlate with the full clinical picture, trend values, and unit protocols before acting.</div>
+</div>
+
+<script>
+const DISORDERS = {
+
+sodium_low: {
+  name:'Hyponatremia', tag:'low', range:'Na⁺ &lt;135 mEq/L',
+  subtitle:'Serum sodium below 135 mEq/L',
+  severity:[
+    {label:'Mild',cls:'sev-mild',range:'130–134'},
+    {label:'Moderate',cls:'sev-mod',range:'125–129'},
+    {label:'Severe',cls:'sev-sev',range:'&lt;125'}
+  ],
+  causes:[
+    'Hypovolaemic: GI losses (vomiting, diarrhoea), diuretics, third-spacing, cerebral/renal salt wasting, adrenal insufficiency',
+    'Euvolaemic: SIADH (malignancy, CNS/pulmonary disease, drugs), hypothyroidism, primary polydipsia, low solute intake',
+    'Hypervolaemic: heart failure, cirrhosis, nephrotic syndrome, advanced renal failure',
+    'Pseudohyponatraemia: severe hyperlipidaemia or hyperproteinaemia (lab artefact)',
+    'Translocational: hyperglycaemia — corrected Na = measured Na + 1.6–2.4 mEq/L per 100 mg/dL glucose above 100'
+  ],
+  symptoms:[
+    'Chronic/mild: often asymptomatic, or nausea, headache, mild confusion, unsteady gait',
+    'Acute/severe (usually Na &lt;120 or rapid drop): confusion, seizures, coma, respiratory arrest from cerebral oedema',
+    'Risk is driven far more by the RATE of fall than the absolute number — acute drops are dangerous at higher Na than slow chronic ones'
+  ],
+  diagnosis:[
+    'Confirm true hypotonic hyponatraemia — exclude pseudohyponatraemia and correct for hyperglycaemia first',
+    'Assess volume status clinically (skin turgor, JVP, oedema, orthostatics)',
+    'Urine osmolality: &lt;100 mOsm/kg suggests primary polydipsia or low solute intake (appropriately suppressed ADH); ≥100 suggests ADH is active (SIADH, hypovolaemia, hypervolaemic states, renal failure)',
+    'Urine sodium: &lt;30 mEq/L suggests hypovolaemia (extra-renal loss) or effective volume depletion (CHF/cirrhosis); ≥30 mEq/L suggests SIADH, renal salt wasting, diuretics, or adrenal insufficiency',
+    'Check TSH and morning cortisol/short synacthen test if euvolaemic — hypothyroidism and adrenal insufficiency are reversible causes'
+  ],
+  management:[
+    {title:'Acute symptomatic hyponatraemia (seizure, coma, resp. distress)',body:'3% hypertonic saline 100–150 mL IV bolus over 10–20 min. Repeat up to 2–3 times (or check Na after each bolus) until symptoms improve or Na has risen 4–6 mEq/L — this modest rise is usually enough to reduce cerebral oedema; full correction is not the goal acutely.',emergency:true},
+    {title:'Correction-rate limit — osmotic demyelination risk',body:'Do not exceed 8 mEq/L rise in any 24-hour period in most patients (some protocols use ≤10–12). Use a stricter limit of ≤4–6 mEq/L/24h in high-risk patients: chronic alcohol use, malnutrition, advanced liver disease, hypokalaemia, or Na &lt;105 mEq/L at presentation.',caution:true},
+    {title:'If correction rate is exceeded',body:'Re-lower serum sodium — stop hypertonic saline, give free water (oral or IV D5W), and consider desmopressin (the "DDAVP clamp") to prevent further autonomous water diuresis while re-lowering.',caution:true},
+    {title:'Chronic hypovolaemic hyponatraemia',body:'Isotonic (0.9%) saline to restore volume; this alone corrects ADH-driven water retention as volume normalises.'},
+    {title:'Chronic SIADH (euvolaemic)',body:'Fluid restriction (typically &lt;800–1000 mL/day) as first line. If inadequate: increase solute intake (salt tablets, oral urea), or add a loop diuretic. Vaptans (e.g. tolvaptan) are an option for refractory cases but are NOT used in cirrhosis-related hyponatraemia (hepatotoxicity boxed warning, overly rapid correction risk) and require initiation with fluid liberalisation and close Na monitoring given rapid-correction risk.'},
+    {title:'Hypervolaemic hyponatraemia',body:'Fluid and sodium restriction; treat the underlying heart failure or cirrhosis; loop diuretics as needed for volume management.'}
+  ],
+  pearl:'The correction-RATE limit applies regardless of cause once you start treating — track cumulative Na rise over rolling 24h windows, not just since starting treatment, especially if boluses are repeated.'
+},
+
+sodium_high: {
+  name:'Hypernatremia', tag:'high', range:'Na⁺ &gt;145 mEq/L',
+  subtitle:'Serum sodium above 145 mEq/L',
+  severity:[
+    {label:'Mild',cls:'sev-mild',range:'145–149'},
+    {label:'Moderate',cls:'sev-mod',range:'150–159'},
+    {label:'Severe',cls:'sev-sev',range:'≥160'}
+  ],
+  causes:[
+    'Pure water loss: diabetes insipidus (central or nephrogenic), insensible losses (fever, burns, mechanical ventilation), hypodipsia/impaired thirst',
+    'Hypotonic fluid loss: GI losses (osmotic diarrhoea), osmotic diuresis (hyperglycaemia, mannitol), excessive sweating',
+    'Sodium gain: hypertonic saline or sodium bicarbonate administration, mineralocorticoid excess, accidental salt ingestion',
+    'Almost always reflects a free-water deficit relative to sodium — in a conscious patient with intact thirst it rarely persists, so look for impaired access to water or altered mental status as the enabling factor'
+  ],
+  symptoms:[
+    'Lethargy, weakness, irritability, confusion progressing to seizures and coma in severe/rapid cases',
+    'Thirst (if intact), signs of hypovolaemia if concurrent volume loss',
+    'Polyuria with dilute urine suggests diabetes insipidus'
+  ],
+  diagnosis:[
+    'Assess volume status — hypovolaemic (most common), euvolaemic, or hypervolaemic hypernatraemia',
+    'Urine osmolality: low/inappropriately dilute despite hypernatraemia suggests diabetes insipidus; high urine osmolality suggests extrarenal water loss or inadequate intake with intact renal concentrating ability',
+    'Distinguish central vs nephrogenic DI: response to desmopressin — urine osmolality rises significantly in central DI, minimal/no response in nephrogenic DI',
+    'Free water deficit (L) = Total Body Water × [(current Na ÷ 140) − 1]; TBW ≈ 0.6 × weight(kg) in men, 0.5 × weight(kg) in women (use ~0.5/0.45 in the elderly)'
+  ],
+  management:[
+    {title:'Correction-rate limit',body:'Lower serum Na by no more than 10–12 mEq/L per 24 hours (many protocols use a more conservative ≤8) to avoid cerebral oedema from overly rapid correction. If hypernatraemia developed acutely (&lt;24–48h), faster correction is reasonable since there has been less time for brain osmotic adaptation.',caution:true},
+    {title:'Route of free water replacement',body:'Oral/enteral water is preferred whenever the GI tract is usable. If IV is required: D5W, or 0.45% saline if some sodium replacement is also needed. Replace the calculated free water deficit over the time needed to stay within the correction-rate limit, and separately continue to match ongoing losses.'},
+    {title:'Concurrent hypovolaemia',body:'If haemodynamically unstable, resuscitate first with isotonic (0.9%) saline to restore perfusion before switching focus to free-water replacement — correcting the free water deficit is not urgent enough to delay treating shock.',emergency:true},
+    {title:'Central diabetes insipidus',body:'Desmopressin (DDAVP), plus free water replacement for any existing deficit.'},
+    {title:'Nephrogenic diabetes insipidus',body:'Treat the underlying cause (stop lithium if applicable, correct hypercalcaemia/hypokalaemia). Low-sodium, low-protein diet plus a thiazide diuretic (paradoxically reduces urine output); NSAIDs (e.g. indomethacin) can be added as an adjunct.'},
+    {title:'Hypervolaemic hypernatraemia (rare)',body:'Diuretics to remove excess sodium, combined with free water replacement.'}
+  ],
+  pearl:'Recheck serum Na every 4–6 hours during active correction — the free water deficit formula is a starting estimate, not a fixed prescription; titrate the infusion to the measured trend.'
+},
+
+potassium_low: {
+  name:'Hypokalemia', tag:'low', range:'K⁺ &lt;3.5 mEq/L',
+  subtitle:'Serum potassium below 3.5 mEq/L',
+  severity:[
+    {label:'Mild',cls:'sev-mild',range:'3.0–3.4'},
+    {label:'Moderate',cls:'sev-mod',range:'2.5–2.9'},
+    {label:'Severe',cls:'sev-sev',range:'&lt;2.5'}
+  ],
+  causes:[
+    'GI losses: vomiting, diarrhoea, nasogastric suction, laxative abuse',
+    'Renal losses: loop/thiazide diuretics, hyperaldosteronism, renal tubular acidosis (type 1 and 2), Bartter/Gitelman syndromes, magnesium depletion',
+    'Transcellular shift: insulin, beta-2 agonists, alkalosis, hypokalaemic periodic paralysis, refeeding syndrome',
+    'Poor intake — uncommon alone but contributory in malnourished/ICU patients'
+  ],
+  symptoms:[
+    'Muscle weakness, cramps, fatigue; severe cases: flaccid paralysis, rhabdomyolysis, ileus',
+    'ECG: T-wave flattening, U waves, ST depression, QT/QU prolongation',
+    'Increased arrhythmia risk, especially with concurrent digoxin therapy'
+  ],
+  diagnosis:[
+    'Always check serum magnesium — hypomagnesaemia both causes renal K⁺ wasting and blocks effective repletion until corrected',
+    'Review medication list (diuretics, laxatives, beta-agonists, insulin) and recent GI losses',
+    'If cause unclear: check blood pressure and acid-base status, urine K⁺ and transtubular potassium gradient to distinguish renal from extrarenal loss'
+  ],
+  management:[
+    {title:'Correct magnesium first/concurrently',body:'Hypokalaemia is often refractory to potassium replacement alone if Mg²⁺ is also low — replete Mg²⁺ in parallel (see Hypomagnesaemia).',caution:true},
+    {title:'Oral replacement (mild–moderate, tolerating oral intake)',body:'KCl 40–100 mEq/day in divided doses is the preferred route when safe — better titratability and lower risk than IV.'},
+    {title:'IV replacement (severe, symptomatic, or NPO)',body:'KCl via peripheral line: maximum 10 mEq/hour. Higher rates (up to 20 mEq/hour) require a central line and continuous cardiac monitoring in an ICU/HDU setting for severe or critical hypokalaemia. As a rough guide, each 10 mEq raises serum K⁺ by roughly 0.1 mEq/L, but individual response varies — recheck levels regularly rather than relying on the estimate alone.',emergency:true},
+    {title:'Diluent choice',body:'Use normal saline as the diluent, not dextrose-containing fluids — the insulin response to dextrose can transiently drive potassium further into cells and worsen the hypokalaemia during replacement.'},
+    {title:'Monitoring',body:'Continuous cardiac (ECG) monitoring for severe hypokalaemia or any IV infusion rate above 10 mEq/hour; recheck serum K⁺ after each replacement cycle.'}
+  ],
+  pearl:'A patient on digoxin with hypokalaemia is at markedly increased risk of digoxin toxicity and arrhythmia even at K⁺ levels that would otherwise be considered only mildly low — treat more urgently in this context.'
+},
+
+potassium_high: {
+  name:'Hyperkalemia', tag:'high', range:'K⁺ &gt;5.0–5.5 mEq/L',
+  subtitle:'Serum potassium above 5.0–5.5 mEq/L',
+  severity:[
+    {label:'Mild',cls:'sev-mild',range:'5.5–5.9'},
+    {label:'Moderate',cls:'sev-mod',range:'6.0–6.4'},
+    {label:'Severe',cls:'sev-sev',range:'≥6.5 or any ECG changes'}
+  ],
+  causes:[
+    'Renal failure (acute or chronic) — reduced excretion is the most common underlying driver',
+    'Medications: ACE inhibitors, ARBs, potassium-sparing diuretics, NSAIDs, trimethoprim, non-selective beta-blockers',
+    'Tissue breakdown: rhabdomyolysis, tumour lysis syndrome, haemolysis, extensive burns/trauma',
+    'Transcellular shift: metabolic acidosis, insulin deficiency',
+    'Adrenal insufficiency, excessive potassium intake with impaired excretion'
+  ],
+  symptoms:[
+    'Often asymptomatic until ECG changes appear — muscle weakness and paraesthesias can occur',
+    'ECG progression: peaked T waves → PR prolongation and P-wave flattening → QRS widening → sine-wave pattern → ventricular fibrillation/asystole',
+    'Any ECG change in the setting of hyperkalaemia is a medical emergency regardless of the exact K⁺ number'
+  ],
+  diagnosis:[
+    'Exclude pseudohyperkalaemia (haemolysed sample, prolonged tourniquet time, marked thrombocytosis/leukocytosis) — recheck on a fresh unhaemolysed sample if the picture is inconsistent',
+    'Obtain a 12-lead ECG immediately in any significant hyperkalaemia',
+    'Review medications, renal function, and consider tissue-breakdown causes (CK, uric acid, LDH if rhabdomyolysis/tumour lysis suspected)'
+  ],
+  management:[
+    {title:'1. Stabilise the cardiac membrane',body:'IV calcium gluconate 10% 10 mL (or calcium chloride 10% 5–10 mL, preferably via a central line) over 2–3 minutes if ECG changes are present. Onset 1–3 minutes, duration 30–60 minutes — repeat if ECG changes persist or recur. This does NOT lower serum potassium, it only protects the heart while other measures take effect.',emergency:true},
+    {title:'2a. Shift potassium intracellularly — insulin/dextrose',body:'Regular insulin 10 units IV with 25 g dextrose (2 amps D50W, or an infusion if glucose is already elevated) given concurrently or dextrose immediately after. Onset 15–30 minutes, duration 4–6 hours, typically lowers K⁺ by ~0.5–1.2 mEq/L. Monitor glucose hourly for several hours — hypoglycaemia is a real risk, especially in renal failure or low body weight; some protocols reduce the insulin dose to 5 units in these groups.',emergency:true},
+    {title:'2b. Shift potassium intracellularly — beta-2 agonist',body:'Nebulised salbutamol 10–20 mg (well above the standard bronchodilator dose) — onset 15–30 minutes, additive effect with insulin/dextrose, lowers K⁺ by roughly another 0.5–1 mEq/L. Use with caution in patients with tachyarrhythmia or significant coronary disease.'},
+    {title:'2c. Sodium bicarbonate',body:'Reserve for hyperkalaemia with significant concurrent metabolic acidosis — not recommended as a routine standalone measure given limited evidence of benefit in isolation.'},
+    {title:'3. Remove potassium from the body',body:'Loop diuretics (e.g. furosemide) if renal function/urine output allow. Potassium binders — sodium zirconium cyclosilicate (faster onset, roughly within an hour) or patiromer (slower, more suited to non-emergent/chronic management) — bind potassium in the gut. Older resin (sodium polystyrene sulfonate) has questioned efficacy and a bowel-necrosis risk, and is now less favoured.'},
+    {title:'4. Dialysis',body:'The fastest and most definitive way to remove potassium — indicated for severe or refractory hyperkalaemia, especially with renal failure, or life-threatening ECG changes not responding to medical therapy.',emergency:true},
+    {title:'Throughout',body:'Continuous cardiac monitoring, stop any contributing medications, treat the underlying cause, and recheck serum potassium serially (the temporising measures above all wear off).'}
+  ],
+  pearl:'Calcium gluconate protects the heart but does not lower the potassium level — every patient who gets it still needs one of the potassium-lowering measures started alongside it.'
+},
+
+calcium_low: {
+  name:'Hypocalcemia', tag:'low', range:'Corrected Ca &lt;8.5 mg/dL',
+  subtitle:'Corrected total calcium &lt;8.5 mg/dL or ionised calcium &lt;1.1 mmol/L (4.4 mg/dL)',
+  severity:[
+    {label:'Mild',cls:'sev-mild',range:'Corrected 8.0–8.5'},
+    {label:'Moderate',cls:'sev-mod',range:'7.0–7.9'},
+    {label:'Severe',cls:'sev-sev',range:'&lt;7.0 or symptomatic'}
+  ],
+  causes:[
+    'Hypoparathyroidism — post-thyroidectomy/neck surgery, autoimmune',
+    'Vitamin D deficiency, chronic kidney disease (impaired 1-alpha hydroxylation)',
+    'Hypomagnesaemia — impairs both PTH secretion and PTH action; hypocalcaemia often will not correct until Mg²⁺ is replaced',
+    'Acute pancreatitis, sepsis/critical illness, massive blood transfusion (citrate chelation), tumour lysis syndrome, hyperphosphataemia'
+  ],
+  symptoms:[
+    'Perioral numbness and tingling, paraesthesias of the fingers/toes',
+    'Chvostek\'s sign (facial twitch on tapping the facial nerve) and Trousseau\'s sign (carpal spasm on BP cuff inflation)',
+    'Tetany, seizures; prolonged QT interval with arrhythmia risk; laryngospasm in severe cases'
+  ],
+  diagnosis:[
+    'Correct total calcium for albumin: corrected Ca (mg/dL) = measured Ca + 0.8 × (4.0 − albumin g/dL)',
+    'Ionised calcium is more reliable than corrected total calcium, particularly in critically ill patients — measure directly where available rather than relying on the correction formula',
+    'Check magnesium, phosphate, PTH, and vitamin D (25-OH-D) to identify the underlying cause'
+  ],
+  management:[
+    {title:'Correct magnesium first',body:'Replete Mg²⁺ before or alongside calcium if magnesium is low — calcium replacement is often ineffective while hypomagnesaemia persists.',caution:true},
+    {title:'Severe or symptomatic (tetany, seizure, arrhythmia, prolonged QT, ionised Ca &lt;0.8 mmol/L)',body:'IV calcium gluconate 10%, 1–2 g (90–180 mg elemental calcium) over 10–20 minutes, followed by a continuous infusion (e.g. 10 vials of 10% calcium gluconate in 1 L D5W, infused over 24 hours and titrated to ionised calcium). Use calcium gluconate rather than calcium chloride via a peripheral line — calcium chloride is a vesicant and risks tissue necrosis if it extravasates.',emergency:true},
+    {title:'Administration cautions',body:'Monitor ECG during IV correction; avoid rapid IV push (risk of bradycardia/arrhythmia); do not infuse through the same line as bicarbonate-containing fluids (risk of precipitation).',caution:true},
+    {title:'Mild/chronic/asymptomatic',body:'Oral calcium (carbonate or citrate) 1–2 g elemental calcium/day in divided doses, plus vitamin D — cholecalciferol/ergocalciferol for simple deficiency, or calcitriol (active vitamin D) if renal failure or hypoparathyroidism is present, since 1-alpha hydroxylation is impaired in both.'},
+    {title:'Chronic hypoparathyroidism',body:'Long-term active vitamin D (calcitriol) plus calcium supplementation; recombinant PTH (rhPTH 1-84) is an option in refractory cases per current endocrine society guidance.'}
+  ],
+  pearl:'In a critically ill patient, trust the ionised calcium over the albumin-corrected total calcium whenever both are available — the correction formula was derived in outpatients and is less reliable in acute illness.'
+},
+
+calcium_high: {
+  name:'Hypercalcemia', tag:'high', range:'Corrected Ca &gt;10.5 mg/dL',
+  subtitle:'Corrected total calcium &gt;10.5 mg/dL or ionised calcium &gt;1.3 mmol/L',
+  severity:[
+    {label:'Mild',cls:'sev-mild',range:'&lt;12'},
+    {label:'Moderate',cls:'sev-mod',range:'12–14'},
+    {label:'Severe / crisis',cls:'sev-sev',range:'&gt;14 or symptomatic'}
+  ],
+  causes:[
+    'Primary hyperparathyroidism — the most common cause of mild, often outpatient-detected hypercalcaemia',
+    'Malignancy — the most common cause of severe, inpatient hypercalcaemia: PTHrP-mediated humoral hypercalcaemia, osteolytic bone metastases, or 1,25(OH)₂D production (lymphoma)',
+    'Granulomatous disease (sarcoidosis, tuberculosis) — increased extra-renal 1,25(OH)₂D production',
+    'Vitamin D or vitamin A toxicity, thiazide diuretics, prolonged immobilisation, milk-alkali syndrome'
+  ],
+  symptoms:[
+    'Classic teaching: "stones, bones, groans, and psychiatric overtones" — nephrolithiasis, bone pain, GI symptoms (constipation, pancreatitis, peptic ulcer disease), and confusion/lethargy progressing to coma',
+    'Polyuria and polydipsia from impaired renal concentrating ability (a nephrogenic-DI-like picture)',
+    'Shortened QT interval, arrhythmia risk'
+  ],
+  diagnosis:[
+    'Correct for albumin (or use ionised calcium directly) as for hypocalcaemia',
+    'Check intact PTH: high/inappropriately normal PTH points to primary hyperparathyroidism; suppressed PTH points to malignancy or other non-PTH-mediated cause',
+    'If PTH suppressed: check PTHrP, vitamin D metabolites (25-OH-D and 1,25(OH)₂D), and search for malignancy or granulomatous disease'
+  ],
+  management:[
+    {title:'Mild, asymptomatic (&lt;12 mg/dL)',body:'Often does not require acute treatment. Ensure adequate hydration, treat the underlying cause, and avoid exacerbating factors — thiazide diuretics, volume depletion, and prolonged bed rest/immobilisation.'},
+    {title:'Moderate–severe (≥12 mg/dL or symptomatic) — Step 1: rehydrate',body:'IV isotonic (0.9%) saline is first-line — corrects the volume depletion that is nearly always present and enhances renal calcium excretion. Rate depends on cardiac/renal status (e.g. 200–300 mL/hr initially, titrated to a urine output around 100–150 mL/hr).',emergency:true},
+    {title:'Step 2: loop diuretic — only if needed for fluid balance',body:'Furosemide is not routinely used as a primary calcium-lowering strategy — only add it if the patient becomes volume overloaded during rehydration. Adding it too early risks worsening the underlying volume depletion.',caution:true},
+    {title:'Step 3: bisphosphonate',body:'Zoledronic acid 4 mg IV over 15 minutes (preferred, more potent) or pamidronate 60–90 mg IV over 2–4 hours. Onset is delayed 2–4 days with effect lasting weeks. Dose-adjust or avoid in significant renal impairment; watch for an acute-phase reaction (fever, myalgia) and, longer-term, osteonecrosis of the jaw.'},
+    {title:'Step 4: calcitonin — as a bridge',body:'4–8 IU/kg SC/IM every 6–12 hours. Onset within hours but the effect is modest and tachyphylaxis develops within about 48 hours — useful specifically to bridge severe symptomatic hypercalcaemia while a bisphosphonate takes effect, not as monotherapy.'},
+    {title:'Alternative/refractory agents',body:'Denosumab (a RANKL inhibitor) is an option for bisphosphonate-refractory cases or significant renal impairment, since it does not require renal dose adjustment — particularly useful in malignancy-associated hypercalcaemia. Glucocorticoids are specifically effective for granulomatous disease (sarcoidosis, TB) and some haematological malignancies (lymphoma, myeloma) by reducing calcitriol production.'},
+    {title:'Dialysis',body:'Hemodialysis with a low/no-calcium dialysate for severe, refractory hypercalcaemic crisis, particularly when renal failure or heart failure limits aggressive fluid resuscitation.',emergency:true},
+    {title:'Definitive treatment',body:'Parathyroidectomy for severe/symptomatic primary hyperparathyroidism; treatment of the underlying malignancy where applicable.'}
+  ],
+  pearl:'A suppressed PTH in the setting of hypercalcaemia should immediately prompt a search for malignancy — it is the most likely explanation for severe, acute, inpatient-level hypercalcaemia.'
+},
+
+magnesium_low: {
+  name:'Hypomagnesemia', tag:'low', range:'Mg²⁺ &lt;1.7 mg/dL',
+  subtitle:'Serum magnesium below approximately 1.7–1.8 mg/dL (0.7 mmol/L)',
+  severity:[
+    {label:'Mild',cls:'sev-mild',range:'1.4–1.7'},
+    {label:'Moderate',cls:'sev-mod',range:'1.0–1.3'},
+    {label:'Severe',cls:'sev-sev',range:'&lt;1.0 or symptomatic'}
+  ],
+  causes:[
+    'GI losses: diarrhoea, malabsorption syndromes, chronic proton pump inhibitor use',
+    'Renal losses: loop/thiazide diuretics, aminoglycosides, amphotericin B, cisplatin, chronic alcohol use',
+    'Refeeding syndrome, poor intake/malnutrition, diabetic ketoacidosis',
+    'Frequently coexists with hypokalaemia and hypocalcaemia, which will often stay refractory to treatment until magnesium is corrected'
+  ],
+  symptoms:[
+    'Tremor, hyperreflexia, muscle cramps, tetany, seizures',
+    'ECG: prolonged QT, widened QRS, peaked T waves in severe cases — torsades de pointes is the key arrhythmia risk',
+    'Often presents as refractory hypokalaemia or hypocalcaemia rather than being recognised in its own right'
+  ],
+  diagnosis:[
+    'Serum magnesium; note that serum level does not always reflect total body stores (mostly intracellular/bony), so a low-normal level in a symptomatic patient with a compatible cause still warrants treatment',
+    'Check concurrent potassium and calcium — correct together',
+    'ECG in any moderate–severe deficiency or if symptomatic'
+  ],
+  management:[
+    {title:'Severe/symptomatic — seizure or torsades de pointes',body:'IV magnesium sulfate 2 g given as a push over 1–2 minutes for torsades, may repeat. For other severe symptomatic deficiency: 4–6 g IV over 12–24 hours.',emergency:true},
+    {title:'Mild–moderate, asymptomatic',body:'Oral magnesium oxide or gluconate, 240–1000 mg elemental magnesium/day in divided doses (diarrhoea is dose-limiting); or IV magnesium sulfate 1–2 g over several hours if oral intake is not tolerated or deficiency is moderate.'},
+    {title:'Monitoring during IV replacement',body:'Magnesium is renally cleared — reduce the dose or avoid in renal failure. Monitor deep tendon reflexes during infusion (loss of reflexes is an early sign of magnesium toxicity) and watch respiratory status. Keep calcium gluconate available at the bedside as the antidote for magnesium toxicity.',caution:true},
+    {title:'Concurrent electrolytes',body:'Replete potassium and calcium as needed alongside magnesium — they often will not correct on their own until magnesium is normalised.'}
+  ],
+  pearl:'If hypokalaemia is not responding to what should be adequate potassium replacement, check magnesium before giving more potassium — it is very likely the real driver.'
+},
+
+magnesium_high: {
+  name:'Hypermagnesemia', tag:'high', range:'Mg²⁺ &gt;2.2 mg/dL',
+  subtitle:'Serum magnesium above approximately 2.2–2.5 mg/dL (1.1 mmol/L)',
+  severity:[
+    {label:'Mild',cls:'sev-mild',range:'2.2–4'},
+    {label:'Moderate',cls:'sev-mod',range:'4–6 (reflexes lost)'},
+    {label:'Severe',cls:'sev-sev',range:'&gt;6, especially &gt;10'}
+  ],
+  causes:[
+    'Renal failure — the most common cause, since the kidney is the primary route of magnesium excretion',
+    'Excessive intake or administration — magnesium-containing antacids/laxatives (especially with concurrent renal impairment), magnesium sulfate given for eclampsia/pre-eclampsia treatment',
+    'Adrenal insufficiency, lithium therapy'
+  ],
+  symptoms:[
+    'Dose-dependent progression: loss of deep tendon reflexes (~4–6 mg/dL) → somnolence and weakness → hypotension and bradycardia → respiratory depression/paralysis (&gt;10 mg/dL) → cardiac arrest/asystole (&gt;12–15 mg/dL)',
+    'ECG: prolonged PR, widened QRS, prolonged QT'
+  ],
+  diagnosis:[
+    'Serum magnesium level plus a careful medication history (magnesium-containing antacids/laxatives, recent eclampsia treatment)',
+    'Check renal function — the vast majority of clinically significant hypermagnesaemia occurs with impaired renal clearance',
+    'Clinical exam for deep tendon reflexes is a useful bedside severity marker, particularly during eclampsia treatment'
+  ],
+  management:[
+    {title:'Stop the source',body:'Discontinue all magnesium-containing medications, supplements, and infusions immediately.'},
+    {title:'Mild, asymptomatic, normal renal function',body:'Often simply requires stopping intake and monitoring — renal excretion will correct it.'},
+    {title:'Symptomatic (cardiac or neuromuscular effects)',body:'IV calcium gluconate 10%, 10–20 mL over 10 minutes — directly antagonises magnesium\'s cardiac and neuromuscular effects. This is a temporising measure and does not itself lower the magnesium level.',emergency:true},
+    {title:'Promote excretion',body:'IV normal saline plus a loop diuretic (furosemide) to promote renal magnesium excretion, provided renal function is adequate.'},
+    {title:'Severe or renal failure',body:'Haemodialysis is the definitive treatment for severe hypermagnesaemia, particularly with renal failure or life-threatening symptoms.',emergency:true},
+    {title:'Supportive care',body:'Mechanical ventilation if respiratory depression or paralysis develops; continuous cardiac monitoring throughout.'}
+  ],
+  pearl:'Any patient receiving magnesium sulfate for eclampsia should have deep tendon reflexes, respiratory rate, and urine output checked regularly — loss of reflexes is the earliest and most practical bedside warning sign, well before respiratory compromise.'
+},
+
+phosphate_low: {
+  name:'Hypophosphatemia', tag:'low', range:'PO₄ &lt;2.5 mg/dL',
+  subtitle:'Serum phosphate below 2.5 mg/dL',
+  severity:[
+    {label:'Mild',cls:'sev-mild',range:'2.0–2.5'},
+    {label:'Moderate',cls:'sev-mod',range:'1.0–1.9'},
+    {label:'Severe',cls:'sev-sev',range:'&lt;1.0'}
+  ],
+  causes:[
+    'Refeeding syndrome — the classic and most important critical-care cause: reintroducing nutrition to a malnourished patient drives phosphate intracellularly alongside glucose and insulin',
+    'Respiratory alkalosis (hyperventilation shifts phosphate intracellularly), insulin therapy/DKA treatment',
+    'Chronic alcohol use disorder, malabsorption, phosphate-binding antacids, hyperparathyroidism, vitamin D deficiency, extensive burns'
+  ],
+  symptoms:[
+    'Muscle weakness, including respiratory muscle weakness that can cause ventilator weaning failure',
+    'Rhabdomyolysis, cardiac dysfunction/heart failure, haemolysis, platelet dysfunction',
+    'Encephalopathy and impaired diaphragmatic contractility in severe cases'
+  ],
+  diagnosis:[
+    'Identify the setting — refeeding is the most important scenario to actively anticipate rather than just react to',
+    'Check calcium and magnesium concurrently, since correction of one can affect the others',
+    'In at-risk patients (malnutrition, alcohol use disorder, prolonged NPO), check phosphate proactively before and during nutrition initiation rather than waiting for symptoms'
+  ],
+  management:[
+    {title:'Severe (&lt;1.0 mg/dL) or symptomatic',body:'IV phosphate replacement — sodium phosphate or potassium phosphate, chosen based on the patient\'s concurrent potassium status — 0.25–0.5 mmol/kg IV over 6–12 hours (typical total adult dose roughly 15–45 mmol depending on severity/local protocol). Recheck levels every 6–12 hours and repeat dosing as needed.',emergency:true},
+    {title:'Moderate',body:'Oral or IV replacement depending on symptoms and ability to tolerate oral intake; oral phosphate supplements roughly 1–2 g elemental phosphate/day in divided doses (diarrhoea is dose-limiting).'},
+    {title:'Mild',body:'Oral repletion or simply addressing the underlying cause/dietary phosphate intake is often sufficient.'},
+    {title:'Correction cautions',body:'Avoid overly rapid IV correction — risks include hyperphosphataemia, hypocalcaemia from calcium-phosphate precipitation (with metastatic calcification risk), and hypotension. Monitor calcium concurrently during IV phosphate replacement.',caution:true},
+    {title:'Refeeding syndrome prevention',body:'Start nutrition slowly in at-risk patients, proactively supplement phosphate, potassium, magnesium, and thiamine before or alongside feeding, and monitor electrolytes closely through the first week of refeeding rather than waiting for a low result to react to.'}
+  ],
+  pearl:'Anticipate refeeding hypophosphataemia rather than waiting for it — in a malnourished or prolonged-NPO patient, check phosphate before starting nutrition and again within the first 24–48 hours, not after weakness or arrhythmia appears.'
+},
+
+phosphate_high: {
+  name:'Hyperphosphatemia', tag:'high', range:'PO₄ &gt;4.5 mg/dL',
+  subtitle:'Serum phosphate above approximately 4.5–5.0 mg/dL in adults',
+  severity:[
+    {label:'Mild',cls:'sev-mild',range:'4.5–6'},
+    {label:'Moderate',cls:'sev-mod',range:'6–9'},
+    {label:'Severe',cls:'sev-sev',range:'&gt;9, esp. with AKI'}
+  ],
+  causes:[
+    'Renal failure (acute or chronic) — the most common cause, from impaired excretion',
+    'Tumour lysis syndrome — massive cell breakdown releasing intracellular phosphate, often with concurrent hyperkalaemia and hypocalcaemia',
+    'Rhabdomyolysis, excessive intake (phosphate-containing laxatives/enemas), vitamin D toxicity, hypoparathyroidism, acidosis (transcellular shift)'
+  ],
+  symptoms:[
+    'Usually manifests through the associated hypocalcaemia it causes — tetany, seizures (see Hypocalcaemia)',
+    'Long-term: metastatic and vascular calcification, a core driver of CKD-mineral and bone disorder (CKD-MBD)',
+    'Acute severe elevation (e.g. tumour lysis) can itself precipitate acute kidney injury via calcium-phosphate crystal deposition in the kidney'
+  ],
+  diagnosis:[
+    'Check renal function first — renal failure is the dominant cause to exclude or confirm',
+    'In the right setting, check for tumour lysis syndrome (uric acid, potassium, calcium, LDH) or rhabdomyolysis (CK)',
+    'Check concurrent calcium — hyperphosphataemia often drives a reciprocal hypocalcaemia'
+  ],
+  management:[
+    {title:'Treat the underlying cause',body:'Tumour lysis prophylaxis/treatment (aggressive hydration, rasburicase or allopurinol as indicated) where relevant; manage the underlying AKI/CKD.'},
+    {title:'Dietary and binder management',body:'Dietary phosphate restriction plus phosphate binders taken with meals. Per current CKD-MBD guidance, non-calcium-based binders (sevelamer, lanthanum) are generally preferred over calcium-based binders (calcium carbonate/acetate) to avoid calcium loading and vascular calcification, particularly in dialysis-dependent patients.'},
+    {title:'Acute severe hyperphosphataemia (e.g. tumour lysis) with renal impairment or refractory to medical management',body:'Haemodialysis effectively and rapidly removes phosphate — indicated for severe hyperphosphataemia with AKI, symptomatic hypocalcaemia, or when medical management is inadequate.',emergency:true},
+    {title:'Managing concurrent hypocalcaemia',body:'Avoid aggressive IV calcium correction until phosphate is controlled where possible, because of the risk of calcium-phosphate precipitation and metastatic calcification — the exception is a patient who is symptomatic from hypocalcaemia (tetany, seizures), who needs calcium regardless of phosphate control.',caution:true},
+    {title:'Saline diuresis',body:'A limited, adjunctive role if renal function is adequate and there is no contraindication to volume administration.'}
+  ],
+  pearl:'In tumour lysis syndrome, do not correct hypocalcaemia and hyperphosphataemia in isolation from each other — think of the calcium-phosphate product as a whole, since aggressive calcium correction while phosphate remains very high risks precipitation and worsening renal injury.'
+}
+
+};
+
+const ORDER=['sodium_low','sodium_high','potassium_low','potassium_high','calcium_low','calcium_high','magnesium_low','magnesium_high','phosphate_low','phosphate_high'];
+
+function buildMenu(){
+  const grid=document.getElementById('menuGrid');
+  grid.innerHTML='';
+  ORDER.forEach(key=>{
+    const d=DISORDERS[key];
+    const card=document.createElement('div');
+    card.className='menu-card';
+    card.onclick=()=>showDisorder(key);
+    card.innerHTML=`
+      <span class="tag ${d.tag}">${d.tag==='high'?'ELEVATED':'LOW'}</span>
+      <span class="name">${d.name}</span>
+      <span class="range">${d.range}</span>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function severityRow(sev){
+  return '<div class="severity-row">'+sev.map(s=>`<span class="sev-chip ${s.cls}">${s.label}: ${s.range}</span>`).join('')+'</div>';
+}
+
+function listCard(title,items){
+  return `<div class="card"><h3>${title}</h3><ul>${items.map(i=>`<li>${i}</li>`).join('')}</ul></div>`;
+}
+
+function mgmtCard(steps){
+  const stepsHtml=steps.map(s=>{
+    const cls='mgmt-step'+(s.emergency?' emergency':'')+(s.caution?' caution':'');
+    return `<div class="${cls}"><div class="step-title">${s.title}</div><div class="step-body">${s.body}</div></div>`;
+  }).join('');
+  return `<div class="card"><h3>Management</h3>${stepsHtml}</div>`;
+}
+
+function showDisorder(key){
+  const d=DISORDERS[key];
+  document.getElementById('menuGrid').parentElement.querySelector('#menuGrid').style.display='none';
+  document.getElementById('detailView').style.display='block';
+  document.querySelector('.ref-note').style.display='none';
+
+  let html='';
+  html+=`<div class="disorder-head">
+    <span class="tag ${d.tag}" style="background:${d.tag==='high'?'#fdecea':'#e9f4f8'};color:${d.tag==='high'?'#c0392b':'#1f6d8a'}">${d.tag==='high'?'ELEVATED':'LOW'}</span>
+    <h2>${d.name}</h2>
+    <div class="subtitle">${d.subtitle}</div>
+  </div>`;
+  html+=`<div class="card"><h3>Severity</h3>${severityRow(d.severity)}</div>`;
+  html+=listCard('Causes',d.causes);
+  html+=listCard('Clinical Features',d.symptoms);
+  html+=listCard('Diagnostic Approach',d.diagnosis);
+  html+=mgmtCard(d.management);
+  html+=`<div class="pearl-box"><b>Key pearl:</b> ${d.pearl}</div>`;
+
+  document.getElementById('detailContent').innerHTML=html;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function showMenu(){
+  document.getElementById('menuGrid').style.display='grid';
+  document.getElementById('detailView').style.display='none';
+  document.querySelector('.ref-note').style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+buildMenu();
+</script>
+</body>
+</html>
