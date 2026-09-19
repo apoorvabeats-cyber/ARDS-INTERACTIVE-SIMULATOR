@@ -192,6 +192,17 @@ ul.abnorm li b{color:#eaf2f7}
         <input id="fTemp" type="number" step="0.1" min="30" max="42" placeholder="37">
       </div>
     </div>
+    <div class="row3" style="margin-bottom:8px">
+      <div class="field">
+        <label><span class="tip">Sample Type<span class="tip-box">Auto-detected from the report text ("Sample type: Arterial/Venous") when readable, otherwise estimated from sO₂ and PaO₂ together. P/F ratio and A-a gradient are only valid for arterial blood — override this if the detection looks wrong.</span></span></label>
+        <select id="fSampleType">
+          <option value="arterial">Arterial</option>
+          <option value="venous">Venous</option>
+          <option value="unknown">Unknown / unclear</option>
+        </select>
+        <div id="sampleTypeNote" style="font-size:11px;color:#9db1ba;margin-top:3px"></div>
+      </div>
+    </div>
     <button class="primary" style="width:100%;margin-top:6px" onclick="interpretABG()">🔬 INTERPRET ABG</button>
   </div>
 </section>
@@ -687,6 +698,26 @@ async function runOCR(canvas){
     if(bestScore===0) extractValues(bestText);
     showManual();
 
+    // Sample type: prefer an explicit label found anywhere across all passes;
+    // fall back to the sO2/PaO2 heuristic only if no label was read at all.
+    const sampleTypeSel=document.getElementById('fSampleType');
+    const sampleTypeNote=document.getElementById('sampleTypeNote');
+    if(sampleTypeSel){
+      const explicitType=detectSampleTypeFromText(allPassText.join('\n'));
+      if(explicitType){
+        sampleTypeSel.value=explicitType;
+        if(sampleTypeNote) sampleTypeNote.textContent='Detected from report text: '+(explicitType==='venous'?'Venous':'Arterial')+'.';
+      } else {
+        const guess=suggestSampleTypeFromValues(bestValues.fPaO2!==undefined?bestValues.fPaO2:null,bestValues.fSpO2!==undefined?bestValues.fSpO2:null);
+        if(guess.type!=='unknown'){
+          sampleTypeSel.value=guess.type;
+          if(sampleTypeNote) sampleTypeNote.textContent=(guess.confidence==='likely'?'Estimated from values: ':'Uncertain — please verify: ')+guess.reason;
+        } else if(sampleTypeNote){
+          sampleTypeNote.textContent=guess.reason||'';
+        }
+      }
+    }
+
   }catch(e){
 
     // Unexpected error — still open the form, never block the user
@@ -862,6 +893,50 @@ function parseExtractedValue(id,raw){
     }
   }
   return null;
+}
+
+/* Primary: look for an explicit "Sample type: Arterial/Venous" label, which
+   most blood gas analyzers (Radiometer, RAPIDPoint, etc.) print directly.
+   This is far more reliable than inferring from values, so it always wins
+   when present. Scans for VENOUS first since a false "arterial" default is
+   the more dangerous mistake (would validate a P/F ratio/A-a gradient that
+   isn't real). */
+function detectSampleTypeFromText(text){
+  if(!text) return null;
+  const compact=text.toUpperCase().replace(/[^A-Z\s]/g,' ').replace(/\s+/g,' ');
+  if(/\bVENOUS\b/.test(compact)) return 'venous';
+  if(/\bARTERIAL\b/.test(compact)) return 'arterial';
+  return null;
+}
+
+/* Fallback heuristic when no explicit label was read: infer likely sample
+   type from sO2 (measured directly on the same sample by co-oximetry) and
+   PaO2 together. Deliberately conservative — only flags "likely venous"
+   when BOTH values point the same way, since either one alone overlaps
+   too much between severe hypoxaemic arterial blood and normal venous
+   blood to be trusted in isolation. Returns {type, confidence, reason}. */
+function suggestSampleTypeFromValues(pao2,spo2){
+  if(pao2===null&&spo2===null) return {type:'unknown',confidence:'none',reason:''};
+  if(pao2!==null&&spo2!==null){
+    if(pao2<50&&spo2<75){
+      return {type:'venous',confidence:'likely',
+        reason:'PaO₂ '+pao2+' with sO₂ '+spo2+'% together are well below what even severe arterial hypoxaemia typically looks like, and match a venous pattern instead.'};
+    }
+    if(pao2>=65&&spo2>=88){
+      return {type:'arterial',confidence:'likely',
+        reason:'PaO₂ '+pao2+' with sO₂ '+spo2+'% are consistent with an arterial sample.'};
+    }
+    return {type:'unknown',confidence:'uncertain',
+      reason:'PaO₂ '+pao2+' with sO₂ '+spo2+'% is in a range that overlaps between hypoxaemic arterial and venous blood — please confirm the sample type from the report if possible.'};
+  }
+  // Only one of the two available — weaker signal, wider margins
+  if(spo2!==null&&spo2<70){
+    return {type:'venous',confidence:'uncertain',reason:'sO₂ '+spo2+'% alone is more typical of venous than arterial blood.'};
+  }
+  if(pao2!==null&&pao2<40){
+    return {type:'venous',confidence:'uncertain',reason:'PaO₂ '+pao2+' alone is more typical of venous than arterial blood.'};
+  }
+  return {type:'unknown',confidence:'none',reason:''};
 }
 
 function extractABGMap(text){
@@ -1105,12 +1180,14 @@ function v(id){const el=document.getElementById(id);return el&&el.value!==''?par
 function interpretABG(){
   const pH=v('fpH'),pco2=v('fPaCO2'),pao2=v('fPaO2'),hco3=v('fHCO3'),be=v('fBE');
   const fio2=v('fFiO2')||0.21,na=v('fNa'),cl=v('fCl'),k=v('fK'),lactate=v('fLactate'),spo2=v('fSpO2');
+  const sampleTypeEl=document.getElementById('fSampleType');
+  const sampleType=sampleTypeEl?sampleTypeEl.value:'arterial';
 
   if(pH===null||pco2===null||hco3===null){
     alert('Please enter at least pH, PaCO₂, and HCO₃⁻ to interpret.');return;
   }
 
-  const res={pH,pco2,pao2,hco3,be,fio2,na,cl,k,lactate,spo2,abnorm:[],mgmt:[],context:ctx};
+  const res={pH,pco2,pao2,hco3,be,fio2,na,cl,k,lactate,spo2,sampleType,abnorm:[],mgmt:[],context:ctx};
 
   /* --- Step 1: pH classification --- */
   res.phStatus = pH<7.35?'Acidaemia':pH>7.45?'Alkalaemia':'Normal pH';
@@ -1173,7 +1250,16 @@ function interpretABG(){
   }
 
   /* --- Step 4: Oxygenation --- */
-  if(pao2!==null){
+  /* P/F ratio and A-a gradient assume PaO2 is an ARTERIAL partial pressure.
+     Applied to venous blood they produce a number that looks plausible but
+     is clinically meaningless (venous PO2 is expected to be low - that's
+     not hypoxaemia, it's tissue oxygen extraction). So these are only
+     computed for a confirmed-or-assumed arterial sample. */
+  if(pao2!==null&&sampleType==='venous'){
+    res.venousSample=true;
+    res.hypoxSev='Not applicable — venous sample';
+  } else if(pao2!==null){
+    res.sampleTypeUncertain=(sampleType==='unknown');
     res.pf=pao2/fio2;
     // A-a gradient: PAO2 = (FiO2 × (760-47)) - PaCO2/0.8
     const pao2_alv=fio2*(760-47)-pco2/0.8;
@@ -1226,7 +1312,8 @@ function interpretABG(){
   if(hco3>26) res.abnorm.push({sev:hco3>35?'Severe':'Mild',text:'Elevated bicarbonate (HCO₃ '+hco3+')'});
   if(be!==null&&be<-2) res.abnorm.push({sev:be<-10?'Severe':be<-5?'Moderate':'Mild',text:'Base deficit (BE '+be+')'});
   if(be!==null&&be>2) res.abnorm.push({sev:'Mild',text:'Base excess (BE '+be+')'});
-  if(pao2!==null&&res.hypoxSev!=='Normal oxygenation') res.abnorm.push({sev:res.hypoxSev.split(' ')[0],text:res.hypoxSev+' (PaO₂ '+pao2+', P/F '+res.pf.toFixed(0)+')'});
+  if(res.venousSample) res.abnorm.push({sev:'Note',text:'Sample marked as venous — PaO₂ '+pao2+' reflects tissue O₂ extraction, not oxygenation. P/F ratio and A-a gradient are not calculated; a venous PaO₂ this low is expected and is not hypoxaemia.'});
+  else if(pao2!==null&&res.hypoxSev!=='Normal oxygenation') res.abnorm.push({sev:res.hypoxSev.split(' ')[0],text:res.hypoxSev+' (PaO₂ '+pao2+', P/F '+res.pf.toFixed(0)+')'+(res.sampleTypeUncertain?' — sample type unconfirmed, verify arterial before acting on this':'')});
   if(res.aaHigh) res.abnorm.push({sev:'Moderate',text:'Elevated A-a gradient ('+res.aaGrad.toFixed(1)+' mmHg) — suggests parenchymal cause'});
   if(res.agHigh) res.abnorm.push({sev:'Moderate',text:'High anion gap ('+res.ag.toFixed(0)+') — HAGMA'});
   if(res.ddInterp&&res.ddInterp!=='Pure HAGMA') res.abnorm.push({sev:'Moderate',text:'Delta-delta: '+res.ddInterp});
@@ -1283,9 +1370,11 @@ function buildMgmt(res){
   }
 
   // Oxygenation
-  if(res.pf!==undefined&&res.hypoxSev!=='Normal oxygenation'){
+  if(res.venousSample){
+    add('Venous Sample — Oxygenation Not Assessable','PaO₂/sO₂ from venous blood reflect tissue oxygen extraction, not lung oxygenation — P/F ratio and A-a gradient cannot be calculated from this sample. The pH, PaCO₂ and metabolic values above remain usable as a rough guide, but if oxygenation status is actually needed clinically, repeat with an arterial sample.');
+  } else if(res.pf!==undefined&&res.hypoxSev!=='Normal oxygenation'){
     const pfGrade=res.pf<100?'Severe ARDS (P/F <100)':res.pf<200?'Moderate ARDS (P/F 100–200)':res.pf<300?'Mild ARDS / significant hypoxaemia':'Mild hypoxaemia';
-    add('Hypoxaemia — '+pfGrade,'Target SpO₂ 94–98% (88–92% in COPD risk). '+(res.pf<200?'Consider HFNC, NIV or intubation based on work of breathing and trajectory. For ARDS: lung-protective ventilation (Vt 4–8 mL/kg PBW, Pplat <30), PEEP individualisation, prone positioning if P/F ≤150.':'Increase FiO₂, position upright, treat cause (PE, pneumonia, atelectasis, pulmonary oedema).'));
+    add('Hypoxaemia — '+pfGrade,(res.sampleTypeUncertain?'⚠ Sample type unconfirmed — verify this is arterial blood before acting on P/F ratio or A-a gradient. ':'')+'Target SpO₂ 94–98% (88–92% in COPD risk). '+(res.pf<200?'Consider HFNC, NIV or intubation based on work of breathing and trajectory. For ARDS: lung-protective ventilation (Vt 4–8 mL/kg PBW, Pplat <30), PEEP individualisation, prone positioning if P/F ≤150.':'Increase FiO₂, position upright, treat cause (PE, pneumonia, atelectasis, pulmonary oedema).'));
     if(res.aaHigh) add('Raised A-a Gradient','Elevated A-a gradient suggests parenchymal or pulmonary vascular cause (pneumonia, pulmonary oedema, PE, ARDS). Low A-a gradient with hypoxaemia suggests hypoventilation or low FiO₂.');
   }
 
@@ -1338,7 +1427,8 @@ function renderResults(res){
     <h3>${res.primary}</h3>
     <p><b>pH Status:</b> ${res.phStatus} ${sevBadge(res.phSeverity)} (pH ${res.pH.toFixed(2)})</p>
     <p><b>Compensation:</b> ${res.comp}</p>`;
-  if(res.pf!==undefined) dHTML+=`<p><b>Oxygenation:</b> ${res.hypoxSev} — P/F ${res.pf.toFixed(0)}, A-a gradient ${res.aaGrad.toFixed(1)} mmHg</p>`;
+  if(res.venousSample) dHTML+=`<p><b>Oxygenation:</b> Not calculated — venous sample (PaO₂ ${pao2} reflects tissue extraction, not lung function)</p>`;
+  else if(res.pf!==undefined) dHTML+=`<p><b>Oxygenation:</b> ${res.hypoxSev} — P/F ${res.pf.toFixed(0)}, A-a gradient ${res.aaGrad.toFixed(1)} mmHg${res.sampleTypeUncertain?' <span style="color:#e0b04a">(sample type unconfirmed)</span>':''}</p>`;
   if(res.agHigh) dHTML+=`<p><b>Anion Gap:</b> ${res.ag.toFixed(0)} (HIGH) — ${res.ddInterp||'HAGMA'}</p>`;
   if(res.lactateSev) dHTML+=`<p><b>Lactate:</b> ${res.lactateSev}</p>`;
   dHTML+=`</div>`;
