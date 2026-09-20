@@ -92,6 +92,45 @@
   }
   .pearl-box b{color:#8a5a00}
   .ref-note{font-size:11px;color:var(--ink-dim);text-align:center;margin-top:18px;padding:0 8px}
+
+  /* Interactive calculator */
+  .calc-card{
+    background:var(--card);color:var(--card-ink);border-radius:12px;
+    padding:16px;margin-bottom:12px;border-left:4px solid #1e7d4f;
+  }
+  .calc-card h3{margin:0 0 10px;font-size:14.5px;letter-spacing:.2px;color:#1e7d4f}
+  .calc-card h3 .step-num{
+    display:inline-block;background:#1e7d4f;color:#fff;font-size:11px;
+    width:18px;height:18px;line-height:18px;text-align:center;border-radius:50%;margin-right:6px;
+  }
+  .calc-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .calc-field{flex:1;min-width:120px}
+  .calc-field label{display:block;font-size:11.5px;color:#5a6d75;margin-bottom:3px}
+  .calc-field input,.calc-field select{
+    width:100%;padding:8px 9px;border:1px solid #cfd9dd;border-radius:8px;
+    font-size:14px;background:#fbfdfe;color:var(--card-ink);
+  }
+  .calc-field input:focus,.calc-field select:focus{outline:2px solid #1e7d4f33;border-color:#1e7d4f}
+  .toggle-btns{display:flex;gap:6px;flex-wrap:wrap}
+  .toggle-btns label{
+    flex:1;min-width:90px;text-align:center;padding:8px 10px;border:1px solid #cfd9dd;
+    border-radius:8px;font-size:13px;cursor:pointer;background:#fbfdfe;color:#3a4a52;
+    user-select:none;
+  }
+  .toggle-btns input{display:none}
+  .toggle-btns label:has(input:checked){background:#1e7d4f;border-color:#1e7d4f;color:#fff}
+  .calc-btn{
+    background:#1e7d4f;color:#fff;border:none;border-radius:8px;
+    padding:10px 16px;font-size:13.5px;font-weight:600;cursor:pointer;width:100%;margin-top:4px;
+  }
+  .calc-btn:active{background:#166b41}
+  .calc-out{margin-top:10px;font-size:13.5px;line-height:1.6}
+  .calc-out:empty{margin-top:0}
+  .calc-hint{font-size:11.5px;color:#7fa0ac;margin-top:-4px;margin-bottom:8px}
+  .di-flag{
+    background:#fdf6e3;border:1px solid #e6d190;border-radius:8px;padding:10px 12px;
+    font-size:13px;color:#6b4e0a;margin-top:8px;
+  }
 </style>
 </head>
 <body>
@@ -158,7 +197,7 @@ sodium_high: {
   name:'Hypernatremia', tag:'high', range:'Na⁺ &gt;145 mEq/L',
   subtitle:'Serum sodium above 145 mEq/L',
   severity:[
-    {label:'Mild',cls:'sev-mild',range:'145–149'},
+    {label:'Mild',cls:'sev-mild',range:'146–149'},
     {label:'Moderate',cls:'sev-mod',range:'150–159'},
     {label:'Severe',cls:'sev-sev',range:'≥160'}
   ],
@@ -501,6 +540,233 @@ function mgmtCard(steps){
   return `<div class="card"><h3>Management</h3>${stepsHtml}</div>`;
 }
 
+/* ===================== Hypernatraemia interactive calculator ===================== */
+
+function hnCalculatorHTML(){
+  return `
+  <div class="calc-card">
+    <h3><span class="step-num">1</span>Enter Serum Sodium</h3>
+    <div class="calc-row">
+      <div class="calc-field">
+        <label>Serum Na⁺ (mmol/L)</label>
+        <input type="number" id="hnNa" step="0.1" placeholder="e.g. 155" oninput="hnUpdateSeverity()">
+      </div>
+    </div>
+    <div id="hnSeverityOut" class="calc-out"></div>
+  </div>
+
+  <div id="hnStep1Wrap" style="display:none">
+    <div class="calc-card">
+      <h3><span class="step-num">2</span>Confirm &amp; Assess</h3>
+      <div class="calc-hint">Enter what's available — this documents the workup and flags a DI pattern; it does not auto-diagnose the cause.</div>
+      <div class="calc-row">
+        <div class="calc-field"><label>Serum glucose (mg/dL)</label><input type="number" id="hnGlu"></div>
+        <div class="calc-field"><label>Serum osmolality (mOsm/kg)</label><input type="number" id="hnSerumOsm"></div>
+      </div>
+      <div class="calc-row">
+        <div class="calc-field"><label>BUN (mg/dL)</label><input type="number" id="hnBUN"></div>
+        <div class="calc-field"><label>Creatinine (mg/dL)</label><input type="number" id="hnCr"></div>
+      </div>
+      <div class="calc-row">
+        <div class="calc-field"><label>Urine osmolality (mOsm/kg)</label><input type="number" id="hnUOsm" oninput="hnCheckDI()"></div>
+        <div class="calc-field"><label>Urine Na⁺ (mmol/L)</label><input type="number" id="hnUNa"></div>
+      </div>
+      <div class="calc-row">
+        <div class="calc-field"><label>Urine volume (mL/24h)</label><input type="number" id="hnUVol"></div>
+      </div>
+      <div class="calc-field" style="margin-bottom:10px">
+        <label>Polyuria present?</label>
+        <div class="toggle-btns">
+          <label><input type="radio" name="hnPolyuria" value="yes" onchange="hnCheckDI()"><span>Yes</span></label>
+          <label><input type="radio" name="hnPolyuria" value="no" onchange="hnCheckDI()"><span>No</span></label>
+        </div>
+      </div>
+      <div id="hnDIFlag"></div>
+      <div class="ref-mini">
+        <b>A. Water loss &gt; sodium loss:</b> GI losses, fever/sweating, burns, osmotic diuresis, diabetes insipidus, diuretics.<br>
+        <b>B. Renal water loss:</b> think DI if hypernatraemia + polyuria + inappropriately dilute urine — central DI (low ADH) vs nephrogenic DI (renal resistance to ADH).<br>
+        <b>C. Sodium gain:</b> hypertonic saline, sodium bicarbonate, salt ingestion, hypertonic feeds.
+      </div>
+    </div>
+  </div>
+
+  <div id="hnDIWrap" style="display:none">
+    <div class="calc-card">
+      <h3>Diabetes Insipidus — Type</h3>
+      <div class="toggle-btns">
+        <label><input type="radio" name="hnDIType" value="central" onchange="hnShowDIType()"><span>Central DI</span></label>
+        <label><input type="radio" name="hnDIType" value="nephrogenic" onchange="hnShowDIType()"><span>Nephrogenic DI</span></label>
+      </div>
+      <div id="hnDITypeOut" class="calc-out"></div>
+    </div>
+  </div>
+
+  <div class="calc-card">
+    <h3><span class="step-num">3</span>Free-Water Deficit</h3>
+    <div class="calc-row">
+      <div class="calc-field"><label>Body weight (kg)</label><input type="number" id="hnWeight"></div>
+      <div class="calc-field">
+        <label>Sex</label>
+        <select id="hnSex"><option value="male">Male</option><option value="female">Female</option></select>
+      </div>
+    </div>
+    <div class="calc-row">
+      <div class="calc-field">
+        <label>Elderly (≥65y)?</label>
+        <div class="toggle-btns">
+          <label><input type="radio" name="hnElderly" value="yes"><span>Yes</span></label>
+          <label><input type="radio" name="hnElderly" value="no" checked><span>No</span></label>
+        </div>
+      </div>
+      <div class="calc-field"><label>Target Na⁺ (mmol/L)</label><input type="number" id="hnTarget" value="140"></div>
+    </div>
+    <button class="calc-btn" onclick="hnCalcDeficit()">Calculate free-water deficit</button>
+    <div id="hnDeficitOut" class="calc-out"></div>
+  </div>
+
+  <div id="hnMgmtWrap" style="display:none">
+    <div class="calc-card">
+      <h3><span class="step-num">4</span>Management &amp; Correction Rate</h3>
+      <div class="calc-field" style="margin-bottom:10px">
+        <label>Shock / hypotension present?</label>
+        <div class="toggle-btns">
+          <label><input type="radio" name="hnShock" value="yes"><span>Yes</span></label>
+          <label><input type="radio" name="hnShock" value="no" checked><span>No</span></label>
+        </div>
+      </div>
+      <div class="calc-field" style="margin-bottom:10px">
+        <label>Duration of hypernatraemia</label>
+        <div class="toggle-btns">
+          <label><input type="radio" name="hnDuration" value="acute"><span>Acute (&lt;48h)</span></label>
+          <label><input type="radio" name="hnDuration" value="chronic" checked><span>&gt;48h / unknown</span></label>
+        </div>
+      </div>
+      <button class="calc-btn" onclick="hnCalcManagement()">Generate management plan</button>
+      <div id="hnMgmtOut" class="calc-out"></div>
+    </div>
+  </div>
+  `;
+}
+
+function hnUpdateSeverity(){
+  const naVal=document.getElementById('hnNa').value;
+  const na=parseFloat(naVal);
+  const out=document.getElementById('hnSeverityOut');
+  const step1=document.getElementById('hnStep1Wrap');
+  if(naVal===''||isNaN(na)){ out.innerHTML=''; step1.style.display='none'; return; }
+  if(na<=145){
+    out.innerHTML='<span class="sev-chip sev-mild">Na⁺ '+na+' mmol/L — not hypernatraemic (definition: &gt;145)</span>';
+    step1.style.display='none';
+    return;
+  }
+  let sev,cls;
+  if(na>=160){sev='Severe';cls='sev-sev';}
+  else if(na>=150){sev='Moderate';cls='sev-mod';}
+  else{sev='Mild';cls='sev-mild';}
+  const warn=na>=160?'<div class="di-flag">⚠ Severe hypernatraemia (≥160 mmol/L) is associated with neurological manifestations and requires urgent, controlled correction.</div>':'';
+  out.innerHTML='<span class="sev-chip '+cls+'">'+sev+' hypernatraemia — Na⁺ '+na+' mmol/L</span>'+warn;
+  step1.style.display='block';
+}
+
+function hnCheckDI(){
+  const uOsmVal=document.getElementById('hnUOsm').value;
+  const uOsm=parseFloat(uOsmVal);
+  const polyuriaEl=document.querySelector('input[name="hnPolyuria"]:checked');
+  const polyuria=polyuriaEl?polyuriaEl.value:null;
+  const flag=document.getElementById('hnDIFlag');
+  const diWrap=document.getElementById('hnDIWrap');
+  if(polyuria==='yes'&&uOsmVal!==''&&uOsm<300){
+    flag.innerHTML='<div class="di-flag">Hypernatraemia + polyuria + inappropriately dilute urine (osmolality '+uOsm+' mOsm/kg) — pattern suggestive of diabetes insipidus. Select the type below.</div>';
+    diWrap.style.display='block';
+  } else if(polyuria==='yes'){
+    flag.innerHTML='<div class="di-flag">Polyuria present — enter urine osmolality to check for a DI pattern (suggested by inappropriately dilute urine despite hypernatraemia).</div>';
+    diWrap.style.display='none';
+  } else {
+    flag.innerHTML='';
+    diWrap.style.display='none';
+  }
+}
+
+function hnShowDIType(){
+  const type=document.querySelector('input[name="hnDIType"]:checked');
+  const out=document.getElementById('hnDITypeOut');
+  if(!type){ out.innerHTML=''; return; }
+  if(type.value==='central'){
+    out.innerHTML='<div class="mgmt-step"><div class="step-title">Central DI — low ADH</div><div class="step-body">Desmopressin, plus free-water replacement for the existing deficit.</div></div>';
+  } else {
+    out.innerHTML='<div class="mgmt-step"><div class="step-title">Nephrogenic DI — renal resistance to ADH</div><div class="step-body">Remove the offending drug (e.g. lithium); correct hypokalaemia/hypercalcaemia; low-solute diet; thiazide ± amiloride depending on the underlying cause.</div></div>';
+  }
+}
+
+let hnDeficitL=null,hnCurrentNa=null,hnTargetNaVal=null;
+
+function hnCalcDeficit(){
+  const na=parseFloat(document.getElementById('hnNa').value);
+  const weight=parseFloat(document.getElementById('hnWeight').value);
+  const sex=document.getElementById('hnSex').value;
+  const elderlyEl=document.querySelector('input[name="hnElderly"]:checked');
+  const elderly=elderlyEl&&elderlyEl.value==='yes';
+  const target=parseFloat(document.getElementById('hnTarget').value)||140;
+  const out=document.getElementById('hnDeficitOut');
+  const mgmtWrap=document.getElementById('hnMgmtWrap');
+
+  if(!na||na<=145){ out.innerHTML='<span style="color:#c0392b">Enter a serum Na⁺ above 145 mmol/L at the top of this page first.</span>'; return; }
+  if(!weight){ out.innerHTML='<span style="color:#c0392b">Enter body weight.</span>'; return; }
+
+  let tbwFactor;
+  if(sex==='male') tbwFactor=elderly?0.5:0.6;
+  else tbwFactor=elderly?0.45:0.5;
+
+  const tbw=tbwFactor*weight;
+  const deficit=tbw*(na/target-1);
+
+  hnDeficitL=deficit;hnCurrentNa=na;hnTargetNaVal=target;
+
+  out.innerHTML=
+    '<p>TBW = '+tbwFactor+' × '+weight+' kg = <b>'+tbw.toFixed(1)+' L</b></p>'+
+    '<p>Free-water deficit = '+tbw.toFixed(1)+' × ('+na+'/'+target+' − 1) = <b>'+deficit.toFixed(2)+' L</b></p>';
+
+  mgmtWrap.style.display='block';
+}
+
+function hnCalcManagement(){
+  const shockEl=document.querySelector('input[name="hnShock"]:checked');
+  const durationEl=document.querySelector('input[name="hnDuration"]:checked');
+  const shock=shockEl?shockEl.value:'no';
+  const duration=durationEl?durationEl.value:'chronic';
+  const out=document.getElementById('hnMgmtOut');
+
+  if(hnDeficitL===null){ out.innerHTML='<span style="color:#c0392b">Calculate the free-water deficit above first.</span>'; return; }
+
+  let html='';
+  if(shock==='yes'){
+    html+='<div class="mgmt-step emergency"><div class="step-title">Resuscitate first</div><div class="step-body">Restore circulation with 0.9% saline before correcting the free-water deficit.</div></div>';
+  }
+
+  const totalDrop=hnCurrentNa-hnTargetNaVal;
+
+  if(duration==='acute'){
+    html+='<div class="mgmt-step caution"><div class="step-title">Acute hypernatraemia (&lt;48h)</div><div class="step-body">More rapid correction can be considered under close monitoring — evidence in adults is less definitive than the conservative approach used for &gt;48h/unknown-duration cases. A reasonable approach is full correction within roughly 24 hours with frequent (2–4 hourly) Na⁺ rechecks, adjusted to the clinical trajectory rather than followed rigidly.</div></div>';
+  } else {
+    const daysNeeded=Math.max(1,Math.ceil(totalDrop/10));
+    const hoursNeeded=daysNeeded*24;
+    const rateMLperHr=(hnDeficitL*1000)/hoursNeeded;
+    const hourlyRateMmol=(totalDrop/hoursNeeded).toFixed(2);
+    html+=
+      '<div class="mgmt-step"><div class="step-title">Staged correction — ≤10 mmol/L per 24h (traditional conservative ICU target)</div><div class="step-body">'+
+      'Total drop needed: '+totalDrop.toFixed(1)+' mmol/L, from '+hnCurrentNa+' to '+hnTargetNaVal+'. Spread over at least <b>'+daysNeeded+' day(s)</b> ('+hoursNeeded+' hours) to stay within the ~10–12 mmol/L/24h limit — averaging ≈'+hourlyRateMmol+' mmol/L/hr, comfortably under the ≤0.5 mmol/L/hr ceiling.<br><br>'+
+      'Free-water deficit '+hnDeficitL.toFixed(2)+' L ÷ '+hoursNeeded+' h ≈ <b>'+rateMLperHr.toFixed(0)+' mL/hr</b> of free water replacement. This covers the calculated deficit only — add separately for ongoing losses and maintenance requirements.'+
+      '</div></div>'+
+      '<div class="mgmt-step caution"><div class="step-title">Monitoring</div><div class="step-body">Recheck serum Na⁺ approximately every 2–4 hours initially in severe hypernatraemia, and adjust the infusion to the measured trend rather than the calculated rate alone.</div></div>';
+  }
+
+  html+='<div class="mgmt-step"><div class="step-title">Route</div><div class="step-body">Oral or enteral water is preferred whenever the GI tract is usable. If IV is required: D5W, or 0.45% saline when some sodium replacement is also needed.</div></div>';
+
+  out.innerHTML=html;
+}
+
+/* =================================================================================== */
+
 function showDisorder(key){
   const d=DISORDERS[key];
   document.getElementById('menuGrid').parentElement.querySelector('#menuGrid').style.display='none';
@@ -513,6 +779,10 @@ function showDisorder(key){
     <h2>${d.name}</h2>
     <div class="subtitle">${d.subtitle}</div>
   </div>`;
+  if(key==='sodium_high'){
+    hnDeficitL=null;hnCurrentNa=null;hnTargetNaVal=null;
+    html+=hnCalculatorHTML();
+  }
   html+=`<div class="card"><h3>Severity</h3>${severityRow(d.severity)}</div>`;
   html+=listCard('Causes',d.causes);
   html+=listCard('Clinical Features',d.symptoms);
