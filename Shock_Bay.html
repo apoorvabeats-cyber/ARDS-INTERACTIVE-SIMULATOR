@@ -1,0 +1,939 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07090c">
+<title>Shock Bay</title>
+<style>
+  :root {
+    --bg:#07090c; --surface:#10141a; --surface2:#171d26; --fg:#e8edf2; --muted:#8b97a6;
+    --subtle:#5c6775; --primary:#5ee0c5; --primary-fg:#04201a; --border:#242b35;
+    --ecg:#3ee07a; --art:#ff6b6b; --pleth:#4cc9f0; --co2:#c8b07a; --warn:#d4a85a; --danger:#f07167;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; min-height:100%; background:var(--bg); color:var(--fg); }
+  body { font-family:"Segoe UI", system-ui, sans-serif; line-height:1.45; }
+  button, select { font:inherit; color:inherit; cursor:pointer; }
+  button { background:var(--surface); border:1px solid var(--border); border-radius:8px; min-height:44px; padding:8px 12px; }
+  button:hover { background:var(--surface2); }
+  button.on { border-color:var(--primary); }
+  button.primary { background:var(--primary); color:var(--primary-fg); border-color:var(--primary); font-weight:600; }
+  button:disabled { opacity:.4; cursor:default; }
+  h1, h2, p { margin:0; }
+  .wrap { max-width:1080px; margin:0 auto; padding:28px 20px 48px; }
+  .kicker { font-family:ui-monospace, monospace; font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:var(--primary); }
+  h1 { font-size:clamp(32px, 6vw, 48px); font-weight:500; letter-spacing:-.03em; margin-top:8px; }
+  .lede { margin-top:10px; max-width:40rem; color:var(--muted); }
+  .card { display:flex; width:100%; text-align:left; gap:12px; align-items:center; margin-top:14px; border-color:var(--primary); }
+  .card h2 { font-size:20px; font-weight:500; }
+  .card p, .meta { color:var(--muted); font-size:14px; margin-top:4px; }
+  .bay { width:100%; text-align:left; display:flex; gap:12px; border-radius:0; border-left:0; border-right:0; margin-top:-1px; }
+  .bays { margin-top:22px; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .bed { font-family:ui-monospace, monospace; color:var(--primary); width:52px; flex:none; }
+  .diff { font-family:ui-monospace, monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--warn); }
+  .top { display:flex; gap:12px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); }
+  .top h1 { font-size:18px; margin:0; }
+  .spacer { flex:1; }
+  .sim { display:grid; grid-template-columns:1fr; min-height:100dvh; }
+  @media (min-width:980px) { .sim { grid-template-columns:minmax(0,1fr) 340px; } }
+  canvas { width:100%; height:220px; display:block; background:var(--bg); }
+  @media (min-width:980px) { canvas { height:280px; } }
+  .nums, .ventgrid, .hemonums { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px 16px; padding:14px 16px; }
+  @media (min-width:720px) { .nums, .hemonums { grid-template-columns:repeat(4, minmax(0,1fr)); } }
+  .lbl { color:var(--muted); font-size:12px; }
+  .val { font-family:ui-monospace, monospace; font-size:28px; line-height:1; font-variant-numeric:tabular-nums; }
+  .unit { color:var(--subtle); font-size:12px; margin-top:4px; }
+  .ecg { color:var(--ecg); } .art { color:var(--art); } .pleth { color:var(--pleth); } .co2 { color:var(--co2); } .warn { color:var(--warn); } .danger { color:var(--danger); } .ok { color:var(--primary); }
+  .side { border-top:1px solid var(--border); padding:14px 16px 28px; display:flex; flex-direction:column; gap:14px; }
+  @media (min-width:980px) { .side { border-top:0; border-left:1px solid var(--border); } }
+  .side h2 { font-family:ui-monospace, monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--subtle); }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .log { font-size:13px; color:var(--muted); min-height:2.6em; }
+  .stem { padding:12px 16px 0; color:var(--muted); font-size:14px; }
+  select { width:100%; min-height:44px; background:var(--surface); color:var(--fg); border:1px solid var(--border); border-radius:8px; padding:8px; }
+  input[type=range] { width:100%; accent-color:var(--primary); }
+  .rowlab { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); }
+  .panel { margin:0 16px 14px; border:1px solid var(--border); border-radius:8px; background:var(--surface); }
+  .note { font-size:13px; color:var(--muted); }
+  a { color:var(--primary); }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const $ = (s, r=document) => r.querySelector(s);
+const app = $("#app");
+const clamp = (n,a,b) => Math.max(a, Math.min(b, n));
+function approach(cur, target, step) {
+  if (cur < target) return Math.min(target, cur + step);
+  if (cur > target) return Math.max(target, cur - step);
+  return cur;
+}
+function spo2FromPao2(pao2) {
+  const p = Math.max(8, pao2);
+  return clamp(100 / (1 + (26.8 / p) ** 2.7), 50, 100);
+}
+
+const CASES = [
+  { id:"sepsis", bed:"Bay 2", title:"Fever, cough, collapse", who:"68F · Nursing-home pneumonia", diff:"intern",
+    stem:"Two days of cough, then found slumped. Febrile, confused, systolic in the 80s. EMS gave 250 mL. No antibiotics yet.",
+    exam:"Warm, flushed, mottled knees. Crackles at the right base. No jugular distension.",
+    echo:"Hyperdynamic left ventricle, small cavity, IVC collapses. No effusion.",
+    cxr:"Right lower-lobe consolidation. No pneumothorax.",
+    abg:"7.29 / 32 / 68 on oxygen. Lactate 4.8.",
+    need:["abx","fluid","norepi"], shock:"Distributive", dx:"Septic shock — pneumonia",
+    options:["Septic shock — pneumonia","Hemorrhagic shock","Cardiogenic shock","Anaphylaxis","Massive PE"],
+    pearls:["Antibiotics as soon as shock is recognized.","Norepinephrine is first-line after a first fill.","Warm skin and a wide pulse pressure point to vasoplegia."],
+    phys:{ volume:3.7, vasoplegia:0.86, contractility:0.88, pvr:1, tamponade:0, ptx:0, lungInjury:0.38, bronchospasm:0, anaphylaxis:0, sepsis:0.9, ischemia:0, pulmonaryEdema:0, temp:38.9, hb:11.1, lactate:4.8, fio2:0.4, pbw:55, bleedRate:0 } },
+  { id:"bleed", bed:"Bay 4", title:"Hematemesis", who:"54M · Coffee-ground then clots", diff:"intern",
+    stem:"Known varices. He filled a basin with clot, then lost the systolic. Two large-bores are in. Type and screen is out.",
+    exam:"Cool, pale, diaphoretic. Distended abdomen, old caput, melena on the glove.",
+    echo:"Underfilled, hyperdynamic ventricle. No effusion. IVC flat.",
+    cxr:"Clear lungs. No widened mediastinum.",
+    abg:"7.32 / 30 / 92. Hemoglobin 6.4.",
+    need:["blood","mtp"], shock:"Hypovolemic", dx:"Hemorrhagic shock — variceal bleed",
+    options:["Hemorrhagic shock — variceal bleed","Septic shock","Cardiogenic shock","Tamponade","PE"],
+    pearls:["Blood, not a third liter of crystalloid, replaces what he lost.","Stop the bleed: massive-transfusion pathway and a GI call.","A rising pressure on norepinephrine alone means you clamped an empty tank."],
+    phys:{ volume:2.9, vasoplegia:0.02, contractility:0.8, pvr:1, tamponade:0, ptx:0, lungInjury:0.02, bronchospasm:0, anaphylaxis:0, sepsis:0, ischemia:0, pulmonaryEdema:0, temp:36.2, hb:6.4, lactate:5.2, fio2:0.5, pbw:75, bleedRate:0.01 } },
+  { id:"stemi", bed:"Bay 1", title:"Crushing chest pain", who:"62M · Anterior STEMI, wet lungs", diff:"resident",
+    stem:"Two hours of crushing pain, now rales to the scapulae and a new S3. The electrocardiogram shows anterior ST elevation.",
+    exam:"Cool hands, jugular veins up, frothy sputum. No fever.",
+    echo:"Anterior wall akinetic. EF about 25%. No effusion. RV not huge.",
+    cxr:"Bat-wing edema. Heart enlarged.",
+    abg:"7.33 / 31 / 58 on a non-rebreather.",
+    need:["cath","pressor"], shock:"Cardiogenic", dx:"Cardiogenic shock — anterior STEMI",
+    options:["Cardiogenic shock — anterior STEMI","Massive PE","Tamponade","Septic shock","Hemorrhagic shock"],
+    pearls:["The cath lab is the treatment. Pressors buy the trip.","Fluid into pulmonary edema drops the saturation.","Dobutamine raises forward flow. Beta blockade in shock does the opposite."],
+    phys:{ volume:5.05, vasoplegia:0.04, contractility:0.5, pvr:1.05, tamponade:0, ptx:0, lungInjury:0.04, bronchospasm:0, anaphylaxis:0, sepsis:0, ischemia:0.4, pulmonaryEdema:0.6, temp:36.7, hb:13.2, lactate:4.1, fio2:0.6, pbw:78, bleedRate:0 } },
+  { id:"pe", bed:"Bay 6", title:"Sudden syncope, POD2", who:"47F · Post-op collapse", diff:"resident",
+    stem:"Day two after a hip fracture repair. She stood, gasped, and lost consciousness. The lungs are clear. P2 is loud.",
+    exam:"Neck veins up. Cool. Clear chest. Recent surgery, not a candidate for a casual heparin-only plan if she stays unstable.",
+    echo:"Dilated, poorly contracting right ventricle. Underfilled left ventricle. No effusion.",
+    cxr:"Clear. No pneumothorax.",
+    abg:"7.36 / 28 / 52 on a non-rebreather. A–a gradient is wide.",
+    need:["lytics"], shock:"Obstructive", dx:"Massive pulmonary embolism",
+    options:["Massive pulmonary embolism","Tamponade","Cardiogenic shock","Tension pneumothorax","Septic shock"],
+    pearls:["Clear lungs plus high venous pressure is not left-heart failure.","Norepinephrine supports the right ventricle while the clot is treated.","Systemic thrombolysis is for unstable PE, not for a stable oxygen requirement."],
+    phys:{ volume:4.25, vasoplegia:0.06, contractility:0.72, pvr:2.15, tamponade:0, ptx:0, lungInjury:0.04, bronchospasm:0, anaphylaxis:0, sepsis:0, ischemia:0, pulmonaryEdema:0, temp:36.8, hb:12.4, lactate:3.6, fio2:1, pbw:60, bleedRate:0 } },
+  { id:"tamp", bed:"Bay 3", title:"Day 2 post-CABG", who:"71M · Rising filling pressure, quiet chest", diff:"fellow",
+    stem:"Yesterday's bypass. This morning the chest tubes slowed, the neck veins rose, and the blood pressure fell. Heart sounds are distant. Lungs are clear.",
+    exam:"Pulsus on the arterial line. No rales. Sternotomy dry on the outside.",
+    echo:"Circumferential pericardial clot. Right atrium collapses. IVC plethoric.",
+    cxr:"Widened cardiac silhouette. Lungs clear.",
+    abg:"7.34 / 33 / 78.",
+    need:["drain"], shock:"Obstructive", dx:"Tamponade",
+    options:["Tamponade","Cardiogenic shock","Massive PE","Hemorrhagic shock","Tension pneumothorax"],
+    pearls:["Equalization and pulsus. The fix is drainage, not another liter.","Do not induce anesthesia before the pericardium is open.","Fluid only temporizes."],
+    phys:{ volume:4.3, vasoplegia:0.02, contractility:0.8, pvr:1, tamponade:0.7, ptx:0, lungInjury:0, bronchospasm:0, anaphylaxis:0, sepsis:0, ischemia:0, pulmonaryEdema:0, temp:36.9, hb:10.6, lactate:3.2, fio2:0.4, pbw:80, bleedRate:0 } },
+  { id:"ptx", bed:"Bay 5", title:"Absent breath sounds", who:"34M · Left chest after MVC", diff:"intern",
+    stem:"Thrown from a motorcycle. Trachea deviated, left chest silent, neck veins up, pressure falling. Oxygen is already on.",
+    exam:"Distended neck veins, tracheal shift, no left breath sounds. Percussion drum-like.",
+    echo:"Small hyperdynamic LV. RV compressed. No pericardial fluid.",
+    cxr:"Do not wait for it.",
+    abg:"7.30 / 40 / 48 on a non-rebreather.",
+    need:["needle"], shock:"Obstructive", dx:"Tension pneumothorax",
+    options:["Tension pneumothorax","Tamponade","Massive PE","Hemorrhagic shock","Cardiogenic shock"],
+    pearls:["Needle or finger before the radiograph.","A chest tube follows the decompression.","The saturation returns when the pleural pressure does."],
+    phys:{ volume:4.15, vasoplegia:0.04, contractility:0.8, pvr:1, tamponade:0, ptx:0.78, lungInjury:0.04, bronchospasm:0, anaphylaxis:0, sepsis:0, ischemia:0, pulmonaryEdema:0, temp:36.5, hb:12.8, lactate:3.4, fio2:1, pbw:75, bleedRate:0 } },
+  { id:"ana", bed:"Bay 7", title:"Minutes after cefepime", who:"29F · Wheeze, hives, collapse", diff:"intern",
+    stem:"First dose of cefepime five minutes ago. Hives, wheeze, and a disappearing blood pressure.",
+    exam:"Flushed, urticaria on the trunk, diffuse wheeze. Abdomen cramping.",
+    echo:"Hyperdynamic, underfilled. No effusion.",
+    cxr:"Not the priority.",
+    abg:"7.36 / 30 / 55. Try an intramuscular injection before another test.",
+    need:["im"], shock:"Distributive", dx:"Anaphylaxis",
+    options:["Anaphylaxis","Septic shock","Cardiogenic shock","PE","Tension pneumothorax"],
+    pearls:["Intramuscular epinephrine into the mid-outer thigh. Not a slow antihistamine.","Fluids after epinephrine, not instead of it.","Airway edema can progress. Watch the voice."],
+    phys:{ volume:3.65, vasoplegia:0.9, contractility:0.86, pvr:1, tamponade:0, ptx:0, lungInjury:0.04, bronchospasm:0.78, anaphylaxis:0.95, sepsis:0, ischemia:0, pulmonaryEdema:0, temp:36.5, hb:13, lactate:3.8, fio2:0.6, pbw:62, bleedRate:0 } },
+  { id:"ards", bed:"Bay 8", title:"Week of fever, now the lung", who:"44F · Severe viral ARDS", diff:"resident",
+    stem:"A week of viral pneumonia. Intubated an hour ago on 10 mL/kg and PEEP 5, FiO2 1.0. The saturation is still poor. Predicted body weight 52 kg.",
+    exam:"Sedated, intubated. Diffuse crackles. Not in shock.",
+    echo:"Normal LV. No major effusion. RV not strained.",
+    cxr:"Bilateral white-out. No pneumothorax.",
+    abg:"7.28 / 48 / 62 on FiO2 1.0. P/F is in the severe range.",
+    need:["protect","prone","steroids"], shock:"Hypoxemic respiratory failure", dx:"Severe ARDS — viral pneumonia",
+    options:["Severe ARDS — viral pneumonia","Cardiogenic edema","Massive PE","Aspiration only","Septic shock without ARDS"],
+    pearls:["6 mL/kg predicted body weight, not actual weight.","PEEP recruits. Plateau stays at or under 30, driving pressure at or under 15.","Prone the severe patient. Steroids for viral ARDS."],
+    vent:{ vt:10, rr:24, peep:5, fio2:1 },
+    phys:{ volume:4.65, vasoplegia:0.18, contractility:0.84, pvr:1.1, tamponade:0, ptx:0, lungInjury:0.95, bronchospasm:0, anaphylaxis:0, sepsis:0.25, ischemia:0, pulmonaryEdema:0.08, temp:38.3, hb:11, lactate:2.4, fio2:1, pbw:52, bleedRate:0 } },
+  { id:"asp", bed:"Bay 9", title:"Found down, now white-out", who:"58M · Aspiration, early ARDS", diff:"fellow",
+    stem:"Found down beside vomit. Intubated in the field on large tidal volumes. Predicted body weight 70 kg. Both lungs are flooding.",
+    exam:"Copious dirty secretions. Coarse crackles. Belly soft.",
+    echo:"Normal systolic function. No effusion.",
+    cxr:"Bilateral infiltrates, right worse. Tube 3 cm above the carina.",
+    abg:"7.26 / 52 / 58 on FiO2 1.0.",
+    need:["protect","prone"], shock:"Hypoxemic respiratory failure", dx:"ARDS — aspiration",
+    options:["ARDS — aspiration","Viral ARDS","Cardiogenic edema","Tension pneumothorax","Massive PE"],
+    pearls:["Aspiration is ARDS until the mechanics say otherwise.","A 70 kg predicted-weight patient on 10 mL/kg is a 700 mL breath into a stiff lung.","Prone if the P/F stays severe after the ventilator is fixed."],
+    vent:{ vt:10, rr:22, peep:5, fio2:1 },
+    phys:{ volume:4.5, vasoplegia:0.1, contractility:0.8, pvr:1.1, tamponade:0, ptx:0, lungInjury:0.88, bronchospasm:0.1, anaphylaxis:0, sepsis:0.1, ischemia:0, pulmonaryEdema:0.12, temp:37.4, hb:13, lactate:2.8, fio2:1, pbw:70, bleedRate:0 } },
+];
+
+let screen = "board";
+let caseId = null;
+let S = null;
+let V = null;
+let timer = 0;
+let speed = 1;
+let hemo = null;
+
+function blankPatient(c) {
+  const p = { ...c.phys, norepi:0, dobu:0, imEpi:false, metop:false, nrb:c.id==="sepsis"||c.id==="bleed"||c.id==="stemi"||c.id==="pe"||c.id==="ptx"||c.id==="ana", prone:false, vent:c.vent?{...c.vent}:null };
+  return {
+    t:0, p, fluids:0, blood:0, abx:false, mtp:false, gi:false, cath:false, lytics:false, drained:false,
+    needle:false, tube:false, steroids:false, cvc:false, harm:0, dx:null, outcome:null, why:"",
+    lowMap:0, lowOx:0, good:0, log:"Read the monitor, then treat the cause.",
+    uo: c.id==="bleed"||c.id==="sepsis" ? 8 : 20,
+  };
+}
+
+function compute(p) {
+  const vaso = clamp(p.vasoplegia - p.norepi * 0.5 - (p.imEpi ? 0.62 : 0), 0, 1);
+  const contract = clamp(p.contractility + Math.min(p.dobu, 6) * 0.035 - (p.metop ? 0.18 : 0), 0.15, 1.15);
+  let sv = 96 * contract * clamp((p.volume - 2.3) / 2.6, 0.2, 1.1);
+  sv *= 1 + 0.22 * vaso;
+  sv *= 1 - 0.58 * p.tamponade;
+  sv *= 1 - 0.48 * p.ptx;
+  sv *= 1 - 0.28 * Math.max(0, p.pvr - 1);
+  sv *= 1 - 0.34 * p.pulmonaryEdema;
+  if (p.vent && p.vent.peep > 10 && p.volume < 3.8) sv *= 1 - (p.vent.peep - 10) * 0.03;
+  sv = clamp(sv, 12, 120);
+  let hr = 70 + Math.max(0, 4.4 - p.volume) * 28 + Math.max(0, 55 - sv) * 0.35;
+  hr += p.sepsis * 14 + p.anaphylaxis * 12 + Math.max(0, p.temp - 37.2) * 10 + p.ischemia * 8;
+  if (p.pulmonaryEdema > 0.45) hr += 16;
+  if (p.tamponade > 0.45) hr += 24;
+  if (p.ptx > 0.45) hr += 18;
+  if (p.pvr > 1.5) hr += (p.pvr - 1) * 10;
+  if (p.metop) hr -= 28;
+  hr = clamp(hr, 44, 160);
+  const svrK = clamp((1 - 0.64 * vaso) * (1 + 0.16 * Math.max(0, 4.15 - p.volume)) * (1 + p.norepi * 0.42) * (1 - Math.min(p.dobu, 6) * 0.025), 0.32, 2.2);
+  const co = (hr * sv) / 1000;
+  const map = clamp(14 + co * svrK * 16, 34, 125);
+  const pp = clamp(18 + sv * (0.38 + 0.22 * vaso) * 0.85, 18, 68);
+  const dbp = Math.max(24, map - pp / 3);
+  const sbp = dbp + pp;
+  const cvp = clamp(4 + (p.volume - 4.3) * 3.6 + p.tamponade * 16 + Math.max(0, p.pvr - 1) * 7.5 + p.pulmonaryEdema * 8 + p.ptx * 7, 0, 30);
+  const v = p.vent;
+  const fio2 = v ? v.fio2 : p.nrb ? 0.9 : p.fio2;
+  const injury = p.lungInjury;
+  const vt = v ? v.vt : 7;
+  const peep = v ? v.peep : 0;
+  const recruit = v ? clamp((Math.min(peep, 16) - 5) / 14, 0, 0.48) + (p.prone && injury > 0.5 ? 0.16 : 0) : 0;
+  const crs = 12 + 34 * (1 - injury) + recruit * 18;
+  const dp = v ? (vt * p.pbw) / Math.max(10, crs) : 0;
+  const pplat = v ? peep + dp : 0;
+  const shunt = clamp(0.14 + injury * (0.84 - 0.26 * recruit) + 0.12 * p.pulmonaryEdema + 0.18 * p.bronchospasm, 0.06, 0.93);
+  const alveolar = Math.max(80, 713 * fio2 - 48);
+  const pao2 = 40 + (alveolar - 40) * (1 - shunt);
+  let spo2 = spo2FromPao2(pao2);
+  if (!v && injury > 0.15) spo2 = Math.min(spo2, 101 - injury * 14);
+  if (p.ptx > 0.15) spo2 = Math.min(spo2, 100 - p.ptx * 18);
+  if (p.pvr > 1.2) spo2 = Math.min(spo2, 103 - (p.pvr - 1) * 11);
+  if (p.bronchospasm > 0.12) spo2 = Math.min(spo2, 102 - p.bronchospasm * 16);
+  if (p.pulmonaryEdema > 0.2) spo2 = Math.min(spo2, 103 - p.pulmonaryEdema * 15);
+  if (p.hb < 7) spo2 -= (7 - p.hb) * 1.1;
+  const pf = pao2 / Math.max(0.21, fio2);
+  if (v && pf <= 100) spo2 = Math.min(spo2, 86);
+  else if (v && pf <= 160) spo2 = Math.min(spo2, 92);
+  else if (v && pf <= 230) spo2 = Math.min(spo2, 96);
+  spo2 = clamp(spo2, 45, 100);
+  const rr = v ? v.rr : clamp(14 + (97 - spo2) * 0.4 + p.sepsis * 3, 12, 42);
+  const berlin = !v ? "" : pf <= 100 ? "severe" : pf <= 200 ? "moderate" : pf <= 300 ? "mild" : "none";
+  const rhythm = p.ischemia > 0.25 ? "STE" : p.pvr > 1.6 ? "RV strain" : hr >= 100 ? "ST" : "NSR";
+  return { hr:Math.round(hr), sbp:Math.round(sbp), dbp:Math.round(dbp), map:Math.round(map), pp:Math.round(sbp-dbp), spo2:Math.round(spo2), rr:Math.round(rr), cvp:Math.round(cvp), co:Math.round(co*10)/10, sv:Math.round(sv), svr:Math.round(((map-cvp)*80)/Math.max(0.8,co)), pf:Math.round(pf), pplat:Math.round(pplat), dp:Math.round(dp), berlin, rhythm, fio2, pao2:Math.round(pao2) };
+}
+
+function protective(s) {
+  const v = s.p.vent;
+  if (!v) return false;
+  const vit = compute(s.p);
+  return v.vt <= 6.2 && v.peep >= 8 && v.peep <= 16 && vit.pplat <= 30 && vit.dp <= 15;
+}
+function causeMet(s, c) {
+  if (c.id==="sepsis") return s.abx && s.fluids >= 500 && s.p.norepi >= 0.08;
+  if (c.id==="bleed") return s.blood >= 1 && s.mtp;
+  if (c.id==="stemi") return s.cath && (s.p.norepi >= 0.05 || s.p.dobu >= 5);
+  if (c.id==="pe") return s.lytics && s.p.pvr < 1.45;
+  if (c.id==="tamp") return s.drained;
+  if (c.id==="ptx") return s.needle || s.tube;
+  if (c.id==="ana") return s.p.imEpi && s.p.bronchospasm < 0.35;
+  if (c.id==="ards") return protective(s) && s.prone && s.steroids;
+  if (c.id==="asp") return protective(s) && s.prone;
+  return false;
+}
+
+function step(dt) {
+  if (!S || S.outcome) return;
+  const p = S.p;
+  const c = CASES.find(x => x.id === caseId);
+  S.t += dt;
+  if (p.bleedRate && !S.mtp) {
+    const k = S.blood ? 0.3 : 1;
+    p.volume -= p.bleedRate * k * dt;
+    p.hb = Math.max(4, p.hb - p.bleedRate * 1.8 * k * dt);
+  }
+  if (p.sepsis > 0.3 && !S.abx) { p.vasoplegia = Math.min(0.96, p.vasoplegia + 0.003*dt); p.lactate += 0.025*dt; }
+  if (S.abx) p.vasoplegia = approach(p.vasoplegia, 0.3, 0.012*dt);
+  if (p.tamponade > 0 && !S.drained) p.tamponade = Math.min(0.92, p.tamponade + 0.003*dt);
+  if (p.ptx > 0 && !S.needle && !S.tube) p.ptx = Math.min(0.95, p.ptx + 0.004*dt);
+  if (p.anaphylaxis > 0.2 && !p.imEpi) { p.vasoplegia = Math.min(0.98, p.vasoplegia + 0.005*dt); p.bronchospasm = Math.min(1, p.bronchospasm + 0.004*dt); }
+  if (p.imEpi) { p.bronchospasm = approach(p.bronchospasm, 0.08, 0.025*dt); p.anaphylaxis = approach(p.anaphylaxis, 0.1, 0.02*dt); p.vasoplegia = approach(p.vasoplegia, 0.22, 0.02*dt); }
+  if (p.ischemia > 0.12 && !S.cath) p.contractility = Math.max(0.28, p.contractility - 0.002*dt);
+  if (S.cath) { p.ischemia = approach(p.ischemia, 0.08, 0.012*dt); p.contractility = approach(p.contractility, 0.64, 0.01*dt); }
+  if (S.lytics) p.pvr = approach(p.pvr, 1.15, 0.025*dt);
+  if (S.drained) p.tamponade = 0;
+  if (S.needle || S.tube) p.ptx = approach(p.ptx, 0, 0.15*dt);
+  const vit = compute(p);
+  if (vit.map >= 68) p.lactate = approach(p.lactate, 1.5, 0.03*dt);
+  else p.lactate += 0.015*dt;
+  S.uo = vit.map >= 68 && p.volume > 3.5 ? Math.min(80, S.uo + 1.2*dt) : Math.max(0, S.uo - 0.6*dt);
+  if (vit.map < 50) S.lowMap += dt; else S.lowMap = Math.max(0, S.lowMap - dt);
+  if (vit.spo2 < 78) S.lowOx += dt; else S.lowOx = Math.max(0, S.lowOx - dt);
+  const oxOk = c.id==="ards" || c.id==="asp" ? vit.spo2 >= 88 : vit.spo2 >= 90;
+  if (causeMet(S, c) && vit.map >= 65 && oxOk) S.good += dt; else S.good = 0;
+  if (S.lowMap > 55) end("died", "The pressure stayed unsurvivable.");
+  else if (S.lowOx > 40) end("died", "Hypoxemia went on too long.");
+  else if (S.good > 14) end("stable", "The cause is treated and the monitor has settled.");
+  V = vit;
+}
+
+function end(outcome, why) {
+  S.outcome = outcome;
+  S.why = why;
+  S.log = why;
+  clearInterval(timer);
+  setTimeout(() => { screen = "debrief"; draw(); }, 700);
+}
+
+function act(id) {
+  if (!S || S.outcome) return;
+  const p = S.p;
+  const c = CASES.find(x => x.id === caseId);
+  const say = (t) => { S.log = t; };
+  if (id==="fluid") {
+    if (p.pulmonaryEdema > 0.4 || c.id==="stemi" || c.id==="ards" || c.id==="asp") {
+      p.pulmonaryEdema = Math.min(1, p.pulmonaryEdema + 0.12);
+      p.volume += 0.2;
+      S.harm += c.id==="stemi" ? 1 : 0;
+      say("The left atrium had no room. Saturation falls.");
+    } else {
+      p.volume = Math.min(5.4, p.volume + 0.45);
+      S.fluids += 500;
+      say("500 mL in. Watch stroke volume, not the habit of hanging another liter.");
+    }
+  } else if (id==="blood") {
+    p.hb = Math.min(14, p.hb + 1.7);
+    p.volume = Math.min(5.2, p.volume + 0.35);
+    S.blood += 1;
+    say("One unit of red cells. Hemoglobin and preload both rise.");
+  } else if (id==="norepi") {
+    p.norepi = p.norepi === 0 ? 0.08 : p.norepi < 0.15 ? 0.16 : 0;
+    say(p.norepi ? "Norepinephrine at " + p.norepi + " mcg/kg/min." : "Norepinephrine off.");
+  } else if (id==="dobu") {
+    p.dobu = p.dobu ? 0 : 5;
+    say(p.dobu ? "Dobutamine 5 mcg/kg/min." : "Dobutamine off.");
+  } else if (id==="abx") { S.abx = true; say("Broad-spectrum antibiotics are in."); }
+  else if (id==="mtp") { S.mtp = true; S.gi = true; say("Massive transfusion pathway and GI are called."); }
+  else if (id==="cath") { S.cath = true; say("Cath lab activated."); }
+  else if (id==="lytics") {
+    if (c.id==="bleed") { p.bleedRate *= 2.5; S.harm++; say("Lytics into a bleeding patient. The hemorrhage accelerates."); }
+    else { S.lytics = true; say("Thrombolysis started."); }
+  } else if (id==="drain") {
+    if (c.id==="tamp") { S.drained = true; p.tamponade = 0; say("Pericardium open. Stroke volume returns."); }
+    else { S.harm++; say("No pericardial collection. You poked the wrong space."); }
+  } else if (id==="needle") {
+    if (c.id==="ptx") { S.needle = true; say("Rush of air. Decompress, then a chest tube."); }
+    else { S.harm++; say("Breath sounds were there. The needle was not the treatment."); }
+  } else if (id==="tube") { S.tube = true; say("Chest tube in."); }
+  else if (id==="im") { p.imEpi = true; say("Epinephrine 0.5 mg intramuscular, mid-outer thigh."); }
+  else if (id==="steroids") { S.steroids = true; say("Dexamethasone given."); }
+  else if (id==="prone") { S.prone = !S.prone; say(S.prone ? "Prone. Watch the tube and the pressure." : "Supine."); }
+  else if (id==="nrb") { p.nrb = true; say("Non-rebreather on."); }
+  else if (id==="intubate") {
+    if (c.id==="tamp" && !S.drained) { end("died", "Induction before drainage. Venous return stopped."); return; }
+    p.vent = { vt:8, rr:16, peep:5, fio2: p.fio2 < 0.6 ? 0.6 : p.fio2 };
+    say("Intubated. Set the tidal volume to predicted body weight.");
+  } else if (id==="cvc") { S.cvc = true; say("Central line in. CVP is a pressure, not a diagnosis."); }
+  else if (id==="echo") say(c.echo);
+  else if (id==="cxr") say(c.cxr);
+  else if (id==="abg") say(c.abg);
+  else if (id==="metop") { p.metop = true; S.harm++; p.contractility = Math.max(0.2, p.contractility - 0.15); say("Beta blockade in shock. The rate falls and the pump worsens."); }
+  else if (id==="ct") {
+    if (compute(p).map < 70 || c.id==="ptx") { end("died", "Arrest on the way to CT."); return; }
+    S.harm++; say("The trip cost time and nothing else.");
+  }
+  V = compute(p);
+  paint();
+}
+
+function clock(t) {
+  const m = Math.floor(t/60), s = Math.floor(t%60);
+  return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
+}
+
+const waves = {
+  raf:0, buffers:null, write:0, t:0, last:0,
+  stop() { cancelAnimationFrame(this.raf); this.raf = 0; this.buffers = null; },
+  start() {
+    this.stop();
+    const canvas = $("#wave");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const N = 600;
+    const gauss = (x,mu,sig,amp) => amp * Math.exp(-0.5 * ((x-mu)/sig)**2);
+    const rowsOf = () => {
+      const rows = [{ id:"ecg", label:"II", color:"#3ee07a" }, { id:"art", label:"ART", color:"#ff6b6b" }, { id:"pleth", label:"SpO2", color:"#4cc9f0" }];
+      if (screen==="sim" && S && S.p.vent) rows.push({ id:"co2", label:"etCO2", color:"#c8b07a" });
+      if (screen==="hemo" && hemo) {
+        if (hemo.cvc) rows.push({ id:"cvp", label:"CVP", color:"#c8b07a" });
+        if (hemo.level==="advanced" && hemo.pac) rows.push({ id:"pa", label: hemo.wedged ? "PCWP" : "PA", color:"#d4a85a" });
+      }
+      return rows;
+    };
+    let rows = rowsOf();
+    const resize = () => {
+      const dpr = Math.min(2, devicePixelRatio||1);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.max(1, rect.width * dpr);
+      canvas.height = Math.max(1, rect.height * dpr);
+    };
+    resize();
+    this.buffers = rows.map(() => new Float32Array(N));
+    this.write = 0; this.t = 0; this.last = performance.now();
+    const sample = (id, t) => {
+      const live = screen==="hemo" && hemo ? hemo.snap : V || { hr:80, map:70, spo2:96, rr:16, pp:40 };
+      const hr = live.hr || 80;
+      const period = 60/Math.max(40, hr);
+      const phase = ((t % period) + period) % period / period;
+      const rr = live.rr || 16;
+      const rp = ((t % (60/rr)) + 60) % (60/rr) / (60/rr);
+      if (id==="ecg") return gauss(phase,.12,.018,.12)+gauss(phase,.225,.01,1)+gauss(phase,.48,.05,.28);
+      if (id==="art") {
+        let y = phase>0.12 && phase<0.3 ? Math.sin((phase-0.12)/0.18*Math.PI) : phase<0.55 ? 0.35*Math.exp(-(phase-0.3)*6) : 0.05;
+        const breath = Math.sin(rp * Math.PI * 2);
+        const swing = screen==="hemo" && hemo ? (hemo.snap.vent==="controlled" ? hemo.snap.ppv/200 : hemo.snap.paradox/80) : (live.pp||40)/400;
+        return y * (1 + breath * swing) - 0.2;
+      }
+      if (id==="pleth") return Math.max(0, Math.sin(((phase+0.2)%1) * Math.PI)) * ((live.spo2||90)/100) - 0.3;
+      if (id==="co2") return rp>0.15 && rp<0.62 ? 0.55 : 0.02;
+      if (id==="cvp") return gauss(phase,.14,.03,.4)+gauss(phase,.55,.05,.3+(hemo&&hemo.snap.tr||0)) - 0.15;
+      const w = hemo && hemo.wedged;
+      if (w) return gauss(phase,.16,.04,.25)+gauss(phase,.55,.06,.3+(hemo.snap.vWave||0));
+      return phase>0.12 && phase<0.34 ? Math.sin((phase-0.12)/0.22*Math.PI) : 0.15;
+    };
+    const loop = (now) => {
+      const nextRows = rowsOf();
+      if (nextRows.length !== rows.length || nextRows.some((r,i)=>r.label!==rows[i].label)) {
+        rows = nextRows;
+        this.buffers = rows.map(() => new Float32Array(N));
+      }
+      const dt = Math.min(0.05, (now - this.last)/1000);
+      this.last = now;
+      this.t += dt;
+      const steps = Math.max(1, Math.round(dt*180));
+      for (let s=0;s<steps;s++) {
+        const ts = this.t - (steps-s)*(dt/steps);
+        this.write = (this.write+1)%N;
+        rows.forEach((r,i) => { this.buffers[i][this.write] = sample(r.id, ts); });
+      }
+      const w = canvas.width, h = canvas.height, dpr = Math.min(2, devicePixelRatio||1);
+      ctx.fillStyle = "#07090c";
+      ctx.fillRect(0,0,w,h);
+      const rowH = h/rows.length;
+      rows.forEach((r,i) => {
+        const y0 = i*rowH;
+        ctx.strokeStyle = "rgba(232,237,242,.06)";
+        ctx.beginPath();
+        for (let g=1;g<8;g++) { const x=g/8*w; ctx.moveTo(x,y0); ctx.lineTo(x,y0+rowH); }
+        ctx.stroke();
+        ctx.fillStyle = r.color;
+        ctx.font = (11*dpr)+"px ui-monospace, monospace";
+        ctx.fillText(r.label, 8*dpr, y0+14*dpr);
+        ctx.beginPath();
+        ctx.strokeStyle = r.color;
+        ctx.lineWidth = 1.25*dpr;
+        const mid = y0+rowH*0.62, amp = rowH*0.32;
+        for (let n=0;n<N;n++) {
+          const idx = (this.write+1+n)%N;
+          const x = n/(N-1)*w, y = mid - this.buffers[i][idx]*amp;
+          if (n===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+      });
+      this.raf = requestAnimationFrame(loop);
+    };
+    this.raf = requestAnimationFrame(loop);
+    this._ro = new ResizeObserver(resize);
+    this._ro.observe(canvas);
+  }
+};
+
+function num(label, value, unit, cls) {
+  return `<div><div class="lbl">${label}</div><div class="val ${cls||""}">${value}</div><div class="unit">${unit||""}</div></div>`;
+}
+
+function draw() {
+  waves.stop();
+  clearInterval(timer);
+  if (screen==="board") return drawBoard();
+  if (screen==="brief") return drawBrief();
+  if (screen==="debrief") return drawDebrief();
+  if (screen==="hemo") return drawHemo();
+  drawSim();
+}
+
+function drawBoard() {
+  const hub = location.hostname.endsWith("github.io") ? `<p class="meta" style="margin-top:18px"><a href="hub.html">All simulators</a></p>` : "";
+  app.innerHTML = `<div class="wrap">
+    <p class="kicker">Critical care simulation</p>
+    <h1>Shock Bay</h1>
+    <p class="lede">You are the intensivist. Undifferentiated shock, or a lung that will not oxygenate, is on the monitor. This page is one HTML file.</p>
+    <button class="card" id="openHemo"><div><p class="kicker">Monitoring lab</p><h2>Hemodynamics — basic and advanced</h2><p>Cuff, skin, arterial line, CVP. Then a pulmonary artery catheter and pulse contour on the same patient.</p></div></button>
+    <div class="bays">${CASES.map(c=>`<button class="bay" data-id="${c.id}"><div class="bed">${c.bed.replace("Bay ","")}</div><div><b>${c.title}</b> <span class="diff">${c.diff}</span><div class="meta">${c.who}</div></div></button>`).join("")}</div>
+    ${hub}
+    <p class="meta" style="margin-top:18px">Educational simulation. Not a medical device.</p>
+  </div>`;
+  $("#openHemo").onclick = () => { hemo = freshHemo("hypovolemic", true); screen="hemo"; draw(); };
+  app.querySelectorAll(".bay").forEach(b => b.onclick = () => { caseId = b.dataset.id; screen="brief"; draw(); });
+}
+
+function drawBrief() {
+  const c = CASES.find(x => x.id===caseId);
+  app.innerHTML = `<div class="wrap">
+    <button id="back">Board</button>
+    <p class="kicker" style="margin-top:18px">${c.bed} · ${c.diff}</p>
+    <h1>${c.title}</h1>
+    <p class="lede">${c.who}</p>
+    <p class="lede">${c.stem}</p>
+    <p class="lede">${c.exam}</p>
+    <button class="primary" id="go" style="margin-top:18px">Assume care</button>
+  </div>`;
+  $("#back").onclick = () => { screen="board"; draw(); };
+  $("#go").onclick = () => {
+    S = blankPatient(c);
+    V = compute(S.p);
+    speed = 1;
+    screen = "sim";
+    draw();
+  };
+}
+
+function actionButtons(c) {
+  const B = [["fluid","500 mL"],["norepi","Norepinephrine"],["cvc","Central line"],["echo","Echo"],["abg","ABG"],["cxr","Film"]];
+  if (c.id==="sepsis") B.push(["abx","Antibiotics"],["nrb","Oxygen"]);
+  if (c.id==="bleed") B.push(["blood","Red cells"],["mtp","MTP + GI"]);
+  if (c.id==="stemi") B.push(["cath","Cath lab"],["dobu","Dobutamine"]);
+  if (c.id==="pe") B.push(["lytics","Thrombolysis"],["norepi","Norepinephrine"]);
+  if (c.id==="tamp") B.push(["drain","Drain pericardium"],["fluid","500 mL"]);
+  if (c.id==="ptx") B.push(["needle","Needle decompress"],["tube","Chest tube"]);
+  if (c.id==="ana") B.push(["im","IM epinephrine"],["fluid","500 mL"]);
+  if (c.id==="ards" || c.id==="asp") B.push(["prone","Prone"],["steroids","Dexamethasone"]);
+  if (!c.vent) B.push(["intubate","Intubate"]);
+  B.push(["metop","Metoprolol"],["ct","Send to CT"]);
+  if (c.id!=="pe" && c.id!=="bleed") B.push(["lytics","Thrombolysis"]);
+  const seen = new Set();
+  return B.filter(([id]) => seen.has(id) ? false : (seen.add(id), true));
+}
+
+function drawSim() {
+  const c = CASES.find(x => x.id===caseId);
+  app.innerHTML = `<div class="sim">
+    <div>
+      <div class="top">
+        <button id="back">Board</button>
+        <div><p class="kicker">${c.bed}</p><h1>${c.title}</h1></div>
+        <div class="spacer"></div>
+        <span id="clock" class="kicker"></span>
+        <button id="pause">Pause</button>
+      </div>
+      <p class="stem">${c.stem}</p>
+      <canvas id="wave" aria-label="Monitor waveforms"></canvas>
+      <div class="nums" id="nums"></div>
+      <div class="panel" id="ventbox"></div>
+      <p class="stem log" id="log"></p>
+    </div>
+    <aside class="side">
+      <div><h2>Treat</h2><div class="grid2" id="acts" style="margin-top:8px"></div></div>
+      <div><h2>Name it</h2>
+        <select id="dx">${c.options.map(o=>`<option>${o}</option>`).join("")}</select>
+        <button id="call" style="margin-top:8px;width:100%">Commit diagnosis</button>
+      </div>
+    </aside>
+  </div>`;
+  $("#back").onclick = () => { screen="board"; S=null; draw(); };
+  $("#pause").onclick = () => { speed = speed ? 0 : 1; $("#pause").textContent = speed ? "Pause" : "Run"; };
+  $("#acts").innerHTML = actionButtons(c).map(([id,label])=>`<button data-a="${id}">${label}</button>`).join("");
+  $("#acts").onclick = (e) => { const b = e.target.closest("button"); if (b) act(b.dataset.a); };
+  $("#call").onclick = () => {
+    const right = $("#dx").value === c.dx;
+    S.dx = right;
+    S.log = right ? "That diagnosis fits the picture." : "Not that one. Look again at the skin, the filling pressure, and the film.";
+    paint();
+  };
+  paint();
+  waves.start();
+  timer = setInterval(() => { if (speed && screen==="sim") { step(speed * 0.5); if (screen==="sim") paint(); } }, 250);
+}
+
+function paint() {
+  if (screen!=="sim" || !S) return;
+  if (!V) V = compute(S.p);
+  const p = S.p;
+  const v = V;
+  const clockEl = $("#clock");
+  if (clockEl) clockEl.textContent = clock(S.t);
+  const nums = $("#nums");
+  if (!nums) return;
+  const crit = (bad, cls) => bad ? "danger" : cls;
+  nums.innerHTML = [
+    num("HR", v.hr, v.rhythm, crit(v.hr>130||v.hr<50, "ecg")),
+    num("ART", v.sbp+"/"+v.dbp, "MAP "+v.map+" · PP "+v.pp, crit(v.map<65, "art")),
+    num("SpO2", v.spo2, "%", crit(v.spo2<90, "pleth")),
+    num("RR", v.rr, p.vent ? "et set" : "breaths", "co2"),
+    num("Temp", p.temp.toFixed(1), "°C"),
+    num("CVP", S.cvc ? v.cvp : "—", S.cvc ? "mmHg" : "place a line"),
+    num("Lactate", p.lactate.toFixed(1), "mmol/L", p.lactate>=4 ? "danger" : ""),
+    num("Hb / UO", p.hb.toFixed(1), Math.round(S.uo)+" mL/h"),
+  ].join("");
+  const box = $("#ventbox");
+  if (p.vent) {
+    const vt = p.vent;
+    box.classList.remove("hidden");
+    if (box.dataset.built !== "1") {
+      box.dataset.built = "1";
+      box.innerHTML = `<div class="ventgrid" id="vread"></div>
+        <div style="padding:0 16px 12px">
+          <div class="rowlab"><span id="vtlab"></span><span id="pbwlab"></span></div>
+          <input id="vt" type="range" min="4" max="12" step="0.5">
+          <div class="rowlab"><span id="peeplab"></span><span id="rrlab"></span></div>
+          <input id="peep" type="range" min="0" max="20" step="1">
+          <input id="rr" type="range" min="10" max="32" step="1">
+          <div class="rowlab"><span id="fio2lab"></span><span id="poslab"></span></div>
+          <input id="fio2" type="range" min="0.3" max="1" step="0.05">
+        </div>`;
+      ["vt","peep","rr","fio2"].forEach(k => {
+        const el = $("#"+k);
+        el.value = String(p.vent[k]);
+        el.oninput = () => { p.vent[k] = Number(el.value); V = compute(p); paint(); };
+      });
+    }
+    $("#vread").innerHTML = [
+      num("MODE","AC/VC",""),
+      num("VT", vt.vt.toFixed(1), "mL/kg PBW", vt.vt>6.5?"danger":"pleth"),
+      num("PEEP", vt.peep, "cmH2O"),
+      num("FiO2", Math.round(vt.fio2*100), "%"),
+      num("PPLAT", v.pplat, "ΔP "+v.dp, v.pplat>30||v.dp>15?"danger":""),
+      num("P/F", v.pf, v.berlin, v.berlin==="severe"||v.berlin==="moderate"?"warn":"pleth"),
+    ].join("");
+    $("#vtlab").textContent = "Tidal volume "+vt.vt.toFixed(1)+" mL/kg · "+Math.round(vt.vt*p.pbw)+" mL";
+    $("#pbwlab").textContent = "PBW "+p.pbw+" kg";
+    $("#peeplab").textContent = "PEEP "+vt.peep;
+    $("#rrlab").textContent = "Rate "+vt.rr;
+    $("#fio2lab").textContent = "FiO2 "+Math.round(vt.fio2*100)+"%";
+    $("#poslab").textContent = S.prone ? "prone" : "supine";
+  } else box.classList.add("hidden");
+  const log = $("#log");
+  if (log) log.textContent = S.log;
+}
+
+function scoreOf(s, c) {
+  let n = 35;
+  if (s.outcome==="stable") n += 30;
+  c.need.forEach(id => {
+    const ok = id==="abx"?s.abx : id==="fluid"?s.fluids>=500 : id==="norepi"?s.p.norepi>=0.08 : id==="blood"?s.blood>=1 : id==="mtp"?s.mtp : id==="cath"?s.cath : id==="pressor"?(s.p.norepi>=0.05||s.p.dobu>=5) : id==="lytics"?s.lytics : id==="drain"?s.drained : id==="needle"?(s.needle||s.tube) : id==="im"?s.p.imEpi : id==="protect"?protective(s) : id==="prone"?s.prone : id==="steroids"?s.steroids : false;
+    if (ok) n += 12;
+  });
+  if (s.dx) n += 8;
+  n -= s.harm * 15;
+  return clamp(Math.round(n), 0, 100);
+}
+
+function drawDebrief() {
+  const c = CASES.find(x => x.id===caseId);
+  const sc = scoreOf(S, c);
+  app.innerHTML = `<div class="wrap">
+    <p class="kicker">${S.outcome==="stable" ? "Stabilized" : "Died"}</p>
+    <h1>${c.title}</h1>
+    <p class="lede">${S.why}</p>
+    <p class="lede">Score ${sc}. The shock was ${c.shock.toLowerCase()}: ${c.dx}.</p>
+    <ul>${c.pearls.map(x=>`<li class="lede">${x}</li>`).join("")}</ul>
+    <button id="back" style="margin-top:16px">Board</button>
+    <button id="retry">Retry</button>
+  </div>`;
+  $("#back").onclick = () => { screen="board"; draw(); };
+  $("#retry").onclick = () => { screen="brief"; draw(); };
+}
+
+const HEMO = {
+  hypovolemic: { label:"Hypovolemic", stem:"Post-operative abdominal surgery. Pale, restless, drain filling with blood.", skin:"cool", vent:"controlled", vWave:0, tr:0.1,
+    base:{hr:132,sv:22,map:60,cvp:1,pcwp:5,pas:22,pad:8,svo2:46,lactate:5.6,spo2:98,hb:7.2,uo:6,crt:4,ppv:24,paradox:6},
+    fluid:{hr:-8,sv:14,map:8,cvp:2,pcwp:2,svo2:6,lactate:-0.5,ppv:-7,uo:8},
+    norepi:{hr:-4,sv:-2,map:12,cvp:1}, dobu:{hr:16,sv:2,map:-6}, peep:{sv:-8,map:-8,ppv:4}, blood:{hr:-10,sv:12,map:8,hb:2.2,lactate:-0.8,svo2:8,ppv:-6,uo:10},
+    basic:"Narrow pulse pressure, shock index over 1, cool skin, falling hemoglobin. The cuff already says the tank is empty.",
+    adv:"Low CVP, low wedge, low stroke volume, high SVR, and a PPV that falls after volume." },
+  distributive: { label:"Distributive", stem:"Pneumonia, fever 39.2. Warm hands, mottled knees, soft pressure.", skin:"mottled", vent:"controlled", vWave:0, tr:0.1,
+    base:{hr:116,sv:82,map:58,cvp:7,pcwp:12,pas:34,pad:16,svo2:74,lactate:4.6,spo2:93,hb:11,uo:28,crt:2,ppv:14,paradox:5},
+    fluid:{sv:6,map:3,cvp:2,pcwp:2,ppv:-4}, norepi:{hr:-6,sv:5,map:16,cvp:1,lactate:-0.4,svo2:-3,uo:8}, dobu:{hr:12,sv:8,map:-5}, peep:{sv:-3,map:-3,spo2:2}, blood:{hb:1,cvp:2},
+    basic:"Warm skin and a wide pulse pressure. Basic signs suggest an open circulation. They cannot prove the output is high.",
+    adv:"Cardiac output is high and SVR is low. Norepinephrine raises pressure. More fluid barely moves the MAP." },
+  cardiogenic: { label:"Cardiogenic", stem:"Anterior infarction two hours ago. Rales, a new S3, cold hands.", skin:"cool", vent:"controlled", vWave:0.15, tr:0.15,
+    base:{hr:108,sv:24,map:70,cvp:18,pcwp:30,pas:48,pad:30,svo2:40,lactate:4.4,spo2:90,hb:13.2,uo:14,crt:5,ppv:5,paradox:5},
+    fluid:{sv:-3,map:-2,cvp:3,pcwp:6,spo2:-3,svo2:-3,pad:3,pas:4}, norepi:{map:10,cvp:1,pcwp:2}, dobu:{hr:8,sv:16,map:-2,cvp:-3,pcwp:-7,svo2:10,spo2:3,lactate:-0.6,uo:12,pad:-3,pas:-4}, peep:{sv:-2,pcwp:-3,spo2:3}, blood:{hb:1,cvp:2,pcwp:2,spo2:-1},
+    basic:"Cool skin, pulmonary edema, narrow pulse pressure. Fluid makes the saturation fall.",
+    adv:"High wedge, low output, high SVR, SvO2 in the 40s. Dobutamine raises stroke volume and the wedge falls." },
+  pe: { label:"Obstructive — PE", stem:"Sudden dyspnea after a hip fracture. Clear lungs, loud P2, neck veins up.", skin:"cool", vent:"controlled", vWave:0, tr:0.9,
+    base:{hr:124,sv:32,map:64,cvp:18,pcwp:8,pas:70,pad:30,svo2:50,lactate:3.8,spo2:86,hb:12.4,uo:20,crt:3,ppv:8,paradox:8},
+    fluid:{sv:2,cvp:4,pcwp:1,map:1}, norepi:{map:12,sv:4,hr:-4,svo2:3}, dobu:{hr:8,sv:6,map:1,pas:3}, peep:{sv:-10,map:-10,cvp:3,pas:6,pad:4,spo2:-2}, blood:{hb:1,cvp:2},
+    basic:"Clear lungs, hypoxia, distended neck veins. High filling pressure with empty-sounding lungs is not left-heart failure.",
+    adv:"CVP high, wedge low, wide PAD–PCWP gradient. PEEP makes the right ventricle worse." },
+  tamponade: { label:"Tamponade", stem:"Day three after cardiac surgery. Distant sounds, clear lungs, pressure swings with breathing.", skin:"cool", vent:"spontaneous", vWave:0, tr:0.2,
+    base:{hr:122,sv:24,map:72,cvp:21,pcwp:21,pas:36,pad:22,svo2:52,lactate:3.4,spo2:96,hb:10.4,uo:16,crt:3,ppv:6,paradox:22},
+    fluid:{sv:5,map:4,cvp:2,pcwp:2}, norepi:{map:8,hr:-2}, dobu:{hr:10,sv:1,map:-2}, peep:{sv:-8,map:-10,cvp:2,pcwp:2}, blood:{hb:1},
+    basic:"Pulsus paradoxus on the arterial trace. The cuff alone hides the swing. Lungs are clear.",
+    adv:"CVP, PAD, and wedge sit together. Drainage separates them. Fluid only temporizes." },
+  mr: { label:"Severe mitral regurgitation", stem:"Inferior infarction last night. New holosystolic murmur at the apex, frothy sputum.", skin:"cool", vent:"controlled", vWave:1, tr:0.2,
+    base:{hr:110,sv:36,map:74,cvp:14,pcwp:32,pas:58,pad:34,svo2:55,lactate:3.2,spo2:89,hb:12.8,uo:22,crt:3,ppv:6,paradox:5},
+    fluid:{pcwp:5,cvp:2,spo2:-2,sv:-2,pad:2}, norepi:{map:8,pcwp:2,sv:-1}, dobu:{hr:6,sv:8,pcwp:-4,spo2:2,svo2:4,map:-1}, peep:{pcwp:-2,spo2:2,sv:-1}, blood:{hb:1,pcwp:2},
+    basic:"Looks like cardiogenic edema on the exam. Basic monitors cannot see the regurgitant wave.",
+    adv:"The wedge mean is high because of a giant v wave. Echo confirms it. The catheter suggests it." },
+};
+const HEMO_IDS = Object.keys(HEMO);
+function addBase(b, step, times) {
+  const o = { ...b };
+  if (!times) return o;
+  Object.keys(step||{}).forEach(k => { o[k] = b[k] + step[k]*times; });
+  return o;
+}
+function hemoSnap(id, ix) {
+  const pr = HEMO[id];
+  let raw = { ...pr.base };
+  if (ix.drain && id==="tamponade") raw = { hr:90,sv:74,map:86,cvp:8,pcwp:11,pas:28,pad:12,svo2:68,lactate:2.1,spo2:98,hb:10,uo:45,crt:2,ppv:7,paradox:4 };
+  else {
+    raw = addBase(raw, pr.fluid, ix.fluid);
+    raw = addBase(raw, pr.norepi, ix.norepi===0.2?2:ix.norepi===0.1?1:0);
+    raw = addBase(raw, pr.dobu, ix.dobu?1:0);
+    raw = addBase(raw, pr.peep, ix.peep?1:0);
+    raw = addBase(raw, pr.blood, ix.blood?1:0);
+  }
+  const hr = Math.round(clamp(raw.hr,48,170));
+  const sv = clamp(raw.sv,12,120);
+  const map = clamp(raw.map,36,115);
+  const cvp = clamp(raw.cvp,0,32);
+  const pcwp = clamp(raw.pcwp,2,40);
+  const pad = clamp(raw.pad,4,50);
+  const pas = clamp(raw.pas, Math.max(pad, pcwp)+4, 90);
+  const co = hr*sv/1000;
+  const svr = ((map-cvp)*80)/Math.max(0.8,co);
+  const mpap = (pas+2*pad)/3;
+  const pvr = ((mpap-pcwp)*80)/Math.max(0.8,co);
+  const pp = clamp(20 + (sv-18) * (1200/clamp(svr,480,2200)) * 0.42, 20, 64);
+  const dbp = clamp(map - pp/3, 22, map-4);
+  const sbp = dbp+pp;
+  const spo2 = clamp(raw.spo2,70,100);
+  const cao2 = raw.hb*1.34*(spo2/100);
+  return {
+    hr, sv:Math.round(sv), map:Math.round(map), cvp:Math.round(cvp), pcwp:Math.round(pcwp), pas:Math.round(pas), pad:Math.round(pad),
+    sbp:Math.round(sbp), dbp:Math.round(dbp), pp:Math.round(pp), mpap:Math.round(mpap), co:Math.round(co*10)/10, ci:Math.round(co/1.9*10)/10,
+    svr:Math.round(svr), pvr:Math.round(pvr), svo2:Math.round(clamp(raw.svo2,28,90)), scvo2:Math.round(clamp(raw.svo2+5,30,92)),
+    lactate:Math.round(raw.lactate*10)/10, spo2:Math.round(spo2), hb:Math.round(raw.hb*10)/10, uo:Math.round(raw.uo),
+    crt:Math.round(clamp(raw.crt + (map<58?1:0) - (map>=75?1:0),1,6)), ppv:Math.round(clamp(raw.ppv,3,32)), paradox:Math.round(raw.paradox),
+    svv:Math.round(raw.ppv*0.92), vWave:pr.vWave, tr:pr.tr, vent:pr.vent, skin:pr.skin, rr: pr.vent==="spontaneous"?24:16,
+    do2:Math.round(co*cao2*10), cao2:Math.round(cao2*10)/10, si:Math.round(hr/Math.max(40,sbp)*100)/100, padGrad:Math.round(pad-pcwp),
+    drained: ix.drain && id==="tamponade",
+  };
+}
+function freshHemo(id, blind) {
+  return { id, blind, level:"basic", art:false, cvc:false, pac:false, contour:false, wedged:false,
+    ix:{fluid:0,norepi:0,dobu:0,peep:0,drain:false,blood:false}, note:"Nothing invasive yet. Read the cuff, the skin, and the urine.",
+    lines:null, guess:null, called:false, snap:hemoSnap(id,{fluid:0,norepi:0,dobu:0,peep:0,drain:false,blood:false}) };
+}
+function hemoNote(id, kind, ix) {
+  const pr = HEMO[id];
+  if (kind==="drain") return id==="tamponade" ? "Pericardium drained. Filling pressures separate and stroke volume returns." : "No pericardial collection. The numbers do not move.";
+  if (kind==="fluid") {
+    if (!ix.fluid) return "Fluid cleared.";
+    if (id==="hypovolemic") return "Stroke volume rises and PPV falls. The tank had room.";
+    if (id==="distributive") return "Flow rises a little. Pressure barely moves — SVR is still low.";
+    if (id==="cardiogenic" || id==="mr") return "Wedge climbs and saturation falls.";
+    if (id==="pe") return "CVP rises more than stroke volume. The right ventricle is the limit.";
+    return "A small temporizing rise. The pericardium is still the problem.";
+  }
+  if (kind==="norepi") {
+    if (!ix.norepi) return "Norepinephrine off.";
+    if (id==="hypovolemic") return "MAP rises. Stroke volume does not.";
+    if (id==="distributive") return "SVR and MAP come up. This was a tone problem.";
+    if (id==="pe") return "Aortic pressure supports the right ventricle.";
+    return "Pressure rises. Forward flow is a separate question.";
+  }
+  if (kind==="dobu") {
+    if (!ix.dobu) return "Dobutamine off.";
+    if (id==="cardiogenic" || id==="mr") return "Stroke volume rises and the wedge falls.";
+    if (id==="hypovolemic") return "Heart rate up, pressure down. Wrong lever.";
+    return "Little useful change in this profile.";
+  }
+  if (kind==="peep") {
+    if (!ix.peep) return "PEEP back down.";
+    if (id==="pe" || id==="tamponade" || id==="hypovolemic") return "Venous return or the right ventricle suffers. Pressure falls.";
+    return "Congestion eases slightly. The lesion remains.";
+  }
+  return id==="hypovolemic" ? "Hemoglobin and delivery rise with the red cells." : "Hemoglobin rises. The shock was not anemia.";
+}
+function hemoRead(sn, h) {
+  const lines = [];
+  const ppWord = sn.pp<35?"narrow":sn.pp>55?"wide":"ordinary";
+  lines.push(`Pressure ${sn.sbp}/${sn.dbp}, MAP ${sn.map}. Pulse pressure is ${ppWord} (${sn.pp}). Shock index ${sn.si.toFixed(2)}.`);
+  lines.push(`${sn.skin} skin, capillary refill ${sn.crt}s, urine ${sn.uo} mL/h, lactate ${sn.lactate.toFixed(1)}, SpO2 ${sn.spo2}%.`);
+  if (h.art && sn.paradox>=15 && sn.vent==="spontaneous") lines.push(`Arterial pressure falls ${sn.paradox} mmHg on inspiration. Pulsus paradoxus. The cuff misses it.`);
+  else if (!h.art) lines.push("No arterial line. You have a cuff, not a waveform.");
+  if (h.cvc || h.pac) lines.push(sn.cvp<6?`CVP ${sn.cvp} is low.` : sn.cvp>14?`CVP ${sn.cvp} is high.` : `CVP ${sn.cvp} is mid-range and will not type the shock.`);
+  else lines.push("No central line. Filling pressure and ScvO2 are unknown.");
+  if (h.level!=="advanced") { lines.push("Advanced view is off. Flow, wedge, and PVR stay hidden."); return lines; }
+  if (h.contour && h.art) {
+    if (sn.vent!=="controlled") lines.push("PPV and SVV are not valid while the patient is breathing spontaneously.");
+    else lines.push(sn.ppv>=13?`PPV ${sn.ppv}% — stroke volume still varies with the ventilator.`:`PPV ${sn.ppv}% is low. A fluid bolus is unlikely to help much.`);
+  }
+  if (h.pac) {
+    lines.push(`PAC: PAP ${sn.pas}/${sn.pad}, PCWP ${sn.pcwp}, CO ${sn.co.toFixed(1)}, SVR ${sn.svr}, PVR ${sn.pvr}, SvO2 ${sn.svo2}%.`);
+    lines.push(`SVR = (${sn.map} − ${sn.cvp}) × 80 / ${sn.co.toFixed(1)}.`);
+    if (sn.vWave>=0.7) lines.push("Giant v wave on the wedge. Severe mitral regurgitation until echo says otherwise.");
+    else if (sn.drained) lines.push("After drainage the diastolic pressures have separated.");
+    else if (Math.abs(sn.cvp-sn.pcwp)<=3 && sn.cvp>=16 && sn.paradox>=12) lines.push("CVP, PAD, and wedge are equalized, with pulsus paradoxus. Tamponade.");
+    else if (sn.pvr>240 && sn.padGrad>8 && sn.pcwp<16) lines.push(`PAD–PCWP gradient ${sn.padGrad} mmHg with a high PVR. Pre-capillary — think PE.`);
+    else if (sn.pcwp>=18 && sn.co<4.8 && sn.svr>1000) lines.push("High wedge, low output, high SVR. Cardiogenic.");
+    else if (sn.svr<800 && sn.co>=6) lines.push("High output, low SVR. Distributive.");
+    else if (sn.cvp<=6 && sn.pcwp<14 && sn.co<5 && sn.svr>1200) lines.push("Low filling pressures, low output, high SVR. Hypovolemic.");
+    lines.push(`Delivery about ${sn.do2} mL/min.`);
+  } else lines.push("No pulmonary artery catheter. Pressure without flow cannot separate an empty tank, an open circulation, and a failing pump.");
+  return lines;
+}
+
+function drawHemo() {
+  const h = hemo;
+  const pr = HEMO[h.id];
+  const sn = h.snap;
+  const adv = h.level==="advanced";
+  const flow = adv && (h.pac || (h.contour && h.art));
+  app.innerHTML = `<div class="sim">
+    <div>
+      <div class="top">
+        <button id="back">Board</button>
+        <div><p class="kicker">Hemodynamic lab</p><h1>${h.blind?"Unknown circulation":pr.label}</h1></div>
+        <div class="spacer"></div>
+        <button id="lv-basic" class="${h.level==="basic"?"on":""}">Basic</button>
+        <button id="lv-advanced" class="${adv?"on":""}">Advanced</button>
+      </div>
+      <p class="stem">${pr.stem}</p>
+      <canvas id="wave" aria-label="Hemodynamic waveforms"></canvas>
+      <div class="hemonums">
+        ${num("HR", sn.hr, "sinus", "ecg")}
+        ${num(h.art?"ART":"NIBP", sn.sbp+"/"+sn.dbp, "MAP "+sn.map+" · PP "+sn.pp, "art")}
+        ${num("SpO2", sn.spo2, "%", "pleth")}
+        ${num("Shock index", sn.si.toFixed(2), "HR / SBP", sn.si>=1?"warn":"")}
+        ${num("Skin", sn.skin, "CRT "+sn.crt+"s")}
+        ${num("Urine", sn.uo, "mL/h", sn.uo<20?"warn":"")}
+        ${num("Lactate", sn.lactate.toFixed(1), "mmol/L", sn.lactate>=4?"danger":"")}
+        ${num("CVP", (h.cvc||h.pac)?sn.cvp:"—", h.cvc?"mmHg · ScvO2 "+sn.scvo2+"%":h.pac?"mmHg · PAC":"place a CVC")}
+      </div>
+      <div class="panel" style="padding:12px 14px">
+        <h2 class="kicker">${adv?"Advanced numbers":"Advanced numbers hidden"}</h2>
+        ${adv ? `<div class="hemonums" style="padding:12px 0 0">
+          ${num("PAP", h.pac?sn.pas+"/"+sn.pad:"—", h.pac?"mean "+sn.mpap:"place a PAC", "co2")}
+          ${num("PCWP", h.pac?sn.pcwp:"—", h.pac?(sn.vWave>=0.7?"giant v wave":"mmHg"):"place a PAC", sn.vWave>=0.7?"warn":"")}
+          ${num("CO", flow?sn.co.toFixed(1):"—", flow?"CI "+sn.ci.toFixed(1):"needs flow")}
+          ${num("SVR", flow?sn.svr:"—", flow?"dyn·s·cm-5":"needs CO", flow&&sn.svr<800?"warn":"")}
+          ${num("PVR", h.pac?sn.pvr:"—", h.pac?"PAD−PCWP "+sn.padGrad:"needs a PAC", h.pac&&sn.pvr>240?"warn":"")}
+          ${num("SvO2", h.pac?sn.svo2:"—", h.pac?"%":"mixed venous", "pleth")}
+          ${num("PPV", h.contour&&h.art&&sn.vent==="controlled"?sn.ppv:"—", !h.contour?"pulse contour":sn.vent==="controlled"?"SVV "+sn.svv+"%":"spontaneous", sn.ppv>=13?"warn":"")}
+          ${num("DO2", h.pac?sn.do2:"—", h.pac?"mL/min":"")}
+        </div>` : `<p class="note" style="margin-top:8px">Basic monitoring stops at the arterial line, CVP, and the body. Advanced opens the pulmonary artery catheter and pulse contour.</p>`}
+      </div>
+      ${h.lines?`<div class="panel" style="padding:12px 14px"><p class="kicker">Read</p>${h.lines.map(l=>`<p class="note" style="margin-top:6px">${l}</p>`).join("")}</div>`:""}
+      ${h.called?`<div class="panel" style="padding:12px 14px"><p class="${h.guess===h.id?"ok":"danger"}">${h.guess===h.id?"That profile fits.":"Not "+HEMO[h.guess].label+". This is "+pr.label+"."}</p><p class="note" style="margin-top:8px">${pr.basic}</p><p class="note" style="margin-top:6px">${pr.adv}</p></div>`:""}
+    </div>
+    <aside class="side">
+      <div><h2>Patient</h2>
+        <div class="grid2" style="margin-top:8px">
+          <button id="unk">New unknown</button>
+          <button id="teach">${h.blind?"Teach":"Hide label"}</button>
+        </div>
+        ${h.blind?"":`<div class="grid2" style="margin-top:8px">${HEMO_IDS.map(id=>`<button data-prof="${id}" class="${id===h.id?"on":""}">${HEMO[id].label}</button>`).join("")}</div>`}
+      </div>
+      <div><h2>Monitors</h2>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+          ${tog("art","Arterial line", h.art, "Beat-to-beat pressure and pulsus.")}
+          ${tog("cvc","Central line", h.cvc, "CVP and ScvO2. Not a cardiac output.")}
+          ${tog("pac","Pulmonary artery catheter", h.pac, "PAP, wedge, CO, SVR, PVR, SvO2.", !adv)}
+          ${tog("contour","Pulse contour", h.contour, h.art?"SV, CO, PPV, SVV.":"Needs an arterial line.", !adv||!h.art)}
+          ${adv&&h.pac?tog("wedge","Balloon up — wedge", h.wedged, "Look for a v wave."):""}
+        </div>
+      </div>
+      <div><h2>Challenge</h2>
+        <div class="grid2" style="margin-top:8px">
+          <button data-ch="fluid">${h.ix.fluid?h.ix.fluid*500+" mL in":"500 mL fluid"}</button>
+          <button data-ch="blood">${h.ix.blood?"Red cells in":"Red cells"}</button>
+          <button data-ch="norepi">${h.ix.norepi?"Norepi "+h.ix.norepi:"Norepinephrine"}</button>
+          <button data-ch="dobu">${h.ix.dobu?"Dobutamine 5":"Dobutamine"}</button>
+          <button data-ch="peep">${h.ix.peep?"PEEP 15":"PEEP +10"}</button>
+          <button data-ch="drain">${h.ix.drain?"Drained":"Drain pericardium"}</button>
+        </div>
+        <p class="note" style="margin-top:8px">${h.note}</p>
+      </div>
+      <div><h2>Name the profile</h2>
+        <div class="grid2" style="margin-top:8px">
+          ${[["hypovolemic","Hypovolemic"],["distributive","Distributive"],["cardiogenic","Cardiogenic"],["pe","PE"],["tamponade","Tamponade"],["mr","Severe MR"]].map(([id,lab])=>`<button data-g="${id}" class="${h.guess===id?"on":""}">${lab}</button>`).join("")}
+        </div>
+        <div class="grid2" style="margin-top:8px">
+          <button id="read">Interpret</button>
+          <button class="primary" id="commit" ${h.guess?"":"disabled"}>Commit</button>
+        </div>
+      </div>
+    </aside>
+  </div>`;
+  $("#back").onclick = () => { screen="board"; draw(); };
+  $("#lv-basic").onclick = () => { h.level="basic"; h.wedged=false; h.lines=null; draw(); };
+  $("#lv-advanced").onclick = () => { h.level="advanced"; h.lines=null; draw(); };
+  $("#unk").onclick = () => {
+    const pool = HEMO_IDS.filter(id => id!==h.id);
+    hemo = freshHemo(pool[Math.floor(Math.random()*pool.length)], true);
+    draw();
+  };
+  $("#teach").onclick = () => { h.blind = !h.blind; draw(); };
+  app.querySelectorAll("[data-prof]").forEach(b => b.onclick = () => { hemo = freshHemo(b.dataset.prof, false); draw(); });
+  app.querySelectorAll("[data-mon]").forEach(b => b.onclick = () => {
+    if (b.disabled) return;
+    const k = b.dataset.mon;
+    if (k==="wedge") h.wedged = !h.wedged;
+    else h[k] = !h[k];
+    if (k==="pac" && !h.pac) h.wedged = false;
+    h.lines = null;
+    draw();
+  });
+  app.querySelectorAll("[data-ch]").forEach(b => b.onclick = () => {
+    const k = b.dataset.ch;
+    const ix = h.ix;
+    if (k==="fluid") ix.fluid = ix.fluid>=2 ? 0 : ix.fluid+1;
+    if (k==="norepi") ix.norepi = ix.norepi===0 ? 0.1 : ix.norepi===0.1 ? 0.2 : 0;
+    if (k==="dobu") ix.dobu = ix.dobu ? 0 : 5;
+    if (k==="peep") ix.peep = ix.peep ? 0 : 10;
+    if (k==="drain") ix.drain = !ix.drain;
+    if (k==="blood") ix.blood = !ix.blood;
+    h.snap = hemoSnap(h.id, ix);
+    h.note = hemoNote(h.id, k, ix);
+    h.lines = null;
+    draw();
+  });
+  app.querySelectorAll("[data-g]").forEach(b => b.onclick = () => { h.guess = b.dataset.g; draw(); });
+  $("#read").onclick = () => { h.lines = hemoRead(h.snap, h); draw(); };
+  $("#commit").onclick = () => { if (h.guess) { h.called = true; h.blind = false; draw(); } };
+  waves.start();
+}
+function tog(id, label, on, detail, disabled) {
+  return `<button data-mon="${id}" class="${on?"on":""}" ${disabled?"disabled":""}><b>${label}</b><div class="note">${detail}</div><span class="kicker">${disabled?"locked":on?"on":"off"}</span></button>`;
+}
+
+draw();
+</script>
+</body>
+</html>
