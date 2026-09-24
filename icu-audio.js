@@ -59,6 +59,26 @@
     else if (kind === "bounding") { tone(990, 0.08, 0.35, "sine"); tone(1480, 0.05, 0.12, "triangle"); }
     else { tone(880, 0.07, 0.28, "sine"); tone(1320, 0.04, 0.08, "sine"); }
   }
+  function playVf() {
+    const c = ensure();
+    if (!c || !noise) return;
+    const t = c.currentTime;
+    const src = c.createBufferSource();
+    const f = c.createBiquadFilter();
+    const g = c.createGain();
+    src.buffer = noise;
+    f.type = "bandpass";
+    f.frequency.setValueAtTime(70 + Math.random() * 90, t);
+    f.Q.value = 0.5;
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.linearRampToValueAtTime(0.001, t + 0.32);
+    src.connect(f); f.connect(g); g.connect(c.destination);
+    src.start(t); src.stop(t + 0.34);
+    tone(90 + Math.random() * 70, 0.05, 0.12, "sawtooth");
+  }
+  function playAsystole() {
+    tone(420, 0.55, 0.18, "square");
+  }
   function playBreath(kind) {
     if (kind === "vent") {
       tone(1600, 0.03, 0.16, "square");
@@ -94,6 +114,28 @@
     try { speechSynthesis.cancel(); } catch (e) {}
     say("Correct");
   }
+  function sayWrong() {
+    if (!enabled) return;
+    const now = performance.now();
+    if (now - saidAt < 1200) return;
+    saidAt = now;
+    try { speechSynthesis.cancel(); } catch (e) {}
+    say("Wrong");
+  }
+  function rhythmState(rhythm, pulse, hr) {
+    const r = String(rhythm || "").toLowerCase();
+    const none = /none|^no\b/.test(String(pulse || "").toLowerCase());
+    const bpm = parseFloat(hr) || 0;
+    if (/asystole/.test(r)) return { pulse: null, breath: null, alarm: true, rhythmSound: "asystole" };
+    if (/(^|[^a-z])vf([^a-z]|$)|ventricular fibrillation|polymorphic|torsade|^poly$/.test(r)) return { pulse: null, breath: null, alarm: true, rhythmSound: "vf" };
+    if (none || /\bpea\b|pulseless|^pvt$/.test(r)) return { pulse: null, breath: null, alarm: true, rhythmSound: "arrest" };
+    let kind = "normal";
+    const rate = bpm || (/svt/.test(r) ? 180 : /vt|tachy/.test(r) ? 150 : /brady|block/.test(r) ? 40 : 78);
+    if (/afib|atrial fibrillation|^af$|sinus_arr|irregular/.test(r)) kind = "irregular";
+    else if (rate >= 120 || /\bvt\b|svt|tachy/.test(r)) kind = "bounding";
+    else if (rate < 50 || /brady|block/.test(r)) kind = "weak";
+    return { pulse: { bpm: rate, kind: kind }, breath: null, alarm: rate < 40 || rate > 160 };
+  }
   function byId(id) {
     const el = document.getElementById(id);
     if (!el) return null;
@@ -123,18 +165,27 @@
   }
   function read() {
     const name = file();
+    if (document.body && document.body.dataset && document.body.dataset.rhythm) {
+      const d = document.body.dataset;
+      const st = rhythmState(d.rhythm, d.pulse, d.hr);
+      if (st.rhythmSound) st.breath = { bpm: 10, kind: "vent" };
+      return st;
+    }
     if (/ACLS_Interactive_Simulator/.test(name) || name === "acls.html") {
       const pills = [...document.querySelectorAll(".pill")].map((p) => p.textContent);
       const pulseLine = pills.find((t) => /pulse/i.test(t)) || "";
       const rhythm = (document.getElementById("rlabel") || {}).textContent || "";
-      if (!pulseLine) return { pulse: null, breath: null, alarm: false };
+      if (!pulseLine && !rhythm) return { pulse: null, breath: null, alarm: false };
       const none = /none/i.test(pulseLine);
-      let bpm = 76, kind = "normal";
-      if (none || /asystole|^vf$|pea|polymorphic/i.test(rhythm)) kind = "absent";
-      else if (/VT/i.test(rhythm)) { bpm = 170; kind = "bounding"; }
-      else if (/SVT/i.test(rhythm)) { bpm = 180; kind = "bounding"; }
-      else if (/brady/i.test(rhythm)) { bpm = 38; kind = "weak"; }
-      return { pulse: { bpm: bpm, kind: kind }, breath: kind === "absent" ? { bpm: 10, kind: "vent" } : null, alarm: kind === "absent" };
+      const st = rhythmState(rhythm, none ? "none" : "yes", null);
+      if (st.pulse) {
+        if (/SVT/i.test(rhythm)) st.pulse.bpm = 180;
+        else if (/\bVT\b/i.test(rhythm)) st.pulse.bpm = 170;
+        else if (/brady/i.test(rhythm)) st.pulse.bpm = 38;
+        else st.pulse.bpm = 80;
+      }
+      if (st.rhythmSound || none) st.breath = { bpm: 10, kind: "vent" };
+      return st;
     }
     if (/Ventilator_Waveform|vent-waves\.html/.test(name)) {
       if (!document.getElementById("scalars")) return { pulse: null, breath: null, alarm: false };
@@ -176,15 +227,22 @@
     ensure();
     const s = read();
     const now = performance.now();
-    if (s && s.pulse && s.pulse.kind !== "absent" && s.pulse.bpm > 20) {
+    if (s && s.rhythmSound === "vf") {
+      if (now >= pulseAt) { playVf(); pulseAt = now + 680; }
+    } else if (s && s.pulse && s.pulse.kind !== "absent" && s.pulse.bpm > 20) {
       let wait = 60000 / clamp(s.pulse.bpm, 30, 200);
+      if (s.pulse.kind === "irregular") wait *= 0.45 + Math.random() * 1.15;
       if (now >= pulseAt) { playPulse(s.pulse.kind); pulseAt = now + wait; }
     }
     if (s && s.breath && s.breath.bpm > 4) {
       const wait = 60000 / clamp(s.breath.bpm, 6, 48);
       if (now >= breathAt) { playBreath(s.breath.kind); breathAt = now + wait; }
     }
-    if (s && s.alarm && now >= alarmAt) { playAlarm(); alarmAt = now + 2400; }
+    if (s && s.alarm && now >= alarmAt) {
+      if (s.rhythmSound === "asystole") playAsystole();
+      else playAlarm();
+      alarmAt = now + (s.rhythmSound === "asystole" ? 1500 : 2400);
+    }
   }
   function enable() {
     if (enabled) { ensure(); return; }
@@ -226,10 +284,12 @@
     if (!b || b === btn) return;
     setTimeout(() => {
       if (!enabled || /Cardiac_Rhythm_Decision/.test(file())) return;
+      if (b.isConnected && /\bbad\b/.test(b.className)) { sayWrong(); return; }
       if (b.isConnected && /\b(good|on)\b/.test(b.className) && !/\bbad\b/.test(b.className)) { sayCorrect(); return; }
       const box = document.getElementById("why") || document.getElementById("fb") || document.getElementById("log");
       const t = box ? box.textContent.trim() : "";
       if (/^(Right[.\s]|Correct\b|That diagnosis fits)/.test(t)) sayCorrect();
+      else if (/^(Not\b|Wrong\b|Incorrect\b|No[.,\s])/i.test(t)) sayWrong();
     }, 80);
   }, false);
   function mount() {
@@ -238,5 +298,5 @@
     try { if (window.speechSynthesis) speechSynthesis.getVoices(); } catch (e) {}
   }
   if (document.body) mount(); else document.addEventListener("DOMContentLoaded", mount);
-  window.ICUAudio = { enable: enable, disable: disable, sayCorrect: sayCorrect, read: read };
+  window.ICUAudio = { enable: enable, disable: disable, sayCorrect: sayCorrect, sayWrong: sayWrong, read: read };
 })();
