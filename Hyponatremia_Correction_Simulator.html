@@ -62,9 +62,9 @@
     </div>
     <div class="row">
       <div><label>Sodium now</label><input id="na" type="number" value="120" step="0.1"></div>
-      <div><label>Target at 24 h</label><input id="target" type="number" value="126" step="0.1"></div>
+      <div><label>24 h goal</label><input id="target" type="number" value="126" step="0.1"></div>
     </div>
-    <h2 style="margin-top:16px">Fluid</h2>
+    <p class="quiet" id="goalNote"></p>
     <label>Type</label>
     <select id="fluid">
       <option value="513">3% saline · 513</option>
@@ -192,6 +192,9 @@ function paint(){
   const risk=s.risk || s.na<105;
   const limit=risk?6:8;
   document.getElementById('limitBadge').textContent=risk?'24 h limit 6':'24 h limit 8';
+  document.getElementById('goalNote').textContent = risk
+    ? 'High risk. Goal is +4. Do not pass +6.'
+    : 'Goal is +6 in 24 h. Do not pass +8.';
   let rise=0, corr=s.na;
   if(s.glu>100){ rise=1.6*(s.glu-100)/100; corr=s.na+rise; }
   if(s.urinePartial){
@@ -228,10 +231,23 @@ function setFluid(v, rate){
 }
 document.getElementById('rate').addEventListener('input', e=>{ document.getElementById('rateN').value=e.target.value; paint(); });
 document.getElementById('rateN').addEventListener('input', e=>{ document.getElementById('rate').value=e.target.value; paint(); });
-['wt','who','na','target','fluid','glu','uNa','uK','uVol'].forEach(id=>document.getElementById(id).addEventListener('input', paint));
+['wt','who','target','fluid','uNa','uK','uVol'].forEach(id=>document.getElementById(id).addEventListener('input', paint));
+document.getElementById('na').addEventListener('input', retarget);
+document.getElementById('glu').addEventListener('input', retarget);
 document.querySelectorAll('.chips button[data-fluid]').forEach(b=>b.addEventListener('click', ()=>setFluid(b.dataset.fluid, +b.dataset.rate)));
 document.getElementById('fit').onclick=function(){ this.classList.toggle('on'); paint(); };
-document.getElementById('risk').onclick=function(){ this.classList.toggle('on'); paint(); };
+document.getElementById('risk').onclick=function(){ this.classList.toggle('on'); retarget(); };
+function setTarget(){
+  const na=parseFloat(document.getElementById('na').value);
+  if(!(na>0)) return;
+  const glu=parseFloat(document.getElementById('glu').value);
+  const corr=(glu>100)?na+1.6*(glu-100)/100:na;
+  const risk=document.getElementById('risk').classList.contains('on') || na<105;
+  const goal=risk?4:6;
+  const t=(corr>=135)?Math.round(na*10)/10:Math.min(140, Math.round((na+goal)*10)/10);
+  document.getElementById('target').value=String(t);
+}
+function retarget(){ setTarget(); paint(); }
 document.getElementById('safe').onclick=function(){
   const s=state();
   const limit=(s.risk||s.na<105)?6:8;
@@ -248,8 +264,7 @@ document.getElementById('safe').onclick=function(){
 const q=new URLSearchParams(location.search);
 if(q.get('na')) document.getElementById('na').value=q.get('na');
 if(q.get('glu')){ document.getElementById('glu').value=q.get('glu'); document.querySelector('details').open=true; }
-const na0=parseFloat(document.getElementById('na').value);
-if(na0) document.getElementById('target').value=Math.min(135, Math.round((na0+6)*10)/10);
+setTarget();
 paint();
 window.addEventListener('resize', paint);
 </script>
