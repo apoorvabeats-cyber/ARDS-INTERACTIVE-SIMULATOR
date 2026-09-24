@@ -41,8 +41,8 @@ select{width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);bac
 .item{padding:10px 12px;border-radius:8px;margin:0 0 8px;background:#f6f8fb;border-left:4px solid var(--blue);font-size:14px}
 .item.crit{border-left-color:var(--red);background:#fff5f6}
 .item.dx{border-left-color:#e0a106;background:#fffaf0}
-.check{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:0 0 12px}
-.check input{margin-top:3px}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 12px}
+canvas{width:100%;height:150px;background:#f6f8fb;border:1px solid var(--line);border-radius:10px;margin-top:8px}
 @media(max-width:800px){.layout{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
@@ -69,12 +69,28 @@ select{width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);bac
     <div class="row"><label>Systolic <b id="v_sbp"></b></label><input id="sbp" type="range" min="50" max="200" value="84"></div>
     <div class="row"><label>Diastolic <b id="v_dbp"></b></label><input id="dbp" type="range" min="30" max="120" value="44"></div>
     <div class="row"><label>Heart rate <b id="v_hr"></b></label><input id="hr" type="range" min="30" max="180" value="116"></div>
-    <div class="row"><label>PPV <b id="v_ppv"></b></label><input id="ppv" type="range" min="2" max="35" value="16"></div>
-    <label class="check"><input type="checkbox" id="ppvValid" checked> PPV is valid: sinus rhythm, no spontaneous breaths, and a tidal volume of at least 8 mL/kg</label>
+    <div class="row"><label>Pulse pressure max <b id="v_ppmax"></b></label><input id="ppmax" type="range" min="10" max="90" value="43"></div>
+    <div class="row"><label>Pulse pressure min <b id="v_ppmin"></b></label><input id="ppmin" type="range" min="8" max="80" value="37"></div>
+    <div class="checks">
+      <label class="check"><input type="checkbox" id="ppvCmv" checked> Passive ventilation</label>
+      <label class="check"><input type="checkbox" id="ppvTv" checked> Tidal volume ≥ 8 mL/kg</label>
+      <label class="check"><input type="checkbox" id="ppvSr" checked> Sinus rhythm</label>
+      <label class="check"><input type="checkbox" id="ppvCc" checked> Chest is closed</label>
+    </div>
     <div class="row"><label>CVP <b id="v_cvp"></b></label><input id="cvp" type="range" min="0" max="25" value="5"></div>
+    <div class="row"><label>Cardiac index <b id="v_ci"></b></label><input id="ci" type="range" min="0.8" max="5" step="0.1" value="4.2"></div>
+    <div class="row"><label>SVR <b id="v_svr"></b></label><input id="svr" type="range" min="300" max="2400" step="25" value="480"></div>
     <h3>Perfusion</h3>
     <div class="row"><label>ScvO₂ <b id="v_scvo2"></b></label><input id="scvo2" type="range" min="30" max="95" value="77"></div>
     <div class="row"><label>Lactate <b id="v_lactate"></b></label><input id="lactate" type="range" min="0.5" max="15" step="0.1" value="4.1"></div>
+    <h3>Passive leg raise</h3>
+    <div class="row"><label>Starting cardiac index <b id="v_plrBase"></b></label><input id="plrBase" type="range" min="0.8" max="5" step="0.05" value="3.8"></div>
+    <div class="row"><label>Peak cardiac index <b id="v_plrPeak"></b></label><input id="plrPeak" type="range" min="0.8" max="5.5" step="0.05" value="4.5"></div>
+    <h3>Cause, if known</h3>
+    <div class="checks">
+      <label class="check"><input type="checkbox" id="bleed"> Bleeding</label>
+      <label class="check"><input type="checkbox" id="anaphylaxis"> Anaphylaxis</label>
+    </div>
     <h3>RUSH exam</h3>
     <div class="row"><label>IVC</label><select id="ivc"><option value="small" selected>Small and collapsing</option><option value="normal">Normal</option><option value="plethoric">Plethoric, not collapsing</option></select></div>
     <div class="row"><label>Lungs</label><select id="luso"><option value="alines" selected>A-lines</option><option value="blines">Bilateral B-lines</option><option value="ards">Patchy B-lines, irregular pleura</option><option value="ptx">No sliding, barcode sign</option></select></div>
@@ -87,8 +103,11 @@ select{width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);bac
       <div class="metrics">
         <div class="metric"><span>MAP</span><strong id="map">57</strong></div>
         <div class="metric"><span>Shock index</span><strong id="si">1.38</strong></div>
-        <div class="metric"><span>Pulse pressure</span><strong id="pp">40</strong></div>
+        <div class="metric"><span>PPV</span><strong id="ppvOut">15</strong></div>
+        <div class="metric"><span>Leg raise</span><strong id="plrOut">18</strong></div>
+        <div class="metric"><span>SVR</span><strong id="svrOut">480</strong></div>
       </div>
+      <canvas id="starling" width="640" height="180"></canvas>
       <h3>Flags</h3>
       <div class="badges" id="badges"></div>
     </div>
@@ -104,14 +123,14 @@ select{width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);bac
 </div>
 <script>
 const presets={
-  hypovolemic:{sbp:80,dbp:50,hr:125,ppv:22,cvp:2,scvo2:58,lactate:6.5,ivc:'small',luso:'alines',lvc:'hyper',rvs:'normal'},
-  cardiogenic:{sbp:82,dbp:60,hr:110,ppv:5,cvp:16,scvo2:48,lactate:7,ivc:'plethoric',luso:'blines',lvc:'hypo',rvs:'normal'},
-  pe:{sbp:85,dbp:62,hr:120,ppv:14,cvp:18,scvo2:52,lactate:5.5,ivc:'plethoric',luso:'alines',lvc:'normal',rvs:'dilated'},
-  tamponade:{sbp:80,dbp:65,hr:125,ppv:18,cvp:19,scvo2:55,lactate:5,ivc:'plethoric',luso:'alines',lvc:'hyper',rvs:'tamponade'},
-  septic_vasoplegic:{sbp:84,dbp:44,hr:116,ppv:16,cvp:5,scvo2:77,lactate:4.1,ivc:'small',luso:'alines',lvc:'hyper',rvs:'normal'},
-  septic_cardiomyopathy:{sbp:86,dbp:50,hr:110,ppv:8,cvp:12,scvo2:62,lactate:5.8,ivc:'plethoric',luso:'blines',lvc:'hypo',rvs:'dilated'},
-  septic_ards:{sbp:88,dbp:46,hr:112,ppv:15,cvp:9,scvo2:72,lactate:4.5,ivc:'normal',luso:'ards',lvc:'normal',rvs:'normal'},
-  neurogenic:{sbp:85,dbp:50,hr:65,ppv:15,cvp:3,scvo2:70,lactate:2.2,ivc:'small',luso:'alines',lvc:'normal',rvs:'normal'}
+  hypovolemic:{sbp:80,dbp:50,hr:125,ppmax:33,ppmin:27,cvp:2,ci:1.8,svr:1800,scvo2:58,lactate:6.5,plrBase:1.8,plrPeak:2.2,ivc:'small',luso:'alines',lvc:'hyper',rvs:'normal'},
+  cardiogenic:{sbp:82,dbp:60,hr:110,ppmax:23,ppmin:21,cvp:16,ci:1.6,svr:1750,scvo2:48,lactate:7,plrBase:1.6,plrPeak:1.65,ivc:'plethoric',luso:'blines',lvc:'hypo',rvs:'normal'},
+  pe:{sbp:85,dbp:62,hr:120,ppmax:25,ppmin:21,cvp:18,ci:1.6,svr:1600,scvo2:52,lactate:5.5,plrBase:1.6,plrPeak:1.7,ivc:'plethoric',luso:'alines',lvc:'normal',rvs:'dilated'},
+  tamponade:{sbp:80,dbp:65,hr:125,ppmax:17,ppmin:14,cvp:19,ci:1.5,svr:1650,scvo2:55,lactate:5,plrBase:1.5,plrPeak:1.55,ivc:'plethoric',luso:'alines',lvc:'hyper',rvs:'tamponade'},
+  septic_vasoplegic:{sbp:84,dbp:44,hr:116,ppmax:43,ppmin:37,cvp:5,ci:4.2,svr:480,scvo2:77,lactate:4.1,plrBase:3.8,plrPeak:4.5,ivc:'small',luso:'alines',lvc:'hyper',rvs:'normal'},
+  septic_cardiomyopathy:{sbp:86,dbp:50,hr:110,ppmax:38,ppmin:35,cvp:12,ci:1.7,svr:720,scvo2:62,lactate:5.8,plrBase:1.7,plrPeak:1.75,ivc:'plethoric',luso:'blines',lvc:'hypo',rvs:'dilated'},
+  septic_ards:{sbp:88,dbp:46,hr:112,ppmax:45,ppmin:39,cvp:9,ci:3.4,svr:620,scvo2:72,lactate:4.5,plrBase:3.2,plrPeak:3.7,ivc:'normal',luso:'ards',lvc:'normal',rvs:'normal'},
+  neurogenic:{sbp:85,dbp:50,hr:65,ppmax:38,ppmin:32,cvp:3,ci:2.4,svr:550,scvo2:70,lactate:2.2,plrBase:2.4,plrPeak:2.8,ivc:'small',luso:'alines',lvc:'normal',rvs:'normal'}
 };
 const types=[
   ['hypovolemic','Hypovolemia'],
@@ -124,7 +143,7 @@ const types=[
   ['ards_leak','Sepsis with ARDS'],
   ['neurogenic','Neurogenic']
 ];
-const ids=['sbp','dbp','hr','ppv','cvp','scvo2','lactate','ivc','luso','lvc','rvs'];
+const ids=['sbp','dbp','hr','ppmax','ppmin','cvp','ci','svr','scvo2','lactate','plrBase','plrPeak','ivc','luso','lvc','rvs'];
 const $=id=>document.getElementById(id);
 let audioOn=false, actx=null, nextBeat=0, nextAlarm=0, live={hr:116,map:57,critical:false};
 
@@ -137,11 +156,20 @@ function read(){
   if(d.dbp>=d.sbp) d.dbp=d.sbp-1;
   d.map=Math.round((d.sbp+2*d.dbp)/3);
   d.pp=d.sbp-d.dbp;
-  d.ppvValid=!!($('ppvValid')&&$('ppvValid').checked);
+  const mean=(d.ppmax+d.ppmin)/2;
+  d.ppv=mean>0&&d.ppmax>d.ppmin?(d.ppmax-d.ppmin)/mean*100:0;
+  d.plr=d.plrBase>0?(d.plrPeak-d.plrBase)/d.plrBase*100:0;
+  d.ppvValid=['ppvCmv','ppvTv','ppvSr','ppvCc'].every(id=>$(id)&&$(id).checked);
+  d.bleed=!!($('bleed')&&$('bleed').checked);
+  d.anaphylaxis=!!($('anaphylaxis')&&$('anaphylaxis').checked);
   return d;
 }
 
 function score(d){
+  if(d.ppmax!=null&&d.ppmin!=null){
+    const mean=(d.ppmax+d.ppmin)/2;
+    d.ppv=mean>0&&d.ppmax>d.ppmin?(d.ppmax-d.ppmin)/mean*100:0;
+  }
   const s={hypovolemic:0,cardiogenic:0,pe:0,tamponade:0,ptx:0,septic_v:0,septic_c:0,ards_leak:0,neurogenic:0};
   if(d.ppvValid&&d.ppv>13) s.hypovolemic+=3;
   if(d.cvp<6) s.hypovolemic+=3;
@@ -177,13 +205,21 @@ function score(d){
   if(d.luso==='alines'){s.hypovolemic+=3;s.pe+=3;s.tamponade+=3;s.septic_v+=3;s.neurogenic+=3;s.cardiogenic-=8;}
   if(d.luso==='blines'){s.cardiogenic+=6;s.septic_c+=4;s.hypovolemic-=4;}
   if(d.luso==='ards') s.ards_leak+=8;
-  if(d.luso==='ptx') s.ptx+=24;
+  if(d.luso==='ptx') s.ptx+=80;
   if(d.lvc==='hyper'){s.hypovolemic+=5;s.tamponade+=4;s.septic_v+=4;s.pe+=2;s.cardiogenic-=12;s.septic_c-=12;}
   if(d.lvc==='hypo'){s.cardiogenic+=7;s.septic_c+=7;}
   if(d.lvc==='normal'){s.neurogenic+=2;s.ards_leak+=2;s.pe+=1;}
   if(d.rvs==='normal'){s.hypovolemic+=2;s.cardiogenic+=1;s.septic_v+=2;s.neurogenic+=2;s.pe-=8;s.tamponade-=8;}
   if(d.rvs==='dilated'){s.pe+=10;s.septic_c+=3;s.cardiogenic-=2;}
   if(d.rvs==='tamponade'){s.tamponade+=14;s.pe-=6;s.hypovolemic-=5;}
+  if(typeof d.ci==='number'){
+    if(d.ci<2.2){s.cardiogenic+=4;s.pe+=3;s.tamponade+=3;s.hypovolemic+=2;s.septic_v-=6;}
+    else if(d.ci>=3){s.septic_v+=5;s.ards_leak+=2;s.cardiogenic-=4;}
+  }
+  if(typeof d.svr==='number'){
+    if(d.svr<800){s.septic_v+=5;s.neurogenic+=4;s.ards_leak+=3;s.hypovolemic-=4;s.cardiogenic-=3;}
+    else if(d.svr>1400){s.hypovolemic+=3;s.cardiogenic+=3;s.pe+=2;s.septic_v-=5;}
+  }
   const total=Object.values(s).reduce((a,n)=>a+Math.max(0,n),0);
   const pct={};
   types.forEach(([id])=>{pct[id]=total?Math.round(Math.max(0,s[id])/total*100):0;});
@@ -197,20 +233,31 @@ function topId(pct){
 function actions(d,pct){
   const top=topId(pct);
   const wet=d.rvs==='dilated'||d.rvs==='tamponade'||d.ivc==='plethoric'||d.luso==='blines'||d.luso==='ptx';
+  const ppvYes=d.ppvValid&&d.ppv>13;
+  const ppvNo=d.ppvValid&&d.ppv<9;
+  const plrYes=d.plr>=10;
+  const plrNo=d.plr<10;
   const list=[];
-  if(d.luso==='ptx') list.push(['crit','No lung sliding with a barcode sign. Decompress the chest now. This is not a pulmonary embolus.']);
-  if(d.rvs==='tamponade') list.push(['crit','Chamber collapse. This needs pericardial drainage, not a fluid bolus.']);
+  if(d.luso==='ptx') list.push(['crit','No lung sliding with a barcode sign. Decompress the chest now. This is not a pulmonary embolus, and it is not a reason for a thrombolytic.']);
+  if(d.rvs==='tamponade') list.push(['crit','Chamber collapse. Drain the pericardium. Do not give alteplase, and do not give a fluid bolus.']);
+  if(d.anaphylaxis) list.push(['crit','Anaphylaxis. Give 0.5 mg intramuscular epinephrine, 1 mg/mL, into the thigh now. Repeat it in 5 minutes if the reaction continues. An infusion is only for shock that remains after those doses.']);
   if(d.map<65) list.push(['crit','MAP is '+d.map+'. The first pressure drug is norepinephrine, aimed above 65.']);
   if(top==='septic_v'||top==='septic_c'||top==='ards_leak') list.push(['crit','Take blood cultures, then start an antibiotic for the likely source. Do not wait for the ultrasound.']);
-  if(d.rvs==='dilated'&&d.luso!=='ptx') list.push(['dx','Dilated right ventricle. Get a CT pulmonary angiogram if the patient can travel. Do not give a thrombolytic unless a massive embolus is confirmed and the pressure is falling.']);
-  if(top==='cardiogenic') list.push(['dx','Poor left-ventricular contraction. Get an ECG and a troponin. Mechanical support is for refractory cardiogenic shock, not the first step.']);
+  if(d.bleed&&top==='hypovolemic') list.push(['crit','Bleeding. Give blood rather than a large crystalloid load. If the bleeding is massive, use a 1:1:1 transfusion. Tranexamic acid 1 g is for trauma within 3 hours, not for every medical bleed.']);
+  if(top==='pe') list.push(['dx','If a massive embolus is confirmed and the pressure stays down, alteplase 100 mg is given over 2 hours. Do not use that dose for tamponade or a pneumothorax.']);
+  else if(d.rvs==='dilated'&&d.luso!=='ptx') list.push(['dx','The right ventricle is dilated. Get a CT pulmonary angiogram if the patient can travel before calling this an embolus.']);
+  if(top==='cardiogenic') list.push(['dx','Poor left-ventricular contraction and a low cardiac index. Get an ECG and a troponin. A pump is for refractory cardiogenic shock, not the first step.']);
   if(wet) list.push(['crit','Do not give a fluid bolus. The cava, the lungs, or the right heart say the patient is already full or obstructed.']);
-  else if(d.ppvValid&&d.ppv>13&&d.cvp<10&&d.luso==='alines') list.push(['','PPV says a 250–500 mL fluid challenge is reasonable. Repeat the lung ultrasound before a second bolus.']);
-  else if(d.ivc==='small'&&d.luso==='alines'&&d.cvp<8) list.push(['','The cava is small and the lungs are dry. A 250–500 mL challenge is reasonable. PPV is not being used for this decision.']);
-  if(d.lvc==='hypo'&&d.scvo2<65) list.push(['','After the pressure is supported, dobutamine can raise the output. Do not start milrinone while the MAP is below 65.']);
-  if(top==='pe'&&d.scvo2<65) list.push(['','Support the pressure with norepinephrine. Dobutamine is a later option for a failing right ventricle, and only after the MAP is restored.']);
-  if((top==='septic_v'||d.dbp<50)&&d.map<65&&d.scvo2>70) list.push(['','Vasodilated shock. Add vasopressin rather than pushing norepinephrine above about 0.25–0.5 mcg/kg/min.']);
-  if(top==='neurogenic') list.push(['','Neurogenic pattern: low pressure without a fast rate. Use norepinephrine. Give atropine only if the rate itself is causing the low pressure.']);
+  else if(plrYes&&ppvNo) list.push(['dx','The leg raise rose ' +d.plr.toFixed(0)+'%, but a valid PPV is under 9%. Repeat one test before a large bolus.']);
+  else if(plrNo&&ppvYes) list.push(['dx','PPV is high, but the leg raise rose only '+d.plr.toFixed(0)+'%. Repeat one test before a large bolus.']);
+  else if(plrYes) list.push(['','The leg raise raised the cardiac index by '+d.plr.toFixed(0)+'%. A 250–500 mL challenge is reasonable. Look at the lungs before a second bolus.']);
+  else if(ppvYes&&d.cvp<10&&d.luso==='alines') list.push(['','PPV is '+d.ppv.toFixed(0)+'% and the validity boxes are ticked. A 250–500 mL challenge is reasonable.']);
+  else if(plrNo) list.push(['','The leg raise rose only '+d.plr.toFixed(0)+'%. Do not give fluid on that result.']);
+  else if(d.ivc==='small'&&d.luso==='alines'&&d.cvp<8) list.push(['','The cava is small and the lungs are dry. A 250–500 mL challenge is reasonable. PPV is not being used.']);
+  if(d.lvc==='hypo'&&d.scvo2<65) list.push(['',d.map<65?'After the pressure is supported, dobutamine can raise a low cardiac index. Do not start milrinone while the MAP is below 65.':'Dobutamine can raise a low cardiac index once the pressure is safe. Milrinone is an alternative only while the MAP stays at 65 or above.']);
+  if(top==='pe'&&d.ci<2.2) list.push(['','Keep the pressure with norepinephrine. Dobutamine is a later option for the right ventricle, and only after the MAP is restored.']);
+  if((top==='septic_v'||(d.svr<800&&d.ci>=3))&&d.map<65) list.push(['','Vasodilated shock. Add vasopressin at 0.03 units/min rather than pushing norepinephrine above about 0.25 mcg/kg/min.']);
+  if(top==='neurogenic') list.push(['','Neurogenic pattern: low resistance without a fast rate. Use norepinephrine. Give atropine only if the rate itself is causing the low pressure.']);
   if(d.luso==='ards') list.push(['','If this is ARDS, ventilate at about 6 mL/kg predicted body weight and keep the plateau at or below 30.']);
   if(d.lactate>=4) list.push(['','Lactate is '+d.lactate.toFixed(1)+'. Recheck it after the pressure and the cause are treated. Do not chase the number with bicarbonate.']);
   if(!list.length) list.push(['','The pressure and the scan do not show one emergency action. Recheck the history and the right heart.']);
@@ -220,12 +267,18 @@ function actions(d,pct){
 function badges(d){
   const out=[];
   const obstructed=d.rvs!=='normal'||d.ivc==='plethoric'||d.luso==='blines'||d.luso==='ptx';
+  const ppvYes=d.ppvValid&&d.ppv>13;
+  const gray=d.ppvValid&&d.ppv>=9&&d.ppv<=13;
   if(obstructed) out.push(['bad','Do not fill this patient']);
-  else if(d.ppvValid&&d.ppv>13&&d.cvp<10) out.push(['ok','May respond to fluid']);
-  else if(!d.ppvValid&&d.ivc==='small'&&d.luso==='alines') out.push(['warn','Small cava. PPV is not being used']);
+  else if(d.plr>=10) out.push(['ok','Leg raise rose '+d.plr.toFixed(0)+'%']);
+  else if(ppvYes&&d.cvp<10) out.push(['ok','PPV '+d.ppv.toFixed(0)+'% and valid']);
+  else if(gray) out.push(['warn','PPV is in the gray zone. Use the leg raise']);
+  else if(d.plr<10) out.push(['warn','Leg raise rose only '+d.plr.toFixed(0)+'%']);
   else out.push(['warn','A fluid bolus is unlikely to help']);
-  if(!d.ppvValid) out.push(['warn','PPV is off. The number is ignored']);
+  if(!d.ppvValid) out.push(['warn','PPV is invalid until every box is ticked']);
   if(d.ppvValid&&d.ppv>13&&obstructed) out.push(['bad blink','PPV is high but the right heart or the lungs disagree']);
+  if(d.ci<2.2) out.push(['bad','Cardiac index '+d.ci.toFixed(1)]);
+  else if(d.ci>=3&&d.svr<800) out.push(['warn','High output, low resistance']);
   if(d.scvo2<60) out.push(['bad','Low ScvO₂: delivery is not meeting demand']);
   else if(d.scvo2>75) out.push(['warn','High ScvO₂: vasodilation or poor extraction']);
   if(d.luso==='blines') out.push(['warn','Bilateral B-lines: hydrostatic edema']);
@@ -240,24 +293,62 @@ function badges(d){
 
 function draw(){
   const d=read();
-  const units={sbp:' mmHg',dbp:' mmHg',hr:' bpm',ppv:'%',cvp:' mmHg',scvo2:'%',lactate:' mmol/L'};
+  const units={sbp:' mmHg',dbp:' mmHg',hr:' /min',ppmax:' mmHg',ppmin:' mmHg',cvp:' mmHg',ci:'',svr:'',scvo2:'%',lactate:'',plrBase:'',plrPeak:''};
   ids.forEach(id=>{const lab=$('v_'+id); if(lab) lab.textContent=$(id).value+(units[id]||'');});
   const pct=score(d);
   $('map').textContent=d.map;
   $('map').style.color=d.map<65?'#9d1c2e':'inherit';
   $('si').textContent=(d.hr/d.sbp).toFixed(2);
-  $('pp').textContent=d.pp;
+  $('ppvOut').textContent=d.ppv.toFixed(0);
+  $('plrOut').textContent=(d.plr>=0?'+':'')+d.plr.toFixed(0);
+  $('svrOut').textContent=Math.round(d.svr);
   $('badges').innerHTML=badges(d).map(([c,t])=>'<span class="badge '+c+'">'+t+'</span>').join('');
   const ranked=types.map(([id,label])=>({id,label,n:pct[id]})).sort((a,b)=>b.n-a.n);
   $('bars').innerHTML=ranked.map((t,i)=>'<div class="'+(i===0?'top':'')+'"><div style="display:flex;justify-content:space-between;font-size:14px"><span>'+t.label+'</span><b>'+t.n+'%</b></div><div class="bar"><i style="width:'+t.n+'%"></i></div></div>').join('');
   $('actions').innerHTML=actions(d,pct).map(([k,t])=>'<div class="item '+(k==='crit'?'crit':k==='dx'?'dx':'')+'">'+t+'</div>').join('');
+  drawStarling(d, ranked[0].id);
   live={hr:d.hr,map:d.map,critical:d.map<65||d.luso==='ptx'||d.rvs==='tamponade'};
+}
+
+function drawStarling(d, top){
+  const canvas=$('starling');
+  const ctx=canvas.getContext('2d');
+  const w=canvas.width, h=canvas.height;
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle='#d7dee6';
+  ctx.beginPath();
+  ctx.moveTo(36,12); ctx.lineTo(36,h-26); ctx.lineTo(w-12,h-26); ctx.stroke();
+  ctx.fillStyle='#5c6b7a';
+  ctx.font='12px sans-serif';
+  ctx.fillText('Preload', w-70, h-8);
+  const flat=top==='cardiogenic'||top==='septic_c';
+  const maxCI=flat?2.4:4.6, K=flat?9:4;
+  ctx.strokeStyle=flat?'#9d1c2e':'#0b4f8a';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  for(let x=0;x<=22;x+=0.4){
+    const ci=(maxCI*x)/(K+x);
+    const cx=36+(x/22)*(w-56);
+    const cy=(h-26)-(ci/5)*(h-40);
+    if(x===0) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
+  }
+  ctx.stroke();
+  const x1=36+(Math.min(22,d.cvp)/22)*(w-56);
+  const y1=(h-26)-(Math.min(5,d.plrBase)/5)*(h-40);
+  const x2=36+(Math.min(22,d.cvp+3)/22)*(w-56);
+  const y2=(h-26)-(Math.min(5,d.plrPeak)/5)*(h-40);
+  ctx.strokeStyle='#0d6b3a';
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.fillStyle='#0b4f8a'; ctx.beginPath(); ctx.arc(x1,y1,4,0,6.3); ctx.fill();
+  ctx.fillStyle='#0d6b3a'; ctx.beginPath(); ctx.arc(x2,y2,5,0,6.3); ctx.fill();
 }
 
 function applyPreset(id){
   const p=presets[id];
   ids.forEach(key=>{$(key).value=p[key];});
-  $('ppvValid').checked=true;
+  ['ppvCmv','ppvTv','ppvSr','ppvCc'].forEach(id=>{$(id).checked=true;});
+  $('bleed').checked=false;
+  $('anaphylaxis').checked=false;
   document.querySelectorAll('.presets button[data-id]').forEach(b=>b.classList.toggle('on',b.dataset.id===id));
   draw();
 }
@@ -300,7 +391,7 @@ ids.forEach(id=>$(id).addEventListener('input',()=>{
   document.querySelectorAll('.presets button[data-id]').forEach(b=>b.classList.remove('on'));
   draw();
 }));
-$('ppvValid').addEventListener('change',draw);
+['ppvCmv','ppvTv','ppvSr','ppvCc','bleed','anaphylaxis'].forEach(id=>$(id).addEventListener('change',draw));
 document.querySelectorAll('.presets button[data-id]').forEach(b=>b.onclick=()=>applyPreset(b.dataset.id));
 draw();
 </script>
