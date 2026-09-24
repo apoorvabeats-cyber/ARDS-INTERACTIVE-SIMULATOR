@@ -23,7 +23,8 @@
   .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
   .chips button{border:0;border-radius:999px;font-weight:800;padding:10px 12px;cursor:pointer;font-size:13px;color:#fff}
-  #calcium{background:#0f766e}#insulin{background:#6d28d9}#salb{background:#0891b2}
+  #calcium{background:#0f766e}#insulin{background:#6d28d9}#salb{background:#0891b2}#dex{background:#d97706}
+  input.bad{border-color:#dc2626;background:#fef2f2;color:#991b1b}
   .chips button.on{outline:3px solid #0f172a;outline-offset:2px}
   .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
   .num{border-radius:12px;text-align:center;padding:10px 6px;color:#fff}
@@ -68,8 +69,11 @@
     <div class="chips">
       <button type="button" id="calcium" class="on">Calcium 10 mL</button>
       <button type="button" id="insulin" class="on">Insulin 10 U</button>
+      <button type="button" id="dex">Dextrose 25 g</button>
       <button type="button" id="salb">Salbutamol 20 mg</button>
     </div>
+    <label>Glucose mg/dL</label>
+    <input id="glu" type="text" inputmode="decimal" value="180">
     <label>Removal <b id="remLabel">0.25</b> mmol/h</label>
     <input id="rem" type="range" min="0" max="0.4" step="0.05" value="0.25">
   </section>
@@ -92,7 +96,7 @@
 </main>
 <script>
 if(new URLSearchParams(location.search).get('embed')) document.body.classList.add('embed');
-var H=6, FLOOR=3.5, phase=0, nowKind='wide', laterKind='normal';
+var H=6, FLOOR=3.5, phase=0, ecgPath=[6.8], ecgHour=0, ecgTick=0;
 var NAME={normal:'Normal',peaked:'Peaked T',wide:'Wide QRS',sine:'Sine wave',flat:'Flat T',uwave:'U wave',bigu:'Large U',vt:'VT'};
 function read(id){ var n=parseFloat(String(document.getElementById(id).value||'').replace(',','.')); return Number.isFinite(n)?n:null; }
 function on(id){ return document.getElementById(id).classList.contains('on'); }
@@ -105,6 +109,12 @@ function kind(k, calcium){
   return 'normal';
 }
 function shift(h, peak){ var up=Math.min(1,h/1), hold=h<=3?1:Math.max(0.4,1-(h-3)/4); return -peak*up*hold; }
+function shiftOk(){
+  if(!on('insulin')) return false;
+  var g=read('glu');
+  if(g==null) return true;
+  return g>=250 || on('dex');
+}
 function project(k, rem, insulin, salb){
   var path=[k];
   for(var h=1;h<=H;h++){
@@ -126,7 +136,7 @@ function sample(t, kd){
   if(kd==='bigu'){ ta=0.02; ua=0.5; qa=0.75; }
   return g(t,0.14,0.018,p)+g(t,0.24,qw*0.45,-0.25*qa)+g(t,0.27,qw,qa)+g(t,tc,tw,ta)+g(t,0.62,0.04,ua);
 }
-function paintChart(path, goal, cross){
+function paintChart(path, goal, cross, hour){
   var c=document.getElementById('chart'), dpr=Math.min(2,devicePixelRatio||1);
   var W=c.clientWidth||640, Ht=c.clientHeight||260;
   c.width=W*dpr; c.height=Ht*dpr;
@@ -146,6 +156,7 @@ function paintChart(path, goal, cross){
   ctx.beginPath(); ctx.moveTo(X(0),Y(FLOOR)); ctx.lineTo(R,Y(FLOOR)); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle='#dc2626'; ctx.fillText('3.5', X(0)+4, Y(FLOOR)-4);
   if(cross!=null){ ctx.fillStyle='#dc2626'; ctx.beginPath(); ctx.arc(X(cross),Y(path[cross]),7,0,7); ctx.fill(); }
+  if(hour!=null){ ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2; ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(X(hour),T); ctx.lineTo(X(hour),Ht-B); ctx.stroke(); }
   var y=Y(goal);
   ctx.strokeStyle='#059669'; ctx.lineWidth=4; ctx.setLineDash([8,5]);
   ctx.beginPath(); ctx.moveTo(X(0),y); ctx.lineTo(R,y); ctx.stroke(); ctx.setLineDash([]);
@@ -176,9 +187,15 @@ function frame(){
   var W=c.clientWidth||640, Ht=c.clientHeight||168;
   if(c.width!==Math.floor(W*dpr)){ c.width=W*dpr; c.height=Ht*dpr; }
   var ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
-  drawStrip(ctx, 0, Ht/2-2, nowKind, 'Now');
-  drawStrip(ctx, Ht/2+2, Ht/2-2, laterKind, '6 h');
+  var kd=kind(ecgPath[ecgHour]||ecgPath[0], on('calcium'));
+  drawStrip(ctx, 0, Ht, kd, ecgHour+' h · '+Number(ecgPath[ecgHour]||0).toFixed(1));
   phase+=0.012;
+  ecgTick++;
+  if(ecgTick>36 && ecgPath.length){
+    ecgTick=0;
+    ecgHour=(ecgHour+1)%ecgPath.length;
+    if(window._kpath) paintChart(window._kpath, window._kgoal, window._kcross, ecgHour);
+  }
   requestAnimationFrame(frame);
 }
 function paint(){
@@ -186,7 +203,10 @@ function paint(){
   document.getElementById('remLabel').textContent=rem.toFixed(2);
   if(k==null) return;
   if(goal==null) goal=k;
-  var path=project(k, rem, on('insulin'), on('salb'));
+  var path=project(k, rem, shiftOk(), on('salb'));
+  var g=read('glu');
+  var held=on('insulin') && g!=null && g<250 && !on('dex');
+  document.getElementById('glu').className=(g!=null && (g<70 || held))?'bad':'';
   var cross=null;
   for(var h=1;h<path.length;h++) if(path[h-1]>FLOOR && path[h]<=FLOOR){ cross=h; break; }
   document.getElementById('h1').textContent=path[1].toFixed(1);
@@ -196,25 +216,28 @@ function paint(){
   document.getElementById('deltaBox').className='num'+(cross!=null?' bad':'');
   var lines=[];
   if(Math.abs(path[6]-goal)>0.2) lines.push('The green line is the goal. This plan does not reach it.');
-  if((k>=6.5) && !on('calcium')) lines.push('No calcium. The top ECG stays wide.');
+  if(held) lines.push('No dextrose.');
+  if(g!=null && g<70) lines.push('Low glucose.');
+  if((k>=6.5) && !on('calcium')) lines.push('No calcium.');
   document.getElementById('banner').className=lines.length?'show':'';
   document.getElementById('banner').textContent=lines.join(' ');
   var ods=document.getElementById('ods');
   if(cross!=null){ ods.className='show'; ods.textContent='Overcorrection. The potassium crosses 3.5 at '+cross+' h. Stop removal.'; }
   else { ods.className=''; ods.textContent=''; }
   document.getElementById('goalKey').innerHTML='<i class="lg-goal"></i>Goal '+goal.toFixed(1);
-  paintChart(path, goal, cross);
+  window._kpath=path; window._kgoal=goal; window._kcross=cross;
+  ecgPath=path;
+  paintChart(path, goal, cross, ecgHour);
   document.getElementById('hours').innerHTML=[0,1,2,3,4,5,6].map(function(h){ return '<div>'+h+' h<b>'+path[h].toFixed(1)+'</b></div>'; }).join('');
-  nowKind=kind(k, on('calcium'));
-  laterKind=kind(path[6], on('calcium'));
-  var bad=nowKind==='sine'||nowKind==='wide'||nowKind==='vt'||laterKind==='vt'||laterKind==='bigu';
+  var worst=kind(Math.max.apply(null, path), on('calcium'));
+  var bad=worst==='sine'||worst==='wide'||worst==='vt'||worst==='bigu';
   document.getElementById('ecgBox').className='ecgbox'+(bad?' bad':'');
 }
 function endAt(rem, insulin, salb){ return project(read('k'), rem, insulin, salb)[6]; }
 function applyGoal(){
   var k=read('k'), goal=read('target');
   if(k==null||goal==null){ paint(); return; }
-  var insulin=on('insulin'), salb=on('salb');
+  var insulin=shiftOk(), salb=on('salb');
   function solve(){
     var a=endAt(0,insulin,salb), b=endAt(0.4,insulin,salb);
     if((a>=b && goal>=a) || (a<b && goal<=a)) return 0;
@@ -227,15 +250,22 @@ function applyGoal(){
     return Math.round(lo/0.05)*0.05;
   }
   var rem=solve();
-  if(Math.abs(endAt(rem,insulin,salb)-goal)>0.25 && !insulin){ insulin=true; document.getElementById('insulin').classList.add('on'); rem=solve(); }
-  if(Math.abs(endAt(rem,insulin,salb)-goal)>0.25 && !salb){ salb=true; document.getElementById('salb').classList.add('on'); rem=solve(); }
+  if(Math.abs(endAt(rem,insulin,salb)-goal)>0.25 && !on('insulin')){
+    document.getElementById('insulin').classList.add('on');
+    insulin=shiftOk();
+    rem=solve();
+  }
+  if(Math.abs(endAt(rem,insulin,salb)-goal)>0.25 && !salb){
+    salb=true; document.getElementById('salb').classList.add('on'); rem=solve();
+  }
   document.getElementById('rem').value=rem.toFixed(2);
   paint();
 }
-['calcium','insulin','salb'].forEach(function(id){
+['calcium','insulin','salb','dex'].forEach(function(id){
   document.getElementById(id).onclick=function(){ this.classList.toggle('on'); if(id==='calcium') paint(); else applyGoal(); };
 });
 document.getElementById('rem').oninput=paint;
+document.getElementById('glu').oninput=applyGoal;
 document.getElementById('k').oninput=function(){ var k=read('k'); if(k!=null && k>5) document.getElementById('target').value='5'; applyGoal(); };
 document.getElementById('target').oninput=applyGoal;
 var q=new URLSearchParams(location.search);
