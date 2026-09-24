@@ -56,6 +56,11 @@ th{background:#eef3fa}
 <div><label for="weightInput">Weight (kg)</label><input id="weightInput" type="number" min="1" step="0.1" value="70"></div>
 <div><label for="glucoseInput">Glucose (mg/dL)</label><input id="glucoseInput" type="number" min="0" step="1" value="110"></div>
 <div><label for="temperatureInput">Temperature (°C)</label><input id="temperatureInput" type="number" min="25" max="45" step="0.1" value="37"></div>
+<div><label for="alcoholInput">Alcohol use or malnutrition</label><select id="alcoholInput"><option value="no">No</option><option value="yes">Yes</option></select></div>
+<div><label for="pregInput">Pregnancy</label><select id="pregInput"><option value="no">No</option><option value="yes">Yes or possible</option></select></div>
+<div><label for="liverInput">Liver</label><select id="liverInput"><option value="no">No known liver failure</option><option value="yes">Significant liver disease</option></select></div>
+<div><label for="heartInput">Heart rhythm and pressure</label><select id="heartInput"><option value="ok">Stable</option><option value="bad">Bradycardia, heart block, or hypotension</option></select></div>
+<div><label for="typeInput">Seizure type</label><select id="typeInput"><option value="conv">Convulsive</option><option value="gen">Absence or myoclonic</option></select></div>
 </div>
 
 <button class="primary" onclick="updateClinicalScenario()">UPDATE CLINICAL SCENARIO</button>
@@ -103,9 +108,10 @@ th{background:#eef3fa}
 </div>
 
 <div class="card hidden" id="step4">
-<h2>Step 4 — Reassess After Benzodiazepine</h2>
-<div class="case">Seizure activity continues despite an adequate benzodiazepine dose.</div>
+<h2>Step 4 — Reassess After the First Benzodiazepine</h2>
+<div class="case">One adequate lorazepam dose has been given. The seizure is still going.</div>
 <div class="grid">
+<button class="option" onclick="repeatBenzo()">Repeat lorazepam once</button>
 <button class="option" onclick="chooseSecondLine('lev')">Levetiracetam</button>
 <button class="option" onclick="chooseSecondLine('val')">Valproate</button>
 <button class="option" onclick="chooseSecondLine('fos')">Fosphenytoin</button>
@@ -129,13 +135,13 @@ th{background:#eef3fa}
 
 <div class="card hidden" id="step6">
 <h2>Step 6 — Refractory Status Epilepticus</h2>
-<div class="alert">If seizures continue despite adequate benzodiazepine therapy and appropriate second-line antiseizure treatment, treat as refractory status epilepticus and escalate neurocritical care.</div>
-<h3>Key actions</h3>
+<div class="alert">Seizures that continue after a benzodiazepine and an adequate second-line drug are refractory. Intubate, start continuous EEG, and begin an anesthetic infusion. Do not give a third benzodiazepine bolus instead.</div>
+<h3>Anesthetic infusion, after the airway is secured</h3>
 <div class="grid">
-<div class="stat"><strong>1</strong>Continuous EEG</div>
-<div class="stat"><strong>2</strong>Airway / ventilation assessment</div>
-<div class="stat"><strong>3</strong>Continuous anesthetic therapy when indicated</div>
-<div class="stat"><strong>4</strong>Identify and treat the underlying cause</div>
+<div class="stat"><strong>Midazolam</strong>0.2 mg/kg bolus, then 0.05–2 mg/kg/h</div>
+<div class="stat"><strong>Propofol</strong>1–2 mg/kg bolus, then 30–200 mcg/kg/min. Watch for propofol infusion syndrome.</div>
+<div class="stat"><strong>If those fail</strong>Pentobarbital coma is the next anesthetic, not another loading drug from the same list.</div>
+<div class="stat"><strong>EEG</strong>Titrate to seizure suppression. A burst-suppression target is for the cases that do not stop.</div>
 </div>
 <button class="primary" onclick="showStep(7)">Continue →</button>
 </div>
@@ -184,11 +190,11 @@ th{background:#eef3fa}
 <h2>Medication Reference</h2>
 <table>
 <tr><th>Medication</th><th>Adult loading dose</th><th>Important point</th></tr>
-<tr><td>Lorazepam</td><td>0.1 mg/kg IV<br>Max 4 mg/dose</td><td>First-line benzodiazepine</td></tr>
-<tr><td>Midazolam</td><td>0.2 mg/kg IM<br>Max 10 mg</td><td>Useful when IV access is not immediately available</td></tr>
-<tr><td>Levetiracetam</td><td>60 mg/kg IV<br>Max 4.5 g</td><td>Second-line option</td></tr>
-<tr><td>Valproate</td><td>40 mg/kg IV<br>Max 3 g</td><td>Second-line option</td></tr>
-<tr><td>Fosphenytoin</td><td>20 mg PE/kg IV</td><td>Second-line option; cardiovascular monitoring required</td></tr>
+<tr><td>Lorazepam</td><td>0.1 mg/kg IV, max 4 mg, once more if needed</td><td>First-line. Do not give a third dose in place of a second-line drug.</td></tr>
+<tr><td>Midazolam</td><td>10 mg IM if 40 kg or more</td><td>Use when there is no IV. 5 mg IM if under 40 kg.</td></tr>
+<tr><td>Levetiracetam</td><td>60 mg/kg IV, max 4,500 mg, over about 10 min</td><td>Equivalent to the other two second-line drugs in ESETT.</td></tr>
+<tr><td>Valproate</td><td>40 mg/kg IV, max 3,000 mg, over about 10 min</td><td>Do not use in pregnancy, liver failure, or known mitochondrial disease.</td></tr>
+<tr><td>Fosphenytoin</td><td>20 mg PE/kg IV, max 1,500 mg PE, no faster than 150 mg PE/min</td><td>Cardiac monitoring. Avoid in heart block or hypotension. Can worsen absence and myoclonus.</td></tr>
 </table>
 </div>
 
@@ -196,103 +202,148 @@ th{background:#eef3fa}
 </div>
 
 <script>
+let benzoRepeats=0;
 function num(id, fallback){
-  const v=Number(document.getElementById(id).value);
-  return Number.isFinite(v) && v>0 ? v : fallback;
+  const raw=(document.getElementById(id).value||"").trim();
+  const v=Number(raw);
+  return raw!=="" && Number.isFinite(v) && v>0 ? v : fallback;
 }
-
+function maybe(id){
+  const raw=(document.getElementById(id).value||"").trim();
+  if(raw==="") return null;
+  const v=Number(raw);
+  return Number.isFinite(v)?v:null;
+}
 function updateClinicalScenario(){
   const duration=num("durationInput",8);
   const weight=num("weightInput",70);
-  const glucose=Number(document.getElementById("glucoseInput").value);
-  const temp=Number(document.getElementById("temperatureInput").value);
-  const g=Number.isFinite(glucose)?glucose:110;
-  const t=Number.isFinite(temp)?temp:37;
-
+  const g=maybe("glucoseInput");
+  const t=maybe("temperatureInput");
+  const alcohol=document.getElementById("alcoholInput").value==="yes";
+  let extra="";
+  if(duration<5) extra+=" This is not yet status epilepticus. Support the airway and have lorazepam ready. Treat if it is still going at 5 minutes.";
+  else extra+=" This is convulsive status epilepticus. Treat now.";
+  if(g!==null && g<60) extra+=" Glucose is under 60 mg/dL. Give 50 mL of 50% dextrose IV now.";
+  if(alcohol) extra+=" Give thiamine 100–200 mg IV with the dextrose.";
+  if(t!==null && t>=38) extra+=" Fever does not delay the benzodiazepine. Look for meningitis or encephalitis in parallel.";
   document.getElementById("scenarioText").innerHTML =
-    `A ${weight}-kg adult presents with continuous generalized convulsive activity. `+
-    `Seizures have been ongoing for approximately <strong>${duration} minutes</strong>.<br><br>`+
-    `Airway is not yet secured. IV access is available. Finger-stick glucose is ${g} mg/dL `+
-    `and temperature is ${t}°C.`;
-
+    `A ${weight}-kg adult has continuous generalized convulsive activity for <strong>${duration} minutes</strong>. `+
+    `The airway is not secured. IV access is available. Glucose is ${g===null?"not entered":g+" mg/dL"} and temperature is ${t===null?"not entered":t+"°C"}.`+extra;
   document.getElementById("durationDisplay").textContent=duration+" min";
   document.getElementById("weightDisplay").textContent=weight+" kg";
-  document.getElementById("glucoseDisplay").textContent=g+" mg/dL";
-  document.getElementById("temperatureDisplay").textContent=t+"°C";
-
+  document.getElementById("glucoseDisplay").textContent=(g===null?"—":g+" mg/dL");
+  document.getElementById("temperatureDisplay").textContent=(t===null?"—":t+"°C");
   document.querySelectorAll(".patientWeight").forEach(el=>el.textContent=weight);
-
   const lorazepam=Math.min(0.1*weight,4);
-  document.getElementById("lorazepamDose").textContent =
-    (Number.isInteger(lorazepam)?lorazepam:lorazepam.toFixed(1))+" mg";
-
+  document.getElementById("lorazepamDose").textContent=(Number.isInteger(lorazepam)?lorazepam:lorazepam.toFixed(1))+" mg";
+  const step3=document.querySelector("#step3 p");
+  if(step3) step3.innerHTML = duration<5
+    ? "The clock is under 5 minutes. Give this dose only if the seizure is still going at 5 minutes."
+    : "For this <span class='patientWeight'>"+weight+"</span>-kg adult, this is the lorazepam dose to give now.";
   calculateDose();
 }
-
 function showStep(n){
   const e=document.getElementById("step"+n);
-  if(e){
-    e.classList.remove("hidden");
-    e.scrollIntoView({behavior:"smooth",block:"start"});
-  }
+  if(e){ e.classList.remove("hidden"); e.scrollIntoView({behavior:"smooth",block:"start"}); }
 }
-
 function answer(choice){
   const r=document.getElementById("answer1");
-  if(choice==="treat"){
-    r.innerHTML='<div class="result correct"><strong>Correct.</strong><br>Status epilepticus requires rapid stabilization and treatment. Do not delay antiseizure therapy while waiting for imaging.</div>';
-    showStep(2);
-  }else{
-    r.innerHTML='<div class="result incorrect"><strong>Not the best next step.</strong><br>The priority is immediate stabilization and treatment of ongoing seizures.</div>';
+  const duration=num("durationInput",8);
+  const g=maybe("glucoseInput");
+  const low=g!==null && g<60;
+  if(choice==="ct" || choice==="lumbar"){
+    r.innerHTML='<div class="result incorrect"><strong>Not the first move.</strong><br>Do not send a seizing patient to CT or start with a lumbar puncture. Treat the seizure. Imaging and infection studies follow in parallel.</div>';
+    return;
   }
+  if(choice==="airway"){
+    if(duration<5 && !low){
+      r.innerHTML='<div class="result correct good"><strong>Reasonable before 5 minutes.</strong><br>Support the airway, check glucose, and have lorazepam drawn up. If the seizure reaches 5 minutes, give it. Do not leave the bedside.</div>';
+      showStep(2);
+    }else{
+      r.innerHTML='<div class="result incorrect"><strong>Do not wait.</strong><br>'+(low?"Glucose is already under 60 mg/dL. Give dextrose now. ":"This seizure has reached 5 minutes, so it is status epilepticus. ")+'Stabilize and treat.</div>';
+    }
+    return;
+  }
+  let msg='<div class="result correct good"><strong>Correct.</strong><br>';
+  if(duration<5 && !low) msg+="Under 5 minutes, stabilize and prepare the benzodiazepine. Give it if the seizure is still going at 5 minutes.";
+  else msg+="Begin stabilization and antiseizure treatment now. Do not wait for a scan.";
+  if(low) msg+=" Give 50 mL of 50% dextrose IV immediately.";
+  if(document.getElementById("alcoholInput").value==="yes") msg+=" Add thiamine if alcohol use or malnutrition is present.";
+  r.innerHTML=msg+"</div>";
+  showStep(2);
 }
-
 function giveBenzo(){
+  const duration=num("durationInput",8);
+  const g=maybe("glucoseInput");
+  let prefix="";
+  if(g!==null && g<60) prefix="Dextrose comes with this dose, not after a failed benzodiazepine. ";
+  if(duration<5) prefix+="Give lorazepam only because the seizure is still going at 5 minutes. ";
   document.getElementById("benzoResult").innerHTML =
-    '<div class="result correct"><strong>Benzodiazepine administered.</strong><br>The patient continues to seize, so proceed rapidly to second-line therapy.</div>';
+    '<div class="result correct good"><strong>First lorazepam dose.</strong><br>'+prefix+'Reassess in a few minutes. One repeat is allowed. If it continues, give a second-line drug. Do not stack a third benzodiazepine.</div>';
   showStep(4);
 }
-
+function repeatBenzo(){
+  benzoRepeats++;
+  const r=document.getElementById("secondLineResult");
+  if(benzoRepeats===1){
+    r.innerHTML='<div class="result correct good"><strong>One repeat is acceptable.</strong><br>If the seizure is still going after this second dose, give levetiracetam, valproate, or fosphenytoin now.</div>';
+  }else{
+    r.innerHTML='<div class="result incorrect"><strong>Do not give a third benzodiazepine.</strong><br>That delay is a common reason status stays untreated. Give a full second-line load.</div>';
+  }
+}
 function chooseSecondLine(drug){
+  const r=document.getElementById("secondLineResult");
   if(drug==="none"){
-    document.getElementById("secondLineResult").innerHTML =
-      '<div class="result incorrect"><strong>Incorrect.</strong><br>Persistent seizures after adequate benzodiazepine therapy require rapid second-line antiseizure treatment.</div>';
+    r.innerHTML='<div class="result incorrect"><strong>Incorrect.</strong><br>A seizure that survives an adequate benzodiazepine needs a full second-line load now.</div>';
+    return;
+  }
+  const preg=document.getElementById("pregInput").value==="yes";
+  const liver=document.getElementById("liverInput").value==="yes";
+  const heart=document.getElementById("heartInput").value==="bad";
+  const gen=document.getElementById("typeInput").value==="gen";
+  if(drug==="val" && (preg||liver)){
+    r.innerHTML='<div class="result incorrect"><strong>Do not give valproate.</strong><br>'+(preg?"Pregnancy makes valproate the wrong second-line drug. ":"Significant liver disease makes valproate the wrong second-line drug. ")+"Use levetiracetam, or fosphenytoin if the heart allows it.</div>";
+    return;
+  }
+  if(drug==="fos" && heart){
+    r.innerHTML='<div class="result incorrect"><strong>Do not give fosphenytoin into an unstable heart.</strong><br>Bradycardia, heart block, or hypotension needs another drug. Choose levetiracetam, or valproate if the liver and pregnancy allow it.</div>';
+    return;
+  }
+  if(drug==="fos" && gen){
+    r.innerHTML='<div class="result incorrect"><strong>Fosphenytoin can worsen absence and myoclonus.</strong><br>Use levetiracetam or valproate for this seizure type.</div>';
     return;
   }
   document.getElementById("secondDrug").value=drug;
   calculateDose();
+  r.innerHTML='<div class="result correct good"><strong>Acceptable second-line drug.</strong><br>ESETT found no important difference among levetiracetam, valproate, and fosphenytoin when each is given as a full load. The patient factors above are what choose among them.</div>';
   showStep(5);
 }
-
 function calculateDose(){
   const weight=num("weightInput",70);
   const drug=document.getElementById("secondDrug").value;
   let dose,note;
-
   if(drug==="lev"){
     const raw=weight*60, capped=Math.min(raw,4500);
     dose=Math.round(capped).toLocaleString()+" mg";
-    note=`<div class="alert"><strong>Levetiracetam:</strong> 60 mg/kg × ${weight} kg = ${Math.round(raw).toLocaleString()} mg; maximum 4,500 mg.</div>`;
+    note=`<div class="alert"><strong>Levetiracetam:</strong> 60 mg/kg × ${weight} kg = ${Math.round(raw).toLocaleString()} mg. Cap 4,500 mg. Infuse over about 10 minutes.</div>`;
   }else if(drug==="val"){
     const raw=weight*40, capped=Math.min(raw,3000);
     dose=Math.round(capped).toLocaleString()+" mg";
-    note=`<div class="alert"><strong>Valproate:</strong> 40 mg/kg × ${weight} kg = ${Math.round(raw).toLocaleString()} mg; maximum 3,000 mg.</div>`;
+    note=`<div class="alert"><strong>Valproate:</strong> 40 mg/kg × ${weight} kg = ${Math.round(raw).toLocaleString()} mg. Cap 3,000 mg. Infuse over about 10 minutes. Not in pregnancy, liver failure, or mitochondrial disease.</div>`;
   }else{
-    const raw=weight*20;
-    dose=Math.round(raw).toLocaleString()+" mg PE";
-    note=`<div class="alert"><strong>Fosphenytoin:</strong> 20 mg PE/kg × ${weight} kg = ${Math.round(raw).toLocaleString()} mg PE.</div>`;
+    const raw=weight*20, capped=Math.min(raw,1500);
+    dose=Math.round(capped).toLocaleString()+" mg PE";
+    note=`<div class="alert"><strong>Fosphenytoin:</strong> 20 mg PE/kg × ${weight} kg = ${Math.round(raw).toLocaleString()} mg PE. Cap 1,500 mg PE. No faster than 150 mg PE/min, on a cardiac monitor.</div>`;
   }
-
   document.getElementById("calculatedDose").textContent=dose;
   document.getElementById("doseNote").innerHTML=note;
 }
-
 function continueRefractory(){showStep(6)}
-
 function resetAll(){
+  benzoRepeats=0;
   for(let i=2;i<=9;i++){
     const e=document.getElementById("step"+i);
-    if(e)e.classList.add("hidden");
+    if(e) e.classList.add("hidden");
   }
   document.getElementById("answer1").innerHTML="";
   document.getElementById("benzoResult").innerHTML="";
@@ -301,11 +352,15 @@ function resetAll(){
   document.getElementById("weightInput").value=70;
   document.getElementById("glucoseInput").value=110;
   document.getElementById("temperatureInput").value=37;
+  document.getElementById("alcoholInput").value="no";
+  document.getElementById("pregInput").value="no";
+  document.getElementById("liverInput").value="no";
+  document.getElementById("heartInput").value="ok";
+  document.getElementById("typeInput").value="conv";
   document.getElementById("secondDrug").value="lev";
   updateClinicalScenario();
   window.scrollTo({top:0,behavior:"smooth"});
 }
-
 updateClinicalScenario();
 </script>
 <script src="icu-audio.js?v=20260924f"></script>
