@@ -59,7 +59,7 @@ var raf=0, hour=0, tick=0, path=[70];
 var TITLE={
   dx:'Diagnosis', labs:'First look', sev:'Severity', fluid:'Fluids',
   pain:'Pain', feed:'Feeding', check:'Check again', cause:'Cause',
-  bile:'Gallstone', comp:'Complication', bag:'Collection', step:'Step up',
+  bile:'Gallstone', comp:'Complication', bag:'Collection', bagwhy:'Why it matters', step:'Step up',
   act:'What to do', sum:'Summary'
 };
 function num(id){ var n=parseFloat(String(S[id]==null?'':S[id]).replace(',','.')); return Number.isFinite(n)?n:null; }
@@ -120,12 +120,16 @@ function glasgow(){
   return {pts:pts, miss:miss};
 }
 function ctsi(){ if(S.bal==null||S.bal===''||S.necros==null||S.necros==='') return null; return (+S.bal)+(+S.necros); }
+function isInfected(){ return S.infected==='yes'||S.gas==='yes'||S.fever==='yes'||S.relapse==='yes'; }
 function route(){
   var r=['dx','labs','sev','fluid','pain','feed','check','cause'];
   if(S.cause==='biliary') r.push('bile');
   r.push('comp');
-  if(S.comp==='collection'){ r.push('bag'); if(S.nec==='yes'||S.infected==='yes'||S.sym==='yes') r.push('step'); }
-  else if(S.comp&&S.comp!=='none') r.push('act');
+  if(S.comp==='collection'){
+    r.push('bag');
+    if(S.nec==='no' && S.sym==='yes') r.push('bagwhy');
+    if(S.nec==='yes'||isInfected()||S.sym==='yes') r.push('step');
+  } else if(S.comp&&S.comp!=='none') r.push('act');
   r.push('sum');
   return r;
 }
@@ -140,7 +144,9 @@ function ok(id){
   if(id==='bile') return !!S.cholangitis && !!S.block;
   if(id==='comp') return !!S.comp;
   if(id==='bag') return !!S.nec && !!S.weeks;
-  if(id==='step') return !!S.stable;
+  if(id==='bagwhy') return !!S.why;
+  if(id==='step') return !!S.stable && (S.drain!=='yes' || !!S.drainHow);
+  if(id==='act') return actReady();
   return true;
 }
 function chips(key, opts){
@@ -222,7 +228,7 @@ function views(){
         +'<div id="live"></div>';
     },
     cause:function(){
-      return '<h2>Cause</h2>'+chips('cause',[['biliary','Gallstone'],['alcohol','Alcohol'],['tg','Triglyceride'],['cal','High calcium'],['drug','Drug'],['ercp','After ERCP'],['trauma','Trauma'],['unknown','Not clear']])
+      return '<h2>Cause</h2>'+chips('cause',[['biliary','Gallstone'],['alcohol','Alcohol'],['tg','Triglyceride'],['cal','High calcium'],['drug','Drug'],['ercp','After ERCP'],['trauma','Trauma'],['auto','Autoimmune'],['unknown','Not clear']])
         +'<div id="live"></div>';
     },
     bile:function(){
@@ -239,16 +245,23 @@ function views(){
     bag:function(){
       return '<h2>What kind</h2>'+yn('nec','Necrosis')+chips('weeks',[['early','Under 4 weeks'],['late','4 weeks or more']])
         +yn('sym','Pain, blockage, or another problem from it')+yn('infected','Infected')
+        +yn('gas','Gas in the collection')+yn('fever','Fever or sepsis')+yn('relapse','Worse after getting better')
         +'<h2>CTSI</h2><div class="grid"><div><label>Balthazar</label><select id="bal"><option value="">—</option><option value="0">A normal</option><option value="1">B enlarged</option><option value="2">C fat</option><option value="3">D one collection</option><option value="4">E two or gas</option></select></div>'
         +'<div><label>Necrosis</label><select id="necros"><option value="">—</option><option value="0">None</option><option value="2">Under 30%</option><option value="4">30–50%</option><option value="6">Over 50%</option></select></div></div>'
         +'<div id="live"></div>';
     },
-    step:function(){
-      return '<p class="hint">'+bagName()+'</p>'+yn('stable','Stable')
-        +'<div class="chips"><button type="button" id="abx" class="'+(S.abx==='yes'?'pick':'')+'">Antibiotic</button><button type="button" id="drain" class="'+(S.drain==='yes'?'pick':'')+'">Drain</button><button type="button" id="op" class="'+(S.op==='yes'?'pick':'')+'">Operate</button></div>'
+    bagwhy:function(){
+      return '<h2>What is it doing</h2>'+chips('why',[['goo','Stomach blocked'],['bile','Bile duct pressed'],['infect','Infected'],['bleed','Bleeding'],['rupture','Ruptured']])
         +'<div id="live"></div>';
     },
-    act:function(){ return '<div id="live"></div>'; },
+    step:function(){
+      return '<p class="hint">'+(bagName()||'Collection')+'</p>'+yn('stable','Stable')
+        +'<div class="chips"><button type="button" id="abx" class="'+(S.abx==='yes'?'pick':'')+'">Antibiotic</button><button type="button" id="drain" class="'+(S.drain==='yes'?'pick':'')+'">Drain</button><button type="button" id="op" class="'+(S.op==='yes'?'pick':'')+'">Necrosectomy</button><button type="button" id="open" class="'+(S.open==='yes'?'pick':'')+'">Open surgery</button></div>'
+        +(S.drain==='yes'?chips('drainHow',[['endo','Endoscopic drain'],['perc','Percutaneous drain']]):'')
+        +(S.drain==='yes'?yn('respond','Better after the drain'):'')
+        +'<div id="live"></div>';
+    },
+    act:function(){ return actBody()+'<div id="live"></div>'; },
     sum:function(){ return summary(); }
   };
 }
@@ -259,6 +272,7 @@ function painLive(){
 }
 function feedLive(){
   if(!S.oral) return '';
+  if(S.oral==='yes') return out('Oral feeding', ['Low fat when it is tolerated.']);
   if(S.oral==='no' && !S.gut) return out('Can the gut be used?', []);
   if(S.gut==='no') return out('Vein feeding', ['Only because the gut cannot be used.']);
   if(S.nj==='yes') return out('Feed past the stomach', []);
@@ -282,6 +296,7 @@ function causeLive(){
   if(S.cause==='alcohol') return out('Support', ['Watch withdrawal.']);
   if(S.cause==='cal') return out('Lower the calcium', []);
   if(S.cause==='drug') return out('Stop the drug', []);
+  if(S.cause==='auto') return out('Prove it first', ['Do not start steroids on a guess.']);
   if(S.cause==='unknown' && num('age')!=null && num('age')>=40) return out('Look for a tumor', []);
   if(S.cause) return out('Support', []);
   return '';
@@ -309,35 +324,121 @@ function bagLive(){
   var lines=[];
   var score=ctsi();
   if(score!=null){ var band=score>=7?'severe':score>=4?'moderate':'mild'; lines.push('CTSI '+score+' · '+band); }
-  if(S.infected==='yes') lines.push('Treat it as infected.');
+  if(S.infected==='yes'||S.gas==='yes'||S.fever==='yes'||S.relapse==='yes') lines.push('Treat it as infected.');
   else if((name==='Acute fluid collection'||name==='Pseudocyst') && S.sym!=='yes') lines.push('No drain just because it is there.');
   return out(name, lines, S.infected==='yes'||(score!=null&&score>=7));
 }
+function bagWhyLive(){
+  var t={goo:'The stomach is blocked. Drain it.', bile:'The duct is pressed. Drain it, and relieve the duct if the jaundice stays.', infect:'This is infected. Go to the step-up.', bleed:'Look for a bleeding vessel. Embolise it.', rupture:'It has ruptured. Drain it and treat the peritonitis.'};
+  return S.why?out(bagName()||'Collection', [t[S.why]]):'';
+}
 function stepLive(){
   if(!S.stable) return '';
-  var early=S.weeks==='early', infected=S.infected==='yes', unstable=S.stable==='no';
+  var early=S.weeks==='early', infected=isInfected(), unstable=S.stable==='no';
   var lines=[], bad=false, title='Step up';
-  if(!infected && early){ title='Sterile, under 4 weeks'; lines.push('No prophylactic antibiotic.'); lines.push('Do not drain or operate yet.'); if(S.drain==='yes'||S.op==='yes'){ lines.push('That is too early.'); bad=true; } }
-  else if(unstable){ title='Unstable'; lines.push('Antibiotic and a drain now.'); if(S.op==='yes'&&S.drain!=='yes'){ lines.push('Drain before you operate.'); bad=true; } if(S.drain!=='yes') bad=true; }
-  else if(infected && early){ title='Infected, under 4 weeks'; lines.push('Antibiotic.'); lines.push('Drain if needed, and delay the necrosectomy while the patient allows it.'); }
-  else if(infected){ title='Infected, walled off'; lines.push('Antibiotic, then drain.'); lines.push('Operate only if the drain fails.'); if(S.op==='yes'&&S.drain!=='yes'){ lines.push('Drain first.'); bad=true; } }
-  else { title='Symptomatic collection'; lines.push('Drain if it is causing a problem. Least invasive first.'); if(S.op==='yes'&&S.drain!=='yes'){ lines.push('Drain first.'); bad=true; } }
+  if(!infected && early && S.nec==='yes'){
+    title='Sterile, under 4 weeks';
+    lines.push('No prophylactic antibiotic.');
+    lines.push('Do not drain or operate yet.');
+    if(S.abx==='yes'||S.drain==='yes'||S.op==='yes'||S.open==='yes'){ lines.push('That is too early.'); bad=true; }
+  } else if(unstable){
+    title='Unstable';
+    lines.push('Antibiotic now.');
+    lines.push('Drain now, endoscopic or percutaneous.');
+    lines.push('Necrosectomy only if the drain fails. Open surgery last.');
+    if(S.drain!=='yes'||S.abx!=='yes') bad=true;
+    if(S.op==='yes'&&S.respond!=='no'){ lines.push('The drain has not failed yet.'); bad=true; }
+    if(S.open==='yes'&&S.op!=='yes'){ lines.push('Open surgery is last.'); bad=true; }
+  } else if(infected && early){
+    title='Infected, not walled off';
+    lines.push('Antibiotic.');
+    lines.push('Wait toward 4 weeks if the patient stays stable.');
+    lines.push('Drain earlier only if they deteriorate.');
+    if(S.open==='yes'){ lines.push('Not open surgery now.'); bad=true; }
+  } else if(infected){
+    title='Infected, walled off';
+    lines.push('Antibiotic, then drain.');
+    lines.push('If the drain fails, endoscopic or minimally invasive necrosectomy.');
+    lines.push('Open surgery only after that fails.');
+    if(S.drain!=='yes') bad=true;
+    if(S.op==='yes'&&S.respond!=='no'){ lines.push('Necrosectomy only after a failed drain.'); bad=true; }
+    if(S.open==='yes'&&!(S.op==='yes'&&S.respond==='no')){ lines.push('Open surgery is last.'); bad=true; }
+  } else {
+    title='Symptomatic collection';
+    lines.push('Drain the problem. Least invasive first.');
+    if(S.op==='yes'||S.open==='yes'){ lines.push('Do not operate first.'); bad=true; }
+  }
   return out(title, lines, bad);
 }
+function actBody(){
+  if(S.comp==='breath') return '<h2>Support</h2>'+chips('o2mode',[['o2','Oxygen'],['hfnc','High flow or mask'],['vent','Ventilator']]);
+  if(S.comp==='shock') return '<h2>Pressure still low</h2>'+yn('norepi','Start norepinephrine')+chips('source',[['nec','Infected necrosis'],['bleed','Bleeding'],['acs','Belly compartment'],['heart','Heart']]);
+  if(S.comp==='aki') return '<h2>Dialysis</h2>'+chips('whyrrt',[['none','No dialysis reason'],['k','High potassium'],['acid','Acid'],['flood','Fluid overload'],['urea','Uremia']])+yn('rrt','Dialyse');
+  if(S.comp==='acs') return '<h2>Bladder pressure</h2>'+box('iap','mmHg')+'<p class="hint">20 or more, with organ failure, is compartment.</p>';
+  if(S.comp==='vessel') return '<h2>Which one</h2>'+chips('vtype',[['clot','Vein clot'],['pseudo','Pseudoaneurysm']]);
+  if(S.comp==='gut') return '<h2>Which one</h2>'+chips('gutkind',[['bleed','Bleed'],['goo','Stomach blocked'],['duo','Duodenum blocked'],['colon','Colon'],['fistula','Fistula'],['perf','Perforation']]);
+  if(S.comp==='bileblock') return yn('stillblock','The duct is still blocked');
+  if(S.comp==='pleura') return yn('amylase','Pleural fluid amylase is high');
+  if(S.comp==='duct') return yn('stent','Stent the duct');
+  return '';
+}
+function actReady(){
+  if(S.comp==='breath') return !!S.o2mode;
+  if(S.comp==='shock') return !!S.norepi && !!S.source;
+  if(S.comp==='aki') return !!S.whyrrt && !!S.rrt;
+  if(S.comp==='acs') return num('iap')!=null;
+  if(S.comp==='vessel') return !!S.vtype;
+  if(S.comp==='gut') return !!S.gutkind;
+  if(S.comp==='bileblock') return !!S.stillblock;
+  if(S.comp==='pleura') return !!S.amylase;
+  if(S.comp==='duct') return !!S.stent;
+  return true;
+}
+function breathNeed(){
+  if(S.vent==='yes'||(num('spo2')!=null&&num('spo2')<88)||(num('rr')!=null&&num('rr')>=35)) return 'vent';
+  if(ofResp()||(num('spo2')!=null&&num('spo2')<94)) return 'hfnc';
+  return 'o2';
+}
 function actLive(){
-  var t={
-    breath:['Breathing','Give oxygen. If the work of breathing rises, ventilate. Look for a wet lung, a pleural effusion, and ARDS.'],
-    shock:['Shock','Fluid has not fixed the pressure. Start norepinephrine. Look for infected necrosis, bleeding, and belly compartment.'],
-    aki:['Kidneys','Restore the pressure. Stop kidney-toxic drugs. Dialyse only for the usual reasons.'],
-    acs:['Belly compartment','Urine falls and breathing worsens. Measure the bladder pressure. This is an ICU problem.'],
-    vessel:['Bleed or clot','Falling hemoglobin or a bleed. CT angiogram. Embolise a pseudoaneurysm. A clot is decided one patient at a time.'],
-    gut:['Gut','Block, bleed, or perforation. CT, then endoscopy, radiology, or surgery.'],
-    bileblock:['Bile duct','Jaundice or a blocked duct. Ultrasound, then MRCP or ERCP if it stays blocked.'],
-    pleura:['Pleural fluid','A large left effusion that returns. Check the amylase in the fluid.'],
-    duct:['Duct leak','A collection that keeps returning. MRCP. Stent the duct if it is leaking.']
-  };
-  var x=t[S.comp]||['',''];
-  return out(x[0], [x[1]], S.comp==='shock'||S.comp==='acs'||S.comp==='breath');
+  if(S.comp==='breath'&&S.o2mode){
+    var need=breathNeed();
+    var name={o2:'Oxygen', hfnc:'High flow or a mask', vent:'A ventilator'};
+    var bad=need==='vent'&&S.o2mode!=='vent' || need==='hfnc'&&S.o2mode==='o2';
+    return out(name[need], bad?['That support is not enough.']:['Match the support to the oxygen and the work of breathing.'], bad);
+  }
+  if(S.comp==='shock'&&S.norepi&&S.source){
+    var low=map()!=null&&map()<65;
+    var lines=[];
+    if(low && S.norepi!=='yes') lines.push('Start norepinephrine.');
+    else if(!low && S.norepi==='yes') lines.push('The pressure is already 65 or more.');
+    else lines.push(S.norepi==='yes'?'Norepinephrine is on.':'No pressor.');
+    var src={nec:'Look in the necrosis.', bleed:'Look for bleeding.', acs:'Measure the belly pressure.', heart:'Look at the heart.'};
+    lines.push(src[S.source]);
+    return out('Shock', lines, low&&S.norepi!=='yes');
+  }
+  if(S.comp==='aki'&&S.whyrrt&&S.rrt){
+    var dial=S.whyrrt!=='none';
+    var bad=dial!==(S.rrt==='yes');
+    return out(dial?'Dialyse':'Not yet', dial?['There is a reason to dialyse.']:['No potassium, acid, fluid, or uremia reason.'], bad);
+  }
+  if(S.comp==='acs'&&num('iap')!=null){
+    var p=num('iap');
+    if(p>=20) return out('Compartment', ['ICU. Stop extra fluid. Decompress if the pressure and the organs do not improve.'], true);
+    if(p>=12) return out('Pressure is up', ['Not compartment yet. Measure it again.']);
+    return out('Not compartment', []);
+  }
+  if(S.comp==='vessel'&&S.vtype){
+    if(S.vtype==='pseudo') return out('Pseudoaneurysm', ['CT angiogram, then embolise it.'], true);
+    return out('Vein clot', ['Decide anticoagulation one patient at a time. Do not anticoagulate active bleeding.']);
+  }
+  if(S.comp==='gut'&&S.gutkind){
+    var g={bleed:['Bleed','Endoscopy.'], goo:['Stomach blocked','Drain the collection that is pressing it.'], duo:['Duodenum blocked','CT, then relieve the block.'], colon:['Colon','Ischemia or blockage needs a surgical decision.'], fistula:['Fistula','Control sepsis, then the anatomy.'], perf:['Perforation','Surgery.']};
+    return out(g[S.gutkind][0], [g[S.gutkind][1]], S.gutkind==='perf'||S.gutkind==='colon');
+  }
+  if(S.comp==='bileblock'&&S.stillblock) return out(S.stillblock==='yes'?'ERCP':'No ERCP now', S.stillblock==='yes'?['The duct is still blocked.']:['Watch.']);
+  if(S.comp==='pleura'&&S.amylase) return out(S.amylase==='yes'?'Duct leak into the chest':'Not a pancreatic effusion', S.amylase==='yes'?['MRCP. Stent the duct if it is leaking.']:[]);
+  if(S.comp==='duct'&&S.stent) return out(S.stent==='yes'?'Stent the duct':'No stent', S.stent==='yes'?['The collection will keep returning without it.']:['Only if the duct is leaking.']);
+  return '';
 }
 function summary(){
   var lines=[];
@@ -351,14 +452,19 @@ function summary(){
   var ms=marshall(); if(ms) lines.push('Marshall '+ms.max+'.');
   if(S.cause) lines.push('Cause: '+S.cause+'.');
   if(bagName()) lines.push(bagName()+'.');
-  if(S.nec==='yes' && S.infected!=='yes' && S.weeks==='early') lines.push('Sterile necrosis under 4 weeks. No drain yet.');
-  if(S.infected==='yes' && S.stable==='no') lines.push('Unstable infected necrosis. Antibiotic and drain now.');
-  if(S.infected==='yes' && S.stable==='yes') lines.push('Infected necrosis. Antibiotic, then drain. Operate only if the drain fails.');
+  if(S.nec==='yes' && !isInfected() && S.weeks==='early') lines.push('Sterile necrosis under 4 weeks. No drain yet.');
+  if(isInfected() && S.stable==='no') lines.push('Unstable infected necrosis. Antibiotic and drain now.');
+  if(isInfected() && S.stable==='yes') lines.push('Infected necrosis. Antibiotic, then drain. Operate only if the drain fails.');
+  if(S.why==='goo') lines.push('The collection is blocking the stomach.');
+  if(S.why==='bleed'||S.vtype==='pseudo') lines.push('Embolise the bleeding vessel.');
+  if(S.o2mode==='vent') lines.push('Ventilate.');
+  if(S.norepi==='yes') lines.push('Norepinephrine.');
+  if(S.rrt==='yes') lines.push('Dialyse.');
+  if(num('iap')!=null && num('iap')>=20) lines.push('Abdominal compartment. Decompress if it does not fall.');
+  if(S.gutkind==='perf') lines.push('Perforation. Surgery.');
+  if(S.amylase==='yes'||S.stent==='yes') lines.push('Stent a leaking duct.');
+  if(S.stillblock==='yes') lines.push('The duct is still blocked. ERCP.');
   var score=ctsi(); if(score!=null) lines.push('CTSI '+score+'.');
-  if(S.comp && S.comp!=='none' && S.comp!=='collection'){
-    var act={breath:'Oxygen, and ventilate if the work of breathing rises.', shock:'Norepinephrine if fluid does not restore the pressure.', aki:'Restore perfusion. Dialyse only for the usual reasons.', acs:'Measure the bladder pressure.', vessel:'CT angiogram. Embolise a pseudoaneurysm.', gut:'CT for blockage, bleed, or perforation.', bileblock:'Ultrasound, then ERCP if the duct stays blocked.', pleura:'Check the amylase in the pleural fluid.', duct:'MRCP. Stent a leaking duct.'};
-    if(act[S.comp]) lines.push(act[S.comp]);
-  }
   if(severity()==='Severe' || S.check==='worse') lines.push('ICU.');
   if(S.cholangitis==='yes') lines.push('ERCP within 24 hours.');
   if(S.cause==='biliary' && severity()==='Mild') lines.push('Cholecystectomy this admission.');
@@ -430,6 +536,7 @@ function refresh(){
   if(id==='bile') html=bileLive();
   if(id==='comp') html=compLive();
   if(id==='bag') html=bagLive();
+  if(id==='bagwhy') html=bagWhyLive();
   if(id==='step') html=stepLive();
   if(id==='act') html=actLive();
   if(id==='fluid'){ path=fluidPath(); html=fluidNote(); var lab=document.getElementById('lrLab'); if(lab) lab.textContent=String(num('lr')||0); draw(); }
@@ -451,7 +558,7 @@ function show(){
 }
 document.getElementById('view').onclick=function(e){
   var b=e.target.closest('button'); if(!b) return;
-  if(b.id==='abx'||b.id==='drain'||b.id==='op'){ S[b.id]=S[b.id]==='yes'?'no':'yes'; show(); return; }
+  if(b.id==='abx'||b.id==='drain'||b.id==='op'||b.id==='open'){ S[b.id]=S[b.id]==='yes'?'no':'yes'; show(); return; }
   var box=b.closest('.chips'); if(!box) return;
   S[box.dataset.k]=b.dataset.v;
   show();
