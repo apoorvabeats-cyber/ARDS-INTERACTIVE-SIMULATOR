@@ -271,6 +271,14 @@ neurointerventional or local protocol decisions.
 <label>Time from symptom onset (hours)</label>
 <input id="onset" type="number" value="4">
 
+<label>Hydrocephalus</label>
+<select id="hydroState">
+<option value="">Not assessed</option>
+<option value="no">No</option>
+<option value="yes">Yes — consciousness stable</option>
+<option value="worse">Yes — consciousness falling</option>
+</select>
+
 <div class="check">
 <input id="thunder" type="checkbox" checked>
 <div>Thunderclap / sudden severe headache</div>
@@ -303,9 +311,7 @@ neurointerventional or local protocol decisions.
 
 <div class="card">
 <h2>2. Clinical Grading</h2>
-
-<label>GCS</label>
-<input id="gradeGcs" type="number" min="3" max="15" value="14">
+<p class="small">GCS is taken from the clinical tab. Change it there.</p>
 
 <label>Motor deficit (hemiparesis, hemiplegia, or aphasia)</label>
 <select id="gradeDeficit">
@@ -418,9 +424,7 @@ neurointerventional or local protocol decisions.
 <option value="moderate">Moderate</option>
 <option value="low">Low</option>
 </select>
-
-<label>Hours from onset</label>
-<input id="dxOnset" type="number" value="4">
+<p class="small">Hours from onset and GCS are taken from the clinical tab.</p>
 
 <div class="check">
 <input id="cta" type="checkbox">
@@ -444,9 +448,7 @@ neurointerventional or local protocol decisions.
 
 <div class="card">
 <h2>4. Pre-Aneurysm-Securing BP</h2>
-
-<label>Current SBP (mmHg)</label>
-<input id="bpValue" type="number" value="175">
+<p class="small">Systolic pressure is taken from the clinical tab.</p>
 
 <label>Neurological status</label>
 <select id="bpNeuro">
@@ -490,9 +492,7 @@ neurological status and complications such as DCI.</li>
 <option value="clipping">Microsurgical clipping</option>
 <option value="uncertain">Not yet determined</option>
 </select>
-
-<label>Hours since onset</label>
-<input id="aneurysmTime" type="number" value="6">
+<p class="small">Hours since onset are taken from the clinical tab.</p>
 
 <label>Location</label>
 <select id="anLoc">
@@ -622,11 +622,6 @@ Do not raise the blood pressure while the aneurysm is still open.
 </div>
 
 <div class="check">
-<input id="hydro" type="checkbox">
-<div>Hydrocephalus assessed</div>
-</div>
-
-<div class="check">
 <input id="eeg" type="checkbox">
 <div>EEG considered when clinically appropriate</div>
 </div>
@@ -748,11 +743,21 @@ function runClinical(){
   if(seizure){
     html+=box("danger","Seizure at onset","Treat the seizure. Continue an antiseizure drug for about 7 days. Do not use phenytoin. This is treatment, not a reason to start prophylaxis in every other patient.");
   }
+  html+=hydroBox();
   document.getElementById("clinicalResult").innerHTML=html;
 }
 
+function hydroBox(){
+  const h=document.getElementById("hydroState").value;
+  const gcs=num("gcs");
+  if(h==="worse" || (h==="yes" && gcs!==null && gcs<=8)) return box("danger","Hydrocephalus needs a drain","Consciousness is falling, or the GCS is 8 or lower, and the ventricles are enlarged. Place an external ventricular drain. Do not wait for the checklist.");
+  if(h==="yes") return box("warning","Hydrocephalus present","Get an urgent neurosurgical review. Drain the ventricles if they obstruct or the conscious level falls. A stable patient is not a reason to forget it.");
+  if(h==="") return box("warning","Hydrocephalus not assessed","Look at the ventricles before you call the intensive-care list complete.");
+  return box("good","No hydrocephalus on the current scan","Recheck the CT if the conscious level falls.");
+}
+
 function runGrading(){
-  const gcs=num("gradeGcs");
+  const gcs=num("gcs");
   const deficit=document.getElementById("gradeDeficit").value;
   const fisher=document.getElementById("fisher").value;
   let wfns="";
@@ -802,7 +807,7 @@ function runDiagnosis(){
   const suspicion=document.getElementById("suspicion").value;
   const cta=document.getElementById("cta").checked;
   const dsa=document.getElementById("dsa").checked;
-  const onset=num("dxOnset");
+  const onset=num("onset");
   const gcs=num("gcs");
   const intact=gcs===15 && !document.getElementById("deficit").checked;
   let html="";
@@ -832,7 +837,7 @@ function runDiagnosis(){
 }
 
 function runBP(){
-  const sbp=num("bpValue");
+  const sbp=num("sbp");
   const deteriorating=document.getElementById("bpNeuro").value==="deteriorating";
   let html="";
   if(sbp===null){
@@ -855,7 +860,7 @@ function runBP(){
 function runAneurysm(){
   const found=document.getElementById("aneurysmFound").value;
   const treatment=document.getElementById("aneurysmTreatment").value;
-  const time=num("aneurysmTime");
+  const time=num("onset");
   const loc=document.getElementById("anLoc").value;
   const fit=document.getElementById("anFit").value;
   const ich=document.getElementById("anIch").value;
@@ -880,20 +885,24 @@ function runAneurysm(){
   }else if(fit==="coil"){
     rec="coiling"; strict=true;
     why="This aneurysm is suitable for coiling and not for clipping. Coil it.";
-  }else if(loc==="posterior" && fit!=="wide"){
+  }else if(loc==="posterior" && fit==="both"){
     rec="coiling";
-    why="A posterior-circulation aneurysm that can be coiled is usually treated endovascularly.";
-  }else if(loc==="mca"){
+    why="Posterior circulation, and both methods can secure it. Coil it.";
+  }else if(loc==="posterior" && !fit){
+    why="Posterior-circulation aneurysms are often coiled, but only after the anatomy is shown to be coilable. An empty anatomy field is not that.";
+  }else if(loc==="mca" && fit){
     rec="clipping";
     why="MCA aneurysms are often clipped, particularly with a wide neck or a Sylvian hematoma. A narrow neck and no mass can still be coiled in experienced hands. That has to be an explicit team decision.";
   }else if(fit==="wide"){
     rec="clipping";
     why="A wide neck often needs clipping, or balloon-assisted coiling. Avoid an acute stent or a flow diverter unless nothing else will secure the aneurysm. Dual antiplatelet drugs raise the bleeding risk in the rupture period.";
-  }else if(fit==="both" || loc==="anterior"){
+  }else if(fit==="both" && loc==="anterior"){
     rec="coiling";
-    why="When both coiling and clipping will secure the aneurysm, coiling is preferred. That is the 2023 AHA/ASA recommendation, based on better functional outcome at 1 year in patients suitable for either method.";
+    why="Both methods can secure this anterior-circulation aneurysm, and it is not an MCA aneurysm. Coiling is then preferred for functional outcome at 1 year.";
+  }else if(fit==="both" && !loc){
+    why="Both methods are marked possible, but the location is blank. Do not lock in coiling until you know it is not an MCA aneurysm.";
   }else{
-    why="Enter the location, whether a coil or a clip can actually hold, and whether a hematoma needs to come out.";
+    why="Coiling is preferred only when both coiling and clipping can secure the aneurysm, and the location is anterior circulation other than the MCA. Enter the location and what the anatomy allows. An empty field is not a yes.";
   }
   html+=box(rec?"result":"warning", rec?("Usual recommendation: "+rec):"Anatomy incomplete", why);
 
@@ -942,6 +951,10 @@ function runDCI(){
   if(!euvolemia){
     html+=box("warning","Not euvolemic","Avoid hypovolemia. Do not run prophylactic hypervolemia, and do not fluid-restrict hyponatremia.");
   }
+  const h=document.getElementById("hydroState").value;
+  if((clinical || h==="worse") && h!=="no"){
+    html+=box(h==="worse"||h==="yes"?"danger":"warning","Check the ventricles before calling this DCI", h===""?"Hydrocephalus has not been assessed. A drain, not induced hypertension, is the treatment if the ventricles are obstructed.":"Hydrocephalus is already present. Treat that before you raise the blood pressure for vasospasm.");
+  }
   document.getElementById("dciResult").innerHTML=html;
 }
 
@@ -949,7 +962,6 @@ function runICU(){
   const checks=[
     ["neuroobs","Neurological monitoring"],
     ["volume","Euvolemia / hemodynamic monitoring"],
-    ["hydro","Hydrocephalus assessment"],
     ["eeg","EEG assessment"],
     ["vte","VTE prevention"],
     ["rehab","Recovery / rehabilitation planning"]
@@ -958,14 +970,16 @@ function runICU(){
   let completed=nimo?1:0;
   checks.forEach(function(item){ if(document.getElementById(item[0]).checked) completed++; });
   const total=checks.length+1;
-  let html="";
+  let html=hydroBox();
   if(!nimo){
     html+=box("danger","Nimodipine not started","This is the one drug that should be hard to miss. Give 60 mg enterally every 4 hours for 21 days unless it is truly not possible.");
   }
-  if(completed===total){
-    html+=box("good","ICU bundle completed","Nimodipine and the checklist are addressed. This does not clear hydrocephalus, seizures, or an unsecured aneurysm.");
+  if(document.getElementById("hydroState").value==="worse"){
+    html+=box("danger","Bundle is not the priority","Place the ventricular drain first.");
+  }else if(completed===total && document.getElementById("hydroState").value!==""){
+    html+=box("good","ICU bundle completed","Nimodipine and the checklist are addressed. This does not clear an unsecured aneurysm.");
   }else{
-    html+=box("warning","ICU bundle incomplete",completed+" of "+total+" items addressed.");
+    html+=box("warning","ICU bundle incomplete",completed+" of "+total+" checklist items addressed. Hydrocephalus is a separate decision, not a tick.");
   }
   document.getElementById("icuResult").innerHTML=html;
 }
