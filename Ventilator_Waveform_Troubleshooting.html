@@ -44,39 +44,42 @@
 <div id="app"></div>
 <script>
 const PRESETS = [
-  { id:"normal", name:"Normal volume control", mode:"VC", rr:14, vt:480, ti:1.0, peep:5, R:8, C:50, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, pinsp:14,
-    stem:"Routine postoperative patient. Comfortable, no alarms.",
-    tell:"Square inspiratory flow, pressure steps then rises, and expiratory flow returns to zero. Peak and plateau are close." },
-  { id:"pc", name:"Normal pressure control", mode:"PC", rr:16, vt:420, ti:1.0, peep:8, R:8, C:45, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, pinsp:14,
-    stem:"Pressure-control breath. The set pressure is square. Flow should decelerate.",
-    tell:"Square pressure, decelerating flow. Flow near zero at the end of inspiration means the lung has equilibrated with the set pressure." },
-  { id:"resistance", name:"High resistance", mode:"VC", rr:14, vt:500, ti:1.0, peep:5, R:28, C:50, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, pinsp:14,
-    stem:"Wheeze after intubation. Peak pressure is alarming. Plateau is not.",
-    tell:"Large peak-to-plateau gap. Expiratory flow is scooped and slow. Think bronchospasm, secretions, a kink, or the patient biting — not a stiff lung." },
-  { id:"compliance", name:"Low compliance", mode:"VC", rr:18, vt:400, ti:0.9, peep:10, R:8, C:18, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, pinsp:18,
+  { id:"normal", name:"Normal volume control", mode:"VC", rr:14, vt:480, ti:1.0, peep:5, R:8, C:50, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, fight:0, pinsp:14,
+    stem:"No alarm. Use this as the reference breath.",
+    tell:"Pressure rises after a small step, and peak is close to plateau. Flow is square in inspiration and returns to zero before the next breath. Volume returns to the baseline. Nothing to change." },
+  { id:"pc", name:"Normal pressure control", mode:"PC", rr:16, vt:420, ti:1.0, peep:8, R:8, C:45, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, fight:0, pinsp:14,
+    stem:"Pressure-control breath. Compare the shape with volume control.",
+    tell:"Pressure is square. Flow decelerates and is near zero at the end of inspiration, so the lung has met the set pressure. Volume rises fast, then flattens, and returns to the baseline." },
+  { id:"resistance", name:"High resistance", mode:"VC", rr:14, vt:500, ti:1.0, peep:5, R:28, C:50, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, fight:0, pinsp:14,
+    stem:"Wheeze after intubation. The peak-pressure alarm is on. Plateau is not high.",
+    tell:"Pressure: a large gap from peak to plateau. Flow: inspiration is still square, but expiration is scooped and slow. Volume still returns unless the next breath arrives first. Bronchospasm, a kink, biting, or a small tube. Not a stiff lung. Treat the airway. Do not start by cutting the tidal volume." },
+  { id:"compliance", name:"Low compliance", mode:"VC", rr:18, vt:400, ti:0.9, peep:10, R:8, C:18, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, fight:0, pinsp:18,
     stem:"Peak and plateau are both high. The gap between them is small.",
-    tell:"Elastic pressure is the problem. Pressure climbs steeply for the volume delivered. ARDS, pneumothorax, mainstem intubation, and abdominal distension all look like this. The waveform does not name which one." },
-  { id:"autopeep", name:"Auto-PEEP", mode:"VC", rr:26, vt:560, ti:1.0, peep:5, R:22, C:55, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, pinsp:14,
-    stem:"COPD. The rate was turned up for a low pH. Expiratory flow never rests.",
-    tell:"The next breath starts before flow reaches zero. Volume is still trapped. Intrinsic PEEP is set PEEP plus what is left in the lung. Give more time to exhale: lower the rate, shorten inspiration." },
-  { id:"leak", name:"Leak", mode:"VC", rr:14, vt:500, ti:1.0, peep:5, R:10, C:45, leak:0.55, starve:0, saw:0, miss:0, double:0, beak:0, pinsp:14,
+    tell:"Pressure climbs steeply and plateau is high. Expiratory flow is brisk and reaches zero. Volume is the set tidal volume and returns to baseline. Stiff lung or chest wall: ARDS, edema, pneumothorax, mainstem intubation, or the abdomen. The traces do not say which. Examine the chest." },
+  { id:"autopeep", name:"Auto-PEEP", mode:"VC", rr:26, vt:560, ti:1.0, peep:5, R:22, C:55, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, fight:0, pinsp:14,
+    stem:"COPD. The rate was turned up for a low pH. The patient cannot finish exhaling.",
+    tell:"Flow is still negative when the next breath starts. Volume has not reached the baseline. The next pressure breath starts on a lung that is still full. Lower the rate and shorten inspiration." },
+  { id:"leak", name:"Leak", mode:"VC", rr:14, vt:500, ti:1.0, peep:5, R:10, C:45, leak:0.55, starve:0, saw:0, miss:0, double:0, beak:0, fight:0, pinsp:14,
     stem:"Exhaled tidal volume is much smaller than inhaled. Pressure is ordinary.",
-    tell:"The volume trace does not return to zero, and exhaled volume is smaller than inhaled. Look for a cuff leak, a disconnected circuit, or a chest tube bubbling off the tidal volume." },
-  { id:"beak", name:"Overdistension", mode:"VC", rr:16, vt:720, ti:1.1, peep:5, R:8, C:28, leak:0, starve:0, saw:0, miss:0, double:0, beak:1, pinsp:14,
-    stem:"Large tidal volume on a stiff lung. Pressure turns up at the end of the breath.",
-    tell:"The last part of the breath costs a lot of pressure and little extra volume. Drop the tidal volume. This is how ventilator-induced lung injury starts." },
-  { id:"starve", name:"Flow starvation", mode:"VC", rr:18, vt:450, ti:1.15, peep:5, R:10, C:40, leak:0, starve:1, saw:0, miss:0, double:0, beak:0, pinsp:14,
-    stem:"Awake, air hunger, the inspiratory pressure curve caves in.",
-    tell:"The patient wants flow the ventilator is not giving. In volume control the pressure scoop means unmet demand. Raise the flow, lengthen inspiration less, or switch to a pressure mode." },
-  { id:"saw", name:"Secretions", mode:"VC", rr:16, vt:460, ti:0.95, peep:6, R:14, C:40, leak:0, starve:0, saw:1, miss:0, double:0, beak:0, pinsp:14,
-    stem:"A rattle in the circuit. The flow line is jagged.",
-    tell:"Sawtooth oscillations on flow and pressure are secretions or water in the tubing. Suction the patient, not the settings." },
-  { id:"miss", name:"Ineffective trigger", mode:"VC", rr:22, vt:500, ti:0.9, peep:5, R:24, C:50, leak:0, starve:0, saw:0, miss:1, double:0, beak:0, pinsp:14,
-    stem:"COPD, uncomfortable. Small efforts do not start a breath.",
-    tell:"Pressure dips without a delivered breath. Auto-PEEP is usually the reason: the patient cannot drop airway pressure enough to trigger. Treat the trapping, or add a little set PEEP to help triggering." },
-  { id:"double", name:"Double trigger", mode:"VC", rr:16, vt:480, ti:0.7, peep:5, R:8, C:45, leak:0, starve:0, saw:0, miss:0, double:1, beak:0, pinsp:14,
-    stem:"Two breaths fire back to back. The exhaled volume of the pair is huge.",
-    tell:"The first breath ended while the patient was still inspiring, so a second breath stacked. Volume is delivered twice. Lengthen inspiration or raise the flow so one breath satisfies the effort." },
+    tell:"Volume falls during expiration but does not reach the baseline, then jumps when the next breath resets it. Expiratory flow is smaller than inspiratory flow. Pressure looks ordinary. Cuff, circuit, or a chest tube bubbling the tidal volume away." },
+  { id:"beak", name:"Overdistension", mode:"VC", rr:16, vt:720, ti:1.1, peep:5, R:8, C:28, leak:0, starve:0, saw:0, miss:0, double:0, beak:1, fight:0, pinsp:14,
+    stem:"Large tidal volume on a stiff lung. Pressure turns up at the end.",
+    tell:"Pressure hooks upward at the end of inspiration. Flow is still the square volume-control flow. Volume is large. The last millilitres cost too much pressure. Drop the tidal volume." },
+  { id:"starve", name:"Flow starvation", mode:"VC", rr:18, vt:450, ti:1.15, peep:5, R:10, C:40, leak:0, starve:1, saw:0, miss:0, double:0, beak:0, fight:0, pinsp:14,
+    stem:"Awake and air hungry. The inspiratory pressure curve caves in.",
+    tell:"Pressure scoops down in the middle of inspiration. Flow stays square because volume control will not give more. Volume keeps rising. Raise the inspiratory flow, or change to a pressure mode." },
+  { id:"saw", name:"Secretions", mode:"VC", rr:16, vt:460, ti:0.95, peep:6, R:14, C:40, leak:0, starve:0, saw:1, miss:0, double:0, beak:0, fight:0, pinsp:14,
+    stem:"A rattle in the circuit. Flow and pressure are jagged.",
+    tell:"Sawtooth oscillations sit on flow and on pressure. Volume is otherwise one breath. Secretions or water in the tubing. Suction the airway and drain the circuit." },
+  { id:"miss", name:"Ineffective trigger", mode:"VC", rr:22, vt:500, ti:0.9, peep:5, R:24, C:50, leak:0, starve:0, saw:0, miss:1, double:0, beak:0, fight:0, pinsp:14,
+    stem:"COPD, uncomfortable. Efforts are visible. Breaths are not.",
+    tell:"Pressure dips and flow makes a small bump, but volume does not rise. The patient could not trigger through auto-PEEP. Treat the trapping. A little set PEEP can close the trigger gap. Do not only make the trigger more sensitive." },
+  { id:"double", name:"Double trigger", mode:"VC", rr:16, vt:480, ti:0.7, peep:5, R:8, C:45, leak:0, starve:0, saw:0, miss:0, double:1, beak:0, fight:0, pinsp:14,
+    stem:"Two breaths fire with almost no expiration between them.",
+    tell:"Pressure, flow, and volume each show a second breath stacked on the first. The exhaled volume of the pair is about twice the set tidal volume. Lengthen inspiration or raise the flow so one breath is enough." },
+  { id:"cycle", name:"Delayed cycling", mode:"PC", rr:16, vt:420, ti:1.45, peep:5, R:8, C:40, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, fight:1, pinsp:14,
+    stem:"The ventilator is still inflating after the patient has started to exhale.",
+    tell:"Pressure spikes at the end of inspiration. Flow is cut off, and may reverse, while the breath is still inspiratory. Volume flattens, then the breath finally releases. Shorten the inspiratory time. In pressure support, cycle earlier." },
 ];
 
 let screen = "explore";
@@ -116,16 +119,21 @@ function generate(c) {
       if (c.starve && phase > Ti * 0.12 && phase < Ti * 0.88) {
         effort = 14 * Math.sin(Math.PI * (phase - Ti * 0.12) / (Ti * 0.76));
       }
+      if (c.fight && phase > Ti * 0.7) {
+        const u = (phase - Ti * 0.7) / (Ti * 0.3);
+        effort = -12 * u;
+        flow = Math.max(-0.45, flow - 0.7 * u);
+      }
     } else {
       const trueFlow = -Math.max(0, lung / C) / R;
       const seen = trueFlow * (1 - c.leak);
       lung = Math.max(0, lung + trueFlow * 1000 * dt);
       meas = Math.max(0, meas + seen * 1000 * dt);
       flow = seen;
-      if (c.miss && phase > Ti + 0.28 && phase < Ti + 0.48) {
-        const u = (phase - (Ti + 0.28)) / 0.2;
-        effort = 6 * Math.sin(Math.PI * u);
-        flow += 0.18 * Math.sin(Math.PI * u);
+      if (c.miss && phase > Ti + 0.34 && phase < Ti + 0.64) {
+        const u = (phase - (Ti + 0.34)) / 0.3;
+        effort = 7 * Math.sin(Math.PI * u);
+        flow += 0.28 * Math.sin(Math.PI * u);
       }
     }
     let paw = c.peep + flow * R + lung / C - effort;
@@ -134,8 +142,8 @@ function generate(c) {
       paw += 22 * x * x;
     }
     if (c.saw) {
-      paw += 1.3 * Math.sin(t * 78);
-      flow += 0.12 * Math.sin(t * 78);
+      paw += 2.6 * Math.sin(t * 95);
+      flow += 0.32 * Math.sin(t * 95);
     }
     if (t >= warm) all.push({ t: t - warm, paw, flow: flow * 60, meas, lung });
   }
@@ -280,6 +288,7 @@ function drawUI() {
     <div class="row" id="presets">${PRESETS.map((p) => `<button data-id="${p.id}" class="${p.id===cfg.id?"on":""}">${p.name}</button>`).join("")}</div>
     <h2>Pressure, flow, volume</h2>
     <canvas id="scalars"></canvas>
+    <div class="panel"><b>What the three traces show</b><p style="margin-top:6px">Pressure: peak versus plateau, a dip with no breath, or a spike at the end of inspiration.</p><p style="margin-top:6px">Flow: square or decelerating, expiration that never reaches zero, or a sawtooth.</p><p style="margin-top:6px">Volume: back to the baseline, short of it, or two breaths stacked.</p></div>
     <div class="nums" id="nums"></div>
     <div class="panel" id="tell"></div>
     <h2>Change the breath</h2>
@@ -357,6 +366,7 @@ function drawQuiz() {
     <h2>Pressure, flow, volume</h2>
     <canvas id="scalars"></canvas>
     <span id="s-rr" hidden>${cfg.rr}</span>
+    <div class="panel"><b>What the three traces show</b><p style="margin-top:6px">Pressure: peak versus plateau, a dip with no breath, or a spike at the end of inspiration.</p><p style="margin-top:6px">Flow: square or decelerating, expiration that never reaches zero, or a sawtooth.</p><p style="margin-top:6px">Volume: back to the baseline, short of it, or two breaths stacked.</p></div>
     <div class="nums" id="nums"></div>
     <h2>Diagnosis</h2>
     <div class="row" id="opts"></div>
