@@ -313,6 +313,16 @@ neurointerventional or local protocol decisions.
 <option value="yes">Yes</option>
 </select>
 
+<label>Modified Fisher grade</label>
+<select id="fisher">
+<option value="">Not entered</option>
+<option value="0">0 — no SAH</option>
+<option value="1">1 — thin SAH, no IVH</option>
+<option value="2">2 — thin SAH plus IVH</option>
+<option value="3">3 — thick SAH, no IVH</option>
+<option value="4">4 — thick SAH plus IVH</option>
+</select>
+
 <button class="primary" onclick="runGrading()">CALCULATE CLINICAL GRADE</button>
 
 <div id="gradingResult"></div>
@@ -349,6 +359,9 @@ clinical picture.
 <option value="moderate">Moderate</option>
 <option value="low">Low</option>
 </select>
+
+<label>Hours from onset</label>
+<input id="dxOnset" type="number" value="4">
 
 <div class="check">
 <input id="cta" type="checkbox">
@@ -449,6 +462,13 @@ treatment preferably within 24 hours when feasible.
 <label>Days after hemorrhage</label>
 <input id="dciDay" type="number" value="7">
 
+<label>Aneurysm already secured?</label>
+<select id="secured">
+<option value="no">No</option>
+<option value="yes">Yes</option>
+<option value="unknown">Not known</option>
+</select>
+
 <div class="check">
 <input id="newDeficit" type="checkbox">
 <div>New focal neurological deficit</div>
@@ -478,8 +498,8 @@ treatment preferably within 24 hours when feasible.
 <h2>Prevention / Management Principles</h2>
 
 <div class="good">
-<b>Nimodipine:</b> early enteral nimodipine is recommended for patients
-with aSAH to reduce DCI and improve functional outcome.
+<b>Nimodipine:</b> 60 mg enterally every 4 hours for 21 days, started early.
+If the blood pressure falls, give 30 mg every 2 hours. Do not stop it as the first move.
 </div>
 
 <div class="warning">
@@ -488,8 +508,9 @@ euvolemia and monitor closely for neurological deterioration.
 </div>
 
 <div class="danger">
-For symptomatic DCI, hemodynamic augmentation may be considered under
-specialist neurocritical-care supervision after excluding other causes.
+For symptomatic DCI, after the aneurysm is secured and other causes are excluded,
+induced hypertension may be used under neurocritical-care supervision.
+Do not raise the blood pressure while the aneurysm is still open.
 </div>
 
 </div>
@@ -561,6 +582,14 @@ Phenytoin should generally be avoided for seizure prophylaxis because of
 its association with excess morbidity.
 </p>
 
+<p>
+Do not give routine tranexamic acid. It does not improve outcome after aneurysmal SAH.
+</p>
+
+<p>
+Hyponatremia is common. Do not fluid-restrict. Distinguish SIADH from cerebral salt wasting and keep the patient euvolemic.
+</p>
+
 </div>
 
 </section>
@@ -596,175 +625,178 @@ function box(type,title,text){
   return '<div class="'+type+'"><b>'+title+'</b><br>'+text+'</div>';
 }
 
+function num(id){
+  const raw=(document.getElementById(id).value||"").trim();
+  if(raw==="") return null;
+  const x=Number(raw);
+  return Number.isFinite(x)?x:null;
+}
+function gcsOk(g){return g!==null && g>=3 && g<=15}
+
 function runClinical(){
-
-  const gcs=Number(document.getElementById("gcs").value);
-  const sbp=Number(document.getElementById("sbp").value);
-  const onset=Number(document.getElementById("onset").value);
-
+  const gcs=num("gcs"), sbp=num("sbp"), onset=num("onset");
+  const thunder=document.getElementById("thunder").checked;
+  const seizure=document.getElementById("seizure").checked;
   let html="";
-
-  if(gcs<=8){
-    html+=box("danger","High clinical severity",
-      "GCS ≤8 indicates markedly impaired consciousness and should trigger immediate neurocritical-care escalation.");
+  if(!gcsOk(gcs)){
+    html+=box("danger","GCS not usable","Enter a GCS from 3 to 15. A blank or impossible score is not a mild SAH.");
+  }else if(gcs<=8){
+    html+=box("danger","High clinical severity","GCS ≤8 needs an airway decision and immediate neurocritical-care escalation.");
   }else if(gcs<=12){
-    html+=box("warning","Moderate–severe neurological impairment",
-      "Frequent neurological reassessment and specialist neurocritical-care management are required.");
+    html+=box("warning","Moderate–severe neurological impairment","Frequent neurological reassessment and specialist neurocritical-care management are required.");
   }else{
-    html+=box("good","Relatively preserved consciousness",
-      "Continue structured neurological assessment and urgent definitive diagnostic evaluation.");
+    html+=box("good","Relatively preserved consciousness","Continue structured neurological assessment and urgent definitive diagnostic evaluation.");
   }
-
-  if(sbp>=160){
-    html+=box("warning","Elevated SBP",
-      "Avoid severe hypertension while avoiding hypotension and excessive BP variability before the aneurysm is secured.");
+  if(sbp!==null && sbp>=160){
+    html+=box("warning","Elevated SBP","Before the aneurysm is secured, treat severe hypertension without causing hypotension. The 2023 guideline does not set one mandatory systolic number.");
   }
-
-  if(onset<=24){
-    html+=box("good","Early presentation",
-      "Prompt aneurysm identification and definitive treatment are priorities.");
+  if(onset===null){
+    html+=box("warning","Onset time missing","The CT rule and the 24-hour treatment window both depend on the clock.");
+  }else if(onset<=6){
+    html+=box("good","Inside 6 hours","A high-quality negative CT in this window can make SAH unlikely only if the patient is intact. A positive CT should go straight to aneurysm imaging. Secure a ruptured aneurysm preferably within 24 hours.");
+  }else if(onset<=24){
+    html+=box("warning","Past 6 hours, still inside 24","A negative CT no longer clears SAH. Aneurysm treatment is still preferred within 24 hours of onset.");
+  }else{
+    html+=box("warning","Later than 24 hours","Do not stop the work-up. Rebleeding risk continues until the aneurysm is secured, and a late negative CT is not reassurance.");
   }
-
+  if(!thunder){
+    html+=box("warning","No thunderclap entered","Absence of a classic thunderclap does not exclude SAH.");
+  }
+  if(seizure){
+    html+=box("danger","Seizure at onset","Treat the seizure. Continue an antiseizure drug for about 7 days. Do not use phenytoin. This is treatment, not a reason to start prophylaxis in every other patient.");
+  }
   document.getElementById("clinicalResult").innerHTML=html;
 }
 
 function runGrading(){
-
-  const gcs=Number(document.getElementById("gradeGcs").value);
+  const gcs=num("gradeGcs");
   const deficit=document.getElementById("gradeDeficit").value;
-
+  const fisher=document.getElementById("fisher").value;
   let wfns="";
-
-  if(gcs===15 && deficit==="no") wfns="WFNS 1";
-  else if(gcs===13 || gcs===14) wfns="WFNS 2";
-  else if(gcs===13 && deficit==="yes") wfns="WFNS 3";
-  else if(gcs>=7 && gcs<=12) wfns="WFNS 4";
-  else if(gcs<=6) wfns="WFNS 5";
-  else wfns="Use clinical judgement and verify grading criteria.";
-
+  if(!gcsOk(gcs)) wfns="Enter a GCS from 3 to 15.";
+  else if(gcs===15 && deficit==="no") wfns="WFNS I";
+  else if(gcs===15 && deficit==="yes") wfns="GCS 15 with a focal deficit does not fit WFNS I, which requires no motor deficit. Confirm that the motor exam really leaves the GCS at 15.";
+  else if((gcs===13||gcs===14) && deficit==="no") wfns="WFNS II";
+  else if((gcs===13||gcs===14) && deficit==="yes") wfns="WFNS III";
+  else if(gcs>=7 && gcs<=12) wfns="WFNS IV";
+  else wfns="WFNS V";
+  let fish="";
+  if(fisher==="3"||fisher==="4") fish="<br>Modified Fisher "+fisher+": thick SAH. The risk of delayed cerebral ischemia is higher. This grade does not itself order surgery or induced hypertension.";
+  else if(fisher==="1"||fisher==="2") fish="<br>Modified Fisher "+fisher+": thin SAH. DCI is less likely than with thick blood, and it is not zero.";
+  else if(fisher==="0") fish="<br>Modified Fisher 0: no SAH on this description.";
+  else fish="<br>Modified Fisher was not entered, so the CT blood burden is not in the grade.";
   document.getElementById("gradingResult").innerHTML=
-    box("result","Clinical grade estimate",wfns+
-    "<br><span class='small'>This is a simplified educational grading aid. Apply the formal grading system and clinical examination in practice.</span>");
+    box("result","Clinical grade",wfns+fish+"<br><span class='small'>WFNS II is GCS 13–14 without a motor deficit. WFNS III is GCS 13–14 with a motor deficit.</span>");
 }
 
 function runDiagnosis(){
-
   const ct=document.getElementById("ctResult").value;
   const suspicion=document.getElementById("suspicion").value;
   const cta=document.getElementById("cta").checked;
-
+  const dsa=document.getElementById("dsa").checked;
+  const onset=num("dxOnset");
+  const gcs=num("gcs");
+  const intact=gcs===15 && !document.getElementById("deficit").checked;
   let html="";
-
+  if(onset===null){
+    html+=box("warning","Hours missing","Enter hours from onset. A negative CT means different things before and after 6 hours.");
+  }
   if(ct==="positive"){
-    html+=box("good","SAH pathway activated",
-      "CT findings compatible with SAH should lead to urgent aneurysm-source evaluation and specialist management.");
+    html+=box("danger","SAH on CT","This is aneurysmal SAH until the vessel study says otherwise. Go to CTA or DSA now. Do not wait on a lumbar puncture.");
+    if(!cta && !dsa) html+=box("danger","No vessel study","The aneurysm has not been looked for.");
+    if(dsa) html+=box("good","DSA","Catheter angiography is the reference study when CTA is negative or the anatomy is unclear.");
+    else if(cta) html+=box("result","CTA only","If CTA does not show an aneurysm and the blood is not a classic perimesencephalic pattern, the next study is DSA.");
   }else if(ct==="equivocal"){
-    html+=box("warning","Further diagnostic evaluation required",
-      "Do not dismiss SAH when clinical suspicion remains significant. Use an appropriate diagnostic pathway.");
+    html+=box("warning","Equivocal CT","Do not clear SAH. Use the timing: within 6 hours, have an experienced reader review it; after 6 hours, add lumbar puncture or CTA.");
+  }else if(onset!==null && onset<=6 && intact && suspicion!=="high"){
+    html+=box("good","Negative CT within 6 hours, intact patient","A high-quality noncontrast CT, read by an experienced radiologist, makes aneurysmal SAH unlikely. This clearance fails if the scan is poor, the story is still a classic thunderclap you do not trust, or the patient is not neurologically intact.");
+  }else if(onset!==null && onset<=6 && intact && suspicion==="high"){
+    html+=box("warning","Negative early CT, but suspicion stays high","The 6-hour rule needs a trusted scan and a trusted read. If either is in doubt, do not send the patient out. Use CTA or lumbar puncture.");
+  }else if(onset!==null && onset<=6 && !intact){
+    html+=box("danger","Negative CT, patient not intact","The 6-hour clearance is for an intact patient. Reduced consciousness or a focal deficit still needs vessel imaging and a search for another cause.");
+  }else if(onset===null){
+    html+=box("warning","Negative CT, clock unknown","Do not clear SAH until you know whether the scan was within 6 hours and whether the patient is intact.");
   }else{
-    if(suspicion==="high"){
-      html+=box("warning","High clinical suspicion despite negative CT",
-        "Further evaluation may be required depending on timing, CT quality, expertise and the clinical scenario.");
-    }else{
-      html+=box("good","No SAH identified on current pathway",
-        "Interpret imaging in the context of clinical presentation and timing.");
-    }
+    html+=box("danger","Negative CT after 6 hours does not clear SAH","Next is lumbar puncture, looking for xanthochromia, or CTA if lumbar puncture cannot be done. Do not discharge a moderate or high suspicion on this scan.");
+    if(suspicion==="low") html+=box("warning","Suspicion was marked low","A low-suspicion label does not repair a late negative CT if the history is a sudden severe headache.");
   }
-
-  if(cta){
-    html+=box("result","Vascular imaging",
-      "CTA information is available for aneurysm-source assessment.");
-  }
-
   document.getElementById("diagnosisResult").innerHTML=html;
 }
 
 function runBP(){
-
-  const sbp=Number(document.getElementById("bpValue").value);
+  const sbp=num("bpValue");
+  const deteriorating=document.getElementById("bpNeuro").value==="deteriorating";
   let html="";
-
-  if(sbp>=180){
-    html+=box("danger","Marked hypertension",
-      "Use a controlled, titratable BP strategy and avoid abrupt excessive reductions.");
+  if(sbp===null){
+    html+=box("danger","No systolic pressure","Enter the SBP.");
+  }else if(sbp>=180){
+    html+=box("danger","Marked hypertension before securing","Lower it in a controlled way with a titratable IV drug. There is no mandatory 2023 target. Do not crash the pressure.");
   }else if(sbp>=160){
-    html+=box("warning","Elevated BP",
-      "Consider controlled BP management while avoiding hypotension and large BP fluctuations.");
+    html+=box("warning","SBP in the 160s or 170s","Avoid swings. A practical hold under 160 mmHg is common, but it is a unit practice, not a guideline number. Do not accept hypotension.");
   }else if(sbp<100){
-    html+=box("danger","Potential hypotension",
-      "Avoid hypotension and evaluate cerebral and systemic perfusion immediately.");
+    html+=box("danger","Hypotension","Find the cause and restore perfusion. A low pressure is not a successful blood-pressure strategy.");
   }else{
-    html+=box("good","No marked BP abnormality",
-      "Continue close monitoring and individualized BP management.");
+    html+=box("good","No marked abnormality on the pre-securing page","Keep watching. This page is for the unsecured aneurysm, not for delayed ischemia.");
   }
-
+  if(deteriorating){
+    html+=box("danger","Deteriorating before the aneurysm is secured","Think rebleeding, hydrocephalus, and seizure before you attribute this to vasospasm. Do not start induced hypertension while the aneurysm is open.");
+  }
   document.getElementById("bpResult").innerHTML=html;
 }
 
 function runAneurysm(){
-
   const found=document.getElementById("aneurysmFound").value;
   const treatment=document.getElementById("aneurysmTreatment").value;
-  const time=Number(document.getElementById("aneurysmTime").value);
-
+  const time=num("aneurysmTime");
   let html="";
-
   if(found==="yes"){
-    html+=box("good","Ruptured aneurysm identified",
-      "Urgent multidisciplinary assessment for definitive aneurysm occlusion is indicated.");
-
-    if(time<=24){
-      html+=box("good","Within the preferred early-treatment window",
-        "The 2023 AHA/ASA guideline recommends prompt treatment, preferably within 24 hours when feasible.");
-    }
-
-    if(treatment==="coiling"){
-      html+=box("result","Endovascular strategy selected",
-        "Confirm suitability with the neurointerventional team and aneurysm anatomy.");
-    }else if(treatment==="clipping"){
-      html+=box("result","Microsurgical strategy selected",
-        "Confirm suitability with the neurosurgical team and aneurysm anatomy.");
-    }else{
-      html+=box("warning","Definitive strategy not selected",
-        "Treatment choice should be determined by experienced multidisciplinary specialists.");
-    }
+    html+=box("danger","Ruptured aneurysm identified","Secure it. Coiling or clipping is a specialist choice based on anatomy and the team, not on a default.");
+    if(time===null) html+=box("warning","Clock missing","The preferred window is within 24 hours of onset.");
+    else if(time<=24) html+=box("good","Inside 24 hours","This is the preferred window. Do not add routine tranexamic acid while you wait.");
+    else html+=box("warning","Later than 24 hours","The preferred window has passed. Secure it as soon as it can be done. Rebleeding does not stop at 24 hours.");
+    if(treatment==="uncertain") html+=box("warning","No method chosen","The multidisciplinary team has to choose. Leaving it blank is not a plan.");
   }else{
-    html+=box("warning","Aneurysm source not yet identified",
-      "Continue appropriate vascular imaging and specialist evaluation.");
+    html+=box("warning","No aneurysm identified yet","CT-positive SAH with a negative CTA still needs DSA unless the pattern is classic perimesencephalic and the study was adequate. A first negative DSA is often repeated.");
   }
-
   document.getElementById("aneurysmResult").innerHTML=html;
 }
 
 function runDCI(){
-
+  const day=num("dciDay");
   const deficit=document.getElementById("newDeficit").checked;
-  const gcs=document.getElementById("dropGcs").checked;
-  const vasospasm=document.getElementById("vasospasm").checked;
+  const drop=document.getElementById("dropGcs").checked;
+  const spasm=document.getElementById("vasospasm").checked;
   const euvolemia=document.getElementById("euvolemia").checked;
-
+  const secured=document.getElementById("secured").value;
+  const clinical=deficit||drop;
   let html="";
-
-  if(deficit || gcs || vasospasm){
-    html+=box("danger","Possible DCI / vasospasm",
-      "Urgently assess for DCI and alternative causes of neurological deterioration. Consider appropriate cerebral imaging and specialist management.");
+  if(day===null){
+    html+=box("warning","Day missing","DCI is a day-3 to day-14 illness. A day-1 decline is usually rebleeding, hydrocephalus, or a seizure.");
+  }else if(clinical && day<3){
+    html+=box("danger","Too early for DCI","A new deficit in the first 2 days is rebleeding, hydrocephalus, seizure, or sodium until those are excluded. Do not treat day 1 as vasospasm, and do not raise the blood pressure for it.");
+  }else if(clinical && day<=14){
+    html+=box("danger","Clinical DCI window","New deficit or a drop in consciousness on days 3–14 can be delayed ischemia after hydrocephalus, rebleeding, seizure, and sodium are excluded.");
+    if(secured==="yes") html+=box("warning","Aneurysm secured","Induced hypertension can be considered. Keep euvolemia. Do not use prophylactic hypervolemia.");
+    else if(secured==="no") html+=box("danger","Aneurysm not secured","Do not induce hypertension. Secure the aneurysm first.");
+    else html+=box("warning","Securing status unknown","Do not raise the blood pressure until you know the aneurysm is closed.");
+  }else if(clinical && day>14){
+    html+=box("warning","Outside the usual DCI window","Delayed ischemia is uncommon after day 14. Look again for infection, sodium, hydrocephalus, and seizures.");
+  }else if(spasm && !clinical){
+    html+=box("warning","Picture of vasospasm without a new deficit","Radiographic vasospasm is not delayed cerebral ischemia. Watch the examination. Do not start induced hypertension for a picture alone.");
   }else{
-    html+=box("good","No current DCI trigger selected",
-      "Continue frequent neurological monitoring because DCI can develop after the initial hemorrhage.");
+    html+=box("good","No DCI trigger selected","Keep examining the patient. The risk is highest from day 3 to day 14.");
   }
-
+  if(spasm && clinical && day!==null && day>=3 && day<=14){
+    html+=box("result","Vasospasm on imaging","Imaging supports the clinical diagnosis. It does not replace the examination.");
+  }
   if(!euvolemia){
-    html+=box("warning","Volume status requires attention",
-      "Avoid hypovolemia and routine prophylactic hypervolemia; goal-directed euvolemia is preferred.");
+    html+=box("warning","Not euvolemic","Avoid hypovolemia. Do not run prophylactic hypervolemia, and do not fluid-restrict hyponatremia.");
   }
-
   document.getElementById("dciResult").innerHTML=html;
 }
 
 function runICU(){
-
   const checks=[
-    ["nimodipine","Nimodipine"],
     ["neuroobs","Neurological monitoring"],
     ["volume","Euvolemia / hemodynamic monitoring"],
     ["hydro","Hydrocephalus assessment"],
@@ -772,24 +804,19 @@ function runICU(){
     ["vte","VTE prevention"],
     ["rehab","Recovery / rehabilitation planning"]
   ];
-
-  let completed=0;
-
-  checks.forEach(function(item){
-    if(document.getElementById(item[0]).checked) completed++;
-  });
-
+  const nimo=document.getElementById("nimodipine").checked;
+  let completed=nimo?1:0;
+  checks.forEach(function(item){ if(document.getElementById(item[0]).checked) completed++; });
+  const total=checks.length+1;
   let html="";
-
-  if(completed===checks.length){
-    html+=box("good","ICU bundle completed",
-      "All educational checklist items have been addressed.");
-  }else{
-    html+=box("warning","ICU bundle incomplete",
-      completed+" of "+checks.length+
-      " checklist items addressed. Review the remaining items before proceeding.");
+  if(!nimo){
+    html+=box("danger","Nimodipine not started","This is the one drug that should be hard to miss. Give 60 mg enterally every 4 hours for 21 days unless it is truly not possible.");
   }
-
+  if(completed===total){
+    html+=box("good","ICU bundle completed","Nimodipine and the checklist are addressed. This does not clear hydrocephalus, seizures, or an unsecured aneurysm.");
+  }else{
+    html+=box("warning","ICU bundle incomplete",completed+" of "+total+" items addressed.");
+  }
   document.getElementById("icuResult").innerHTML=html;
 }
 
