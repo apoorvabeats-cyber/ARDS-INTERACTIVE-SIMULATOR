@@ -24,6 +24,11 @@ h2{margin:0 0 14px;font-size:25px}
 .meta{margin-top:5px;color:#5f6f86;line-height:1.4}
 .badge{display:inline-block;margin-top:10px;padding:6px 10px;border-radius:999px;background:#e9f2ff;color:#1457a6;font-weight:700;font-size:13px}
 .footer{text-align:center;color:#718096;font-size:13px;padding:20px 0}
+.searchbar{position:sticky;top:8px;z-index:5;margin:0 0 14px}
+.searchbar input{width:100%;font:700 18px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;padding:14px 16px;border-radius:16px;border:2px solid #1457a6;background:#fff;color:#14213d;box-shadow:0 8px 24px #071b3a22}
+.searchbar input:focus{outline:3px solid #93c5fd}
+#none{display:none;background:#fff;border:1px solid #d7e0ec;border-radius:16px;padding:16px;color:#5f6f86;font-weight:700}
+.card[hidden],.section[hidden]{display:none !important}
 </style>
 </head>
 <body>
@@ -32,6 +37,11 @@ h2{margin:0 0 14px;font-size:25px}
     <h1>Critical Care<br>Interactive Hub</h1>
     <p>Interactive bedside learning tools and clinical simulators.</p>
   </header>
+
+  <div class="searchbar">
+    <input id="find" type="search" enterkeyhint="search" placeholder="Find a simulator — stroke, ARDS, sodium, ACLS" autocomplete="off" aria-label="Find a simulator">
+  </div>
+  <p id="none">No simulator matches that.</p>
 
   <section class="section">
     <h2>Neurocritical Care</h2>
@@ -142,12 +152,12 @@ h2{margin:0 0 14px;font-size:25px}
 
   <section class="section">
     <h2>Electrolyte &amp; Metabolic</h2>
-    <a class="card" href="Hyponatremia_Correction_Simulator.html?v=20260925w" style="border-color:#1457a6;background:#f3f8ff">
+    <a class="card" data-find="sodium hyponatremia hypernatremia 3% saline correction" href="Hyponatremia_Correction_Simulator.html?v=20260925w" style="border-color:#1457a6;background:#f3f8ff">
       <div class="title">Sodium Correction</div>
       <div class="meta">Drag the infusion rate. The line shows the sodium over the next 24 hours. 3% saline, saline, and water. The limit turns red when the change passes 8, or 6 if the risk is high.</div>
       <span class="badge">OPEN SODIUM CORRECTION →</span>
     </a>
-    <a class="card" href="Electrolyte_Disorders_Interactive_Simulator.html?v=20260925u">
+    <a class="card" data-find="potassium calcium magnesium phosphate sodium hyponatremia hypernatremia electrolyte" href="Electrolyte_Disorders_Interactive_Simulator.html?v=20260925u">
       <div class="title">Electrolyte Simulator</div>
       <div class="meta">Diagnosis and guideline-based management for hyponatremia, hypernatremia, hypo/hyperkalemia, hypo/hypercalcemia, hypo/hypermagnesemia and hypo/hyperphosphatemia. Hypernatremia includes a working calculator: severity classification, DI-pattern detection, free-water deficit, and a staged correction-rate management plan.</div>
       <span class="badge">OPEN ELECTROLYTE SIMULATOR →</span>
@@ -180,5 +190,30 @@ h2{margin:0 0 14px;font-size:25px}
 
   <div class="footer">Educational decision-support tools • Verify against current guidelines and local protocols.</div>
 </div>
+<script>
+(function(){
+  var box=document.getElementById('find');
+  var cards=[].slice.call(document.querySelectorAll('.card'));
+  var sections=[].slice.call(document.querySelectorAll('.section'));
+  var none=document.getElementById('none');
+  function hay(el){
+    return ((el.getAttribute('data-find')||'')+' '+(el.textContent||'')+' '+(el.getAttribute('href')||'')).toLowerCase();
+  }
+  function go(){
+    var words=box.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    var n=0;
+    cards.forEach(function(c){
+      var show=!words.length || words.every(function(w){ return hay(c).indexOf(w)!==-1; });
+      c.hidden=!show;
+      if(show) n++;
+    });
+    sections.forEach(function(s){
+      s.hidden=![].slice.call(s.querySelectorAll('.card')).some(function(c){ return !c.hidden; });
+    });
+    none.style.display=n?'none':'block';
+  }
+  box.addEventListener('input', go);
+})();
+</script>
 </body>
 </html>
