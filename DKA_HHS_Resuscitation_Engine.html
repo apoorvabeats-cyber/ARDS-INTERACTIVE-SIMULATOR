@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DKA and HHS resuscitation</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",Helvetica,Arial,sans-serif;background:#f4f7fb;color:#172033;line-height:1.4}
+.wrap{max-width:1100px;margin:0 auto;padding:14px}
+h1{margin:0;font-size:22px}
+.sub{color:#5c6b7a;font-size:14px;margin:6px 0 12px}
+.grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:900px){.grid{grid-template-columns:1fr 1.15fr}}
+.card{background:#fff;border:1px solid #d7dee6;border-radius:12px;padding:14px;margin-bottom:12px}
+h2{margin:0 0 10px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#5c6b7a}
+.row{margin:0 0 10px}
+.row label{display:flex;justify-content:space-between;font-size:14px;font-weight:650}
+.row b{color:#0b4f8a}
+input[type=range]{width:100%}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.checks{display:flex;flex-wrap:wrap;gap:8px}
+.checks label{font-size:13px;display:flex;gap:6px;align-items:center}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.metric{background:#f6f8fb;border-radius:8px;padding:8px;text-align:center}
+.metric span{display:block;font-size:11px;color:#5c6b7a;text-transform:uppercase}
+.metric strong{font-size:22px}
+.badge{padding:10px;border-radius:8px;font-weight:800;text-align:center;margin-bottom:10px}
+.severe{background:#fde8eb;color:#9d1c2e}
+.mod{background:#fff1e6;color:#9a4d12}
+.mild{background:#fff7df;color:#8a5a00}
+.hhs{background:#f3e8ff;color:#6b21a8}
+.box{padding:10px 12px;border-radius:8px;margin:0 0 8px;font-size:14px;border-left:4px solid #0b4f8a;background:#f4f8fc}
+.bad{border-left-color:#9d1c2e;background:#fff5f6}
+.warn{border-left-color:#a16207;background:#fffaf0}
+.ok{border-left-color:#0d6b3a;background:#f3fbf6}
+button{width:100%;padding:10px;border:0;border-radius:8px;background:#172033;color:#fff;font-weight:700}
+pre{background:#1e293b;color:#f8fafc;border-radius:8px;padding:12px;font-size:12px;white-space:pre-wrap;max-height:240px;overflow:auto}
+canvas{width:100%;height:180px;background:#fff;border:1px solid #e6ebf1;border-radius:8px}
+.note{font-size:12px;color:#5c6b7a;margin:6px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>DKA and HHS resuscitation</h1>
+  <p class="sub">Adult protocol. The diagnosis needs a ketone, not a low pH alone. Insulin stays on when the glucose falls.</p>
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Labs</h2>
+        <div class="row"><label>Weight <b id="vWt"></b></label><input id="wt" type="range" min="40" max="150" value="70"></div>
+        <div class="row"><label>Glucose <b id="vGlu"></b></label><input id="glu" type="range" min="80" max="1200" step="10" value="450"></div>
+        <div class="row"><label>pH <b id="vPh"></b></label><input id="ph" type="range" min="6.7" max="7.5" step="0.01" value="7.15"></div>
+        <div class="row"><label>Beta-hydroxybutyrate <b id="vBhb"></b></label><input id="bhb" type="range" min="0" max="12" step="0.1" value="4.8"></div>
+        <div class="two">
+          <div class="row"><label>Sodium <b id="vNa"></b></label><input id="na" type="range" min="110" max="170" value="132"></div>
+          <div class="row"><label>Potassium <b id="vK"></b></label><input id="k" type="range" min="2" max="7.5" step="0.1" value="4.2"></div>
+          <div class="row"><label>Bicarbonate <b id="vHco3"></b></label><input id="hco3" type="range" min="2" max="34" value="12"></div>
+          <div class="row"><label>Chloride <b id="vCl"></b></label><input id="cl" type="range" min="80" max="125" value="98"></div>
+        </div>
+        <div class="checks">
+          <label><input type="checkbox" id="pending"> Ketone not back yet</label>
+          <label><input type="checkbox" id="sglt2"> SGLT2 inhibitor</label>
+          <label><input type="checkbox" id="shock"> Shocked</label>
+          <label><input type="checkbox" id="overload"> Heart failure or overloaded</label>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Calculated</h2>
+        <div class="metrics">
+          <div class="metric"><span>Corrected Na</span><strong id="cNa"></strong></div>
+          <div class="metric"><span>Anion gap</span><strong id="ag"></strong></div>
+          <div class="metric"><span>Effective osm</span><strong id="osm"></strong></div>
+        </div>
+        <p class="note">Corrected sodium uses 1.6 for each 100 mg/dL of glucose above 100. Effective osmolality is 2 × sodium + glucose / 18. Urea is not included.</p>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h2>What this is</h2>
+        <div id="badge" class="badge mod"></div>
+        <div id="alerts"></div>
+      </div>
+      <div class="card">
+        <h2>Sketch of 12 hours, not a prediction</h2>
+        <canvas id="chart" width="640" height="200"></canvas>
+        <p class="note">Glucose is red. The anion gap is blue. The glucose line flattens when dextrose is added. The gap does not close if insulin is being held.</p>
+      </div>
+      <div class="card">
+        <h2>Orders that match the advice above</h2>
+        <button type="button" id="copy">Copy the orders</button>
+        <pre id="orders"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+function read(){
+  const n=id=>parseFloat($(id).value);
+  const glu=n('glu'), na=n('na'), hco3=n('hco3'), cl=n('cl');
+  return {
+    wt:n('wt'), glu, ph:n('ph'), bhb:n('bhb'), na, k:n('k'), hco3, cl,
+    pending:$('pending').checked, sglt2:$('sglt2').checked, shock:$('shock').checked, overload:$('overload').checked,
+    corrNa:na+1.6*((glu-100)/100),
+    ag:na-(cl+hco3),
+    osm:2*na+glu/18
+  };
+}
+function kindOf(p){
+  const acid=p.ph<7.30||p.hco3<18;
+  const measuredKetone=p.bhb>=3;
+  const pendingKetone=p.pending&&p.ag>=12;
+  const ketones=measuredKetone||pendingKetone;
+  const hhsNumbers=p.glu>600&&p.osm>320;
+  const quiet=p.ph>7.30&&p.hco3>18&&p.bhb<3;
+  if(acid&&ketones&&hhsNumbers) return 'mixed';
+  if(acid&&p.glu<200&&(measuredKetone||pendingKetone)) return 'euglycemic';
+  if(hhsNumbers&&quiet) return 'hhs';
+  if(acid&&ketones&&p.glu>=200){
+    if(p.ph<7.00||p.hco3<10) return 'severe';
+    if(p.ph<=7.24||p.hco3<15) return 'moderate';
+    return 'mild';
+  }
+  if(acid) return 'other';
+  return 'neither';
+}
+const titles={
+  severe:'Severe DKA', moderate:'Moderate DKA', mild:'Mild DKA',
+  hhs:'Hyperosmolar hyperglycaemic state', mixed:'DKA and HHS together',
+  euglycemic:'Euglycaemic DKA', other:'Acidosis, but not DKA', neither:'Not DKA or HHS'
+};
+function plan(p){
+  const kind=kindOf(p);
+  const dka=['severe','moderate','mild','mixed','euglycemic'].includes(kind);
+  const hold=p.k<3.3;
+  const highK=p.k>5.2;
+  const dextroseAt=kind==='hhs'?300:(dka?200:null);
+  let fluid;
+  if(p.overload) fluid='Heart failure or fluid overload. Give 250 mL of isotonic fluid and look again. Do not give 15 mL/kg.';
+  else if(p.shock) fluid='Shocked. Give isotonic boluses until the perfusion recovers, then replace the deficit. Use a balanced crystalloid unless the potassium is above 5.2, in which case use 0.9% saline.';
+  else {
+    const first=Math.round(p.wt*15);
+    const laterLo=Math.max(150, Math.min(500, Math.round(p.wt*4)));
+    const laterHi=Math.max(laterLo, Math.min(500, Math.round(p.wt*6)));
+    const firstBag=highK?'0.9% saline':'a balanced crystalloid';
+    const next=p.shock?'Stay with isotonic fluid while the patient is still shocked.':(p.corrNa>=135?'If the corrected sodium is still 135 or higher, the next fluid can be 0.45% saline.':'The corrected sodium is low. Continue isotonic fluid.');
+    fluid='First hour: '+first+' mL of '+firstBag+', once, over that hour (about 15 mL/kg). Then '+laterLo+'–'+laterHi+' mL/h and reassess. '+next;
+  }
+  let insulin;
+  if(!dka&&kind!=='hhs') insulin='Do not start a DKA insulin infusion for this gas.';
+  else if(hold) insulin='Hold insulin. The potassium is '+p.k.toFixed(1)+'.';
+  else if(kind==='hhs') insulin='HHS. Give fluid first. Regular insulin '+ (p.wt*0.05).toFixed(1) +' units/h (0.05 units/kg/h). Do not start at 0.14 units/kg/h.';
+  else insulin='Regular insulin '+(p.wt*0.1).toFixed(1)+' units/h (0.1 units/kg/h) with no bolus. If the glucose has not fallen by about 50 mg/dL in the first hour, increase the rate.';
+  if(dka&&kind==='mild'&&!p.shock&&!hold) insulin+=' Mild DKA without shock can be treated with subcutaneous rapid-acting insulin, 0.1 units/kg and then 0.1 units/kg every 1–2 hours, if the glucose can be checked every hour.';
+  let dextrose='';
+  if(dextroseAt&&!hold){
+    dextrose=kind==='euglycemic'
+      ? 'The glucose is already under 200. Start dextrose with the insulin. Do not wait for it to fall further, and do not stop the insulin.'
+      : 'When the glucose reaches '+dextroseAt+' mg/dL, add dextrose and keep the insulin running. '+(kind==='hhs'?'Do not stop the insulin only because the glucose has fallen.':'Stopping the insulin here is how the ketoacidosis returns.');
+    if(kind==='hhs'||kind==='mixed') dextrose+=' In HHS, do not let the effective osmolality fall faster than about 3 mOsm/kg per hour.';
+  } else if(hold&&dextroseAt) dextrose='Insulin is held, so do not start dextrose yet.';
+  let potassium;
+  if(hold) potassium='Give 20–30 mmol/h of potassium with the ECG monitored until the potassium is above 3.3. Do not put 40 mmol/h through a peripheral vein. Then start insulin.';
+  else if(highK) potassium='Potassium is '+p.k.toFixed(1)+'. Put no potassium in the fluid. Check it again within 2 hours. Insulin will bring it down.';
+  else potassium='Potassium is '+p.k.toFixed(1)+'. Put 20–30 mmol of potassium in each litre so the level stays about 4–5.';
+  let bicarb='';
+  if(dka&&p.ph<6.9){
+    bicarb=highK
+      ? 'pH is under 6.90. Give 100 mmol of sodium bicarbonate in 400 mL of water over 2 hours. Do not add potassium while the potassium is high. Check the pH again. Do not give bicarbonate once the pH is 6.90 or higher.'
+      : 'pH is under 6.90. Give 100 mmol of sodium bicarbonate in 400 mL of water over 2 hours, with 20 mmol of potassium chloride. Check the pH again. Do not give bicarbonate once the pH is 6.90 or higher.';
+  } else if(dka) bicarb='Bicarbonate is not indicated. The pH is '+p.ph.toFixed(2)+'.';
+  const resolved=kind==='hhs'
+    ? 'HHS is settling when the glucose is near 250 mg/dL, the effective osmolality is under 300, and the patient is more awake.'
+    : (dka ? 'DKA is resolved only when the glucose is under 200 mg/dL and two of these are true: bicarbonate at least 18, venous pH at least 7.30, anion gap 12 or less. Overlap subcutaneous basal insulin for 1–2 hours before the infusion stops.' : '');
+  const alerts=[];
+  if(kind==='other') alerts.push(['bad','The pH is low but the beta-hydroxybutyrate is under 3 mmol/L. This is not DKA. Look for lactate, a toxin, or kidney failure.']);
+  if(p.pending&&dka) alerts.push(['warn','The ketone is not back. This is being treated as DKA because the gap is high. Confirm the beta-hydroxybutyrate.']);
+  if(kind==='euglycemic') alerts.push(['bad','Euglycaemic DKA. Glucose is under 200 with a high ketone. Think of an SGLT2 inhibitor, pregnancy, or starvation. Stop the SGLT2 inhibitor.']);
+  if(p.sglt2) alerts.push(['warn','Stop the SGLT2 inhibitor. Do not restart it in this illness.']);
+  alerts.push(['', fluid]);
+  alerts.push([hold?'bad':'', insulin]);
+  if(dextrose) alerts.push(['warn', dextrose]);
+  alerts.push([hold||highK?'bad':'ok', potassium]);
+  if(bicarb) alerts.push([p.ph<6.9?'bad':'ok', bicarb]);
+  if(resolved) alerts.push(['', resolved]);
+  const orders=[
+    titles[kind],
+    '1. Fluids: '+fluid,
+    '2. Insulin: '+(hold?'HOLD until potassium is above 3.3.':insulin),
+    dextrose?('3. Dextrose: '+dextrose):null,
+    '4. Potassium: '+potassium,
+    bicarb?('5. Bicarbonate: '+bicarb):'5. Bicarbonate: not indicated.',
+    '6. Glucose hourly. Electrolytes, pH, and the anion gap every 2–4 hours.',
+    resolved?('7. Resolution: '+resolved):null,
+    '8. Check phosphate. Replace it if it is below 1 mg/dL.'
+  ].filter(Boolean).join('\n');
+  return {kind, alerts, orders, hold, dextroseAt, dka};
+}
+function drawChart(p, result){
+  const c=$('chart'), ctx=c.getContext('2d'), w=c.width, h=c.height;
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle='#e6ebf1';
+  for(let i=1;i<=4;i++){ctx.beginPath();ctx.moveTo(28,i*h/5);ctx.lineTo(w-8,i*h/5);ctx.stroke();}
+  ctx.fillStyle='#5c6b7a'; ctx.font='12px sans-serif';
+  const floor=result.dextroseAt||150;
+  function yGlu(g){return h-16-(Math.max(0,Math.min(1200,g))/1200)*(h-36);}
+  function yAg(a){return h-16-(Math.max(0,Math.min(40,a))/40)*(h-36);}
+  ctx.beginPath(); ctx.strokeStyle='#9d1c2e'; ctx.lineWidth=2;
+  for(let hr=0;hr<=12;hr++){
+    const fall=result.hold?hr*15:hr*60;
+    const g=result.hold?Math.max(p.glu-fall, p.glu*0.85):Math.max(floor, p.glu-fall);
+    const x=28+(w-40)*hr/12, y=yGlu(g);
+    if(hr===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.beginPath(); ctx.strokeStyle='#0b4f8a';
+  for(let hr=0;hr<=12;hr++){
+    const a=result.hold||!result.dka?p.ag:Math.max(10, p.ag-hr*1.2);
+    const x=28+(w-40)*hr/12, y=yAg(a);
+    if(hr===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.fillStyle='#9d1c2e'; ctx.fillText('Glucose', 32, 16);
+  ctx.fillStyle='#0b4f8a'; ctx.fillText('Anion gap', 100, 16);
+}
+function render(){
+  const p=read();
+  $('vWt').textContent=p.wt+' kg';
+  $('vGlu').textContent=p.glu+' mg/dL';
+  $('vPh').textContent=p.ph.toFixed(2);
+  $('vBhb').textContent=p.bhb.toFixed(1)+' mmol/L';
+  $('vNa').textContent=p.na;
+  $('vK').textContent=p.k.toFixed(1);
+  $('vHco3').textContent=p.hco3;
+  $('vCl').textContent=p.cl;
+  $('cNa').textContent=p.corrNa.toFixed(1);
+  $('ag').textContent=p.ag.toFixed(1);
+  $('osm').textContent=p.osm.toFixed(0);
+  const result=plan(p);
+  const badge=$('badge');
+  badge.textContent=titles[result.kind];
+  badge.className='badge '+(result.kind==='severe'||result.kind==='euglycemic'?'severe':result.kind==='moderate'||result.kind==='mixed'?'mod':result.kind==='hhs'?'hhs':'mild');
+  $('alerts').innerHTML=result.alerts.map(([c,t])=>'<div class="box '+(c||'')+'">'+t+'</div>').join('');
+  $('orders').textContent=result.orders;
+  drawChart(p, result);
+}
+document.querySelectorAll('input').forEach(el=>el.addEventListener('input',render));
+$('copy').onclick=async()=>{
+  const text=$('orders').textContent;
+  try{await navigator.clipboard.writeText(text); $('copy').textContent='Copied';}
+  catch(e){$('copy').textContent='Select the orders and copy them';}
+  setTimeout(()=>$('copy').textContent='Copy the orders', 1500);
+};
+render();
+</script>
+</body>
+</html>
