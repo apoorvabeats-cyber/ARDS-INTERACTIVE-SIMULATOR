@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="theme-color" content="#071b3a">
+<title>DKA Simulator</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #f4f7fb; color: #14213d; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; line-height: 1.4; }
+  button, select { font: inherit; cursor: pointer; }
+  button { border: 1px solid #d7e0ec; background: #fff; color: #14213d; border-radius: 14px; min-height: 48px; padding: 10px 12px; }
+  button:active { transform: scale(.99); }
+  button.on { background: #1457a6; color: #fff; border-color: #1457a6; }
+  button.bad { border-color: #b42318; color: #b42318; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 16px 16px 48px; }
+  .hero { background: linear-gradient(135deg, #071b3a, #1457a6); color: #fff; border-radius: 24px; padding: 26px 20px; }
+  h1 { font-size: clamp(30px, 8vw, 44px); line-height: 1.05; margin: 8px 0; font-weight: 750; }
+  h2 { font-size: 15px; letter-spacing: .08em; text-transform: uppercase; color: #5f6f86; margin: 22px 0 8px; }
+  p { margin: 0; }
+  a { color: #9ec5ff; }
+  .lede { color: #dbe9ff; font-size: 17px; }
+  .card { display: block; width: 100%; text-align: left; margin-top: 12px; border-radius: 16px; }
+  .card b { display: block; color: #1457a6; font-size: 18px; }
+  .meta { color: #5f6f86; margin-top: 4px; font-size: 15px; }
+  .top { position: sticky; top: 0; z-index: 3; display: flex; gap: 8px; align-items: center; background: #071b3a; color: #fff; padding: 10px 12px; }
+  .top .grow { flex: 1; min-width: 0; }
+  .clock { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .stem { background: #fff; border: 1px solid #d7e0ec; border-radius: 16px; padding: 14px; margin: 12px 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  @media (min-width: 720px) { .grid.labs { grid-template-columns: repeat(4, 1fr); } }
+  .lab { background: #fff; border: 1px solid #d7e0ec; border-radius: 14px; padding: 10px; }
+  .lab span { display: block; color: #5f6f86; font-size: 12px; }
+  .lab b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .lab em { display: block; font-style: normal; color: #5f6f86; font-size: 12px; }
+  .hi { color: #b42318; }
+  .ok { color: #067647; }
+  .warn { color: #b54708; }
+  .chip { display: inline-block; margin-top: 8px; padding: 4px 10px; border-radius: 999px; background: #fff3; font-weight: 700; font-size: 13px; }
+  .log { background: #fff; border-radius: 16px; border: 1px solid #d7e0ec; padding: 12px; min-height: 3.2em; }
+  .check { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid #eef2f6; }
+  .small { font-size: 14px; color: #5f6f86; }
+  .vitals { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .vitals span { background: #e9f2ff; color: #1457a6; border-radius: 999px; padding: 6px 10px; font-weight: 700; font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+function approach(cur, target, step) {
+  if (cur < target) return Math.min(target, cur + step);
+  if (cur > target) return Math.max(target, cur - step);
+  return cur;
+}
+const phOf = (hco3, pco2) => 6.1 + Math.log10(Math.max(1, hco3) / (0.03 * Math.max(8, pco2)));
+const agOf = (p) => p.na - (p.cl + p.hco3);
+const osmOf = (p) => 2 * p.na + p.glucose / 18 + p.bun / 2.8;
+const correctedNa = (p) => p.na + 1.6 * ((p.glucose - 100) / 100);
+
+const CASES = [
+  {
+    id: "classic",
+    title: "Missed basal insulin",
+    who: "19F · type 1 · vomiting for two days",
+    stem: "She ran out of insulin. Deep, rapid breathing, dry mouth, sweet breath. Fingerstick reads HIGH. Nobody has given fluid or insulin yet.",
+    exam: "Drowsy but protecting her airway. Cool hands, HR fast, blood pressure soft. Abdomen soft, no peritonism.",
+    causeText: "Precipitant: missed insulin. No pneumonia, no infarct, no pregnancy.",
+    mode: "dka", needAbx: false,
+    phys: { na: 128, cl: 90, k: 5.6, hco3: 4, glucose: 580, bhb: 8.2, pco2: 16, deficit: 6, weight: 70, temp: 36.8, bun: 32, gcs: 14 },
+    pearls: [
+      "A high serum potassium is a shift, not a surplus. Total body potassium is low, and it will fall as soon as insulin starts.",
+      "Fluid first, then insulin at 0.1 unit/kg/hour. A bolus is optional and not required.",
+      "When glucose reaches about 200, add dextrose and keep the insulin on until the gap closes.",
+    ],
+  },
+  {
+    id: "hypok",
+    title: "Potassium 2.7",
+    who: "34M · type 1 · gastroenteritis",
+    stem: "Diarrhea and vomiting since yesterday. He skipped his insulin because he was not eating. Leg cramps. The potassium is already 2.7.",
+    exam: "Awake, weak, Kussmaul breathing. No fever. Soft abdomen.",
+    causeText: "Precipitant: viral gastroenteritis plus missed insulin. Replace potassium before any insulin.",
+    mode: "dka", needAbx: false,
+    phys: { na: 132, cl: 96, k: 2.7, hco3: 8, glucose: 410, bhb: 6.4, pco2: 20, deficit: 5, weight: 62, temp: 36.6, bun: 24, gcs: 15 },
+    pearls: [
+      "If potassium is under 3.3, hold insulin. Replace potassium first or the first insulin will drive it into the muscle and the heart.",
+      "Once potassium is at least 3.3, start the infusion and keep replacing.",
+      "The gap, not the glucose, tells you when the ketoacidosis is over.",
+    ],
+  },
+  {
+    id: "eu",
+    title: "Glucose is only 168",
+    who: "58F · type 2 · empagliflozin",
+    stem: "Nausea and abdominal pain. Started an SGLT2 inhibitor last month and has been eating little. A colleague says the glucose is too low for DKA.",
+    exam: "Dry, tachypneic, afebrile. Glucose 168. Ketones are strongly positive.",
+    causeText: "Precipitant: SGLT2 inhibitor with poor intake. This is euglycemic DKA. She still needs insulin, and she needs dextrose early.",
+    mode: "dka", needAbx: false,
+    phys: { na: 136, cl: 100, k: 4.1, hco3: 9, glucose: 168, bhb: 6.1, pco2: 22, deficit: 4, weight: 80, temp: 36.9, bun: 18, gcs: 15 },
+    pearls: [
+      "SGLT2 inhibitors can cause DKA with a near-normal glucose. Ketones and the anion gap make the diagnosis, not the fingerstick.",
+      "Start dextrose with the insulin or the glucose will crash while ketones are still high.",
+      "Stop the SGLT2 inhibitor. Do not restart it this admission.",
+    ],
+  },
+  {
+    id: "hhs",
+    title: "Glucose 980, barely acidotic",
+    who: "76M · type 2 · nursing home",
+    stem: "Confused and profoundly dry. Glucose 980. He is not blowing off carbon dioxide. The urine is foul. Ketones are only faintly positive.",
+    exam: "GCS 12, tongue like leather, no Kussmaul. Fever 37.2. This is hyperosmolar, not a classic ketoacidosis.",
+    causeText: "Precipitant: urinary infection and dehydration. Fluids restore most of the glucose. Insulin is a low dose, after the first fluid, and antibiotics treat the cause.",
+    mode: "hhs", needAbx: true,
+    phys: { na: 150, cl: 114, k: 4.8, hco3: 18, glucose: 980, bhb: 1.4, pco2: 36, deficit: 9, weight: 78, temp: 37.8, bun: 48, gcs: 12 },
+    pearls: [
+      "HHS is hyperosmolar dehydration with little ketoacidosis. The first drug is saline, not a full-dose insulin drip.",
+      "Effective osmolarity and mental status matter more than the anion gap.",
+      "After glucose is near 300, add dextrose. Antibiotics if there is a source.",
+    ],
+  },
+];
+
+let screen = "board";
+let caseId = null;
+let P = null;
+let timer = 0;
+let running = false;
+let stable = 0;
+
+function blank(c) {
+  return {
+    ...c.phys, bun: c.phys.bun, mode: c.mode, needAbx: c.needAbx, id: c.id,
+    t: 0, insulin: 0, rate: "", dextrose: false, kcl: 0, bicarbUsed: false, bicarbBad: false,
+    abx: false, cause: false, basal: false, dead: null, lowK: false, fastDrop: false,
+    hypo: false, note: "The clock is paused. Choose fluids and look at the potassium before you run it.",
+    weight: c.phys.weight,
+  };
+}
+function snap(p) {
+  const ph = phOf(p.hco3, p.pco2);
+  const ag = agOf(p);
+  const osm = osmOf(p);
+  const hr = Math.round(clamp(68 + p.deficit * 7 + (ph < 7.2 ? 16 : 0) + (p.glucose > 700 ? 8 : 0), 55, 155));
+  const sbp = Math.round(clamp(128 - p.deficit * 6, 72, 155));
+  const rr = Math.round(clamp(12 + Math.max(0, 7.4 - ph) * 22, 12, 42));
+  let sev = "Not DKA";
+  if (p.mode === "hhs") sev = osm >= 320 ? "HHS" : "HHS, improving";
+  else if (ph < 7.0 || p.hco3 < 10 && ag > 12) sev = ph < 7.0 ? "Severe DKA" : "Moderate–severe DKA";
+  else if (ph < 7.25) sev = "Moderate DKA";
+  else if (ph < 7.3 || ag > 14) sev = "Resolving";
+  else sev = "Gap closed";
+  return { ph, ag, osm, hr, sbp, rr, cna: correctedNa(p), winter: 1.5 * p.hco3 + 8, sev };
+}
+function step(p, dt) {
+  if (p.dead) return;
+  const g0 = p.glucose;
+  p.t += dt * 60;
+  if (p.rate === "bolus") {
+    p.deficit = Math.max(0, p.deficit - 1);
+    p.glucose -= 18;
+    p.na += 0.3;
+    p.rate = "ns500";
+    p.note = "First liter of 0.9% saline is in. Maintenance is 500 mL/hour.";
+  }
+  const perH = p.rate === "ns500" ? 0.5 : p.rate === "ns250" ? 0.25 : p.rate === "half" ? 0.25 : p.rate === "d5half" ? 0.25 : 0;
+  p.deficit = Math.max(0, p.deficit - perH * dt);
+  if (perH) {
+    p.glucose -= (p.rate === "d5half" ? 4 : 10) * dt;
+    p.na = approach(p.na, p.mode === "hhs" ? 142 : 140, (p.rate === "half" || p.rate === "d5half" ? 0.2 : 0.35) * dt);
+    p.cl += (p.rate === "ns500" ? 1.05 : 0.45) * dt;
+  }
+  if (p.dextrose || p.rate === "d5half") p.glucose += (p.glucose < 180 ? 18 : 8) * dt;
+  if (p.insulin > 0) {
+    if (p.k < 3.3) {
+      p.k -= 0.9 * (p.insulin / 0.1) * dt;
+      p.lowK = true;
+      p.glucose -= 25 * dt;
+      p.note = "Potassium is under 3.3 and insulin is still running.";
+    } else {
+      const perf = p.deficit > 6.5 ? 0.65 : 1;
+      const gFall = (p.mode === "hhs" ? 140 : 72) * (p.insulin / 0.1) * perf;
+      const held = (p.dextrose || p.rate === "d5half") && p.glucose < 260;
+      p.glucose -= (held ? gFall * 0.22 : gFall) * dt;
+      p.bhb = Math.max(0.2, p.bhb - (p.mode === "hhs" ? 0.35 : 1.15) * (p.insulin / 0.1) * perf * dt);
+      p.k -= 0.4 * (p.insulin / 0.1) * dt;
+      if (p.mode === "dka") p.hco3 += 2.15 * (p.insulin / 0.1) * perf * dt;
+    }
+  } else if (p.mode === "dka" && !p.basal) {
+    p.bhb = Math.min(12, p.bhb + 0.25 * dt);
+    p.hco3 = Math.max(2, p.hco3 - 0.25 * dt);
+    p.glucose += 10 * dt;
+  }
+  if (p.kcl > 0) p.k += (p.kcl / 20) * 0.32 * dt;
+  if (p.bicarbUsed && phOf(p.hco3, p.pco2) < 6.95) p.hco3 += 2 * dt;
+  p.glucose = clamp(p.glucose, 18, 1400);
+  p.k = clamp(p.k, 1.5, 7.8);
+  p.hco3 = clamp(p.hco3, 2, 28);
+  p.bhb = clamp(p.bhb, 0.1, 14);
+  p.na = clamp(p.na, 118, 168);
+  p.cl = clamp(p.cl, 80, 125);
+  const winter = clamp(1.5 * p.hco3 + 8, 12, 44);
+  p.pco2 = approach(p.pco2, winter, 3.4 * dt);
+  if ((g0 - p.glucose) / Math.max(0.05, dt) > 110) p.fastDrop = true;
+  if (p.k < 2.5 || (p.lowK && p.k < 2.8 && p.insulin > 0 && p.t > 20)) p.dead = "Ventricular arrhythmia. Insulin ran into a potassium debt.";
+  if (p.glucose < 50) { p.hypo = true; p.dead = "Severe hypoglycemia. Insulin was still on, without enough dextrose."; }
+}
+function resolved(p) {
+  const s = snap(p);
+  const causeOk = p.cause && (!p.needAbx || p.abx);
+  if (!causeOk) return false;
+  if (p.mode === "hhs") return p.glucose <= 300 && p.glucose >= 140 && p.deficit <= 3 && s.osm < 330 && p.k >= 3.5 && p.k <= 5.2 && p.insulin > 0 && p.insulin <= 0.06 && (p.dextrose || p.rate === "d5half");
+  return s.ph >= 7.3 && p.hco3 >= 15 && s.ag <= 14 && p.bhb <= 1.2 && p.glucose >= 90 && p.glucose <= 250 && p.k >= 3.4 && p.k <= 5.2 && p.deficit <= 2.5 && (p.insulin > 0 || p.basal);
+}
+function clock(mins) {
+  const h = Math.floor(mins / 60), m = Math.floor(mins % 60);
+  return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+}
+function say(t) { if (P) P.note = t; }
+
+function order(id) {
+  const p = P;
+  const s = snap(p);
+  if (p.dead) return;
+  if (id === "bolus") { p.rate = "bolus"; say("1 L of 0.9% saline ordered now."); }
+  else if (id === "ns500") { p.rate = "ns500"; say("0.9% saline at 500 mL/hour."); }
+  else if (id === "ns250") { p.rate = "ns250"; say("0.9% saline at 250 mL/hour."); }
+  else if (id === "half") { p.rate = "half"; say("0.45% saline. Use this only after the first volume is in and sodium is high."); }
+  else if (id === "dex") {
+    p.dextrose = !p.dextrose;
+    if (p.dextrose) p.rate = p.rate && p.rate !== "bolus" ? "d5half" : "d5half";
+    say(p.dextrose ? "Dextrose added. Keep insulin running if the gap is still open." : "Dextrose stopped.");
+  }
+  else if (id === "ins1") {
+    if (p.k < 3.3) { p.insulin = 0.1; p.lowK = true; say("Insulin started at potassium " + p.k.toFixed(1) + ". This is unsafe."); }
+    else { p.insulin = 0.1; say("Insulin 0.1 unit/kg/hour. No bolus."); }
+  }
+  else if (id === "ins05") {
+    if (p.k < 3.3) { p.insulin = 0.05; p.lowK = true; say("Even a low dose will drop the potassium further."); }
+    else { p.insulin = 0.05; say(p.mode === "hhs" ? "Low-dose insulin. Right pace for HHS after fluid." : "Rate cut to 0.05. Only do this if the glucose is falling too fast and the gap is closing."); }
+  }
+  else if (id === "insoff") {
+    p.insulin = 0;
+    say(p.basal ? "Infusion stopped after basal overlap." : "Infusion stopped. If ketones are still present they will return.");
+  }
+  else if (id === "k20") { p.kcl = p.kcl === 20 ? 0 : 20; say(p.kcl ? "Potassium chloride 20 mEq/hour." : "Potassium stopped."); }
+  else if (id === "k40") {
+    if (p.k >= 4.5) say("Potassium is not low. 40 mEq/hour is for a level under 3.3, with a monitor.");
+    p.kcl = 40;
+    say("Potassium chloride 40 mEq/hour. Recheck often.");
+  }
+  else if (id === "bicarb") {
+    p.bicarbUsed = true;
+    if (s.ph >= 6.9) { p.bicarbBad = true; say("pH is " + s.ph.toFixed(2) + ". Bicarbonate is not indicated and will drop the potassium."); }
+    else say("Bicarbonate for pH under 6.9, while potassium is watched.");
+  }
+  else if (id === "abx") {
+    p.abx = true;
+    say(p.needAbx ? "Antibiotics started for the urinary source." : "No infection on exam or the story. Antibiotics are not the treatment.");
+  }
+  else if (id === "cause") {
+    p.cause = true;
+    say(CASES.find((c) => c.id === caseId).causeText);
+  }
+  else if (id === "basal") {
+    if (!resolved({ ...p, basal: true, cause: true, abx: true }) && snap(p).ag > 14 && p.mode === "dka") say("Too early for basal insulin. The anion gap is still open.");
+    else { p.basal = true; say("Basal insulin given. Overlap the drip for one to two hours, then stop it."); }
+  }
+  paint();
+}
+
+function tick() {
+  if (!running || !P || P.dead) return;
+  step(P, 0.25);
+  if (P.dead) { finish(); return; }
+  if (resolved(P)) stable += 15; else stable = 0;
+  if (stable >= 30) { finish(); return; }
+  const s = snap(P);
+  if (!P.dead && P.mode === "dka" && P.glucose < 200 && P.insulin > 0 && !P.dextrose && P.rate !== "d5half" && Math.round(P.t) % 30 === 0) P.note = "Glucose is under 200 and insulin is still on. Add dextrose or the next number is a hypo.";
+  if (P.mode === "hhs" && P.glucose < 300 && P.insulin > 0 && !P.dextrose && Math.round(P.t) % 30 === 0) P.note = "Glucose is under 300. Add dextrose so the insulin does not overshoot.";
+  if (P.k > 5.2 && P.kcl > 0) P.note = "Potassium is " + P.k.toFixed(1) + ". Stop the replacement.";
+  if (P.fastDrop && !P.fastNoted && P.id === "classic") { P.fastNoted = true; P.note = "Glucose fell faster than 100 mg/dL in an hour. In a young patient, slow the drop — cerebral edema is the risk."; }
+  paint();
+  if (s.ph < 6.8 && P.t > 120 && P.insulin === 0 && P.deficit > 4) { P.dead = "The acidosis was left untreated."; finish(); }
+}
+function finish() {
+  running = false;
+  clearInterval(timer);
+  screen = "debrief";
+  draw();
+}
+function scoreOf(p) {
+  let n = 20;
+  if (p.dead) n = 15;
+  else if (resolved(p) || stable >= 30) n += 45;
+  if (!p.lowK) n += 15;
+  if (p.dextrose && p.mode !== "hhs") n += 8;
+  if (p.mode === "hhs" && (p.dextrose || p.glucose >= 140)) n += 8;
+  if (p.cause) n += 8;
+  if (!p.needAbx || p.abx) n += 8;
+  if (p.basal) n += 6;
+  if (p.bicarbBad) n -= 12;
+  if (p.fastDrop && p.id === "classic") n -= 6;
+  if (p.hypo) n -= 20;
+  return clamp(Math.round(n), 0, 100);
+}
+
+const app = document.getElementById("app");
+function draw() {
+  clearInterval(timer);
+  if (screen === "board") return board();
+  if (screen === "debrief") return debrief();
+  sim();
+  if (running) timer = setInterval(tick, 900);
+}
+function board() {
+  const hub = location.hostname.endsWith("github.io") ? '<p><a href="index.html">← All simulators</a></p>' : "";
+  app.innerHTML = `<div class="wrap">
+    <div class="hero">${hub}
+      <div style="opacity:.8;font-weight:700;letter-spacing:.08em;font-size:13px">ENDOCRINE CRITICAL CARE</div>
+      <h1>DKA simulator</h1>
+      <p class="lede">Four patients. The labs move when you give fluid, potassium, insulin, and dextrose. The glucose falling is not the same as the ketoacidosis ending.</p>
+    </div>
+    ${CASES.map((c) => `<button class="card" data-id="${c.id}"><b>${c.title}</b><div class="meta">${c.who}</div></button>`).join("")}
+    <p class="small" style="margin-top:16px">Educational simulation. Accelerated time. Not a medical device or a protocol.</p>
+  </div>`;
+  app.querySelectorAll(".card").forEach((b) => b.onclick = () => {
+    caseId = b.dataset.id;
+    P = blank(CASES.find((c) => c.id === caseId));
+    running = false;
+    stable = 0;
+    screen = "sim";
+    draw();
+  });
+}
+function lab(label, value, unit, cls) {
+  return `<div class="lab"><span>${label}</span><b class="${cls || ""}">${value}</b><em>${unit || ""}</em></div>`;
+}
+function sim() {
+  const c = CASES.find((x) => x.id === caseId);
+  app.innerHTML = `<div class="top">
+      <button id="back">Cases</button>
+      <div class="grow"><b>${c.title}</b><div class="clock" id="clock"></div></div>
+      <button id="run">Run</button>
+    </div>
+    <div class="wrap">
+      <div class="stem"><div id="sev"></div><p>${c.stem}</p><p class="small" style="margin-top:8px">${c.exam}</p><div class="vitals" id="vitals"></div></div>
+      <h2>Labs</h2>
+      <div class="grid labs" id="labs"></div>
+      <h2>Calculated</h2>
+      <div class="grid labs" id="calc"></div>
+      <h2>Pathway</h2>
+      <div class="stem" id="path"></div>
+      <h2>Orders</h2>
+      <div class="grid" id="orders"></div>
+      <h2>What just happened</h2>
+      <div class="log" id="note"></div>
+    </div>`;
+  document.getElementById("back").onclick = () => { screen = "board"; running = false; draw(); };
+  document.getElementById("run").onclick = () => {
+    running = !running;
+    draw();
+  };
+  document.getElementById("orders").innerHTML = [
+    ["bolus", "1 L 0.9% saline now"],
+    ["ns500", "Saline 500 mL/h"],
+    ["ns250", "Saline 250 mL/h"],
+    ["half", "0.45% saline"],
+    ["dex", "Add dextrose"],
+    ["ins1", "Insulin 0.1 u/kg/h"],
+    ["ins05", "Insulin 0.05 u/kg/h"],
+    ["insoff", "Stop insulin"],
+    ["k20", "KCl 20 mEq/h"],
+    ["k40", "KCl 40 mEq/h"],
+    ["bicarb", "Bicarbonate"],
+    ["abx", "Antibiotics"],
+    ["cause", "Identify precipitant"],
+    ["basal", "Basal insulin overlap"],
+  ].map(([id, label]) => `<button data-o="${id}">${label}</button>`).join("");
+  document.getElementById("orders").onclick = (e) => {
+    const b = e.target.closest("button");
+    if (b) order(b.dataset.o);
+  };
+  paint();
+}
+function paint() {
+  if (screen !== "sim" || !P) return;
+  const p = P;
+  const s = snap(p);
+  const clockEl = document.getElementById("clock");
+  if (!clockEl) return;
+  clockEl.textContent = clock(p.t) + " h   " + (running ? "running" : "paused");
+  document.getElementById("run").textContent = running ? "Pause" : "Run";
+  const kCls = p.k < 3.3 ? "hi" : p.k > 5.2 ? "warn" : "ok";
+  const gCls = p.glucose < 70 ? "hi" : p.glucose > 250 ? "warn" : "ok";
+  const phCls = s.ph < 7.2 ? "hi" : s.ph < 7.3 ? "warn" : "ok";
+  document.getElementById("sev").innerHTML = `<span class="chip" style="background:#e9f2ff;color:#1457a6">${s.sev}</span>`;
+  document.getElementById("vitals").innerHTML = `<span>HR ${s.hr}</span><span>BP ${s.sbp}/${Math.max(40, Math.round(s.sbp * 0.62))}</span><span>RR ${s.rr}</span><span>GCS ${p.gcs}</span><span>${p.temp.toFixed(1)}°</span>`;
+  document.getElementById("labs").innerHTML = [
+    lab("Glucose", Math.round(p.glucose), "mg/dL", gCls),
+    lab("pH", s.ph.toFixed(2), "arterial", phCls),
+    lab("HCO3", p.hco3.toFixed(1), "mmol/L", p.hco3 < 15 ? "hi" : "ok"),
+    lab("pCO2", Math.round(p.pco2), "mmHg"),
+    lab("Sodium", Math.round(p.na), "mmol/L"),
+    lab("Potassium", p.k.toFixed(1), "mmol/L", kCls),
+    lab("Chloride", Math.round(p.cl), "mmol/L"),
+    lab("Ketones", p.bhb.toFixed(1), "β-hydroxybutyrate", p.bhb > 3 ? "hi" : "ok"),
+  ].join("");
+  document.getElementById("calc").innerHTML = [
+    lab("Anion gap", Math.round(s.ag), "Na − (Cl + HCO3)", s.ag > 14 ? "hi" : "ok"),
+    lab("Corrected Na", s.cna.toFixed(1), "for hyperglycemia"),
+    lab("Osmolarity", Math.round(s.osm), "mOsm/kg", s.osm > 320 ? "warn" : ""),
+    lab("Winter pCO2", Math.round(s.winter), "1.5 × HCO3 + 8"),
+  ].join("");
+  const fluid = p.rate === "ns500" ? "NS 500" : p.rate === "ns250" ? "NS 250" : p.rate === "half" ? "0.45% NS" : p.rate === "d5half" ? "D5 1/2 NS" : p.rate === "bolus" ? "bolus" : "no fluid";
+  const rows = [
+    ["Fluid running", fluid],
+    ["Insulin", p.insulin ? p.insulin.toFixed(2) + " u/kg/h" : "off"],
+    ["Potassium", p.kcl ? p.kcl + " mEq/h" : "off"],
+    ["Dextrose", p.dextrose || p.rate === "d5half" ? "on" : "off"],
+    ["Precipitant", p.cause ? "found" : "not yet"],
+    ["Antibiotics", p.needAbx ? (p.abx ? "in" : "needed") : "not indicated"],
+  ];
+  document.getElementById("path").innerHTML = rows.map(([a, b]) => `<div class="check"><span>${a}</span><b>${b}</b></div>`).join("");
+  document.getElementById("note").textContent = p.note;
+  document.querySelectorAll("#orders button").forEach((btn) => {
+    const id = btn.dataset.o;
+    const on = (id === "ns500" && p.rate === "ns500") || (id === "ns250" && p.rate === "ns250") || (id === "half" && p.rate === "half") || (id === "dex" && (p.dextrose || p.rate === "d5half")) || (id === "ins1" && p.insulin === 0.1) || (id === "ins05" && p.insulin === 0.05) || (id === "k20" && p.kcl === 20) || (id === "k40" && p.kcl === 40) || (id === "abx" && p.abx) || (id === "cause" && p.cause) || (id === "basal" && p.basal);
+    btn.classList.toggle("on", on);
+  });
+}
+function debrief() {
+  const c = CASES.find((x) => x.id === caseId);
+  const won = P && !P.dead && (resolved(P) || stable >= 30);
+  app.innerHTML = `<div class="wrap">
+    <div class="hero">
+      <div style="font-weight:700;letter-spacing:.08em;font-size:13px">${won ? "RESOLVED" : "NOT YET SAFE"}</div>
+      <h1>${c.title}</h1>
+      <p class="lede">${P.dead ? P.dead : won ? "The biochemistry has settled and the precipitant is dealt with." : "The clock stopped before the end points were all met."}</p>
+      <p class="lede" style="margin-top:8px">Score ${scoreOf(P)}.</p>
+    </div>
+    <div class="stem" style="margin-top:14px">${c.pearls.map((x) => `<p style="margin-top:8px">${x}</p>`).join("")}</div>
+    <button id="back" style="margin-top:12px">Cases</button>
+    <button id="retry">Retry</button>
+  </div>`;
+  document.getElementById("back").onclick = () => { screen = "board"; draw(); };
+  document.getElementById("retry").onclick = () => { P = blank(c); stable = 0; running = false; screen = "sim"; draw(); };
+}
+draw();
+</script>
+</body>
+</html>
