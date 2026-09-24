@@ -181,6 +181,10 @@ ul.abnorm li b{color:#eaf2f7}
     </div>
     <div class="row3" style="margin-bottom:8px">
       <div class="field">
+        <label><span class="tip">Ionized Ca²⁺ (mmol/L)<span class="tip-box">Normal about 1.15–1.29 mmol/L. Below 0.9 is severe. This is the ionized value, not the albumin-corrected total.</span></span></label>
+        <input id="fCa" type="number" step="0.01" min="0.2" max="2.2" placeholder="1.15–1.29">
+      </div>
+      <div class="field">
         <label><span class="tip">Lactate (mmol/L)<span class="tip-box">Normal <2 mmol/L. ≥2 = hyperlactataemia; ≥4 = severe lactic acidosis.</span></span></label>
         <input id="fLactate" type="number" step="0.1" min="0" max="30" placeholder="<2">
       </div>
@@ -868,6 +872,7 @@ function parseExtractedValue(id,raw){
     fNa:[100,180],
     fCl:[70,140],
     fK:[1,10],
+    fCa:[0.2,2.2],
     fLactate:[0,30],
     fSpO2:[50,100],
     fTemp:[30,45]
@@ -889,15 +894,18 @@ function parseExtractedValue(id,raw){
      reinterpreting it with a decimal point would silently produce a
      plausible-looking but wrong result instead of correctly returning
      null. */
-  const placesByField={fpH:[3,2],fPaCO2:[1],fPaO2:[1],fHCO3:[1],fBE:[1],fK:[2,1],fLactate:[2,1],fNa:[1],fCl:[1],fSpO2:[1]};
+  const placesByField={fpH:[3,2],fPaCO2:[1],fPaO2:[1],fHCO3:[1],fBE:[1],fK:[2,1],fLactate:[2,1],fNa:[1],fCl:[1],fSpO2:[1],fCa:[2]};
   const places=placesByField[id];
   const body=rawStr.replace(/^[+-]/,'');
   if(places && /^-?\d+$/.test(rawStr) && body.length>=2){
     const sign=rawStr.startsWith('-')?'-':'';
     const found=[];
     for(const decimals of places){
-      if(body.length<=decimals) continue;
-      const candidate=parseFloat(sign+body.slice(0,body.length-decimals)+'.'+body.slice(body.length-decimals));
+      if(body.length<decimals) continue;
+      if(body.length===decimals && id!=='fCa') continue;
+      const candidate=parseFloat(sign+(body.length===decimals&&id==='fCa'
+        ? '0.'+body
+        : body.slice(0,body.length-decimals)+'.'+body.slice(body.length-decimals)));
       if(Number.isFinite(candidate) && candidate>=min && candidate<=max) found.push(candidate);
     }
     if(found.length){
@@ -983,6 +991,8 @@ function extractPrintoutTemplates(text){
   if(na!==null) out.fNa=na;
   const k=firstInRange(text, /\bc?K\+(?!\+)[^\n\[]{0,16}?(\d{1,4}(?:[.,]\d+)?)/i, 'fK');
   if(k!==null) out.fK=k;
+  const ca=firstInRange(text, /\bc?Ca\s*(?:2\+|[\+]{2})(?!\s*\()[^\n\[]{0,18}?(\d{1,4}(?:[.,]\d+)?)/i, 'fCa');
+  if(ca!==null) out.fCa=ca;
   const cl=firstInRange(text, /\bc?Cl-?[^\n\[]{0,16}?(\d{2,4}(?:[.,]\d+)?)/i, 'fCl');
   if(cl!==null) out.fCl=cl;
   const lac=firstInRange(text, /\bc?Lac(?:tate)?\b[^\n\[]{0,16}?(\d{1,4}(?:[.,]\d+)?)/i, 'fLactate');
@@ -1230,7 +1240,7 @@ function v(id){const el=document.getElementById(id);return el&&el.value!==''?par
    ============================================================ */
 function interpretABG(){
   const pH=v('fpH'),pco2=v('fPaCO2'),pao2=v('fPaO2'),hco3=v('fHCO3'),be=v('fBE');
-  const fio2=v('fFiO2')||0.21,na=v('fNa'),cl=v('fCl'),k=v('fK'),lactate=v('fLactate'),spo2=v('fSpO2'),age=v('fAge');
+  const fio2=v('fFiO2')||0.21,na=v('fNa'),cl=v('fCl'),k=v('fK'),ca=v('fCa'),lactate=v('fLactate'),spo2=v('fSpO2'),age=v('fAge');
   const sampleTypeEl=document.getElementById('fSampleType');
   const sampleType=sampleTypeEl?sampleTypeEl.value:'arterial';
 
@@ -1238,7 +1248,7 @@ function interpretABG(){
     alert('Please enter at least pH, PaCO₂, and HCO₃⁻ to interpret.');return;
   }
 
-  const res={pH,pco2,pao2,hco3,be,fio2,na,cl,k,lactate,spo2,sampleType,abnorm:[],mgmt:[],context:ctx};
+  const res={pH,pco2,pao2,hco3,be,fio2,na,cl,k,ca,lactate,spo2,sampleType,abnorm:[],mgmt:[],context:ctx};
 
   /* --- Step 1: pH classification --- */
   res.phStatus = pH<7.35?'Acidaemia':pH>7.45?'Alkalaemia':'Normal pH';
@@ -1274,7 +1284,10 @@ function interpretABG(){
     const chron=24-(40-pco2)*5/10;
     const fitsMet=Math.abs(pco2-expCO2)<=2;
     const fitsResp=Math.abs(hco3-chron)<=3;
-    if(fitsMet&&!fitsResp){res.primary='Compensated metabolic acidosis';res.primaryType='met';}
+    if(lactate!==null&&lactate>=2&&pco2<expCO2-2){
+      res.primary='Mixed Metabolic Acidosis and Respiratory Alkalosis';
+      res.primaryType='mixed';
+    } else if(fitsMet&&!fitsResp){res.primary='Compensated metabolic acidosis';res.primaryType='met';}
     else if(fitsResp&&!fitsMet){res.primary='Compensated respiratory alkalosis';res.primaryType='resp';}
     else if(pco2>expCO2+2&&hco3<chron-3){res.primary='Mixed metabolic acidosis and respiratory acidosis';res.primaryType='mixed';}
     else{res.primary='Normal pH with low CO₂ and HCO₃';res.primaryType='either';}
@@ -1308,6 +1321,10 @@ function interpretABG(){
     if(Math.abs(pco2-expCO2)<=5){res.comp='Adequate respiratory compensation for metabolic alkalosis';res.compAdequate=true;}
     else if(pco2>expCO2+5){res.comp='CO₂ is higher than expected — coexisting respiratory acidosis';res.compAdequate=false;}
     else{res.comp='CO₂ is lower than expected — coexisting respiratory alkalosis';res.compAdequate=false;}
+  } else if(res.primary==='Mixed Metabolic Acidosis and Respiratory Alkalosis'){
+    const expCO2=1.5*hco3+8;
+    res.comp='Lactate is '+lactate+' mmol/L and PaCO₂ is below the Winter value of '+expCO2.toFixed(0)+' mmHg. This is not a compensated respiratory alkalosis.';
+    res.compAdequate=false;
   } else if(res.primaryType==='either'){
     res.comp='The gas alone cannot say which process is primary. Use the history.';
     res.compAdequate=true;
@@ -1381,6 +1398,11 @@ function interpretABG(){
   if(res.ddInterp&&res.ddInterp!=='Pure HAGMA') res.abnorm.push({sev:'Moderate',text:'Delta-delta: '+res.ddInterp});
   if(lactate!==null&&lactate>=2) res.abnorm.push({sev:lactate>=4?'Severe':'Moderate',text:res.lactateSev+' ('+lactate+' mmol/L)'});
   if(k!==null&&res.kStatus!=='Normal potassium') res.abnorm.push({sev:k<3.0||k>5.5?'Severe':'Mild',text:res.kStatus+' (K⁺ '+k+')'});
+  if(ca!==null){
+    if(ca<0.9) res.abnorm.push({sev:'Severe',text:'Severe ionized hypocalcaemia (Ca²⁺ '+ca+' mmol/L)'});
+    else if(ca<1.12) res.abnorm.push({sev:'Moderate',text:'Low ionized calcium (Ca²⁺ '+ca+' mmol/L)'});
+    else if(ca>1.35) res.abnorm.push({sev:'Moderate',text:'High ionized calcium (Ca²⁺ '+ca+' mmol/L)'});
+  }
   if(!res.compAdequate&&res.comp!=='Not calculated') res.abnorm.push({sev:'Moderate',text:'Compensation: '+res.comp});
 
   /* --- Management points --- */
@@ -1417,8 +1439,8 @@ function buildMgmt(res){
 
   // Metabolic acidosis
   if(res.primary.includes('Metabolic Acidosis')||(res.primaryType==='met'&&res.hco3<22)){
-    if(res.agHigh){
-      add('High Anion Gap Metabolic Acidosis (HAGMA)','Causes to screen: lactate, ketones, uraemia, methanol, ethylene glycol, and salicylate. '+
+    if(res.agHigh||(res.lactate!==null&&res.lactate>=2)){
+      add('High Anion Gap Metabolic Acidosis (HAGMA)',(res.agHigh?'The anion gap is high. ':'The calculated gap is not high, but the lactate is. A low sodium or a low albumin can hide the gap. ')+'Causes to screen: lactate, ketones, uraemia, methanol, ethylene glycol, and salicylate. '+
         (res.lactateSev&&res.lactateSev.includes('hyperlact')?'Elevated lactate — look for shock, sepsis, or metformin. Treat the cause. Do not chase the lactate with bicarbonate.':'')+
         ' In DKA: insulin, fluid, and potassium. In lactic acidosis: restore oxygen delivery.');
     } else if(res.na===null||res.cl===null){
@@ -1468,6 +1490,13 @@ function buildMgmt(res){
   // Compensation incomplete
   if(res.compAdequate===false){
     add('Incomplete Compensation / Mixed Disorder',''+res.comp+'. Consider whether a second primary process is present. Review clinical context carefully.');
+  }
+  if(res.ca!==null&&res.ca<0.9){
+    add('Severe ionized hypocalcaemia','Ionized calcium is '+res.ca+' mmol/L. Give intravenous calcium now and watch the ECG. Check the magnesium. Albumin does not explain this result, because it is already the ionized value.');
+  } else if(res.ca!==null&&res.ca<1.12){
+    add('Low ionized calcium','Ionized calcium is '+res.ca+' mmol/L. Replace it and look for sepsis, citrate, a low magnesium, pancreatitis, or renal failure.');
+  } else if(res.ca!==null&&res.ca>1.35){
+    add('High ionized calcium','Ionized calcium is '+res.ca+' mmol/L. Look for malignancy, hyperparathyroidism, or excess calcium replacement. Give fluid if the patient is volume depleted.');
   }
   if(res.primaryType==='either'){
     add('Normal pH, two numbers moved together','This can be one compensated disorder or two disorders cancelling out. A stable patient with a high CO₂ and a matching bicarbonate is not in acute ventilatory failure. Do not ventilate the CO₂ to normal.');
@@ -1607,7 +1636,7 @@ function toggleExportBox(){
    Reset
    ============================================================ */
 function resetAll(){
-  ['fpH','fPaCO2','fPaO2','fHCO3','fBE','fFiO2','fNa','fCl','fK','fLactate','fSpO2','fTemp'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['fpH','fPaCO2','fPaO2','fHCO3','fBE','fFiO2','fNa','fCl','fK','fCa','fLactate','fSpO2','fTemp'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('resultsSection').style.display='none';
   document.getElementById('ocrStatus').style.display='none';
   document.getElementById('previewWrap').style.display='none';
