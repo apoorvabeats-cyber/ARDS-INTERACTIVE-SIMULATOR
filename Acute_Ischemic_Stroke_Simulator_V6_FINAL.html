@@ -173,19 +173,25 @@ This schematic is an educational abstraction, not a substitute for formal CT int
 <div class="field"><label>Vessel</label>
 <select id="vessel">
 <option value="ica_m1">ICA / M1</option>
-<option value="m2">M2 / other</option>
+<option value="m2dom">Proximal dominant M2</option>
+<option value="m2other">Distal, co-dominant, or non-dominant M2</option>
 <option value="basilar">Basilar</option>
 <option value="none">No LVO</option>
 </select></div>
 <div class="field"><label>PC-ASPECTS</label><input id="pc" type="number" min="0" max="10" value="8"></div>
 <div class="field"><label>Imaging</label>
 <select id="imagingType"><option>NCCT + CTA</option><option>CTP</option><option>MRI DWI/FLAIR</option></select></div>
+<div class="field"><label>Mismatch on CTP or MRI</label>
+<select id="mismatch">
+<option value="none">Not assessed</option>
+<option value="present">Present</option>
+<option value="absent">Absent</option>
+</select></div>
 </div>
 
 <div class="checks">
 <label class="check"><input id="hem" type="checkbox"><span><b>ICH on initial imaging</b></span></label>
 <label class="check"><input id="mass" type="checkbox"><span><b>Significant mass effect</b></span></label>
-<label class="check"><input id="advanced" type="checkbox"><span><b>Advanced imaging available</b></span></label>
 </div>
 </div></div>
 
@@ -402,7 +408,8 @@ function P(){
     sbp:N("sbp"),dbp:N("dbp"),glucose:N("glucose"),
     disabling:C("disabling"),wake:C("wake"),anticoag:C("anticoag"),
     dapt:C("dapt"),vessel:$("vessel").value,pc:N("pc"),imaging:$("imagingType").value,
-    hem:C("hem"),mass:C("mass"),advanced:C("advanced"),
+    mismatch:$("mismatch").value,
+    hem:C("hem"),mass:C("mass"),
     recentbleed:C("recentbleed"),recentbrain:C("recentbrain"),
     coag:C("coag"),priorich:C("priorich"),
     asp:aspects(),nihss:nihss()
@@ -422,7 +429,7 @@ function ivtDecision(p){
   const bp=p.sbp<185 && p.dbp<110;
   const standard=p.h<=4.5 && !p.wake;
   const extended=p.wake || (p.h>4.5 && p.h<=9);
-  const mismatch = p.advanced && (p.imaging==="CTP" || p.imaging==="MRI DWI/FLAIR");
+  const rightScan=p.imaging==="CTP" || p.imaging==="MRI DWI/FLAIR";
   let cls="info", title="IVT: REVIEW REQUIRED", msg="Review time, deficit, BP, imaging and the full contraindication list.";
   let cleared=false;
   if(reasons.length){
@@ -442,16 +449,34 @@ function ivtDecision(p){
     cls="info"; title="IVT: NON-DISABLING DEFICIT";
     msg="2026 AHA: thrombolysis is for a disabling deficit, at any NIHSS. A non-disabling deficit is not an automatic treatment.";
   }else if(extended && p.h<=24){
-    if(mismatch){
-      cls="info"; title="IVT: EXTENDED WINDOW — MISMATCH REQUIRED";
-      msg="Unknown onset, wake-up, or 4.5–9 hours can be considered only when advanced imaging shows salvageable tissue (DWI-FLAIR mismatch, or perfusion mismatch). Selecting CTP or MRI does not by itself prove that mismatch.";
+    if(!rightScan || p.mismatch==="none"){
+      cls="warn"; title="IVT: EXTENDED WINDOW — MISMATCH NOT READ";
+      msg="NCCT and CTA cannot answer this. Use CTP or MRI DWI–FLAIR, then record whether mismatch is present or absent.";
+    }else if(p.mismatch==="absent"){
+      cls="bad"; title="IVT: NO MISMATCH";
+      msg="Mismatch is absent. Do not give thrombolysis for a wake-up stroke or a 4.5–9 hour onset.";
+    }else if(!p.disabling){
+      cls="info"; title="IVT: NON-DISABLING DEFICIT";
+      msg="Mismatch is present, but thrombolysis is for a disabling deficit.";
+    }else if(!bp){
+      cls="warn"; title="IVT: BP CONTROL REQUIRED";
+      msg="Mismatch is present. Lower BP to below 185/110 mmHg, recheck it, then reassess.";
     }else{
-      cls="warn"; title="IVT: EXTENDED WINDOW NEEDS THE RIGHT SCAN";
-      msg="NCCT and CTA are not enough here. Use CTP or MRI DWI-FLAIR, and the mismatch still has to be present.";
+      cls="good"; title="IVT: EXTENDED WINDOW — MISMATCH PRESENT";
+      msg="Wake-up, unknown onset, or 4.5–9 hours, with mismatch on CTP or MRI and a disabling deficit. Finish the contraindication review, then treat.";
+      cleared=true;
     }
   }else if(p.h>9 && !p.wake){
-    cls="warn"; title="IVT: OUTSIDE THE STANDARD WINDOW";
-    msg="Known onset beyond 9 hours is not a routine thrombolysis window. A later, expert-only pathway exists for some LVO patients who cannot receive thrombectomy and who have perfusion mismatch.";
+    if(p.mismatch==="absent"){
+      cls="bad"; title="IVT: NO MISMATCH";
+      msg="Known onset is beyond 9 hours and mismatch is absent. Do not give thrombolysis.";
+    }else if(p.mismatch==="present" && rightScan){
+      cls="warn"; title="IVT: EXPERT PATHWAY ONLY";
+      msg="Beyond 9 hours with mismatch is not routine. It is considered only for some large-vessel occlusions when thrombectomy cannot be done.";
+    }else{
+      cls="warn"; title="IVT: OUTSIDE THE STANDARD WINDOW";
+      msg="Known onset beyond 9 hours is not a routine thrombolysis window. A later pathway needs a real perfusion mismatch, and only when thrombectomy cannot be done.";
+    }
   }
   return {cls, title, msg, cleared, stopped: reasons.length>0};
 }
@@ -465,11 +490,15 @@ function evtDecision(p){
       msg:ok?"Within 24 h, NIHSS ≥10, prestroke mRS 0–1, PC-ASPECTS ≥6, no significant mass effect. Activate the basilar pathway."
         :"2026 screening is not all met: ≤24 h, NIHSS ≥10, mRS 0–1, PC-ASPECTS ≥6, and no significant mass effect."};
   }
-  if(p.vessel==="m2"){
+  if(p.vessel==="m2dom"){
     const ok=p.h<=6 && p.nihss>=6 && p.mrs<=1 && p.asp>=6 && !p.mass;
-    return {cls:ok?"warn":"info", title:"M2 OCCLUSION", ok:false,
-      msg:ok?"Reasonable only for a proximal dominant M2 within 6 hours, NIHSS ≥6, mRS 0–1, ASPECTS ≥6. Not recommended for a non-dominant, co-dominant, or distal M2."
-        :"No automatic M2 recommendation on these inputs. Dominant M2 is a 6-hour pathway with NIHSS ≥6, mRS 0–1 and ASPECTS ≥6."};
+    return {cls:ok?"good":"warn", title:"PROXIMAL DOMINANT M2", ok,
+      msg:ok?"Within 6 hours, NIHSS ≥6, prestroke mRS 0–1, ASPECTS ≥6, no significant mass effect. Reasonable to take a proximal dominant M2."
+        :"Not met. A proximal dominant M2 needs ≤6 hours, NIHSS ≥6, mRS 0–1, ASPECTS ≥6, and no significant mass effect."};
+  }
+  if(p.vessel==="m2other"){
+    return {cls:"warn", title:"DISTAL OR NON-DOMINANT M2", ok:false,
+      msg:"Not recommended. Do not take a non-dominant, co-dominant, or distal M2 on this pathway."};
   }
   const earlyGood=p.h<=6 && p.nihss>=6 && p.mrs<=1 && p.asp>=6;
   const earlyCore=p.h<=6 && p.nihss>=6 && p.mrs<=1 && p.asp>=3 && p.asp<=5 && !p.mass;
@@ -563,11 +592,12 @@ function update(){
 function reset(){
   const vals={age:65,weight:70,hours:2,sbp:170,dbp:95,glucose:120,pc:8};
   Object.entries(vals).forEach(([k,v])=>$(k).value=v);
-  ["wake","anticoag","dapt","hem","mass","advanced","recentbleed",
+  ["wake","anticoag","dapt","hem","mass","recentbleed",
    "recentbrain","coag","priorich"].forEach(k=>$(k).checked=false);
   $("disabling").checked=true;
   setMrs(0,false);
   $("vessel").value="ica_m1";
+  $("mismatch").value="none";
   affectedSet=new Set(["M4","M5"]);
   document.querySelectorAll("#nihssForm select").forEach(s=>s.value="0");
   buildAsp();
