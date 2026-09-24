@@ -23,7 +23,7 @@
   .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
   .chips button{border:0;border-radius:999px;font-weight:800;padding:10px 12px;cursor:pointer;font-size:13px;color:#fff}
-  #r10{background:#0f766e}#r20{background:#7c3aed}#oral{background:#0891b2}#mg{background:#d97706}
+  #r10{background:#0f766e}#r20{background:#7c3aed}#oral{background:#0891b2}#mg{background:#d97706}#mag{background:#059669}
   .chips button.on{outline:3px solid #0f172a;outline-offset:2px}
   .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
   .num{border-radius:12px;text-align:center;padding:10px 6px;color:#fff}
@@ -79,6 +79,7 @@
       <button type="button" id="r20">20 mmol/h</button>
       <button type="button" id="oral">Oral 40</button>
       <button type="button" id="mg">Low magnesium</button>
+      <button type="button" id="mag">Magnesium 2 g</button>
     </div>
   </section>
   <section>
@@ -100,17 +101,24 @@
 </main>
 <script>
 if(new URLSearchParams(location.search).get('embed')) document.body.classList.add('embed');
-var H=12, CAP=5, phase=0, nowKind='normal', laterKind='normal';
+var H=12, CAP=5, phase=0, ecgPath=[2.8], ecgHour=0, ecgTick=0;
 var NAME={normal:'Normal',peaked:'Peaked T',wide:'Wide QRS',sine:'Sine wave',flat:'Flat T',uwave:'U wave',bigu:'Large U',vt:'VT'};
 function read(id){ var n=parseFloat(String(document.getElementById(id).value||'').replace(',','.')); return Number.isFinite(n)?n:null; }
 function on(id){ return document.getElementById(id).classList.contains('on'); }
-function factor(){ return on('mg')?0.4:1; }
+function factor(){ return (on('mg') && !on('mag')) ? 0.4 : 1; }
 function hyperKind(k){ if(k>=8) return 'sine'; if(k>=6.5) return 'wide'; if(k>=5.5) return 'peaked'; return 'normal'; }
 function hypoKind(k){ if(k>=5.5) return hyperKind(k); if(k<2.2) return 'vt'; if(k<2.6) return 'bigu'; if(k<3.2) return 'uwave'; if(k<3.5) return 'flat'; return 'normal'; }
 function project(k, rate, oral){
-  var per=0.01*factor(), path=[k], given=0;
-  for(var h=1;h<=H;h++){ given+=rate; if(oral&&h<=4) given+=10; path.push(k+given*per); }
-  return {path:path, mmol:given, final:path[H]};
+  var per=0.01*factor(), path=[k], iv=0, byMouth=0;
+  var fast=rate>=20;
+  for(var h=1;h<=H;h++){
+    iv+=rate;
+    if(oral&&h<=4) byMouth+=10;
+    var settled=k+(iv+byMouth)*per;
+    var spike=fast ? rate*0.04*(h===1?1:h===2?0.4:h===3?0.12:0) : 0;
+    path.push(settled+spike);
+  }
+  return {path:path, mmol:iv+byMouth, final:k+(iv+byMouth)*per};
 }
 function g(x,c,w,a){ var d=x-c; return a*Math.exp(-(d*d)/(2*w*w)); }
 function sample(t, kind){
@@ -125,7 +133,7 @@ function sample(t, kind){
   if(kind==='bigu'){ ta=0.02; ua=0.5; qa=0.75; }
   return g(t,0.14,0.018,p)+g(t,0.24,qw*0.45,-0.25*qa)+g(t,0.27,qw,qa)+g(t,tc,tw,ta)+g(t,uc,0.04,ua);
 }
-function paintChart(path, goal, cross){
+function paintChart(path, goal, cross, hour){
   var c=document.getElementById('chart'), dpr=Math.min(2,devicePixelRatio||1);
   var W=c.clientWidth||640, Ht=c.clientHeight||280;
   c.width=W*dpr; c.height=Ht*dpr;
@@ -145,6 +153,7 @@ function paintChart(path, goal, cross){
   ctx.beginPath(); ctx.moveTo(X(0),Y(CAP)); ctx.lineTo(R,Y(CAP)); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle='#dc2626'; ctx.fillText('5.0', X(0)+4, Y(CAP)-4);
   if(cross!=null){ ctx.fillStyle='#dc2626'; ctx.beginPath(); ctx.arc(X(cross),Y(path[cross]),7,0,7); ctx.fill(); }
+  if(hour!=null){ ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2; ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(X(hour),T); ctx.lineTo(X(hour),Ht-B); ctx.stroke(); }
   var y=Y(goal);
   ctx.strokeStyle='#059669'; ctx.lineWidth=4; ctx.setLineDash([8,5]);
   ctx.beginPath(); ctx.moveTo(X(0),y); ctx.lineTo(R,y); ctx.stroke(); ctx.setLineDash([]);
@@ -177,9 +186,14 @@ function frame(){
   var W=c.clientWidth||640, Ht=c.clientHeight||168;
   if(c.width!==Math.floor(W*dpr)){ c.width=W*dpr; c.height=Ht*dpr; }
   var ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
-  drawStrip(ctx, 0, Ht/2-2, nowKind, 'Now');
-  drawStrip(ctx, Ht/2+2, Ht/2-2, laterKind, '12 h');
+  drawStrip(ctx, 0, Ht, hypoKind(ecgPath[ecgHour]||ecgPath[0]), ecgHour+' h · '+Number(ecgPath[ecgHour]||0).toFixed(1));
   phase+=0.012;
+  ecgTick++;
+  if(ecgTick>40 && ecgPath.length){
+    ecgTick=0;
+    ecgHour=(ecgHour+1)%ecgPath.length;
+    if(window._kpath) paintChart(window._kpath, window._kgoal, window._kcross, ecgHour);
+  }
   requestAnimationFrame(frame);
 }
 function paint(){
@@ -207,10 +221,12 @@ function paint(){
   if(over){ ods.className='show'; ods.textContent='Overcorrection. The potassium crosses 5.0 at '+cross+' h. Stop the infusion.'; }
   else { ods.className=''; ods.textContent=''; }
   document.getElementById('goalKey').innerHTML='<i class="lg-goal"></i>Goal '+goal.toFixed(1);
-  paintChart(t.path, goal, cross);
+  window._kpath=t.path; window._kgoal=goal; window._kcross=cross;
+  ecgPath=t.path;
+  paintChart(t.path, goal, cross, ecgHour);
   document.getElementById('hours').innerHTML=[0,3,6,9,12].map(function(h){ return '<div>'+h+' h<b>'+t.path[h].toFixed(1)+'</b></div>'; }).join('');
-  nowKind=hypoKind(k); laterKind=hypoKind(t.final);
-  var bad=nowKind==='vt'||nowKind==='bigu'||laterKind==='sine'||laterKind==='wide'||laterKind==='vt';
+  var watch=hypoKind(Math.max.apply(null, t.path));
+  var bad=watch==='vt'||watch==='bigu'||watch==='sine'||watch==='wide'||watch==='peaked';
   document.getElementById('ecgBox').className='ecgbox'+(bad?' bad':'');
 }
 function applyGoal(){
@@ -230,6 +246,7 @@ document.getElementById('r10').onclick=function(){ document.getElementById('rout
 document.getElementById('r20').onclick=function(){ document.getElementById('route').value='20'; document.getElementById('rateN').value=20; paint(); };
 document.getElementById('oral').onclick=function(){ this.classList.toggle('on'); applyGoal(); };
 document.getElementById('mg').onclick=function(){ this.classList.toggle('on'); applyGoal(); };
+document.getElementById('mag').onclick=function(){ this.classList.toggle('on'); applyGoal(); };
 var q=new URLSearchParams(location.search);
 if(q.get('k')) document.getElementById('k').value=q.get('k');
 applyGoal();
