@@ -104,6 +104,8 @@
     width:18px;height:18px;line-height:18px;text-align:center;border-radius:50%;margin-right:6px;
   }
   .calc-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  th,td{border-bottom:1px solid #e6eef2;text-align:left;padding:6px 4px}
   .calc-field{flex:1;min-width:120px}
   .calc-field label{display:block;font-size:11.5px;color:#5a6d75;margin-bottom:3px}
   .calc-field input,.calc-field select{
@@ -136,8 +138,8 @@
 <body>
 
 <header>
-  <h1>Electrolyte Disorders</h1>
-  <p>Diagnosis &amp; guideline-based management — Critical Care Reference</p>
+  <h1>Electrolytes</h1>
+  <p>Choose an electrolyte and enter the number. The page decides which algorithm applies.</p>
 </header>
 
 <div class="wrap">
@@ -145,7 +147,7 @@
   <div id="menuGrid" class="menu-grid"></div>
 
   <div id="detailView">
-    <button class="backbtn" onclick="showMenu()">← All disorders</button>
+    <button class="backbtn" onclick="showMenu()">← All electrolytes</button>
     <div id="detailContent"></div>
   </div>
 
@@ -505,23 +507,55 @@ phosphate_high: {
 
 };
 
-const ORDER=['sodium_low','sodium_high','potassium_low','potassium_high','calcium_low','calcium_high','magnesium_low','magnesium_high','phosphate_low','phosphate_high'];
+const IONS=[
+  {id:'sodium', name:'Sodium', unit:'mmol/L', prompt:'Enter the sodium', low:135, high:145, lowKey:'sodium_low', highKey:'sodium_high', hint:'Usual range 135–145 mmol/L'},
+  {id:'potassium', name:'Potassium', unit:'mmol/L', prompt:'Enter the potassium', low:3.5, high:5.0, lowKey:'potassium_low', highKey:'potassium_high', hint:'Usual range 3.5–5.0 mmol/L'},
+  {id:'calcium', name:'Calcium', unit:'mg/dL', prompt:'Enter the corrected calcium', low:8.5, high:10.5, lowKey:'calcium_low', highKey:'calcium_high', hint:'Corrected calcium. Usual range 8.5–10.5 mg/dL'},
+  {id:'magnesium', name:'Magnesium', unit:'mg/dL', prompt:'Enter the magnesium', low:1.7, high:2.5, lowKey:'magnesium_low', highKey:'magnesium_high', hint:'Usual range 1.7–2.5 mg/dL'},
+  {id:'phosphate', name:'Phosphate', unit:'mg/dL', prompt:'Enter the phosphate', low:2.5, high:4.5, lowKey:'phosphate_low', highKey:'phosphate_high', hint:'Usual range 2.5–4.5 mg/dL'}
+];
+let currentIon=null;
 
 function buildMenu(){
   const grid=document.getElementById('menuGrid');
   grid.innerHTML='';
-  ORDER.forEach(key=>{
-    const d=DISORDERS[key];
+  IONS.forEach(ion=>{
     const card=document.createElement('div');
     card.className='menu-card';
-    card.onclick=()=>showDisorder(key);
-    card.innerHTML=`
-      <span class="tag ${d.tag}">${d.tag==='high'?'ELEVATED':'LOW'}</span>
-      <span class="name">${d.name}</span>
-      <span class="range">${d.range}</span>
-    `;
+    card.onclick=()=>showEntry(ion.id);
+    card.innerHTML=`<span class="name">${ion.name}</span><span class="range">${ion.hint}</span>`;
     grid.appendChild(card);
   });
+}
+
+function showEntry(id){
+  currentIon=IONS.find(i=>i.id===id);
+  document.getElementById('menuGrid').style.display='none';
+  document.getElementById('detailView').style.display='block';
+  document.querySelector('.ref-note').style.display='none';
+  document.getElementById('detailContent').innerHTML=`
+    <div class="disorder-head"><h2>${currentIon.name}</h2><div class="subtitle">${currentIon.prompt}</div></div>
+    <div class="card">
+      <h3>${currentIon.prompt}</h3>
+      <p>${currentIon.hint}. The value chooses the algorithm. A number inside the usual range does not open one.</p>
+      <div class="calc-field"><label>${currentIon.name} (${currentIon.unit})</label>
+        <input type="number" id="ionValue" step="0.1" inputmode="decimal">
+      </div>
+      <button class="calc-btn" onclick="useValue()">Use this value</button>
+      <div id="ionMsg" class="calc-out"></div>
+    </div>`;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function useValue(){
+  const raw=document.getElementById('ionValue').value;
+  const v=parseFloat(raw);
+  const msg=document.getElementById('ionMsg');
+  if(raw===''||Number.isNaN(v)){ msg.textContent='Enter a number.'; return; }
+  const ion=currentIon;
+  if(v<ion.low) showDisorder(ion.lowKey, v, ion);
+  else if(v>ion.high) showDisorder(ion.highKey, v, ion);
+  else msg.innerHTML='<b>'+v+' '+ion.unit+'</b> is inside the usual range. No low or high algorithm applies.';
 }
 
 function severityRow(sev){
@@ -540,256 +574,121 @@ function mgmtCard(steps){
   return `<div class="card"><h3>Management</h3>${stepsHtml}</div>`;
 }
 
-/* ===================== Hypernatraemia interactive calculator ===================== */
-
-function hnCalculatorHTML(){
-  return `
-  <div class="calc-card">
-    <h3><span class="step-num">1</span>Enter Serum Sodium</h3>
-    <div class="calc-row">
-      <div class="calc-field">
-        <label>Serum Na⁺ (mmol/L)</label>
-        <input type="number" id="hnNa" step="0.1" placeholder="e.g. 155" oninput="hnUpdateSeverity()">
-      </div>
-    </div>
-    <div id="hnSeverityOut" class="calc-out"></div>
-  </div>
-
-  <div id="hnStep1Wrap" style="display:none">
-    <div class="calc-card">
-      <h3><span class="step-num">2</span>Confirm &amp; Assess</h3>
-      <div class="calc-hint">Enter what's available — this documents the workup and flags a DI pattern; it does not auto-diagnose the cause.</div>
-      <div class="calc-row">
-        <div class="calc-field"><label>Serum glucose (mg/dL)</label><input type="number" id="hnGlu"></div>
-        <div class="calc-field"><label>Serum osmolality (mOsm/kg)</label><input type="number" id="hnSerumOsm"></div>
-      </div>
-      <div class="calc-row">
-        <div class="calc-field"><label>BUN (mg/dL)</label><input type="number" id="hnBUN"></div>
-        <div class="calc-field"><label>Creatinine (mg/dL)</label><input type="number" id="hnCr"></div>
-      </div>
-      <div class="calc-row">
-        <div class="calc-field"><label>Urine osmolality (mOsm/kg)</label><input type="number" id="hnUOsm" oninput="hnCheckDI()"></div>
-        <div class="calc-field"><label>Urine Na⁺ (mmol/L)</label><input type="number" id="hnUNa"></div>
-      </div>
-      <div class="calc-row">
-        <div class="calc-field"><label>Urine volume (mL/24h)</label><input type="number" id="hnUVol"></div>
-      </div>
-      <div class="calc-field" style="margin-bottom:10px">
-        <label>Polyuria present?</label>
-        <div class="toggle-btns">
-          <label><input type="radio" name="hnPolyuria" value="yes" onchange="hnCheckDI()"><span>Yes</span></label>
-          <label><input type="radio" name="hnPolyuria" value="no" onchange="hnCheckDI()"><span>No</span></label>
-        </div>
-      </div>
-      <div id="hnDIFlag"></div>
-      <div class="ref-mini">
-        <b>A. Water loss &gt; sodium loss:</b> GI losses, fever/sweating, burns, osmotic diuresis, diabetes insipidus, diuretics.<br>
-        <b>B. Renal water loss:</b> think DI if hypernatraemia + polyuria + inappropriately dilute urine — central DI (low ADH) vs nephrogenic DI (renal resistance to ADH).<br>
-        <b>C. Sodium gain:</b> hypertonic saline, sodium bicarbonate, salt ingestion, hypertonic feeds.
-      </div>
-    </div>
-  </div>
-
-  <div id="hnDIWrap" style="display:none">
-    <div class="calc-card">
-      <h3>Diabetes Insipidus — Type</h3>
-      <div class="toggle-btns">
-        <label><input type="radio" name="hnDIType" value="central" onchange="hnShowDIType()"><span>Central DI</span></label>
-        <label><input type="radio" name="hnDIType" value="nephrogenic" onchange="hnShowDIType()"><span>Nephrogenic DI</span></label>
-      </div>
-      <div id="hnDITypeOut" class="calc-out"></div>
-    </div>
-  </div>
-
-  <div class="calc-card">
-    <h3><span class="step-num">3</span>Free-Water Deficit</h3>
-    <div class="calc-row">
-      <div class="calc-field"><label>Body weight (kg)</label><input type="number" id="hnWeight"></div>
-      <div class="calc-field">
-        <label>Sex</label>
-        <select id="hnSex"><option value="male">Male</option><option value="female">Female</option></select>
-      </div>
-    </div>
-    <div class="calc-row">
-      <div class="calc-field">
-        <label>Elderly (≥65y)?</label>
-        <div class="toggle-btns">
-          <label><input type="radio" name="hnElderly" value="yes"><span>Yes</span></label>
-          <label><input type="radio" name="hnElderly" value="no" checked><span>No</span></label>
-        </div>
-      </div>
-      <div class="calc-field"><label>Target Na⁺ (mmol/L)</label><input type="number" id="hnTarget" value="140"></div>
-    </div>
-    <button class="calc-btn" onclick="hnCalcDeficit()">Calculate free-water deficit</button>
-    <div id="hnDeficitOut" class="calc-out"></div>
-  </div>
-
-  <div id="hnMgmtWrap" style="display:none">
-    <div class="calc-card">
-      <h3><span class="step-num">4</span>Management &amp; Correction Rate</h3>
-      <div class="calc-field" style="margin-bottom:10px">
-        <label>Shock / hypotension present?</label>
-        <div class="toggle-btns">
-          <label><input type="radio" name="hnShock" value="yes"><span>Yes</span></label>
-          <label><input type="radio" name="hnShock" value="no" checked><span>No</span></label>
-        </div>
-      </div>
-      <div class="calc-field" style="margin-bottom:10px">
-        <label>Duration of hypernatraemia</label>
-        <div class="toggle-btns">
-          <label><input type="radio" name="hnDuration" value="acute"><span>Acute (&lt;48h)</span></label>
-          <label><input type="radio" name="hnDuration" value="chronic" checked><span>&gt;48h / unknown</span></label>
-        </div>
-      </div>
-      <button class="calc-btn" onclick="hnCalcManagement()">Generate management plan</button>
-      <div id="hnMgmtOut" class="calc-out"></div>
-    </div>
-  </div>
-  `;
+function sodiumPlan(o){
+  const tbw=o.weight*o.factor;
+  const target=Math.min(o.target, o.na-0.1);
+  const fwd=tbw*((o.na/target)-1);
+  const delta=(o.infusate-o.na)/(tbw+1);
+  const cap=o.onset==='acute'?1:10/24;
+  const used=Math.min(o.wanted, cap);
+  let rate=null, block='';
+  if(delta>=-0.2){
+    block='This fluid will not lower the sodium in a useful way. Use water or 0.45% saline for the sodium. Use 0.9% saline only if the patient is shocked.';
+  }else{
+    rate=Math.round((used/Math.abs(delta))*1000);
+    if(o.infusate>=154 && rate>150){
+      block='0.9% saline lowers this sodium too slowly. At '+rate+' mL/h it is a volume load, not a sodium treatment. Use water or 0.45% saline, and use 0.9% saline first only for shock.';
+      rate=null;
+    }
+  }
+  return {tbw, fwd, delta, cap, used, over:o.wanted>cap+0.001, rate, block, target};
 }
 
-function hnUpdateSeverity(){
-  const naVal=document.getElementById('hnNa').value;
-  const na=parseFloat(naVal);
-  const out=document.getElementById('hnSeverityOut');
-  const step1=document.getElementById('hnStep1Wrap');
-  if(naVal===''||isNaN(na)){ out.innerHTML=''; step1.style.display='none'; return; }
-  if(na<=145){
-    out.innerHTML='<span class="sev-chip sev-mild">Na⁺ '+na+' mmol/L — not hypernatraemic (definition: &gt;145)</span>';
-    step1.style.display='none';
+function sodiumCalcHTML(na){
+  return `
+  <div class="card">
+    <h3>Infusion</h3>
+    <p>Sodium entered: <b>${na}</b> mmol/L. The rate below is the Adrogue estimate for the chosen fluid. It is not a free-water loss added on top, and 0.9% saline is not used to chase the number.</p>
+    <div class="calc-row">
+      <div class="calc-field"><label>Weight (kg)</label><input type="number" id="naWt" value="70"></div>
+      <div class="calc-field"><label>Body water</label>
+        <select id="naFactor">
+          <option value="0.6" selected>Adult male, 60%</option>
+          <option value="0.5">Adult female, 50%</option>
+          <option value="0.5">Elderly male, 50%</option>
+          <option value="0.45">Elderly female, 45%</option>
+        </select>
+      </div>
+    </div>
+    <div class="calc-row">
+      <div class="calc-field"><label>Fluid</label>
+        <select id="naFluid">
+          <option value="0" selected>Water or 5% dextrose (0)</option>
+          <option value="77">0.45% saline (77)</option>
+          <option value="154">0.9% saline (154)</option>
+        </select>
+      </div>
+      <div class="calc-field"><label>Target sodium</label><input type="number" id="naTarget" value="145"></div>
+    </div>
+    <div class="calc-field" style="margin-bottom:10px"><label>How long has it been high?</label>
+      <div class="toggle-btns">
+        <label><input type="radio" name="naOnset" value="chronic" checked onchange="runSodiumCalc()"><span>48 hours or unknown</span></label>
+        <label><input type="radio" name="naOnset" value="acute" onchange="runSodiumCalc()"><span>Under 48 hours</span></label>
+      </div>
+    </div>
+    <div class="calc-field" style="margin-bottom:10px"><label>Shocked?</label>
+      <div class="toggle-btns">
+        <label><input type="radio" name="naShock" value="no" checked><span>No</span></label>
+        <label><input type="radio" name="naShock" value="yes"><span>Yes</span></label>
+      </div>
+    </div>
+    <div class="calc-field"><label>Requested fall (mmol/L per hour)</label><input type="number" id="naRate" step="0.1" value="0.4"></div>
+    <button class="calc-btn" onclick="runSodiumCalc()">Calculate the rate</button>
+    <div id="naOut" class="calc-out"></div>
+  </div>`;
+}
+
+function runSodiumCalc(){
+  const na=parseFloat(document.getElementById('naEntered').value);
+  const weight=parseFloat(document.getElementById('naWt').value);
+  const factor=parseFloat(document.getElementById('naFactor').value);
+  const infusate=parseFloat(document.getElementById('naFluid').value);
+  const target=parseFloat(document.getElementById('naTarget').value);
+  const wanted=parseFloat(document.getElementById('naRate').value);
+  const onset=(document.querySelector('input[name="naOnset"]:checked')||{}).value||'chronic';
+  const shock=(document.querySelector('input[name="naShock"]:checked')||{}).value||'no';
+  const out=document.getElementById('naOut');
+  if(!(na>145)||!(weight>0)||!(wanted>0)||!(target>0)||target>=na){
+    out.innerHTML='Enter a sodium above 145, a weight, a target below the current sodium, and a fall per hour.';
     return;
   }
-  let sev,cls;
-  if(na>=160){sev='Severe';cls='sev-sev';}
-  else if(na>=150){sev='Moderate';cls='sev-mod';}
-  else{sev='Mild';cls='sev-mild';}
-  const warn=na>=160?'<div class="di-flag">⚠ Severe hypernatraemia (≥160 mmol/L) is associated with neurological manifestations and requires urgent, controlled correction.</div>':'';
-  out.innerHTML='<span class="sev-chip '+cls+'">'+sev+' hypernatraemia — Na⁺ '+na+' mmol/L</span>'+warn;
-  step1.style.display='block';
-}
-
-function hnCheckDI(){
-  const uOsmVal=document.getElementById('hnUOsm').value;
-  const uOsm=parseFloat(uOsmVal);
-  const polyuriaEl=document.querySelector('input[name="hnPolyuria"]:checked');
-  const polyuria=polyuriaEl?polyuriaEl.value:null;
-  const flag=document.getElementById('hnDIFlag');
-  const diWrap=document.getElementById('hnDIWrap');
-  if(polyuria==='yes'&&uOsmVal!==''&&uOsm<300){
-    flag.innerHTML='<div class="di-flag">Hypernatraemia + polyuria + inappropriately dilute urine (osmolality '+uOsm+' mOsm/kg) — pattern suggestive of diabetes insipidus. Select the type below.</div>';
-    diWrap.style.display='block';
-  } else if(polyuria==='yes'){
-    flag.innerHTML='<div class="di-flag">Polyuria present — enter urine osmolality to check for a DI pattern (suggested by inappropriately dilute urine despite hypernatraemia).</div>';
-    diWrap.style.display='none';
-  } else {
-    flag.innerHTML='';
-    diWrap.style.display='none';
-  }
-}
-
-function hnShowDIType(){
-  const type=document.querySelector('input[name="hnDIType"]:checked');
-  const out=document.getElementById('hnDITypeOut');
-  if(!type){ out.innerHTML=''; return; }
-  if(type.value==='central'){
-    out.innerHTML='<div class="mgmt-step"><div class="step-title">Central DI — low ADH</div><div class="step-body">Desmopressin, plus free-water replacement for the existing deficit.</div></div>';
-  } else {
-    out.innerHTML='<div class="mgmt-step"><div class="step-title">Nephrogenic DI — renal resistance to ADH</div><div class="step-body">Remove the offending drug (e.g. lithium); correct hypokalaemia/hypercalcaemia; low-solute diet; thiazide ± amiloride depending on the underlying cause.</div></div>';
-  }
-}
-
-let hnDeficitL=null,hnCurrentNa=null,hnTargetNaVal=null;
-
-function hnCalcDeficit(){
-  const na=parseFloat(document.getElementById('hnNa').value);
-  const weight=parseFloat(document.getElementById('hnWeight').value);
-  const sex=document.getElementById('hnSex').value;
-  const elderlyEl=document.querySelector('input[name="hnElderly"]:checked');
-  const elderly=elderlyEl&&elderlyEl.value==='yes';
-  const target=parseFloat(document.getElementById('hnTarget').value)||140;
-  const out=document.getElementById('hnDeficitOut');
-  const mgmtWrap=document.getElementById('hnMgmtWrap');
-
-  if(!na||na<=145){ out.innerHTML='<span style="color:#c0392b">Enter a serum Na⁺ above 145 mmol/L at the top of this page first.</span>'; return; }
-  if(!weight){ out.innerHTML='<span style="color:#c0392b">Enter body weight.</span>'; return; }
-
-  let tbwFactor;
-  if(sex==='male') tbwFactor=elderly?0.5:0.6;
-  else tbwFactor=elderly?0.45:0.5;
-
-  const tbw=tbwFactor*weight;
-  const deficit=tbw*(na/target-1);
-
-  hnDeficitL=deficit;hnCurrentNa=na;hnTargetNaVal=target;
-
-  out.innerHTML=
-    '<p>TBW = '+tbwFactor+' × '+weight+' kg = <b>'+tbw.toFixed(1)+' L</b></p>'+
-    '<p>Free-water deficit = '+tbw.toFixed(1)+' × ('+na+'/'+target+' − 1) = <b>'+deficit.toFixed(2)+' L</b></p>';
-
-  mgmtWrap.style.display='block';
-}
-
-function hnCalcManagement(){
-  const shockEl=document.querySelector('input[name="hnShock"]:checked');
-  const durationEl=document.querySelector('input[name="hnDuration"]:checked');
-  const shock=shockEl?shockEl.value:'no';
-  const duration=durationEl?durationEl.value:'chronic';
-  const out=document.getElementById('hnMgmtOut');
-
-  if(hnDeficitL===null){ out.innerHTML='<span style="color:#c0392b">Calculate the free-water deficit above first.</span>'; return; }
-
+  const plan=sodiumPlan({na, weight, factor, infusate, target, wanted, onset});
   let html='';
-  if(shock==='yes'){
-    html+='<div class="mgmt-step emergency"><div class="step-title">Resuscitate first</div><div class="step-body">Restore circulation with 0.9% saline before correcting the free-water deficit.</div></div>';
+  if(shock==='yes') html+='<div class="mgmt-step emergency"><div class="step-title">Shock first</div><div class="step-body">Restore the circulation with 0.9% saline. Do not delay that for free water.</div></div>';
+  if(plan.over){
+    const limit=onset==='acute'?'1 mmol/L in an hour':'10 mmol/L in 24 hours';
+    html+='<div class="mgmt-step emergency"><div class="step-title">That fall is too fast</div><div class="step-body">The request was '+wanted.toFixed(2)+' mmol/L per hour. The limit used here is '+limit+'. The rate below uses '+(plan.used*24).toFixed(1)+' mmol/L per day.</div></div>';
+  }else{
+    html+='<div class="mgmt-step"><div class="step-title">Limit</div><div class="step-body">'+(onset==='acute'?'Known to be under 48 hours. Recheck the sodium every 1–2 hours. If the duration is not certain, use the 10 mmol/L per day limit instead.':'Duration is 48 hours or unknown. Do not lower the sodium by more than 10 mmol/L in 24 hours.')+'</div></div>';
   }
-
-  const totalDrop=hnCurrentNa-hnTargetNaVal;
-
-  if(duration==='acute'){
-    html+='<div class="mgmt-step caution"><div class="step-title">Acute hypernatraemia (&lt;48h)</div><div class="step-body">More rapid correction can be considered under close monitoring — evidence in adults is less definitive than the conservative approach used for &gt;48h/unknown-duration cases. A reasonable approach is full correction within roughly 24 hours with frequent (2–4 hourly) Na⁺ rechecks, adjusted to the clinical trajectory rather than followed rigidly.</div></div>';
-  } else {
-    const daysNeeded=Math.max(1,Math.ceil(totalDrop/10));
-    const hoursNeeded=daysNeeded*24;
-    const rateMLperHr=(hnDeficitL*1000)/hoursNeeded;
-    const hourlyRateMmol=(totalDrop/hoursNeeded).toFixed(2);
-    html+=
-      '<div class="mgmt-step"><div class="step-title">Staged correction — ≤10 mmol/L per 24h (traditional conservative ICU target)</div><div class="step-body">'+
-      'Total drop needed: '+totalDrop.toFixed(1)+' mmol/L, from '+hnCurrentNa+' to '+hnTargetNaVal+'. Spread over at least <b>'+daysNeeded+' day(s)</b> ('+hoursNeeded+' hours) to stay within the ~10–12 mmol/L/24h limit — averaging ≈'+hourlyRateMmol+' mmol/L/hr, comfortably under the ≤0.5 mmol/L/hr ceiling.<br><br>'+
-      'Free-water deficit '+hnDeficitL.toFixed(2)+' L ÷ '+hoursNeeded+' h ≈ <b>'+rateMLperHr.toFixed(0)+' mL/hr</b> of free water replacement. This covers the calculated deficit only — add separately for ongoing losses and maintenance requirements.'+
-      '</div></div>'+
-      '<div class="mgmt-step caution"><div class="step-title">Monitoring</div><div class="step-body">Recheck serum Na⁺ approximately every 2–4 hours initially in severe hypernatraemia, and adjust the infusion to the measured trend rather than the calculated rate alone.</div></div>';
-  }
-
-  html+='<div class="mgmt-step"><div class="step-title">Route</div><div class="step-body">Oral or enteral water is preferred whenever the GI tract is usable. If IV is required: D5W, or 0.45% saline when some sodium replacement is also needed.</div></div>';
-
+  html+='<p>Body water <b>'+plan.tbw.toFixed(1)+' L</b>. Free-water deficit to '+plan.target.toFixed(0)+' is <b>'+plan.fwd.toFixed(1)+' L</b>. One litre of this fluid changes the sodium by <b>'+plan.delta.toFixed(2)+'</b> mmol/L.</p>';
+  if(plan.block) html+='<div class="mgmt-step caution"><div class="step-title">Do not use this fluid for the number</div><div class="step-body">'+plan.block+'</div></div>';
+  else html+='<p>Recommended rate: <b>'+plan.rate+' mL/h</b>. This covers the fall only. Ongoing water losses are extra free water, not extra saline.</p>';
+  html+='<table class="schedule-table"><tr><th>Hour</th><th>Sodium if the fall stays even</th><th>Volume of this fluid</th></tr>';
+  [0,6,12,18,24].forEach(h=>{
+    const est=Math.max(plan.target, na-plan.used*h);
+    const vol=plan.rate==null?'—':(plan.rate*h/1000).toFixed(1)+' L';
+    html+='<tr><td>'+h+'</td><td>'+est.toFixed(1)+'</td><td>'+vol+'</td></tr>';
+  });
+  html+='</table><p>Recheck the measured sodium every 2–4 hours and change the rate from the measured fall, not from this table.</p>';
   out.innerHTML=html;
 }
 
-/* =================================================================================== */
-
-function showDisorder(key){
+function showDisorder(key, value, ion){
   const d=DISORDERS[key];
-  document.getElementById('menuGrid').parentElement.querySelector('#menuGrid').style.display='none';
+  document.getElementById('menuGrid').style.display='none';
   document.getElementById('detailView').style.display='block';
   document.querySelector('.ref-note').style.display='none';
-
-  let html='';
-  html+=`<div class="disorder-head">
-    <span class="tag ${d.tag}" style="background:${d.tag==='high'?'#fdecea':'#e9f4f8'};color:${d.tag==='high'?'#c0392b':'#1f6d8a'}">${d.tag==='high'?'ELEVATED':'LOW'}</span>
-    <h2>${d.name}</h2>
-    <div class="subtitle">${d.subtitle}</div>
-  </div>`;
-  if(key==='sodium_high'){
-    hnDeficitL=null;hnCurrentNa=null;hnTargetNaVal=null;
-    html+=hnCalculatorHTML();
-  }
+  const side=d.tag==='high'?'high':'low';
+  let html=`<div class="disorder-head"><h2>${ion.name}</h2><div class="subtitle">${value} ${ion.unit}. This ${ion.name.toLowerCase()} is ${side}.</div></div>`;
+  html+=`<input type="hidden" id="naEntered" value="${value}">`;
+  if(key==='sodium_high') html+=sodiumCalcHTML(value);
   html+=`<div class="card"><h3>Severity</h3>${severityRow(d.severity)}</div>`;
-  html+=listCard('Causes',d.causes);
-  html+=listCard('Clinical Features',d.symptoms);
-  html+=listCard('Diagnostic Approach',d.diagnosis);
+  html+=listCard('Causes', d.causes);
+  html+=listCard('Clinical features', d.symptoms);
+  html+=listCard('How to sort it out', d.diagnosis);
   html+=mgmtCard(d.management);
   html+=`<div class="pearl-box"><b>Key pearl:</b> ${d.pearl}</div>`;
-
   document.getElementById('detailContent').innerHTML=html;
   window.scrollTo({top:0,behavior:'smooth'});
 }
