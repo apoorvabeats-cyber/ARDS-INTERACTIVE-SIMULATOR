@@ -40,11 +40,12 @@ label{display:block;font-size:13px;font-weight:850;color:#647083;margin-bottom:6
 <div><label>DBP (mmHg)</label><input id="dbp" type="number" value="105"></div>
 <div><label>CT length A (cm)</label><input id="a" type="number" step=".1" value="5"></div>
 <div><label>CT width B (cm)</label><input id="b" type="number" step=".1" value="3"></div>
-<div><label>CT slices with hemorrhage C</label><input id="c" type="number" step=".1" value="4"></div>
-<div><label>Slice thickness / factor (cm)</label><input id="d" type="number" step=".1" value="1"></div>
+<div><label>Number of CT slices with blood</label><input id="c" type="number" step="1" value="4"></div>
+<div><label>Slice thickness (cm)</label><input id="d" type="number" step=".1" value="1"></div>
+<div><label>Location</label><select id="loc"><option value="">Select</option><option value="lobar">Supratentorial lobar</option><option value="deep">Supratentorial deep</option><option value="cerebellar">Cerebellar</option><option value="brainstem">Brainstem</option></select></div>
+<div><label>Hours from onset</label><input id="hours" type="number" min="0" step="0.5" placeholder="Blank if unknown"></div>
 </div>
 <div class="check"><input id="ivh" type="checkbox"><span><b>Intraventricular hemorrhage present</b></span></div>
-<div class="check"><input id="infra" type="checkbox"><span><b>Infratentorial hemorrhage</b> (cerebellar/brainstem)</span></div>
 <div class="check"><input id="hydro" type="checkbox"><span><b>Hydrocephalus / ventricular obstruction</b></span></div>
 <div class="check"><input id="deteriorate" type="checkbox"><span><b>Neurological deterioration / clinical mass effect</b></span></div>
 <button class="action" onclick="updateAll()">RUN / UPDATE</button>
@@ -57,7 +58,7 @@ label{display:block;font-size:13px;font-weight:850;color:#647083;margin-bottom:6
 
 <section id="reversal" class="panel"><h2>4. Antithrombotic reversal</h2><div class="body">
 <div class="grid">
-<div><label>Antithrombotic</label><select id="drug" onchange="reversal()"><option value="none">None / unknown</option><option value="warfarin">Warfarin / VKA</option><option value="dabigatran">Dabigatran</option><option value="fxa">Factor Xa inhibitor (apixaban/rivaroxaban/edoxaban)</option><option value="heparin">Unfractionated heparin</option><option value="lmwh">LMWH</option><option value="antiplatelet">Antiplatelet agent</option></select></div>
+<div><label>Antithrombotic</label><select id="drug" onchange="reversal()"><option value="none">None / unknown</option><option value="warfarin">Warfarin / VKA</option><option value="dabigatran">Dabigatran</option><option value="fxa">Apixaban or rivaroxaban</option><option value="edoxaban">Edoxaban</option><option value="heparin">Unfractionated heparin</option><option value="lmwh">LMWH</option><option value="antiplatelet">Antiplatelet agent</option></select></div>
 <div><label>Last dose / exposure</label><select id="recent"><option>Recent / clinically relevant</option><option>Remote / uncertain</option></select></div>
 </div>
 <div id="revOut"></div>
@@ -68,7 +69,7 @@ label{display:block;font-size:13px;font-weight:850;color:#647083;margin-bottom:6
 <div class="check"><input id="brainstem" type="checkbox"><span><b>Brainstem compression / severe posterior-fossa effect</b></span></div>
 <div class="check"><input id="ventricular" type="checkbox"><span><b>Ventricular obstruction requiring CSF diversion consideration</b></span></div>
 <button class="action" onclick="surgery()">Update surgical pathway</button>
-<div class="small">Cerebellar ICH ≥15 mL, neurological deterioration, brainstem compression or obstructive hydrocephalus are important triggers for urgent surgical evaluation. EVD is considered when hydrocephalus contributes to reduced consciousness. Supratentorial minimally invasive evacuation may reduce mortality in selected patients; functional benefit remains uncertain.</div>
+<div class="small">Cerebellar ICH larger than 15 mL, or any cerebellar ICH with deterioration, brainstem compression, or obstructive hydrocephalus, needs immediate surgical evacuation with or without an EVD. A brainstem hemorrhage is not evacuated on volume. For a lobar bleed of 30–80 mL, early minimally invasive evacuation can be considered within 24 hours. That result does not apply to deep bleeds.</div>
 </div></section>
 
 <section id="decision" class="panel"><h2>6. Final ICH decision</h2><div class="body"><button class="action" onclick="updateAll();document.getElementById('decisionOut').scrollIntoView({behavior:'smooth'})">Generate final pathway</button><div id="decisionOut"></div></div></section>
@@ -77,60 +78,111 @@ label{display:block;font-size:13px;font-weight:850;color:#647083;margin-bottom:6
 </div>
 
 <script>
-const $=id=>document.getElementById(id), n=id=>Number($(id).value)||0;
-document.querySelectorAll('.tabs button').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));btn.classList.add('active');$(btn.dataset.tab).classList.add('active');window.scrollTo(0,0)}));
-
-function volume(){return n('a')*n('b')*n('c')*n('d')/2}
+const $=id=>document.getElementById(id);
+function num(id){const raw=($(id).value||"").trim(); if(raw==="")return null; const x=Number(raw); return Number.isFinite(x)?x:null}
+function volume(){const a=num("a"),b=num("b"),c=num("c"),d=num("d"); if([a,b,c,d].some(x=>x===null))return null; return a*b*c*d/2}
+function gcsOk(g){return g!==null && g>=3 && g<=15}
 function score(){
-let g=n('gcs'),age=n('age'),v=volume(),s=0;
-if(g>=3&&g<=4)s+=2;else if(g>=5&&g<=12)s+=1;
-if(age>=80)s++;if(v>=30)s++;if($('ivh').checked)s++;if($('infra').checked)s++;
-return {s,v}
+ const g=num("gcs"), age=num("age"), v=volume(), loc=$("loc").value;
+ let s=0, ok=gcsOk(g) && age!==null && v!==null && loc;
+ if(ok){
+  if(g<=4)s+=2; else if(g<=12)s+=1;
+  if(age>=80)s++; if(v>=30)s++; if($("ivh").checked)s++;
+  if(loc==="cerebellar"||loc==="brainstem")s++;
+ }
+ return {s,v,ok,g,age,loc};
+}
+document.querySelectorAll(".tabs button").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));btn.classList.add("active");$(btn.dataset.tab).classList.add("active");window.scrollTo(0,0)}));
+function box(cls,title,text){return `<div class="result ${cls}"><strong>${title}</strong>${text}</div>`}
+function picture(){
+ const g=num("gcs"), v=volume(), loc=$("loc").value, hours=num("hours");
+ const hydro=$("hydro").checked||$("ventricular").checked;
+ const deter=$("deteriorate").checked, crush=$("brainstem").checked;
+ const recent=($("recent").value||"").startsWith("Recent");
+ return {g,v,loc,hours,hydro,deter,crush,recent,ivh:$("ivh").checked,age:num("age"),sbp:num("sbp"),drug:$("drug").value};
+}
+function surgicalFlags(p){
+ const f=[];
+ if(!p.loc){f.push(["warn","Location not selected","The cerebellar rule and the brainstem exception cannot be applied until the hemorrhage is located."]);return f}
+ if(p.v===null){f.push(["warn","Volume incomplete","Enter length, width, slice count, and slice thickness. A blank measurement is not a small hemorrhage."]);}
+ if(p.loc==="cerebellar"){
+  const pressed=p.deter||p.crush||p.hydro;
+  if(p.v===null && pressed) f.push(["danger","Cerebellar ICH — evacuate","Deterioration, brainstem compression, or hydrocephalus is already an indication for immediate evacuation, with or without an EVD. The volume is still missing, so do not wait for it."]);
+  else if(p.v!==null && (p.v>15||pressed)) f.push(["danger","Cerebellar ICH — evacuate","Immediate evacuation, with or without an EVD, is indicated for volume over 15 mL, deterioration, brainstem compression, or hydrocephalus from ventricular obstruction."]);
+  else if(p.v===15) f.push(["warn","Cerebellar ICH at 15 mL","This is the border of the volume indication. Do not clear non-operative care."]);
+  else if(p.v!==null) f.push(["info","Cerebellar ICH below the evacuation set","Volume is under 15 mL and there is no deterioration, brainstem compression, or hydrocephalus. Keep the patient under neurosurgical observation."]);
+ }
+ if(p.loc==="brainstem"){
+  f.push(["warn","Brainstem ICH — do not evacuate on volume","Primary brainstem hemorrhage is not taken to the operating room because it is large. The cerebellar volume rule does not apply."]);
+  if(p.hydro) f.push(["danger","Brainstem ICH with ventricular obstruction","An EVD can be considered when hydrocephalus is contributing to coma. Evacuating the brainstem clot is a separate and uncommon decision."]);
+  else if(p.deter) f.push(["warn","Deteriorating brainstem ICH","This needs neurocritical care and neurosurgical review. Deterioration alone is not an indication to evacuate the clot."]);
+ }
+ if(p.loc==="lobar" && p.v!==null){
+  const band=p.v>=30 && p.v<=80;
+  const early=p.hours===null || p.hours<=24;
+  if(band && early) f.push(["danger","Lobar ICH — minimally invasive evacuation","Volume is 30–80 mL and the bleed is lobar. Early minimally invasive evacuation, within about 24 hours, improved outcome in ENRICH. This does not apply to a deep hemorrhage. Neurosurgery has to confirm the patient is a candidate."]);
+  else if(band && p.hours>24) f.push(["warn","Lobar ICH outside the early window","Volume would have fitted the minimally invasive trial, but onset was more than 24 hours ago. Surgery is then individualized, not automatic."]);
+  else if(p.deter && p.v>=30) f.push(["warn","Lobar ICH with deterioration","Urgent neurosurgical review for mass effect. The volume is outside 30–80 mL, so the ENRICH result does not apply directly."]);
+  else f.push(["info","No lobar evacuation trigger","No 30–80 mL early-evacuation trigger and no large deteriorating clot were entered."]);
+ }
+ if(p.loc==="deep"){
+  f.push(["info","Deep ICH — do not borrow the lobar result","Basal ganglia and thalamic hemorrhages did not get the ENRICH benefit seen in lobar bleeds. Minimally invasive evacuation is not the default."]);
+  if(p.deter && p.v!==null && p.v>=30) f.push(["warn","Deep ICH with deterioration","Urgent neurosurgical review. Evacuation is not automatic."]);
+ }
+ if(p.hydro) f.push(["warn","Hydrocephalus","Consider an EVD when ventricular obstruction is reducing consciousness. Either hydrocephalus checkbox is enough to raise this."]);
+ return f;
 }
 function updateAll(){
-let x=score(),v=x.v,g=n('gcs'),a=n('age'),s=x.s;
-$('clinicalOut').innerHTML=`<div class="result info"><strong>Current CT/clinical state</strong>Estimated ICH volume = ${v.toFixed(1)} mL. ICH Score = ${s}. Continue full neurocritical assessment.</div>`;
-$('scoreOut').innerHTML=`<div class="result ${s>=3?'warn':''}"><strong>ICH Score = ${s}</strong><div class="metrics"><div><b>${g<=4?2:g<=12?1:0}</b>GCS</div><div><b>${a>=80?1:0}</b>Age ≥80</div><div><b>${v>=30?1:0}</b>Volume ≥30 mL</div></div><div class="metrics"><div><b>${$('ivh').checked?1:0}</b>IVH</div><div><b>${$('infra').checked?1:0}</b>Infratentorial</div><div><b>${v.toFixed(1)}</b>mL volume</div></div></div>`;
-bp();
-reversal();
-surgery();
-decision(x);
+ const x=score(), p=picture();
+ if(!x.ok){
+  $("clinicalOut").innerHTML=box("danger","ICH score not calculated","GCS must be 3–15, and age, location, and all four CT measurements have to be entered. An empty or impossible GCS is not scored as normal.");
+  $("scoreOut").innerHTML=$("clinicalOut").innerHTML;
+ }else{
+  const gPts=x.g<=4?2:x.g<=12?1:0, infra=x.loc==="cerebellar"||x.loc==="brainstem";
+  $("clinicalOut").innerHTML=box("info","Current CT/clinical state",`Estimated ICH volume = ${x.v.toFixed(1)} mL. ICH Score = ${x.s}. Location: ${x.loc}.`);
+  $("scoreOut").innerHTML=box(x.s>=3?"warn":"","ICH Score = "+x.s,`<div class="metrics"><div><b>${gPts}</b>GCS</div><div><b>${x.age>=80?1:0}</b>Age ≥80</div><div><b>${x.v>=30?1:0}</b>Volume ≥30 mL</div></div><div class="metrics"><div><b>${$("ivh").checked?1:0}</b>IVH</div><div><b>${infra?1:0}</b>Infratentorial</div><div><b>${x.v.toFixed(1)}</b>mL volume</div></div>`);
+ }
+ bp(); reversal(); surgery(); decision(x,p);
 }
 function bp(){
-let sbp=n('sbp'),html='';
-if(sbp>220)html=`<div class="result warn"><strong>Markedly elevated SBP &gt;220</strong>Use continuous IV antihypertensive treatment with close BP monitoring and individualized reduction. Avoid abrupt excessive lowering.</div>`;
-else if(sbp>=150&&sbp<=220)html=`<div class="result"><strong>Target pathway: SBP ≈140 mmHg</strong>For mild-to-moderate spontaneous ICH, use smooth, sustained BP control; maintain approximately 130–150 mmHg. Avoid reducing SBP below 130 mmHg.</div>`;
-else html=`<div class="result info"><strong>SBP ${sbp} mmHg</strong>No acute ICH-specific BP reduction trigger from the simplified 150–220 pathway. Continue individualized monitoring and treat other indications.</div>`;
-$('bpOut').innerHTML=html;
+ const sbp=num("sbp"), hours=num("hours");
+ let html;
+ if(sbp===null) html=box("warn","No systolic pressure","Enter the SBP.");
+ else if(sbp>220) html=box("warn","Markedly elevated SBP >220","Use a continuous IV antihypertensive and close monitoring. Lower carefully. Do not drive the SBP below 130 mmHg.");
+ else if(sbp>=150) html=box("","Target pathway: SBP about 140 mmHg","For a presenting SBP of 150–220 mmHg, aim for a smooth hold at 130–150 mmHg. Going below 130 mmHg is potentially harmful.");
+ else html=box("info","SBP "+sbp+" mmHg","Below the 150 mmHg treatment window. Keep monitoring. Treat another reason for high or low pressure on its own merits.");
+ if(hours!==null && hours>6 && sbp!==null && sbp>=150) html+=box("info","Onset more than 6 hours ago","The 140 mmHg target was studied early. After 6 hours, still avoid large swings, and do not treat a late reading as if it were the first hour.");
+ $("bpOut").innerHTML=html;
 }
 function reversal(){
-let d=$('drug').value,html='';
-if(d==='warfarin')html=`<div class="result danger"><strong>VKA-associated ICH: urgent reversal pathway</strong>Vitamin K antagonist reversal should be initiated promptly; 4-factor PCC is preferred to FFP for rapid reversal when appropriate, with IV vitamin K as part of reversal.</div>`;
-else if(d==='dabigatran')html=`<div class="result danger"><strong>Dabigatran-associated ICH</strong>Consider idarucizumab for rapid reversal when clinically appropriate.</div>`;
-else if(d==='fxa')html=`<div class="result danger"><strong>Factor Xa inhibitor-associated ICH</strong>Consider andexanet alfa when appropriate; if unavailable or unsuitable, a PCC-based reversal strategy may be considered according to local protocol.</div>`;
-else if(d==='heparin')html=`<div class="result danger"><strong>UFH-associated ICH</strong>Stop heparin and consider protamine reversal when clinically indicated.</div>`;
-else if(d==='lmwh')html=`<div class="result warn"><strong>LMWH-associated ICH</strong>Stop LMWH; protamine provides incomplete reversal and use depends on agent, timing and dose.</div>`;
-else if(d==='antiplatelet')html=`<div class="result warn"><strong>Antiplatelet-associated ICH</strong>Routine platelet transfusion is potentially harmful outside specific settings such as emergency surgery or severe thrombocytopenia. Discuss individualized management with neurosurgery/hematology as appropriate.</div>`;
-else html=`<div class="result info"><strong>No antithrombotic selected</strong>No reversal agent indicated from this simplified screen.</div>`;
-$('revOut').innerHTML=html;
+ const d=$("drug").value, recent=($("recent").value||"").startsWith("Recent");
+ let html;
+ if(d==="warfarin") html=recent?box("danger","Warfarin, recent dose","Give 4-factor PCC and IV vitamin K now. Recheck the INR and aim below 1.4."):box("warn","Warfarin, remote or uncertain","Check the INR immediately. Reverse if it is still elevated. A remote dose is not the same as a normal INR.");
+ else if(d==="dabigatran") html=recent?box("danger","Dabigatran, recent dose","Idarucizumab 5 g IV if the last dose is inside the reversal window or the thrombin time is prolonged. Renal failure stretches that window."):box("warn","Dabigatran, remote or uncertain","If the thrombin time is normal, reversal is usually not needed. If the time or the level is unknown, treat it as recent.");
+ else if(d==="fxa") html=recent?box("danger","Apixaban or rivaroxaban, recent dose","Andexanet alfa if it is available and the patient is a candidate. If not, use 4-factor PCC."):box("warn","Apixaban or rivaroxaban, remote or uncertain","Reverse if the last dose was recent enough that drug effect is still plausible, or if anti-Xa activity is present. A clearly remote dose with no drug effect does not need andexanet.");
+ else if(d==="edoxaban") html=recent?box("danger","Edoxaban, recent dose","Use 4-factor PCC. Andexanet is established for apixaban and rivaroxaban, not for edoxaban."):box("warn","Edoxaban, remote or uncertain","Check the time and, if you can, anti-Xa activity. Use PCC only if drug effect is still plausible. Do not reach for andexanet.");
+ else if(d==="heparin") html=recent?box("danger","Heparin infusion, recent","Stop the infusion and give protamine."):box("warn","Heparin, remote or uncertain","Protamine helps while the heparin effect is still present. If the infusion has been off for several hours and the aPTT is normal, protamine is usually not useful.");
+ else if(d==="lmwh") html=recent?box("warn","LMWH, recent dose","Protamine reverses only part of the effect, and it is most useful within about 8 hours of the dose."):box("info","LMWH, remote dose","Protamine is unlikely to help once many hours have passed. Confirm the clock time before giving it.");
+ else if(d==="antiplatelet") html=box("warn","Antiplatelet","The platelet effect can last days, so a remote aspirin dose still matters. Do not give platelets routinely. An emergency craniotomy is the situation in which transfusion is discussed, not a default. Desmopressin may be discussed for aspirin.");
+ else html=box("info","No antithrombotic selected","No reversal agent from this screen. Unknown is not the same as none if the history is incomplete.");
+ $("revOut").innerHTML=html;
 }
 function surgery(){
-let v=volume(),infra=$('infra').checked,hydro=$('hydro').checked,deter=$('deteriorate').checked,bs=$('brainstem').checked,vent=$('ventricular').checked;
-let urgent=(infra&&(v>=15||hydro||deter||bs))||(hydro&&gcsLow());
-let h=urgent?`<div class="result danger"><strong>URGENT neurosurgical evaluation</strong>Posterior-fossa ICH with important volume/clinical effect and/or obstructive hydrocephalus may require immediate evacuation ± EVD.</div>`:`<div class="result info"><strong>No automatic surgical trigger in this simplified screen</strong>Continue serial neurological examination, repeat imaging as indicated and specialist review.</div>`;
-if(hydro||vent)h+=`<div class="result warn"><strong>Hydrocephalus / ventricular obstruction</strong>Consider EVD/CSF diversion when hydrocephalus contributes to decreased consciousness.</div>`;
-$('surgOut').innerHTML=h;
+ const flags=surgicalFlags(picture());
+ $("surgOut").innerHTML=flags.map(x=>box(x[0],x[1],x[2])).join("") || box("info","No surgical data","Run the calculator from the clinical tab.");
 }
-function gcsLow(){return n('gcs')<=8}
-function decision(x){
-let sbp=n('sbp'),d=$('drug').value,infra=$('infra').checked,hydro=$('hydro').checked,v=x.v;
-let arr=[];
-arr.push(`<div class="result info"><strong>ICH Score ${x.s} • Estimated volume ${v.toFixed(1)} mL</strong>Do not use the score alone to make decisions about limiting life-sustaining treatment.</div>`);
-if(sbp>=150)arr.push(`<div class="result ${sbp>220?'warn':''}"><strong>BP pathway</strong>${sbp>220?'Markedly elevated SBP: individualized continuous IV treatment and close monitoring.':'Smooth sustained BP control; target around 140 mmHg and maintain 130–150 mmHg when appropriate.'}</div>`);
-if(d!=='none')arr.push(`<div class="result danger"><strong>Reversal</strong>Antithrombotic-associated ICH selected: activate the drug-specific reversal pathway urgently.</div>`);
-if(infra&&v>=15||hydro)arr.push(`<div class="result danger"><strong>Neurosurgical priority</strong>Posterior fossa / hydrocephalus features require urgent specialist evaluation and consideration of evacuation and/or CSF diversion.</div>`);
-arr.push(`<div class="result"><strong>General ICU priorities</strong>Frequent neurological monitoring, repeat CT when clinically indicated, airway/ventilation support when required, temperature/glucose management, seizure treatment when seizures occur, and prevention of medical complications.</div>`);
-$('decisionOut').innerHTML=arr.join('');
+function decision(x,p){
+ p=p||picture(); x=x||score();
+ const flags=surgicalFlags(p);
+ const arr=[];
+ if(!x.ok) arr.push(box("danger","Score withheld","Fix the GCS, age, location, or CT measurements before using the score."));
+ else arr.push(box("info",`ICH Score ${x.s} • Volume ${x.v.toFixed(1)} mL`,"Do not use the score alone to limit life-sustaining treatment."));
+ const sbp=p.sbp;
+ if(sbp!==null && sbp>=150) arr.push(box(sbp>220?"warn":"", "BP pathway", sbp>220?"SBP over 220: continuous IV treatment, and do not go below 130 mmHg.":"Smooth control. Target about 140 mmHg and stay at 130–150."));
+ if(p.drug!=="none") arr.push(box("danger","Reversal", p.recent?"Antithrombotic effect is entered as recent. Open the reversal tab for the drug-specific action.":"Exposure is remote or uncertain. Reverse only if drug effect is still plausible. The reversal tab has the distinction."));
+ flags.forEach(f=>arr.push(box(f[0],f[1],f[2])));
+ arr.push(box("","General ICU priorities","Frequent neurological checks, a repeat CT if the patient changes, an airway when the GCS requires it, temperature and glucose control, treat seizures that occur, and do not start routine seizure prophylaxis."));
+ $("decisionOut").innerHTML=arr.join("");
 }
 </script>
 <script src="icu-audio.js?v=20260924f"></script>
