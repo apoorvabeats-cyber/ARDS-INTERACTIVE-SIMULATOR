@@ -547,10 +547,15 @@ function showEntry(id){
       <div class="calc-field"><label>${currentIon.name} (${currentIon.unit})</label>
         <input type="number" id="ionValue" step="0.1" inputmode="decimal">
       </div>
+      ${currentIon.id==='sodium'?'<div class="calc-field"><label>Glucose (mg/dL)</label><input type="number" id="ionGlucose" inputmode="decimal" placeholder="Required if the sodium is under 135"></div><p>A sodium under 135 is not treated until the glucose is entered. Corrected sodium = measured sodium + 1.6 for every 100 mg/dL of glucose above 100.</p>':''}
       <button class="calc-btn" onclick="useValue()">Use this value</button>
       <div id="ionMsg" class="calc-out"></div>
     </div>`;
   window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function correctedNa(na, glucose){
+  return na + 1.6 * Math.max(0, glucose-100) / 100;
 }
 
 function useValue(){
@@ -559,6 +564,19 @@ function useValue(){
   const msg=document.getElementById('ionMsg');
   if(raw===''||Number.isNaN(v)){ msg.textContent='Enter a number.'; return; }
   const ion=currentIon;
+  if(ion.id==='sodium' && v<ion.low){
+    const gEl=document.getElementById('ionGlucose');
+    const gRaw=gEl?gEl.value:'';
+    const g=parseFloat(gRaw);
+    if(gRaw===''||Number.isNaN(g)||g<=0){ msg.textContent='Enter the glucose. A high glucose can make the sodium look low, and 3% saline should not be chosen from the uncorrected number.'; return; }
+    const corr=correctedNa(v, g);
+    if(corr>=135){
+      msg.innerHTML='Measured sodium is '+v+' mmol/L. With a glucose of '+g+' mg/dL the corrected sodium is about <b>'+corr.toFixed(1)+'</b>. That is not a low sodium. Do not give 3% saline for this number.';
+      return;
+    }
+    showDisorder(ion.lowKey, v, ion, {glucose:g, corrected:corr});
+    return;
+  }
   if(v<ion.low) showDisorder(ion.lowKey, v, ion);
   else if(v>ion.high) showDisorder(ion.highKey, v, ion);
   else msg.innerHTML='<b>'+v+' '+ion.unit+'</b> is inside the usual range. No low or high algorithm applies.';
@@ -686,12 +704,19 @@ function hypoTrack(o){
   const path=[o.na];
   let cur=o.na;
   const vol=o.rateMl/1000;
+  const useUrine=o.urineNa!=null && o.urineK!=null && o.urineMl!=null;
+  const uvol=useUrine?o.urineMl/1000:0;
+  let bad=false;
   for(let h=1;h<=24;h++){
-    cur=(cur*tbw + o.fluidNa*vol)/(tbw+vol);
-    tbw+=vol;
+    const denom=tbw+vol-uvol;
+    if(denom<5){ bad=true; break; }
+    const removed=useUrine?(o.urineNa+o.urineK)*uvol:0;
+    cur=(cur*tbw + o.fluidNa*vol - removed)/denom;
+    tbw=denom;
     path.push(cur);
   }
-  return {tbw:start, path, final:path[24], delta:path[24]-o.na};
+  while(path.length<25) path.push(path[path.length-1]);
+  return {tbw:start, path, final:path[24], delta:path[24]-o.na, urine:useUrine, bad};
 }
 
 function hypoCalcHTML(na){
@@ -699,7 +724,8 @@ function hypoCalcHTML(na){
   return `
   <div class="card">
     <h3>24-hour sodium</h3>
-    <p>Each hour the sodium is recalculated from the fluid just given. Urine is not in the sum. If the kidneys start to pass dilute urine, the sodium will rise faster than this line.</p>
+    <p id="hyGlucoseNote"></p>
+    <p>Each hour the sodium is recalculated from the fluid given and, once all three are entered, from the urine sodium, urine potassium, and urine output. Leave the urine blank and the line is the infusion only.</p>
     <div class="calc-row">
       <div class="calc-field"><label>Weight (kg)</label><input type="number" id="hyWt" value="70"></div>
       <div class="calc-field"><label>Body water</label>
@@ -721,6 +747,11 @@ function hypoCalcHTML(na){
         </select>
       </div>
       <div class="calc-field"><label>24-hour target</label><input type="number" id="hyTarget" value="${target}"></div>
+    </div>
+    <div class="calc-row">
+      <div class="calc-field"><label>Urine sodium</label><input type="number" id="hyUNa" placeholder="mmol/L"></div>
+      <div class="calc-field"><label>Urine potassium</label><input type="number" id="hyUK" placeholder="mmol/L"></div>
+      <div class="calc-field"><label>Urine output</label><input type="number" id="hyUVol" placeholder="mL/h"></div>
     </div>
     <div class="calc-field"><label>Rate <b id="hyRateLabel">30</b> mL/h</label>
       <input type="range" id="hyRate" min="0" max="250" step="5" value="30">
@@ -766,8 +797,21 @@ function drawHypo(path, target, limit, start){
   ctx.fillText('target', X(1), Y(target)-4);
 }
 
+function urineInputs(){
+  const na=document.getElementById('hyUNa').value;
+  const k=document.getElementById('hyUK').value;
+  const v=document.getElementById('hyUVol').value;
+  const filled=[na,k,v].filter(x=>x!=='').length;
+  if(filled===0) return {ok:true, use:false};
+  if(filled<3) return {ok:false};
+  const urineNa=parseFloat(na), urineK=parseFloat(k), urineMl=parseFloat(v);
+  if([urineNa,urineK,urineMl].some(n=>Number.isNaN(n)||n<0)) return {ok:false};
+  return {ok:true, use:true, urineNa, urineK, urineMl};
+}
+
 function runHypo(){
   const na=parseFloat(document.getElementById('naEntered').value);
+  const glucose=parseFloat(document.getElementById('naGlucose').value);
   const weight=parseFloat(document.getElementById('hyWt').value);
   const factor=parseFloat(document.getElementById('hyFactor').value);
   const fluidNa=parseFloat(document.getElementById('hyFluid').value);
@@ -776,38 +820,60 @@ function runHypo(){
   const risk=document.getElementById('hyRisk').checked || na<105;
   const fit=document.getElementById('hyFit').checked;
   document.getElementById('hyRateLabel').textContent=String(rate);
+  const note=document.getElementById('hyGlucoseNote');
+  const glucoseRise=(glucose>100)?1.6*(glucose-100)/100:0;
+  if(note) note.textContent=glucose>100
+    ? 'Glucose is '+glucose+' mg/dL. Bringing it back toward 100 is expected to raise the sodium by about '+glucoseRise.toFixed(1)+' mmol/L without any saline.'
+    : 'Glucose does not explain this low sodium.';
   if(!(weight>0)||!(na<135)) return;
-  const track=hypoTrack({weight, factor, na, fluidNa, rateMl:rate});
+  const urine=urineInputs();
+  if(!urine.ok){
+    document.getElementById('hyAlert').innerHTML='<div class="mgmt-step caution"><div class="step-title">Urine</div><div class="step-body">Enter urine sodium, urine potassium, and urine output in mL/h, or leave all three blank.</div></div>';
+    return;
+  }
+  const track=hypoTrack({weight, factor, na, fluidNa, rateMl:rate, urineNa:urine.use?urine.urineNa:null, urineK:urine.use?urine.urineK:null, urineMl:urine.use?urine.urineMl:null});
   const limit=risk?6:8;
   document.getElementById('hyTbw').textContent=track.tbw.toFixed(1);
   document.getElementById('hyEnd').textContent=track.final.toFixed(1);
   document.getElementById('hyDelta').textContent=(track.delta>=0?'+':'')+track.delta.toFixed(1);
   const bits=[];
   if(fit) bits.push('<div class="mgmt-step emergency"><div class="step-title">Seizure or coma</div><div class="step-body">Give 100–150 mL of 3% saline over 10–20 minutes. Repeat until the symptoms improve or the sodium has risen 4–6 mmol/L. The line on the graph is the hourly infusion, not that bolus.</div></div>');
-  if(track.delta < -0.5) bits.push('<div class="mgmt-step emergency"><div class="step-title">This fluid lowers the sodium</div><div class="step-body">A low sodium needs a fluid with more sodium than the serum, usually 3% saline. Water and 0.45% saline will take it lower.</div></div>');
-  if(Math.abs(track.delta) > limit) bits.push('<div class="mgmt-step emergency"><div class="step-title">More than '+limit+' mmol/L in 24 hours</div><div class="step-body">Stop hypertonic saline. Give water or 5% dextrose, and consider desmopressin, so the sodium does not keep rising. The limit is 8 mmol/L, or 6 if demyelination risk is high.</div></div>');
-  else bits.push('<div class="mgmt-step"><div class="step-title">Limit</div><div class="step-body">Keep the change inside '+limit+' mmol/L in 24 hours'+(na<105?' because the sodium is under 105.':'')+'. Recheck it every 2–4 hours. This drawing ignores urine, so a water diuresis can overshoot the line.</div></div>');
+  if(glucoseRise>=limit) bits.push('<div class="mgmt-step emergency"><div class="step-title">The glucose will raise the sodium</div><div class="step-body">Correcting this glucose can raise the sodium by about '+glucoseRise.toFixed(1)+' mmol/L. Do not add 3% saline on top of that just because the measured sodium is low.</div></div>');
+  else if(glucoseRise>0 && track.delta+glucoseRise>limit) bits.push('<div class="mgmt-step emergency"><div class="step-title">Saline plus the glucose correction</div><div class="step-body">The fluid changes the sodium by '+track.delta.toFixed(1)+' and the falling glucose can add about '+glucoseRise.toFixed(1)+'. Together that passes the '+limit+' mmol/L limit. Slow the saline.</div></div>');
+  if(track.bad) bits.push('<div class="mgmt-step caution"><div class="step-title">Urine output</div><div class="step-body">That urine volume is too large for an hourly rate. Enter mL per hour, not mL per day.</div></div>');
+  if(track.delta < -0.5) bits.push('<div class="mgmt-step emergency"><div class="step-title">The sodium falls on this plan</div><div class="step-body">Either the fluid has less sodium than the serum, or the urine is taking out more sodium than the fluid puts in. A low sodium is not treated with water or 0.45% saline.</div></div>');
+  const limitWords=risk
+    ? 'High risk of demyelination. Keep the rise inside 4–6 mmol/L in 24 hours. The red line is 6, the top of that range, not a target to aim for.'
+    : 'Keep the change inside 8 mmol/L in 24 hours.';
+  if(Math.abs(track.delta) > limit) bits.push('<div class="mgmt-step emergency"><div class="step-title">More than '+limit+' mmol/L in 24 hours</div><div class="step-body">Stop hypertonic saline. Give water or 5% dextrose, and consider desmopressin, so the sodium does not keep rising. '+limitWords+'</div></div>');
+  else bits.push('<div class="mgmt-step"><div class="step-title">Limit</div><div class="step-body">'+limitWords+(urine.use?' The line includes the urine you entered.':' Urine is not on the line until sodium, potassium, and output are all entered.')+' Recheck the measured sodium every 2–4 hours.</div></div>');
   if(target-na > limit) bits.push('<div class="mgmt-step caution"><div class="step-title">That target is not a 24-hour target</div><div class="step-body">The chosen target is '+(target-na).toFixed(1)+' above the current sodium. Do not try to reach it in one day.</div></div>');
   document.getElementById('hyAlert').innerHTML=bits.join('');
   drawHypo(track.path, target, limit, na);
 }
 
 function wireHypo(){
-  ['hyWt','hyFactor','hyFluid','hyTarget','hyRate','hyRisk','hyFit'].forEach(id=>{
+  ['hyWt','hyFactor','hyFluid','hyTarget','hyRate','hyRisk','hyFit','hyUNa','hyUK','hyUVol'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.addEventListener('input', runHypo);
   });
   runHypo();
 }
 
-function showDisorder(key, value, ion){
+function showDisorder(key, value, ion, extra){
   const d=DISORDERS[key];
   document.getElementById('menuGrid').style.display='none';
   document.getElementById('detailView').style.display='block';
   document.querySelector('.ref-note').style.display='none';
   const side=d.tag==='high'?'high':'low';
-  let html=`<div class="disorder-head"><h2>${ion.name}</h2><div class="subtitle">${value} ${ion.unit}. This ${ion.name.toLowerCase()} is ${side}.</div></div>`;
+  const glucose=extra&&extra.glucose;
+  const corr=extra&&extra.corrected;
+  const sub=glucose
+    ? value+' '+ion.unit+' measured. Corrected for a glucose of '+glucose+' it is '+corr.toFixed(1)+'. This sodium is still low.'
+    : value+' '+ion.unit+'. This '+ion.name.toLowerCase()+' is '+side+'.';
+  let html=`<div class="disorder-head"><h2>${ion.name}</h2><div class="subtitle">${sub}</div></div>`;
   html+=`<input type="hidden" id="naEntered" value="${value}">`;
+  html+=`<input type="hidden" id="naGlucose" value="${glucose||0}">`;
   if(key==='sodium_high') html+=sodiumCalcHTML(value);
   if(key==='sodium_low') html+=hypoCalcHTML(value);
   html+=`<div class="card"><h3>Severity</h3>${severityRow(d.severity)}</div>`;
