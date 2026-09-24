@@ -45,8 +45,12 @@
 </nav>
 <script>
 var S={age:'60',sex:'male',ht:'170',wt:'70',scr:'1',uo:'50',eff:'25',where:'hospital',source:'vap',sev:'shock',bact:'yes',blood:'no',srcx:'no',addMrsa:'no',addPseudo:'yes',addAna:'no',recent:'no',prior:'none',org:'kleb',mech:'ndm',mic:'4',ast:'R',drug:'meropenem',inf:'extended',rrt:'none',load:'load',traj:'stable',vd:'increased',level:'no',identified:'yes',astYes:'yes',resp:'improving',control:'yes',po:'no'};
-var stack=['pt'];
-var TITLE={pt:'Patient',cover:'Empiric cover',bug:'Organism',drug:'Drug and dose',pk:'Exposure',plan:'Review'};
+var stack=['bact'];
+var TITLE={bact:'Bacterial?',sick:'How sick',site:'Site',micro:'Cultures',mdr:'MDR risk',cover:'Empiric cover',bug:'Mechanism',ast:'MIC',body:'Patient PK',drug:'Drug and dose',pk:'Exposure',review:'24–72 h',src:'Source control',narrow:'De-escalation',po:'IV to oral',stop:'Duration',non:'Not bacterial'};
+function route(){
+  if(S.bact==='no') return ['bact','non'];
+  return ['bact','sick','site','micro','mdr','cover','bug','ast','body','drug','pk','review','src','narrow','po','stop'];
+}
 function num(id){ var n=parseFloat(String(S[id]==null?'':S[id]).replace(',','.')); return Number.isFinite(n)?n:null; }
 function crcl(){
   var age=num('age'), wt=num('wt'), scr=num('scr'), ht=num('ht');
@@ -384,76 +388,94 @@ function empiric(){
 }
 function views(){
   return {
-    pt:function(){
-      return '<p class="hint">Clearance uses age, sex, height, weight, and creatinine.</p><div class="grid">'
-        +sel('where','Where',[['community','Community'],['hospital','Hospital']])
-        +sel('source','Source',[['vap','HAP / VAP'],['cap','Severe community pneumonia'],['uti','Urine'],['iab','Abdomen'],['ssti','Skin'],['cns','Brain'],['bsi','Blood'],['line','Line'],['endo','Endocarditis']])
-        +sel('sev','How sick',[['shock','Septic shock'],['sepsis','Sepsis'],['stable','Stable'],['low','Low chance of bacterial infection']])
-        +sel('bact','Is this likely bacterial?',[['yes','Yes'],['no','No']])
-        +sel('blood','Blood cultures taken',[['yes','Yes'],['no','Not yet']])
-        +sel('srcx','Source culture taken',[['yes','Yes'],['no','Not yet']])
-        +box('age','Age')+sel('sex','Sex',[['male','Male'],['female','Female']])+box('ht','Height cm')+box('wt','Weight kg')+box('scr','Creatinine mg/dL')+box('uo','Urine mL/h')
-        +sel('recent','Antibiotics in the last 90 days',[['no','No'],['yes','Yes']])
-        +sel('prior','Previous resistant organism',[['none','None'],['mrsa','MRSA'],['esbl','ESBL'],['ampc','AmpC'],['kpc','KPC'],['oxa','OXA-48-like'],['ndm','NDM'],['vim','VIM'],['imp','IMP'],['dtr','Difficult Pseudomonas'],['crab','CRAB']])
-        +'</div><div id="live"></div>';
-    },
-    cover:function(){
-      return '<p class="hint">Add a drug only when this site needs it.</p><div class="grid">'
-        +sel('addMrsa','Add MRSA cover',[['yes','Yes'],['no','No']])
-        +sel('addPseudo','Add Pseudomonas cover',[['yes','Yes'],['no','No']])
-        +sel('addAna','Add anaerobic cover',[['yes','Yes'],['no','No']])
-        +'</div><div id="live"></div>';
-    },
-    bug:function(){
-      return '<div class="grid">'
-        +sel('org','Organism',Object.keys(ORG).map(function(k){return [k,ORG[k][0]];}))
-        +sel('mech','Mechanism',Object.keys(MECH).map(function(k){return [k,MECH[k]];}))
-        +box('mic','MIC mg/L')
-        +sel('ast','Report',[['S','Susceptible'],['I','Intermediate'],['R','Resistant'],['pending','Pending']])
-        +'</div><div id="live"></div>';
-    },
-    drug:function(){
-      return '<div class="grid">'
-        +sel('drug','Antibiotic',Object.keys(DRUG).map(function(k){return [k,DRUG[k][0]];}))
-        +sel('inf','Infusion',[['standard','30 minutes'],['extended','3 hours'],['continuous','Continuous']])
-        +sel('rrt','Kidney replacement',[['none','None'],['crrt','CRRT'],['ihd','Hemodialysis'],['sled','SLED']])
-        +box('eff','CRRT effluent mL/kg/h')
-        +sel('load','Loading dose',[['standard','No extra load'],['load','Loading dose']])
-        +'</div><div id="live"></div>';
-    },
-    pk:function(){
-      return '<div class="grid">'
-        +sel('traj','Clearance now',[['stable','Steady'],['arc','Augmented'],['aki','Falling fast'],['rrt','On replacement']])
-        +sel('vd','Volume of distribution',[['normal','Normal'],['increased','Increased'],['marked','Very increased']])
-        +sel('level','A measured level exists',[['no','No'],['yes','Yes']])
-        +'</div><h2>Level against the MIC</h2><canvas id="chart" width="720" height="220"></canvas>'
-        +'<div class="legend"><span><i></i>Free level</span><span><i class="red"></i>MIC</span></div>'
-        +'<p class="hint">Hours along the bottom. This is a sketch, not a measured level.</p><div id="live"></div>';
-    },
-    plan:function(){
-      return '<div class="grid">'
-        +sel('identified','Organism is known',[['yes','Yes'],['no','No']])
-        +sel('astYes','Susceptibility is known',[['yes','Yes'],['no','No']])
-        +sel('resp','Course',[['improving','Improving'],['stable','Unchanged'],['worsening','Worse']])
-        +sel('control','Source controlled',[['yes','Yes'],['no','No']])
-        +sel('po','Can this become a tablet?',[['yes','Yes, eating and an oral drug exists'],['no','Stay on the vein']])
-        +'</div><div id="live"></div><p><a href="index.html">All simulators</a></p>';
-    }
+    bact:function(){ return '<h2>Is this bacterial?</h2>'+sel('bact','Likely bacterial',[['yes','Yes'],['no','No']])+'<div id="live"></div>'; },
+    sick:function(){ return '<h2>Sepsis or shock?</h2>'+sel('sev','How sick',[['shock','Septic shock'],['sepsis','Sepsis'],['stable','Stable'],['low','Low chance']])+'<div id="live"></div>'; },
+    site:function(){ return '<h2>Where is it?</h2><div class="grid">'
+      +sel('where','Setting',[['community','Community'],['hospital','Hospital']])
+      +sel('source','Site',[['vap','Lung, hospital'],['cap','Lung, community'],['uti','Urine'],['iab','Abdomen'],['cns','Brain'],['ssti','Skin'],['bsi','Blood'],['line','Line'],['endo','Endocarditis']])
+      +'</div><div id="live"></div>'; },
+    micro:function(){ return '<h2>Cultures</h2><div class="grid">'
+      +sel('blood','Blood cultures',[['yes','Taken'],['no','Not yet']])
+      +sel('srcx','Site culture',[['yes','Taken'],['no','Not yet']])
+      +'</div><div id="live"></div>'; },
+    mdr:function(){ return '<h2>Previous resistant organism</h2><div class="grid">'
+      +sel('prior','Known from before',[['none','None'],['mrsa','MRSA'],['esbl','ESBL'],['ampc','AmpC'],['kpc','KPC'],['oxa','OXA-48-like'],['ndm','NDM'],['vim','VIM'],['imp','IMP'],['dtr','Difficult Pseudomonas'],['crab','CRAB']])
+      +sel('recent','Antibiotics in 90 days',[['no','No'],['yes','Yes']])
+      +'</div><div id="live"></div>'; },
+    cover:function(){ return '<h2>What extra cover?</h2><div class="grid">'
+      +sel('addMrsa','MRSA',[['yes','Add'],['no','Do not add']])
+      +sel('addPseudo','Pseudomonas',[['yes','Add'],['no','Do not add']])
+      +sel('addAna','Anaerobes',[['yes','Add'],['no','Do not add']])
+      +'</div><div id="live"></div>'; },
+    bug:function(){ return '<h2>Organism and enzyme</h2><div class="grid">'
+      +sel('org','Organism',Object.keys(ORG).map(function(k){return [k,ORG[k][0]];}))
+      +sel('mech','Mechanism',Object.keys(MECH).map(function(k){return [k,MECH[k]];}))
+      +'</div><div id="live"></div>'; },
+    ast:function(){ return '<h2>Susceptibility</h2><div class="grid">'+box('mic','MIC mg/L')
+      +sel('ast','Report',[['S','Susceptible'],['I','Intermediate'],['R','Resistant'],['pending','Pending']])
+      +'</div><div id="live"></div>'; },
+    body:function(){ return '<h2>Weight, clearance, replacement</h2><div class="grid">'
+      +box('age','Age')+sel('sex','Sex',[['male','Male'],['female','Female']])+box('ht','Height cm')+box('wt','Weight kg')+box('scr','Creatinine mg/dL')+box('uo','Urine mL/h')
+      +sel('traj','Clearance now',[['stable','Steady'],['arc','Augmented'],['aki','Falling fast'],['rrt','On replacement']])
+      +sel('rrt','Kidney replacement',[['none','None'],['crrt','CRRT'],['ihd','Hemodialysis'],['sled','SLED']])
+      +box('eff','CRRT effluent mL/kg/h')
+      +sel('vd','Volume of distribution',[['normal','Normal'],['increased','Increased'],['marked','Very increased']])
+      +sel('load','Loading dose',[['standard','No extra load'],['load','Give a load']])
+      +'</div><div id="live"></div>'; },
+    drug:function(){ return '<h2>Which antibiotic?</h2><div class="grid">'
+      +sel('drug','Antibiotic',Object.keys(DRUG).map(function(k){return [k,DRUG[k][0]];}))
+      +sel('inf','Infusion',[['standard','30 minutes'],['extended','3 hours'],['continuous','Continuous']])
+      +'</div><div id="live"></div>'; },
+    pk:function(){ return '<h2>Is the exposure enough?</h2>'
+      +sel('level','A measured level exists',[['no','No'],['yes','Yes']])
+      +'<canvas id="chart" width="720" height="220"></canvas><div class="legend"><span><i></i>Free level</span><span><i class="red"></i>MIC</span></div><div id="live"></div>'; },
+    review:function(){ return '<h2>At 24 to 72 hours</h2>'+sel('resp','Course',[['improving','Improving'],['stable','Unchanged'],['worsening','Worse']])+'<div id="live"></div>'; },
+    src:function(){ return '<h2>Is the source controlled?</h2>'+sel('control','Source',[['yes','Yes'],['no','No']])+'<div id="live"></div>'; },
+    narrow:function(){ return '<h2>Can you narrow?</h2><div class="grid">'
+      +sel('identified','Organism known',[['yes','Yes'],['no','No']])
+      +sel('astYes','Susceptibility known',[['yes','Yes'],['no','No']])
+      +'</div><div id="live"></div>'; },
+    po:function(){ return '<h2>Can the vein stop?</h2>'+sel('po','Oral drug',[['yes','Yes, eating and an oral drug is active'],['no','No']])+'<div id="live"></div>'; },
+    stop:function(){ return '<h2>When does it stop?</h2><div id="live"></div><p><a href="index.html">All simulators</a></p>'; },
+    non:function(){ return '<h2>Not an antibiotic</h2><div id="live"></div><p><a href="index.html">All simulators</a></p>'; }
   };
 }
-function livePt(){
-  var c=crcl();
-  var lines=empiric();
-  if(c==null) return out('Need the body numbers', []);
-  lines.unshift(band(c)+'.');
-  var u=num('uo'), w=num('wt');
-  if(u!=null&&w) lines.push('Urine '+(u/w).toFixed(2)+' mL/kg/h.');
-  if(S.bact==='no'||S.sev==='low') lines.unshift('Not a bacterial start. Look for another diagnosis.');
-  if((S.sev==='shock'||S.sev==='sepsis') && S.blood!=='yes') lines.push('Shock. Take blood cultures, then give the antibiotic. Do not wait for the result.');
-  else if(S.sev==='stable' && S.blood!=='yes') lines.push('Stable. Take cultures before the first dose if it is safe to wait.');
-  if(S.source!=='bsi' && S.srcx!=='yes') lines.push('Take a culture from the site as well as the blood.');
-  if(S.prior!=='none') lines.push('A previous isolate is known. Start from that susceptibility, then narrow this culture.');
-  return out('Creatinine clearance '+Math.round(c)+' mL/min', lines, c<30||c>130||S.bact==='no'||((S.sev==='shock'||S.sev==='sepsis')&&S.blood!=='yes'));
+function liveBact(){
+  if(S.bact==='no') return out('Stop here', ['Look for a noninfectious diagnosis. Do not start an antibiotic.'], true);
+  return out('Bacterial until proven otherwise', ['Next is how sick the patient is.']);
+}
+function liveSick(){
+  if(S.sev==='shock'||S.sev==='sepsis') return out('Start now', ['Take the cultures, then give the empiric drug. Do not wait for the result.'], true);
+  if(S.sev==='low') return out('Do not treat yet', ['The chance of a bacterial infection is low. Finish the work-up first.'], true);
+  return out('Work-up first', ['Stable. Cultures before the antibiotic if it is safe to wait.']);
+}
+function liveSite(){
+  var name={vap:'Hospital lung',cap:'Community lung',uti:'Urine',iab:'Abdomen',cns:'Brain',ssti:'Skin',bsi:'Blood',line:'Line',endo:'Heart valve'}[S.source];
+  return out(name, [S.where==='hospital'?'Hospital organism until the culture returns.':'Community organism until the culture returns.']);
+}
+function liveMicro(){
+  var lines=[];
+  var bad=false;
+  if(S.blood!=='yes'){ lines.push('Blood cultures are not taken.'); bad=S.sev==='shock'||S.sev==='sepsis'; }
+  else lines.push('Blood cultures are taken.');
+  if(S.source!=='bsi' && S.srcx!=='yes'){ lines.push('The site is not cultured.'); bad=true; }
+  else lines.push('The site is cultured, or the site is the blood.');
+  if(S.prior!=='none') lines.push('Use the previous isolate until this culture returns.');
+  else lines.push('No previous isolate. Use the syndrome and the local pattern.');
+  return out(bad?'Cultures first':'Cultures are in', lines, bad && (S.sev==='shock'||S.sev==='sepsis'));
+}
+function liveMdr(){
+  var lines=[];
+  if(S.prior==='none') lines.push('No previous resistant organism. Empiric cover follows the site.');
+  if(S.prior==='mrsa') lines.push('Previous MRSA. Add MRSA cover.');
+  if(S.prior==='esbl') lines.push('Previous ESBL. A carbapenem is the invasive choice.');
+  if(S.prior==='ampc') lines.push('Previous AmpC. Cefepime if the MIC allows. Not ceftriaxone.');
+  if(S.prior==='kpc'||S.prior==='oxa') lines.push('Previous serine carbapenemase. Not meropenem alone.');
+  if(S.prior==='ndm'||S.prior==='vim'||S.prior==='imp') lines.push('Previous metallo-enzyme. Not meropenem. Not avibactam alone.');
+  if(S.prior==='dtr') lines.push('Previous difficult Pseudomonas. The usual beta-lactams may fail.');
+  if(S.prior==='crab') lines.push('Previous CRAB. A carbapenem does not cover it.');
+  if(S.recent==='yes') lines.push('Recent antibiotics raise the chance of resistance.');
+  return out(S.prior==='none'?'No prior MDR':'Use the previous organism', lines, S.prior!=='none');
 }
 function liveCover(){
   if(S.bact==='no') return out('Do not start an antibiotic', ['Look for a noninfectious diagnosis.'], true);
@@ -599,35 +621,88 @@ function livePlan(){
   var bad=S.resp==='worsening'||S.control==='no'||j.bad;
   return out(bad?'Change the plan':'Stop when the course is done', lines, bad);
 }
+function liveAst(){
+  if(S.ast==='R') return out('Resistant', ['Do not use this drug. Pick an active alternative.'], true);
+  if(S.ast==='I') return out('Intermediate', ['Do not switch yet. Optimize the dose, the interval, and the infusion. Then recheck the exposure.']);
+  if(S.ast==='pending') return out('No MIC yet', ['Stay empiric. Use the site and any previous isolate.']);
+  return out('Susceptible', ['MIC '+(num('mic')==null?'—':num('mic'))+' mg/L. Continue only if the exposure reaches the target.']);
+}
+function liveBody(){
+  var c=crcl();
+  if(c==null) return out('Need the body numbers', []);
+  var lines=[band(c)+'.'];
+  var u=num('uo'), w=num('wt');
+  if(u!=null&&w) lines.push('Urine '+(u/w).toFixed(2)+' mL/kg/h.');
+  if(c>130||S.traj==='arc') lines.push('Augmented clearance. A normal dose may fall short.');
+  if(S.traj==='aki') lines.push('Clearance is falling. Recalculate as the creatinine changes.');
+  if(S.rrt==='crrt') lines.push('CRRT effluent '+(num('eff')||25)+' mL/kg/h. At 25 or above, keep a full dose.');
+  if(S.rrt==='ihd') lines.push('Dose for hemodialysis, and give it after dialysis.');
+  if(S.vd!=='normal'||S.sev==='shock') lines.push('The volume is large. Give a loading dose.');
+  return out('Creatinine clearance '+Math.round(c)+' mL/min', lines, c<30||c>130);
+}
+function liveReview(){
+  if(S.resp==='worsening') return out('Worse', ['Recheck the source, the MIC, and the level before you add a drug.'], true);
+  if(S.resp==='stable') return out('Unchanged', ['Recheck the diagnosis and the source.']);
+  return out('Improving', ['Continue the active drug.']);
+}
+function liveSrc(){
+  if(S.control==='no') return out('Source is open', ['Drain it, remove the line, debride, or relieve the obstruction. A broader antibiotic does not replace that.'], true);
+  return out('Source is controlled', ['Continue the antibiotic.']);
+}
+function liveNarrow(){
+  var j=judge();
+  if(S.identified!=='yes'||S.astYes!=='yes') return out('Not yet', ['Reassess every day. Do not leave the broad drug on by habit.']);
+  if(j.bad||S.ast==='R') return out('This drug is not the narrow one', [j.title+'.'], true);
+  return out('Narrow', ['Use '+DRUG[S.drug][0]+'. Stop duplicate cover.']);
+}
+function livePo(){
+  var okSite=S.source==='cap'||S.source==='uti'||S.source==='ssti';
+  if(S.po==='yes' && okSite && S.resp==='improving') return out('Convert', ['The patient is eating and an oral drug is active. Stop the vein.']);
+  if(S.po==='yes' && !okSite) return out('Stay on the vein', ['This site is not a tablet site yet.'], true);
+  return out('Stay on the vein', ['No oral switch.']);
+}
+function liveStop(){
+  var stop={cap:'5 days',vap:'7 days',uti:'5 to 7 days',iab:'about 4 days after source control',ssti:'5 to 7 days',bsi:'7 days if a gram-negative is improving',line:'a short course once the line is out',cns:'often 2 to 3 weeks',endo:'weeks, by the organism'};
+  var lines=[];
+  if(S.control!=='yes') lines.push('Do not start the clock until the source is controlled.');
+  if(S.resp==='worsening') lines.push('Do not stop a failing course on a calendar.');
+  lines.push('Usual duration: '+(stop[S.source]||'by the syndrome')+'.');
+  if(S.control==='yes' && S.resp==='improving' && S.identified==='yes' && !judge().bad) lines.push('When that time is done, stop the antibiotic.');
+  return out('Then stop', lines, S.control!=='yes'||S.resp==='worsening');
+}
+function liveNon(){ return out('Look elsewhere', ['No antibiotic. Search for a noninfectious diagnosis.'], true); }
 function refresh(){
   var id=stack[stack.length-1];
+  var map={bact:liveBact,sick:liveSick,site:liveSite,micro:liveMicro,mdr:liveMdr,cover:liveCover,bug:liveBug,ast:liveAst,body:liveBody,drug:liveDrug,pk:livePk,review:liveReview,src:liveSrc,narrow:liveNarrow,po:livePo,stop:liveStop,non:liveNon};
   var el=document.getElementById('live');
-  var html=id==='pt'?livePt():id==='cover'?liveCover():id==='bug'?liveBug():id==='drug'?liveDrug():id==='pk'?livePk():livePlan();
-  if(el) el.innerHTML=html;
-  var ok=id==='pt'?crcl()!=null:id==='bug'?num('mic')!=null:true;
-  document.getElementById('next').disabled=id==='plan'?false:!ok;
+  if(el && map[id]) el.innerHTML=map[id]();
+  var ok=id==='body'?crcl()!=null:id==='ast'?(S.ast==='pending'||num('mic')!=null):true;
+  document.getElementById('next').disabled=(id==='stop'||id==='non')?false:!ok;
 }
 function show(){
   var id=stack[stack.length-1];
-  var order=['pt','cover','bug','drug','pk','plan'];
-  document.getElementById('stepName').textContent=TITLE[id]+' · '+(order.indexOf(id)+1)+' of 5';
+  var order=route();
+  if(order.indexOf(id)<0){ stack=['bact']; id='bact'; order=route(); }
+  document.getElementById('stepName').textContent=TITLE[id]+' · '+(order.indexOf(id)+1)+' of '+order.length;
   document.getElementById('view').innerHTML=views()[id]();
   document.getElementById('back').disabled=stack.length<2;
-  document.getElementById('next').textContent=id==='plan'?'Done':'Next';
+  document.getElementById('next').textContent=(id==='stop'||id==='non')?'Done':'Next';
   refresh();
 }
 document.getElementById('view').oninput=function(e){
   if(!e.target.id) return;
   S[e.target.id]=e.target.value;
-  refresh();
+  if(e.target.id==='bact') show();
+  else refresh();
 };
 document.getElementById('view').onchange=document.getElementById('view').oninput;
 document.getElementById('back').onclick=function(){ if(stack.length>1){ stack.pop(); show(); } };
 document.getElementById('next').onclick=function(){
   var id=stack[stack.length-1];
-  if(id==='plan'){ location.href='index.html'; return; }
-  var order=['pt','cover','bug','drug','pk','plan'];
-  stack.push(order[order.indexOf(id)+1]);
+  var order=route();
+  var i=order.indexOf(id);
+  if(i<0||i===order.length-1){ location.href='index.html'; return; }
+  stack.push(order[i+1]);
   show();
 };
 show();
