@@ -84,6 +84,8 @@
       <div><label>24 h goal</label><input id="target" type="number" value="126" step="0.1"></div>
     </div>
     <p class="quiet" id="goalNote"></p>
+    <label>Glucose mg/dL</label>
+    <input id="glu" type="number" placeholder="Adds the rise onto the line" inputmode="decimal">
     <label>Type</label>
     <select id="fluid">
       <option value="513">3% saline · 513</option>
@@ -105,9 +107,7 @@
       <button type="button" id="risk">High risk</button>
     </div>
     <details>
-      <summary>Glucose and urine</summary>
-      <label>Glucose mg/dL</label>
-      <input id="glu" type="number" placeholder="blank if unknown" inputmode="decimal">
+      <summary>Urine</summary>
       <div class="row">
         <div><label>Urine Na</label><input id="uNa" type="number" placeholder="mmol/L"></div>
         <div><label>Urine K</label><input id="uK" type="number" placeholder="mmol/L"></div>
@@ -249,10 +249,13 @@ function paint(){
     return;
   }
   const t=track({weight:s.weight, factor:s.factor, na:s.na, fluid:s.fluid, rate:s.rate, uNa:s.urine&&s.urine.uNa, uK:s.urine&&s.urine.uK, uVol:s.urine&&s.urine.uVol});
+  const path=t.path.map((v,h)=>v+rise*h/24);
+  const final=path[24];
+  const delta=final-s.na;
   document.getElementById('tbw').textContent=t.tbw.toFixed(1);
-  document.getElementById('end').textContent=t.final.toFixed(1);
-  document.getElementById('delta').textContent=(t.delta>=0?'+':'')+t.delta.toFixed(1);
-  const over=Math.abs(t.delta)>limit;
+  document.getElementById('end').textContent=final.toFixed(1);
+  document.getElementById('delta').textContent=(delta>=0?'+':'')+delta.toFixed(1);
+  const over=Math.abs(delta)>limit;
   document.getElementById('deltaBox').className='num'+(over?' bad':'');
   document.getElementById('endBox').className='num'+(over?' bad':'');
   document.getElementById('safe').hidden=!over;
@@ -261,16 +264,16 @@ function paint(){
   else if(rise>=1) lines.push('Fixing the glucose raises sodium about '+rise.toFixed(1)+' before any saline.');
   if(t.bad) lines.push('That urine volume is a daily total. Enter mL per hour.');
   if(t.delta<-0.5) lines.push('This fluid lowers the sodium.');
-  if(over) lines.push('Change is over '+limit+' in 24 hours. Slow the rate.');
+  if(over) lines.push('Change is over '+limit+' in 24 hours, including the glucose. Slow the rate.');
   else if(s.target!=null && s.target-s.na>limit) lines.push('That target is more than one day.');
   banner.className=lines.length?'show':'';
   banner.textContent=lines[0]||'';
   if(lines.length>1) banner.textContent=lines.join(' ');
-  draw(t.path, s.target==null?s.na:s.target, limit, s.na);
+  draw(path, s.target==null?s.na:s.target, limit, s.na);
   const shown=s.target==null?s.na:s.target;
   document.getElementById('goalKey').innerHTML='<i class="lg-goal"></i>Goal '+Number(shown).toFixed(1);
-  document.getElementById('hours').innerHTML=[0,6,12,18,24].map(h=>'<div>'+h+' h<b>'+t.path[h].toFixed(1)+'</b></div>').join('');
-  document.getElementById('note').textContent=s.urine?'Urine included.':'';
+  document.getElementById('hours').innerHTML=[0,6,12,18,24].map(h=>'<div>'+h+' h<b>'+path[h].toFixed(1)+'</b></div>').join('');
+  document.getElementById('note').textContent=rise?('Glucose adds +'+rise.toFixed(1)+' as it falls to 100.'):(s.urine?'Urine included.':'');
 }
 function setFluid(v, rate){
   document.getElementById('fluid').value=String(v);
@@ -291,7 +294,8 @@ document.getElementById('risk').onclick=function(){ this.classList.toggle('on');
 function suggestedGoal(na, glu, risk){
   const corr=(glu>100)?na+1.6*(glu-100)/100:na;
   const goal=risk?4:6;
-  return (corr>=135)?Math.round(na*10)/10:Math.min(140, Math.round((na+goal)*10)/10);
+  if(corr>=135 && na<135) return Math.round(Math.min(140, corr)*10)/10;
+  return Math.min(140, Math.round((na+goal)*10)/10);
 }
 function setTarget(){
   const na=parseFloat(document.getElementById('na').value);
@@ -307,7 +311,8 @@ document.getElementById('safe').onclick=function(){
   let lo=0, hi=s.rate;
   for(let i=0;i<18;i++){
     const mid=(lo+hi)/2;
-    const d=Math.abs(track({weight:s.weight,factor:s.factor,na:s.na,fluid:s.fluid,rate:mid,uNa:s.urine&&s.urine.uNa,uK:s.urine&&s.urine.uK,uVol:s.urine&&s.urine.uVol}).delta);
+  const rise=(s.glu>100)?1.6*(s.glu-100)/100:0;
+  const d=Math.abs(track({weight:s.weight,factor:s.factor,na:s.na,fluid:s.fluid,rate:mid,uNa:s.urine&&s.urine.uNa,uK:s.urine&&s.urine.uK,uVol:s.urine&&s.urine.uVol}).delta+rise);
     if(d>limit) hi=mid; else lo=mid;
   }
   const rate=Math.max(0, Math.floor(lo/5)*5);
