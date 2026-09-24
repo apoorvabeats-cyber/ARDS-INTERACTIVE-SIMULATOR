@@ -44,11 +44,12 @@ button,input,select{font:inherit}button{min-height:44px;border:1px solid #35505d
 
 <section class="card" id="vitals">
 <div class="title">02 • Patient vitals</div>
-<div class="grid4">
+<div class="grid5">
 <div class="metric" id="mhr"><div class="name">Heart rate</div><div class="value"><span id="hr">118</span> <span class="unit">bpm</span></div></div>
 <div class="metric" id="mmap"><div class="name">MAP</div><div class="value"><span id="map">72</span> <span class="unit">mmHg</span></div></div>
 <div class="metric" id="mspo2"><div class="name">SpO₂</div><div class="value"><span id="spo2">86</span><span class="unit">%</span></div></div>
 <div class="metric" id="mrr"><div class="name">Respiratory rate</div><div class="value"><span id="rr">34</span> <span class="unit">/min</span></div></div>
+<div class="metric" id="mgcs"><div class="name">GCS</div><div class="value"><span id="gcs">15</span></div></div>
 </div>
 <div class="monitor" style="height:220px">
   <div style="position:relative;height:50%">
@@ -73,8 +74,27 @@ button,input,select{font:inherit}button{min-height:44px;border:1px solid #35505d
 </div>
 </section>
 
+<section class="card" id="oxygen">
+<div class="title">04 • Controlled oxygen</div>
+<div class="controls">
+  <div class="control"><label>Face mask, before any ventilator</label>
+    <select id="maskFio2">
+      <option value="21">Room air 21%</option>
+      <option value="24">Venturi 24%</option>
+      <option value="28" selected>Venturi 28%</option>
+      <option value="35">Venturi 35%</option>
+      <option value="40">Venturi 40%</option>
+      <option value="50">Venturi 50%</option>
+      <option value="60">Simple mask about 60%</option>
+    </select>
+  </div>
+</div>
+<button id="applyO2" class="primary" style="margin-top:8px">Apply oxygen</button>
+<div class="small" id="o2Note" style="margin-top:6px">COPD target 88–92%. Asthma target 94–98%. This works before NIV. A ventilator FiO₂ replaces it once that mode is applied.</div>
+</section>
+
 <section class="card" id="support">
-<div class="title">04 • Respiratory support</div>
+<div class="title">05 • Respiratory support</div>
 
 <div class="mode">
   <button id="nivSelect" class="primary">NIV</button>
@@ -97,7 +117,7 @@ button,input,select{font:inherit}button{min-height:44px;border:1px solid #35505d
 </section>
 
 <section class="card hidden" id="settings">
-<div class="title">05 • Ventilator / NIV settings</div>
+<div class="title">06 • Ventilator / NIV settings</div>
 
 <!-- NIV Pressure Control settings -->
 <div id="pcSettings" class="hidden">
@@ -151,13 +171,13 @@ button,input,select{font:inherit}button{min-height:44px;border:1px solid #35505d
 </section>
 
 <section class="card" id="waveforms">
-<div class="title">06 • Pressure, flow, and volume</div>
+<div class="title">07 • Pressure, flow, and volume</div>
 <canvas id="scalars" style="width:100%;height:420px;background:#0b0f14;border-radius:12px;display:block"></canvas>
 <div class="note" style="margin-top:9px"><strong id="airStatus">Air trapping present</strong><span id="airText">Watch whether expiratory flow and volume get back to the baseline before the next breath.</span></div>
 </section>
 
 <section class="card" id="treatment">
-<div class="title">07 • Treatment medications</div>
+<div class="title">08 • Treatment medications</div>
 <div class="actions">
 <button id="broncho">💨 Salbutamol + Ipratropium</button>
 <button id="steroid">💊 Systemic corticosteroid</button>
@@ -168,7 +188,7 @@ button,input,select{font:inherit}button{min-height:44px;border:1px solid #35505d
 </section>
 
 <section class="card" id="decision">
-<div class="title">08 • Clinical decision</div>
+<div class="title">09 • Clinical decision</div>
 <div class="wavegrid">
 <div class="note" id="oxygenDecision"><strong>Oxygenation</strong><span>Assess SpO₂ / PaO₂ and the disease-specific oxygen target.</span></div>
 <div class="note" id="ventDecision"><strong>Ventilation</strong><span>Assess pH, PaCO₂, work of breathing and mental status.</span></div>
@@ -233,9 +253,9 @@ function physiology(){
  const base=window.caseBase||{hr:118,map:72,spo2:86,rr:34,ph:7.28,pco2:62,po2:58,hco3:28,pf:166,auto:9,ppeak:34,pplat:22};
  const broncho=therapy.broncho;
  const mag=disease==="Asthma"?therapy.mag:0;
- const rate=s.rate||base.rr||14;
+ const setRate=(support==="INT"||(support==="NIV"&&nivMode==="PC"))?(s.rate||14):14;
  const ie=(support==="INT"||(support==="NIV"&&nivMode==="PC"))?(s.ie||4):4;
- const highRate=Math.max(0,rate-14);
+ const highRate=Math.max(0,setRate-14);
  const flowHelp=support==="INT"?Math.max(0,(s.flow||60)-60)*0.045:0;
  s.auto=clamp(base.auto+highRate*0.85-flowHelp-broncho*1.6-mag*2.2-Math.max(0,ie-3)*0.9,1,28);
  const supportGain=support==="NIV"?Math.min(12,(s.press||8)*0.7):(support==="INT"?Math.min(8,(s.vt||420)/90):0);
@@ -257,10 +277,10 @@ function physiology(){
  else{s.ppeak=base.ppeak;s.pplat=base.pplat}
 }
 function render(){
- set("hr",Math.round(s.hr));set("map",Math.round(s.map));set("spo2",Math.round(s.spo2));set("rr",Math.round(s.rr));
+ set("hr",Math.round(s.hr));set("map",Math.round(s.map));set("spo2",Math.round(s.spo2));set("rr",Math.round(s.rr));set("gcs",s.gcs);
  set("ph",s.ph);set("pco2",Math.round(s.pco2));set("po2",Math.round(s.po2));set("hco3",s.hco3);set("pf",s.pf);
  const o2bad=disease==="COPD"? (s.spo2<88||s.spo2>92) : (s.spo2<94||s.spo2>98);
- mark("mhr",s.hr<50||s.hr>130);mark("mmap",s.map<=65);mark("mspo2",o2bad);mark("mrr",s.rr>30);
+ mark("mhr",s.hr<50||s.hr>130);mark("mmap",s.map<=65);mark("mspo2",o2bad);mark("mrr",s.rr>30);mark("mgcs",s.gcs<14);
  mark("mph",s.ph<7.25);mark("mpco2",disease==="COPD"?s.ph<7.25:s.pco2>45);mark("mpo2",s.po2<60);mark("mpf",false);
  $("airStatus").textContent=s.auto>6?"Dynamic hyperinflation":"Expiratory emptying improving";
  $("airText").textContent=s.auto>6?"Flow is still negative and volume is still up when the next breath starts. Auto-PEEP is "+s.auto.toFixed(0)+" cmH₂O.":"Expiration is getting back to the baseline.";
@@ -270,21 +290,26 @@ function render(){
  $("airDecision").classList.toggle("deranged",s.auto>6);
  const nivFail=support==="NIV"&&(s.ph<7.25||s.map<=65||s.gcs<14||(disease==="Asthma"&&s.pco2>55));
  $("supportDecision").classList.toggle("deranged",nivFail);
- let next="Bronchodilator and a steroid come first. NIV is for acidotic COPD. Intubate if that fails or if asthma is tiring.";
- if(s.map<=65&&s.auto>6)next="Blood pressure is falling with air trapping. Let the chest empty, then lower the rate and lengthen expiration. Do not give a fluid bolus for this.";
+ const onVent=support==="INT"||(support==="NIV"&&nivMode);
+ let next="Give salbutamol and ipratropium, and a steroid, on the face mask. NIV is the next step for acidotic COPD.";
+ if(s.map<=65&&s.auto>6&&onVent)next="Blood pressure is falling with air trapping. Let the chest empty, then lower the rate and lengthen expiration. Do not give a fluid bolus for this.";
  else if(nivFail)next=disease==="Asthma"?"NIV is not the default for life-threatening asthma. Intubate if the patient is tiring, then use a low rate and a long expiratory time.":"NIV is failing. Intubate. Do not keep adding pressure to a patient who is exhausted or whose pH is still under 7.25.";
  else if(disease==="Asthma"&&s.pco2>45&&support!=="INT")next="PaCO₂ is rising in asthma. That is fatigue. Give oxygen to 94–98%, continuous salbutamol, ipratropium, and a steroid. Add magnesium if severe. Prepare to intubate.";
- else if(s.auto>6)next="Expiratory flow is not reaching zero. Lower the rate, raise inspiratory flow, and use an I:E of 1:4 or 1:5. A high PaCO₂ is safer than stacking another breath.";
- else if(disease==="COPD"&&s.spo2>92)next="SpO₂ is above 92%. Turn the oxygen down into 88–92%. Extra oxygen raises PaCO₂ in COPD.";
- else if(disease==="COPD"&&s.spo2<88)next="SpO₂ is under 88%. Give controlled oxygen and aim for 88–92%, not a normal saturation.";
+ else if(s.auto>6&&onVent)next="Expiratory flow is not reaching zero. Lower the rate, raise inspiratory flow, and use an I:E of 1:4 or 1:5. A high PaCO₂ is safer than stacking another breath.";
+ else if(disease==="COPD"&&s.spo2>92)next="SpO₂ is above 92%. Turn the Venturi down into 88–92%. Extra oxygen raises PaCO₂ in COPD.";
+ else if(disease==="COPD"&&s.spo2<88)next="SpO₂ is under 88%. Step the Venturi up and aim for 88–92%, not a normal saturation.";
  else if(disease==="Asthma"&&s.spo2<94)next="SpO₂ is under 94%. Give oxygen and aim for 94–98%.";
+ else if(!therapy.broncho)next="Oxygen is in range. Give salbutamol and ipratropium now, plus a steroid. Do not start with intubation.";
+ else if(disease==="COPD"&&s.ph<7.35&&support!=="INT")next="pH is still under 7.35 after oxygen and bronchodilator. Start NIV and continue the nebulisers. GCS "+s.gcs+" is still compatible with NIV if the patient can protect the airway.";
  $("nextText").textContent=next;
  $("goIntubation").classList.toggle("hidden",!nivFail);
  if(support==="INT"){if($("iPpeak"))$("iPpeak").value=Math.round(s.ppeak);if($("iPplat"))$("iPplat").value=Math.round(s.pplat);}
 }
 function updateAndNavigate(){
- if(!support || (support==="NIV" && !nivMode)){scrollCard("support");return;}
- readSettings();physiology();render();
+ const onVent=support==="INT"||(support==="NIV"&&!!nivMode);
+ if(onVent)readSettings();
+ else s.fio2=+$("maskFio2").value||28;
+ physiology();render();
  if($("pressureReadout")){
    $("pressureReadout").classList.remove("hidden");
    set("ppeakReadout",Math.round(s.ppeak));
@@ -293,7 +318,7 @@ function updateAndNavigate(){
    mark("pplatCard",s.pplat>30);
  }
  const abnormal=[
-  ["mspo2",disease==="COPD"?s.spo2<88:s.spo2<92],
+  ["mspo2",disease==="COPD"?(s.spo2<88||s.spo2>92):(s.spo2<94||s.spo2>98)],
   ["mph",s.ph<7.25],["mpco2",s.pco2>55],
   ["mmap",s.map<=65],["mrr",s.rr>30],["mhr",s.hr<50||s.hr>120],["mpf",s.pf<150]
  ];
@@ -351,6 +376,7 @@ function selectNivMode(m){
 }
 $("nivSelect").onclick=()=>selectSupport("NIV");$("intSelect").onclick=()=>selectSupport("INT");$("pcBtn").onclick=()=>selectNivMode("PC");$("psBtn").onclick=()=>selectNivMode("PS");
 $("apply").onclick=updateAndNavigate;
+$("applyO2").onclick=updateAndNavigate;
 $("goSupport").onclick=()=>scrollCard("support");$("goIntubation").onclick=()=>{selectSupport("INT");scrollCard("settings")};
 $("broncho").onclick=()=>{therapy.broncho=clamp(therapy.broncho+1,0,4);$("medStatus").textContent="Bronchodilators given";$("medText").textContent="Salbutamol + ipratropium response is simulated. Reassess vitals, ABG and expiratory flow.";updateAndNavigate()};
 $("steroid").onclick=()=>{therapy.steroid=1;$("medStatus").textContent="Systemic corticosteroid given";$("medText").textContent=disease==="COPD"?"Prednisolone 40 mg daily for 5 days.":"Prednisolone 40–50 mg daily for 5 days. Use intravenous hydrocortisone if the patient cannot swallow.";updateAndNavigate()};
@@ -556,13 +582,13 @@ function drawScalars(){
 
 window.resetSupportUI=clearSupportUI;
 window.renderSimulator=render;
-window.applyCaseState=function(c){ disease=c.d; support=""; nivMode=""; therapy={broncho:0,steroid:0,mag:0,antibiotic:0}; window.caseBase=c.base; Object.assign(s,c.base); clearSupportUI(); render(); };
+window.applyCaseState=function(c){ disease=c.d; support=""; nivMode=""; therapy={broncho:0,steroid:0,mag:0,antibiotic:0}; window.caseBase=c.base; Object.assign(s,c.base); s.fio2=28; if($("maskFio2"))$("maskFio2").value="28"; clearSupportUI(); render(); };
 window.setCaseText=function(title,text,count){ $("scenarioTitle").textContent=title; $("scenarioText").textContent=text; $("caseCount").textContent=count; };
 clearSupportUI();render();draw();
 })();/* Case-driven physiology: each clinical case supplies its own baseline and locked etiology. */
 (function(){
  const cases=[
-  {d:"COPD",title:"COPD — Acute hypercapnic respiratory failure",text:"68-year-old with COPD, worsening dyspnea, wheeze and drowsiness. Initial ABG: pH 7.28, PaCO₂ 68, PaO₂ 55. Choose controlled oxygen, bronchodilators, steroids and NIV.",base:{hr:118,map:72,spo2:84,rr:34,gcs:15,ph:7.28,pco2:68,po2:55,hco3:30,pf:157,auto:9,ppeak:32,pplat:21}},
+  {d:"COPD",title:"COPD — Acute hypercapnic respiratory failure",text:"68-year-old with COPD, wheeze and drowsiness, GCS 14. Initial ABG: pH 7.28, PaCO₂ 68, PaO₂ 55. Start a Venturi mask, bronchodilators and a steroid. NIV is appropriate if the pH stays under 7.35.",base:{hr:118,map:72,spo2:84,rr:34,gcs:14,ph:7.28,pco2:68,po2:55,hco3:30,pf:157,auto:9,ppeak:32,pplat:21}},
   {d:"COPD",title:"COPD — Severe dynamic hyperinflation",text:"A severe COPD exacerbation remains tachypnoeic despite support. Expiratory flow fails to return to baseline and blood pressure is falling. Correct auto-PEEP and timing.",base:{hr:126,map:68,spo2:87,rr:38,gcs:15,ph:7.25,pco2:74,po2:58,hco3:32,pf:166,auto:15,ppeak:42,pplat:25}},
   {d:"COPD",title:"COPD — NIV failure",text:"COPD patient on NIV develops worsening acidosis, hypercapnia and fatigue. Reassess synchrony, pressure support and the need for intubation.",base:{hr:132,map:64,spo2:82,rr:40,gcs:13,ph:7.16,pco2:86,po2:50,hco3:31,pf:143,auto:12,ppeak:38,pplat:24}},
   {d:"Asthma",title:"Asthma — Acute severe asthma",text:"Young patient with severe asthma has marked wheeze, RR 36/min and increasing work of breathing. Rising PaCO₂ is concerning for fatigue. Treat aggressively and reassess.",base:{hr:132,map:76,spo2:90,rr:36,gcs:15,ph:7.31,pco2:48,po2:60,hco3:23,pf:171,auto:11,ppeak:36,pplat:20}},
