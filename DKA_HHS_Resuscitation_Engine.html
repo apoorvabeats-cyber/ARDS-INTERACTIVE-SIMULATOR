@@ -136,15 +136,34 @@ function plan(p){
   const hold=p.k<3.3;
   const highK=p.k>5.2;
   const dextroseAt=kind==='hhs'?300:(dka?200:null);
+  const hyperosm=kind==='hhs'||kind==='mixed';
   let fluid;
-  if(p.overload) fluid='Heart failure or fluid overload. Give 250 mL of isotonic fluid and look again. Do not give 15 mL/kg.';
-  else if(p.shock) fluid='Shocked. Give isotonic boluses until the perfusion recovers, then replace the deficit. Use a balanced crystalloid unless the potassium is above 5.2, in which case use 0.9% saline.';
-  else {
+  if(p.overload){
+    fluid='Heart failure or fluid overload. Give 250 mL of isotonic fluid and look again. Do not give 15 mL/kg.';
+    if(hold) fluid+=' Add 20–30 mmol of potassium to that bag. A plain balanced bag has only about 4 mmol/L.';
+  } else if(p.shock){
+    fluid='Shocked. Give isotonic boluses until the perfusion recovers, then replace the deficit.';
+    if(hold) fluid+=' Add 20–30 mmol of potassium per hour to the fluid. A plain balanced bag has only about 4 mmol/L, so do not count it as the replacement.';
+    else if(highK) fluid+=' Use 0.9% saline with no potassium in the bag.';
+    else fluid+=' Use a balanced crystalloid, and put 20–30 mmol of potassium in each litre.';
+  } else {
     const first=Math.round(p.wt*15);
     const laterLo=Math.max(150, Math.min(500, Math.round(p.wt*4)));
     const laterHi=Math.max(laterLo, Math.min(500, Math.round(p.wt*6)));
-    const firstBag=highK?'0.9% saline':'a balanced crystalloid';
-    const next=p.shock?'Stay with isotonic fluid while the patient is still shocked.':(p.corrNa>=135?'If the corrected sodium is still 135 or higher, the next fluid can be 0.45% saline.':'The corrected sodium is low. Continue isotonic fluid.');
+    let firstBag, next;
+    if(hold){
+      firstBag='0.9% saline with 20–30 mmol of potassium added per hour';
+      next='A plain balanced bag has only about 4 mmol/L. Do not count it as the replacement. Keep the ECG on, and do not give 40 mmol/h through a peripheral vein.';
+    } else if(hyperosm){
+      firstBag=highK?'0.9% saline with no potassium added':'a balanced crystalloid';
+      next='Stay on isotonic fluid. Do not change to 0.45% saline while the effective osmolality is falling faster than about 3 mOsm/kg per hour. Once the fall is slower than that, 0.45% saline is reasonable only if the corrected sodium is still 135 or higher.';
+    } else if(highK){
+      firstBag='0.9% saline with no potassium added';
+      next=p.corrNa>=135?'If the corrected sodium is still 135 or higher, the next fluid can be 0.45% saline.':'The corrected sodium is low. Continue isotonic fluid.';
+    } else {
+      firstBag='a balanced crystalloid';
+      next=p.corrNa>=135?'If the corrected sodium is still 135 or higher, the next fluid can be 0.45% saline.':'The corrected sodium is low. Continue isotonic fluid.';
+    }
     fluid='First hour: '+first+' mL of '+firstBag+', once, over that hour (about 15 mL/kg). Then '+laterLo+'–'+laterHi+' mL/h and reassess. '+next;
   }
   let insulin;
