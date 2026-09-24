@@ -313,14 +313,24 @@ neurointerventional or local protocol decisions.
 <option value="yes">Yes</option>
 </select>
 
-<label>Modified Fisher grade</label>
+<label>Modified Fisher (Frontera 2006)</label>
 <select id="fisher">
 <option value="">Not entered</option>
-<option value="0">0 — no SAH</option>
+<option value="0">0 — no SAH and no IVH</option>
 <option value="1">1 — thin SAH, no IVH</option>
-<option value="2">2 — thin SAH plus IVH</option>
+<option value="2">2 — thin SAH, with any IVH</option>
 <option value="3">3 — thick SAH, no IVH</option>
-<option value="4">4 — thick SAH plus IVH</option>
+<option value="4">4 — thick SAH, with any IVH</option>
+</select>
+<p class="small">Thick means blood filling a cistern or fissure. Some calculators instead call thick anything of 1 mm or more. Those are not the same measurement. Any intraventricular blood counts.</p>
+
+<label>Original Fisher (1980), only if the report uses that numbering</label>
+<select id="fisherOld">
+<option value="">Not used</option>
+<option value="1">1 — no blood seen</option>
+<option value="2">2 — thin SAH, under 1 mm</option>
+<option value="3">3 — thick SAH, 1 mm or more, or a localized clot</option>
+<option value="4">4 — intracerebral or intraventricular clot, with little or no SAH</option>
 </select>
 
 <label>Hunt–Hess: consciousness</label>
@@ -484,6 +494,29 @@ neurological status and complications such as DCI.</li>
 <label>Hours since onset</label>
 <input id="aneurysmTime" type="number" value="6">
 
+<label>Location</label>
+<select id="anLoc">
+<option value="">Not entered</option>
+<option value="anterior">Anterior circulation, not MCA</option>
+<option value="mca">Middle cerebral artery</option>
+<option value="posterior">Posterior circulation</option>
+</select>
+
+<label>What the anatomy allows</label>
+<select id="anFit">
+<option value="">Not entered</option>
+<option value="both">Suitable for coiling or clipping</option>
+<option value="coil">Coilable, not a clipping aneurysm</option>
+<option value="clip">Needs clipping, not coilable without a stent</option>
+<option value="wide">Wide neck — a simple coil may not hold</option>
+</select>
+
+<label>Intraparenchymal hematoma with mass effect</label>
+<select id="anIch">
+<option value="no">No</option>
+<option value="yes">Yes — needs evacuation</option>
+</select>
+
 <button class="primary" onclick="runAneurysm()">RUN ANEURYSM PATHWAY</button>
 
 <div id="aneurysmResult"></div>
@@ -494,9 +527,10 @@ neurological status and complications such as DCI.</li>
 
 <div class="good">
 <b>Do not delay definitive treatment unnecessarily.</b><br>
-Once the ruptured aneurysm is identified, prompt treatment is central
-to reducing the risk of rebleeding. The 2023 AHA/ASA guideline recommends
-treatment preferably within 24 hours when feasible.
+Secure a ruptured aneurysm as early as feasible, preferably within 24 hours.
+If both coiling and clipping are possible, coiling is preferred for 1-year outcome.
+Clip when the aneurysm cannot be coiled, when it is an MCA aneurysm that the team would rather clip, or when a hematoma has to come out.
+Avoid an acute stent or flow diverter unless nothing else will secure it.
 </div>
 </div>
 
@@ -729,11 +763,21 @@ function runGrading(){
   else if((gcs===13||gcs===14) && deficit==="yes") wfns="WFNS III";
   else if(gcs>=7 && gcs<=12) wfns="WFNS IV";
   else wfns="WFNS V";
+  const risks={
+    "0":"Modified Fisher 0. No SAH and no IVH. Symptomatic vasospasm in the Frontera series was about 0%. This grade does not explain the headache by itself.",
+    "1":"Modified Fisher 1. Thin SAH, no IVH. Symptomatic vasospasm was about 24%.",
+    "2":"Modified Fisher 2. Thin SAH with IVH. Symptomatic vasospasm was about 33%, close to thick blood without IVH. Thin blood is not low risk once IVH is present.",
+    "3":"Modified Fisher 3. Thick SAH, no IVH. Symptomatic vasospasm was about 33%.",
+    "4":"Modified Fisher 4. Thick SAH with IVH. This is the highest grade, about 40% symptomatic vasospasm."
+  };
   let fish="";
-  if(fisher==="3"||fisher==="4") fish="<br>Modified Fisher "+fisher+": thick SAH. The risk of delayed cerebral ischemia is higher. This grade does not itself order surgery or induced hypertension.";
-  else if(fisher==="1"||fisher==="2") fish="<br>Modified Fisher "+fisher+": thin SAH. DCI is less likely than with thick blood, and it is not zero.";
-  else if(fisher==="0") fish="<br>Modified Fisher 0: no SAH on this description.";
-  else fish="<br>Modified Fisher was not entered, so the CT blood burden is not in the grade.";
+  if(risks[fisher]) fish="<br>"+risks[fisher]+" The grade changes how closely you watch for delayed ischemia on days 3–14. It does not choose clipping or coiling. Give nimodipine for aneurysmal SAH at every grade above 0.";
+  else fish="<br>Modified Fisher was not entered.";
+  const old=document.getElementById("fisherOld").value;
+  if(old==="1") fish+="<br>Original Fisher 1 means no blood. On the modified scale that is 0, not 1.";
+  else if(old==="2") fish+="<br>Original Fisher 2 means thin SAH. On the modified scale that is 1 if there is no IVH, and 2 if there is IVH.";
+  else if(old==="3") fish+="<br>Original Fisher 3 means thick SAH. On the modified scale that is 3 without IVH, and 4 if IVH is also present.";
+  else if(old==="4") fish+="<br>Original Fisher 4 is an intracerebral or intraventricular clot with little or no subarachnoid blood. It is not modified Fisher 4. Do not copy the number across.";
   const mind=document.getElementById("hhMind").value;
   const head=document.getElementById("hhHead").value;
   const cn=document.getElementById("hhCn").value;
@@ -812,15 +856,57 @@ function runAneurysm(){
   const found=document.getElementById("aneurysmFound").value;
   const treatment=document.getElementById("aneurysmTreatment").value;
   const time=num("aneurysmTime");
+  const loc=document.getElementById("anLoc").value;
+  const fit=document.getElementById("anFit").value;
+  const ich=document.getElementById("anIch").value;
   let html="";
-  if(found==="yes"){
-    html+=box("danger","Ruptured aneurysm identified","Secure it. Coiling or clipping is a specialist choice based on anatomy and the team, not on a default.");
-    if(time===null) html+=box("warning","Clock missing","The preferred window is within 24 hours of onset.");
-    else if(time<=24) html+=box("good","Inside 24 hours","This is the preferred window. Do not add routine tranexamic acid while you wait.");
-    else html+=box("warning","Later than 24 hours","The preferred window has passed. Secure it as soon as it can be done. Rebleeding does not stop at 24 hours.");
-    if(treatment==="uncertain") html+=box("warning","No method chosen","The multidisciplinary team has to choose. Leaving it blank is not a plan.");
+  if(found!=="yes"){
+    html+=box("warning","No aneurysm identified yet","CT-positive SAH with a negative CTA still needs DSA unless the pattern is classic perimesencephalic and the study was adequate. A first negative DSA is often repeated. Do not choose clipping or coiling until there is an aneurysm to treat.");
+    document.getElementById("aneurysmResult").innerHTML=html;
+    return;
+  }
+  html+=box("danger","Ruptured aneurysm identified","Secure it. Rebleeding is the failure this step is trying to prevent.");
+  if(time===null) html+=box("warning","Clock missing","The preferred window is within 24 hours of onset.");
+  else if(time<=24) html+=box("good","Inside 24 hours","This is the preferred window. Do not add routine tranexamic acid while you wait.");
+  else html+=box("warning","Later than 24 hours","The preferred window has passed. Secure it as soon as it can be done. Rebleeding does not stop at 24 hours.");
+
+  let rec="", why="", strict=false;
+  if(ich==="yes"){
+    rec="clipping"; strict=true;
+    why="There is a hematoma with mass effect. Clip the aneurysm and evacuate the clot. Coiling alone leaves the mass.";
+  }else if(fit==="clip"){
+    rec="clipping"; strict=true;
+    why="This aneurysm is not safely coilable without a stent. Clip it rather than waiting on an endovascular plan the anatomy will not accept.";
+  }else if(fit==="coil"){
+    rec="coiling"; strict=true;
+    why="This aneurysm is suitable for coiling and not for clipping. Coil it.";
+  }else if(loc==="posterior" && fit!=="wide"){
+    rec="coiling";
+    why="A posterior-circulation aneurysm that can be coiled is usually treated endovascularly.";
+  }else if(loc==="mca"){
+    rec="clipping";
+    why="MCA aneurysms are often clipped, particularly with a wide neck or a Sylvian hematoma. A narrow neck and no mass can still be coiled in experienced hands. That has to be an explicit team decision.";
+  }else if(fit==="wide"){
+    rec="clipping";
+    why="A wide neck often needs clipping, or balloon-assisted coiling. Avoid an acute stent or a flow diverter unless nothing else will secure the aneurysm. Dual antiplatelet drugs raise the bleeding risk in the rupture period.";
+  }else if(fit==="both" || loc==="anterior"){
+    rec="coiling";
+    why="When both coiling and clipping will secure the aneurysm, coiling is preferred. That is the 2023 AHA/ASA recommendation, based on better functional outcome at 1 year in patients suitable for either method.";
   }else{
-    html+=box("warning","No aneurysm identified yet","CT-positive SAH with a negative CTA still needs DSA unless the pattern is classic perimesencephalic and the study was adequate. A first negative DSA is often repeated.");
+    why="Enter the location, whether a coil or a clip can actually hold, and whether a hematoma needs to come out.";
+  }
+  html+=box(rec?"result":"warning", rec?("Usual recommendation: "+rec):"Anatomy incomplete", why);
+
+  if(rec && treatment==="uncertain"){
+    html+=box("warning","No method selected","The recommendation above is the plan to take to the neurovascular team. Leaving the method blank is not a plan.");
+  }else if(rec && treatment===rec){
+    html+=box("good","Selected plan matches this anatomy", rec==="coiling"?"After coiling, recurrence is more common than after clipping. Arrange follow-up imaging. The patient still needs nimodipine and DCI surveillance.":"Clipping is the more durable occlusion. It does not remove the need to watch for hydrocephalus and delayed ischemia.");
+  }else if(rec && treatment!==rec){
+    html+=box(strict?"danger":"warning", strict?"Selected plan conflicts with the anatomy":"Selected plan is not the usual lean",
+      "You selected "+treatment+". For this anatomy the usual method is "+rec+". "+(strict?"Do not proceed against a hard anatomical reason.":"It can still be right if the team has a reason. Write that reason down."));
+  }
+  if(fit==="wide" && treatment==="coiling" && ich!=="yes"){
+    html+=box("warning","Coiling a wide neck","If coiling is the plan, it should be a technique that can hold the neck, such as balloon assistance. Do not start with a stent or a flow diverter unless the aneurysm cannot be secured another way.");
   }
   document.getElementById("aneurysmResult").innerHTML=html;
 }
