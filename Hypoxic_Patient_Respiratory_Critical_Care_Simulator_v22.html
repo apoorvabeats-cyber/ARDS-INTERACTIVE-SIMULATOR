@@ -133,6 +133,7 @@ input,select{width:100%;padding:10px;border:1px solid #c9d4e2;border-radius:10px
 <div class="field"><label>HCO₃⁻ mmol/L</label><input id="hco3" type="number" value="24"></div>
 <div class="field"><label>Lactate mmol/L</label><input id="lactate" type="number" step="0.1" value="2"></div>
 <div class="field"><label>FiO₂ at ABG</label><input id="abgFio2" type="number" step="0.01" min="0.21" max="1" value="0.40"></div>
+<div class="field"><label>Age (years)</label><input id="age" type="number" value="55"></div>
 <div class="field"><label>Barometric pressure mmHg</label><input id="patm" type="number" value="760"></div>
 </div>
 <button class="btn" onclick="calculateABG()">CALCULATE ABG + A–a GRADIENT</button><div id="abgOut"></div><div class="page-indicator">PAGE 2 OF THE RESPIRATORY FAILURE WORKFLOW</div>
@@ -169,7 +170,7 @@ input,select{width:100%;padding:10px;border:1px solid #c9d4e2;border-radius:10px
 <button class="btn" onclick="reassessConventional()">REASSESS AFTER 10–15 MIN</button><div id="t1out"></div>
 <div class="result">
 <h3>TYPE 1 RF — ALL SUPPORT OPTIONS AVAILABLE</h3>
-<p>The simulator will interpret the bedside data and recommend the next level. The four pathways remain selectable:</p>
+<p>For hypoxemia without hypercapnia, the next step after ordinary oxygen is usually HFNC. NIV is for cardiogenic pulmonary edema, or for COPD with a respiratory acidosis. It is not the default rescue for pneumonia or ARDS.</p>
 <div class="choice">
 <button class="btn" onclick="selectSupport('type1','OXYGEN')">CONVENTIONAL O₂ — NC / FACE MASK / VENTURI</button>
 <button class="btn" onclick="selectSupport('type1','HFNC')">HFNC</button>
@@ -193,7 +194,7 @@ input,select{width:100%;padding:10px;border:1px solid #c9d4e2;border-radius:10px
 <div class="field"><label>Work of breathing</label><select id="hfWob"><option>Low</option><option>Moderate</option><option>High</option><option>Exhaustion</option></select></div>
 </div>
 <button class="btn" onclick="assessHFNC()">CALCULATE HFNC RESPONSE</button><div id="hfOut"></div>
-<div class="choice"><button class="btn green" onclick="stabilize()">PATIENT STABILIZED → ETIOLOGY</button><button class="btn red" onclick="openNIV()">HFNC FAILURE → NIV / INTUBATION</button></div>
+<div class="choice"><button class="btn green" onclick="stabilize()">PATIENT STABILIZED → ETIOLOGY</button><button class="btn red" onclick="selectSupport('type1','INTUBATION')">HFNC FAILURE → INTUBATION</button></div>
 </section>
 
 <section class="phase hidden" id="niv">
@@ -446,8 +447,11 @@ function reassessIntubationABG(){
 
 
 function compareABG(){
- let rph=+$('rph').value,rco=+$('rpco2').value,rpo=+$('rpao2').value,rl=+$('rlactate').value,
- im=rph>=state.ph&&rco<=state.paco2&&rpo>=state.pao2&&rl<=state.lactate;
+ let rph=+$('rph').value,rco=+$('rpco2').value,rpo=+$('rpao2').value,rl=+$('rlactate').value;
+ const ventilating=rph>=state.ph && rco<=state.paco2+1;
+ const oxygenOk=rpo>=state.pao2-5;
+ const stillSevere=rph<7.25;
+ const im=ventilating && oxygenOk && rl<=state.lactate+0.2 && !stillSevere;
  box('serialOut','SERIAL ABG COMPARISON',
  'pH '+state.ph+' → '+rph+'; PaCO₂ '+state.paco2+' → '+rco+
  '; PaO₂ '+state.pao2+' → '+rpo+'; lactate '+state.lactate+' → '+rl+
@@ -1199,9 +1203,9 @@ function showEtiologyTreatment(){ showDetailedEtiologyTreatment(); }
 function buildEtiology(){
   let t=state.type, aa=state.aa;
   let mech=t==='Type 1 RF'
-    ?(aa>20?'V/Q mismatch / shunt / diffusion impairment':'Low inspired O₂ / ambient hypoxia')
+    ?(state.aaHigh?'V/Q mismatch / shunt / diffusion impairment':'Low inspired O₂ / ambient hypoxia')
     :t==='Type 2 RF'
-    ?(aa<=20?'Pure alveolar hypoventilation':'Mixed ventilatory + gas-exchange failure')
+    ?(state.aaHigh?'Mixed ventilatory + gas-exchange failure':'Pure alveolar hypoventilation')
     :'Mixed ventilatory + gas-exchange failure';
 
   box('etiologyMechanism','MAIN MECHANISM DETERMINED BY SIMULATOR',
@@ -1304,34 +1308,38 @@ function calculateABG(){
 
   const PAO2=fio2*(patm-47)-paco2/0.8;
   const aa=PAO2-pao2;
-  const pf=pao2/fio2;
+  const pf=fio2>0 ? pao2/fio2 : 0;
+  const age=+$('age').value||40;
+  const expected=Math.max(15, age/4+4);
+  const aaHigh=aa>expected;
+  const aaInterpretation = !aaHigh
+      ? 'A–a gradient is within the age-adjusted limit of about '+expected.toFixed(0)+' mmHg. Think low inspired oxygen or pure hypoventilation before lung disease.'
+      : 'A–a gradient is above the age-adjusted limit of about '+expected.toFixed(0)+' mmHg. Think V/Q mismatch, shunt, or diffusion impairment.'
+        +(fio2>0.3?' On a raised FiO₂ the gradient also widens in normal lungs, so use the P/F ratio with it.':'');
 
-  const aaInterpretation =
-    aa<=20
-      ? 'A–a gradient is not significantly elevated — pure alveolar hypoventilation / low inspired oxygen is more likely.'
-      : aa<=40
-        ? 'A–a gradient is elevated — consider V/Q mismatch, early shunt or diffusion impairment.'
-        : 'A–a gradient is markedly elevated — significant V/Q mismatch, shunt or diffusion impairment is likely.';
-
-  /* Classification follows the standard ABG reference table:
-       Type 1 (Hypoxemic RF):        PaO2 <60         AND PaCO2 normal/low (<=50)
-       Type 2 (Hypercapnic RF):      PaO2 normal/low  AND PaCO2 >50
-       Mixed Type 1 + Type 2:        PaO2 <60         AND PaCO2 >50
-     Mixed is checked first since it is the intersection of the other two. */
+  const hypoxemic=pao2<60 || (fio2>=0.3 && pf<300);
+  const acuteCO2=paco2>50 && ph<7.35;
+  const chronicCO2=paco2>50 && ph>=7.35;
+  const o2low=chronicCO2;
   const type =
-    (paco2>50 && pao2<60)
-      ? 'Mixed Type 1 + Type 2 RF'
-      : paco2>50
-        ? 'Type 2 RF'
-        : pao2<60
-          ? 'Type 1 RF'
-          : 'No classic Type 1/2 RF';
+    (hypoxemic && acuteCO2) ? 'Mixed Type 1 + Type 2 RF'
+    : acuteCO2 ? 'Type 2 RF'
+    : hypoxemic ? 'Type 1 RF'
+    : chronicCO2 ? 'Compensated hypercapnia'
+    : 'No classic Type 1/2 RF';
+  const maskNote = (pao2>=60 && fio2>=0.3 && pf<300)
+    ? ' PaO₂ is at least 60 only because FiO₂ is '+fio2.toFixed(2)+'. P/F is '+pf.toFixed(0)+', so this is still hypoxemic respiratory failure.'
+    : (chronicCO2 && !acuteCO2)
+    ? ' pH is not acidemic. This is compensated hypercapnia, not an indication for NIV. Oxygen target is 88–92%.'
+    : '';
 
   state={
     ph,pao2,paco2,fio2,aa,pf,
     hco3:+$('hco3').value,
     lactate:+$('lactate').value,
     type,
+    o2low,
+    aaHigh,
     selectedSupport:''
   };
 
@@ -1355,7 +1363,7 @@ function calculateABG(){
     'A–a gradient = <b>'+aa.toFixed(1)+' mmHg</b><br>'+
     'P/F ratio = <b>'+pf.toFixed(0)+'</b><br><br>'+
     '<b>A–a INTERPRETATION:</b> '+aaInterpretation+
-    '<br><br><b>CLASSIFICATION:</b> '+type+
+    '<br><br><b>CLASSIFICATION:</b> '+type+maskNote+
     '<br><br>'+rfTableHtml,
     'warn');
 
@@ -1365,9 +1373,9 @@ function calculateABG(){
 function classify(){
   const t=state.type;
   const mech=t==='Type 1 RF'
-    ?(state.aa>20?'V/Q mismatch / shunt / diffusion impairment':'Low inspired O₂ / ambient hypoxia')
+    ?(state.aaHigh?'V/Q mismatch / shunt / diffusion impairment':'Low inspired O₂ / ambient hypoxia')
     :t==='Type 2 RF'
-      ?(state.aa<=20?'Pure alveolar hypoventilation':'Mixed ventilatory + gas-exchange failure')
+      ?(state.aaHigh?'Mixed ventilatory + gas-exchange failure':'Pure alveolar hypoventilation')
       :t==='Mixed Type 1 + Type 2 RF'
         ?'Mixed ventilatory + gas-exchange failure'
         :'No classic Type 1/2 mechanism established';
@@ -1382,7 +1390,10 @@ function classify(){
   $('btnType1').classList.toggle('hidden',t!=='Type 1 RF');
   $('btnType2').classList.toggle('hidden',t!=='Type 2 RF');
   $('btnMixed').classList.toggle('hidden',t!=='Mixed Type 1 + Type 2 RF');
-  $('btnNoClassic').classList.toggle('hidden',t!=='No classic Type 1/2 RF');
+  $('btnNoClassic').classList.toggle('hidden', t!=='No classic Type 1/2 RF' && t!=='Compensated hypercapnia');
+  $('btnNoClassic').textContent = t==='Compensated hypercapnia'
+    ? 'COMPENSATED HYPERCAPNIA → CONTROLLED OXYGEN, NOT NIV'
+    : 'NO CLASSIC TYPE 1/2 RF → PROCEED TO MANAGEMENT';
 
   if(t==='Type 2 RF'){
     $('type2Intro').innerHTML='<div class="result warn">pH = <b>'+state.ph+
@@ -1428,22 +1439,31 @@ function selectSupport(path,support){
 }
 
 function reassessConventional(){
-  const s=+$('t1spo2').value,
-        rr=+$('t1rr').value,
-        w=$('t1wob').value,
-        ok=s>=88 && rr<24 && w==='Low';
+  const s=+$('t1spo2').value, rr=+$('t1rr').value, w=$('t1wob').value;
+  const targetLow=!!state.o2low;
+  const low=targetLow?88:94, high=targetLow?92:98;
+  const tooMuch=s>high;
+  const inBand=s>=low && s<=high;
+  const ok=inBand && rr<30 && w==='Low';
+  let meaning, action;
+  if(tooMuch){
+    meaning='Oxygen is above the target of '+low+'–'+high+'%.';
+    action='Turn the oxygen down. This is not a reason to start NIV.';
+  }else if(ok){
+    meaning='Saturation is in the '+low+'–'+high+'% target and the work of breathing is low.';
+    action='Continue this oxygen and go to the cause.';
+  }else{
+    meaning='Oxygen or the work of breathing is not acceptable for '+(targetLow?'a patient at risk of hypercapnia.':'hypoxemia without hypercapnia.');
+    action=targetLow
+      ? 'Adjust oxygen toward 88–92%. If acidosis or exhaustion appears, use NIV rather than more oxygen.'
+      : 'Move to HFNC. Do not use NIV as the default next step unless this is pulmonary edema.';
+  }
 
   box('t1out','10–15 MIN REASSESSMENT',
     'SpO₂ '+s+'%; RR '+rr+'/min; HR '+$('t1hr').value+
     '/min; WOB '+w+
-    '.<br><br><b>INTERPRETATION:</b> '+
-    (ok
-      ? 'Conventional oxygen appears adequate and the patient is stabilized.'
-      : 'Conventional oxygen is inadequate or work of breathing remains concerning.')+
-    '<br><br><b>WHAT TO DO:</b> '+
-    (ok
-      ? 'Continue current oxygen support and proceed to etiology.'
-      : 'Escalate to HFNC or NIV.'),
+    '.<br><br><b>INTERPRETATION:</b> '+meaning+
+    '<br><br><b>WHAT TO DO:</b> '+action,
     ok?'good':'warn');
 
   const old=$('oxygenEtiologyButton');
@@ -1507,13 +1527,11 @@ function assessMixedO2(){
 }
 
 function assessHFNC(){
-  const s=+$('hfSpo2').value,
-        f=+$('hfFio2').value,
-        rr=+$('hfRR').value,
-        rox=(s/f)/rr,
-        map=+$('hfMAP').value,
-        w=$('hfWob').value,
-        c=$('hfCons').value;
+  const s=+$('hfSpo2').value, rr=+$('hfRR').value;
+  const fRaw=+$('hfFio2').value;
+  const f=fRaw>1?fRaw/100:fRaw;
+  const rox=f>0?(s/f)/rr:0;
+  const map=+$('hfMAP').value, w=$('hfWob').value, c=$('hfCons').value;
 
   const danger=c!=='Awake'||w==='Exhaustion'||map<65||s<88||rr>=35;
   const favorable=rox>=4.88&&w==='Low'&&map>=65&&s>=88&&c==='Awake';
@@ -1526,7 +1544,7 @@ function assessHFNC(){
     (danger?'Clinical deterioration/instability is present.':
       favorable?'Favorable HFNC response.':'Indeterminate/concerning response.')+
     '<br><br><b>WHAT TO DO:</b> '+
-    (danger?'Escalate to NIV or intubation according to clinical status.':
+    (danger?'Intubate if the patient is exhausted, unconscious, or shocked. NIV is not the default rescue for hypoxemic pneumonia or ARDS. Use it for pulmonary edema or hypercapnic COPD.':
       favorable?'Continue HFNC and proceed to etiology when stabilized.':
       'Reassess frequently and consider NIV/intubation according to trajectory.'),
     danger?'bad':favorable?'good':'warn');
@@ -1544,7 +1562,7 @@ function assessHFNC(){
   }else if(danger || !favorable){
     $('hfOut').innerHTML +=
       '<br><div class="choice">'+
-      '<button class="btn" onclick="selectSupport(state.type===\'Mixed Type 1 + Type 2 RF\'?\'mixed\':\'type1\',\'NIV\')">SELECT NIV / BiPAP</button>'+
+      '<button class="btn" onclick="selectSupport(state.type===\'Mixed Type 1 + Type 2 RF\'?\'mixed\':\'type1\',\'NIV\')">NIV ONLY FOR EDEMA OR HYPERCAPNIA</button>'+
       '<button class="btn red" onclick="selectSupport(state.type===\'Mixed Type 1 + Type 2 RF\'?\'mixed\':\'type1\',\'INTUBATION\')">SELECT INTUBATION</button>'+
       '</div>';
   }
@@ -1603,12 +1621,15 @@ function decideType2(){
     'pH <b>'+state.ph+'</b>; consciousness '+c+
     '; airway protected '+a+'; MAP '+map+'; WOB '+w+
     '.<br><br><b>INTERPRETATION:</b> '+
-    (im?'Immediate airway/hemodynamic concern favors intubation.':
-      acid?'Respiratory acidemia: NIV/BiPAP is appropriate if no contraindication; intubate if clinically unsafe.':
-      'No current acidemia: treat the cause, use controlled oxygen and monitor serial ABGs.')+
-    '<br><br><b>AVAILABLE TYPE 2 OPTIONS:</b><br>'+
-    '<button class="btn" onclick="selectSupport(\'type2\',\'NIV\')">CONTINUE WITH NIV / BiPAP</button>'+
-    '<button class="btn red" onclick="selectSupport(\'type2\',\'INTUBATION\')">CONTINUE WITH INTUBATION</button>',
+    (im?'Proceed to intubation. NIV is unsafe when the airway is unprotected, the patient is obtunded, the MAP is under 65, or the patient is exhausted.':
+      acid?'Respiratory acidosis with a protected airway: start NIV and repeat the ABG in 1–2 hours. Intubate if the pH does not improve.':
+      'The pH is not acidemic. Do not start NIV for a compensated carbon dioxide. Use controlled oxygen at 88–92% and treat the cause.')+
+    '<br><br><b>WHAT TO DO:</b><br>'+
+    (im
+      ? '<button class="btn red" onclick="selectSupport(\'type2\',\'INTUBATION\')">INTUBATE</button>'
+      : acid
+        ? '<button class="btn" onclick="selectSupport(\'type2\',\'NIV\')">START NIV / BiPAP</button><button class="btn red" onclick="selectSupport(\'type2\',\'INTUBATION\')">INTUBATE IF NIV IS UNSAFE</button>'
+        : '<button class="btn" onclick="buildEtiology();_v20ShowPage(\'etiology\')">CONTROLLED OXYGEN AND TREAT THE CAUSE</button>'),
     im?'bad':acid?'warn':'good');
 }
 
