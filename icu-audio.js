@@ -1,93 +1,109 @@
-/* Shared monitor audio for the critical-care hub. Synthesized in the browser. */
+/* Monitor audio for the hub. Must start inside a tap or a phone will stay silent. */
 (function () {
   "use strict";
   const file = () => decodeURIComponent((location.pathname.split("/").pop() || "").split("?")[0]);
-  let ctx = null, enabled = false, noise = null, raf = 0;
+  let ctx = null, enabled = false, noise = null, timer = 0;
   let pulseAt = 0, breathAt = 0, alarmAt = 0, saidAt = 0;
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.textContent = "Sound";
+  btn.textContent = "Sound off";
   btn.setAttribute("aria-pressed", "false");
-  btn.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:80;border:0;border-radius:999px;padding:10px 14px;font:700 14px -apple-system,Segoe UI,sans-serif;background:#071b3a;color:#fff;box-shadow:0 6px 18px #0004";
+  btn.style.cssText = "position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:99999;border:0;border-radius:999px;padding:14px 22px;min-width:148px;font:800 16px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:#b72b39;color:#fff;box-shadow:0 8px 24px #0006";
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
   function ensure() {
     const C = window.AudioContext || window.webkitAudioContext;
     if (!C) return null;
-    ctx = ctx || new C();
-    if (ctx.state === "suspended") ctx.resume();
-    if (!noise) {
+    if (!ctx) ctx = new C();
+    if (ctx.state !== "running") { try { ctx.resume(); } catch (e) {} }
+    if (!noise && ctx) {
       noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
       const d = noise.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     }
     return ctx;
   }
-  function tone(freq, dur, gain, type, when) {
-    const c = ensure(); if (!c || !enabled) return;
-    const t = when || c.currentTime;
-    const o = c.createOscillator(), g = c.createGain();
+  function tone(freq, dur, gain, type) {
+    const c = ensure();
+    if (!c) return;
+    const t = c.currentTime;
+    const o = c.createOscillator();
+    const g = c.createGain();
     o.type = type || "sine";
     o.frequency.setValueAtTime(freq, t);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(gain, t + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.gain.setValueAtTime(gain, t);
+    g.gain.linearRampToValueAtTime(0.0008, t + dur);
     o.connect(g); g.connect(c.destination);
     o.start(t); o.stop(t + dur + 0.02);
   }
-  function puff(freq, dur, gain, when) {
-    const c = ensure(); if (!c || !enabled || !noise) return;
-    const t = when || c.currentTime;
-    const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
-    src.buffer = noise; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 0.7;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(gain, t + dur * 0.35);
-    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+  function puff(freq, dur, gain) {
+    const c = ensure();
+    if (!c || !noise) return;
+    const t = c.currentTime;
+    const src = c.createBufferSource();
+    const f = c.createBiquadFilter();
+    const g = c.createGain();
+    src.buffer = noise;
+    f.type = "bandpass";
+    f.frequency.value = freq;
+    f.Q.value = 0.8;
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(gain, t + dur * 0.3);
+    g.gain.linearRampToValueAtTime(0.001, t + dur);
     src.connect(f); f.connect(g); g.connect(c.destination);
     src.start(t); src.stop(t + dur);
   }
   function playPulse(kind) {
     if (kind === "absent") return;
-    if (kind === "weak") tone(520, 0.045, 0.03, "sine");
-    else if (kind === "bounding") { tone(980, 0.07, 0.09, "sine"); tone(1460, 0.04, 0.03, "sine"); }
-    else tone(880, 0.06, 0.055, "sine");
+    if (kind === "weak") tone(480, 0.06, 0.18, "sine");
+    else if (kind === "bounding") { tone(990, 0.08, 0.35, "sine"); tone(1480, 0.05, 0.12, "triangle"); }
+    else { tone(880, 0.07, 0.28, "sine"); tone(1320, 0.04, 0.08, "sine"); }
   }
   function playBreath(kind) {
-    const c = ensure(); if (!c) return;
-    const t = c.currentTime;
     if (kind === "vent") {
-      tone(1400, 0.02, 0.04, "square", t);
-      puff(480, 0.42, 0.03, t + 0.02);
-      puff(260, 0.55, 0.015, t + 0.55);
+      tone(1600, 0.03, 0.16, "square");
+      puff(520, 0.38, 0.14);
+      setTimeout(() => { if (enabled) puff(280, 0.45, 0.06); }, 420);
     } else {
-      puff(620, 0.7, 0.022, t);
+      puff(700, 0.65, 0.1);
     }
   }
   function playAlarm() {
-    tone(520, 0.18, 0.04, "square");
-    setTimeout(() => { if (enabled) tone(680, 0.18, 0.04, "square"); }, 220);
+    tone(880, 0.16, 0.22, "square");
+    setTimeout(() => { if (enabled) tone(620, 0.18, 0.22, "square"); }, 180);
   }
-  function sayCorrect() {
-    if (!enabled || !window.speechSynthesis) return;
-    const now = performance.now();
-    if (now - saidAt < 1200) return;
-    saidAt = now;
+  function say(text) {
+    if (!window.speechSynthesis) return;
     try {
-      const u = new SpeechSynthesisUtterance("Correct");
+      const u = new SpeechSynthesisUtterance(text);
       u.lang = "en-IN";
       u.rate = 0.95;
+      u.volume = 1;
       const voices = speechSynthesis.getVoices();
       const v = voices.find((x) => /en-IN/i.test(x.lang)) || voices.find((x) => /^en/i.test(x.lang));
       if (v) u.voice = v;
-      speechSynthesis.cancel();
+      speechSynthesis.resume();
       speechSynthesis.speak(u);
     } catch (e) {}
+  }
+  function sayCorrect() {
+    if (!enabled) return;
+    const now = performance.now();
+    if (now - saidAt < 1200) return;
+    saidAt = now;
+    try { speechSynthesis.cancel(); } catch (e) {}
+    say("Correct");
   }
   function byId(id) {
     const el = document.getElementById(id);
     if (!el) return null;
-    const n = parseFloat(el.value != null && el.value !== "" ? el.value : el.textContent);
-    return Number.isFinite(n) ? n : null;
+    const raw = el.value != null && String(el.value) !== "" ? el.value : el.textContent;
+    const n = parseFloat(String(raw).replace(/[^\d.-]/g, ""));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  function grab(re) {
+    const m = re.exec(document.body ? document.body.innerText : "");
+    return m ? parseFloat(m[1]) : null;
   }
   function labels() {
     const out = {};
@@ -105,15 +121,8 @@
     });
     return out;
   }
-  function fromText(id, key) {
-    const el = document.getElementById(id);
-    if (!el) return null;
-    const m = new RegExp(key + "\\s+(\\d+)").exec(el.textContent);
-    return m ? parseFloat(m[1]) : null;
-  }
   function read() {
     const name = file();
-    if (/Cardiac_Rhythm_Decision_Simulator_V29/.test(name)) return null;
     if (/ACLS_Interactive_Simulator/.test(name) || name === "acls.html") {
       const pills = [...document.querySelectorAll(".pill")].map((p) => p.textContent);
       const pulseLine = pills.find((t) => /pulse/i.test(t)) || "";
@@ -121,26 +130,20 @@
       if (!pulseLine) return { pulse: null, breath: null, alarm: false };
       const none = /none/i.test(pulseLine);
       let bpm = 76, kind = "normal";
-      if (none || /asystole|VF|PEA|polymorphic/i.test(rhythm)) kind = "absent";
+      if (none || /asystole|^vf$|pea|polymorphic/i.test(rhythm)) kind = "absent";
       else if (/VT/i.test(rhythm)) { bpm = 170; kind = "bounding"; }
       else if (/SVT/i.test(rhythm)) { bpm = 180; kind = "bounding"; }
       else if (/brady/i.test(rhythm)) { bpm = 38; kind = "weak"; }
-      const arrest = kind === "absent";
-      return { pulse: { bpm: bpm, kind: kind }, breath: arrest ? { bpm: 10, kind: "vent" } : null, alarm: arrest };
+      return { pulse: { bpm: bpm, kind: kind }, breath: kind === "absent" ? { bpm: 10, kind: "vent" } : null, alarm: kind === "absent" };
     }
     if (/Ventilator_Waveform|vent-waves\.html/.test(name)) {
       if (!document.getElementById("scalars")) return { pulse: null, breath: null, alarm: false };
-      const rr = byId("s-rr") || 14;
-      return { pulse: null, breath: { bpm: rr, kind: "vent" }, alarm: !!document.querySelector("#nums b.hi") };
-    }
-    if (/COPD_Asthma_V11|ARDS_Active_Simulator\.html/.test(name)) {
-      const alarm = !!document.querySelector(".deranged");
-      return { pulse: null, breath: null, alarm: /ARDS_Active/.test(name) ? false : alarm };
+      return { pulse: null, breath: { bpm: byId("s-rr") || 14, kind: "vent" }, alarm: !!document.querySelector("#nums b.hi") };
     }
     const L = labels();
-    let hr = (L.HR && L.HR.num) || byId("hr") || fromText("vitals", "HR");
-    let rr = (L.RR && L.RR.num) || byId("rr") || byId("s-rr") || fromText("vitals", "RR");
-    let spo2 = (L.SPO2 && L.SPO2.num) || byId("spo2");
+    let hr = (L.HR && L.HR.num) || byId("hr") || grab(/\bHR\s+(\d{2,3})\b/) || grab(/Heart rate\s+(\d{2,3})/i);
+    let rr = (L.RR && L.RR.num) || byId("rr") || byId("rrLive") || byId("s-rr") || grab(/\bRR\s+(\d{1,2})\b/) || grab(/Respiratory rate\s+(\d{1,2})/i);
+    let spo2 = (L.SPO2 && L.SPO2.num) || byId("spo2") || grab(/SpO2\s+(\d{2,3})/i) || grab(/SpO₂\s+(\d{2,3})/i);
     let map = byId("map");
     let pp = null;
     if (L.ART && L.ART.unit) {
@@ -148,83 +151,92 @@
       const p = /PP\s+(\d+)/.exec(L.ART.unit); if (p) pp = +p[1];
     }
     const ventBox = document.getElementById("ventbox");
+    const ventMgr = document.getElementById("ventilatorManagement");
     const ventOpen = (ventBox && !ventBox.classList.contains("hidden")) ||
-      (document.getElementById("ventilatorManagement") && !document.getElementById("ventilatorManagement").classList.contains("hidden")) ||
-      !!document.getElementById("scalars");
+      (ventMgr && !ventMgr.classList.contains("hidden")) ||
+      !!document.getElementById("scalars") ||
+      !!document.getElementById("pulseCanvas");
     let kind = "normal";
     if (hr && hr < 50) kind = "weak";
     else if (map && map < 65) kind = "weak";
-    else if (pp && pp >= 60) kind = "bounding";
-    else if (hr && hr >= 120) kind = "bounding";
-    const danger = !!(L.HR && L.HR.danger) || !!(L.SPO2 && L.SPO2.danger) || !!(L.ART && L.ART.danger) ||
-      !!document.querySelector(".deranged, #nums b.hi, #labs .hi");
-    const alarm = danger || (spo2 != null && spo2 < 90) || (hr != null && (hr < 45 || hr > 145)) || (map != null && map < 65);
+    else if ((pp && pp >= 60) || (hr && hr >= 120)) kind = "bounding";
+    const alarm = !!(L.HR && L.HR.danger) || !!(L.SPO2 && L.SPO2.danger) || !!(L.ART && L.ART.danger) ||
+      !!document.querySelector(".deranged, #nums b.hi, #labs b.hi") ||
+      (spo2 != null && spo2 > 0 && spo2 < 90) ||
+      (hr != null && (hr < 45 || hr > 145)) ||
+      (map != null && map > 0 && map < 65);
     return {
       pulse: hr ? { bpm: hr, kind: kind } : null,
       breath: rr ? { bpm: rr, kind: ventOpen ? "vent" : "spont" } : null,
-      alarm: alarm,
+      alarm: !!alarm,
     };
   }
-  function loop(now) {
+  function tick() {
     if (!enabled) return;
+    ensure();
     const s = read();
+    const now = performance.now();
     if (s && s.pulse && s.pulse.kind !== "absent" && s.pulse.bpm > 20) {
       let wait = 60000 / clamp(s.pulse.bpm, 30, 200);
-      if (s.pulse.kind === "irregular") wait *= 0.55 + Math.random() * 0.9;
       if (now >= pulseAt) { playPulse(s.pulse.kind); pulseAt = now + wait; }
     }
     if (s && s.breath && s.breath.bpm > 4) {
       const wait = 60000 / clamp(s.breath.bpm, 6, 48);
       if (now >= breathAt) { playBreath(s.breath.kind); breathAt = now + wait; }
     }
-    if (s && s.alarm && now >= alarmAt) { playAlarm(); alarmAt = now + 2600; }
-    raf = requestAnimationFrame(loop);
+    if (s && s.alarm && now >= alarmAt) { playAlarm(); alarmAt = now + 2400; }
   }
   function enable() {
+    if (enabled) { ensure(); return; }
     enabled = true;
-    btn.textContent = "Mute";
+    btn.textContent = "Sound on";
+    btn.style.background = "#087f5b";
     btn.setAttribute("aria-pressed", "true");
-    sessionStorage.setItem("icu-sound", "1");
+    try { sessionStorage.setItem("icu-sound", "1"); } catch (e) {}
     ensure();
-    const native = document.getElementById("audioBtn");
-    if (native && /start/i.test(native.textContent)) native.click();
-    try {
-      const u = new SpeechSynthesisUtterance("Sound on");
-      u.volume = 0.01; u.rate = 1.4;
-      speechSynthesis.cancel(); speechSynthesis.speak(u);
-    } catch (e) {}
-    pulseAt = breathAt = alarmAt = 0;
-    cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(loop);
+    tone(880, 0.12, 0.35, "sine");
+    setTimeout(() => tone(1320, 0.1, 0.2, "sine"), 140);
+    say("Sound on");
+    pulseAt = breathAt = alarmAt = performance.now() + 400;
+    clearInterval(timer);
+    timer = setInterval(tick, 80);
+    const old = document.getElementById("audioBtn");
+    if (old) old.style.display = "none";
   }
   function disable() {
     enabled = false;
-    btn.textContent = "Sound";
+    btn.textContent = "Sound off";
+    btn.style.background = "#b72b39";
     btn.setAttribute("aria-pressed", "false");
-    sessionStorage.removeItem("icu-sound");
-    cancelAnimationFrame(raf);
-    const native = document.getElementById("audioBtn");
-    if (native && /mute/i.test(native.textContent)) native.click();
+    try { sessionStorage.removeItem("icu-sound"); } catch (e) {}
+    clearInterval(timer);
     try { speechSynthesis.cancel(); } catch (e) {}
   }
-  btn.addEventListener("click", () => { enabled ? disable() : enable(); });
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (enabled) disable(); else enable();
+  });
+  document.addEventListener("pointerdown", (e) => {
+    if (e.target === btn || btn.contains(e.target)) return;
+    if (!enabled) enable();
+  }, true);
   document.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b || b === btn) return;
     setTimeout(() => {
-      if (!enabled) return;
-      if (/Cardiac_Rhythm_Decision/.test(file())) return;
+      if (!enabled || /Cardiac_Rhythm_Decision/.test(file())) return;
       if (b.isConnected && /\b(good|on)\b/.test(b.className) && !/\bbad\b/.test(b.className)) { sayCorrect(); return; }
       const box = document.getElementById("why") || document.getElementById("fb") || document.getElementById("log");
       const t = box ? box.textContent.trim() : "";
       if (/^(Right[.\s]|Correct\b|That diagnosis fits)/.test(t)) sayCorrect();
-    }, 60);
+    }, 80);
   }, false);
-  document.addEventListener("DOMContentLoaded", () => {});
-  document.body.appendChild(btn);
-  if (sessionStorage.getItem("icu-sound") === "1") {
-    const arm = () => { if (!enabled) enable(); };
-    document.addEventListener("pointerdown", arm, { once: true });
+  function mount() {
+    if (!document.body) return;
+    document.body.appendChild(btn);
+    try { if (window.speechSynthesis) speechSynthesis.getVoices(); } catch (e) {}
   }
-  window.ICUAudio = { enable: enable, disable: disable, sayCorrect: sayCorrect };
+  if (document.body) mount(); else document.addEventListener("DOMContentLoaded", mount);
+  window.ICUAudio = { enable: enable, disable: disable, sayCorrect: sayCorrect, read: read };
 })();
