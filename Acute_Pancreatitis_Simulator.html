@@ -121,15 +121,23 @@ function glasgow(){
 }
 function ctsi(){ if(S.bal==null||S.bal===''||S.necros==null||S.necros==='') return null; return (+S.bal)+(+S.necros); }
 function isInfected(){ return S.infected==='yes'||S.gas==='yes'||S.fever==='yes'||S.relapse==='yes'; }
+function comps(){
+  if(Array.isArray(S.comp)) return S.comp.filter(function(x){ return x && x!=='none'; });
+  return S.comp && S.comp!=='none' ? [S.comp] : [];
+}
+function hasComp(name){ return comps().indexOf(name)>=0; }
 function route(){
   var r=['dx','labs','sev','fluid','pain','feed','check','cause'];
   if(S.cause==='biliary') r.push('bile');
   r.push('comp');
-  if(S.comp==='collection'){
+  ['breath','shock','aki','acs','vessel','gut','bileblock','pleura','duct'].forEach(function(c){
+    if(hasComp(c)) r.push('act-'+c);
+  });
+  if(hasComp('collection')){
     r.push('bag');
     if(S.nec==='no' && S.sym==='yes') r.push('bagwhy');
     if(S.nec==='yes'||isInfected()||S.sym==='yes') r.push('step');
-  } else if(S.comp&&S.comp!=='none') r.push('act');
+  }
   r.push('sum');
   return r;
 }
@@ -142,11 +150,11 @@ function ok(id){
   if(id==='check') return !!S.check;
   if(id==='cause') return !!S.cause;
   if(id==='bile') return !!S.cholangitis && !!S.block;
-  if(id==='comp') return !!S.comp;
+  if(id==='comp') return Array.isArray(S.comp) && S.comp.length>0;
   if(id==='bag') return !!S.nec && !!S.weeks;
   if(id==='bagwhy') return !!S.why;
   if(id==='step') return !!S.stable && (S.drain!=='yes' || !!S.drainHow);
-  if(id==='act') return actReady();
+  if(id.indexOf('act-')===0) return actReady();
   return true;
 }
 function chips(key, opts){
@@ -236,11 +244,11 @@ function views(){
         +'<div id="live"></div>';
     },
     comp:function(){
-      return '<h2>What is wrong now</h2>'+chips('comp',[
-        ['none','Nothing new'],['breath','Breathing'],['shock','Shock'],['aki','Kidneys'],
-        ['collection','Collection'],['acs','Belly pressure'],['vessel','Bleed or clot'],
-        ['gut','Gut'],['bileblock','Bile duct later'],['pleura','Pleural fluid'],['duct','Duct leak']
-      ])+'<div id="live"></div>';
+      var opts=[['none','Nothing new'],['breath','Breathing'],['shock','Shock'],['aki','Kidneys'],['collection','Collection'],['acs','Belly pressure'],['vessel','Bleed or clot'],['gut','Gut'],['bileblock','Bile duct later'],['pleura','Pleural fluid'],['duct','Duct leak']];
+      var sel=Array.isArray(S.comp)?S.comp:[];
+      return '<p class="hint">Choose every problem. More than one is allowed.</p><div class="chips" data-k="comp">'+opts.map(function(o){
+        return '<button type="button" data-v="'+o[0]+'" class="'+(sel.indexOf(o[0])>=0?'pick':'')+'">'+o[1]+'</button>';
+      }).join('')+'</div><div id="live"></div>';
     },
     bag:function(){
       return '<h2>What kind</h2>'+yn('nec','Necrosis')+chips('weeks',[['early','Under 4 weeks'],['late','4 weeks or more']])
@@ -313,10 +321,10 @@ function bileLive(){
   return out(S.cholangitis==='yes'?'Cholangitis':'Gallstone pancreatitis', lines, bad);
 }
 function compLive(){
-  if(!S.comp) return '';
-  if(S.comp==='none') return out('No new complication', []);
-  if(S.comp==='collection') return out('Open the collection page', []);
-  return out('Next page is the action', []);
+  if(!Array.isArray(S.comp)||!S.comp.length) return '';
+  if(S.comp.indexOf('none')>=0) return out('No new complication', []);
+  var names={breath:'Breathing',shock:'Shock',aki:'Kidneys',collection:'Collection',acs:'Belly pressure',vessel:'Bleed or clot',gut:'Gut',bileblock:'Bile duct',pleura:'Pleural fluid',duct:'Duct leak'};
+  return out(comps().length+' selected', comps().map(function(c){ return names[c]; }));
 }
 function bagLive(){
   var name=bagName();
@@ -370,28 +378,31 @@ function stepLive(){
   }
   return out(title, lines, bad);
 }
+function thisComp(){ var id=stack[stack.length-1]; return id.indexOf('act-')===0?id.slice(4):''; }
 function actBody(){
-  if(S.comp==='breath') return '<h2>Support</h2>'+chips('o2mode',[['o2','Oxygen'],['hfnc','High flow or mask'],['vent','Ventilator']]);
-  if(S.comp==='shock') return '<h2>Pressure still low</h2>'+yn('norepi','Start norepinephrine')+chips('source',[['nec','Infected necrosis'],['bleed','Bleeding'],['acs','Belly compartment'],['heart','Heart']]);
-  if(S.comp==='aki') return '<h2>Dialysis</h2>'+chips('whyrrt',[['none','No dialysis reason'],['k','High potassium'],['acid','Acid'],['flood','Fluid overload'],['urea','Uremia']])+yn('rrt','Dialyse');
-  if(S.comp==='acs') return '<h2>Bladder pressure</h2>'+box('iap','mmHg')+'<p class="hint">20 or more, with organ failure, is compartment.</p>';
-  if(S.comp==='vessel') return '<h2>Which one</h2>'+chips('vtype',[['clot','Vein clot'],['pseudo','Pseudoaneurysm']]);
-  if(S.comp==='gut') return '<h2>Which one</h2>'+chips('gutkind',[['bleed','Bleed'],['goo','Stomach blocked'],['duo','Duodenum blocked'],['colon','Colon'],['fistula','Fistula'],['perf','Perforation']]);
-  if(S.comp==='bileblock') return yn('stillblock','The duct is still blocked');
-  if(S.comp==='pleura') return yn('amylase','Pleural fluid amylase is high');
-  if(S.comp==='duct') return yn('stent','Stent the duct');
+  var c=thisComp();
+  if(c==='breath') return '<h2>Support</h2>'+chips('o2mode',[['o2','Oxygen'],['hfnc','High flow or mask'],['vent','Ventilator']]);
+  if(c==='shock') return '<h2>Pressure still low</h2>'+yn('norepi','Start norepinephrine')+chips('source',[['nec','Infected necrosis'],['bleed','Bleeding'],['acs','Belly compartment'],['heart','Heart']]);
+  if(c==='aki') return '<h2>Dialysis</h2>'+chips('whyrrt',[['none','No dialysis reason'],['k','High potassium'],['acid','Acid'],['flood','Fluid overload'],['urea','Uremia']])+yn('rrt','Dialyse');
+  if(c==='acs') return '<h2>Bladder pressure</h2>'+box('iap','mmHg')+'<p class="hint">20 or more, with organ failure, is compartment.</p>';
+  if(c==='vessel') return '<h2>Which one</h2>'+chips('vtype',[['clot','Vein clot'],['pseudo','Pseudoaneurysm']]);
+  if(c==='gut') return '<h2>Which one</h2>'+chips('gutkind',[['bleed','Bleed'],['goo','Stomach blocked'],['duo','Duodenum blocked'],['colon','Colon'],['fistula','Fistula'],['perf','Perforation']]);
+  if(c==='bileblock') return yn('stillblock','The duct is still blocked');
+  if(c==='pleura') return yn('amylase','Pleural fluid amylase is high');
+  if(c==='duct') return yn('stent','Stent the duct');
   return '';
 }
 function actReady(){
-  if(S.comp==='breath') return !!S.o2mode;
-  if(S.comp==='shock') return !!S.norepi && !!S.source;
-  if(S.comp==='aki') return !!S.whyrrt && !!S.rrt;
-  if(S.comp==='acs') return num('iap')!=null;
-  if(S.comp==='vessel') return !!S.vtype;
-  if(S.comp==='gut') return !!S.gutkind;
-  if(S.comp==='bileblock') return !!S.stillblock;
-  if(S.comp==='pleura') return !!S.amylase;
-  if(S.comp==='duct') return !!S.stent;
+  var c=thisComp();
+  if(c==='breath') return !!S.o2mode;
+  if(c==='shock') return !!S.norepi && !!S.source;
+  if(c==='aki') return !!S.whyrrt && !!S.rrt;
+  if(c==='acs') return num('iap')!=null;
+  if(c==='vessel') return !!S.vtype;
+  if(c==='gut') return !!S.gutkind;
+  if(c==='bileblock') return !!S.stillblock;
+  if(c==='pleura') return !!S.amylase;
+  if(c==='duct') return !!S.stent;
   return true;
 }
 function breathNeed(){
@@ -400,13 +411,14 @@ function breathNeed(){
   return 'o2';
 }
 function actLive(){
-  if(S.comp==='breath'&&S.o2mode){
+  var c=thisComp();
+  if(c==='breath'&&S.o2mode){
     var need=breathNeed();
     var name={o2:'Oxygen', hfnc:'High flow or a mask', vent:'A ventilator'};
     var bad=need==='vent'&&S.o2mode!=='vent' || need==='hfnc'&&S.o2mode==='o2';
     return out(name[need], bad?['That support is not enough.']:['Match the support to the oxygen and the work of breathing.'], bad);
   }
-  if(S.comp==='shock'&&S.norepi&&S.source){
+  if(c==='shock'&&S.norepi&&S.source){
     var low=map()!=null&&map()<65;
     var lines=[];
     if(low && S.norepi!=='yes') lines.push('Start norepinephrine.');
@@ -416,28 +428,28 @@ function actLive(){
     lines.push(src[S.source]);
     return out('Shock', lines, low&&S.norepi!=='yes');
   }
-  if(S.comp==='aki'&&S.whyrrt&&S.rrt){
+  if(c==='aki'&&S.whyrrt&&S.rrt){
     var dial=S.whyrrt!=='none';
     var bad=dial!==(S.rrt==='yes');
     return out(dial?'Dialyse':'Not yet', dial?['There is a reason to dialyse.']:['No potassium, acid, fluid, or uremia reason.'], bad);
   }
-  if(S.comp==='acs'&&num('iap')!=null){
+  if(c==='acs'&&num('iap')!=null){
     var p=num('iap');
     if(p>=20) return out('Compartment', ['ICU. Stop extra fluid. Decompress if the pressure and the organs do not improve.'], true);
     if(p>=12) return out('Pressure is up', ['Not compartment yet. Measure it again.']);
     return out('Not compartment', []);
   }
-  if(S.comp==='vessel'&&S.vtype){
+  if(c==='vessel'&&S.vtype){
     if(S.vtype==='pseudo') return out('Pseudoaneurysm', ['CT angiogram, then embolise it.'], true);
     return out('Vein clot', ['Decide anticoagulation one patient at a time. Do not anticoagulate active bleeding.']);
   }
-  if(S.comp==='gut'&&S.gutkind){
+  if(c==='gut'&&S.gutkind){
     var g={bleed:['Bleed','Endoscopy.'], goo:['Stomach blocked','Drain the collection that is pressing it.'], duo:['Duodenum blocked','CT, then relieve the block.'], colon:['Colon','Ischemia or blockage needs a surgical decision.'], fistula:['Fistula','Control sepsis, then the anatomy.'], perf:['Perforation','Surgery.']};
     return out(g[S.gutkind][0], [g[S.gutkind][1]], S.gutkind==='perf'||S.gutkind==='colon');
   }
-  if(S.comp==='bileblock'&&S.stillblock) return out(S.stillblock==='yes'?'ERCP':'No ERCP now', S.stillblock==='yes'?['The duct is still blocked.']:['Watch.']);
-  if(S.comp==='pleura'&&S.amylase) return out(S.amylase==='yes'?'Duct leak into the chest':'Not a pancreatic effusion', S.amylase==='yes'?['MRCP. Stent the duct if it is leaking.']:[]);
-  if(S.comp==='duct'&&S.stent) return out(S.stent==='yes'?'Stent the duct':'No stent', S.stent==='yes'?['The collection will keep returning without it.']:['Only if the duct is leaking.']);
+  if(c==='bileblock'&&S.stillblock) return out(S.stillblock==='yes'?'ERCP':'No ERCP now', S.stillblock==='yes'?['The duct is still blocked.']:['Watch.']);
+  if(c==='pleura'&&S.amylase) return out(S.amylase==='yes'?'Duct leak into the chest':'Not a pancreatic effusion', S.amylase==='yes'?['MRCP. Stent the duct if it is leaking.']:[]);
+  if(c==='duct'&&S.stent) return out(S.stent==='yes'?'Stent the duct':'No stent', S.stent==='yes'?['The collection will keep returning without it.']:['Only if the duct is leaking.']);
   return '';
 }
 function summary(){
@@ -538,7 +550,7 @@ function refresh(){
   if(id==='bag') html=bagLive();
   if(id==='bagwhy') html=bagWhyLive();
   if(id==='step') html=stepLive();
-  if(id==='act') html=actLive();
+  if(id.indexOf('act-')===0) html=actLive();
   if(id==='fluid'){ path=fluidPath(); html=fluidNote(); var lab=document.getElementById('lrLab'); if(lab) lab.textContent=String(num('lr')||0); draw(); }
   var pl=document.getElementById('painLab'); if(pl) pl.textContent=String(num('painScore')==null?5:num('painScore'));
   if(el) el.innerHTML=html;
@@ -548,8 +560,10 @@ function show(){
   if(raf){ cancelAnimationFrame(raf); raf=0; }
   var id=stack[stack.length-1];
   var r=route();
-  document.getElementById('stepName').textContent=TITLE[id]+' · '+(r.indexOf(id)+1)+' of '+r.length;
-  document.getElementById('view').innerHTML=views()[id]();
+  var actName={breath:'Breathing',shock:'Shock',aki:'Kidneys',acs:'Belly pressure',vessel:'Bleed or clot',gut:'Gut',bileblock:'Bile duct',pleura:'Pleural fluid',duct:'Duct leak'};
+  var title=id.indexOf('act-')===0?actName[id.slice(4)]:TITLE[id];
+  document.getElementById('stepName').textContent=title+' · '+(r.indexOf(id)+1)+' of '+r.length;
+  document.getElementById('view').innerHTML=id.indexOf('act-')===0?actBody()+'<div id="live"></div>':views()[id]();
   if(id==='bag'){ ['bal','necros'].forEach(function(k){ var s=document.getElementById(k); if(s&&S[k]!=null) s.value=S[k]; }); }
   document.getElementById('back').disabled=stack.length<2;
   document.getElementById('next').textContent=id==='sum'?'Done':'Next';
@@ -560,6 +574,18 @@ document.getElementById('view').onclick=function(e){
   var b=e.target.closest('button'); if(!b) return;
   if(b.id==='abx'||b.id==='drain'||b.id==='op'||b.id==='open'){ S[b.id]=S[b.id]==='yes'?'no':'yes'; show(); return; }
   var box=b.closest('.chips'); if(!box) return;
+  if(box.dataset.k==='comp'){
+    var v=b.dataset.v;
+    if(!Array.isArray(S.comp)) S.comp=[];
+    if(v==='none') S.comp=['none'];
+    else {
+      S.comp=S.comp.filter(function(x){ return x!=='none'; });
+      var i=S.comp.indexOf(v);
+      if(i>=0) S.comp.splice(i,1); else S.comp.push(v);
+    }
+    show();
+    return;
+  }
   S[box.dataset.k]=b.dataset.v;
   show();
 };
