@@ -57,7 +57,8 @@ background:#fafbfd;margin:8px 0;line-height:1.45}
 .total{font-size:30px;font-weight:950}
 .nihss{display:grid;grid-template-columns:1fr 150px;gap:8px;align-items:center;
 border-bottom:1px solid #edf0f4;padding:8px 0}
-.nihss select{font-size:15px;padding:8px}
+.mrsRow{display:block;width:100%;text-align:left;margin:6px 0;padding:10px 12px;border:2px solid #cbd4df;border-radius:10px;background:#f9fbfd;font:inherit;font-weight:650;cursor:pointer;line-height:1.35}
+.mrsRow.on{border-color:#1457a6;background:#e7effd}
 .aspectsGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:12px 0}
 .region{border:2px solid #cbd4df;background:#f9fbfd;border-radius:10px;padding:14px 5px;
 text-align:center;font-weight:850;font-size:12px;min-height:70px;cursor:pointer}
@@ -101,10 +102,16 @@ interpretation or local protocol.</div>
 <div class="field"><label>Age (years)</label><input id="age" type="number" value="65"></div>
 <div class="field"><label>Weight (kg)</label><input id="weight" type="number" value="70"></div>
 <div class="field"><label>Hours from LKW</label><input id="hours" type="number" step=".1" value="2"></div>
-<div class="field"><label>Prestroke mRS</label><input id="mrs" type="number" min="0" max="6" value="0"></div>
 <div class="field"><label>SBP (mmHg)</label><input id="sbp" type="number" value="170"></div>
 <div class="field"><label>DBP (mmHg)</label><input id="dbp" type="number" value="95"></div>
 <div class="field"><label>Glucose (mg/dL)</label><input id="glucose" type="number" value="120"></div>
+</div>
+
+<div style="margin-top:12px">
+<div class="small" style="font-weight:900">PRESTROKE mRS — score the function before this stroke</div>
+<input id="mrs" type="hidden" value="0">
+<div id="mrsScale"></div>
+<div class="step info"><strong id="mrsTitle">Prestroke mRS 0</strong><span id="mrsMeaning"></span></div>
 </div>
 
 <div class="checks">
@@ -363,6 +370,32 @@ function updateAspUI(){
   $("coreCat").textContent=a<=2?"0–2":a<=5?"3–5":"6–10";
 }
 
+function buildMrs(){
+ const grades=[
+  ["0","No symptoms."],
+  ["1","No significant disability. Able to carry out all usual duties and activities."],
+  ["2","Slight disability. Unable to carry out all previous activities, but looks after own affairs without assistance."],
+  ["3","Moderate disability. Needs some help, but walks without assistance."],
+  ["4","Moderately severe disability. Cannot walk without assistance and cannot attend to bodily needs without help."],
+  ["5","Severe disability. Bedridden, incontinent, and needs constant nursing care."],
+  ["6","Dead. Not a prestroke score for a patient who has just arrived."]
+ ];
+ $("mrsScale").innerHTML=grades.map(g=>'<button type="button" class="mrsRow" data-mrs="'+g[0]+'"><b>'+g[0]+'</b> '+g[1]+'</button>').join("");
+ $("mrsScale").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>setMrs(+b.dataset.mrs)));
+ setMrs(0,false);
+}
+function setMrs(n,refresh){
+ n=Math.max(0,Math.min(6,n|0));
+ $("mrs").value=String(n);
+ document.querySelectorAll("#mrsScale button").forEach(b=>b.classList.toggle("on",+b.dataset.mrs===n));
+ const use=n<=1?"Usual population for thrombolysis and thrombectomy."
+  :n===2?"Thrombectomy can still be reasonable within 6 hours for an ICA or M1 occlusion. Thrombolysis is not excluded."
+  :n<=5?"Not a routine thrombectomy score. Thrombolysis only if this stroke is disabling compared with that baseline."
+  :"mRS 6 means dead. Choose the score from before this stroke.";
+ $("mrsTitle").textContent="Prestroke mRS "+n;
+ $("mrsMeaning").textContent=use;
+ if(refresh!==false) update();
+}
 function P(){
   return {
     age:N("age"),w:N("weight"),h:N("hours"),mrs:N("mrs"),
@@ -383,7 +416,7 @@ function ivtDecision(p){
   if(p.recentbleed) reasons.push("Recent significant bleeding is selected.");
   if(p.recentbrain) reasons.push("Recent intracranial or spinal surgery, or a major intracranial event, is selected.");
   if(p.coag) reasons.push("A major coagulation abnormality or thrombocytopenia concern is selected.");
-  if(p.priorich) reasons.push("Prior intracranial hemorrhage is selected. This screen does not clear that history.");
+  if(p.mrs>=6) reasons.push("Prestroke mRS 6 means dead. Score the function before this stroke.");
   if(p.glucose<50) reasons.push("Glucose is under 50 mg/dL. Correct it, then reassess. Do not give thrombolysis until the deficit is still a stroke.");
   if(p.glucose>400) reasons.push("Glucose is over 400 mg/dL. Correct it and reassess before thrombolysis.");
   const bp=p.sbp<185 && p.dbp<110;
@@ -400,7 +433,7 @@ function ivtDecision(p){
     msg="Identify the agent, last dose, and the required labs (for warfarin, INR). This checkbox is not clearance and it is not an automatic exclusion.";
   }else if(standard && p.disabling && bp){
     cls="good"; title="IVT: SCREEN POSITIVE";
-    msg="Disabling deficit within 4.5 hours, BP below 185/110, glucose 50–400 mg/dL, and no selected safety flag. Finish the full eligibility review, then treat without delay.";
+    msg="Disabling deficit within 4.5 hours, BP below 185/110, glucose 50–400 mg/dL, and no selected safety flag. Finish the full eligibility review, then treat without delay."+(p.mrs>=3?" Prestroke mRS is "+p.mrs+". Give thrombolysis only if the new deficit is disabling compared with that baseline.":"");
     cleared=true;
   }else if(standard && p.disabling && !bp){
     cls="warn"; title="IVT: BP CONTROL REQUIRED";
@@ -458,7 +491,9 @@ function evtDecision(p){
     msg:"Within 6 hours, NIHSS ≥6, ASPECTS ≥6. Reasonable (Class 2a)."};
   let why="These inputs do not match a 2026 ICA/M1 pathway.";
   if(p.mass && p.asp<=5) why="Significant mass effect is selected. The ASPECTS 0–5 pathways require no significant mass effect.";
-  else if(p.h>6 && p.h<=24 && p.asp>=6 && p.mrs>1) why="Late-window ASPECTS ≥6 still needs prestroke mRS 0–1 and NIHSS ≥6.";
+  else if(p.mrs>=6) why="mRS 6 means dead. It is not a prestroke score.";
+  else if(p.mrs>=3) why="Prestroke mRS "+p.mrs+" is not a routine thrombectomy pathway. The recommendations use mRS 0–1, and mRS 2 only within 6 hours for ICA/M1 with ASPECTS ≥6.";
+  else if(p.h>6 && p.h<=24 && p.mrs===2) why="Prestroke mRS 2 is reasonable only within 6 hours, for ICA/M1 with ASPECTS ≥6. The late window still needs mRS 0–1.";
   else if(p.h>6 && p.h<=24 && p.asp<=5 && p.age>=80) why="ASPECTS 3–5 after 6 hours is for age under 80. Age 80 or older needs ASPECTS ≥6.";
   return {cls:"warn", title:"ICA/M1 EVT — ADDITIONAL REVIEW", msg:why, ok:false};
 }
@@ -486,7 +521,7 @@ function update(){
 
   let s=[];
   s.push(B("info","PATIENT",
-    "NIHSS "+p.nihss+" • LKW "+p.h+" h • age "+p.age+" • mRS "+p.mrs+
+    "NIHSS "+p.nihss+" • LKW "+p.h+" h • age "+p.age+" • prestroke mRS "+p.mrs+
     " • BP "+p.sbp+"/"+p.dbp+" • glucose "+p.glucose+" • ASPECTS "+p.asp+
     " • "+p.imaging));
 
@@ -526,11 +561,12 @@ function update(){
 }
 
 function reset(){
-  const vals={age:65,weight:70,hours:2,mrs:0,sbp:170,dbp:95,glucose:120,pc:8};
+  const vals={age:65,weight:70,hours:2,sbp:170,dbp:95,glucose:120,pc:8};
   Object.entries(vals).forEach(([k,v])=>$(k).value=v);
   ["wake","anticoag","dapt","hem","mass","advanced","recentbleed",
    "recentbrain","coag","priorich"].forEach(k=>$(k).checked=false);
   $("disabling").checked=true;
+  setMrs(0,false);
   $("vessel").value="ica_m1";
   affectedSet=new Set(["M4","M5"]);
   document.querySelectorAll("#nihssForm select").forEach(s=>s.value="0");
@@ -568,6 +604,7 @@ document.addEventListener("change",e=>{
 });
 
 buildNIHSS();
+buildMrs();
 buildAsp();
 update();
 showPanel("clinical");
