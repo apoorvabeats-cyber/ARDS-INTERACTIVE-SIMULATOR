@@ -5,457 +5,473 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GI Critical Care — Acute pancreatitis</title>
 <style>
-  :root{--ink:#14213d}
   *{box-sizing:border-box}
-  body{margin:0;background:#f4f7fb;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-  header{padding:16px 18px;background:linear-gradient(90deg,#14532d,#0f766e);color:#fff}
-  h1{margin:0;font-size:22px;letter-spacing:-.03em;text-transform:uppercase}
-  header p{margin:2px 0 0;font-size:13px;color:#d1fae5}
-  main{display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:16px;padding:16px;max-width:1100px;margin:0 auto}
-  @media(max-width:800px){main{grid-template-columns:1fr;padding:12px}}
+  body{margin:0;background:#f4f7fb;color:#14213d;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  header{padding:16px 18px 10px;background:#0f766e;color:#fff}
+  h1{margin:0;font-size:18px;letter-spacing:.04em;text-transform:uppercase}
+  #stepName{margin:4px 0 0;font-weight:700}
+  main{max-width:760px;margin:0 auto;padding:14px 14px 92px}
   section{background:#fff;border-radius:16px;padding:14px;box-shadow:0 8px 24px #0f172a14}
-  h2{margin:14px 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#0f766e}
+  h2{margin:12px 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#0f766e}
   h2:first-child{margin-top:0}
+  .hint{margin:0 0 10px;font-weight:700;color:#334155}
   .chips{display:flex;flex-wrap:wrap;gap:8px}
-  .chips button{border:0;border-radius:999px;font-weight:800;padding:10px 12px;cursor:pointer;font-size:13px;color:#fff;background:#0f766e}
-  .chips button.pick{outline:3px solid #0f172a;outline-offset:2px}
-  .sev b.on,.sev b.warn,.sev b.bad{background:#0f766e;color:#fff}
-  .sc{background:#fff;color:#14213d;border:2px solid #e2e8f0}
-  .sc.bad{border-color:#be123c}
-  .sc.bad b{color:#be123c}
-  .yn button{flex:1;border:0;border-radius:10px;padding:8px;font-weight:800;color:#fff;background:#0f766e;cursor:pointer}
-  .sev{display:flex;gap:8px;margin-bottom:10px}
-  .sev b{flex:1;text-align:center;border-radius:12px;padding:10px 6px;background:#e2e8f0;color:#64748b;font-size:13px}
-  .sev b.bad{background:#0f766e;color:#fff}
-  #now{border-radius:14px;padding:14px;background:#ecfdf5;font-weight:800;line-height:1.4}
-  .vit{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
-  .vit div{border-radius:12px;text-align:center;padding:8px;color:#fff;background:#0f766e}
-  .vit b{display:block;font-size:26px}
-  .vit span{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
-  #ods{display:none;margin-top:8px;background:#7f1d1d;color:#fff;border-radius:12px;padding:10px;font-weight:800}
-  #ods.show{display:block}
-  canvas.chart{width:100%;height:220px;display:block;background:#fff;border:2px solid #e2e8f0;border-radius:12px}
+  .chips button,.yn button{border:0;border-radius:999px;font-weight:800;padding:10px 12px;cursor:pointer;color:#fff;background:#0f766e}
+  .chips button.pick,.yn button.pick{outline:3px solid #0f172a;outline-offset:2px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  @media(max-width:560px){.grid{grid-template-columns:1fr}}
+  label{display:block;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#334155;margin-bottom:4px}
+  input,select{width:100%;font-size:16px;font-weight:700;padding:8px;border:2px solid #cbd5e1;border-radius:10px}
+  input[type=range]{accent-color:#0f766e}
+  .out{margin-top:12px;border-radius:14px;padding:12px;background:#f8fafc;border:2px solid #e2e8f0;font-weight:800;line-height:1.45}
+  .out.bad{border-color:#be123c}
+  .out b{font-size:22px;display:block}
+  .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+  .row3 div{border:2px solid #e2e8f0;border-radius:12px;padding:8px;text-align:center;font-weight:800}
+  .row3 div.bad{border-color:#be123c}
+  .row3 b{display:block;font-size:20px}
+  canvas{width:100%;height:220px;background:#fff;border:2px solid #e2e8f0;border-radius:12px;display:block}
   .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;font-weight:800;margin-top:8px}
   .legend i{display:inline-block;width:18px;height:4px;background:#0f766e;margin-right:6px;vertical-align:middle}
   .legend .red{background:#dc2626}
   .legend .now{background:#f59e0b;width:4px;height:14px}
-  .hint{margin:6px 0 0;color:#334155;font-weight:700}
-  input[type=range]{width:100%;accent-color:#0f766e}
-  #now small{display:block;font-weight:700;color:#115e59;margin-bottom:4px}
-  #steps{margin:10px 0 0;padding:0;list-style:none}
-  #steps li{background:#fff;border-radius:10px;padding:8px 10px;margin-top:6px}
-  #ask{display:none}
-  #ask.show{display:block}
-  .q{display:flex;flex-direction:column;gap:8px;margin-top:8px}
-  .q button{text-align:left;border:2px solid #e2e8f0;background:#fff;border-radius:12px;padding:12px;font-weight:800;cursor:pointer}
-  .q button.good{border-color:#059669;background:#ecfdf5}
-  .q button.bad{border-color:#dc2626;background:#fef2f2}
+  nav{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;padding:10px;background:#fff;border-top:1px solid #e2e8f0}
+  nav button{flex:1;border:0;border-radius:12px;padding:14px;font-weight:800;font-size:16px;background:#0f766e;color:#fff}
+  nav button:disabled{background:#cbd5e1;color:#64748b}
+  ul{margin:8px 0 0;padding-left:18px}
   a{color:#0f766e}
-  #scores{grid-column:1/-1}
-  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px;margin-bottom:12px}
-  .sc{border-radius:14px;padding:10px;min-height:92px}
-  .sc span,.sc small{display:block}
-  .sc span{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;opacity:.9}
-  .sc b{font-size:28px;line-height:1.1}
-  .sc small{font-size:12px;font-weight:700}
-  .yn button.pick{outline:3px solid #0f172a;outline-offset:1px}
-  .labs label{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#334155}
-  .labs input,.labs select{width:100%;font-size:16px;font-weight:700;padding:8px;border:2px solid #cbd5e1;border-radius:10px}
-  .grp{grid-column:1/-1;margin:8px 0 0;color:#0f766e}
-  .yn{display:flex;gap:6px}
-  .labs{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
 </style>
 </head>
 <body>
 <header>
   <h1>GI Critical Care</h1>
-  <p>Acute pancreatitis. The necrosis steps are the step-up approach.</p>
+  <p id="stepName">Diagnosis</p>
 </header>
-<main>
-  <section id="scores">
-    <h2>Scores</h2>
-    <div class="board" id="board"></div>
-    <div class="labs" id="labs"></div>
-  </section>
-  <section>
-    <h2>Diagnosis</h2>
-    <div class="chips" data-k="pain">
-      <button type="button" class="g" data-v="yes">Typical pain</button>
-      <button type="button" class="n" data-v="no">No typical pain</button>
-    </div>
-    <div class="chips" data-k="lipase" style="margin-top:8px">
-      <button type="button" class="g" data-v="high">Lipase ≥ 3×</button>
-      <button type="button" class="n" data-v="low">Lipase under 3×</button>
-    </div>
-    <h2>Organ failure</h2>
-    <div class="chips" data-k="of">
-      <button type="button" class="g" data-v="none">None</button>
-      <button type="button" class="a" data-v="transient">Under 48 h</button>
-      <button type="button" class="r" data-v="persistent">Over 48 h</button>
-    </div>
-    <h2>Cause</h2>
-    <div class="chips" data-k="cause">
-      <button type="button" class="b" data-v="biliary">Gallstone</button>
-      <button type="button" class="a" data-v="alcohol">Alcohol</button>
-      <button type="button" class="p" data-v="tg">Triglyceride</button>
-      <button type="button" class="n" data-v="other">Other</button>
-    </div>
-    <div class="chips" data-k="cholangitis" style="margin-top:8px">
-      <button type="button" class="r" data-v="yes">Cholangitis</button>
-      <button type="button" class="g" data-v="no">No cholangitis</button>
-    </div>
-    <h2>Necrosis</h2>
-    <div class="chips" data-k="necrosis">
-      <button type="button" class="g" data-v="no">No collection</button>
-      <button type="button" class="r" data-v="yes">Necrosis</button>
-    </div>
-    <div id="ask">
-      <h2>1. Timing</h2>
-      <div class="chips" data-k="timing">
-        <button type="button" class="a" data-v="lt4">Under 4 weeks</button>
-        <button type="button" class="g" data-v="gte4">4 weeks or more</button>
-      </div>
-      <h2>2. Infection</h2>
-      <div class="chips" data-k="infection">
-        <button type="button" class="r" data-v="yes">Suspected or proven</button>
-        <button type="button" class="g" data-v="no">Sterile</button>
-      </div>
-      <h2>3. Unstable</h2>
-      <div class="chips" data-k="instability">
-        <button type="button" class="r" data-v="yes">Sepsis or organ failure</button>
-        <button type="button" class="g" data-v="no">Stable</button>
-      </div>
-      <h2>4. After drainage</h2>
-      <div class="chips" data-k="response">
-        <button type="button" class="g" data-v="improve">Improving</button>
-        <button type="button" class="r" data-v="noimprove">No improvement</button>
-      </div>
-    </div>
-  </section>
-  <section>
-    <div class="sev" id="sev"><b>Mild</b><b>Moderate</b><b>Severe</b></div>
-    <div id="now"><small>Now</small><span id="title">Set the patient.</span><ul id="steps"></ul></div>
-    <h2>24 hours</h2>
-    <label>Lactated Ringer <b id="lrLabel">150</b> mL/h</label>
-    <input id="lr" type="range" min="0" max="400" step="10" value="150">
-    <label>Feed</label>
-    <select id="feed"><option value="oral">Oral</option><option value="ng">Enteral</option><option value="hold">Hold</option></select>
-    <div class="chips" style="margin-top:8px">
-      <button type="button" class="p" id="insulin">Insulin</button>
-      <button type="button" class="b" id="abx">Antibiotic</button>
-      <button type="button" class="a" id="ercp">ERCP</button>
-      <button type="button" class="r" id="drain">Drain</button>
-      <button type="button" class="n" id="op">Operate</button>
-    </div>
-    <div class="vit"><div><span>HR</span><b id="hr">—</b></div><div><span>MAP</span><b id="map">—</b></div><div><span>RR</span><b id="rr">—</b></div></div>
-    <h2>Mean arterial pressure</h2>
-    <canvas class="chart" id="chart" width="720" height="220"></canvas>
-    <div class="legend"><span><i class="lg"></i>MAP mmHg</span><span><i class="lg red"></i>65 shock</span><span><i class="lg now"></i>This hour</span></div>
-    <p class="hint">Bottom axis is hours. The line is the blood pressure. Under the red line the pressure is too low.</p>
-    <div id="ods"></div>
-    <p><a href="index.html">All simulators</a></p>
-  </section>
-</main>
+<main><section id="view"></section></main>
+<nav>
+  <button type="button" id="back">Back</button>
+  <button type="button" id="next">Next</button>
+</nav>
 <script>
-var S={pain:null,lipase:null,of:null,cause:null,cholangitis:null,necrosis:null,timing:null,infection:null,instability:null,response:null};
-var T={};
-var hour=0, tick=0, path=[1];
-function necrosis(){
-  if(S.instability==='yes') return {title:'Unstable necrosis', key:'unstable', lines:['Urgent source control and resuscitation.','Antibiotics and ICU care.','Drain by endoscope or catheter if the collection is reachable.','If the drain fails, necrosectomy. Do not wait out uncontrolled sepsis.']};
-  if(S.infection==='no' && S.timing==='lt4') return {title:'Sterile, under 4 weeks', key:'sterileEarly', lines:['Support only.','Enteral feed.','Do not drain or operate yet. Wait for walled-off necrosis.']};
-  if(S.infection==='yes' && S.instability==='no' && S.timing==='gte4') return {title:'Infected, walled off', key:'stepup', lines:['Antibiotics and support.','Drain first, endoscopic or percutaneous.','Necrosectomy only if the drain fails.','Open surgery last.']};
-  if(S.infection==='yes' && S.instability==='no') return {title:'Infected, under 4 weeks', key:'earlyInfected', lines:['Antibiotics.','Drain if needed.','Delay necrosectomy while the patient allows it.','Escalate if there is no improvement.']};
-  if(S.infection==='no' && S.timing==='gte4' && S.response==='noimprove') return {title:'Sterile, not improving', key:'sterileLate', lines:['Look again for infection, obstruction, or ongoing inflammation.','Drain if there is pain, SIRS, or organ failure.']};
-  return {title:'Step up', key:'fallback', lines:['Least invasive first.','Escalate only if there is no improvement.']};
+var S={lr:'150'};
+var stack=['dx'];
+var raf=0, hour=0, tick=0, path=[70];
+var TITLE={
+  dx:'Diagnosis', labs:'First look', sev:'Severity', fluid:'Fluids',
+  pain:'Pain', feed:'Feeding', check:'Check again', cause:'Cause',
+  bile:'Gallstone', comp:'Complication', bag:'Collection', step:'Step up',
+  act:'What to do', sum:'Summary'
+};
+function num(id){ var n=parseFloat(String(S[id]==null?'':S[id]).replace(',','.')); return Number.isFinite(n)?n:null; }
+function map(){ var a=num('sbp'), b=num('dbp'); return a==null||b==null?null:(a+2*b)/3; }
+function ag(){ var a=num('na'), b=num('cl'), c=num('hco3'); return a==null||b==null||c==null?null:a-(b+c); }
+function corr(){ var ca=num('ca'), alb=num('alb'); return ca==null||alb==null?null:ca+0.8*(4-alb); }
+function pf(){ var o=num('pao2'), f=num('fio2'); if(o==null||f==null) return null; if(f>1) f=f/100; return f?o/f:null; }
+function sirs(){
+  var n=0, have=0;
+  if(num('temp')!=null){ have++; if(num('temp')>38||num('temp')<36) n++; }
+  if(num('hr')!=null){ have++; if(num('hr')>90) n++; }
+  if(num('rr')!=null){ have++; if(num('rr')>20) n++; }
+  if(num('wbc')!=null){ have++; if(num('wbc')>12||num('wbc')<4) n++; }
+  return {n:n, have:have};
 }
-function plan(){
-  if(S.pain!=='yes' || S.lipase!=='high') return {title:'Not pancreatitis', key:'not', lines:['Typical pain and a lipase at least 3 times normal are missing.']};
-  if(S.cholangitis==='yes' && S.necrosis!=='yes') return {title:'Cholangitis', key:'ercp', lines:['Urgent ERCP.','Antibiotics.','Support the organ failure.']};
-  if(S.necrosis==='yes'){
-    if(!S.timing||!S.infection||!S.instability||!S.response) return {title:'Necrosis', key:'wait', lines:['Answer timing, infection, stability, and the response to drainage.']};
-    var n=necrosis();
-    if(S.cholangitis==='yes'){ n.lines=['Urgent ERCP for cholangitis.'].concat(n.lines); if(n.key!=='unstable'){ n.key='ercp'; n.title='Cholangitis and necrosis'; } }
-    return n;
-  }
-  if(S.of==='persistent') return {title:'Severe pancreatitis', key:'icu', lines:['ICU.','Moderate lactated Ringer, not a large flood.','Enteral feed if the gut works.','No prophylactic antibiotic.']};
-  if(S.cause==='tg') return {title:'Triglyceride pancreatitis', key:'tg', lines:['Insulin infusion.','No prophylactic antibiotic.','Feed when the abdomen allows.']};
-  if(S.cause==='biliary' && S.of==='none') return {title:'Mild gallstone pancreatitis', key:'chole', lines:['Early oral feeding.','No antibiotics.','Cholecystectomy this admission.']};
-  var name=S.of==='transient'?'Moderately severe pancreatitis':'Mild pancreatitis';
-  return {title:name, key:'support', lines:['Moderate lactated Ringer.','Early oral or enteral feeding.','No prophylactic antibiotic.','CT only if the patient gets worse or the diagnosis is unclear.']};
+function bisap(){
+  var s=sirs();
+  var bits=[num('bun')==null?null:num('bun')>25, num('gcs')==null?null:num('gcs')<15, s.have<4?null:s.n>=2, num('age')==null?null:num('age')>60, S.pleura==null?null:S.pleura==='yes'];
+  return {pts:bits.filter(function(x){return x===true;}).length, left:bits.filter(function(x){return x==null;}).length};
 }
-function act(id){ return document.getElementById(id).classList.contains('pick'); }
-function burden(){
-  if(S.pain!=='yes' || S.lipase!=='high') return 0.4;
-  var b=S.of==='persistent'?3.2:S.of==='transient'?2.3:1.1;
-  if(S.cholangitis==='yes') b+=1.1;
-  if(S.necrosis==='yes' && S.infection==='yes') b+=0.8;
-  if(S.instability==='yes') b+=0.6;
-  if(S.cause==='tg') b+=0.4;
-  return Math.min(4.2,b);
-}
-function course(){
-  var rate=+document.getElementById('lr').value||0;
-  var feed=document.getElementById('feed').value;
-  var infected=S.infection==='yes'||S.cholangitis==='yes';
-  var early=S.necrosis==='yes'&&S.infection==='no'&&S.timing==='lt4';
-  var need=S.instability==='yes'||(S.necrosis==='yes'&&S.infection==='yes')||(S.necrosis==='yes'&&S.timing==='gte4'&&S.response==='noimprove');
-  var cur=burden(), out=[cur];
-  for(var h=1;h<=24;h++){
-    var d=0;
-    if(rate>=80&&rate<=250) d-=0.045;
-    else if(rate>300) d+=0.03;
-    else if(rate<40&&cur>1.5) d+=0.02;
-    if(feed!=='hold'&&h>=6) d-=0.03;
-    else if(feed==='hold'&&h>=12&&cur>1) d+=0.015;
-    if(act('abx')&&infected) d-=0.04;
-    if(S.cholangitis==='yes'){ if(act('ercp')&&h<=8) d-=0.12; else if(!act('ercp')) d+=0.02; }
-    else if(act('ercp')&&h===3) d+=0.45;
-    if(S.cause==='tg') d+=act('insulin')?-0.05:0.02;
-    if(act('drain')){ if(early&&h<=6) d+=0.08; else if(need) d-=0.07; }
-    else if(need&&S.instability==='yes') d+=0.04;
-    if(act('op')){
-      if(early||(need&&!act('drain'))){ if(h<=8) d+=0.1; }
-      else if(need&&act('drain')&&S.response==='noimprove') d-=0.05;
-    }
-    cur=Math.max(0.2,Math.min(4.5,cur+d));
-    out.push(+cur.toFixed(2));
-  }
-  return out;
-}
-function mapOf(s){ return Math.round(Math.max(50, Math.min(115, 96-s*10))); }
-function draw(p, mark){
-  var maps=p.map(mapOf);
-  var c=document.getElementById('chart'), dpr=Math.min(2,devicePixelRatio||1);
-  var W=c.clientWidth||640, Ht=c.clientHeight||220;
-  c.width=W*dpr; c.height=Ht*dpr;
-  var ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,Ht);
-  var min=45, max=120, L=46, T=16, B=28, R=W-12, n=maps.length-1;
-  var X=function(i){ return L+(R-L)*i/n; };
-  var Y=function(v){ return T+(Ht-T-B)*(1-(v-min)/(max-min)); };
-  ctx.font='12px sans-serif'; ctx.fillStyle='#334155'; ctx.strokeStyle='#e2e8f0';
-  [50,65,90,110].forEach(function(v){
-    ctx.beginPath(); ctx.moveTo(L,Y(v)); ctx.lineTo(R,Y(v)); ctx.stroke();
-    ctx.fillText(v+' ', 4, Y(v)+4);
-  });
-  ctx.fillText('mmHg', 4, 12);
-  [0,6,12,18,24].forEach(function(h){ ctx.fillText(h+' h', X(h)-10, Ht-8); });
-  ctx.strokeStyle='#dc2626'; ctx.setLineDash([5,4]); ctx.beginPath(); ctx.moveTo(L,Y(65)); ctx.lineTo(R,Y(65)); ctx.stroke(); ctx.setLineDash([]);
-  ctx.strokeStyle='#0f766e'; ctx.lineWidth=3; ctx.beginPath();
-  maps.forEach(function(v,i){ if(i) ctx.lineTo(X(i),Y(v)); else ctx.moveTo(X(i),Y(v)); });
-  ctx.stroke();
-  ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(X(mark),T); ctx.lineTo(X(mark),Ht-B); ctx.stroke();
-  ctx.fillStyle='#0f766e'; ctx.font='bold 14px sans-serif'; ctx.fillText(maps[mark]+' mmHg', Math.min(R-70, X(mark)+6), Y(maps[mark])-6);
-}
-function vitals(s){
-  document.getElementById('hr').textContent=String(Math.round(72+s*18));
-  document.getElementById('map').textContent=String(mapOf(s));
-  document.getElementById('rr').textContent=String(Math.round(14+s*6));
-}
-function warn(rate){
-  var lines=[];
-  var early=S.necrosis==='yes'&&S.infection==='no'&&S.timing==='lt4';
-  var need=S.instability==='yes'||(S.necrosis==='yes'&&S.infection==='yes');
-  if(rate>300) lines.push('Too much fluid.');
-  if(act('ercp')&&S.cholangitis!=='yes') lines.push('ERCP without cholangitis.');
-  if(S.cholangitis==='yes'&&!act('ercp')) lines.push('No ERCP.');
-  if(early&&(act('drain')||act('op'))) lines.push('Too early to drain or operate.');
-  if(need&&act('op')&&!act('drain')) lines.push('Operate only after the drain fails.');
-  if(S.instability==='yes'&&!act('drain')) lines.push('No drain.');
-  var el=document.getElementById('ods');
-  el.className=lines.length?'show':'';
-  el.textContent=lines[0]||'';
-}
-var lastKey='';
-function paint(){
-  document.getElementById('ask').className=S.necrosis==='yes'?'show':'';
-  var sev=document.querySelectorAll('#sev b');
-  sev[0].className=S.of==='none'?'on':'';
-  sev[1].className=S.of==='transient'?'warn':'';
-  sev[2].className=S.of==='persistent'?'bad':'';
-  var p=plan();
-  document.getElementById('title').textContent=p.title;
-  document.getElementById('steps').innerHTML=p.lines.map(function(l){ return '<li>'+l+'</li>'; }).join('');
-  var rate=+document.getElementById('lr').value||0;
-  document.getElementById('lrLabel').textContent=String(rate);
-  path=course();
-  warn(rate);
-  draw(path, hour);
-  vitals(path[hour]||path[0]);
-  score();
-}
-document.querySelectorAll('.chips').forEach(function(box){
-  if(!box.dataset.k) return;
-  box.querySelectorAll('button').forEach(function(b){
-    b.onclick=function(){
-      box.querySelectorAll('button').forEach(function(x){ x.classList.remove('pick'); });
-      b.classList.add('pick');
-      S[box.dataset.k]=b.dataset.v;
-      paint();
-    };
-  });
-});
-document.getElementById('lr').oninput=paint;
-document.getElementById('feed').onchange=paint;
-['insulin','abx','ercp','drain','op'].forEach(function(id){
-  document.getElementById(id).onclick=function(){ this.classList.toggle('pick'); paint(); };
-});
-function frame(){
-  tick++;
-  if(tick>28){ tick=0; hour=(hour+1)%path.length; draw(path, hour); vitals(path[hour]||path[0]); }
-  requestAnimationFrame(frame);
-}
-paint();
-requestAnimationFrame(frame);
-
-var LAB=[
-  ['Patient','age','Age years'],['Patient','bmi','BMI'],['Patient','gcs','GCS'],
-  ['Labs','wbc','WBC ×10⁹/L'],['Labs','glu','Glucose mg/dL'],['Labs','ast','AST U/L'],['Labs','ldh','LDH U/L'],
-  ['Labs','ca','Calcium mg/dL'],['Labs','alb','Albumin g/dL'],['Labs','bun','BUN mg/dL'],['Labs','bunup','BUN rise mg/dL'],
-  ['Labs','hct','Hematocrit %'],['Labs','hctfall','Hematocrit fall'],['Labs','cr','Creatinine mg/dL'],
-  ['Labs','be','Base deficit'],['Labs','fluid','Fluid sequestr. L'],
-  ['Gas','temp','Temp °C'],['Gas','map','MAP'],['Gas','hr','Heart rate'],['Gas','rr','Resp rate'],
-  ['Gas','fio2','FiO2'],['Gas','pao2','PaO2 mmHg'],['Gas','paco2','PaCO2 mmHg'],['Gas','ph','pH'],['Gas','na','Sodium'],['Gas','k','Potassium']
-];
-var html='', lastG='';
-LAB.forEach(function(f){
-  if(f[0]!==lastG){ html+='<h2 class="grp">'+f[0]+'</h2>'; lastG=f[0]; }
-  html+='<div><label>'+f[2]+'</label><input id="f_'+f[1]+'" type="text" inputmode="decimal"></div>';
-});
-html+='<h2 class="grp">Yes or no</h2>';
-[['pleura','Pleural effusion'],['guard','Rebound or guarding'],['arf','Acute kidney injury'],['chronic','Severe chronic disease'],['elective','Elective surgery'],['extra','Chest, ascites, vessel, or gut']].forEach(function(t){
-  html+='<div><label>'+t[1]+'</label><div class="yn" data-t="'+t[0]+'"><button type="button" data-v="yes">Yes</button><button type="button" data-v="no">No</button></div></div>';
-});
-html+='<h2 class="grp">CT</h2>';
-html+='<div><label>Balthazar</label><select id="f_bal"><option value="">—</option><option value="0">A normal</option><option value="1">B enlarged</option><option value="2">C fat stranding</option><option value="3">D one collection</option><option value="4">E two collections or gas</option></select></div>';
-html+='<div><label>Necrosis</label><select id="f_nec"><option value="">—</option><option value="0">None</option><option value="2">Under 30%</option><option value="4">30–50%</option><option value="6">Over 50%</option></select></div>';
-html+='<div><label>mCTSI pancreas</label><select id="f_infl"><option value="">—</option><option value="0">Normal</option><option value="2">Inflamed</option><option value="4">Fluid or fat necrosis</option></select></div>';
-html+='<div><label>Systolic pressure</label><select id="f_sbp"><option value="">—</option><option value="0">90 or more</option><option value="1">Under 90, responds</option><option value="2">Under 90, not responding</option></select></div>';
-document.getElementById('labs').innerHTML=html;
-function val(id){ var el=document.getElementById('f_'+id); var n=parseFloat(String(el&&el.value||'').replace(',','.')); return Number.isFinite(n)?n:null; }
-function picked(id){ var s=document.getElementById('f_'+id); return s&&s.value!==''?+s.value:null; }
-function fio(){ var f=val('fio2'); if(f==null) return null; return f>1?f/100:f; }
-function flag(on){ return on?1:0; }
-function sirs(o){
-  var n=0;
-  if(o.temp!=null && (o.temp>38||o.temp<36)) n++;
-  if(o.hr!=null && o.hr>90) n++;
-  if((o.rr!=null && o.rr>20) || (o.paco2!=null && o.paco2<32)) n++;
-  if(o.wbc!=null && (o.wbc>12||o.wbc<4)) n++;
-  return n;
-}
-function apache(){
-  var ids=['temp','map','hr','rr','ph','na','k','cr','hct','wbc','gcs','age','pao2'];
-  var f=fio();
-  if(f==null) return null;
-  if(f>=0.5 && val('paco2')==null) return null;
-  for(var i=0;i<ids.length;i++) if(val(ids[i])==null) return null;
-  function temp(t){ if(t>=41)return 4; if(t>=39)return 3; if(t>=38.5)return 1; if(t>=36)return 0; if(t>=34)return 1; if(t>=32)return 2; if(t>=30)return 3; return 4; }
-  function map(m){ if(m>=160)return 4; if(m>=130)return 3; if(m>=110)return 2; if(m>=70)return 0; if(m>=50)return 2; return 4; }
-  function hr(h){ if(h>=180)return 4; if(h>=140)return 3; if(h>=110)return 2; if(h>=70)return 0; if(h>=55)return 2; if(h>=40)return 3; return 4; }
-  function rr(r){ if(r>=50)return 4; if(r>=35)return 3; if(r>=25)return 1; if(r>=12)return 0; if(r>=10)return 1; if(r>=6)return 2; return 4; }
-  function ph(p){ if(p>=7.7)return 4; if(p>=7.6)return 3; if(p>=7.5)return 1; if(p>=7.33)return 0; if(p>=7.25)return 2; if(p>=7.15)return 3; return 4; }
-  function na(n){ if(n>=180)return 4; if(n>=160)return 3; if(n>=155)return 2; if(n>=150)return 1; if(n>=130)return 0; if(n>=120)return 2; if(n>=111)return 3; return 4; }
-  function k(n){ if(n>=7)return 4; if(n>=6)return 3; if(n>=5.5)return 1; if(n>=3.5)return 0; if(n>=3)return 1; if(n>=2.5)return 2; return 4; }
-  function hct(h){ if(h>=60)return 4; if(h>=50)return 2; if(h>=46)return 1; if(h>=30)return 0; if(h>=20)return 2; return 4; }
-  function wbc(w){ if(w>=40)return 4; if(w>=20)return 2; if(w>=15)return 1; if(w>=3)return 0; if(w>=1)return 2; return 4; }
-  var oxy;
-  if(f>=0.5){
-    var aa=(f*(760-47)-val('paco2')/0.8)-val('pao2');
-    oxy=aa>=500?4:aa>=350?3:aa>=200?2:0;
-  } else oxy=val('pao2')>70?0:val('pao2')>=61?1:val('pao2')>=55?3:4;
-  var crp=val('cr')>=3.5?4:val('cr')>=2?3:val('cr')>=1.5?2:val('cr')>=0.6?0:2;
-  if(T.arf==='yes') crp*=2;
-  var ageP=val('age')<=44?0:val('age')<=54?2:val('age')<=64?3:val('age')<=74?5:6;
-  var chron=T.elective==='yes'?2:T.chronic==='yes'?5:0;
-  return temp(val('temp'))+map(val('map'))+hr(val('hr'))+rr(val('rr'))+ph(val('ph'))+na(val('na'))+k(val('k'))+hct(val('hct'))+wbc(val('wbc'))+(15-val('gcs'))+oxy+crp+ageP+chron;
+function ofResp(){ var r=pf(); if(S.vent==='yes') return true; if(r!=null&&r<=300) return true; if(num('spo2')!=null&&num('spo2')<90) return true; return false; }
+function ofCirc(){ var m=map(); if(S.pressor==='yes') return true; if(m!=null&&m<65) return true; return false; }
+function ofRenal(){ if(num('cr')!=null&&num('cr')>=1.9) return true; if(num('uo')!=null&&num('wt')!=null&&num('uo')/num('wt')<0.5) return true; return false; }
+function anyOF(){ return ofResp()||ofCirc()||ofRenal(); }
+function severity(){
+  if(anyOF()&&S.dur==='persist') return 'Severe';
+  if(anyOF()&&S.dur==='transient') return 'Moderately severe';
+  if(anyOF()) return '';
+  if(S.local==='yes') return 'Moderately severe';
+  return 'Mild';
 }
 function marshall(){
-  var f=fio(), p=val('pao2'), c=val('cr'), s=picked('sbp'), ph=val('ph');
-  if(f==null||p==null||c==null||s==null) return null;
-  var pf=p/f;
-  var resp=pf>400?0:pf>300?1:pf>200?2:pf>100?3:4;
+  var r=pf(), c=num('cr'), s=num('sbp');
+  if(r==null||c==null||s==null) return null;
+  var resp=r>400?0:r>300?1:r>200?2:r>100?3:4;
   var renal=c<1.4?0:c<=1.8?1:c<=3.6?2:c<=4.9?3:4;
-  var cv=s;
-  if(s>=1 && ph!=null){ if(ph<7.2) cv=4; else if(ph<7.3) cv=Math.max(cv,3); }
-  return {resp:resp,renal:renal,cv:cv,max:Math.max(resp,renal,cv)};
+  var cv=s>=90?0:S.pressor==='yes'?2:1;
+  return {resp:resp, renal:renal, cv:cv, max:Math.max(resp,renal,cv)};
 }
-function tile(name,text,note,tone){ return '<div class="sc '+tone+'"><span>'+name+'</span><b>'+text+'</b><small>'+note+'</small></div>'; }
-function score(){
-  var age=val('age'), wbc=val('wbc'), glu=val('glu'), bun=val('bun'), gcs=val('gcs');
-  var bis=[age==null?null:age>60, bun==null?null:bun>25, gcs==null?null:gcs<15, T.pleura==null?null:T.pleura==='yes', null];
-  var so=sirs({temp:val('temp'),hr:val('hr'),rr:val('rr'),paco2:val('paco2'),wbc:wbc});
-  var sHave=(val('temp')!=null?1:0)+(val('hr')!=null?1:0)+((val('rr')!=null||val('paco2')!=null)?1:0)+(wbc!=null?1:0);
-  bis[4]=sHave===4?so>=2:null;
-  var bisN=bis.filter(function(x){return x===true;}).length;
-  var bisMiss=bis.filter(function(x){return x===null;}).length;
+function bagName(){
+  if(!S.nec||!S.weeks) return '';
+  if(S.nec==='no'&&S.weeks==='early') return 'Acute fluid collection';
+  if(S.nec==='no') return 'Pseudocyst';
+  if(S.weeks==='early') return 'Acute necrotic collection';
+  return 'Walled-off necrosis';
+}
+function ranson(){
   var biliary=S.cause==='biliary';
-  var adm=[
-    age!=null && age>(biliary?70:55),
-    wbc!=null && wbc>(biliary?18:16),
-    glu!=null && glu>(biliary?220:200),
-    val('ldh')!=null && val('ldh')>(biliary?400:350),
-    val('ast')!=null && val('ast')>250
-  ];
-  var late=[
-    val('hctfall')!=null && val('hctfall')>10,
-    val('bunup')!=null && val('bunup')>(biliary?2:5),
-    val('ca')!=null && val('ca')<8,
-    val('be')!=null && val('be')>(biliary?5:4),
-    val('fluid')!=null && val('fluid')>(biliary?4:6)
-  ];
-  if(!biliary) late.splice(3,0, val('pao2')!=null && val('pao2')<60);
-  var admMiss=[age,wbc,glu,val('ldh'),val('ast')].filter(function(x){return x==null;}).length;
-  var lateIds=biliary?['hctfall','bunup','ca','be','fluid']:['hctfall','bunup','ca','pao2','be','fluid'];
-  var lateMiss=lateIds.filter(function(id){return val(id)==null;}).length;
-  var admPts=adm.filter(Boolean).length, latePts=late.filter(Boolean).length;
-  var glaIds=['age','wbc','glu','bun','pao2','ca','alb','ldh'];
-  var glaMiss=glaIds.filter(function(id){return val(id)==null;}).length;
-  var gla=flag(age>55)+flag(wbc>15)+flag(glu>180)+flag(bun>45)+flag(val('pao2')<60)+flag(val('ca')<8)+flag(val('alb')<3.2)+flag(val('ldh')>600);
-  var hapsReady=T.guard!=null && val('cr')!=null && val('hct')!=null;
-  var hapsOk=T.guard==='no' && val('cr')<1.2 && val('hct')>=35 && val('hct')<=48;
-  var pancReady=val('hct')!=null && val('bmi')!=null && T.pleura!=null;
-  var panc=flag(val('hct')>44)+flag(val('bmi')>30)+flag(T.pleura==='yes');
-  var bal=picked('bal'), nec=picked('nec'), infl=picked('infl');
-  var ctsi=(bal!=null&&nec!=null)?bal+nec:null;
-  var mnec=nec==null?null:nec>=4?4:nec;
-  var mctsi=(infl!=null && mnec!=null && T.extra!=null)?infl+mnec+(T.extra==='yes'?2:0):null;
-  var m=marshall();
-  var ap=apache();
-  var dbc='—', dbcTone='wait', dbcNote='Set organ failure';
-  if(S.of && S.necrosis){
-    var infected=S.infection==='yes', pers=S.of==='persistent';
-    if(infected && pers){ dbc='Critical'; dbcTone='bad'; }
-    else if(infected || pers){ dbc='Severe'; dbcTone='bad'; }
-    else if(S.necrosis==='yes' || S.of==='transient'){ dbc='Moderate'; dbcTone='mid'; }
-    else { dbc='Mild'; dbcTone='ok'; }
-    dbcNote='Determinant based';
-  }
-  document.getElementById('board').innerHTML=[
-    tile('BISAP', bisMiss===5?'—':String(bisN), bisMiss?bisMiss+' left':'3 or more is high', bisMiss?'wait':bisN>=3?'bad':'ok'),
-    tile('SIRS', sHave===0?'—':String(so), sHave<4?sHave+'/4':so>=2?'2 or more':'under 2', sHave<4?'wait':so>=2?'bad':'ok'),
-    tile('HAPS', !hapsReady?'—':hapsOk?'Harmless':'Not', !hapsReady?'guard, creatinine, Hct':hapsOk?'all three absent':'not harmless', !hapsReady?'wait':hapsOk?'ok':'mid'),
-    tile('PANC 3', !pancReady?'—':String(panc), !pancReady?'Hct, BMI, effusion':panc===3?'all three':'not all three', !pancReady?'wait':panc===3?'bad':'ok'),
-    tile('Ranson', (admMiss||lateMiss)?'—':String(admPts+latePts), (biliary?'Gallstone':'Other')+' · admission '+admPts+' · 48 h '+latePts+(admMiss||lateMiss?' · '+(admMiss+lateMiss)+' left':''), (admMiss||lateMiss)?'wait':(admPts+latePts)>=5?'bad':(admPts+latePts)>=3?'mid':'ok'),
-    tile('Glasgow', glaMiss?'—':String(gla), glaMiss?glaMiss+' left':'3 or more is severe', glaMiss?'wait':gla>=3?'bad':'ok'),
-    tile('Marshall', m?String(m.max):'—', m?'lung '+m.resp+' · kidney '+m.renal+' · BP '+m.cv:'P/F, creatinine, BP', !m?'wait':m.max>=2?'bad':'ok'),
-    tile('CTSI', ctsi==null?'—':String(ctsi), ctsi==null?'grade + necrosis':ctsi>=7?'severe':ctsi>=4?'moderate':'mild', ctsi==null?'wait':ctsi>=7?'bad':ctsi>=4?'mid':'ok'),
-    tile('mCTSI', mctsi==null?'—':String(mctsi), mctsi==null?'pancreas, necrosis, outside':mctsi>=8?'severe':mctsi>=4?'moderate':'mild', mctsi==null?'wait':mctsi>=8?'bad':mctsi>=4?'mid':'ok'),
-    tile('APACHE II', ap==null?'—':String(ap), ap==null?'vitals, gas, labs, GCS':'≥8 higher risk', ap==null?'wait':ap>=8?'bad':'ok'),
-    tile('Class', dbc, dbcNote, dbcTone)
-  ].join('');
+  var ids=['age','wbc','glu','ldh','ast'];
+  var miss=ids.filter(function(id){ return num(id)==null; }).length;
+  var pts=(num('age')>(biliary?70:55)?1:0)+(num('wbc')>(biliary?18:16)?1:0)+(num('glu')>(biliary?220:200)?1:0)+(num('ldh')>(biliary?400:350)?1:0)+(num('ast')>250?1:0);
+  return {pts:pts, miss:miss, biliary:biliary};
 }
-document.getElementById('labs').oninput=score;
-document.getElementById('labs').onchange=score;
-document.getElementById('labs').onclick=function(e){
-  var b=e.target.closest('.yn button'); if(!b) return;
-  var box=b.parentNode;
-  box.querySelectorAll('button').forEach(function(x){ x.classList.remove('pick'); });
-  b.classList.add('pick');
-  T[box.dataset.t]=b.dataset.v;
-  score();
+function glasgow(){
+  var ids=['age','wbc','glu','bun','pao2','ca','alb','ldh'];
+  var miss=ids.filter(function(id){ return num(id)==null; }).length;
+  var pts=(num('age')>55?1:0)+(num('wbc')>15?1:0)+(num('glu')>180?1:0)+(num('bun')>45?1:0)+(num('pao2')<60?1:0)+(num('ca')<8?1:0)+(num('alb')<3.2?1:0)+(num('ldh')>600?1:0);
+  return {pts:pts, miss:miss};
+}
+function ctsi(){ if(S.bal==null||S.bal===''||S.necros==null||S.necros==='') return null; return (+S.bal)+(+S.necros); }
+function route(){
+  var r=['dx','labs','sev','fluid','pain','feed','check','cause'];
+  if(S.cause==='biliary') r.push('bile');
+  r.push('comp');
+  if(S.comp==='collection'){ r.push('bag'); if(S.nec==='yes'||S.infected==='yes'||S.sym==='yes') r.push('step'); }
+  else if(S.comp&&S.comp!=='none') r.push('act');
+  r.push('sum');
+  return r;
+}
+function dxCount(){ return (S.pain==='yes'?1:0)+(S.lipase==='yes'?1:0)+(S.image==='yes'?1:0); }
+function ok(id){
+  if(id==='dx') return dxCount()>=2;
+  if(id==='labs') return map()!=null;
+  if(id==='sev') return !anyOF() || !!S.dur;
+  if(id==='feed') return !!S.oral;
+  if(id==='check') return !!S.check;
+  if(id==='cause') return !!S.cause;
+  if(id==='bile') return !!S.cholangitis && !!S.block;
+  if(id==='comp') return !!S.comp;
+  if(id==='bag') return !!S.nec && !!S.weeks;
+  if(id==='step') return !!S.stable;
+  return true;
+}
+function chips(key, opts){
+  return '<div class="chips" data-k="'+key+'">'+opts.map(function(o){
+    return '<button type="button" data-v="'+o[0]+'" class="'+(S[key]===o[0]?'pick':'')+'">'+o[1]+'</button>';
+  }).join('')+'</div>';
+}
+function box(id, label){ return '<div><label>'+label+'</label><input id="'+id+'" inputmode="decimal" value="'+(S[id]||'')+'"></div>'; }
+function yn(key, label){
+  return '<div><label>'+label+'</label><div class="chips" data-k="'+key+'"><button type="button" data-v="yes" class="'+(S[key]==='yes'?'pick':'')+'">Yes</button><button type="button" data-v="no" class="'+(S[key]==='no'?'pick':'')+'">No</button></div></div>';
+}
+function out(title, lines, bad){
+  return '<div class="out'+(bad?' bad':'')+'"><b>'+title+'</b>'+(lines&&lines.length?'<ul>'+lines.map(function(l){return '<li>'+l+'</li>';}).join('')+'</ul>':'')+'</div>';
+}
+function labsLive(){
+  var m=map(), g=ag(), ca=corr(), s=sirs(), b=bisap();
+  var bits=[];
+  if(m!=null) bits.push('MAP '+m.toFixed(0));
+  if(g!=null) bits.push('Anion gap '+g.toFixed(0));
+  if(ca!=null) bits.push('Corrected calcium '+ca.toFixed(1));
+  if(s.have) bits.push('SIRS '+(s.have<4?s.n+' so far':s.n));
+  if(b.left<5) bits.push('BISAP '+b.pts+(b.left?' · '+b.left+' left':''));
+  return bits.length?out(bits[0], bits.slice(1), m!=null&&m<65):'';
+}
+function views(){
+  return {
+    dx:function(){
+      var n=dxCount();
+      return '<h2>Two of these three</h2><p class="hint">Do not wait for a CT if the first two are present.</p>'
+        +yn('pain','Typical pain')+yn('lipase','Lipase or amylase at least 3 times normal')+yn('image','Scan looks like pancreatitis')
+        +out(n>=2?'Acute pancreatitis':n+' of 3', n>=2?['Start treatment.']:['Not enough to call it pancreatitis.'], n<2);
+    },
+    labs:function(){
+      return '<p class="hint">MAP needs the two pressures. The other boxes feed the scores.</p>'
+        +'<h2>Vitals</h2><div class="grid">'+box('age','Age')+box('wt','Weight kg')+box('hr','Heart rate')+box('sbp','Systolic')+box('dbp','Diastolic')+box('spo2','SpO2 %')+box('rr','Respiratory rate')+box('temp','Temperature °C')+box('gcs','GCS')+'</div>'
+        +'<h2>Blood</h2><div class="grid">'+box('wbc','WBC')+box('hct','Hematocrit')+box('bun','BUN mg/dL')+box('cr','Creatinine')+box('na','Sodium')+box('k','Potassium')+box('cl','Chloride')+box('hco3','Bicarbonate')+box('glu','Glucose')+box('ca','Calcium')+box('alb','Albumin')+box('mg','Magnesium')+box('lact','Lactate')+box('uo','Urine mL/h')+'</div>'
+        +'<h2>Liver and cause</h2><div class="grid">'+box('bili','Bilirubin')+box('ast','AST')+box('alt','ALT')+box('alp','ALP')+box('ggt','GGT')+box('lip','Lipase')+box('crp','CRP')+box('ldh','LDH')+box('tg','Triglyceride')+box('fio2','FiO2')+box('pao2','PaO2')+'</div>'
+        +'<h2>Yes or no</h2><div class="grid">'+yn('pleura','Pleural effusion')+yn('pressor','Vasopressor')+yn('vent','On a ventilator')+yn('local','A collection is already known')+'</div>'
+        +'<div id="live">'+labsLive()+'</div>';
+    },
+    sev:function(){
+      var name=severity();
+      var m=marshall();
+      var lines=[];
+      lines.push('Lung '+(ofResp()?'failing':'clear'));
+      lines.push('Pressure '+(ofCirc()?'failing':'holding'));
+      lines.push('Kidney '+(ofRenal()?'failing':'clear'));
+      if(m) lines.push('Marshall '+m.max+' · lung '+m.resp+' · kidney '+m.renal+' · pressure '+m.cv);
+      var b=bisap();
+      if(b.left===0) lines.push('BISAP '+b.pts+(b.pts>=3?' · high':''));
+      var rn=ranson(); if(rn.miss===0) lines.push((rn.biliary?'Gallstone Ranson ':'Ranson ')+rn.pts);
+      var gl=glasgow(); if(gl.miss===0) lines.push('Glasgow '+gl.pts+(gl.pts>=3?' · severe':''));
+      var body='<h2>Organ failure</h2><div class="row3"><div class="'+(ofResp()?'bad':'')+'"><span>Lung</span><b>'+(ofResp()?'Yes':'No')+'</b></div><div class="'+(ofCirc()?'bad':'')+'"><span>Pressure</span><b>'+(ofCirc()?'Yes':'No')+'</b></div><div class="'+(ofRenal()?'bad':'')+'"><span>Kidney</span><b>'+(ofRenal()?'Yes':'No')+'</b></div></div>';
+      if(anyOF()) body+='<h2>How long</h2>'+chips('dur',[['transient','Under 48 h'],['persist','48 h or more']]);
+      body+=out(name||'How long has this lasted?', lines, name==='Severe');
+      return body;
+    },
+    fluid:function(){
+      return '<p class="hint">Lactated Ringer. Aim for a pressure of at least 65. Reassess, do not flood.</p>'
+        +'<label>Lactated Ringer <b id="lrLab">'+(S.lr||150)+'</b> mL/h</label><input id="lr" type="range" min="0" max="400" step="10" value="'+(S.lr||150)+'">'
+        +yn('wet','Crackles, high neck veins, or wet lungs')
+        +'<h2>Mean arterial pressure</h2><canvas id="chart" width="720" height="220"></canvas>'
+        +'<div class="legend"><span><i></i>MAP mmHg</span><span><i class="red"></i>65</span><span><i class="now"></i>This hour</span></div>'
+        +'<p class="hint">Bottom axis is hours. Under the red line the pressure is too low.</p><div id="live"></div>';
+    },
+    pain:function(){
+      return '<p class="hint">Treat the pain. Do not let the pain medicine delay a low pressure or low oxygen.</p>'
+        +'<label>Pain <b id="painLab">'+(S.painScore||'5')+'</b> / 10</label><input id="painScore" type="range" min="0" max="10" step="1" value="'+(S.painScore||5)+'">'
+        +yn('analgesia','Pain medicine given')
+        +'<div id="live"></div>';
+    },
+    feed:function(){
+      return '<p class="hint">Feed within a day if the belly allows it. Use the gut before a vein.</p>'
+        +yn('oral','Can drink')+yn('gut','Gut can be used')+yn('nj','Stomach is not emptying')
+        +'<div id="live"></div>';
+    },
+    check:function(){
+      return '<h2>At 6 to 12 hours</h2>'+chips('check',[['better','Improving'],['same','No change'],['worse','Worse']])
+        +'<div id="live"></div>';
+    },
+    cause:function(){
+      return '<h2>Cause</h2>'+chips('cause',[['biliary','Gallstone'],['alcohol','Alcohol'],['tg','Triglyceride'],['cal','High calcium'],['drug','Drug'],['ercp','After ERCP'],['trauma','Trauma'],['unknown','Not clear']])
+        +'<div id="live"></div>';
+    },
+    bile:function(){
+      return '<h2>Bile duct</h2>'+yn('cholangitis','Cholangitis')+yn('block','Stone or blockage still there')
+        +'<div id="live"></div>';
+    },
+    comp:function(){
+      return '<h2>What is wrong now</h2>'+chips('comp',[
+        ['none','Nothing new'],['breath','Breathing'],['shock','Shock'],['aki','Kidneys'],
+        ['collection','Collection'],['acs','Belly pressure'],['vessel','Bleed or clot'],
+        ['gut','Gut'],['bileblock','Bile duct later'],['pleura','Pleural fluid'],['duct','Duct leak']
+      ])+'<div id="live"></div>';
+    },
+    bag:function(){
+      return '<h2>What kind</h2>'+yn('nec','Necrosis')+chips('weeks',[['early','Under 4 weeks'],['late','4 weeks or more']])
+        +yn('sym','Pain, blockage, or another problem from it')+yn('infected','Infected')
+        +'<h2>CTSI</h2><div class="grid"><div><label>Balthazar</label><select id="bal"><option value="">—</option><option value="0">A normal</option><option value="1">B enlarged</option><option value="2">C fat</option><option value="3">D one collection</option><option value="4">E two or gas</option></select></div>'
+        +'<div><label>Necrosis</label><select id="necros"><option value="">—</option><option value="0">None</option><option value="2">Under 30%</option><option value="4">30–50%</option><option value="6">Over 50%</option></select></div></div>'
+        +'<div id="live"></div>';
+    },
+    step:function(){
+      return '<p class="hint">'+bagName()+'</p>'+yn('stable','Stable')
+        +'<div class="chips"><button type="button" id="abx" class="'+(S.abx==='yes'?'pick':'')+'">Antibiotic</button><button type="button" id="drain" class="'+(S.drain==='yes'?'pick':'')+'">Drain</button><button type="button" id="op" class="'+(S.op==='yes'?'pick':'')+'">Operate</button></div>'
+        +'<div id="live"></div>';
+    },
+    act:function(){ return '<div id="live"></div>'; },
+    sum:function(){ return summary(); }
+  };
+}
+function painLive(){
+  var p=num('painScore'); if(p==null) p=5;
+  if(p>=4 && S.analgesia!=='yes') return out('Give a pain medicine', ['Then check the breathing and the pressure.'], true);
+  return out('Pain is treated', []);
+}
+function feedLive(){
+  if(!S.oral) return '';
+  if(S.oral==='no' && !S.gut) return out('Can the gut be used?', []);
+  if(S.gut==='no') return out('Vein feeding', ['Only because the gut cannot be used.']);
+  if(S.nj==='yes') return out('Feed past the stomach', []);
+  return out('Nasogastric feeding', ['Do not use a vein if the gut works.']);
+}
+function checkLive(){
+  if(S.check==='worse') return out('ICU', ['Look for a complication.'], true);
+  if(S.check==='same') return out('Look for a complication', []);
+  if(S.check==='better') return out('Continue this plan', []);
+  return '';
+}
+function causeLive(){
+  var tg=num('tg');
+  if(S.cause==='tg'){
+    if(tg==null) return out('Enter the triglyceride', []);
+    if(tg>=1000) return out('Lower the triglyceride', ['Insulin infusion.'], true);
+    if(tg>=500) return out('Triglyceride is high', ['Lower it.']);
+    return out('Triglyceride is not the cause', ['Under 500.'], true);
+  }
+  if(S.cause==='biliary') return out('Next is the bile duct', []);
+  if(S.cause==='alcohol') return out('Support', ['Watch withdrawal.']);
+  if(S.cause==='cal') return out('Lower the calcium', []);
+  if(S.cause==='drug') return out('Stop the drug', []);
+  if(S.cause==='unknown' && num('age')!=null && num('age')>=40) return out('Look for a tumor', []);
+  if(S.cause) return out('Support', []);
+  return '';
+}
+function bileLive(){
+  if(!S.cholangitis||!S.block) return '';
+  var lines=[];
+  var bad=false;
+  if(S.cholangitis==='yes'){ lines.push('ERCP within 24 hours.'); bad=true; }
+  else if(S.block==='yes') lines.push('The duct is still blocked. ERCP, not a routine early ERCP for simple gallstone pancreatitis.');
+  else lines.push('No urgent ERCP.');
+  if(severity()==='Mild') lines.push('Take the gallbladder out this admission.');
+  else if(severity()) lines.push('Do not take the gallbladder out this admission.');
+  return out(S.cholangitis==='yes'?'Cholangitis':'Gallstone pancreatitis', lines, bad);
+}
+function compLive(){
+  if(!S.comp) return '';
+  if(S.comp==='none') return out('No new complication', []);
+  if(S.comp==='collection') return out('Open the collection page', []);
+  return out('Next page is the action', []);
+}
+function bagLive(){
+  var name=bagName();
+  if(!name) return '';
+  var lines=[];
+  var score=ctsi();
+  if(score!=null){ var band=score>=7?'severe':score>=4?'moderate':'mild'; lines.push('CTSI '+score+' · '+band); }
+  if(S.infected==='yes') lines.push('Treat it as infected.');
+  else if((name==='Acute fluid collection'||name==='Pseudocyst') && S.sym!=='yes') lines.push('No drain just because it is there.');
+  return out(name, lines, S.infected==='yes'||(score!=null&&score>=7));
+}
+function stepLive(){
+  if(!S.stable) return '';
+  var early=S.weeks==='early', infected=S.infected==='yes', unstable=S.stable==='no';
+  var lines=[], bad=false, title='Step up';
+  if(!infected && early){ title='Sterile, under 4 weeks'; lines.push('No prophylactic antibiotic.'); lines.push('Do not drain or operate yet.'); if(S.drain==='yes'||S.op==='yes'){ lines.push('That is too early.'); bad=true; } }
+  else if(unstable){ title='Unstable'; lines.push('Antibiotic and a drain now.'); if(S.op==='yes'&&S.drain!=='yes'){ lines.push('Drain before you operate.'); bad=true; } if(S.drain!=='yes') bad=true; }
+  else if(infected && early){ title='Infected, under 4 weeks'; lines.push('Antibiotic.'); lines.push('Drain if needed, and delay the necrosectomy while the patient allows it.'); }
+  else if(infected){ title='Infected, walled off'; lines.push('Antibiotic, then drain.'); lines.push('Operate only if the drain fails.'); if(S.op==='yes'&&S.drain!=='yes'){ lines.push('Drain first.'); bad=true; } }
+  else { title='Symptomatic collection'; lines.push('Drain if it is causing a problem. Least invasive first.'); if(S.op==='yes'&&S.drain!=='yes'){ lines.push('Drain first.'); bad=true; } }
+  return out(title, lines, bad);
+}
+function actLive(){
+  var t={
+    breath:['Breathing','Give oxygen. If the work of breathing rises, ventilate. Look for a wet lung, a pleural effusion, and ARDS.'],
+    shock:['Shock','Fluid has not fixed the pressure. Start norepinephrine. Look for infected necrosis, bleeding, and belly compartment.'],
+    aki:['Kidneys','Restore the pressure. Stop kidney-toxic drugs. Dialyse only for the usual reasons.'],
+    acs:['Belly compartment','Urine falls and breathing worsens. Measure the bladder pressure. This is an ICU problem.'],
+    vessel:['Bleed or clot','Falling hemoglobin or a bleed. CT angiogram. Embolise a pseudoaneurysm. A clot is decided one patient at a time.'],
+    gut:['Gut','Block, bleed, or perforation. CT, then endoscopy, radiology, or surgery.'],
+    bileblock:['Bile duct','Jaundice or a blocked duct. Ultrasound, then MRCP or ERCP if it stays blocked.'],
+    pleura:['Pleural fluid','A large left effusion that returns. Check the amylase in the fluid.'],
+    duct:['Duct leak','A collection that keeps returning. MRCP. Stent the duct if it is leaking.']
+  };
+  var x=t[S.comp]||['',''];
+  return out(x[0], [x[1]], S.comp==='shock'||S.comp==='acs'||S.comp==='breath');
+}
+function summary(){
+  var lines=[];
+  var m=map(); if(m!=null) lines.push('MAP '+m.toFixed(0)+' mmHg.');
+  var g=ag(); if(g!=null) lines.push('Anion gap '+g.toFixed(0)+'.');
+  var ca=corr(); if(ca!=null) lines.push('Corrected calcium '+ca.toFixed(1)+'.');
+  var b=bisap(); if(b.left===0) lines.push('BISAP '+b.pts+'.');
+  var rn=ranson(); if(rn.miss===0) lines.push((rn.biliary?'Gallstone Ranson ':'Ranson ')+rn.pts+'.');
+  var gl=glasgow(); if(gl.miss===0) lines.push('Glasgow '+gl.pts+'.');
+  var s=sirs(); if(s.have===4) lines.push('SIRS '+s.n+'.');
+  var ms=marshall(); if(ms) lines.push('Marshall '+ms.max+'.');
+  if(S.cause) lines.push('Cause: '+S.cause+'.');
+  if(bagName()) lines.push(bagName()+'.');
+  if(S.nec==='yes' && S.infected!=='yes' && S.weeks==='early') lines.push('Sterile necrosis under 4 weeks. No drain yet.');
+  if(S.infected==='yes' && S.stable==='no') lines.push('Unstable infected necrosis. Antibiotic and drain now.');
+  if(S.infected==='yes' && S.stable==='yes') lines.push('Infected necrosis. Antibiotic, then drain. Operate only if the drain fails.');
+  var score=ctsi(); if(score!=null) lines.push('CTSI '+score+'.');
+  if(S.comp && S.comp!=='none' && S.comp!=='collection'){
+    var act={breath:'Oxygen, and ventilate if the work of breathing rises.', shock:'Norepinephrine if fluid does not restore the pressure.', aki:'Restore perfusion. Dialyse only for the usual reasons.', acs:'Measure the bladder pressure.', vessel:'CT angiogram. Embolise a pseudoaneurysm.', gut:'CT for blockage, bleed, or perforation.', bileblock:'Ultrasound, then ERCP if the duct stays blocked.', pleura:'Check the amylase in the pleural fluid.', duct:'MRCP. Stent a leaking duct.'};
+    if(act[S.comp]) lines.push(act[S.comp]);
+  }
+  if(severity()==='Severe' || S.check==='worse') lines.push('ICU.');
+  if(S.cholangitis==='yes') lines.push('ERCP within 24 hours.');
+  if(S.cause==='biliary' && severity()==='Mild') lines.push('Cholecystectomy this admission.');
+  var wet=S.wet==='yes'; if(wet) lines.push('Stop extra fluid. The lungs are wet.');
+  return out(severity()||'Acute pancreatitis', lines, severity()==='Severe');
+}
+function fluidNote(){
+  var rate=num('lr')||0, m=map();
+  var lines=[];
+  if(S.wet==='yes') lines.push('Stop more fluid. The lungs are wet.');
+  else if(rate>300) lines.push('Too much fluid.');
+  else if(m!=null && m<65 && rate<80) lines.push('The pressure is under 65. Give more, then check again.');
+  else lines.push('Check the pressure, urine, BUN, hematocrit, and lactate again at 6 hours.');
+  var u=num('uo'), w=num('wt');
+  if(u!=null&&w) lines.push('Urine '+(u/w).toFixed(2)+' mL/kg/h. Aim at least 0.5.');
+  return out('Fluid', lines, S.wet==='yes'||rate>300||(m!=null&&m<65));
+}
+function fluidPath(){
+  var start=map()==null?72:map();
+  var rate=num('lr')==null?150:num('lr');
+  var wet=S.wet==='yes';
+  var cur=start, outp=[cur];
+  for(var h=1;h<=12;h++){
+    var d=0;
+    if(wet) d -= cur>70?1:0.3;
+    else if(rate>300) d -= 0.4;
+    else if(rate>=80 && rate<=200) d += cur<78?1.6:0.15;
+    else if(rate<50 && cur<70) d -= 0.7;
+    cur=Math.max(45, Math.min(115, cur+d));
+    outp.push(cur);
+  }
+  return outp;
+}
+function draw(){
+  var c=document.getElementById('chart'); if(!c) return;
+  var dpr=Math.min(2, window.devicePixelRatio||1);
+  var W=c.clientWidth||640, H=c.clientHeight||220;
+  c.width=W*dpr; c.height=H*dpr;
+  var g=c.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  var min=45, max=120, L=46, T=16, B=28, R=W-10, n=path.length-1;
+  var X=function(i){ return L+(R-L)*i/n; };
+  var Y=function(v){ return T+(H-T-B)*(1-(v-min)/(max-min)); };
+  g.font='12px sans-serif'; g.fillStyle='#334155'; g.strokeStyle='#e2e8f0';
+  [50,65,90,110].forEach(function(v){ g.beginPath(); g.moveTo(L,Y(v)); g.lineTo(R,Y(v)); g.stroke(); g.fillText(String(v),4,Y(v)+4); });
+  g.fillText('mmHg',4,12);
+  [0,3,6,9,12].forEach(function(h){ g.fillText(h+' h', X(h)-8, H-8); });
+  g.strokeStyle='#dc2626'; g.setLineDash([5,4]); g.beginPath(); g.moveTo(L,Y(65)); g.lineTo(R,Y(65)); g.stroke(); g.setLineDash([]);
+  g.strokeStyle='#0f766e'; g.lineWidth=3; g.beginPath();
+  path.forEach(function(v,i){ if(i) g.lineTo(X(i),Y(v)); else g.moveTo(X(i),Y(v)); });
+  g.stroke();
+  g.strokeStyle='#f59e0b'; g.lineWidth=2; g.beginPath(); g.moveTo(X(hour),T); g.lineTo(X(hour),H-B); g.stroke();
+  g.fillStyle='#0f766e'; g.font='bold 14px sans-serif';
+  g.fillText(Math.round(path[hour])+' mmHg', Math.min(R-78, X(hour)+6), Math.max(28, Y(path[hour])-6));
+}
+function loop(){
+  tick++;
+  if(tick>28){ tick=0; hour=(hour+1)%path.length; draw(); }
+  raf=requestAnimationFrame(loop);
+}
+function refresh(){
+  var id=stack[stack.length-1];
+  var el=document.getElementById('live');
+  var html='';
+  if(id==='labs') html=labsLive();
+  if(id==='pain') html=painLive();
+  if(id==='feed') html=feedLive();
+  if(id==='check') html=checkLive();
+  if(id==='cause') html=causeLive();
+  if(id==='bile') html=bileLive();
+  if(id==='comp') html=compLive();
+  if(id==='bag') html=bagLive();
+  if(id==='step') html=stepLive();
+  if(id==='act') html=actLive();
+  if(id==='fluid'){ path=fluidPath(); html=fluidNote(); var lab=document.getElementById('lrLab'); if(lab) lab.textContent=String(num('lr')||0); draw(); }
+  var pl=document.getElementById('painLab'); if(pl) pl.textContent=String(num('painScore')==null?5:num('painScore'));
+  if(el) el.innerHTML=html;
+  document.getElementById('next').disabled = id==='sum' ? false : !ok(id);
+}
+function show(){
+  if(raf){ cancelAnimationFrame(raf); raf=0; }
+  var id=stack[stack.length-1];
+  var r=route();
+  document.getElementById('stepName').textContent=TITLE[id]+' · '+(r.indexOf(id)+1)+' of '+r.length;
+  document.getElementById('view').innerHTML=views()[id]();
+  if(id==='bag'){ ['bal','necros'].forEach(function(k){ var s=document.getElementById(k); if(s&&S[k]!=null) s.value=S[k]; }); }
+  document.getElementById('back').disabled=stack.length<2;
+  document.getElementById('next').textContent=id==='sum'?'Done':'Next';
+  refresh();
+  if(id==='fluid'){ hour=0; tick=0; raf=requestAnimationFrame(loop); }
+}
+document.getElementById('view').onclick=function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  if(b.id==='abx'||b.id==='drain'||b.id==='op'){ S[b.id]=S[b.id]==='yes'?'no':'yes'; show(); return; }
+  var box=b.closest('.chips'); if(!box) return;
+  S[box.dataset.k]=b.dataset.v;
+  show();
 };
-score();
+document.getElementById('view').oninput=function(e){
+  if(!e.target.id) return;
+  S[e.target.id]=e.target.value;
+  refresh();
+};
+document.getElementById('view').onchange=document.getElementById('view').oninput;
+document.getElementById('back').onclick=function(){ if(stack.length>1){ stack.pop(); show(); } };
+document.getElementById('next').onclick=function(){
+  var id=stack[stack.length-1];
+  if(id==='sum'){ window.location.href='index.html'; return; }
+  if(!ok(id)) return;
+  var r=route(), i=r.indexOf(id);
+  stack.push(r[i+1]);
+  show();
+};
+show();
 </script>
-<script src="icu-audio.js?v=20260925s"></script>
 </body>
 </html>
