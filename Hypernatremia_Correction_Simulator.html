@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>High sodium correction</title>
+<style>
+  :root{--ink:#0f172a;--muted:#475569;--bg:#f8efe6}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;padding:16px 18px;background:linear-gradient(90deg,#9a3412,#c2410c);color:#fff}
+  h1{margin:0;font-size:22px;letter-spacing:-.03em;text-transform:uppercase}
+  header p{margin:2px 0 0;font-size:13px;color:#ffedd5}
+  #limitBadge{background:#fff;color:#9a3412;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:800;white-space:nowrap}
+  main{display:grid;grid-template-columns:minmax(260px,400px) 1fr;gap:16px;padding:16px;max-width:1100px;margin:0 auto}
+  @media(max-width:800px){main{grid-template-columns:1fr;padding:12px}}
+  section{background:#fff;border-radius:16px;padding:14px;box-shadow:0 8px 24px #0f172a14}
+  h2{margin:0 0 12px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#9a3412}
+  label{display:block;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin:10px 0 4px;color:#334155}
+  input,select{width:100%;font-size:18px;font-weight:700;padding:8px;border:2px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:10px}
+  #target{border-color:#059669;background:#ecfdf5}
+  input[type=range]{padding:0;height:32px;accent-color:#c2410c;border:0}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .chips button,.safe{border:0;border-radius:999px;font-weight:800;padding:10px 12px;cursor:pointer;font-size:13px;color:#fff}
+  #modes button[data-mode="water"]{background:#0891b2}
+  #modes button[data-mode="iv"]{background:#7c3aed}
+  #modes button[data-mode="both"]{background:#9a3412}
+  .chips button.on{outline:3px solid #0f172a;outline-offset:2px}
+  #pWater{background:#0891b2}
+  #pHalf{background:#7c3aed}
+  #pBoth{background:#9a3412}
+  #pNs{background:#0f766e}
+  #acute.on{background:#b45309}
+  .safe{background:#059669;margin-top:8px}
+  .panel{border:2px solid #fed7aa;border-radius:12px;padding:8px 10px;margin-top:10px}
+  .panel.off{display:none}
+  .panel.water{border-color:#67e8f9}
+  .panel.iv{border-color:#c4b5fd}
+  .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .num{border-radius:12px;text-align:center;padding:10px 6px;color:#fff}
+  .num:nth-child(1){background:#9a3412}
+  .num:nth-child(2){background:#c2410c}
+  .num:nth-child(3){background:#059669}
+  .num.bad{background:#dc2626}
+  .num span{display:block;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.85;margin-bottom:4px}
+  .num b{font-size:28px}
+  #banner{display:none;border-radius:12px;background:#fef2f2;color:#b91c1c;font-weight:800;text-align:center;padding:10px;margin:12px 0}
+  #banner.show{display:block}
+  .plot{margin-top:12px;background:#fff7ed;border:2px solid #fdba74;border-radius:16px;padding:8px 8px 4px}
+  canvas{width:100%;height:340px;display:block}
+  .legend{display:flex;gap:14px;justify-content:center;font-size:12px;font-weight:800;margin:4px 0 8px}
+  .legend i{display:inline-block;width:18px;height:4px;border-radius:4px;margin-right:6px;vertical-align:middle}
+  .lg-na{background:#c2410c}
+  .lg-goal{background:#059669}
+  .lg-lim{background:#dc2626}
+  .hours{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:8px;font-size:12px;text-align:center}
+  .hours b{display:block;font-size:16px;color:#c2410c}
+  .quiet{font-size:12px;color:var(--muted);margin:8px 0 0}
+  a{color:#9a3412}
+  details{margin-top:8px}
+  summary{cursor:pointer;font-weight:800;font-size:13px;color:#9a3412}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>High sodium</h1>
+    <p>Free water, IV fluid, or both. The line is 24 hours.</p>
+  </div>
+  <div id="limitBadge">24 h limit 10</div>
+</header>
+<main>
+  <section>
+    <h2>Patient</h2>
+    <div class="row">
+      <div><label>Weight kg</label><input id="wt" type="number" value="70" min="30" max="250"></div>
+      <div><label>Body water</label>
+        <select id="who">
+          <option value="0.6">Male 0.6</option>
+          <option value="0.5">Female or elderly male 0.5</option>
+          <option value="0.45">Elderly female 0.45</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div><label>Sodium now</label><input id="na" type="number" value="160" step="0.1"></div>
+      <div><label>24 h goal</label><input id="target" type="number" value="152" step="0.1"></div>
+    </div>
+    <p class="quiet" id="goalNote"></p>
+    <div class="chips" id="modes">
+      <button type="button" data-mode="water">Free water</button>
+      <button type="button" data-mode="iv">IV fluid</button>
+      <button type="button" data-mode="both" class="on">Both</button>
+      <button type="button" id="acute">Acute</button>
+    </div>
+    <div class="panel water" id="waterBox">
+      <label>Free water or D5W <b id="fwLabel">50</b> mL/h</label>
+      <input id="fw" type="range" min="0" max="300" step="5" value="50">
+      <input id="fwN" type="number" value="50" min="0" max="500" step="5">
+    </div>
+    <div class="panel iv" id="ivBox">
+      <label>IV fluid</label>
+      <select id="ivNa">
+        <option value="77" selected>0.45% saline · 77</option>
+        <option value="38.5">0.225% saline · 38.5</option>
+        <option value="130">Ringer's lactate · 130</option>
+        <option value="154">0.9% saline · 154</option>
+      </select>
+      <label>IV rate <b id="ivLabel">40</b> mL/h</label>
+      <input id="iv" type="range" min="0" max="300" step="5" value="40">
+      <input id="ivN" type="number" value="40" min="0" max="500" step="5">
+    </div>
+    <div class="chips">
+      <button type="button" id="pWater">Water 100</button>
+      <button type="button" id="pHalf">0.45% 100</button>
+      <button type="button" id="pBoth">Both 50 + 50</button>
+      <button type="button" id="pNs">0.9% 80</button>
+    </div>
+    <details>
+      <summary>Urine</summary>
+      <div class="row">
+        <div><label>Urine Na</label><input id="uNa" type="number" placeholder="mmol/L"></div>
+        <div><label>Urine K</label><input id="uK" type="number" placeholder="mmol/L"></div>
+      </div>
+      <label>Urine mL/h</label>
+      <input id="uVol" type="number" placeholder="mL per hour, not per day">
+    </details>
+  </section>
+  <section>
+    <div class="nums">
+      <div class="num"><span>Body water</span><b id="tbw">—</b></div>
+      <div class="num" id="endBox"><span>At 24 h</span><b id="end">—</b></div>
+      <div class="num" id="deltaBox"><span>Change</span><b id="delta">—</b></div>
+    </div>
+    <div id="banner"></div>
+    <button class="safe" id="safe" type="button" hidden>Slow both rates</button>
+    <div class="plot">
+      <canvas id="chart" width="720" height="340"></canvas>
+      <div class="legend"><span><i class="lg-na"></i>Sodium</span><span id="goalKey"><i class="lg-goal"></i>Your goal</span><span><i class="lg-lim"></i>Limit</span></div>
+    </div>
+    <div class="hours" id="hours"></div>
+    <p class="quiet" id="note"></p>
+    <p class="quiet"><a href="index.html">All simulators</a></p>
+  </section>
+</main>
+<script>
+function track(o){
+  let tbw=o.weight*o.factor;
+  const start=tbw;
+  const path=[o.na];
+  let cur=o.na;
+  const fw=o.fw/1000, iv=o.iv/1000;
+  const use=o.uNa!=null;
+  const uvol=use?o.uVol/1000:0;
+  let bad=false;
+  for(let h=1;h<=24;h++){
+    const denom=tbw+fw+iv-uvol;
+    if(denom<5){ bad=true; break; }
+    const removed=use?(o.uNa+o.uK)*uvol:0;
+    cur=(cur*tbw + o.ivNa*iv - removed)/denom;
+    tbw=denom;
+    path.push(cur);
+  }
+  while(path.length<25) path.push(path[path.length-1]);
+  return {tbw:start, path, final:path[24], delta:path[24]-o.na, bad};
+}
+function num(id){ const v=document.getElementById(id).value; return v===''?null:parseFloat(v); }
+function mode(){ return document.querySelector('#modes button.on[data-mode]').dataset.mode; }
+function state(){
+  const urine=[num('uNa'),num('uK'),num('uVol')];
+  const filled=urine.filter(v=>v!=null && !Number.isNaN(v)).length;
+  const m=mode();
+  return {
+    weight:num('wt')||0, factor:parseFloat(document.getElementById('who').value),
+    na:num('na'), target:num('target'),
+    fw:m==='iv'?0:(num('fwN')||0),
+    iv:m==='water'?0:(num('ivN')||0),
+    ivNa:parseFloat(document.getElementById('ivNa').value),
+    urine:filled===3?{uNa:urine[0],uK:urine[1],uVol:urine[2]}:null,
+    urinePartial:filled>0 && filled<3,
+    acute:document.getElementById('acute').classList.contains('on'),
+    mode:m
+  };
+}
+function draw(path, target, limit, start){
+  const c=document.getElementById('chart');
+  const dpr=Math.min(2, devicePixelRatio||1);
+  const cssW=c.clientWidth||640, cssH=c.clientHeight||340;
+  c.width=cssW*dpr; c.height=cssH*dpr;
+  const ctx=c.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,cssW,cssH);
+  const goal=Number(target);
+  const floor=start-limit;
+  const vals=path.concat([goal, floor, start]);
+  let min=Math.min.apply(null,vals)-3, max=Math.max.apply(null,vals)+3;
+  if(!(max>min)){ min=start-8; max=start+8; }
+  const L=46, T=22, B=26, plotR=cssW-92;
+  const X=i=>L+(plotR-L)*i/24;
+  const Y=v=>T+(cssH-T-B)*(1-(v-min)/(max-min));
+  ctx.font='12px sans-serif'; ctx.fillStyle='#64748b'; ctx.strokeStyle='#ffedd5'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const v=max-(max-min)*i/4, y=T+(cssH-T-B)*i/4;
+    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(plotR,y); ctx.stroke();
+    ctx.fillText(v.toFixed(0), 4, y+4);
+  }
+  ctx.beginPath();
+  path.forEach((v,i)=>{ const x=X(i), y=Y(v); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.strokeStyle='#c2410c'; ctx.lineWidth=3.5; ctx.stroke();
+  ctx.fillStyle='#c2410c';
+  ctx.beginPath(); ctx.arc(X(24), Y(path[24]), 5, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#dc2626'; ctx.setLineDash([5,4]); ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(X(0), Y(floor)); ctx.lineTo(plotR, Y(floor)); ctx.stroke();
+  ctx.setLineDash([]); ctx.fillStyle='#dc2626'; ctx.font='11px sans-serif';
+  ctx.fillText('-'+limit, X(0)+4, Y(floor)-4);
+  const y=Y(goal);
+  ctx.strokeStyle='#059669'; ctx.lineWidth=4; ctx.setLineDash([8,5]);
+  ctx.beginPath(); ctx.moveTo(X(0), y); ctx.lineTo(plotR, y); ctx.stroke();
+  ctx.setLineDash([]);
+  const label='Goal '+goal.toFixed(1);
+  ctx.font='bold 13px sans-serif';
+  const tw=ctx.measureText(label).width+14;
+  const bx=Math.min(cssW-tw-6, plotR+6);
+  const by=Math.max(6, Math.min(cssH-30, y-12));
+  ctx.fillStyle='#059669'; ctx.fillRect(bx, by, tw, 24);
+  ctx.fillStyle='#fff'; ctx.fillText(label, bx+7, by+16);
+  ctx.fillStyle='#64748b'; ctx.font='12px sans-serif';
+  ctx.fillText('0 h', X(0), cssH-6);
+  ctx.fillText('24 h', X(24)-28, cssH-6);
+}
+function paint(){
+  const s=state();
+  document.getElementById('fw').value=document.getElementById('fwN').value;
+  document.getElementById('iv').value=document.getElementById('ivN').value;
+  document.getElementById('fwLabel').textContent=document.getElementById('fwN').value;
+  document.getElementById('ivLabel').textContent=document.getElementById('ivN').value;
+  document.getElementById('waterBox').classList.toggle('off', s.mode==='iv');
+  document.getElementById('ivBox').classList.toggle('off', s.mode==='water');
+  const banner=document.getElementById('banner');
+  const lines=[];
+  if(!(s.weight>0) || s.na==null || Number.isNaN(s.na)) return;
+  const limit=s.acute?12:10;
+  document.getElementById('limitBadge').textContent='24 h limit '+limit;
+  const auto=suggested(s.na, s.acute);
+  const custom=s.target!=null && Math.abs(s.target-auto)>0.15;
+  document.getElementById('goalNote').textContent=custom
+    ? 'Your goal is '+s.target+'. The green line is that number.'
+    : (s.acute ? 'Acute. Goal is −10. Do not fall more than 12.' : 'Goal is −8. Do not fall more than 10.');
+  if(s.urinePartial){
+    banner.className='show';
+    banner.textContent='Enter urine sodium, potassium, and mL/h, or leave all three blank.';
+    return;
+  }
+  const t=track({weight:s.weight,factor:s.factor,na:s.na,fw:s.fw,iv:s.iv,ivNa:s.ivNa,uNa:s.urine&&s.urine.uNa,uK:s.urine&&s.urine.uK,uVol:s.urine&&s.urine.uVol});
+  document.getElementById('tbw').textContent=t.tbw.toFixed(1);
+  document.getElementById('end').textContent=t.final.toFixed(1);
+  document.getElementById('delta').textContent=(t.delta>=0?'+':'')+t.delta.toFixed(1);
+  const over=t.delta < -limit;
+  document.getElementById('deltaBox').className='num'+(over||t.delta>0.5?' bad':'');
+  document.getElementById('endBox').className='num'+(over?' bad':'');
+  document.getElementById('safe').hidden=!over;
+  if(t.bad) lines.push('That urine volume is a daily total. Enter mL per hour.');
+  if(t.delta>0.5) lines.push('The sodium rises on this plan. Use more water, or a fluid below the serum sodium.');
+  if(over) lines.push('The fall is more than '+limit+' in 24 hours. Slow the rate.');
+  else if(s.target!=null && s.na-s.target>limit) lines.push('That goal is more than one day.');
+  const deficit=t.tbw*(s.na/140-1);
+  banner.className=lines.length?'show':'';
+  banner.textContent=lines.join(' ');
+  draw(t.path, s.target==null?s.na:s.target, limit, s.na);
+  const shown=s.target==null?s.na:s.target;
+  document.getElementById('goalKey').innerHTML='<i class="lg-goal"></i>Goal '+Number(shown).toFixed(1);
+  document.getElementById('hours').innerHTML=[0,6,12,18,24].map(h=>'<div>'+h+' h<b>'+t.path[h].toFixed(1)+'</b></div>').join('');
+  const parts=[];
+  if(s.mode!=='iv') parts.push('water '+s.fw);
+  if(s.mode!=='water') parts.push('IV '+s.iv);
+  if(deficit>0.2) parts.push('deficit to 140 is '+deficit.toFixed(1)+' L');
+  document.getElementById('note').textContent=parts.join(' · ');
+}
+function suggested(na, acute){
+  if(!(na>145)) return Math.round(na*10)/10;
+  const drop=acute?10:8;
+  return Math.max(140, Math.round((na-drop)*10)/10);
+}
+function setTarget(){
+  const na=parseFloat(document.getElementById('na').value);
+  if(!(na>0)) return;
+  document.getElementById('target').value=String(suggested(na, document.getElementById('acute').classList.contains('on')));
+}
+function setMode(m){
+  document.querySelectorAll('#modes button[data-mode]').forEach(b=>b.classList.toggle('on', b.dataset.mode===m));
+  paint();
+}
+function preset(m, fw, iv, ivNa){
+  setMode(m);
+  document.getElementById('fwN').value=fw;
+  document.getElementById('ivN').value=iv;
+  if(ivNa!=null) document.getElementById('ivNa').value=String(ivNa);
+  paint();
+}
+document.getElementById('fw').addEventListener('input', e=>{ document.getElementById('fwN').value=e.target.value; paint(); });
+document.getElementById('fwN').addEventListener('input', paint);
+document.getElementById('iv').addEventListener('input', e=>{ document.getElementById('ivN').value=e.target.value; paint(); });
+document.getElementById('ivN').addEventListener('input', paint);
+['wt','who','ivNa','uNa','uK','uVol'].forEach(id=>document.getElementById(id).addEventListener('input', paint));
+document.getElementById('target').addEventListener('input', paint);
+document.getElementById('target').addEventListener('change', paint);
+document.getElementById('na').addEventListener('input', ()=>{ setTarget(); paint(); });
+document.querySelectorAll('#modes button[data-mode]').forEach(b=>b.addEventListener('click', ()=>setMode(b.dataset.mode)));
+document.getElementById('acute').onclick=function(){ this.classList.toggle('on'); setTarget(); paint(); };
+document.getElementById('pWater').onclick=()=>preset('water',100,0,null);
+document.getElementById('pHalf').onclick=()=>preset('iv',0,100,77);
+document.getElementById('pBoth').onclick=()=>preset('both',50,50,77);
+document.getElementById('pNs').onclick=()=>preset('iv',0,80,154);
+document.getElementById('safe').onclick=function(){
+  const s=state();
+  const limit=s.acute?12:10;
+  let lo=0, hi=1;
+  for(let i=0;i<18;i++){
+    const mid=(lo+hi)/2;
+    const d=track({weight:s.weight,factor:s.factor,na:s.na,fw:s.fw*mid,iv:s.iv*mid,ivNa:s.ivNa,uNa:s.urine&&s.urine.uNa,uK:s.urine&&s.urine.uK,uVol:s.urine&&s.urine.uVol}).delta;
+    if(d < -limit) hi=mid; else lo=mid;
+  }
+  document.getElementById('fwN').value=Math.max(0, Math.round(s.fw*lo/5)*5);
+  document.getElementById('ivN').value=Math.max(0, Math.round(s.iv*lo/5)*5);
+  paint();
+};
+const q=new URLSearchParams(location.search);
+if(q.get('na')) document.getElementById('na').value=q.get('na');
+setTarget();
+paint();
+window.addEventListener('resize', paint);
+</script>
+</body>
+</html>
