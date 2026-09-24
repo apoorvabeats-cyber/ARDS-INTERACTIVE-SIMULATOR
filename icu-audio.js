@@ -1,0 +1,226 @@
+/* Shared monitor audio for the critical-care hub. Synthesized in the browser. */
+(function () {
+  "use strict";
+  const file = () => decodeURIComponent((location.pathname.split("/").pop() || "").split("?")[0]);
+  let ctx = null, enabled = false, noise = null, raf = 0;
+  let pulseAt = 0, breathAt = 0, alarmAt = 0, saidAt = 0;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.textContent = "Sound";
+  btn.setAttribute("aria-pressed", "false");
+  btn.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:80;border:0;border-radius:999px;padding:10px 14px;font:700 14px -apple-system,Segoe UI,sans-serif;background:#071b3a;color:#fff;box-shadow:0 6px 18px #0004";
+
+  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+  function ensure() {
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return null;
+    ctx = ctx || new C();
+    if (ctx.state === "suspended") ctx.resume();
+    if (!noise) {
+      noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const d = noise.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return ctx;
+  }
+  function tone(freq, dur, gain, type, when) {
+    const c = ensure(); if (!c || !enabled) return;
+    const t = when || c.currentTime;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  function puff(freq, dur, gain, when) {
+    const c = ensure(); if (!c || !enabled || !noise) return;
+    const t = when || c.currentTime;
+    const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    src.buffer = noise; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 0.7;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(gain, t + dur * 0.35);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(c.destination);
+    src.start(t); src.stop(t + dur);
+  }
+  function playPulse(kind) {
+    if (kind === "absent") return;
+    if (kind === "weak") tone(520, 0.045, 0.03, "sine");
+    else if (kind === "bounding") { tone(980, 0.07, 0.09, "sine"); tone(1460, 0.04, 0.03, "sine"); }
+    else tone(880, 0.06, 0.055, "sine");
+  }
+  function playBreath(kind) {
+    const c = ensure(); if (!c) return;
+    const t = c.currentTime;
+    if (kind === "vent") {
+      tone(1400, 0.02, 0.04, "square", t);
+      puff(480, 0.42, 0.03, t + 0.02);
+      puff(260, 0.55, 0.015, t + 0.55);
+    } else {
+      puff(620, 0.7, 0.022, t);
+    }
+  }
+  function playAlarm() {
+    tone(520, 0.18, 0.04, "square");
+    setTimeout(() => { if (enabled) tone(680, 0.18, 0.04, "square"); }, 220);
+  }
+  function sayCorrect() {
+    if (!enabled || !window.speechSynthesis) return;
+    const now = performance.now();
+    if (now - saidAt < 1200) return;
+    saidAt = now;
+    try {
+      const u = new SpeechSynthesisUtterance("Correct");
+      u.lang = "en-IN";
+      u.rate = 0.95;
+      const voices = speechSynthesis.getVoices();
+      const v = voices.find((x) => /en-IN/i.test(x.lang)) || voices.find((x) => /^en/i.test(x.lang));
+      if (v) u.voice = v;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+  function byId(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const n = parseFloat(el.value != null && el.value !== "" ? el.value : el.textContent);
+    return Number.isFinite(n) ? n : null;
+  }
+  function labels() {
+    const out = {};
+    document.querySelectorAll(".lbl").forEach((el) => {
+      const box = el.parentElement;
+      if (!box) return;
+      const val = box.querySelector(".val");
+      const unit = box.querySelector(".unit");
+      if (!val) return;
+      out[el.textContent.replace(/\s+/g, " ").trim().toUpperCase()] = {
+        num: parseFloat(String(val.textContent).replace(/[^\d.-]/g, "")),
+        unit: unit ? unit.textContent : "",
+        danger: val.classList.contains("danger") || val.classList.contains("hi"),
+      };
+    });
+    return out;
+  }
+  function fromText(id, key) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const m = new RegExp(key + "\\s+(\\d+)").exec(el.textContent);
+    return m ? parseFloat(m[1]) : null;
+  }
+  function read() {
+    const name = file();
+    if (/Cardiac_Rhythm_Decision_Simulator_V29/.test(name)) return null;
+    if (/ACLS_Interactive_Simulator/.test(name) || name === "acls.html") {
+      const pills = [...document.querySelectorAll(".pill")].map((p) => p.textContent);
+      const pulseLine = pills.find((t) => /pulse/i.test(t)) || "";
+      const rhythm = (document.getElementById("rlabel") || {}).textContent || "";
+      if (!pulseLine) return { pulse: null, breath: null, alarm: false };
+      const none = /none/i.test(pulseLine);
+      let bpm = 76, kind = "normal";
+      if (none || /asystole|VF|PEA|polymorphic/i.test(rhythm)) kind = "absent";
+      else if (/VT/i.test(rhythm)) { bpm = 170; kind = "bounding"; }
+      else if (/SVT/i.test(rhythm)) { bpm = 180; kind = "bounding"; }
+      else if (/brady/i.test(rhythm)) { bpm = 38; kind = "weak"; }
+      const arrest = kind === "absent";
+      return { pulse: { bpm: bpm, kind: kind }, breath: arrest ? { bpm: 10, kind: "vent" } : null, alarm: arrest };
+    }
+    if (/Ventilator_Waveform|vent-waves\.html/.test(name)) {
+      if (!document.getElementById("scalars")) return { pulse: null, breath: null, alarm: false };
+      const rr = byId("s-rr") || 14;
+      return { pulse: null, breath: { bpm: rr, kind: "vent" }, alarm: !!document.querySelector("#nums b.hi") };
+    }
+    if (/COPD_Asthma_V11|ARDS_Active_Simulator\.html/.test(name)) {
+      const alarm = !!document.querySelector(".deranged");
+      return { pulse: null, breath: null, alarm: /ARDS_Active/.test(name) ? false : alarm };
+    }
+    const L = labels();
+    let hr = (L.HR && L.HR.num) || byId("hr") || fromText("vitals", "HR");
+    let rr = (L.RR && L.RR.num) || byId("rr") || byId("s-rr") || fromText("vitals", "RR");
+    let spo2 = (L.SPO2 && L.SPO2.num) || byId("spo2");
+    let map = byId("map");
+    let pp = null;
+    if (L.ART && L.ART.unit) {
+      const m = /MAP\s+(\d+)/.exec(L.ART.unit); if (m) map = +m[1];
+      const p = /PP\s+(\d+)/.exec(L.ART.unit); if (p) pp = +p[1];
+    }
+    const ventBox = document.getElementById("ventbox");
+    const ventOpen = (ventBox && !ventBox.classList.contains("hidden")) ||
+      (document.getElementById("ventilatorManagement") && !document.getElementById("ventilatorManagement").classList.contains("hidden")) ||
+      !!document.getElementById("scalars");
+    let kind = "normal";
+    if (hr && hr < 50) kind = "weak";
+    else if (map && map < 65) kind = "weak";
+    else if (pp && pp >= 60) kind = "bounding";
+    else if (hr && hr >= 120) kind = "bounding";
+    const danger = !!(L.HR && L.HR.danger) || !!(L.SPO2 && L.SPO2.danger) || !!(L.ART && L.ART.danger) ||
+      !!document.querySelector(".deranged, #nums b.hi, #labs .hi");
+    const alarm = danger || (spo2 != null && spo2 < 90) || (hr != null && (hr < 45 || hr > 145)) || (map != null && map < 65);
+    return {
+      pulse: hr ? { bpm: hr, kind: kind } : null,
+      breath: rr ? { bpm: rr, kind: ventOpen ? "vent" : "spont" } : null,
+      alarm: alarm,
+    };
+  }
+  function loop(now) {
+    if (!enabled) return;
+    const s = read();
+    if (s && s.pulse && s.pulse.kind !== "absent" && s.pulse.bpm > 20) {
+      let wait = 60000 / clamp(s.pulse.bpm, 30, 200);
+      if (s.pulse.kind === "irregular") wait *= 0.55 + Math.random() * 0.9;
+      if (now >= pulseAt) { playPulse(s.pulse.kind); pulseAt = now + wait; }
+    }
+    if (s && s.breath && s.breath.bpm > 4) {
+      const wait = 60000 / clamp(s.breath.bpm, 6, 48);
+      if (now >= breathAt) { playBreath(s.breath.kind); breathAt = now + wait; }
+    }
+    if (s && s.alarm && now >= alarmAt) { playAlarm(); alarmAt = now + 2600; }
+    raf = requestAnimationFrame(loop);
+  }
+  function enable() {
+    enabled = true;
+    btn.textContent = "Mute";
+    btn.setAttribute("aria-pressed", "true");
+    sessionStorage.setItem("icu-sound", "1");
+    ensure();
+    try {
+      const u = new SpeechSynthesisUtterance("Sound on");
+      u.volume = 0.01; u.rate = 1.4;
+      speechSynthesis.cancel(); speechSynthesis.speak(u);
+    } catch (e) {}
+    pulseAt = breathAt = alarmAt = 0;
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(loop);
+  }
+  function disable() {
+    enabled = false;
+    btn.textContent = "Sound";
+    btn.setAttribute("aria-pressed", "false");
+    sessionStorage.removeItem("icu-sound");
+    cancelAnimationFrame(raf);
+    try { speechSynthesis.cancel(); } catch (e) {}
+  }
+  btn.addEventListener("click", () => { enabled ? disable() : enable(); });
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b || b === btn) return;
+    setTimeout(() => {
+      if (!enabled) return;
+      if (/Cardiac_Rhythm_Decision/.test(file())) return;
+      if (b.isConnected && /\b(good|on)\b/.test(b.className) && !/\bbad\b/.test(b.className)) { sayCorrect(); return; }
+      const box = document.getElementById("why") || document.getElementById("fb") || document.getElementById("log");
+      const t = box ? box.textContent.trim() : "";
+      if (/^(Right[.\s]|Correct\b|That diagnosis fits)/.test(t)) sayCorrect();
+    }, 60);
+  }, false);
+  document.addEventListener("DOMContentLoaded", () => {});
+  document.body.appendChild(btn);
+  if (sessionStorage.getItem("icu-sound") === "1") {
+    const arm = () => { if (!enabled) enable(); };
+    document.addEventListener("pointerdown", arm, { once: true });
+  }
+  window.ICUAudio = { enable: enable, disable: disable, sayCorrect: sayCorrect };
+})();
