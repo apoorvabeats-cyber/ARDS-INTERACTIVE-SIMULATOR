@@ -126,7 +126,7 @@
     <button class="safe" id="safe" type="button" hidden>Slow to a safe rate</button>
     <div class="plot">
       <canvas id="chart" width="720" height="340"></canvas>
-      <div class="legend"><span><i class="lg-na"></i>Sodium</span><span><i class="lg-goal"></i>Your goal</span><span><i class="lg-lim"></i>Limit</span></div>
+      <div class="legend"><span><i class="lg-na"></i>Sodium</span><span id="goalKey"><i class="lg-goal"></i>Your goal</span><span><i class="lg-lim"></i>Limit</span></div>
     </div>
     <div class="hours" id="hours"></div>
     <p class="quiet" id="note"></p>
@@ -176,37 +176,51 @@ function draw(path, target, limit, start){
   const ctx=c.getContext('2d');
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,cssW,cssH);
-  const vals=path.concat([target, start+limit, start-limit]);
-  let min=Math.min.apply(null,vals)-2, max=Math.max.apply(null,vals)+2;
-  if(max-min<4) max=min+4;
-  const L=46,R=12,T=18,B=26;
-  const X=i=>L+(cssW-L-R)*i/24;
+  const goal=Number(target);
+  const vals=path.concat([goal, start+limit, start-limit]);
+  let min=Math.min.apply(null,vals)-3, max=Math.max.apply(null,vals)+3;
+  if(!(max>min)) { min=start-8; max=start+8; }
+  const L=46,R=8,T=22,B=26;
+  const plotR=cssW-92;
+  const X=i=>L+(plotR-L)*i/24;
   const Y=v=>T+(cssH-T-B)*(1-(v-min)/(max-min));
   ctx.font='12px sans-serif'; ctx.fillStyle='#64748b'; ctx.strokeStyle='#dbeafe'; ctx.lineWidth=1;
   for(let i=0;i<=4;i++){
     const v=max-(max-min)*i/4;
     const y=T+(cssH-T-B)*i/4;
-    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(cssW-R,y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(plotR,y); ctx.stroke();
     ctx.fillText(v.toFixed(0), 4, y+4);
   }
-  function rule(v,color,dash,label){
-    ctx.strokeStyle=color; ctx.setLineDash(dash); ctx.lineWidth=2; ctx.beginPath();
-    ctx.moveTo(X(0),Y(v)); ctx.lineTo(X(24),Y(v)); ctx.stroke();
-    ctx.setLineDash([]); ctx.fillStyle=color; ctx.font='bold 12px sans-serif';
-    ctx.fillText(label, X(1), Y(v)-5);
-  }
-  rule(target,'#059669',[6,4],'Goal '+Number(target).toFixed(1));
-  rule(start+limit,'#dc2626',[5,4],'+'+limit);
-  rule(start-limit,'#f97316',[5,4],'-'+limit);
   ctx.beginPath();
   path.forEach((v,i)=>{ const x=X(i), y=Y(v); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
   ctx.lineTo(X(24), cssH-B); ctx.lineTo(X(0), cssH-B); ctx.closePath();
-  ctx.fillStyle='rgba(37,99,235,0.15)'; ctx.fill();
+  ctx.fillStyle='rgba(37,99,235,0.12)'; ctx.fill();
   ctx.beginPath(); ctx.strokeStyle='#2563eb'; ctx.lineWidth=3.5; ctx.setLineDash([]);
   path.forEach((v,i)=>{ const x=X(i), y=Y(v); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
   ctx.stroke();
   ctx.fillStyle='#2563eb';
   ctx.beginPath(); ctx.arc(X(24), Y(path[24]), 5, 0, Math.PI*2); ctx.fill();
+  function limitLine(v, color, label){
+    ctx.strokeStyle=color; ctx.setLineDash([5,4]); ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(X(0), Y(v)); ctx.lineTo(plotR, Y(v)); ctx.stroke();
+    ctx.setLineDash([]); ctx.fillStyle=color; ctx.font='11px sans-serif';
+    ctx.fillText(label, X(0)+4, Y(v)-4);
+  }
+  limitLine(start+limit, '#dc2626', '+'+limit);
+  limitLine(start-limit, '#f97316', '-'+limit);
+  const y=Y(goal);
+  ctx.strokeStyle='#059669'; ctx.lineWidth=4; ctx.setLineDash([8,5]);
+  ctx.beginPath(); ctx.moveTo(X(0), y); ctx.lineTo(plotR, y); ctx.stroke();
+  ctx.setLineDash([]);
+  const label='Goal '+goal.toFixed(1);
+  ctx.font='bold 13px sans-serif';
+  const tw=ctx.measureText(label).width+14;
+  const bx=Math.min(cssW-tw-6, plotR+6);
+  const by=Math.max(6, Math.min(cssH-30, y-12));
+  ctx.fillStyle='#059669';
+  ctx.fillRect(bx, by, tw, 24);
+  ctx.fillStyle='#fff';
+  ctx.fillText(label, bx+7, by+16);
   ctx.fillStyle='#64748b'; ctx.font='12px sans-serif';
   ctx.fillText('0 h', X(0), cssH-6);
   ctx.fillText('24 h', X(24)-28, cssH-6);
@@ -253,6 +267,8 @@ function paint(){
   banner.textContent=lines[0]||'';
   if(lines.length>1) banner.textContent=lines.join(' ');
   draw(t.path, s.target==null?s.na:s.target, limit, s.na);
+  const shown=s.target==null?s.na:s.target;
+  document.getElementById('goalKey').innerHTML='<i class="lg-goal"></i>Goal '+Number(shown).toFixed(1);
   document.getElementById('hours').innerHTML=[0,6,12,18,24].map(h=>'<div>'+h+' h<b>'+t.path[h].toFixed(1)+'</b></div>').join('');
   document.getElementById('note').textContent=s.urine?'Urine included.':'';
 }
@@ -265,8 +281,8 @@ function setFluid(v, rate){
 document.getElementById('rate').addEventListener('input', e=>{ document.getElementById('rateN').value=e.target.value; paint(); });
 document.getElementById('rateN').addEventListener('input', e=>{ document.getElementById('rate').value=e.target.value; paint(); });
 ['wt','who','fluid','uNa','uK','uVol'].forEach(id=>document.getElementById(id).addEventListener('input', paint));
-document.getElementById('target').addEventListener('input', applyGoal);
-document.getElementById('target').addEventListener('change', applyGoal);
+document.getElementById('target').addEventListener('input', paint);
+document.getElementById('target').addEventListener('change', paint);
 document.getElementById('na').addEventListener('input', retarget);
 document.getElementById('glu').addEventListener('input', retarget);
 document.querySelectorAll('.chips button[data-fluid]').forEach(b=>b.addEventListener('click', ()=>setFluid(b.dataset.fluid, +b.dataset.rate)));
@@ -276,29 +292,6 @@ function suggestedGoal(na, glu, risk){
   const corr=(glu>100)?na+1.6*(glu-100)/100:na;
   const goal=risk?4:6;
   return (corr>=135)?Math.round(na*10)/10:Math.min(140, Math.round((na+goal)*10)/10);
-}
-function finalAt(s, rate){
-  return track({weight:s.weight,factor:s.factor,na:s.na,fluid:s.fluid,rate:rate,uNa:s.urine&&s.urine.uNa,uK:s.urine&&s.urine.uK,uVol:s.urine&&s.urine.uVol}).final;
-}
-function applyGoal(){
-  const s=state();
-  if(s.target==null || Number.isNaN(s.target) || !(s.weight>0) || s.na==null){ paint(); return; }
-  const a=finalAt(s,0), b=finalAt(s,250);
-  let rate;
-  if((a<=b && s.target<=a) || (a>b && s.target>=a)) rate=0;
-  else if((a<=b && s.target>=b) || (a>b && s.target<=b)) rate=250;
-  else {
-    let lo=0, hi=250;
-    for(let i=0;i<20;i++){
-      const mid=(lo+hi)/2;
-      const v=finalAt(s, mid);
-      if(a<=b ? v<s.target : v>s.target) lo=mid; else hi=mid;
-    }
-    rate=Math.round(lo/5)*5;
-  }
-  document.getElementById('rateN').value=rate;
-  document.getElementById('rate').value=rate;
-  paint();
 }
 function setTarget(){
   const na=parseFloat(document.getElementById('na').value);
