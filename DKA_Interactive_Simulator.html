@@ -13,7 +13,7 @@
   button, select { font: inherit; cursor: pointer; }
   button { border: 1px solid #d7e0ec; background: #fff; color: #14213d; border-radius: 14px; min-height: 48px; padding: 10px 12px; }
   button:active { transform: scale(.99); }
-  button.on { background: #1457a6; color: #fff; border-color: #1457a6; }
+  button.picked { background: #1457a6; color: #fff; border-color: #1457a6; }
   button.bad { border-color: #b42318; color: #b42318; }
   .wrap { max-width: 820px; margin: 0 auto; padding: 16px 16px 48px; }
   .hero { background: linear-gradient(135deg, #071b3a, #1457a6); color: #fff; border-radius: 24px; padding: 26px 20px; }
@@ -219,11 +219,42 @@ function clock(mins) {
   return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
 }
 function say(t) { if (P) P.note = t; }
+function indicated(id, p) {
+  const s = snap(p);
+  if (id === "bolus" || id === "ns500") return p.deficit > 2;
+  if (id === "ns250") return p.deficit > 0 && p.deficit <= 4;
+  if (id === "half") return p.mode !== "hhs" && s.cna >= 145 && p.deficit < 5 && !!p.rate;
+  if (id === "dex") {
+    if (p.dextrose) return false;
+    if (p.id === "eu") return true;
+    if (p.mode === "hhs") return p.glucose <= 320;
+    return p.glucose <= 220;
+  }
+  if (id === "ins1") return p.mode === "dka" && p.k >= 3.3;
+  if (id === "ins05") {
+    if (p.k < 3.3) return false;
+    if (p.mode === "hhs") return !!p.rate || p.deficit < 8;
+    return p.glucose < 250 || p.fastDrop;
+  }
+  if (id === "insoff") return p.insulin > 0 && p.basal && s.ag <= 14 && p.bhb <= 1.5;
+  if (id === "k20") return p.k <= 5.2 && p.kcl !== 20;
+  if (id === "k40") return p.k < 3.3;
+  if (id === "bicarb") return s.ph < 6.9;
+  if (id === "abx") return !!p.needAbx && !p.abx;
+  if (id === "cause") return !p.cause;
+  if (id === "basal") {
+    if (p.basal) return false;
+    const tooEarly = !resolved({ ...p, basal: true, cause: true, abx: true }) && s.ag > 14 && p.mode === "dka";
+    return !tooEarly && (p.mode === "hhs" ? p.glucose < 300 : s.ag <= 14);
+  }
+  return false;
+}
 
 function order(id) {
   const p = P;
   const s = snap(p);
   if (p.dead) return;
+  const ok = indicated(id, p);
   if (id === "bolus") { p.rate = "bolus"; say("1 L of 0.9% saline ordered now."); }
   else if (id === "ns500") { p.rate = "ns500"; say("0.9% saline at 500 mL/hour."); }
   else if (id === "ns250") { p.rate = "ns250"; say("0.9% saline at 250 mL/hour."); }
@@ -269,6 +300,7 @@ function order(id) {
     else { p.basal = true; say("Basal insulin given. Overlap the drip for one to two hours, then stop it."); }
   }
   paint();
+  if (ok && window.ICUAudio) window.ICUAudio.sayCorrect();
 }
 
 function tick() {
@@ -428,7 +460,7 @@ function paint() {
   document.querySelectorAll("#orders button").forEach((btn) => {
     const id = btn.dataset.o;
     const on = (id === "ns500" && p.rate === "ns500") || (id === "ns250" && p.rate === "ns250") || (id === "half" && p.rate === "half") || (id === "dex" && (p.dextrose || p.rate === "d5half")) || (id === "ins1" && p.insulin === 0.1) || (id === "ins05" && p.insulin === 0.05) || (id === "k20" && p.kcl === 20) || (id === "k40" && p.kcl === 40) || (id === "abx" && p.abx) || (id === "cause" && p.cause) || (id === "basal" && p.basal);
-    btn.classList.toggle("on", on);
+    btn.classList.toggle("picked", on);
   });
 }
 function debrief() {
