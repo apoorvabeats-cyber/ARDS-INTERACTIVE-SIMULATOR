@@ -106,6 +106,12 @@
   .calc-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
   table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
   th,td{border-bottom:1px solid #e6eef2;text-align:left;padding:6px 4px}
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .metric{background:#f4f8fb;border-radius:8px;padding:8px;text-align:center}
+  .metric span{display:block;font-size:11px;color:#5c6b7a}
+  .metric strong{font-size:22px}
+  .check{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:8px 0}
+  canvas{width:100%;height:auto;background:#fff}
   .calc-field{flex:1;min-width:120px}
   .calc-field label{display:block;font-size:11.5px;color:#5a6d75;margin-bottom:3px}
   .calc-field input,.calc-field select{
@@ -674,6 +680,126 @@ function runSodiumCalc(){
   out.innerHTML=html;
 }
 
+function hypoTrack(o){
+  let tbw=o.weight*o.factor;
+  const start=tbw;
+  const path=[o.na];
+  let cur=o.na;
+  const vol=o.rateMl/1000;
+  for(let h=1;h<=24;h++){
+    cur=(cur*tbw + o.fluidNa*vol)/(tbw+vol);
+    tbw+=vol;
+    path.push(cur);
+  }
+  return {tbw:start, path, final:path[24], delta:path[24]-o.na};
+}
+
+function hypoCalcHTML(na){
+  const target=Math.min(135, Math.round((na+6)*10)/10);
+  return `
+  <div class="card">
+    <h3>24-hour sodium</h3>
+    <p>Each hour the sodium is recalculated from the fluid just given. Urine is not in the sum. If the kidneys start to pass dilute urine, the sodium will rise faster than this line.</p>
+    <div class="calc-row">
+      <div class="calc-field"><label>Weight (kg)</label><input type="number" id="hyWt" value="70"></div>
+      <div class="calc-field"><label>Body water</label>
+        <select id="hyFactor">
+          <option value="0.6">Adult male, 60%</option>
+          <option value="0.5">Adult female or elderly male, 50%</option>
+          <option value="0.45">Elderly female, 45%</option>
+        </select>
+      </div>
+    </div>
+    <div class="calc-row">
+      <div class="calc-field"><label>Fluid</label>
+        <select id="hyFluid">
+          <option value="513" selected>3% saline (513)</option>
+          <option value="154">0.9% saline (154)</option>
+          <option value="130">Lactated Ringer's (130)</option>
+          <option value="77">0.45% saline (77)</option>
+          <option value="0">5% dextrose or water (0)</option>
+        </select>
+      </div>
+      <div class="calc-field"><label>24-hour target</label><input type="number" id="hyTarget" value="${target}"></div>
+    </div>
+    <div class="calc-field"><label>Rate <b id="hyRateLabel">30</b> mL/h</label>
+      <input type="range" id="hyRate" min="0" max="250" step="5" value="30">
+    </div>
+    <label class="check"><input type="checkbox" id="hyRisk"> High risk of demyelination: alcohol, malnutrition, liver disease, low potassium, or sodium under 105</label>
+    <label class="check"><input type="checkbox" id="hyFit"> Seizure, coma, or severe distress</label>
+    <div class="metrics" style="margin-top:10px">
+      <div class="metric"><span>Body water</span><strong id="hyTbw">—</strong></div>
+      <div class="metric"><span>Sodium at 24 h</span><strong id="hyEnd">—</strong></div>
+      <div class="metric"><span>Change</span><strong id="hyDelta">—</strong></div>
+    </div>
+    <div id="hyAlert"></div>
+    <canvas id="hyChart" width="640" height="220"></canvas>
+  </div>`;
+}
+
+function drawHypo(path, target, limit, start){
+  const c=document.getElementById('hyChart');
+  if(!c) return;
+  const ctx=c.getContext('2d');
+  const w=c.width, h=c.height;
+  ctx.clearRect(0,0,w,h);
+  const vals=path.concat([target, start+limit, start-limit]);
+  let min=Math.min.apply(null, vals)-2, max=Math.max.apply(null, vals)+2;
+  if(max-min<4) max=min+4;
+  const L=36, R=10, T=14, B=22;
+  const X=i=>L+(w-L-R)*i/24;
+  const Y=v=>T+(h-T-B)*(1-(v-min)/(max-min));
+  ctx.strokeStyle='#e6eef2'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){ const y=T+(h-T-B)*i/4; ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke(); }
+  function rule(v, color, dash){
+    ctx.strokeStyle=color; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(X(0), Y(v)); ctx.lineTo(X(24), Y(v)); ctx.stroke();
+  }
+  rule(target, '#1f6d8a', [4,3]);
+  rule(start+limit, '#c0392b', [5,4]);
+  rule(start-limit, '#c0392b', [5,4]);
+  ctx.setLineDash([]); ctx.strokeStyle='#122733'; ctx.lineWidth=2;
+  ctx.beginPath();
+  path.forEach((v,i)=>{ const x=X(i), y=Y(v); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke(); ctx.lineWidth=1;
+  ctx.fillStyle='#5c6b7a'; ctx.font='11px sans-serif';
+  ctx.fillText('0 h', X(0), h-6); ctx.fillText('24 h', X(22), h-6);
+  ctx.fillText('target', X(1), Y(target)-4);
+}
+
+function runHypo(){
+  const na=parseFloat(document.getElementById('naEntered').value);
+  const weight=parseFloat(document.getElementById('hyWt').value);
+  const factor=parseFloat(document.getElementById('hyFactor').value);
+  const fluidNa=parseFloat(document.getElementById('hyFluid').value);
+  const rate=parseFloat(document.getElementById('hyRate').value);
+  const target=parseFloat(document.getElementById('hyTarget').value);
+  const risk=document.getElementById('hyRisk').checked || na<105;
+  const fit=document.getElementById('hyFit').checked;
+  document.getElementById('hyRateLabel').textContent=String(rate);
+  if(!(weight>0)||!(na<135)) return;
+  const track=hypoTrack({weight, factor, na, fluidNa, rateMl:rate});
+  const limit=risk?6:8;
+  document.getElementById('hyTbw').textContent=track.tbw.toFixed(1);
+  document.getElementById('hyEnd').textContent=track.final.toFixed(1);
+  document.getElementById('hyDelta').textContent=(track.delta>=0?'+':'')+track.delta.toFixed(1);
+  const bits=[];
+  if(fit) bits.push('<div class="mgmt-step emergency"><div class="step-title">Seizure or coma</div><div class="step-body">Give 100–150 mL of 3% saline over 10–20 minutes. Repeat until the symptoms improve or the sodium has risen 4–6 mmol/L. The line on the graph is the hourly infusion, not that bolus.</div></div>');
+  if(track.delta < -0.5) bits.push('<div class="mgmt-step emergency"><div class="step-title">This fluid lowers the sodium</div><div class="step-body">A low sodium needs a fluid with more sodium than the serum, usually 3% saline. Water and 0.45% saline will take it lower.</div></div>');
+  if(Math.abs(track.delta) > limit) bits.push('<div class="mgmt-step emergency"><div class="step-title">More than '+limit+' mmol/L in 24 hours</div><div class="step-body">Stop hypertonic saline. Give water or 5% dextrose, and consider desmopressin, so the sodium does not keep rising. The limit is 8 mmol/L, or 6 if demyelination risk is high.</div></div>');
+  else bits.push('<div class="mgmt-step"><div class="step-title">Limit</div><div class="step-body">Keep the change inside '+limit+' mmol/L in 24 hours'+(na<105?' because the sodium is under 105.':'')+'. Recheck it every 2–4 hours. This drawing ignores urine, so a water diuresis can overshoot the line.</div></div>');
+  if(target-na > limit) bits.push('<div class="mgmt-step caution"><div class="step-title">That target is not a 24-hour target</div><div class="step-body">The chosen target is '+(target-na).toFixed(1)+' above the current sodium. Do not try to reach it in one day.</div></div>');
+  document.getElementById('hyAlert').innerHTML=bits.join('');
+  drawHypo(track.path, target, limit, na);
+}
+
+function wireHypo(){
+  ['hyWt','hyFactor','hyFluid','hyTarget','hyRate','hyRisk','hyFit'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.addEventListener('input', runHypo);
+  });
+  runHypo();
+}
+
 function showDisorder(key, value, ion){
   const d=DISORDERS[key];
   document.getElementById('menuGrid').style.display='none';
@@ -683,6 +809,7 @@ function showDisorder(key, value, ion){
   let html=`<div class="disorder-head"><h2>${ion.name}</h2><div class="subtitle">${value} ${ion.unit}. This ${ion.name.toLowerCase()} is ${side}.</div></div>`;
   html+=`<input type="hidden" id="naEntered" value="${value}">`;
   if(key==='sodium_high') html+=sodiumCalcHTML(value);
+  if(key==='sodium_low') html+=hypoCalcHTML(value);
   html+=`<div class="card"><h3>Severity</h3>${severityRow(d.severity)}</div>`;
   html+=listCard('Causes', d.causes);
   html+=listCard('Clinical features', d.symptoms);
@@ -690,6 +817,7 @@ function showDisorder(key, value, ion){
   html+=mgmtCard(d.management);
   html+=`<div class="pearl-box"><b>Key pearl:</b> ${d.pearl}</div>`;
   document.getElementById('detailContent').innerHTML=html;
+  if(key==='sodium_low') wireHypo();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
