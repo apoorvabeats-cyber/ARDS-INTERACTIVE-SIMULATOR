@@ -323,6 +323,39 @@ neurointerventional or local protocol decisions.
 <option value="4">4 — thick SAH plus IVH</option>
 </select>
 
+<label>Hunt–Hess: consciousness</label>
+<select id="hhMind">
+<option value="alert">Alert</option>
+<option value="drowsy">Drowsy, lethargic, or confused</option>
+<option value="stupor">Stupor</option>
+<option value="coma">Coma</option>
+</select>
+
+<label>Hunt–Hess: headache and neck stiffness</label>
+<select id="hhHead">
+<option value="mild">None or mild</option>
+<option value="severe">Moderate or severe</option>
+</select>
+
+<label>Hunt–Hess: cranial-nerve palsy</label>
+<select id="hhCn">
+<option value="no">No</option>
+<option value="yes">Yes</option>
+</select>
+
+<label>Hunt–Hess: weakness</label>
+<select id="hhWeak">
+<option value="none">None</option>
+<option value="mild">Mild focal deficit</option>
+<option value="severe">Moderate or severe hemiparesis, or decerebrate</option>
+</select>
+
+<label>Serious systemic disease</label>
+<select id="hhSick">
+<option value="no">No</option>
+<option value="yes">Yes — hypertension, diabetes, severe atherosclerosis, or severe lung disease</option>
+</select>
+
 <button class="primary" onclick="runGrading()">CALCULATE CLINICAL GRADE</button>
 
 <div id="gradingResult"></div>
@@ -339,6 +372,19 @@ neurointerventional or local protocol decisions.
 <div>V<b>GCS 3–6, deficit or not</b></div>
 </div>
 <p class="small">A motor deficit means hemiparesis, hemiplegia, or aphasia. An isolated cranial-nerve palsy, such as a third-nerve palsy, does not raise the grade. GCS uses the best limb, so a patient can be GCS 15 and still have weakness on the other side. That combination is not in the original table. Do not force it into grade I.</p>
+</div>
+
+<div class="card">
+<h2>Hunt–Hess scale</h2>
+<p class="small">This is a clinical description. It does not use the GCS. Report the worst feature.</p>
+<div class="metric">
+<div>I<b>Alert. Mild headache or none. No deficit.</b></div>
+<div>II<b>Severe headache or a cranial-nerve palsy. Alert.</b></div>
+<div>III<b>Drowsy or confused, or a mild focal deficit.</b></div>
+<div>IV<b>Stupor, or moderate to severe hemiparesis.</b></div>
+<div>V<b>Coma, decerebrate, or moribund.</b></div>
+</div>
+<p class="small">The 1968 description moves the patient one grade worse for serious systemic disease. Say the clinical grade first, then the adjustment. A third-nerve palsy makes this grade II, not WFNS III.</p>
 </div>
 
 </section>
@@ -688,8 +734,23 @@ function runGrading(){
   else if(fisher==="1"||fisher==="2") fish="<br>Modified Fisher "+fisher+": thin SAH. DCI is less likely than with thick blood, and it is not zero.";
   else if(fisher==="0") fish="<br>Modified Fisher 0: no SAH on this description.";
   else fish="<br>Modified Fisher was not entered, so the CT blood burden is not in the grade.";
+  const mind=document.getElementById("hhMind").value;
+  const head=document.getElementById("hhHead").value;
+  const cn=document.getElementById("hhCn").value;
+  const weak=document.getElementById("hhWeak").value;
+  let hh=1;
+  if(mind==="coma") hh=5;
+  else if(mind==="stupor" || weak==="severe") hh=4;
+  else if(mind==="drowsy" || weak==="mild") hh=3;
+  else if(cn==="yes" || head==="severe") hh=2;
+  const names=["","I","II","III","IV","V"];
+  let hhText="Hunt–Hess "+names[hh]+".";
+  if(document.getElementById("hhSick").value==="yes"){
+    const adj=Math.min(5, hh+1);
+    hhText+=" Serious systemic disease: the 1968 scale moves this to Hunt–Hess "+names[adj]+". Say both.";
+  }
   document.getElementById("gradingResult").innerHTML=
-    box("result","Clinical grade",wfns+fish+"<br><span class='small'>I: GCS 15, no motor deficit. II: GCS 13–14, no motor deficit. III: GCS 13–14 with a motor deficit. IV: GCS 7–12. V: GCS 3–6.</span>");
+    box("result","Clinical grade",wfns+"<br>"+hhText+fish+"<br><span class='small'>WFNS uses GCS. Hunt–Hess uses the description. They do not have to match. A third-nerve palsy is Hunt–Hess II and does not change WFNS.</span>");
 }
 
 function runDiagnosis(){
