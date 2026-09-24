@@ -363,6 +363,10 @@ function stepBuild(){
     return true;
   }
   function afterDrainFails(){
+    if(!nec){
+      ask({key:'again', text:'The drain failed. There is no necrosis to remove.', opts:[['drain','Drain again'],['open','Surgery for the collection'],['necro','Necrosectomy']], right:['drain','open'], end:true});
+      return false;
+    }
     if(!ask({key:'opKind', text:'The drain failed. Next is necrosectomy, not an open abdomen.', opts:[['endo','Through the scope'],['mis','Small incision'],['open','Open surgery now']], right:['endo','mis']})) return false;
     if(!ask({key:'opFail', text:'Did that necrosectomy control the infection?', opts:[['controlled','Yes, controlled'],['failed','No, still infected']], right:null, endOn:'controlled'})) return false;
     ask({key:'open', text:'That necrosectomy failed. Open surgery is now the next step.', opts:[['yes','Open surgery'],['no','No open surgery']], right:'yes', end:true});
@@ -389,9 +393,16 @@ function stepBuild(){
     ask({key:'drainHow', text:'Next: drain now. No necrosectomy yet.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain'],['op','Necrosectomy']], right:['endo','perc'], end:true});
     return pack();
   }
-  if(infected){
+  if(infected && nec){
     if(!ask({key:'abx', text:'Next: antibiotic.', opts:[['yes','Antibiotic'],['no','No antibiotic']], right:'yes'})) return pack();
     if(!ask({key:'drainHow', text:'Next: drain first. Necrosectomy only if this drain fails.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain'],['op','Necrosectomy first'],['open','Open surgery first']], right:['endo','perc']})) return pack();
+    if(!ask({key:'respond', text:'Did the drain control the infection?', opts:[['yes','Yes, drain worked'],['no','No, drain failed']], right:null, endOn:'yes'})) return pack();
+    afterDrainFails();
+    return pack();
+  }
+  if(infected && !nec){
+    if(!ask({key:'abx', text:'Next: antibiotic. There is no necrosis.', opts:[['yes','Antibiotic'],['no','No antibiotic']], right:'yes'})) return pack();
+    if(!ask({key:'drainHow', text:'Next: drain the collection. Not a necrosectomy.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain'],['op','Necrosectomy']], right:['endo','perc']})) return pack();
     if(!ask({key:'respond', text:'Did the drain control the infection?', opts:[['yes','Yes, drain worked'],['no','No, drain failed']], right:null, endOn:'yes'})) return pack();
     afterDrainFails();
     return pack();
@@ -413,6 +424,8 @@ function stepPlan(){
   if(S.stable==='no'){
     var lines=[name+'. Unstable.','Antibiotic now.',drain];
     if(S.respond==='yes') lines.push('The drain controlled it. No necrosectomy.');
+    if(S.nec!=='yes' && S.again==='drain') lines.push('No necrosis. Drain again.');
+    if(S.nec!=='yes' && S.again==='open') lines.push('No necrosis. Surgery for the collection, not necrosectomy.');
     if(S.opKind==='endo') lines.push('Drain failed. Necrosectomy through the scope.');
     if(S.opKind==='mis') lines.push('Drain failed. Necrosectomy through a small incision.');
     if(S.opFail==='controlled') lines.push('Necrosectomy controlled it. No open surgery.');
@@ -428,7 +441,7 @@ function stepPlan(){
     if(S.delay==='now') earlyLines.push(drain,'No necrosectomy yet.');
     return earlyLines;
   }
-  if(isInfected()){
+  if(isInfected() && S.nec==='yes'){
     var late=[name+'. Infected and walled off.','Antibiotic.',drain];
     if(S.respond==='yes') late.push('The drain is working. No necrosectomy.');
     if(S.opKind==='endo') late.push('Drain failed. Necrosectomy through the scope.');
@@ -436,6 +449,13 @@ function stepPlan(){
     if(S.opFail==='controlled') late.push('Necrosectomy controlled it. No open surgery.');
     if(S.open==='yes') late.push('Necrosectomy failed. Open surgery.');
     return late;
+  }
+  if(isInfected()){
+    var fluidInfected=[name+'. Infected fluid, no necrosis.','Antibiotic.',drain];
+    if(S.respond==='yes') fluidInfected.push('The drain worked. No necrosectomy.');
+    if(S.again==='drain') fluidInfected.push('The drain failed. Drain again. No necrosectomy.');
+    if(S.again==='open') fluidInfected.push('The drain failed. Surgery for the collection. No necrosectomy.');
+    return fluidInfected;
   }
   var fluid=[name+'.','No antibiotic.',drain];
   if(S.respond==='yes') fluid.push('The drain worked. No necrosectomy.');
@@ -449,7 +469,8 @@ function stepLive(){
   var st=stepState();
   if(st.wrong){
     var why=st.last.text;
-    if(st.last.key==='drainHow'||st.last.key==='opKind') why='Open surgery is not next. Drain first. If the drain fails, necrosectomy through the scope or a small incision.';
+    if(st.last.key==='again') why='There is no necrosis. Do not do a necrosectomy. Drain again, or operate on the collection.';
+    if(st.last.key==='drainHow'||st.last.key==='opKind') why='Open surgery is not next. Drain first. If the drain fails and there is necrosis, necrosectomy through the scope or a small incision.';
     if(st.last.key==='open') why='The necrosectomy failed. Open surgery is the next step.';
     return out('Not the next step', [why], true);
   }
@@ -664,7 +685,7 @@ document.getElementById('view').onclick=function(e){
     show();
     return;
   }
-  var stepKeys=['stable','abx','delay','drainHow','respond','opKind','opFail','open','vesselAct','worse'];
+  var stepKeys=['stable','abx','delay','drainHow','respond','opKind','opFail','open','again','vesselAct','worse'];
   var si=stepKeys.indexOf(box.dataset.k);
   if(si>=0){ for(var j=si+1;j<stepKeys.length;j++) delete S[stepKeys[j]]; }
   S[box.dataset.k]=b.dataset.v;
