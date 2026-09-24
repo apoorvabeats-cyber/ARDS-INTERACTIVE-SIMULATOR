@@ -478,15 +478,15 @@ if(im){
 
 
 function updateVentMechanics(){
- let peep=+$('ventPEEP').value||0, plat=+$('ventPplat').value||0;
- $('ventDP').value=Math.max(0,plat-peep).toFixed(1);
+ let peep=+$('ventPEEP').value||0, auto=+$('ventAutoPEEP').value||0, plat=+$('ventPplat').value||0;
+ $('ventDP').value=Math.max(0, plat-(peep+auto)).toFixed(1);
 }
 function performInspiratoryHold(){
  updateVentMechanics();
  let ppeak=+$('ventPpeak').value, plat=+$('ventPplat').value;
  $('ventHoldOut').innerHTML='<div class="result good"><b>INSPIRATORY HOLD PERFORMED:</b> Ppeak = '+ppeak+
  ' cmH₂O; static Pplat = '+plat+' cmH₂O; driving pressure = '+$('ventDP').value+
- ' cmH₂O. Pplat is the value used for lung-stress assessment.</div>';
+ ' cmH₂O, which is Pplat minus set PEEP minus auto-PEEP.</div>';
 }
 function performExpiratoryPause(){
  let auto=+$('ventAutoPEEP').value||0;
@@ -1491,7 +1491,25 @@ function assessMixedO2(){
         c=$('mO2cons').value,
         w=$('mO2wob').value;
 
-  const stable=s>=88 && rr<24 && map>=65 && c==='Awake' && w==='Low';
+  const tooHigh=s>92;
+  const inBand=s>=88 && s<=92;
+  const unsafe=map<65 || c!=='Awake' || w==='Exhaustion' || w==='High' || rr>=30 || s<88;
+  const stable=inBand && !unsafe;
+
+  let meaning, action, cls;
+  if(tooHigh && !unsafe){
+    meaning='Saturation is above 92% in a patient who also retains carbon dioxide.';
+    action='Turn the oxygen down into 88–92%. Do not call this a success, and do not start NIV because the saturation is high.';
+    cls='warn';
+  }else if(stable){
+    meaning='Saturation is in the 88–92% band and the patient is awake, with a safe blood pressure and a low work of breathing.';
+    action='Continue controlled oxygen and proceed to the cause.';
+    cls='good';
+  }else{
+    meaning='Controlled oxygen is not holding this mixed failure.';
+    action='If the pH is acidemic or the patient is tiring, use NIV or intubate. Do not fix a low saturation by giving unrestricted oxygen.';
+    cls='warn';
+  }
 
   box('mO2out','MIXED RF — OXYGEN REASSESSMENT',
     'Device <b>'+$('mO2device').value+
@@ -1500,15 +1518,9 @@ function assessMixedO2(){
     '/min</b>; MAP <b>'+map+
     '</b>; consciousness <b>'+c+
     '</b>; WOB <b>'+w+'</b>.'+
-    '<br><br><b>INTERPRETATION:</b> '+
-    (stable
-      ? 'Controlled oxygen appears adequate at this reassessment.'
-      : 'Controlled oxygen is inadequate or the patient remains physiologically unstable.')+
-    '<br><br><b>WHAT TO DO:</b> '+
-    (stable
-      ? 'Continue controlled oxygen and proceed to etiology.'
-      : 'Escalate respiratory support and reassess.'),
-    stable?'good':'warn');
+    '<br><br><b>INTERPRETATION:</b> '+meaning+
+    '<br><br><b>WHAT TO DO:</b> '+action,
+    cls);
 
   const old=$('mixedOxygenEtiologyButton');
   if(old) old.remove();
