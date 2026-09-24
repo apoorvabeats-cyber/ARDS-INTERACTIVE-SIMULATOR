@@ -26,6 +26,14 @@
   .sev b.warn{background:#b45309;color:#fff}
   .sev b.bad{background:#be123c;color:#fff}
   #now{border-radius:14px;padding:14px;background:#ecfdf5;font-weight:800;line-height:1.4}
+  .vit{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+  .vit div{border-radius:12px;text-align:center;padding:8px;color:#fff;background:#0f766e}
+  .vit b{display:block;font-size:26px}
+  .vit span{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+  #ods{display:none;margin-top:8px;background:#7f1d1d;color:#fff;border-radius:12px;padding:10px;font-weight:800}
+  #ods.show{display:block}
+  canvas.chart{width:100%;height:220px;display:block;background:#f0fdfa;border-radius:12px}
+  input[type=range]{width:100%;accent-color:#0f766e}
   #now small{display:block;font-weight:700;color:#115e59;margin-bottom:4px}
   #steps{margin:10px 0 0;padding:0;list-style:none}
   #steps li{background:#fff;border-radius:10px;padding:8px 10px;margin-top:6px}
@@ -117,8 +125,21 @@
   <section>
     <div class="sev" id="sev"><b>Mild</b><b>Moderate</b><b>Severe</b></div>
     <div id="now"><small>Now</small><span id="title">Set the patient.</span><ul id="steps"></ul></div>
-    <h2>Your move</h2>
-    <div class="q" id="q"></div>
+    <h2>24 hours</h2>
+    <label>Lactated Ringer <b id="lrLabel">150</b> mL/h</label>
+    <input id="lr" type="range" min="0" max="400" step="10" value="150">
+    <label>Feed</label>
+    <select id="feed"><option value="oral">Oral</option><option value="ng">Enteral</option><option value="hold">Hold</option></select>
+    <div class="chips" style="margin-top:8px">
+      <button type="button" class="p" id="insulin">Insulin</button>
+      <button type="button" class="b" id="abx">Antibiotic</button>
+      <button type="button" class="a" id="ercp">ERCP</button>
+      <button type="button" class="r" id="drain">Drain</button>
+      <button type="button" class="n" id="op">Operate</button>
+    </div>
+    <div class="vit"><div><span>HR</span><b id="hr">—</b></div><div><span>MAP</span><b id="map">—</b></div><div><span>RR</span><b id="rr">—</b></div></div>
+    <canvas class="chart" id="chart" width="720" height="220"></canvas>
+    <div id="ods"></div>
     <p><a href="index.html">All simulators</a></p>
   </section>
   <section id="scores">
@@ -129,26 +150,7 @@
 </main>
 <script>
 var S={pain:null,lipase:null,of:null,cause:null,cholangitis:null,necrosis:null,timing:null,infection:null,instability:null,response:null};
-var BANK={
-  not:['Do not treat as pancreatitis','Urgent ERCP','Prophylactic antibiotics','Open necrosectomy'],
-  ercp:['Urgent ERCP','Cholecystectomy before ERCP','Prophylactic antibiotics only','Open necrosectomy'],
-  icu:['ICU and enteral feed','Prophylactic meropenem','Open necrosectomy now','Nil by mouth for a week'],
-  chole:['Cholecystectomy this admission','Urgent ERCP','Prophylactic antibiotics','Delay surgery 6 weeks'],
-  tg:['Insulin infusion','Prophylactic antibiotics','Urgent ERCP','Open necrosectomy'],
-  support:['Early feed, no antibiotic','Prophylactic antibiotics','Urgent ERCP','Nil by mouth for a week'],
-  unstable:['Urgent drainage','Wait 4 weeks no matter what','Antibiotics only','Open surgery first'],
-  sterileEarly:['Support and wait','Drain now','Open necrosectomy','Prophylactic antibiotics'],
-  stepup:['Drain first','Open necrosectomy first','Antibiotics and never drain','Ignore the collection'],
-  earlyInfected:['Drain, delay necrosectomy','Open necrosectomy now','No antibiotics','No drainage'],
-  sterileLate:['Reassess, drain if symptomatic','Open necrosectomy first','Stop feeding','Ignore it'],
-  fallback:['Least invasive first','Open necrosectomy first','Prophylactic antibiotics','Nil by mouth for a week'],
-  wait:['Finish the necrosis questions','Open necrosectomy','Prophylactic antibiotics','Urgent ERCP']
-};
-function shuffle(a){
-  var b=a.slice();
-  for(var i=b.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=b[i]; b[i]=b[j]; b[j]=t; }
-  return b;
-}
+var hour=0, tick=0, path=[1];
 function necrosis(){
   if(S.instability==='yes') return {title:'Unstable necrosis', key:'unstable', lines:['Urgent source control and resuscitation.','Antibiotics and ICU care.','Drain by endoscope or catheter if the collection is reachable.','If the drain fails, necrosectomy. Do not wait out uncontrolled sepsis.']};
   if(S.infection==='no' && S.timing==='lt4') return {title:'Sterile, under 4 weeks', key:'sterileEarly', lines:['Support only.','Enteral feed.','Do not drain or operate yet. Wait for walled-off necrosis.']};
@@ -172,6 +174,80 @@ function plan(){
   var name=S.of==='transient'?'Moderately severe pancreatitis':'Mild pancreatitis';
   return {title:name, key:'support', lines:['Moderate lactated Ringer.','Early oral or enteral feeding.','No prophylactic antibiotic.','CT only if the patient gets worse or the diagnosis is unclear.']};
 }
+function act(id){ return document.getElementById(id).classList.contains('pick'); }
+function burden(){
+  if(S.pain!=='yes' || S.lipase!=='high') return 0.4;
+  var b=S.of==='persistent'?3.2:S.of==='transient'?2.3:1.1;
+  if(S.cholangitis==='yes') b+=1.1;
+  if(S.necrosis==='yes' && S.infection==='yes') b+=0.8;
+  if(S.instability==='yes') b+=0.6;
+  if(S.cause==='tg') b+=0.4;
+  return Math.min(4.2,b);
+}
+function course(){
+  var rate=+document.getElementById('lr').value||0;
+  var feed=document.getElementById('feed').value;
+  var infected=S.infection==='yes'||S.cholangitis==='yes';
+  var early=S.necrosis==='yes'&&S.infection==='no'&&S.timing==='lt4';
+  var need=S.instability==='yes'||(S.necrosis==='yes'&&S.infection==='yes')||(S.necrosis==='yes'&&S.timing==='gte4'&&S.response==='noimprove');
+  var cur=burden(), out=[cur];
+  for(var h=1;h<=24;h++){
+    var d=0;
+    if(rate>=80&&rate<=250) d-=0.045;
+    else if(rate>300) d+=0.03;
+    else if(rate<40&&cur>1.5) d+=0.02;
+    if(feed!=='hold'&&h>=6) d-=0.03;
+    else if(feed==='hold'&&h>=12&&cur>1) d+=0.015;
+    if(act('abx')&&infected) d-=0.04;
+    if(S.cholangitis==='yes'){ if(act('ercp')&&h<=8) d-=0.12; else if(!act('ercp')) d+=0.02; }
+    else if(act('ercp')&&h===3) d+=0.45;
+    if(S.cause==='tg') d+=act('insulin')?-0.05:0.02;
+    if(act('drain')){ if(early&&h<=6) d+=0.08; else if(need) d-=0.07; }
+    else if(need&&S.instability==='yes') d+=0.04;
+    if(act('op')){
+      if(early||(need&&!act('drain'))){ if(h<=8) d+=0.1; }
+      else if(need&&act('drain')&&S.response==='noimprove') d-=0.05;
+    }
+    cur=Math.max(0.2,Math.min(4.5,cur+d));
+    out.push(+cur.toFixed(2));
+  }
+  return out;
+}
+function draw(p, mark){
+  var c=document.getElementById('chart'), dpr=Math.min(2,devicePixelRatio||1);
+  var W=c.clientWidth||640, Ht=c.clientHeight||220;
+  c.width=W*dpr; c.height=Ht*dpr;
+  var ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,Ht);
+  var min=0, max=4.6, L=36, T=12, B=22, R=W-12, n=p.length-1;
+  var X=function(i){ return L+(R-L)*i/n; };
+  var Y=function(v){ return T+(Ht-T-B)*(1-(v-min)/(max-min)); };
+  ctx.strokeStyle='#99f6e4'; ctx.font='12px sans-serif'; ctx.fillStyle='#64748b';
+  [0,2,4].forEach(function(v){ ctx.beginPath(); ctx.moveTo(L,Y(v)); ctx.lineTo(R,Y(v)); ctx.stroke(); ctx.fillText(String(v),4,Y(v)+4); });
+  ctx.strokeStyle='#dc2626'; ctx.setLineDash([5,4]); ctx.beginPath(); ctx.moveTo(L,Y(2)); ctx.lineTo(R,Y(2)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle='#0f766e'; ctx.lineWidth=3; ctx.beginPath();
+  p.forEach(function(v,i){ if(i) ctx.lineTo(X(i),Y(v)); else ctx.moveTo(X(i),Y(v)); });
+  ctx.stroke();
+  ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(X(mark),T); ctx.lineTo(X(mark),Ht-B); ctx.stroke();
+}
+function vitals(s){
+  document.getElementById('hr').textContent=String(Math.round(72+s*18));
+  document.getElementById('map').textContent=String(Math.round(Math.max(55,96-s*10)));
+  document.getElementById('rr').textContent=String(Math.round(14+s*6));
+}
+function warn(rate){
+  var lines=[];
+  var early=S.necrosis==='yes'&&S.infection==='no'&&S.timing==='lt4';
+  var need=S.instability==='yes'||(S.necrosis==='yes'&&S.infection==='yes');
+  if(rate>300) lines.push('Too much fluid.');
+  if(act('ercp')&&S.cholangitis!=='yes') lines.push('ERCP without cholangitis.');
+  if(S.cholangitis==='yes'&&!act('ercp')) lines.push('No ERCP.');
+  if(early&&(act('drain')||act('op'))) lines.push('Too early to drain or operate.');
+  if(need&&act('op')&&!act('drain')) lines.push('Operate only after the drain fails.');
+  if(S.instability==='yes'&&!act('drain')) lines.push('No drain.');
+  var el=document.getElementById('ods');
+  el.className=lines.length?'show':'';
+  el.textContent=lines[0]||'';
+}
 var lastKey='';
 function paint(){
   document.getElementById('ask').className=S.necrosis==='yes'?'show':'';
@@ -182,13 +258,12 @@ function paint(){
   var p=plan();
   document.getElementById('title').textContent=p.title;
   document.getElementById('steps').innerHTML=p.lines.map(function(l){ return '<li>'+l+'</li>'; }).join('');
-  if(p.key!==lastKey){
-    lastKey=p.key;
-    var right=BANK[p.key][0];
-    document.getElementById('q').innerHTML=shuffle(BANK[p.key]).map(function(t){
-      return '<button type="button" data-ok="'+(t===right?'1':'0')+'">'+t+'</button>';
-    }).join('');
-  }
+  var rate=+document.getElementById('lr').value||0;
+  document.getElementById('lrLabel').textContent=String(rate);
+  path=course();
+  warn(rate);
+  draw(path, hour);
+  vitals(path[hour]||path[0]);
   score();
 }
 document.querySelectorAll('.chips').forEach(function(box){
@@ -202,13 +277,18 @@ document.querySelectorAll('.chips').forEach(function(box){
     };
   });
 });
-document.getElementById('q').onclick=function(e){
-  var b=e.target.closest('button');
-  if(!b) return;
-  document.querySelectorAll('#q button').forEach(function(x){ x.classList.remove('good','bad'); });
-  b.classList.add(b.dataset.ok==='1'?'good':'bad');
-};
+document.getElementById('lr').oninput=paint;
+document.getElementById('feed').onchange=paint;
+['insulin','abx','ercp','drain','op'].forEach(function(id){
+  document.getElementById(id).onclick=function(){ this.classList.toggle('pick'); paint(); };
+});
+function frame(){
+  tick++;
+  if(tick>28){ tick=0; hour=(hour+1)%path.length; draw(path, hour); vitals(path[hour]||path[0]); }
+  requestAnimationFrame(frame);
+}
 paint();
+requestAnimationFrame(frame);
 
 var LAB=[
   ['Patient','age','Age years'],['Patient','bmi','BMI'],['Patient','gcs','GCS'],
