@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sodium correction</title>
+<style>
+  :root{--ink:#111;--line:#111;--muted:#555;--red:#c0392b;--bg:#fff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;border-bottom:2px solid var(--line);padding:16px 18px}
+  h1{margin:0;font-size:22px;letter-spacing:-.03em;text-transform:uppercase}
+  header p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+  #limitBadge{border:1px solid var(--line);padding:6px 10px;font-size:12px;font-weight:800;white-space:nowrap}
+  main{display:grid;grid-template-columns:minmax(260px,380px) 1fr;gap:22px;padding:18px;max-width:1100px;margin:0 auto}
+  @media(max-width:800px){main{grid-template-columns:1fr;padding:14px}}
+  section{border:1px solid var(--line);padding:14px}
+  h2{margin:0 0 12px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:6px}
+  label{display:block;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin:10px 0 4px}
+  input,select{width:100%;font-size:18px;font-weight:700;padding:8px;border:1px solid var(--line);background:#fff;color:#111;border-radius:0}
+  input[type=range]{padding:0;height:28px;accent-color:#111}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .chips button,.safe{border:1px solid var(--line);background:#fff;font-weight:700;padding:8px 10px;cursor:pointer;font-size:13px}
+  .chips button.on{background:#111;color:#fff}
+  .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .num{border:1px solid var(--line);text-align:center;padding:10px 6px}
+  .num span{display:block;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:4px;margin-bottom:6px}
+  .num b{font-size:28px}
+  .num.bad b{color:var(--red)}
+  #banner{display:none;border:2px solid var(--red);color:var(--red);font-weight:800;text-align:center;padding:10px;margin:12px 0;text-transform:uppercase;letter-spacing:.03em}
+  #banner.show{display:block}
+  canvas{width:100%;height:auto;display:block;margin-top:8px}
+  .hours{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:8px;font-size:12px;text-align:center}
+  .hours b{display:block;font-size:16px}
+  .quiet{font-size:12px;color:var(--muted);margin:8px 0 0}
+  a{color:#111}
+  details{margin-top:8px}
+  summary{cursor:pointer;font-weight:800;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Sodium correction</h1>
+    <p>Drag the rate. The line is the next 24 hours.</p>
+  </div>
+  <div id="limitBadge">24 h limit 8</div>
+</header>
+<main>
+  <section>
+    <h2>Patient</h2>
+    <div class="row">
+      <div><label>Weight kg</label><input id="wt" type="number" value="70" min="30" max="250"></div>
+      <div><label>Body water</label>
+        <select id="who">
+          <option value="0.6">Male 0.6</option>
+          <option value="0.5">Female or elderly male 0.5</option>
+          <option value="0.45">Elderly female 0.45</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div><label>Sodium now</label><input id="na" type="number" value="120" step="0.1"></div>
+      <div><label>Target at 24 h</label><input id="target" type="number" value="126" step="0.1"></div>
+    </div>
+    <h2 style="margin-top:16px">Fluid</h2>
+    <label>Type</label>
+    <select id="fluid">
+      <option value="513">3% saline · 513</option>
+      <option value="154">0.9% saline · 154</option>
+      <option value="130">Ringer's lactate · 130</option>
+      <option value="77">0.45% saline · 77</option>
+      <option value="38.5">0.225% saline · 38.5</option>
+      <option value="0">Water or 5% dextrose · 0</option>
+    </select>
+    <label>Rate <b id="rateLabel">30</b> mL/h</label>
+    <input id="rate" type="range" min="0" max="250" step="5" value="30">
+    <input id="rateN" type="number" value="30" min="0" max="500" step="5">
+    <div class="chips">
+      <button type="button" data-fluid="513" data-rate="30">3% slow</button>
+      <button type="button" data-fluid="513" data-rate="50">3% 50</button>
+      <button type="button" data-fluid="154" data-rate="100">0.9% 100</button>
+      <button type="button" data-fluid="0" data-rate="80">Water</button>
+      <button type="button" id="fit">Seizure</button>
+      <button type="button" id="risk">High risk</button>
+    </div>
+    <details>
+      <summary>Glucose and urine</summary>
+      <label>Glucose mg/dL</label>
+      <input id="glu" type="number" placeholder="blank if unknown" inputmode="decimal">
+      <div class="row">
+        <div><label>Urine Na</label><input id="uNa" type="number" placeholder="mmol/L"></div>
+        <div><label>Urine K</label><input id="uK" type="number" placeholder="mmol/L"></div>
+      </div>
+      <label>Urine mL/h</label>
+      <input id="uVol" type="number" placeholder="mL per hour, not per day">
+    </details>
+  </section>
+  <section>
+    <div class="nums">
+      <div class="num"><span>Body water</span><b id="tbw">—</b></div>
+      <div class="num" id="endBox"><span>At 24 h</span><b id="end">—</b></div>
+      <div class="num" id="deltaBox"><span>Change</span><b id="delta">—</b></div>
+    </div>
+    <div id="banner"></div>
+    <button class="safe" id="safe" type="button" hidden>Slow to a safe rate</button>
+    <canvas id="chart" width="720" height="280"></canvas>
+    <div class="hours" id="hours"></div>
+    <p class="quiet" id="note"></p>
+    <p class="quiet"><a href="index.html">All simulators</a></p>
+  </section>
+</main>
+<script>
+function track(o){
+  let tbw=o.weight*o.factor;
+  const start=tbw;
+  const path=[o.na];
+  let cur=o.na;
+  const vol=o.rate/1000;
+  const use=o.uNa!=null;
+  const uvol=use?o.uVol/1000:0;
+  let bad=false;
+  for(let h=1;h<=24;h++){
+    const denom=tbw+vol-uvol;
+    if(denom<5){ bad=true; break; }
+    const removed=use?(o.uNa+o.uK)*uvol:0;
+    cur=(cur*tbw + o.fluid*vol - removed)/denom;
+    tbw=denom;
+    path.push(cur);
+  }
+  while(path.length<25) path.push(path[path.length-1]);
+  return {tbw:start, path, final:path[24], delta:path[24]-o.na, bad};
+}
+function num(id){ const v=document.getElementById(id).value; return v===''?null:parseFloat(v); }
+function state(){
+  const urine=[num('uNa'),num('uK'),num('uVol')];
+  const filled=urine.filter(v=>v!=null && !Number.isNaN(v)).length;
+  return {
+    weight:num('wt')||0, factor:parseFloat(document.getElementById('who').value),
+    na:num('na'), target:num('target'), fluid:parseFloat(document.getElementById('fluid').value),
+    rate:num('rateN')||0, glu:num('glu'),
+    urine: filled===3 ? {uNa:urine[0], uK:urine[1], uVol:urine[2]} : null,
+    urinePartial: filled>0 && filled<3,
+    fit:document.getElementById('fit').classList.contains('on'),
+    risk:document.getElementById('risk').classList.contains('on')
+  };
+}
+function draw(path, target, limit, start){
+  const c=document.getElementById('chart');
+  const dpr=Math.min(2, devicePixelRatio||1);
+  const cssW=c.clientWidth||640, cssH=240;
+  c.width=cssW*dpr; c.height=cssH*dpr;
+  const ctx=c.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,cssW,cssH);
+  const vals=path.concat([target, start+limit, start-limit]);
+  let min=Math.min.apply(null,vals)-2, max=Math.max.apply(null,vals)+2;
+  if(max-min<4) max=min+4;
+  const L=42,R=8,T=16,B=24;
+  const X=i=>L+(cssW-L-R)*i/24;
+  const Y=v=>T+(cssH-T-B)*(1-(v-min)/(max-min));
+  ctx.strokeStyle='#eee'; ctx.lineWidth=1;
+  ctx.font='12px sans-serif'; ctx.fillStyle='#111';
+  for(let i=0;i<=4;i++){
+    const v=max-(max-min)*i/4;
+    const y=T+(cssH-T-B)*i/4;
+    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(cssW-R,y); ctx.stroke();
+    ctx.fillText(v.toFixed(0), 4, y+4);
+  }
+  function rule(v,color,dash){
+    ctx.strokeStyle=color; ctx.setLineDash(dash); ctx.beginPath();
+    ctx.moveTo(X(0),Y(v)); ctx.lineTo(X(24),Y(v)); ctx.stroke();
+  }
+  rule(target,'#111',[3,3]);
+  rule(start+limit,'#c0392b',[5,4]);
+  rule(start-limit,'#c0392b',[5,4]);
+  ctx.setLineDash([]); ctx.strokeStyle='#111'; ctx.lineWidth=2.5;
+  ctx.beginPath();
+  path.forEach((v,i)=>{ const x=X(i), y=Y(v); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+  ctx.fillText('0 h', X(0), cssH-6);
+  ctx.fillText('24 h', X(24)-28, cssH-6);
+}
+function paint(){
+  const s=state();
+  document.getElementById('rate').value=s.rate;
+  document.getElementById('rateLabel').textContent=String(s.rate);
+  const banner=document.getElementById('banner');
+  const lines=[];
+  if(!(s.weight>0) || s.na==null || Number.isNaN(s.na)) return;
+  const risk=s.risk || s.na<105;
+  const limit=risk?6:8;
+  document.getElementById('limitBadge').textContent=risk?'24 h limit 6':'24 h limit 8';
+  let rise=0, corr=s.na;
+  if(s.glu>100){ rise=1.6*(s.glu-100)/100; corr=s.na+rise; }
+  if(s.urinePartial){
+    banner.className='show'; banner.textContent='Enter urine sodium, potassium, and mL/h, or leave all three blank.';
+    return;
+  }
+  const t=track({weight:s.weight, factor:s.factor, na:s.na, fluid:s.fluid, rate:s.rate, uNa:s.urine&&s.urine.uNa, uK:s.urine&&s.urine.uK, uVol:s.urine&&s.urine.uVol});
+  document.getElementById('tbw').textContent=t.tbw.toFixed(1);
+  document.getElementById('end').textContent=t.final.toFixed(1);
+  document.getElementById('delta').textContent=(t.delta>=0?'+':'')+t.delta.toFixed(1);
+  const over=Math.abs(t.delta)>limit;
+  document.getElementById('deltaBox').className='num'+(over?' bad':'');
+  document.getElementById('endBox').className='num'+(over?' bad':'');
+  document.getElementById('safe').hidden=!over;
+  if(s.fit) lines.push('Seizure: 150 mL of 3% saline over 10 minutes. This line is the drip after that.');
+  if(corr>=135 && s.na<135) lines.push('Corrected sodium is '+corr.toFixed(1)+'. This is not a low sodium. Do not start 3% saline.');
+  else if(rise>=1) lines.push('Fixing the glucose raises sodium about '+rise.toFixed(1)+' before any saline.');
+  if(t.bad) lines.push('That urine volume is a daily total. Enter mL per hour.');
+  if(t.delta<-0.5) lines.push('This fluid lowers the sodium.');
+  if(over) lines.push('Change is over '+limit+' in 24 hours. Slow the rate.');
+  else if(s.target!=null && s.target-s.na>limit) lines.push('That target is more than one day.');
+  banner.className=lines.length?'show':'';
+  banner.textContent=lines[0]||'';
+  if(lines.length>1) banner.textContent=lines.join(' ');
+  draw(t.path, s.target==null?s.na:s.target, limit, s.na);
+  document.getElementById('hours').innerHTML=[0,6,12,18,24].map(h=>'<div>'+h+' h<b>'+t.path[h].toFixed(1)+'</b></div>').join('');
+  document.getElementById('note').textContent=s.urine?'Urine included.':'';
+}
+function setFluid(v, rate){
+  document.getElementById('fluid').value=String(v);
+  document.getElementById('rateN').value=rate;
+  document.getElementById('rate').value=rate;
+  paint();
+}
+document.getElementById('rate').addEventListener('input', e=>{ document.getElementById('rateN').value=e.target.value; paint(); });
+document.getElementById('rateN').addEventListener('input', e=>{ document.getElementById('rate').value=e.target.value; paint(); });
+['wt','who','na','target','fluid','glu','uNa','uK','uVol'].forEach(id=>document.getElementById(id).addEventListener('input', paint));
+document.querySelectorAll('.chips button[data-fluid]').forEach(b=>b.addEventListener('click', ()=>setFluid(b.dataset.fluid, +b.dataset.rate)));
+document.getElementById('fit').onclick=function(){ this.classList.toggle('on'); paint(); };
+document.getElementById('risk').onclick=function(){ this.classList.toggle('on'); paint(); };
+document.getElementById('safe').onclick=function(){
+  const s=state();
+  const limit=(s.risk||s.na<105)?6:8;
+  let lo=0, hi=s.rate;
+  for(let i=0;i<18;i++){
+    const mid=(lo+hi)/2;
+    const d=Math.abs(track({weight:s.weight,factor:s.factor,na:s.na,fluid:s.fluid,rate:mid,uNa:s.urine&&s.urine.uNa,uK:s.urine&&s.urine.uK,uVol:s.urine&&s.urine.uVol}).delta);
+    if(d>limit) hi=mid; else lo=mid;
+  }
+  const rate=Math.max(0, Math.floor(lo/5)*5);
+  document.getElementById('rateN').value=rate;
+  paint();
+};
+const q=new URLSearchParams(location.search);
+if(q.get('na')) document.getElementById('na').value=q.get('na');
+if(q.get('glu')){ document.getElementById('glu').value=q.get('glu'); document.querySelector('details').open=true; }
+const na0=parseFloat(document.getElementById('na').value);
+if(na0) document.getElementById('target').value=Math.min(135, Math.round((na0+6)*10)/10);
+paint();
+window.addEventListener('resize', paint);
+</script>
+</body>
+</html>
