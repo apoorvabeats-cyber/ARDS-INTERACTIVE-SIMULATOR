@@ -34,7 +34,12 @@
   .vit span{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
   #ods{display:none;margin-top:8px;background:#7f1d1d;color:#fff;border-radius:12px;padding:10px;font-weight:800}
   #ods.show{display:block}
-  canvas.chart{width:100%;height:220px;display:block;background:#f0fdfa;border-radius:12px}
+  canvas.chart{width:100%;height:220px;display:block;background:#fff;border:2px solid #e2e8f0;border-radius:12px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;font-weight:800;margin-top:8px}
+  .legend i{display:inline-block;width:18px;height:4px;background:#0f766e;margin-right:6px;vertical-align:middle}
+  .legend .red{background:#dc2626}
+  .legend .now{background:#f59e0b;width:4px;height:14px}
+  .hint{margin:6px 0 0;color:#334155;font-weight:700}
   input[type=range]{width:100%;accent-color:#0f766e}
   #now small{display:block;font-weight:700;color:#115e59;margin-bottom:4px}
   #steps{margin:10px 0 0;padding:0;list-style:none}
@@ -67,6 +72,11 @@
   <p>Acute pancreatitis. The necrosis steps are the step-up approach.</p>
 </header>
 <main>
+  <section id="scores">
+    <h2>Scores</h2>
+    <div class="board" id="board"></div>
+    <div class="labs" id="labs"></div>
+  </section>
   <section>
     <h2>Diagnosis</h2>
     <div class="chips" data-k="pain">
@@ -138,18 +148,17 @@
       <button type="button" class="n" id="op">Operate</button>
     </div>
     <div class="vit"><div><span>HR</span><b id="hr">—</b></div><div><span>MAP</span><b id="map">—</b></div><div><span>RR</span><b id="rr">—</b></div></div>
+    <h2>Mean arterial pressure</h2>
     <canvas class="chart" id="chart" width="720" height="220"></canvas>
+    <div class="legend"><span><i class="lg"></i>MAP mmHg</span><span><i class="lg red"></i>65 shock</span><span><i class="lg now"></i>This hour</span></div>
+    <p class="hint">Bottom axis is hours. The line is the blood pressure. Under the red line the pressure is too low.</p>
     <div id="ods"></div>
     <p><a href="index.html">All simulators</a></p>
-  </section>
-  <section id="scores">
-    <h2>Scores</h2>
-    <div class="board" id="board"></div>
-    <div class="labs" id="labs"></div>
   </section>
 </main>
 <script>
 var S={pain:null,lipase:null,of:null,cause:null,cholangitis:null,necrosis:null,timing:null,infection:null,instability:null,response:null};
+var T={};
 var hour=0, tick=0, path=[1];
 function necrosis(){
   if(S.instability==='yes') return {title:'Unstable necrosis', key:'unstable', lines:['Urgent source control and resuscitation.','Antibiotics and ICU care.','Drain by endoscope or catheter if the collection is reachable.','If the drain fails, necrosectomy. Do not wait out uncontrolled sepsis.']};
@@ -213,25 +222,33 @@ function course(){
   }
   return out;
 }
+function mapOf(s){ return Math.round(Math.max(50, Math.min(115, 96-s*10))); }
 function draw(p, mark){
+  var maps=p.map(mapOf);
   var c=document.getElementById('chart'), dpr=Math.min(2,devicePixelRatio||1);
   var W=c.clientWidth||640, Ht=c.clientHeight||220;
   c.width=W*dpr; c.height=Ht*dpr;
   var ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,Ht);
-  var min=0, max=4.6, L=36, T=12, B=22, R=W-12, n=p.length-1;
+  var min=45, max=120, L=46, T=16, B=28, R=W-12, n=maps.length-1;
   var X=function(i){ return L+(R-L)*i/n; };
   var Y=function(v){ return T+(Ht-T-B)*(1-(v-min)/(max-min)); };
-  ctx.strokeStyle='#99f6e4'; ctx.font='12px sans-serif'; ctx.fillStyle='#64748b';
-  [0,2,4].forEach(function(v){ ctx.beginPath(); ctx.moveTo(L,Y(v)); ctx.lineTo(R,Y(v)); ctx.stroke(); ctx.fillText(String(v),4,Y(v)+4); });
-  ctx.strokeStyle='#dc2626'; ctx.setLineDash([5,4]); ctx.beginPath(); ctx.moveTo(L,Y(2)); ctx.lineTo(R,Y(2)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font='12px sans-serif'; ctx.fillStyle='#334155'; ctx.strokeStyle='#e2e8f0';
+  [50,65,90,110].forEach(function(v){
+    ctx.beginPath(); ctx.moveTo(L,Y(v)); ctx.lineTo(R,Y(v)); ctx.stroke();
+    ctx.fillText(v+' ', 4, Y(v)+4);
+  });
+  ctx.fillText('mmHg', 4, 12);
+  [0,6,12,18,24].forEach(function(h){ ctx.fillText(h+' h', X(h)-10, Ht-8); });
+  ctx.strokeStyle='#dc2626'; ctx.setLineDash([5,4]); ctx.beginPath(); ctx.moveTo(L,Y(65)); ctx.lineTo(R,Y(65)); ctx.stroke(); ctx.setLineDash([]);
   ctx.strokeStyle='#0f766e'; ctx.lineWidth=3; ctx.beginPath();
-  p.forEach(function(v,i){ if(i) ctx.lineTo(X(i),Y(v)); else ctx.moveTo(X(i),Y(v)); });
+  maps.forEach(function(v,i){ if(i) ctx.lineTo(X(i),Y(v)); else ctx.moveTo(X(i),Y(v)); });
   ctx.stroke();
   ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(X(mark),T); ctx.lineTo(X(mark),Ht-B); ctx.stroke();
+  ctx.fillStyle='#0f766e'; ctx.font='bold 14px sans-serif'; ctx.fillText(maps[mark]+' mmHg', Math.min(R-70, X(mark)+6), Y(maps[mark])-6);
 }
 function vitals(s){
   document.getElementById('hr').textContent=String(Math.round(72+s*18));
-  document.getElementById('map').textContent=String(Math.round(Math.max(55,96-s*10)));
+  document.getElementById('map').textContent=String(mapOf(s));
   document.getElementById('rr').textContent=String(Math.round(14+s*6));
 }
 function warn(rate){
@@ -314,7 +331,6 @@ html+='<div><label>Necrosis</label><select id="f_nec"><option value="">—</opti
 html+='<div><label>mCTSI pancreas</label><select id="f_infl"><option value="">—</option><option value="0">Normal</option><option value="2">Inflamed</option><option value="4">Fluid or fat necrosis</option></select></div>';
 html+='<div><label>Systolic pressure</label><select id="f_sbp"><option value="">—</option><option value="0">90 or more</option><option value="1">Under 90, responds</option><option value="2">Under 90, not responding</option></select></div>';
 document.getElementById('labs').innerHTML=html;
-var T={};
 function val(id){ var el=document.getElementById('f_'+id); var n=parseFloat(String(el&&el.value||'').replace(',','.')); return Number.isFinite(n)?n:null; }
 function picked(id){ var s=document.getElementById('f_'+id); return s&&s.value!==''?+s.value:null; }
 function fio(){ var f=val('fio2'); if(f==null) return null; return f>1?f/100:f; }
@@ -415,12 +431,12 @@ function score(){
     dbcNote='Determinant based';
   }
   document.getElementById('board').innerHTML=[
-    tile('BISAP', bisMiss?'—':String(bisN), bisMiss?(5-bisMiss)+'/5':'≥3 higher death', bisMiss?'wait':bisN>=3?'bad':'ok'),
-    tile('SIRS', sHave<4?'—':String(so), sHave<4?sHave+'/4':so>=2?'2 or more':'under 2', sHave<4?'wait':so>=2?'bad':'ok'),
+    tile('BISAP', bisMiss===5?'—':String(bisN), bisMiss?bisMiss+' left':'3 or more is high', bisMiss?'wait':bisN>=3?'bad':'ok'),
+    tile('SIRS', sHave===0?'—':String(so), sHave<4?sHave+'/4':so>=2?'2 or more':'under 2', sHave<4?'wait':so>=2?'bad':'ok'),
     tile('HAPS', !hapsReady?'—':hapsOk?'Harmless':'Not', !hapsReady?'guard, creatinine, Hct':hapsOk?'all three absent':'not harmless', !hapsReady?'wait':hapsOk?'ok':'mid'),
     tile('PANC 3', !pancReady?'—':String(panc), !pancReady?'Hct, BMI, effusion':panc===3?'all three':'not all three', !pancReady?'wait':panc===3?'bad':'ok'),
-    tile('Ranson', (admMiss||lateMiss)?'—':String(admPts+latePts), (biliary?'Gallstone':'Other')+' · in '+admPts+' · 48 h '+latePts, (admMiss||lateMiss)?'wait':(admPts+latePts)>=5?'bad':(admPts+latePts)>=3?'mid':'ok'),
-    tile('Glasgow', glaMiss?'—':String(gla), glaMiss?(8-glaMiss)+'/8':'≥3 severe', glaMiss?'wait':gla>=3?'bad':'ok'),
+    tile('Ranson', (admMiss||lateMiss)?'—':String(admPts+latePts), (biliary?'Gallstone':'Other')+' · admission '+admPts+' · 48 h '+latePts+(admMiss||lateMiss?' · '+(admMiss+lateMiss)+' left':''), (admMiss||lateMiss)?'wait':(admPts+latePts)>=5?'bad':(admPts+latePts)>=3?'mid':'ok'),
+    tile('Glasgow', glaMiss?'—':String(gla), glaMiss?glaMiss+' left':'3 or more is severe', glaMiss?'wait':gla>=3?'bad':'ok'),
     tile('Marshall', m?String(m.max):'—', m?'lung '+m.resp+' · kidney '+m.renal+' · BP '+m.cv:'P/F, creatinine, BP', !m?'wait':m.max>=2?'bad':'ok'),
     tile('CTSI', ctsi==null?'—':String(ctsi), ctsi==null?'grade + necrosis':ctsi>=7?'severe':ctsi>=4?'moderate':'mild', ctsi==null?'wait':ctsi>=7?'bad':ctsi>=4?'mid':'ok'),
     tile('mCTSI', mctsi==null?'—':String(mctsi), mctsi==null?'pancreas, necrosis, outside':mctsi>=8?'severe':mctsi>=4?'moderate':'mild', mctsi==null?'wait':mctsi>=8?'bad':mctsi>=4?'mid':'ok'),
