@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="theme-color" content="#071b3a">
+<title>Antibiotic simulator</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #f4f7fb; color: #14213d; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; line-height: 1.4; }
+  button { font: inherit; cursor: pointer; border: 1px solid #d7e0ec; background: #fff; color: #14213d; border-radius: 14px; min-height: 48px; padding: 10px 12px; text-align: left; }
+  .wrap { max-width: 840px; margin: 0 auto; padding: 16px 16px 48px; }
+  .hero { background: linear-gradient(135deg,#071b3a,#1457a6); color: #fff; border-radius: 24px; padding: 22px 18px; }
+  h1 { font-size: clamp(28px, 7vw, 42px); line-height: 1.05; margin: 8px 0; }
+  h2 { margin: 16px 0 8px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: #5f6f86; }
+  p { margin: 0; }
+  a { color: #9ec5ff; }
+  .lede { color: #dbe9ff; font-size: 16px; }
+  .card { display: block; width: 100%; margin-top: 10px; }
+  .card b { display: block; color: #1457a6; font-size: 17px; }
+  .meta { color: #5f6f86; margin-top: 4px; font-size: 14px; }
+  .slip { background: #fff; border: 1px solid #d7e0ec; border-radius: 16px; padding: 12px; margin-top: 12px; }
+  .row { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid #eef2f6; }
+  .row span { color: #5f6f86; }
+  .opts { display: grid; gap: 8px; margin-top: 8px; }
+  .good { background: #ecfdf5; border-color: #9bd9c5; }
+  .bad { background: #fff1f2; border-color: #f1a4ad; }
+  .ok { background: #fff8e6; border-color: #efd28d; }
+  .top { display: flex; gap: 8px; margin-top: 12px; }
+  .top button { flex: 1; text-align: center; }
+  .pill { display: inline-block; background: #e9f2ff; color: #1457a6; border-radius: 999px; padding: 4px 10px; font-weight: 700; font-size: 13px; margin-right: 6px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const CASES = [
+  {
+    id: "ecoli", group: "Community", title: "Susceptible E. coli",
+    story: "42-year-old, pyelonephritis, fever, flank pain. No penicillin allergy. Kidneys are normal. Community onset, no recent antibiotics.",
+    bug: "Escherichia coli", source: "Urine and blood",
+    mech: "No resistance marker. Ampicillin R, ceftriaxone S, gentamicin S, meropenem S.",
+    ask: "Which agent fits this culture?",
+    options: [
+      { t: "Ceftriaxone 2 g IV once daily", grade: "best", why: "A susceptible community Enterobacterales in the kidney is a third-generation cephalosporin. Once-daily ceftriaxone matches a long half-life and time-dependent killing. Step down to an oral agent when the culture and the patient allow." },
+      { t: "Meropenem 1 g IV every 8 hours", grade: "bad", why: "Meropenem is active, and that is the problem. A carbapenem here selects for carbapenemase producers later. Save it for ESBL, AmpC you cannot trust, or a resistant hospital organism." },
+      { t: "Vancomycin, AUC-guided", grade: "bad", why: "Vancomycin does not treat E. coli. It is a gram-positive drug. The culture is a gram-negative rod." },
+      { t: "Nitrofurantoin 100 mg twice daily", grade: "bad", why: "Nitrofurantoin only reaches the bladder. It does not treat pyelonephritis or bacteremia, and it is a poor choice once creatinine clearance is low." },
+    ],
+    pk: "Ceftriaxone is time-dependent: you need free drug above the MIC for long enough (fT>MIC). The long half-life is why 2 g once daily works outside the meninges.",
+    harm: "Ceftriaxone can sludge the bile. It does not cover Pseudomonas. It is not a drug for neonates mixed with calcium.",
+  },
+  {
+    id: "mssa", group: "Community", title: "MSSA bacteremia",
+    story: "55-year-old, dialysis line out, blood cultures growing a gram-positive coccus in clusters. Source is the line. Kidneys via dialysis. No beta-lactam allergy.",
+    bug: "Staphylococcus aureus, methicillin susceptible", source: "Blood",
+    mech: "MSSA. Oxacillin S, cefazolin S, vancomycin S. MecA negative.",
+    ask: "Best targeted drug for MSSA in the blood?",
+    options: [
+      { t: "Cefazolin 2 g IV every 8 hours, after dialysis on dialysis days", grade: "best", why: "A beta-lactam beats vancomycin for MSSA bacteremia. Cefazolin is the usual choice, including for hemodialysis, dosed after dialysis. Look for endocarditis and pull the line." },
+      { t: "Vancomycin and stop there", grade: "bad", why: "Vancomycin is what you start before the sensitivities. Once it is MSSA, staying on vancomycin is inferior. Higher failure and more nephrotoxicity for no gain." },
+      { t: "Piperacillin-tazobactam 4.5 g every 6 hours", grade: "bad", why: "Piperacillin is not the anti-staphylococcal beta-lactam you want in the blood, and it is far broader than this culture. Use cefazolin or an anti-staphylococcal penicillin." },
+      { t: "Linezolid 600 mg every 12 hours", grade: "bad", why: "Linezolid is a poor choice as definitive therapy for staphylococcal bacteremia. It also suppresses the marrow and interacts with serotonergic drugs." },
+    ],
+    pk: "Beta-lactams kill by time above MIC. For MSSA bacteremia you want reliable fT>MIC, which cefazolin gives at 2 g every 8 hours when the kidneys are working, or after dialysis when they are not.",
+    harm: "Cefazolin is one of the cleaner beta-lactams. The harm here is under-treating: short course, retained line, or no echo.",
+  },
+  {
+    id: "pseudo", group: "Hospital", title: "Pseudomonas, low clearance",
+    story: "Ventilator day 6. New fever, purulent secretions. Creatinine clearance is 22 mL/min. No seizure history.",
+    bug: "Pseudomonas aeruginosa, susceptible", source: "Tracheal aspirate, and the clinical picture is VAP",
+    mech: "Cefepime S, piperacillin-tazobactam S, meropenem S, ciprofloxacin R. No carbapenemase.",
+    ask: "Which prescription matches the organism and the kidneys?",
+    options: [
+      { t: "Cefepime 2 g IV every 24 hours", grade: "best", why: "Cefepime covers susceptible Pseudomonas and is time-dependent, so a prolonged infusion still helps. At a creatinine clearance of 11–29 mL/min the severe-infection dose is 2 g every 24 hours, not every 8. Confirm the interval with pharmacy. Unadjusted cefepime causes encephalopathy, myoclonus, and non-convulsive seizures." },
+      { t: "Cefepime 2 g IV every 8 hours", grade: "bad", why: "That is the normal-kidney Pseudomonas dose. At this clearance it accumulates. Cefepime neurotoxicity is the predictable result: confusion, myoclonus, seizures. The culture being susceptible does not make the dose safe." },
+      { t: "Ertapenem 1 g IV daily", grade: "bad", why: "Ertapenem has no useful Pseudomonas activity. It also misses Acinetobacter and Enterococcus. A carbapenem on the label is not a Pseudomonas carbapenem." },
+      { t: "Ciprofloxacin 400 mg IV every 8 hours", grade: "bad", why: "The report says ciprofloxacin R. Fluoroquinolones also bring tendinopathy, QT prolongation, delirium, and C. difficile, and they are not monotherapy for Pseudomonas pneumonia even when susceptible." },
+    ],
+    pk: "Pseudomonas beta-lactams in the ICU are pushed toward 100% fT>MIC. Prolong or continuously infuse the dose the kidneys can clear. Aminoglycosides, if added, are Cmax/MIC drugs (peak about 8–10 times the MIC) and are nephrotoxic and ototoxic. Do not use them alone for pneumonia.",
+    harm: "Cefepime: neurotoxicity when the dose ignores the creatinine clearance. Piperacillin-tazobactam plus vancomycin: extra acute kidney injury. Meropenem: drops valproate levels.",
+  },
+  {
+    id: "esbl", group: "Hospital", title: "ESBL bacteremia",
+    story: "Day 12 in hospital. Septic shock from a urinary source. Kidneys are normal. Not on valproate.",
+    bug: "Klebsiella pneumoniae, ESBL", source: "Blood and urine",
+    mech: "CTX-M ESBL. Ceftriaxone R, piperacillin-tazobactam S on the panel, meropenem S, ertapenem S. No carbapenemase.",
+    ask: "The panel says piperacillin-tazobactam is susceptible. What do you give?",
+    options: [
+      { t: "Meropenem 1 g IV every 8 hours, extended infusion", grade: "best", why: "For ESBL bacteremia, meropenem is the drug. MERINO showed higher mortality with piperacillin-tazobactam than meropenem even when the lab called piperacillin susceptible. Extended infusion supports time-dependent killing in shock." },
+      { t: "Piperacillin-tazobactam 4.5 g every 6 hours", grade: "bad", why: "Do not believe the S next to piperacillin-tazobactam in ESBL bacteremia. Inoculum and the trial result both argue against it as definitive therapy for bloodstream infection." },
+      { t: "Ceftriaxone 2 g daily", grade: "bad", why: "ESBL means the organism hydrolyzes ceftriaxone. The R is real." },
+      { t: "Ciprofloxacin, because the urine grows it", grade: "bad", why: "This case is bacteremia and shock. Even a susceptible quinolone is the wrong class of drug here, and this stem does not give you a susceptible quinolone to lean on." },
+    ],
+    pk: "Meropenem: fT>MIC. In shock, infuse each dose over 3 hours. Ertapenem can treat a stable ESBL urinary infection; it is the wrong carbapenem for septic shock and it never covers Pseudomonas.",
+    harm: "Meropenem lowers valproate within hours and can precipitate seizures. Imipenem lowers the seizure threshold more than meropenem, especially if the dose is not renally adjusted.",
+  },
+  {
+    id: "ampc", group: "Hospital", title: "AmpC Enterobacter",
+    story: "Hospital-acquired bacteremia after abdominal surgery. Hemodynamics are improving. Kidneys normal.",
+    bug: "Enterobacter cloacae", source: "Blood",
+    mech: "Inducible AmpC. The first panel shows ceftriaxone S and cefepime S. That ceftriaxone S is a trap.",
+    ask: "Which drug will still work if AmpC derepresses on therapy?",
+    options: [
+      { t: "Cefepime 2 g IV every 8 hours", grade: "best", why: "Cefepime is stable enough against AmpC for serious Enterobacter infections and is narrower than a carbapenem. Give 2 g every 8 hours when clearance is normal." },
+      { t: "Ceftriaxone 2 g daily, the panel says S", grade: "bad", why: "Enterobacter, Klebsiella aerogenes, and Citrobacter freundii can derepress AmpC during treatment. A ceftriaxone S on day 1 does not make ceftriaxone safe definitive therapy." },
+      { t: "Meropenem 1 g every 8 hours", grade: "ok", why: "A carbapenem works and is appropriate if the patient is very ill or cefepime cannot be used. It is broader than you need once the patient is stable. Not wrong. Not the narrowest right answer." },
+      { t: "Piperacillin-tazobactam", grade: "bad", why: "Tazobactam does not reliably inhibit AmpC. Piperacillin-tazobactam is a poor definitive choice for serious AmpC infection." },
+    ],
+    pk: "Cefepime is time above MIC. 2 g every 8 hours, ideally prolonged infusion, is the full Pseudomonas and AmpC dose when the kidneys are normal.",
+    harm: "The toxicity to remember is still cefepime neurotoxicity if someone later forgets to stretch the interval as the creatinine rises.",
+  },
+  {
+    id: "mrsa", group: "Hospital", title: "MRSA pneumonia on an SSRI",
+    story: "Influenza, then ventilator-associated pneumonia. Blood cultures also positive. The patient takes sertraline. Creatine kinase is normal.",
+    bug: "Staphylococcus aureus, MRSA", source: "Sputum and blood",
+    mech: "MecA positive. Vancomycin MIC 1. Oxacillin R. Daptomycin S. Linezolid S.",
+    ask: "Which drug treats MRSA in the lung in this patient?",
+    options: [
+      { t: "Vancomycin: load 20–25 mg/kg, then dose to AUC/MIC 400–600", grade: "best", why: "Vancomycin reaches the lung and is the default for MRSA pneumonia plus bacteremia. Target AUC/MIC 400–600, not a reflexive trough of 15–20. It is nephrotoxic, worse when piled onto piperacillin-tazobactam." },
+      { t: "Linezolid 600 mg IV every 12 hours", grade: "bad", why: "Linezolid is a good pneumonia drug and a weak bacteremia drug. This patient is also on an SSRI. Linezolid is a reversible MAOI: serotonin syndrome, plus thrombocytopenia and neuropathy if the course runs long." },
+      { t: "Daptomycin 10 mg/kg IV daily", grade: "bad", why: "Pulmonary surfactant inactivates daptomycin. It is a bacteremia and endocarditis drug, not a pneumonia drug. It also causes myopathy: check the CK, and stop the statin." },
+      { t: "Ceftriaxone 2 g daily", grade: "bad", why: "MRSA is oxacillin resistant. Ceftriaxone will not treat it. Ceftaroline would have MRSA activity; ceftriaxone does not." },
+    ],
+    pk: "Vancomycin exposure is AUC/MIC. The 2020 target for serious MRSA is 400–600. Trough-only dosing misses that. Daptomycin is concentration-dependent (about 8–10 mg/kg for bacteremia) but never for the lung.",
+    harm: "Vancomycin: kidney injury, ototoxicity, infusion reaction if it runs in fast. Linezolid: marrow, serotonin syndrome, lactic acidosis. Daptomycin: muscle and eosinophilic pneumonia.",
+  },
+  {
+    id: "ndm", group: "Carbapenemase", title: "NDM Klebsiella",
+    story: "Transferred from another hospital. Urosepsis, now bacteremic. Kidneys normal. No penicillin anaphylaxis.",
+    bug: "Klebsiella pneumoniae, NDM", source: "Blood and urine",
+    mech: "New Delhi metallo-beta-lactamase, plus an ESBL. Meropenem R. Ceftazidime-avibactam R. Aztreonam R. Meropenem-vaborbactam R.",
+    ask: "NDM hydrolyzes carbapenems. What actually works?",
+    options: [
+      { t: "Ceftazidime-avibactam 2.5 g PLUS aztreonam 2 g, each every 8 hours over 3 hours", grade: "best", why: "A metallo-beta-lactamase hydrolyzes every beta-lactam except aztreonam. The co-produced ESBL then destroys aztreonam. Avibactam blocks that serine enzyme, so aztreonam can work. Give both every 8 hours, infused over 3 hours, at the same time. Cefiderocol 2 g every 8 hours over 3 hours is the other preferred option." },
+      { t: "Ceftazidime-avibactam alone", grade: "bad", why: "Avibactam does not inhibit NDM, VIM, or IMP. Ceftazidime-avibactam monotherapy is for KPC and OXA-48-like enzymes, not for a metallo-beta-lactamase." },
+      { t: "Meropenem 2 g every 8 hours", grade: "bad", why: "NDM hydrolyzes meropenem. A bigger dose does not fix a carbapenemase. This is not the ESBL case." },
+      { t: "Meropenem-vaborbactam 4 g every 8 hours", grade: "bad", why: "Vaborbactam inhibits KPC. It does not inhibit metallo-beta-lactamases and it does not reliably inhibit OXA-48. NDM is the wrong enzyme for this drug." },
+    ],
+    pk: "Both aztreonam and ceftazidime-avibactam need time above MIC. The 3-hour infusion every 8 hours is what lets you run them together and still hit the target.",
+    harm: "Cefiderocol is the alternative, not a casual one: resistance can emerge, and it is an antibiotic-stewardship drug. Polymyxins are salvage. They injure the kidney and the nerves.",
+  },
+  {
+    id: "kpc", group: "Carbapenemase", title: "KPC Klebsiella",
+    story: "Hospital bacteremia. The molecular test says KPC, not NDM. Kidneys normal.",
+    bug: "Klebsiella pneumoniae, KPC", source: "Blood",
+    mech: "KPC serine carbapenemase. Meropenem R. Ceftazidime-avibactam S. Meropenem-vaborbactam S.",
+    ask: "Which agent is built for KPC?",
+    options: [
+      { t: "Ceftazidime-avibactam 2.5 g IV every 8 hours over 2–3 hours", grade: "best", why: "KPC is a serine carbapenemase. Avibactam inhibits it. Meropenem-vaborbactam and imipenem-relebactam are the other preferred KPC drugs. Cefiderocol is an alternative. Do not use a plain carbapenem." },
+      { t: "Meropenem 2 g every 8 hours by prolonged infusion", grade: "bad", why: "Prolonged infusion cannot outrun a KPC enzyme. The organism is meropenem resistant for a reason." },
+      { t: "Aztreonam plus ceftazidime-avibactam", grade: "ok", why: "The combination would work, but the aztreonam is for a metallo-enzyme. KPC does not need it. You burn a second drug and confuse the next person who reads the chart." },
+      { t: "Ertapenem plus meropenem", grade: "bad", why: "Double carbapenem is an old salvage trick, not preferred therapy, once avibactam or vaborbactam is available." },
+    ],
+    pk: "Same beta-lactam rule: fT>MIC, infused over 2–3 hours. The avibactam is what keeps ceftazidime alive against KPC.",
+    harm: "These drugs select resistant mutants if the source is not drained. Remove the focus. Do not add a polymyxin because it feels stronger.",
+  },
+  {
+    id: "oxa", group: "Carbapenemase", title: "OXA-48 Klebsiella",
+    story: "Same ward, different patient. The test specifically says OXA-48-like, not KPC and not NDM.",
+    bug: "Klebsiella pneumoniae, OXA-48-like", source: "Blood",
+    mech: "OXA-48-like serine carbapenemase. Often meropenem looks only intermediate. Ceftazidime-avibactam S.",
+    ask: "Which beta-lactamase inhibitor actually covers OXA-48?",
+    options: [
+      { t: "Ceftazidime-avibactam 2.5 g IV every 8 hours", grade: "best", why: "Avibactam inhibits OXA-48-like enzymes. That makes ceftazidime-avibactam the preferred drug. Cefiderocol is the alternative. Confirm you are not also looking at an NDM, which sometimes travels with OXA-48." },
+      { t: "Meropenem-vaborbactam", grade: "bad", why: "Vaborbactam is a KPC inhibitor. It does not reliably inhibit OXA-48. The name carbapenem-plus-inhibitor is not enough." },
+      { t: "Meropenem alone, because the MIC is only intermediate", grade: "bad", why: "An intermediate meropenem MIC with a known OXA-48 is not an invitation to use meropenem as definitive therapy." },
+      { t: "Piperacillin-tazobactam", grade: "bad", why: "Tazobactam does not cover OXA-48. Piperacillin will fail." },
+    ],
+    pk: "Ceftazidime-avibactam 2.5 g every 8 hours. Infuse over 2–3 hours so fT>MIC is preserved.",
+    harm: "If a second carbapenemase (often NDM) is present, ceftazidime-avibactam alone fails. Read the genotype, not just the word carbapenemase.",
+  },
+  {
+    id: "vre", group: "Hospital", title: "VRE faecium in the blood",
+    story: "Hematology patient, febrile, line infection. Creatinine clearance 70. Not on an SSRI. CK normal.",
+    bug: "Enterococcus faecium, vancomycin resistant", source: "Blood",
+    mech: "VanA. Vancomycin R, ampicillin R, linezolid S, daptomycin S. This is not E. faecalis.",
+    ask: "Vancomycin is resistant. What do you use?",
+    options: [
+      { t: "Daptomycin 8–10 mg/kg IV every 24 hours", grade: "best", why: "High-dose daptomycin is appropriate for VRE faecium bacteremia when the CK is normal and the lung is not the source. Linezolid 600 mg every 12 hours is the other active choice and was held back here only because daptomycin fits bacteremia cleanly in this stem. E. faecalis would have been an ampicillin case. E. faecium usually is not." },
+      { t: "Vancomycin with a higher trough", grade: "bad", why: "VanA means the target is changed. No vancomycin exposure fixes that. AUC monitoring does not create susceptibility." },
+      { t: "Ceftriaxone", grade: "bad", why: "Enterococci are intrinsically resistant to cephalosporins. Ceftriaxone is not an enterococcal drug, even in combination, for this infection." },
+      { t: "Meropenem", grade: "bad", why: "E. faecium is not a meropenem organism. Ampicillin resistance plus vancomycin resistance leaves linezolid or daptomycin." },
+    ],
+    pk: "Daptomycin is concentration-dependent. Bacteremia doses are 8–10 mg/kg once daily, higher than the skin-infection dose of 4 mg/kg. Linezolid is 600 mg every 12 hours and needs little renal adjustment.",
+    harm: "Daptomycin: stop the statin, check CK, watch for eosinophilic pneumonia, and do not use it for pneumonia. Linezolid: platelets, serotonin syndrome, neuropathy after about two weeks.",
+  },
+  {
+    id: "steno", group: "Hospital", title: "Stenotrophomonas",
+    story: "Prolonged ventilation and a carbapenem course. New pneumonia. The lab calls a non-fermenter that is not Pseudomonas.",
+    bug: "Stenotrophomonas maltophilia", source: "Respiratory, clinically a pneumonia",
+    mech: "Intrinsic metallo-beta-lactamase. Carbapenems R. Cephalosporins R. TMP-SMX usually S.",
+    ask: "Which drug is even active?",
+    options: [
+      { t: "Trimethoprim-sulfamethoxazole, about 5 mg/kg of trimethoprim IV every 8 hours", grade: "best", why: "TMP-SMX is active against Stenotrophomonas. For serious pneumonia, 2024 guidance often pairs it, or prefers cefiderocol plus a second agent, ceftazidime-avibactam plus aztreonam, or minocycline plus a second agent. A carbapenem is never the answer. Watch potassium, kidney function, rash, and the marrow." },
+      { t: "Meropenem 1 g every 8 hours", grade: "bad", why: "Stenotrophomonas makes a metallo-beta-lactamase. Meropenem is intrinsically inactive. This is a classic post-carbapenem organism." },
+      { t: "Cefepime 2 g every 8 hours", grade: "bad", why: "Cefepime does not treat Stenotrophomonas. It was the Pseudomonas drug in a different case." },
+      { t: "Vancomycin", grade: "bad", why: "Wrong kingdom of organism. This is a gram-negative non-fermenter." },
+    ],
+    pk: "TMP-SMX for serious Stenotrophomonas is dosed on the trimethoprim component, about 5 mg/kg every 8 hours, and it needs renal adjustment. It is not the cystitis dose.",
+    harm: "Hyperkalemia, creatinine rise, marrow suppression, and Stevens-Johnson syndrome. It also interacts with warfarin and methotrexate.",
+  },
+  {
+    id: "dtr", group: "Hospital", title: "Difficult-to-treat Pseudomonas",
+    story: "VAP. The Pseudomonas is resistant to cefepime, piperacillin-tazobactam, meropenem, and ciprofloxacin. Kidneys normal.",
+    bug: "Pseudomonas aeruginosa, difficult to treat", source: "Respiratory",
+    mech: "Not a simple KPC. Resistant to the usual antipseudomonal beta-lactams and ciprofloxacin.",
+    ask: "Which newer agent is a pneumonia dose for this isolate?",
+    options: [
+      { t: "Ceftolozane-tazobactam 3 g IV every 8 hours", grade: "best", why: "For difficult-to-treat Pseudomonas pneumonia the ceftolozane-tazobactam dose is 3 g every 8 hours, not the 1.5 g urinary dose. Ceftazidime-avibactam, imipenem-relebactam, and cefiderocol are the other options, chosen from the actual susceptibility panel." },
+      { t: "Ceftolozane-tazobactam 1.5 g every 8 hours", grade: "bad", why: "1.5 g is the intra-abdominal and urinary dose. Pneumonia needs 3 g every 8 hours. The organism can be susceptible and the exposure still too low." },
+      { t: "Meropenem 2 g every 8 hours", grade: "bad", why: "The report already says meropenem resistant. Doubling a resistant carbapenem is not a regimen." },
+      { t: "Ertapenem", grade: "bad", why: "Ertapenem has no Pseudomonas activity, resistant or not." },
+    ],
+    pk: "Ceftolozane is time-dependent. The higher gram dose in the lung is about hitting fT>MIC at the site, not about a different mechanism.",
+    harm: "These agents still fail if the MIC is high or the source is undrained. Recheck sensitivities. Do not add an aminoglycoside and forget the ears and the creatinine.",
+  },
+];
+
+let screen = "board";
+let caseId = null;
+let picked = null;
+const seen = {};
+
+function cur() { return CASES.find((c) => c.id === caseId); }
+const app = document.getElementById("app");
+
+function draw() {
+  if (screen === "primer") return primer();
+  if (screen === "case") return showCase();
+  board();
+}
+function board() {
+  const hub = location.hostname.endsWith("github.io") ? '<p><a href="index.html">← All simulators</a></p>' : "";
+  const groups = ["Community", "Hospital", "Carbapenemase"];
+  app.innerHTML = `<div class="wrap"><div class="hero">${hub}
+    <div style="font-size:13px;letter-spacing:.08em;font-weight:700">INFECTION IN CRITICAL CARE</div>
+    <h1>Antibiotic simulator</h1>
+    <p class="lede">A culture comes back. You pick the drug that covers the organism, at a dose the kidneys can tolerate, with the toxicity this patient will actually meet.</p>
+    <div class="top"><button id="pk">PK/PD and toxicity</button></div>
+  </div>
+  ${groups.map((g) => `<h2>${g}</h2>` + CASES.filter((c) => c.group === g).map((c) =>
+    `<button class="card" data-id="${c.id}"><b>${c.title}</b><div class="meta">${c.bug}${seen[c.id] ? " · done" : ""}</div></button>`
+  ).join("")).join("")}
+  <p class="meta" style="margin-top:16px">Educational drill. Doses are typical adult IV starting points, not a prescription. Confirm with the culture, the creatinine clearance, the local antibiogram, and pharmacy or infectious diseases.</p>
+  </div>`;
+  document.getElementById("pk").onclick = () => { screen = "primer"; draw(); };
+  app.querySelectorAll(".card").forEach((b) => b.onclick = () => {
+    caseId = b.dataset.id; picked = null; screen = "case"; draw();
+  });
+}
+function showCase() {
+  const c = cur();
+  app.innerHTML = `<div class="wrap"><div class="hero">
+    <div style="font-size:13px;letter-spacing:.08em;font-weight:700">${c.group.toUpperCase()}</div>
+    <h1>${c.title}</h1>
+    <div class="top"><button id="back">Cases</button></div>
+  </div>
+  <div class="slip"><p>${c.story}</p></div>
+  <h2>Culture</h2>
+  <div class="slip">
+    <div class="row"><span>Organism</span><b>${c.bug}</b></div>
+    <div class="row"><span>Source</span><b>${c.source}</b></div>
+    <div class="row"><span>Marker</span><b>${c.mech}</b></div>
+  </div>
+  <h2>${c.ask}</h2>
+  <div class="opts" id="opts">${c.options.map((o, i) => `<button data-i="${i}">${o.t}</button>`).join("")}</div>
+  <div class="slip" id="fb" style="display:none"></div>
+  </div>`;
+  document.getElementById("back").onclick = () => { screen = "board"; draw(); };
+  document.getElementById("opts").onclick = (e) => {
+    const b = e.target.closest("button");
+    if (!b || picked) return;
+    picked = c.options[+b.dataset.i];
+    seen[c.id] = true;
+    document.querySelectorAll("#opts button").forEach((btn) => {
+      const g = c.options[+btn.dataset.i].grade;
+      if (g === "best") btn.className = "good";
+      else if (btn === b && g === "bad") btn.className = "bad";
+      else if (btn === b && g === "ok") btn.className = "ok";
+    });
+    const fb = document.getElementById("fb");
+    const label = picked.grade === "best" ? "Right drug." : picked.grade === "ok" ? "Active, not the best fit." : "Not this drug.";
+    fb.style.display = "block";
+    fb.className = "slip " + (picked.grade === "best" ? "good" : picked.grade === "ok" ? "ok" : "bad");
+    fb.innerHTML = `<b>${label}</b><p style="margin-top:8px">${picked.why}</p>
+      <p style="margin-top:10px"><span class="pill">PK/PD</span> ${c.pk}</p>
+      <p style="margin-top:8px"><span class="pill">Harm</span> ${c.harm}</p>`;
+  };
+}
+function primer() {
+  const rows = [
+    ["Beta-lactams", "Time above MIC", "40–70% fT>MIC; aim near 100% in shock. Prolong the infusion.", "Cefepime neurotoxicity if the kidneys are ignored. Meropenem drops valproate. Piperacillin plus vancomycin adds kidney injury."],
+    ["Vancomycin", "AUC/MIC", "400–600 for serious MRSA. Load, then level. Not a trough of 15–20 as the only target.", "Nephrotoxicity, ototoxicity, infusion reaction."],
+    ["Aminoglycosides", "Peak / MIC", "Cmax/MIC about 8–10, once daily when you can.", "Kidney injury and irreversible hearing and balance loss."],
+    ["Fluoroquinolones", "AUC/MIC", "Ciprofloxacin 400 mg every 8 hours only if Pseudomonas is truly susceptible.", "Tendons, QT, delirium, low or high glucose, C. difficile."],
+    ["Linezolid", "AUC, fixed dose", "600 mg every 12 hours. Little renal change.", "Platelets, serotonin syndrome, neuropathy, lactic acidosis."],
+    ["Daptomycin", "Concentration", "8–10 mg/kg daily for bacteremia. Never pneumonia.", "CK rise, eosinophilic pneumonia. Stop the statin."],
+    ["NDM / VIM / IMP", "Metallo-enzyme", "Aztreonam plus ceftazidime-avibactam, or cefiderocol.", "A carbapenem, or avibactam alone, does not inhibit it."],
+    ["KPC", "Serine carbapenemase", "Ceftazidime-avibactam, meropenem-vaborbactam, or imipenem-relebactam.", "Plain meropenem fails."],
+    ["OXA-48", "Serine, different inhibitor", "Ceftazidime-avibactam. Cefiderocol is the alternative.", "Vaborbactam is the wrong inhibitor."],
+  ];
+  app.innerHTML = `<div class="wrap"><div class="hero">
+    <div style="font-size:13px;letter-spacing:.08em;font-weight:700">REFERENCE</div>
+    <h1>PK/PD and the enzymes</h1>
+    <div class="top"><button id="back">Cases</button></div>
+  </div>
+  ${rows.map((r) => `<div class="slip" style="margin-top:10px"><b>${r[0]}</b><div class="meta">${r[1]}</div><p style="margin-top:6px">${r[2]}</p><p class="meta" style="margin-top:6px">${r[3]}</p></div>`).join("")}
+  </div>`;
+  document.getElementById("back").onclick = () => { screen = "board"; draw(); };
+}
+draw();
+</script>
+</body>
+</html>
