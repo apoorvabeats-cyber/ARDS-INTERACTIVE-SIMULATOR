@@ -24,8 +24,7 @@
   .lede { color: #dbe9ff; font-size: 16px; }
   .row { display: flex; flex-wrap: wrap; gap: 8px; }
   canvas { width: 100%; display: block; background: #0e1520; border-radius: 16px; }
-  #scalars { height: 280px; }
-  #loops { height: 220px; margin-top: 8px; }
+  #scalars { height: 420px; }
   .nums { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
   @media (min-width: 720px) { .nums { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
   .num { background: #fff; border: 1px solid #d7e0ec; border-radius: 14px; padding: 8px 10px; }
@@ -47,7 +46,7 @@
 const PRESETS = [
   { id:"normal", name:"Normal volume control", mode:"VC", rr:14, vt:480, ti:1.0, peep:5, R:8, C:50, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, pinsp:14,
     stem:"Routine postoperative patient. Comfortable, no alarms.",
-    tell:"Square inspiratory flow, pressure steps then rises, expiratory flow returns to zero, and both loops close. Peak and plateau are close." },
+    tell:"Square inspiratory flow, pressure steps then rises, and expiratory flow returns to zero. Peak and plateau are close." },
   { id:"pc", name:"Normal pressure control", mode:"PC", rr:16, vt:420, ti:1.0, peep:8, R:8, C:45, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, pinsp:14,
     stem:"Pressure-control breath. The set pressure is square. Flow should decelerate.",
     tell:"Square pressure, decelerating flow. Flow near zero at the end of inspiration means the lung has equilibrated with the set pressure." },
@@ -56,16 +55,16 @@ const PRESETS = [
     tell:"Large peak-to-plateau gap. Expiratory flow is scooped and slow. Think bronchospasm, secretions, a kink, or the patient biting — not a stiff lung." },
   { id:"compliance", name:"Low compliance", mode:"VC", rr:18, vt:400, ti:0.9, peep:10, R:8, C:18, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, pinsp:18,
     stem:"Peak and plateau are both high. The gap between them is small.",
-    tell:"Elastic pressure is the problem. The pressure-volume loop is flat. ARDS, pneumothorax, mainstem intubation, and abdominal distension all look like this. The waveform does not name which one." },
+    tell:"Elastic pressure is the problem. Pressure climbs steeply for the volume delivered. ARDS, pneumothorax, mainstem intubation, and abdominal distension all look like this. The waveform does not name which one." },
   { id:"autopeep", name:"Auto-PEEP", mode:"VC", rr:26, vt:560, ti:1.0, peep:5, R:22, C:55, leak:0, starve:0, saw:0, miss:0, double:0, beak:0, pinsp:14,
     stem:"COPD. The rate was turned up for a low pH. Expiratory flow never rests.",
     tell:"The next breath starts before flow reaches zero. Volume is still trapped. Intrinsic PEEP is set PEEP plus what is left in the lung. Give more time to exhale: lower the rate, shorten inspiration." },
   { id:"leak", name:"Leak", mode:"VC", rr:14, vt:500, ti:1.0, peep:5, R:10, C:45, leak:0.55, starve:0, saw:0, miss:0, double:0, beak:0, pinsp:14,
     stem:"Exhaled tidal volume is much smaller than inhaled. Pressure is ordinary.",
-    tell:"The volume trace does not return to zero and the loops do not close. Look for a cuff leak, a disconnected circuit, or a chest tube bubbling off the tidal volume." },
+    tell:"The volume trace does not return to zero, and exhaled volume is smaller than inhaled. Look for a cuff leak, a disconnected circuit, or a chest tube bubbling off the tidal volume." },
   { id:"beak", name:"Overdistension", mode:"VC", rr:16, vt:720, ti:1.1, peep:5, R:8, C:28, leak:0, starve:0, saw:0, miss:0, double:0, beak:1, pinsp:14,
-    stem:"Large tidal volume on a stiff lung. The pressure-volume loop turns up at the end.",
-    tell:"Bird beak: the last part of the breath costs a lot of pressure and little volume. Drop the tidal volume. This is how ventilator-induced lung injury starts." },
+    stem:"Large tidal volume on a stiff lung. Pressure turns up at the end of the breath.",
+    tell:"The last part of the breath costs a lot of pressure and little extra volume. Drop the tidal volume. This is how ventilator-induced lung injury starts." },
   { id:"starve", name:"Flow starvation", mode:"VC", rr:18, vt:450, ti:1.15, peep:5, R:10, C:40, leak:0, starve:1, saw:0, miss:0, double:0, beak:0, pinsp:14,
     stem:"Awake, air hunger, the inspiratory pressure curve caves in.",
     tell:"The patient wants flow the ventilator is not giving. In volume control the pressure scoop means unmet demand. Raise the flow, lengthen inspiration less, or switch to a pressure mode." },
@@ -138,7 +137,7 @@ function generate(c) {
       paw += 1.3 * Math.sin(t * 78);
       flow += 0.12 * Math.sin(t * 78);
     }
-    if (t >= warm) all.push({ t: t - warm, paw, flow, meas, lung });
+    if (t >= warm) all.push({ t: t - warm, paw, flow: flow * 60, meas, lung });
   }
   let ppeak = 0, pplat = 0, vend = 0, flowEnd = 0;
   const lastT = all[all.length - 1].t;
@@ -160,94 +159,90 @@ function generate(c) {
   return { pts: all.filter((p) => p.t >= start - T), T, Ti, ppeak, pplat, vti, vte, peepi, flowEnd, vend };
 }
 
+let live = null;
+let rafId = 0;
 function draw(series) {
-  const sCanvas = document.getElementById("scalars");
-  const lCanvas = document.getElementById("loops");
-  if (!sCanvas || !series) return;
-  paintScalars(sCanvas, series);
-  paintLoops(lCanvas, series);
+  live = series;
+  if (!document.getElementById("scalars") || !series) return;
+  if (!rafId) rafId = requestAnimationFrame(loop);
+}
+function loop(now) {
+  const canvas = document.getElementById("scalars");
+  if (!canvas || !live) { rafId = 0; return; }
+  paintScalars(canvas, live, now / 1000);
+  rafId = requestAnimationFrame(loop);
 }
 function setup(canvas) {
   const dpr = Math.min(2, devicePixelRatio || 1);
   const rect = canvas.getBoundingClientRect();
-  canvas.width = Math.max(1, rect.width * dpr);
-  canvas.height = Math.max(1, rect.height * dpr);
+  const pw = Math.max(1, Math.round(rect.width * dpr));
+  const ph = Math.max(1, Math.round(rect.height * dpr));
+  if (canvas.width !== pw || canvas.height !== ph) {
+    canvas.width = pw;
+    canvas.height = ph;
+  }
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return { ctx, w: rect.width, h: rect.height };
 }
-function paintScalars(canvas, series) {
+function sample(pts, key, time) {
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t, span = t1 - t0 || 1;
+  let u = t0 + ((time % span) + span) % span;
+  const i = Math.min(pts.length - 2, Math.max(0, Math.floor((u - t0) / span * (pts.length - 1))));
+  const a = pts[i], b = pts[i + 1];
+  const f = (u - a.t) / ((b.t - a.t) || 1);
+  return a[key] + (b[key] - a[key]) * Math.max(0, Math.min(1, f));
+}
+function paintScalars(canvas, series, now) {
   const { ctx, w, h } = setup(canvas);
-  ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = "#0e1520";
+  ctx.fillStyle = "#0b0f14";
   ctx.fillRect(0, 0, w, h);
   const rows = [
-    { key:"paw", label:"Paw  cmH2O", color:"#e6b325", zero:true },
-    { key:"flow", label:"Flow  L/s", color:"#3dbe6a", zero:true, mid:true },
-    { key:"meas", label:"Volume  mL", color:"#4aa3ff", zero:true },
+    { key:"paw", name:"Paw", unit:"cmH2O", color:"#ffe14a", lo:0, hi:40 },
+    { key:"flow", name:"Flow", unit:"L/min", color:"#3dff4a", lo:-80, hi:80 },
+    { key:"meas", name:"Volume", unit:"mL", color:"#5ce1ff", lo:0, hi:700 },
   ];
   const pts = series.pts;
   const rh = h / 3;
+  const windowSec = 10;
+  const left = 58;
   rows.forEach((row, i) => {
     const y0 = i * rh;
-    let min = Infinity, max = -Infinity;
-    pts.forEach((p) => { const v = p[row.key]; if (v < min) min = v; if (v > max) max = v; });
-    if (row.key === "flow") { const m = Math.max(Math.abs(min), Math.abs(max), 0.2); min = -m; max = m; }
-    if (row.key === "meas") { min = 0; max = Math.max(max, 200); }
-    if (row.key === "paw") { min = Math.min(0, min - 2); max = Math.max(max + 4, 20); }
-    const pad = 8;
-    const mapY = (v) => y0 + rh - pad - ((v - min) / (max - min || 1)) * (rh - pad * 2);
-    const mapX = (t) => 46 + ((t - pts[0].t) / (pts[pts.length - 1].t - pts[0].t)) * (w - 56);
-    ctx.strokeStyle = "rgba(255,255,255,.12)";
+    let lo = row.lo, hi = row.hi;
+    pts.forEach((p) => { lo = Math.min(lo, p[row.key]); hi = Math.max(hi, p[row.key]); });
+    if (row.key === "flow") { const m = Math.max(80, Math.abs(lo), Math.abs(hi)); lo = -m; hi = m; }
+    if (row.key === "paw") { lo = Math.min(0, lo); hi = Math.max(40, hi + 2); }
+    if (row.key === "meas") { lo = 0; hi = Math.max(700, hi); }
+    const pad = 10;
+    const mapY = (v) => y0 + rh - pad - ((v - lo) / (hi - lo || 1)) * (rh - pad * 2);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, y0 + 1, w, rh - 2);
+    ctx.clip();
+    ctx.strokeStyle = "rgba(255,255,255,.14)";
+    ctx.lineWidth = 1;
     ctx.beginPath();
     const yz = mapY(0);
-    ctx.moveTo(46, yz); ctx.lineTo(w - 8, yz); ctx.stroke();
+    ctx.moveTo(left, yz); ctx.lineTo(w - 6, yz); ctx.stroke();
     ctx.fillStyle = row.color;
     ctx.font = "12px ui-monospace, monospace";
-    ctx.fillText(row.label, 8, y0 + 16);
+    ctx.fillText(row.name, 6, y0 + 16);
+    ctx.fillText(hi.toFixed(0), 6, y0 + 32);
+    ctx.fillText(row.unit, 6, y0 + 46);
+    ctx.fillText(lo.toFixed(0), 6, y0 + rh - 8);
     ctx.beginPath();
     ctx.strokeStyle = row.color;
-    ctx.lineWidth = 1.6;
-    pts.forEach((p, n) => {
-      const x = mapX(p.t), y = mapY(p[row.key]);
-      if (n === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    });
+    ctx.lineWidth = 1.8;
+    const n = Math.max(2, Math.floor(w - left));
+    for (let x = 0; x <= n; x++) {
+      const time = now - windowSec + (x / n) * windowSec;
+      const y = mapY(sample(pts, row.key, time));
+      const px = left + x;
+      if (x === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+    }
     ctx.stroke();
+    ctx.restore();
   });
-}
-function paintLoops(canvas, series) {
-  const { ctx, w, h } = setup(canvas);
-  ctx.fillStyle = "#0e1520";
-  ctx.fillRect(0, 0, w, h);
-  const pts = series.pts.filter((p) => p.t > series.pts[series.pts.length - 1].t - series.T);
-  function loop(box, xKey, yKey, color, xlab, ylab, xZero, yZero) {
-    let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity;
-    pts.forEach((p) => {
-      xmin = Math.min(xmin, p[xKey]); xmax = Math.max(xmax, p[xKey]);
-      ymin = Math.min(ymin, p[yKey]); ymax = Math.max(ymax, p[yKey]);
-    });
-    if (xZero) xmin = Math.min(0, xmin);
-    if (yZero === "mid") { const m = Math.max(Math.abs(ymin), Math.abs(ymax), 0.2); ymin = -m; ymax = m; }
-    if (yZero === "base") ymin = 0;
-    const pad = 16;
-    const X = (v) => box.x + pad + ((v - xmin) / (xmax - xmin || 1)) * (box.w - pad * 2);
-    const Y = (v) => box.y + box.h - pad - ((v - ymin) / (ymax - ymin || 1)) * (box.h - pad * 2);
-    ctx.strokeStyle = "rgba(255,255,255,.15)";
-    ctx.beginPath();
-    if (yZero) { ctx.moveTo(box.x + 8, Y(0)); ctx.lineTo(box.x + box.w - 8, Y(0)); }
-    if (xZero) { ctx.moveTo(X(0), box.y + 8); ctx.lineTo(X(0), box.y + box.h - 8); }
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.7;
-    pts.forEach((p, n) => { const x = X(p[xKey]), y = Y(p[yKey]); if (n === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
-    ctx.stroke();
-    ctx.fillStyle = "#c5d0dc";
-    ctx.font = "12px ui-monospace, monospace";
-    ctx.fillText(ylab + " / " + xlab, box.x + 8, box.y + 14);
-  }
-  loop({ x:0, y:0, w:w/2, h }, "paw", "lung", "#e6b325", "Paw", "P–V", true, "base");
-  loop({ x:w/2, y:0, w:w/2, h }, "meas", "flow", "#3dbe6a", "Vol", "F–V", false, "mid");
 }
 
 function nums(series) {
@@ -261,7 +256,7 @@ function nums(series) {
     ["VTi", Math.round(series.vti), "mL", ""],
     ["VTe", Math.round(series.vte), "mL", leakPct > 20 ? "hi" : ""],
     ["Leak", Math.round(leakPct), "%", leakPct > 20 ? "hi" : "ok"],
-    ["End flow", series.flowEnd.toFixed(2), "L/s", series.flowEnd < -0.08 ? "hi" : "ok"],
+    ["End flow", series.flowEnd.toFixed(0), "L/min", series.flowEnd < -5 ? "hi" : "ok"],
   ];
 }
 
@@ -275,7 +270,7 @@ function drawUI() {
     <div class="hero">${hub}
       <div style="font-size:13px;letter-spacing:.08em;font-weight:700">RESPIRATORY CRITICAL CARE</div>
       <h1>Ventilator waveforms</h1>
-      <p class="lede">Change the lung and the breath. The scalars and the loops are how you tell resistance from compliance, trapping from a leak, and a patient who is still pulling.</p>
+      <p class="lede">Three scalars only, scrolling like the ventilator. Yellow is pressure in cmH2O. Green is flow in L/min. Blue is volume in mL. Turn Sound on for the ventilator breath.</p>
       <div class="top">
         <button class="on" id="tabE">Explore</button>
         <button id="tabQ">Troubleshoot</button>
@@ -283,9 +278,8 @@ function drawUI() {
     </div>
     <h2>Pattern</h2>
     <div class="row" id="presets">${PRESETS.map((p) => `<button data-id="${p.id}" class="${p.id===cfg.id?"on":""}">${p.name}</button>`).join("")}</div>
-    <h2>Scalars</h2>
+    <h2>Pressure, flow, volume</h2>
     <canvas id="scalars"></canvas>
-    <canvas id="loops" aria-label="Pressure-volume and flow-volume loops"></canvas>
     <div class="nums" id="nums"></div>
     <div class="panel" id="tell"></div>
     <h2>Change the breath</h2>
@@ -360,9 +354,9 @@ function drawQuiz() {
       <p class="lede">${preset.stem}</p>
       <div class="top"><button id="back">Explore</button><button id="next" ${picked?"":"disabled"}>Next</button></div>
     </div>
-    <h2>Scalars and loops</h2>
+    <h2>Pressure, flow, volume</h2>
     <canvas id="scalars"></canvas>
-    <canvas id="loops"></canvas>
+    <span id="s-rr" hidden>${cfg.rr}</span>
     <div class="nums" id="nums"></div>
     <h2>Diagnosis</h2>
     <div class="row" id="opts"></div>
@@ -405,7 +399,6 @@ function drawDone() {
   document.getElementById("explore").onclick = () => { screen = "explore"; cfg = Object.assign({}, PRESETS[0]); drawUI(); };
 }
 drawUI();
-window.addEventListener("resize", () => { if (document.getElementById("scalars")) { const series = generate(cfg); draw(series); } });
 </script>
 <script src="icu-audio.js?v=20260924f"></script>
 </body>
