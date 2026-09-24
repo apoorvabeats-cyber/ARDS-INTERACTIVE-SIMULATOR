@@ -75,7 +75,7 @@ button:disabled{opacity:.4;cursor:not-allowed}.num{text-align:center;font-weight
    <option value="sepsis">Sepsis-associated ARDS</option>
   </select>
  </div>
- <div class="small" id="caseDesc">Lobar pneumonia progressing to bilateral infiltrates; moderate–severe hypoxemia. P/F 78, severe ARDS.</div>
+ <div class="small" id="caseDesc">Bilateral infiltrates after pneumonia. P/F 55, severe ARDS. Compliance is low.</div>
  <div class="row"><span>Height</span><input id="height" type="number" min="100" max="220" value="170"></div>
  <div class="row"><span>Sex</span><select id="sex"><option value="male">Male</option><option value="female">Female</option></select></div>
  <div class="row"><span>Actual weight</span><input id="weight" type="number" min="20" max="250" value="70"></div>
@@ -131,12 +131,12 @@ button:disabled{opacity:.4;cursor:not-allowed}.num{text-align:center;font-weight
 
 <section class="card" id="clinicalDecision" style="margin-top:12px">
  <div class="label">Clinical Decision Tree</div>
- <div id="alert" class="alert"><strong>⚠️ Persistent severe hypoxemia</strong><span>P/F 78. Review lung-protective ventilation and consider prone positioning.</span></div>
+ <div id="alert" class="alert"><strong>Severe ARDS</strong><span>P/F 55. Set the tidal volume near 6 mL/kg predicted body weight before prone positioning or rescue therapy.</span></div>
  <div class="row"><span>ARDS severity</span><strong id="severity">Severe</strong></div><div class="decisionGrid">
   <div class="decision" id="decOxy"><h3>1. Oxygenation</h3><p id="decOxyText">Target SpO₂ 88–95%. If improving, reduce FiO₂ stepwise first.</p></div>
   <div class="decision" id="decLung"><h3>2. Lung protection / PEEP</h3><p id="decLungText">Maintain Vt 4–8 mL/kg PBW and Pplat &lt;30; after FiO₂ is low, reassess PEEP.</p></div>
-  <div class="decision" id="decProne"><h3>3. Prone positioning</h3><p id="decProneText">For P/F ≤150, consider prolonged prone positioning (typically ≥16 h/session).</p></div>
-  <div class="decision" id="decRescue"><h3>4. Liberation / rescue</h3><p id="decRescueText">If refractory: rescue/ECMO pathway. If improving with low FiO₂/PEEP: assess SBT/extubation readiness.</p></div>
+  <div class="decision" id="decProne"><h3>3. Prone positioning</h3><p id="decProneText">If P/F stays ≤150 on FiO₂ ≥0.60 and PEEP ≥5, after the tidal volume is safe, prone for at least 16 hours.</p></div>
+  <div class="decision" id="decRescue"><h3>4. Liberation / rescue</h3><p id="decRescueText">Do not use routine recruitment. An inhaled vasodilator is only a bridge. VV-ECMO is for refractory failure after a low tidal volume and prone positioning.</p></div>
  </div>
  <div class="trajectory" id="trajectory">
   <div class="trajectoryHead"><strong>Patient trajectory</strong><span id="phaseBadge">INITIAL SEVERE ARDS</span></div>
@@ -195,10 +195,10 @@ const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 
 /* ---- Case definitions ---- */
 const CASES={
-  pneumonia:{label:'Pneumonia-associated ARDS',desc:'Lobar pneumonia progressing to bilateral infiltrates; moderate–severe hypoxemia. P/F 78, severe ARDS.',pfBase:55,co2Base:48,mapBase:78,hrBase:112,spo2Init:89,vtInit:400,rrInit:24,fio2Init:0.80,peepInit:10,bpInit:'104/59'},
-  covid:{label:'COVID-19 ARDS',desc:'SARS-CoV-2 pneumonia with L-phenotype ARDS; high compliance but profound hypoxemia. P/F 85, severe ARDS.',pfBase:62,co2Base:44,mapBase:80,hrBase:108,spo2Init:90,vtInit:440,rrInit:22,fio2Init:0.75,peepInit:8,bpInit:'108/61'},
-  aspiration:{label:'Aspiration ARDS',desc:'Witnessed aspiration event; chemical pneumonitis with bilateral infiltrates and severe shunt physiology. P/F 65, severe ARDS.',pfBase:48,co2Base:52,mapBase:74,hrBase:118,spo2Init:87,vtInit:380,rrInit:26,fio2Init:0.85,peepInit:12,bpInit:'100/57'},
-  sepsis:{label:'Sepsis-associated ARDS',desc:'Abdominal sepsis with ARDS; vasopressor-dependent, highly tenuous hemodynamics. P/F 70, severe ARDS.',pfBase:50,co2Base:50,mapBase:68,hrBase:122,spo2Init:88,vtInit:400,rrInit:24,fio2Init:0.80,peepInit:10,bpInit:'95/54'}
+  pneumonia:{label:'Pneumonia-associated ARDS',desc:'Bilateral infiltrates after pneumonia. P/F 55, severe ARDS. Compliance is low.',pfBase:55,crs:30,peepGain:2.4,co2Base:48,mapBase:78,hrBase:112,spo2Init:89,vtInit:400,rrInit:24,fio2Init:0.80,peepInit:10,bpInit:'104/59'},
+  covid:{label:'COVID-19 ARDS',desc:'SARS-CoV-2 pneumonia. P/F 62, severe ARDS. Compliance is relatively high, so more PEEP does not fix the hypoxemia. A low tidal volume still applies.',pfBase:62,crs:52,peepGain:0.8,co2Base:44,mapBase:80,hrBase:108,spo2Init:90,vtInit:440,rrInit:22,fio2Init:0.75,peepInit:8,bpInit:'108/61'},
+  aspiration:{label:'Aspiration ARDS',desc:'Witnessed aspiration with bilateral infiltrates. P/F 48, severe ARDS. Compliance is low.',pfBase:48,crs:22,peepGain:2.2,co2Base:52,mapBase:74,hrBase:118,spo2Init:87,vtInit:380,rrInit:26,fio2Init:0.85,peepInit:12,bpInit:'100/57'},
+  sepsis:{label:'Sepsis-associated ARDS',desc:'Abdominal sepsis with ARDS, already on a vasopressor. P/F 50, severe ARDS. Extra PEEP drops the blood pressure.',pfBase:50,crs:26,peepGain:1.6,co2Base:50,mapBase:64,hrBase:122,spo2Init:88,vtInit:400,rrInit:24,fio2Init:0.80,peepInit:8,bpInit:'92/50'}
 };
 let currentCase=CASES.pneumonia;
 let recruitMapPenalty=0;
@@ -225,7 +225,14 @@ function loadCase(key){
   $('pf').textContent=String(currentCase.pfBase);
   $('pplat').textContent='—';$('totalpeep').textContent='—';$('autopeep').textContent='—';$('drive').textContent='—';
   $('driveEst').textContent='';
+  $('alert').innerHTML='<strong>Severe ARDS</strong><span>P/F '+currentCase.pfBase+'. Set the tidal volume near 6 mL/kg predicted body weight before prone positioning or rescue therapy. A corticosteroid is suggested and does not replace that limit.</span>';
   render();
+}
+
+function crs(s){
+ let c=currentCase.crs - Math.max(0, s.vt/pbw()-8)*2;
+ if(s.peep>16) c-=(s.peep-16)*1.2;
+ return clamp(c,12,80);
 }
 
 function pbw(){
@@ -326,10 +333,10 @@ function setDecision(kind,title,msg,suggest,targets,alarmNeeded=true){
 
 /* ---- Driving pressure estimate ---- */
 function updateDriveEstimate(){
- const s=state(),p=pbw(),ratio=s.vt/p;
- const comp=clamp(35-(ratio-6)*2,20,45);
+ const s=state(),ratio=s.vt/pbw();
+ const comp=crs(s);
  const estimatedPlat=s.peep+s.vt/comp;
- const dp=estimatedPlat-s.peep; // = Vt/Crs estimate
+ const dp=estimatedPlat-s.peep;
  const dpEl=$('driveEst');
  if(dpEl){
    dpEl.textContent='(est. ~'+dp.toFixed(0)+' cmH₂O'+(dp>15?' ⚠️':'')+')';
@@ -338,7 +345,7 @@ function updateDriveEstimate(){
 }
 
 function render(){
- const s=state(),p=pbw(),ratio=s.vt/p,comp=clamp(35-(ratio-6)*2,20,45);
+ const s=state(),p=pbw(),comp=crs(s);
  $('pbw').textContent=p.toFixed(1)+' kg';
  $('ppeak').textContent=(s.peep+s.vt/comp+4).toFixed(0);
  $('mv').textContent=(s.vt*s.rr/1000).toFixed(1);
@@ -352,8 +359,8 @@ function render(){
 function updateTrajectory(pf,s,ph,map,hr){
  let phase=1,score=0,next='Optimize lung-protective ventilation and reassess Pplat, driving pressure, oxygenation and hemodynamics.';
  const ratio=s.vt/pbw();
- if(ratio<=8)score+=20;if(plat!==null&&plat<30)score+=15;if(pf<=150&&proned)score+=15;if(s.fio2<=0.40)score+=15;if(s.peep<=8)score+=10;if(map>=60)score+=10;if(ph>=7.20)score+=5;
- if(pf<=150){phase=2;next=proned?'Continue prolonged prone positioning and reassess oxygenation + hemodynamics.':'If P/F ≤150, consider prone positioning after optimizing lung-protective ventilation.';}
+ if(ratio>=4&&ratio<=8)score+=20;if(plat!==null&&plat<=30)score+=15;if(s.vt/crs(s)<=15)score+=10;if(pf<=150&&proned&&ratio<=8)score+=15;if(s.fio2<=0.60&&pf>150)score+=10;if(map>=65)score+=10;if(ph>=7.20)score+=5;
+ if(pf<=150){phase=2;next=proned?'Continue the prone session toward 16 hours and watch the blood pressure.':'If the tidal volume is 4–8 mL/kg and P/F stays ≤150 on FiO₂ ≥0.60, prone for at least 16 hours.';}
  if(pf>150&&s.fio2>0.40){phase=2;next='Oxygenation is improving: reduce FiO₂ stepwise while maintaining SpO₂ 88–95%, then reassess P/F and vital signs.';}
  if(pf>150&&s.fio2<=0.40&&s.peep>8){phase=3;next='FiO₂ is now low: reassess and gradually reduce PEEP if oxygenation and hemodynamics remain stable.';}
  if(pf>180&&s.fio2<=0.40&&s.peep<=8&&map>=65&&hr<120&&ph>=7.25){phase=4;next='Assess ventilator liberation: awake/appropriate, hemodynamically stable, spontaneous breathing and SBT readiness.';}
@@ -386,13 +393,18 @@ window.resetCase=function(){
 };
 
 function simulate(reason='ventilator'){
- const s=state(),p=pbw(),ratio=s.vt/p;
- let pf=currentCase.pfBase+s.peep*3+(ratio<=7?10:0)+(proned?45:0);
- if(recruitUsed)pf+=15;if(rescueUsed)pf+=25;pf=clamp(pf,45,420);
+ const s=state(),p=pbw(),ratio=s.vt/p,comp=crs(s);
+ const dp=s.vt/comp;
+ let peepEffect=Math.min(s.peep,14)*currentCase.peepGain;
+ if(s.peep>16) peepEffect-=(s.peep-16)*1.5;
+ let pf=currentCase.pfBase+peepEffect+(ratio>=4&&ratio<=8?8:0);
+ if(proned) pf+= ratio<=8?28:4;
+ pf=clamp(pf,40,380);
  let co2=currentCase.co2Base+(9.6-s.vt*s.rr/1000)*3;co2=clamp(co2,30,90);
  let ph=7.40-(co2-40)*.008, pao2=pf*s.fio2, spo2=clamp(84+pf/18,75,99);
- let map=clamp(currentCase.mapBase-Math.max(0,s.peep-10)*1.4-Math.max(0,ratio-8)*2-recruitMapPenalty,48,90);
- let hr=clamp(currentCase.hrBase + Math.max(0,100-pf)*0.22 + Math.max(0,co2-45)*0.35 - (proned?8:0) - Math.max(0,s.peep-14)*1.5,60,175);
+ const peepCut=currentCase===CASES.sepsis?8:12;
+ let map=clamp(currentCase.mapBase-Math.max(0,s.peep-peepCut)*1.8-Math.max(0,ratio-8)*2-(proned?3:0)-recruitMapPenalty,48,90);
+ let hr=clamp(currentCase.hrBase + Math.max(0,100-pf)*0.22 + Math.max(0,co2-45)*0.35 - Math.max(0,s.peep-14)*1.5,60,175);
  if(pf>180 && co2<50) hr=clamp(hr-12,60,175);
  let pulse=clamp(hr-(map<60?5:0),50,175);
  let sbp=clamp(map+30,65,150), dbp=clamp(map-15,35,95);
@@ -414,14 +426,22 @@ function simulate(reason='ventilator'){
    kind='decOxy';title='⚠️ Cardiovascular stress detected';msg='Heart rate/pulse has increased significantly with the simulated respiratory deterioration.';
    suggest='Look at the vital signs before escalating ventilator support: reassess hypoxemia, hypercapnia, pain/agitation, volume status and PEEP tolerance.';
    targets=[...new Set(['mHR','mPulse','mBP','mMAP',...vitalTargets])];alarmNeeded=true;
- } else if(pf<=100 && !proned){
-   kind='decProne';title='🚨 Severe refractory hypoxemia';msg='P/F is ≤100 despite current support.';
-   suggest='Confirm lung-protective ventilation, assess PEEP response, prone for a prolonged session and consider rescue therapies/VV-ECMO referral if refractory.';
+ } else if(ratio>8 || dp>15){
+   kind='decLung';title='Tidal volume is not lung-protective';msg='Vt is '+ratio.toFixed(1)+' mL/kg PBW. Estimated driving pressure is '+dp.toFixed(0)+' cmH₂O.';
+   suggest='Come down toward 6 mL/kg PBW, and to 4 if the plateau is above 30 or the driving pressure is above 15. Do not use prone positioning or rescue therapy instead of this.';
+   targets=[...new Set(['mDrive','mPplat',...vitalTargets])];alarmNeeded=true;
+ } else if(pf<=150 && s.fio2>=0.60 && s.peep>=5 && !proned){
+   kind='decProne';title=pf<=100?'Severe hypoxemia':'Persistent hypoxemia';msg='P/F is '+pf.toFixed(0)+' on FiO₂ '+s.fio2.toFixed(2)+'.';
+   suggest='The tidal volume is in range. Prone for at least 16 hours. A corticosteroid is suggested and does not replace the prone session.';
    targets=[...new Set(['mPF','abg',...vitalTargets])];alarmNeeded=true;
  } else if(pf<=150 && !proned){
-   kind='decProne';title='⚠️ Persistent moderate–severe hypoxemia';msg='P/F is ≤150.';
-   suggest='Optimize Vt/PEEP/FiO₂ and strongly consider prolonged prone positioning (≥16 h/session).';
-   targets=[...new Set(['mPF','abg',...vitalTargets])];alarmNeeded=true;
+   kind='decOxy';title='P/F is in the prone range, but the oxygen or PEEP is not';msg='P/F is '+pf.toFixed(0)+'.';
+   suggest='Prone positioning was studied at FiO₂ at least 0.60 and PEEP at least 5. Set those, then reassess.';
+   targets=[...new Set(['mPF',...vitalTargets])];alarmNeeded=true;
+ } else if(proned && pf<=150 && ratio<=8){
+   kind='decProne';title='Continue the prone session';msg='P/F is still '+pf.toFixed(0)+'.';
+   suggest='Keep the low tidal volume and continue toward 16 hours if the blood pressure holds.';
+   targets=[...new Set(['mPF',...vitalTargets])];alarmNeeded=false;
  } else if(ph<7.20){
    kind='decOxy';title='🚨 Significant respiratory acidosis';msg='pH is below 7.20.';
    suggest='Reassess minute ventilation, dead space and synchrony while preserving lung-protective Vt; escalate if safe ventilation cannot maintain acceptable pH.';
@@ -432,13 +452,41 @@ function simulate(reason='ventilator'){
    targets=[...new Set(['mSpO2','mPF',...vitalTargets])];alarmNeeded=true;
  }
  if(reason==='prone'&&proned){
-   kind=pf<=150?'decProne':'decOxy';targets=[...new Set(['mPF','mSpO2','mHR','mBP','mMAP','mPulse',...vitalTargets])];
-   title=pf<=150?'⚠️ Oxygenation + hemodynamic reassessment after prone':'✅ Oxygenation improved after prone';
-   msg='The patient has been placed prone and both oxygenation and cardiovascular response have been reassessed.';
-   suggest=pf<=150?'Review P/F together with BP, MAP, HR and pulse. Continue prolonged prone positioning if clinically indicated and stop/reassess if hemodynamics deteriorate.':'Continue monitoring P/F and vital signs. Reassess readiness to return supine based on the full clinical state.';
+   targets=[...new Set(['mPF','mSpO2','mHR','mBP','mMAP','mPulse',...vitalTargets])];
+   if(ratio>8){
+     kind='decLung';title='Prone does not excuse the tidal volume';msg='The patient is prone, and Vt is still '+ratio.toFixed(1)+' mL/kg PBW.';
+     suggest='Come back to about 6 mL/kg. Prone positioning was studied on top of a low tidal volume, not instead of it.';
+   }else if(pf<=150){
+     kind='decProne';title='Reassess after prone positioning';msg='Oxygenation and blood pressure both need another look.';
+     suggest='Continue the session toward 16 hours if the blood pressure holds. Stop and reassess if the circulation falls.';
+   }else{
+     kind='decOxy';title='Oxygenation improved after prone positioning';msg='P/F is now above 150.';
+     suggest='Keep the low tidal volume. Decide when to return supine from the whole picture, not from one blood gas.';
+   }
    alarmNeeded=true;
  }
- if(!alarmNeeded && pf>150){
+ if(reason==='recruit'){
+   kind='decRescue';title='Recruitment is not routine';msg='The maneuver was delivered. Blood pressure fell. Oxygenation did not meaningfully improve.';
+   suggest='A prolonged recruitment maneuver is not recommended for routine ARDS care. Go back to tidal volume, plateau pressure, and prone positioning. Do not repeat it.';
+   targets=[...new Set(['mMAP','mBP','mPF'])];alarmNeeded=true;
+ }
+ if(reason==='rescue'){
+   kind='decRescue';alarmNeeded=true;targets=[...new Set(['mPF','mMAP'])];
+   if(ratio>8||dp>15){
+     title='This is not a rescue problem yet';msg='The tidal volume or the driving pressure is still unsafe.';
+     suggest='Fix that before an inhaled vasodilator or an ECMO call.';
+   }else if(!proned&&pf<=150){
+     title='Prone positioning comes before rescue';msg='P/F is still '+pf.toFixed(0)+' and the patient is supine.';
+     suggest='A prolonged prone session is the next treatment. An inhaled vasodilator is only a bridge. VV-ECMO is for failure after prone positioning.';
+   }else if(proned&&(pf<=80||ph<7.15)){
+     title='Consider VV-ECMO referral';msg='Lung-protective ventilation and prone positioning have not corrected this.';
+     suggest='Refer to a center that provides VV-ECMO. An inhaled pulmonary vasodilator does not replace that referral.';
+   }else{
+     title='Rescue therapy is not indicated';msg='There is no refractory hypoxemia.';
+     suggest='Do not add a rescue therapy to a patient who is improving.';alarmNeeded=false;
+   }
+ }
+ if(!alarmNeeded && pf>150 && reason==='ventilator'){
    if(s.fio2>0.40){
      kind='decOxy';title='✅ Oxygenation improving — next step: wean FiO₂';msg='P/F is improving and the patient is within a safer oxygenation range.';
      suggest='Reduce FiO₂ in small steps (e.g., 0.05 at a time) while keeping SpO₂ 88–95%. After each change, reassess SpO₂, P/F, BP, MAP, HR and pulse.';
@@ -472,9 +520,10 @@ $('apply').addEventListener('click',()=>{plat=null;total=null;simulate('ventilat
 $('height').addEventListener('input',()=>{render();$('feedbackText').textContent='Height changed. PBW and the Vt/PBW target have been recalculated.';});
 $('weight').addEventListener('input',()=>{$('feedbackText').textContent='Actual body weight changed. PBW remains based on height and sex.';});
 $('sex').addEventListener('change',()=>{render();$('feedbackText').textContent='Sex changed. PBW has been recalculated from height and sex.';});
-$('insp').addEventListener('click',()=>{const s=state(),comp=clamp(35-(s.vt/pbw()-6)*2,20,45);plat=s.peep+s.vt/comp;render();highlight('mPplat');
- if(plat>30)setDecision('decLung','🚨 Plateau pressure >30 cmH₂O','Pplat is above the lung-protective threshold.','Reduce Vt and reassess mechanics while maintaining adequate gas exchange.',['mPplat','mDrive'],true);
- else setDecision('decLung','Pplat measured','Pplat is '+plat.toFixed(0)+' cmH₂O.','Interpret Pplat together with PEEP and driving pressure.',['mPplat','clinicalDecision'],false);
+$('insp').addEventListener('click',()=>{const s=state(),comp=crs(s);plat=s.peep+s.vt/comp;const dp=plat-s.peep;render();highlight('mPplat');
+ if(plat>30)setDecision('decLung','Plateau pressure is above 30','Pplat is '+plat.toFixed(0)+' cmH₂O.','Reduce the tidal volume and reassess. Do not raise the pressure to deliver the volume.',['mPplat','mDrive'],true);
+ else if(dp>15)setDecision('decLung','Driving pressure is above 15','Driving pressure is '+dp.toFixed(0)+' cmH₂O with a plateau of '+plat.toFixed(0)+'.','Lower the tidal volume even though the plateau is under 30.',['mDrive','mPplat'],true);
+ else setDecision('decLung','Pplat measured','Pplat is '+plat.toFixed(0)+' cmH₂O and driving pressure is '+dp.toFixed(0)+'.','Keep the tidal volume in the 4–8 mL/kg range.',['mPplat','clinicalDecision'],false);
 });
 $('exp').addEventListener('click',()=>{const s=state(),auto=s.rr>30?Math.min(6,(s.rr-30)*.8):0;total=s.peep+auto;render();highlight('mTotalPEEP');highlight('mAutoPEEP');
  if(auto>=3)setDecision('decLung','⚠️ Intrinsic PEEP detected','Auto-PEEP is '+auto.toFixed(0)+' cmH₂O.','Reassess expiratory time, RR and dynamic hyperinflation before further increasing minute ventilation.',['mAutoPEEP','mTotalPEEP'],true);
@@ -497,16 +546,13 @@ $('recruit').addEventListener('click',()=>{
    return;
  }
  recruitDone=true;recruitUsed=true;
- // Brief MAP drop as hemodynamic penalty
- recruitMapPenalty=6;
- $('recruit').textContent='✓ Recruitment Done';
+ recruitMapPenalty=8;
+ $('recruit').textContent='Recruitment already used';
  $('recruit').disabled=true;
  simulate('recruit');
- // Resolve MAP penalty after brief period
- setTimeout(()=>{recruitMapPenalty=0;},3000);
- $('feedbackText').textContent='Recruitment maneuver performed (one-time). A transient hemodynamic consequence has been applied. Observe oxygenation and MAP response; prolonged/aggressive recruitment is not routine ARDS care.';
+ setTimeout(()=>{recruitMapPenalty=0;},4000);
 });
-$('rescue').addEventListener('click',()=>{rescueUsed=!rescueUsed;simulate('rescue');$('feedbackText').textContent='Rescue pathway activated: reassess optimized ventilation, prone positioning and reversible causes; inhaled pulmonary vasodilator may be considered as a bridge, with VV-ECMO referral for refractory severe ARDS when appropriate.';});
+$('rescue').addEventListener('click',()=>{rescueUsed=true;simulate('rescue');});
 $('audioBtn').addEventListener('click',async()=>{
  if(audioOn){
    if(audioCtx && audioCtx.state==='suspended'){
