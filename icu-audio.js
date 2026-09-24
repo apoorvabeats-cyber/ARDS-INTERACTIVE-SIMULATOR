@@ -186,6 +186,8 @@
     btn.setAttribute("aria-pressed", "true");
     sessionStorage.setItem("icu-sound", "1");
     ensure();
+    const native = document.getElementById("audioBtn");
+    if (native && /start/i.test(native.textContent)) native.click();
     try {
       const u = new SpeechSynthesisUtterance("Sound on");
       u.volume = 0.01; u.rate = 1.4;
@@ -201,6 +203,8 @@
     btn.setAttribute("aria-pressed", "false");
     sessionStorage.removeItem("icu-sound");
     cancelAnimationFrame(raf);
+    const native = document.getElementById("audioBtn");
+    if (native && /mute/i.test(native.textContent)) native.click();
     try { speechSynthesis.cancel(); } catch (e) {}
   }
   btn.addEventListener("click", () => { enabled ? disable() : enable(); });
