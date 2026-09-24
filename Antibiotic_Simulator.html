@@ -44,7 +44,7 @@
   <button type="button" id="next">Next</button>
 </nav>
 <script>
-var S={age:'60',sex:'male',ht:'170',wt:'70',scr:'1',uo:'50',where:'hospital',source:'vap',sev:'shock',recent:'no',prior:'none',org:'kleb',mech:'ndm',mic:'4',ast:'R',drug:'meropenem',inf:'extended',rrt:'none',load:'load',traj:'stable',vd:'increased',level:'no',identified:'yes',astYes:'yes',resp:'improving',control:'yes'};
+var S={age:'60',sex:'male',ht:'170',wt:'70',scr:'1',uo:'50',eff:'25',where:'hospital',source:'vap',sev:'shock',recent:'no',prior:'none',org:'kleb',mech:'ndm',mic:'4',ast:'R',drug:'meropenem',inf:'extended',rrt:'none',load:'load',traj:'stable',vd:'increased',level:'no',identified:'yes',astYes:'yes',resp:'improving',control:'yes'};
 var stack=['pt'];
 var TITLE={pt:'Patient',bug:'Organism',drug:'Drug and dose',pk:'Exposure',plan:'Plan'};
 function num(id){ var n=parseFloat(String(S[id]==null?'':S[id]).replace(',','.')); return Number.isFinite(n)?n:null; }
@@ -149,38 +149,198 @@ function judge(){
   if(S.mech==='steno' && (id==='meropenem'||id==='cefepime')) return {bad:true, title:'Inactive against Stenotrophomonas', lines:['Trimethoprim-sulfamethoxazole or susceptible cefiderocol.']};
   return {bad:true, title:'Does not match '+MECH[S.mech], lines:['Preferred: '+pref.map(function(x){return DRUG[x][0];}).join(', ')+'.']};
 }
+function doseWt(){
+  var wt=num('wt'), ht=num('ht');
+  if(wt==null||ht==null||ht<=0) return null;
+  var inch=ht/2.54;
+  var ibw=(S.sex==='female'?45.5:50)+2.3*Math.max(0, inch-60);
+  var bmi=wt/Math.pow(ht/100,2);
+  if(bmi>=30 && wt>ibw) return ibw+0.4*(wt-ibw);
+  return wt;
+}
+function g(mg){
+  if(mg===3375) return '3.375 g';
+  if(mg===2250) return '2.25 g';
+  if(mg>=1000) return (Math.round(mg/10)/100)+' g';
+  return Math.round(mg)+' mg';
+}
+function tier(){
+  if(S.rrt==='ihd') return 'hd';
+  if(S.rrt==='sled') return 'sled';
+  if(S.rrt==='crrt'){ var e=num('eff'); if(e==null) e=25; return e>=25?'crrt':'crrtLow'; }
+  var c=crcl();
+  if(c==null) return null;
+  if(c>=120 || S.traj==='arc') return 'arc';
+  return c;
+}
+function wantLoad(){ return S.load==='load' || S.vd!=='normal' || S.sev==='shock'; }
+function regimen(){
+  var t=tier(), c=crcl(), id=S.drug, wt=num('wt'), dw=doseWt();
+  if(t==null || (id!=='linezolid' && id!=='tigecycline' && c==null && S.rrt==='none')) return null;
+  var mic=num('mic')||1;
+  var high=S.source==='cns' || mic>=4 || S.sev==='shock';
+  var lung=S.source==='vap'||S.source==='cap';
+  var row, loadMg, every, after=false, note='';
+  function pick(rows){ return rows; }
+  if(id==='meropenem'){
+    if(t==='arc') row=high?[2000,6]:[2000,8];
+    else if(t==='hd'){ row=[500,24]; after=true; }
+    else if(t==='crrt') row=high?[2000,8]:[1000,8];
+    else if(t==='crrtLow') row=[500,8];
+    else if(t==='sled') row=[1000,12];
+    else if(c>=50) row=high?[2000,8]:[1000,8];
+    else if(c>=26) row=[1000,12];
+    else if(c>=10) row=[500,12];
+    else row=[500,24];
+  } else if(id==='cefepime'){
+    if(t==='arc') row=[2000,6];
+    else if(t==='hd'){ row=[1000,24]; after=true; }
+    else if(t==='crrt') row=[2000,8];
+    else if(t==='crrtLow') row=[1000,12];
+    else if(t==='sled') row=[2000,12];
+    else if(c>=60) row=[2000,8];
+    else if(c>=30) row=[2000,12];
+    else if(c>=11) row=[2000,24];
+    else row=[1000,24];
+  } else if(id==='piptazo'){
+    var big=lung||S.sev==='shock'||S.sev==='sepsis';
+    if(t==='arc'||t==='crrt') row=[4500,6];
+    else if(t==='crrtLow'||t==='sled') row=[4500,8];
+    else if(t==='hd'){ row=[2250,8]; after=true; }
+    else if(c>40) row=big?[4500,6]:[3375,6];
+    else if(c>=20) row=[2250,6];
+    else row=[2250,8];
+  } else if(id==='ceftazavi'){
+    if(t==='arc'||t==='crrt') row=[2500,8];
+    else if(t==='crrtLow'||t==='sled') row=[1250,8];
+    else if(t==='hd'||c<6){ row=[940,48]; after=t==='hd'; }
+    else if(c>=50) row=[2500,8];
+    else if(c>=31) row=[1250,8];
+    else if(c>=16) row=[940,12];
+    else row=[940,24];
+  } else if(id==='merovab'){
+    if(t==='arc'||t==='crrt') row=[4000,8];
+    else if(t==='crrtLow'||t==='sled') row=[2000,8];
+    else if(t==='hd'){ row=[1000,12]; after=true; }
+    else if(c>=50) row=[4000,8];
+    else if(c>=30) row=[2000,8];
+    else if(c>=15) row=[2000,12];
+    else row=[1000,12];
+  } else if(id==='imirele'){
+    if(t==='arc') row=[1250,6];
+    else if(t==='crrt') row=[1250,6];
+    else if(t==='crrtLow'||t==='sled') row=[750,6];
+    else if(t==='hd'){ row=[500,12]; after=true; }
+    else if(c>=90) row=[1250,6];
+    else if(c>=60) row=[1000,6];
+    else if(c>=30) row=[750,6];
+    else if(c>=15) row=[500,6];
+    else row=[500,12];
+  } else if(id==='ceftolozane'){
+    if(lung){
+      if(t==='arc'||t==='crrt') row=[3000,8];
+      else if(t==='hd'){ row=[450,8]; loadMg=2250; after=true; }
+      else if(c>=50) row=[3000,8];
+      else if(c>=30) row=[1500,8];
+      else row=[750,8];
+    } else {
+      if(t==='arc'||t==='crrt') row=[1500,8];
+      else if(t==='hd'){ row=[150,8]; loadMg=750; after=true; }
+      else if(c>=50) row=[1500,8];
+      else if(c>=30) row=[750,8];
+      else row=[375,8];
+    }
+    if(t==='crrtLow'||t==='sled') row=lung?[1500,8]:[750,8];
+  } else if(id==='cefiderocol'){
+    if(t==='arc') row=[2000,6];
+    else if(t==='crrt') row=[2000,8];
+    else if(t==='crrtLow'||t==='sled') row=[1500,8];
+    else if(t==='hd'){ row=[750,12]; after=true; }
+    else if(c>=120) row=[2000,6];
+    else if(c>=60) row=[2000,8];
+    else if(c>=30) row=[1500,8];
+    else if(c>=15) row=[1000,8];
+    else row=[750,12];
+  } else if(id==='aztavi'||id==='cazazi'){
+    var az=2000, ev=8;
+    if(t==='hd'|| (c!=null && c<10)){ az=500; ev=8; after=t==='hd'; }
+    else if(c!=null && c<30 && t!=='crrt' && t!=='arc'){ az=1000; ev=8; }
+    row=[az,ev];
+    note=id==='cazazi'?'Give this aztreonam with the ceftazidime-avibactam dose for the same clearance, both over 3 hours.':'Avibactam is the matching product amount, in the same bag, over 3 hours.';
+  } else if(id==='vancomycin'){
+    var kg=wt||70;
+    loadMg=Math.min(3000, Math.round(kg*(S.sev==='shock'?25:20)/250)*250);
+    var md=Math.min(2000, Math.round((dw||kg)*15/250)*250);
+    var ev=c>=90||t==='arc'?8:c>=50||t==='crrt'?12:24;
+    if(t==='hd'||t==='sled'||(c!=null&&c<20)) ev=24;
+    row=[md,ev];
+    note='Target AUC/MIC 400–600. Check a level. Do not chase a trough of 15 by habit.';
+    if(loadMg>1500) note+=' Infuse the load over at least 2 hours.';
+  } else if(id==='linezolid'){
+    row=[600,12];
+  } else if(id==='daptomycin'){
+    var per=S.sev==='shock'||S.source==='bsi'||S.source==='endo'?10:8;
+    var dmg=Math.round((dw||wt||70)*per/50)*50;
+    var evd=(t==='hd'||t==='vl'||(c!=null&&c<30))?48:24;
+    if(t==='crrt'||t==='crrtLow') evd=24;
+    row=[dmg,evd];
+    loadMg=dmg;
+  } else if(id==='amikacin'){
+    var am=Math.min(2000, Math.round((dw||wt||70)*15/50)*50);
+    var eva=t==='hd'?48:(c>=60||t==='arc'||t==='crrt')?24:(c>=40)?36:48;
+    row=[am,eva];
+    loadMg=am;
+    note='Aim a peak about '+(8*mic).toFixed(0)+'–'+(10*mic).toFixed(0)+' mg/L. Stop if the kidneys or the hearing change.';
+  } else if(id==='tmp'){
+    var tm=Math.max(80, Math.round((dw||wt||70)*5/40)*40);
+    var evt=8;
+    if(t==='hd'||(c!=null&&c<15)) evt=24;
+    else if(c!=null&&c<30) evt=12;
+    if(t==='crrt') evt=8;
+    row=[tm,evt];
+    note='This milligram is the trimethoprim part.';
+  } else if(id==='sulbactam'){
+    var evs=6;
+    if(t==='arc'||(c!=null&&c>=130)) evs=4;
+    else if(t==='hd'){ evs=12; after=true; }
+    else if(c!=null&&c<15) evs=12;
+    else if(c!=null&&c<30) evs=12;
+    else if(c!=null&&c<45) evs=8;
+    if(t==='crrt') evs=6;
+    if(t==='crrtLow') evs=8;
+    row=[1000,evs];
+    note='1 g sulbactam with 1 g durlobactam.';
+  } else if(id==='tigecycline'){
+    row=[50,12]; loadMg=100;
+  } else if(id==='eravacycline'){
+    row=[Math.max(10, Math.round((dw||wt||70)*1/10)*10),12];
+  }
+  if(!row) return null;
+  every=row[1];
+  var mg=row[0];
+  if(loadMg==null && wantLoad() && (id==='meropenem'||id==='cefepime') && mg<2000 && t!=='hd' && !(typeof t==='number' && t<30)) loadMg=2000;
+  if(loadMg==null) loadMg=mg;
+  var loadText=(wantLoad()||id==='vancomycin'||id==='tigecycline')?g(loadMg)+' IV once':'No extra load. Start with '+g(mg);
+  var infH=0.5;
+  var pk=DRUG[id][1];
+  if(pk==='fT>MIC'){
+    if(S.inf==='continuous') infH=every;
+    else if(S.inf==='extended'||id==='cefiderocol'||id==='merovab'||id==='sulbactam'||id==='aztavi'||id==='cazazi') infH=Math.min(3, every-0.25);
+    else if(id==='ceftazavi') infH=Math.min(S.inf==='extended'?3:2, every-0.25);
+    else if(id==='ceftolozane') infH=S.inf==='extended'?Math.min(3, every-0.25):1;
+    else infH=0.5;
+  } else if(id==='vancomycin') infH=(Math.max(loadMg||0, mg)>1500)?2:1;
+  var infuseLabel=S.inf==='continuous'&&pk==='fT>MIC'?('the whole '+every+' hours'):(infH>=1?infH+' hours':Math.round(infH*60)+' minutes');
+  if(t==='crrt'||t==='crrtLow') note=((note?note+' ':'')+'CRRT effluent '+(num('eff')||25)+' mL/kg/h.');
+  if(t==='sled') note=((note?note+' ':'')+'SLED sits between dialysis and CRRT.');
+  var maint=g(mg)+' IV every '+every+' hours'+(after?', after dialysis':'');
+  if(id==='sulbactam') maint='1 g / 1 g IV every '+every+' hours'+(after?', after dialysis':'');
+  return {mg:mg, every:every, infH:infH, load:loadText, maint:maint, infuseLabel:infuseLabel, note:note, pk:pk};
+}
 function doseLine(){
-  var c=crcl(), id=S.drug;
-  if(S.rrt==='crrt') return 'On CRRT start from the severe-infection dose and match the effluent. Do not use the anuric dose.';
-  if(S.rrt==='sled') return 'SLED sits between dialysis and CRRT. Confirm the dose with the effluent and the residual urine.';
-  if(c==null) return 'Enter age, sex, height, weight, and creatinine.';
-  var hd=S.rrt==='ihd'||c<10;
-  var low=c<30, mid=c<50;
-  var map={
-    meropenem: hd?'500 mg every 24 hours, plus a dose after hemodialysis.':low?'500 mg to 1 g every 12 hours.':mid?'1 g every 12 hours.':'1 g every 8 hours. Use 2 g every 8 hours for a high MIC or meningitis.',
-    cefepime: hd?'1 g every 24 hours, plus 1 g after hemodialysis.':c<30?'2 g every 24 hours.':c<60?'2 g every 12 hours.':'2 g every 8 hours.',
-    piptazo: hd?'2.25 g every 8 hours, plus a dose after hemodialysis.':c<20?'2.25 g every 8 hours.':c<40?'2.25 g every 6 hours.':'4.5 g every 6 hours, extended infusion.',
-    ceftazavi: hd?'0.94 g every 24 to 48 hours, after hemodialysis.':c<30?'0.94 g every 12 to 24 hours.':c<50?'1.25 g every 8 hours.':'2.5 g every 8 hours over 3 hours.',
-    merovab: hd?'Adjust from the label. Dose after hemodialysis.':c<30?'Reduce the 4 g dose. Confirm the label.':c<50?'Reduce the interval or the dose from the label.':'4 g every 8 hours over 3 hours.',
-    imirele: hd?'Label dose after hemodialysis.':c<30?'Renal label dose.':'Full label dose when clearance is normal. Confirm the product table.',
-    ceftolozane: hd?'Reduced label dose after hemodialysis.':c<50?'Reduce from the pneumonia dose.':'Pneumonia: 3 g every 8 hours over 3 hours. Urine or abdomen: 1.5 g.',
-    cefiderocol: hd?'Reduced dose after hemodialysis.':c<60?'Reduce from 2 g every 8 hours.':'2 g every 8 hours over 3 hours.',
-    aztavi: 'Product-specific dose. Give it over about 3 hours and adjust for this clearance of '+Math.round(c)+' mL/min.',
-    cazazi: 'Infuse both over 3 hours. Adjust each drug for this clearance of '+Math.round(c)+' mL/min.',
-    vancomycin: 'Load 20–25 mg/kg, then dose to an AUC/MIC of 400–600. Do not chase a trough of 15 by habit.',
-    linezolid: '600 mg every 12 hours. Little renal change. Watch the platelets and serotonin drugs.',
-    daptomycin: '8–10 mg/kg every 24 hours for bacteremia. Stretch the interval when clearance is under 30, including hemodialysis.',
-    amikacin: 'Peak should be about 8–10 times the MIC. Extend the interval as clearance falls. Stop if the kidneys or hearing change.',
-    tmp: 'About 5 mg/kg of trimethoprim every 8 hours for pneumonia, then stretch the interval as clearance falls.',
-    sulbactam: c<30?'Reduce the every-6-hour dose. Confirm the label.':'1 g / 1 g every 6 hours over 3 hours when clearance allows.',
-    tigecycline: 'Label load, then maintenance. Not a renal drug. Not a blood drug.',
-    eravacycline: '1 mg/kg every 12 hours. Not a blood drug.'
-  };
-  var line=map[id]||'Confirm the label.';
-  if(S.inf==='extended' && DRUG[id][1]==='fT>MIC' && S.rrt!=='ihd') line+=' Infuse over 3 hours.';
-  if(S.inf==='continuous' && DRUG[id][1]==='fT>MIC') line+=' A continuous infusion can hold the level above the MIC.';
-  if(S.load==='load' && (S.vd!=='normal' || S.sev==='shock')) line+=' Give a loading dose. The volume of distribution is large in shock.';
-  return line;
+  var r=regimen();
+  if(!r) return 'Enter age, sex, height, weight, and creatinine.';
+  return 'Load '+r.load+'. Then '+r.maint+'. Infuse over '+r.infuseLabel+'.'+(r.note?' '+r.note:'');
 }
 function mechWarn(){
   var kind=ORG[S.org][1], m=S.mech;
@@ -197,9 +357,12 @@ function empiric(){
   else if(S.prior==='kpc'||S.prior==='oxa') lines.push('A previous serine carbapenemase is known. Meropenem alone is the wrong start.');
   else if(S.prior==='dtr') lines.push('A previous difficult Pseudomonas is known. The usual antipseudomonal beta-lactams may fail.');
   else if(S.prior==='crab') lines.push('A previous CRAB is known. A carbapenem does not cover it.');
-  else if(S.where==='hospital' && (S.source==='vap'||S.source==='bsi')) lines.push('Hospital source. Cover Pseudomonas. Add MRSA cover only if the risk is real.');
   else if(S.where==='community' && S.source==='cap') lines.push('Community lung. Pseudomonas is not automatic.');
-  if(S.sev==='low') lines.push('The chance of a bacterial infection is low. Do not start a broad drug just to feel covered.');
+  if(S.sev==='low') lines.push('This may not be bacterial. Look for another cause before starting a broad drug.');
+  var mrsa=S.prior==='mrsa'||S.source==='line'||S.source==='ssti'||(S.where==='hospital'&&S.source==='vap');
+  if(mrsa) lines.push('MRSA cover is reasonable: vancomycin or linezolid.');
+  if(S.where==='hospital'&&(S.source==='vap'||S.source==='iab'||S.source==='bsi')||S.prior==='dtr') lines.push('Pseudomonas cover is reasonable. Ertapenem does not count.');
+  if(S.source==='iab') lines.push('Anaerobic cover belongs with an abdominal source.');
   if(S.recent==='yes') lines.push('Recent antibiotics raise the chance of resistance.');
   var c=crcl();
   if(c!=null && c>130) lines.push('Clearance is augmented. A normal dose may fall short.');
@@ -230,6 +393,7 @@ function views(){
         +sel('drug','Antibiotic',Object.keys(DRUG).map(function(k){return [k,DRUG[k][0]];}))
         +sel('inf','Infusion',[['standard','30 minutes'],['extended','3 hours'],['continuous','Continuous']])
         +sel('rrt','Kidney replacement',[['none','None'],['crrt','CRRT'],['ihd','Hemodialysis'],['sled','SLED']])
+        +box('eff','CRRT effluent mL/kg/h')
         +sel('load','Loading dose',[['standard','No extra load'],['load','Loading dose']])
         +'</div><div id="live"></div>';
     },
@@ -280,31 +444,43 @@ function liveBug(){
 }
 function liveDrug(){
   var j=judge();
+  var r=regimen();
   var lines=j.lines.slice();
-  lines.push(DRUG[S.drug][1]+'.');
-  lines.push(doseLine());
+  if(!r) lines.push('Enter the body numbers on the first page.');
+  else {
+    lines.push('Loading dose: '+r.load+'.');
+    lines.push('Maintenance: '+r.maint+'.');
+    lines.push('Infusion: '+r.infuseLabel+'.');
+    lines.push('PK/PD target: '+r.pk+'.');
+    if(r.note) lines.push(r.note);
+  }
   return out(j.title, lines, j.bad);
 }
 function series(){
   var mic=num('mic'); if(mic==null) mic=1;
+  var r=regimen();
+  var every=r?r.every:8, inf=r?r.infH:0.5, mg=r?r.mg:1000;
   var c=crcl(); if(c==null) c=80;
   var ke=0.15*(c/80);
   if(S.traj==='arc'||c>130) ke*=1.7;
   if(S.traj==='aki') ke*=0.4;
-  if(S.rrt==='crrt'||S.traj==='rrt') ke=0.12;
+  if(S.rrt==='crrt'||S.traj==='rrt'){
+    var e=num('eff'); if(e==null) e=25;
+    ke=0.08+e/400;
+  }
   var vd=S.vd==='marked'?1.8:S.vd==='increased'?1.35:1;
-  var inf=S.inf==='continuous'?8:S.inf==='extended'?3:0.5;
-  var peak=(S.load==='load'?40:28)/vd;
-  var pts=[];
-  for(var t=0;t<=8.001;t+=0.25){
+  var peak=(32*(mg/1000))/vd;
+  var pts=[], step=Math.max(0.25, every/32);
+  for(var t=0;t<=every+0.001;t+=step){
     var y;
-    if(S.inf==='continuous') y=peak*0.55;
-    else if(t<=inf) y=peak*(t/inf);
+    if(S.inf==='continuous' && DRUG[S.drug][1]==='fT>MIC') y=peak*0.45;
+    else if(t<=inf) y=peak*(inf?t/inf:1);
     else y=peak*Math.exp(-ke*(t-inf));
     pts.push(y);
   }
   var above=pts.filter(function(y){return y>mic;}).length/pts.length;
-  return {pts:pts, mic:mic, above:above};
+  var peakNow=Math.max.apply(null, pts);
+  return {pts:pts, mic:mic, above:above, every:every, step:step, peak:peakNow};
 }
 function draw(){
   var c=document.getElementById('chart'); if(!c) return;
@@ -318,7 +494,10 @@ function draw(){
   var X=function(i){ return L+(R-L)*i/n; };
   var Y=function(v){ return T+(H-T-B)*(1-v/max); };
   g.font='12px sans-serif'; g.fillStyle='#334155'; g.strokeStyle='#e2e8f0';
-  [0,2,4,6,8].forEach(function(h){ g.fillText(h+' h', X(h*4)-8, H-8); });
+  [0, s.every/2, s.every].forEach(function(h){
+    var i=Math.round(h/s.step);
+    g.fillText((Math.round(h*10)/10)+' h', X(Math.min(n,i))-10, H-8);
+  });
   g.fillText('mg/L', 4, 12);
   g.strokeStyle='#dc2626'; g.setLineDash([5,4]); g.beginPath(); g.moveTo(L,Y(s.mic)); g.lineTo(R,Y(s.mic)); g.stroke(); g.setLineDash([]);
   g.fillText('MIC '+s.mic, L, Y(s.mic)-4);
@@ -331,16 +510,26 @@ function livePk(){
   var s=series();
   var lines=[];
   var idx=DRUG[S.drug][1];
-  if(idx==='fT>MIC') lines.push('Time above the MIC is the target. About '+Math.round(s.above*100)+'% of this interval is above the red line.');
-  if(idx==='AUC/MIC') lines.push('The target is the area under the curve, not a single peak. Vancomycin wants an AUC/MIC of 400–600.');
-  if(idx==='Cmax/MIC') lines.push('The peak should be several times the MIC. Watch the trough so the drug can clear.');
+  var need=(S.sev==='shock'||S.sev==='sepsis')?100:70;
+  if(idx==='fT>MIC'){
+    var pct=Math.round(s.above*100);
+    lines.push(pct+'% of this dose interval is above the MIC. The target in this patient is '+need+'%.');
+    lines.push(pct>=need?'Target met.':'Target missed. Extend the infusion, shorten the interval, or raise the dose the kidneys allow.');
+  }
+  if(idx==='AUC/MIC') lines.push('Vancomycin and the other AUC drugs need a measured level. The target for vancomycin is an AUC/MIC of 400–600.');
+  if(idx==='Cmax/MIC'){
+    var ratio=s.mic?s.peak/s.mic:0;
+    lines.push('Sketch peak is about '+ratio.toFixed(1)+' times the MIC. Aminoglycosides want about 8–10.');
+    lines.push(ratio>=8?'Peak target met on this sketch.':'Peak target missed on this sketch.');
+  }
   if(S.traj==='arc') lines.push('Augmented clearance can drop the level under the MIC before the next dose.');
   if(S.traj==='aki') lines.push('Clearance is changing. Recalculate rather than leaving yesterday’s dose.');
-  if(S.vd!=='normal') lines.push('A larger volume lowers the early level. Load, then maintain.');
-  if(S.level==='yes') lines.push('Use the measured level. This sketch does not replace it.');
+  if(S.vd!=='normal') lines.push('A larger volume lowers the early level. The loading dose is already in the regimen.');
+  if(S.level==='yes') lines.push('A measured level replaces this sketch.');
   if(judge().bad) lines.push('A level above the MIC does not help if the enzyme destroys the drug.');
-  var bad=judge().bad||(idx==='fT>MIC' && s.above<0.5);
-  return out(idx, lines, bad);
+  var missed=idx==='fT>MIC' && Math.round(s.above*100)<need;
+  if(idx==='Cmax/MIC' && s.mic && s.peak/s.mic<8) missed=true;
+  return out(idx, lines, judge().bad||missed);
 }
 function livePlan(){
   var j=judge();
@@ -353,6 +542,11 @@ function livePlan(){
   else if(S.identified==='yes' && S.astYes==='yes' && !j.bad) lines.push('Narrow to this active drug. Stop duplicate cover. Ask whether the vein can become a tablet.');
   else lines.push('Cultures are incomplete. Reassess before the broad drug becomes the habit.');
   var c=crcl(); if(c!=null) lines.push('Clearance '+Math.round(c)+' mL/min.');
+  if(S.resp!=='worsening' && S.control==='yes' && S.identified==='yes'){
+    var stop={cap:'5 days',vap:'7 days',uti:'5 to 7 days',iab:'about 4 days after source control',ssti:'5 to 7 days',bsi:'7 days for a gram-negative that is improving',line:'a short course once the line is out',cns:'often 2 to 3 weeks',endo:'weeks, by the organism'};
+    if(stop[S.source]) lines.push('Usual stop: '+stop[S.source]+'.');
+    if(S.source==='cap'||S.source==='uti'||S.source==='ssti') lines.push('If the patient is eating and an oral drug is active, the vein can stop.');
+  }
   return out(S.resp==='worsening'||j.bad?'Change the plan':'Stewardship plan', lines, S.resp==='worsening'||S.control==='no'||j.bad);
 }
 function refresh(){
