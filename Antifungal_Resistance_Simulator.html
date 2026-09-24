@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="theme-color" content="#071b3a">
+<title>Antifungal resistance</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #f4f7fb; color: #14213d; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; line-height: 1.4; }
+  button { font: inherit; cursor: pointer; border: 1px solid #d7e0ec; background: #fff; color: #14213d; border-radius: 14px; min-height: 48px; padding: 10px 12px; text-align: left; }
+  .wrap { max-width: 840px; margin: 0 auto; padding: 16px 16px 48px; }
+  .hero { background: linear-gradient(135deg,#071b3a,#1457a6); color: #fff; border-radius: 24px; padding: 22px 18px; }
+  h1 { font-size: clamp(28px, 7vw, 42px); line-height: 1.05; margin: 8px 0; }
+  h2 { margin: 16px 0 8px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: #5f6f86; }
+  p { margin: 0; }
+  a { color: #9ec5ff; }
+  .lede { color: #dbe9ff; font-size: 16px; }
+  .card { display: block; width: 100%; margin-top: 10px; }
+  .card b { display: block; color: #1457a6; font-size: 17px; }
+  .meta { color: #5f6f86; margin-top: 4px; font-size: 14px; }
+  .slip { background: #fff; border: 1px solid #d7e0ec; border-radius: 16px; padding: 12px; margin-top: 12px; }
+  .row { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid #eef2f6; }
+  .row span { color: #5f6f86; }
+  .opts { display: grid; gap: 8px; margin-top: 8px; }
+  .good { background: #ecfdf5; border-color: #9bd9c5; }
+  .bad { background: #fff1f2; border-color: #f1a4ad; }
+  .ok { background: #fff8e6; border-color: #efd28d; }
+  .top { display: flex; gap: 8px; margin-top: 12px; }
+  .top button { flex: 1; text-align: center; }
+  .pill { display: inline-block; background: #e9f2ff; color: #1457a6; border-radius: 999px; padding: 4px 10px; font-weight: 700; font-size: 13px; margin-right: 6px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const CASES = [
+  {
+    id: "albicans", group: "Candida", title: "C. albicans, ready to step down",
+    story: "Candidemia, day 5. Afebrile, line removed, eye exam clear, clearance is 40 mL/min. The isolate is fluconazole susceptible.",
+    bug: "Candida albicans", source: "Blood, now cleared",
+    mech: "Fluconazole S. No FKS mutation. Echinocandin was the initial drug.",
+    ask: "What is the oral step-down, at this creatinine clearance?",
+    options: [
+      { t: "Fluconazole 800 mg once, then 200 mg daily", grade: "best", why: "Susceptible C. albicans, a stable patient, a removed line, and a clear eye exam can step down to fluconazole. Clearance under 50 mL/min: give the full 800 mg load, then half the usual 400 mg maintenance, so 200 mg daily. The echinocandin does not need to continue." },
+      { t: "Fluconazole 800 mg once, then 400 mg daily", grade: "bad", why: "400 mg is the normal-kidney maintenance dose. Below a creatinine clearance of about 50 mL/min, maintenance is halved after the load. The load itself stays full." },
+      { t: "Stay on micafungin for the whole course", grade: "ok", why: "Safe, and right if the eye or the heart is involved, or the patient is still unstable. This patient is ready to leave the IV echinocandin. Echinocandins also do not treat the eye or the CSF if you have not looked." },
+      { t: "Voriconazole, because it is stronger", grade: "bad", why: "Voriconazole is not a better Candida albicans drug. It adds nonlinear kinetics, liver injury, visual effects, QT prolongation, and CYP interactions. Fluconazole is the step-down." },
+    ],
+    pk: "Azoles are AUC/MIC drugs and fungistatic against Candida. Fluconazole is renally cleared. Load fully, then halve maintenance when clearance is ≤50 mL/min.",
+    harm: "Fluconazole raises calcineurin-inhibitor and warfarin levels and can injure the liver. It has almost no Aspergillus or Mucorales activity.",
+  },
+  {
+    id: "glabrata", group: "Candida", title: "C. glabrata in shock",
+    story: "Septic shock, a new yeast in the blood. No prior antifungals. The species result is back before the MIC.",
+    bug: "Nakaseomyces glabratus (Candida glabrata)", source: "Blood",
+    mech: "Species-level reduced azole susceptibility. Fluconazole MIC not back. Echinocandin usually active unless an FKS mutation is present.",
+    ask: "What do you start?",
+    options: [
+      { t: "Micafungin 100 mg IV daily", grade: "best", why: "An echinocandin is first-line for candidemia, and it is mandatory thinking for C. glabrata. Caspofungin 70 mg then 50 mg, or anidulafungin 200 mg then 100 mg, is equivalent. Do not wait on the fluconazole MIC to choose the first dose." },
+      { t: "Fluconazole 800 mg, then 400 mg daily", grade: "bad", why: "C. glabrata is often fluconazole resistant or susceptible only at 800 mg, and that is a step-down discussion after the MIC, in a stable patient. It is the wrong first drug in shock." },
+      { t: "Voriconazole 6 mg/kg twice, then 4 mg/kg", grade: "bad", why: "Voriconazole is not more reliable than fluconazole against C. glabrata. Cross-resistance is common. It is also the wrong drug to start while the patient is crashing." },
+      { t: "Conventional amphotericin, because yeast in blood is serious", grade: "bad", why: "Liposomal amphotericin is the rescue drug for echinocandin resistance or intolerance, not the default. Conventional amphotericin adds a lot of kidney injury for no gain here." },
+    ],
+    pk: "Echinocandins are concentration-dependent against Candida (AUC/MIC or Cmax/MIC) and fungicidal. They are IV only. Urine, eye, and CSF levels are poor, so they do not treat those sites alone.",
+    harm: "Echinocandins are the least toxic antifungal class. The harm is using one for meningitis, endophthalmitis, or a urinary source and thinking the blood culture clearing means the site is treated.",
+  },
+  {
+    id: "fks", group: "Acquired resistance", title: "Echinocandin failure, FKS mutation",
+    story: "C. glabrata candidemia. Two weeks of micafungin. Still bacteremic. The reference lab sequences FKS2.",
+    bug: "C. glabrata with an FKS hotspot mutation", source: "Blood, persistent",
+    mech: "FKS alteration. The glucan-synthase target has changed. Caspofungin, micafungin, and anidulafungin MICs all rise together.",
+    ask: "The echinocandin MIC is now high. Next drug?",
+    options: [
+      { t: "Liposomal amphotericin B 3–5 mg/kg IV daily", grade: "best", why: "FKS hotspot mutations confer class resistance. Switching from micafungin to caspofungin does not fix the target. Liposomal amphotericin is the usual rescue. Remove every line and look for endocarditis and an abscess." },
+      { t: "Caspofungin 70 mg, then 50 mg", grade: "bad", why: "Same class, same enzyme, same mutation. A loading dose does not restore a broken glucan synthase." },
+      { t: "Fluconazole 800 mg daily", grade: "bad", why: "This species was already a poor azole target, and you do not have a susceptible fluconazole MIC. Persistent candidemia is not the moment to guess with an azole." },
+      { t: "Higher micafungin, 200 mg", grade: "bad", why: "Dose escalation does not overcome an FKS mutation. The drug cannot bind the altered enzyme." },
+    ],
+    pk: "Echinocandin resistance is target-site, not a penetration problem. Liposomal amphotericin is concentration-dependent and binds ergosterol in the membrane, a different target.",
+    harm: "Liposomal amphotericin still drops potassium and magnesium and can injure the kidney, but less than conventional amphotericin. Infusion reactions happen. Hydrate and replace electrolytes.",
+  },
+  {
+    id: "krusei", group: "Candida", title: "C. krusei",
+    story: "Neutropenic patient on fluconazole prophylaxis. Breakthrough yeast in the blood.",
+    bug: "Pichia kudriavzevii (Candida krusei)", source: "Blood",
+    mech: "Intrinsic fluconazole resistance. This is not an acquired MIC surprise.",
+    ask: "Fluconazole was already on board. What treats this species?",
+    options: [
+      { t: "Anidulafungin 200 mg once, then 100 mg daily", grade: "best", why: "C. krusei is intrinsically resistant to fluconazole. An echinocandin treats it. The prophylaxis explains the breakthrough. Change class." },
+      { t: "Increase fluconazole to 800 mg", grade: "bad", why: "Intrinsic resistance is not a dose problem. More fluconazole still does not bind usefully." },
+      { t: "Add flucytosine to the fluconazole", grade: "bad", why: "Flucytosine is not salvage glue for the wrong azole. Monotherapy with flucytosine also selects resistance and suppresses the marrow." },
+      { t: "Stop antifungals, this yeast is often a contaminant", grade: "bad", why: "Candida in a blood culture is never a contaminant. Pull lines and treat." },
+    ],
+    pk: "Same echinocandin exposure as other candidemia. Anidulafungin needs no renal or hepatic dose change, which is useful if this neutropenic patient has both.",
+    harm: "Do not keep fluconazole 'just in case' alongside the echinocandin once the species is known. It adds interactions without covering krusei.",
+  },
+  {
+    id: "parapsilosis", group: "Candida", title: "C. parapsilosis, fluconazole susceptible",
+    story: "Line infection, candidemia, now stable, line removed. MIC says fluconazole susceptible. Kidneys are normal.",
+    bug: "Candida parapsilosis", source: "Blood",
+    mech: "Fluconazole S. Echinocandin MICs for this species run higher than for C. albicans even when called susceptible.",
+    ask: "Best targeted drug?",
+    options: [
+      { t: "Fluconazole 800 mg once, then 400 mg daily", grade: "best", why: "When C. parapsilosis is fluconazole susceptible, fluconazole is the preferred targeted drug. Echinocandins are less potent against this species. The line still has to come out." },
+      { t: "Stay on micafungin because it was started correctly", grade: "ok", why: "Acceptable if the MIC is truly susceptible and the patient is improving, but it is not the best targeted choice for susceptible parapsilosis. Step down." },
+      { t: "Liposomal amphotericin", grade: "bad", why: "Too toxic for a susceptible organism that fluconazole treats." },
+      { t: "Fluconazole 200 mg daily from the start, no load", grade: "bad", why: "Candidemia needs the 800 mg load, then 400 mg, when the kidneys are normal. Half dose from day one underdoses a fungistatic drug." },
+    ],
+    pk: "Fluconazole AUC/MIC. The load fills the volume. Maintenance of 400 mg holds it when clearance is normal. C. parapsilosis echinocandin MICs sit closer to the breakpoint because the glucan synthase is naturally less sensitive.",
+    harm: "A separate problem is ERG11-mutant, fluconazole-resistant C. parapsilosis, which has caused hospital outbreaks. If this MIC had been resistant, the echinocandin would stay. Do not assume every parapsilosis is susceptible.",
+  },
+  {
+    id: "auris", group: "Candida auris", title: "C. auris, echinocandin susceptible",
+    story: "ICU outbreak. A yeast the bench first called C. haemulonii is confirmed C. auris. The patient is bacteremic. This isolate is echinocandin susceptible.",
+    bug: "Candidozyma auris (Candida auris)", source: "Blood",
+    mech: "Fluconazole MIC ≥32 µg/mL (resistant). Amphotericin susceptible. Anidulafungin susceptible. No FKS mutation reported.",
+    ask: "What do you treat with, and what else has to happen?",
+    options: [
+      { t: "Micafungin 100 mg daily, and isolate the patient", grade: "best", why: "Echinocandins remain first-line while the isolate is susceptible. In US CDC testing of clinical isolates in 2022–2023, about 95% were fluconazole resistant, about 15% amphotericin resistant, about 1% echinocandin resistant, and pan-resistance was under 1%. Amphotericin resistance is much higher in some Northeast and Mid-Atlantic collections. Treat, screen contacts, and use the unit's C. auris cleaning protocol. This yeast persists on skin and surfaces." },
+      { t: "Fluconazole 800 mg, this is a Candida", grade: "bad", why: "Fluconazole resistance is the usual state for clades I and III, via ERG11 mutations (Y132F, K143R, and others) and efflux. A Candida label does not mean fluconazole will work." },
+      { t: "Voriconazole, because the fluconazole MIC is high", grade: "bad", why: "Azole cross-resistance is expected. Voriconazole is not the rescue for fluconazole-resistant C. auris." },
+      { t: "No isolation. Resistance is a treatment issue only", grade: "bad", why: "C. auris spreads between patients and is often misidentified. Resistance and transmission are the same emergency." },
+    ],
+    pk: "Echinocandin class activity is preserved until an FKS1 hotspot mutation appears (S639F, S639P, S639Y and neighbors). Those mutations are still uncommon nationally, but clusters happen.",
+    harm: "Do not combine three antifungals out of anxiety. Use the echinocandin, control the source, and call infection control.",
+  },
+  {
+    id: "auris-fks", group: "Candida auris", title: "C. auris with FKS1 S639F",
+    story: "Same unit, next month. This patient's C. auris has an FKS1 S639F mutation. Anidulafungin and micafungin MICs are in the resistant range. Amphotericin MIC is susceptible.",
+    bug: "C. auris, echinocandin resistant", source: "Blood",
+    mech: "FKS1 hotspot 1, S639F. Fluconazole also resistant. Amphotericin susceptible on this isolate.",
+    ask: "The echinocandin is gone. What is left?",
+    options: [
+      { t: "Liposomal amphotericin B 5 mg/kg IV daily", grade: "best", why: "S639F removes the echinocandin class. If amphotericin is susceptible, liposomal amphotericin is the treatment. Recheck the amphotericin MIC: in some US regions a large minority of C. auris is amphotericin resistant too. Pan-resistant isolates need expert consultation and often an investigational or combination plan. Keep isolation." },
+      { t: "Switch micafungin to caspofungin", grade: "bad", why: "FKS1 is the common target. All licensed echinocandins lose activity together." },
+      { t: "Fluconazole plus micafungin", grade: "bad", why: "Both drugs are resisted by different mechanisms at once. Adding a failed azole to a failed echinocandin is not synergy you can count on." },
+      { t: "Rezafungin weekly, because it is newer", grade: "bad", why: "Rezafungin is still an echinocandin. A glucan-synthase mutation hits it too." },
+    ],
+    pk: "Resistance here is target replacement, the same idea as an altered penicillin-binding protein. You need a different cell-wall or membrane attack. Polyenes bind ergosterol.",
+    harm: "Liposomal amphotericin: potassium, magnesium, creatinine, infusion reactions. Conventional amphotericin is harder on the kidney and is not a clever substitution.",
+  },
+  {
+    id: "aspergillus", group: "Moulds", title: "Invasive aspergillosis, azole susceptible",
+    story: "Prolonged neutropenia, nodules with halos, galactomannan positive. The isolate is Aspergillus fumigatus, voriconazole susceptible. Kidneys are normal. On tacrolimus.",
+    bug: "Aspergillus fumigatus", source: "Lung",
+    mech: "No CYP51A tandem repeat. Voriconazole MIC susceptible.",
+    ask: "First-line mould-active azole?",
+    options: [
+      { t: "Voriconazole 6 mg/kg IV every 12 hours for two doses, then 4 mg/kg every 12 hours, with a trough", grade: "best", why: "Voriconazole is first-line for susceptible invasive aspergillosis. Isavuconazole or posaconazole are alternatives, especially if voriconazole is toxic or the CYP interactions are unacceptable. Check a trough. Tacrolimus will rise: cut the tacrolimus dose and follow levels. Fluconazole has no role." },
+      { t: "Fluconazole 800 mg daily", grade: "bad", why: "Fluconazole does not treat Aspergillus. A positive galactomannan is not a Candida problem." },
+      { t: "Micafungin alone", grade: "bad", why: "Echinocandin monotherapy is inadequate for invasive aspergillosis. It is sometimes added as salvage, not used alone." },
+      { t: "Voriconazole at a fixed 200 mg twice daily, no level", grade: "bad", why: "Voriconazole kinetics are nonlinear and vary by CYP2C19. A trough is required. Treatment targets are generally about 1–5.5 mg/L. Under-dosing fails. Over-dosing causes hepatotoxicity, visual hallucinations, and neurotoxicity." },
+    ],
+    pk: "Voriconazole exposure is AUC, but we monitor the trough because the kinetics are saturable. IV voriconazole's cyclodextrin vehicle accumulates when creatinine clearance is under 50; use oral voriconazole then.",
+    harm: "Liver injury, visual changes, photosensitivity and skin cancer with long use, QT, fluorosis, and major CYP3A4 interactions (tacrolimus, sirolimus, rifampin, vincristine).",
+  },
+  {
+    id: "tr34", group: "Acquired resistance", title: "Azole-resistant Aspergillus",
+    story: "The same syndrome. This A. fumigatus carries CYP51A TR34/L98H. Voriconazole MIC is resistant. The patient has been on voriconazole for six days and is worse.",
+    bug: "A. fumigatus, TR34/L98H", source: "Lung",
+    mech: "Promoter tandem repeat plus L98H in the azole target (CYP51A / lanosterol 14-alpha demethylase). Environmental selection from agricultural azoles is the usual story. Often pan-azole.",
+    ask: "Voriconazole has already failed the MIC. Switch to what?",
+    options: [
+      { t: "Liposomal amphotericin B 5 mg/kg IV daily", grade: "best", why: "TR34/L98H and TR46/Y121F/T289A knock out medical azoles, including isavuconazole and posaconazole in most cases. Liposomal amphotericin is the drug. Stop voriconazole. This mechanism is still uncommon in many US centers and common in parts of Europe and Asia. Test the MIC when aspergillosis fails an azole or when local surveillance says resistance is present." },
+      { t: "Change voriconazole to isavuconazole", grade: "bad", why: "Same target, same mutation family. Isavuconazole is the switch for toxicity or interactions, not for CYP51A-mediated azole resistance." },
+      { t: "Posaconazole tablets, higher trough", grade: "bad", why: "A higher posaconazole level does not restore a resistant CYP51A. TR34/L98H is typically posaconazole resistant too." },
+      { t: "Fluconazole, it was not tried", grade: "bad", why: "Fluconazole never treated Aspergillus, resistant or not." },
+    ],
+    pk: "Azole resistance here is target-site. Amphotericin does not use CYP51A. Give a full liposomal dose and reimage. Combination with an echinocandin is salvage, not a substitute for amphotericin when the azole is resistant.",
+    harm: "Do not keep a failed azole 'for synergy' without a reason. It continues the interactions and the liver injury.",
+  },
+  {
+    id: "mucor", group: "Moulds", title: "Mucormycosis",
+    story: "Diabetic ketoacidosis, black palatal eschar, cavernous sinus signs. Histology shows broad non-septate hyphae. Not Aspergillus.",
+    bug: "Mucorales", source: "Rhino-orbital",
+    mech: "Intrinsic voriconazole resistance. Amphotericin is active. Posaconazole and isavuconazole are the azoles that can follow, after induction and surgery.",
+    ask: "First antifungal, and what else is mandatory?",
+    options: [
+      { t: "Liposomal amphotericin B 5–10 mg/kg, and urgent debridement", grade: "best", why: "Mucorales are not voriconazole organisms. Start liposomal amphotericin at the high end, reverse the ketoacidosis, and operate. Posaconazole or isavuconazole is step-down or salvage, not the emergency drug. Echinocandins do not treat Mucorales." },
+      { t: "Voriconazole, the aspergillus dose", grade: "bad", why: "Voriconazole has no clinically useful Mucorales activity. Using the aspergillus protocol here delays the right drug and the operation." },
+      { t: "Fluconazole plus micafungin", grade: "bad", why: "Neither drug treats Mucorales. Two inactive agents are still inactive." },
+      { t: "Isavuconazole alone, and wait to see a surgeon next week", grade: "bad", why: "Isavuconazole has activity, but rhino-orbital disease is a surgical emergency and liposomal amphotericin is the induction drug. Waiting is how this infection reaches the brain." },
+    ],
+    pk: "Liposomal amphotericin at 5–10 mg/kg is concentration-dependent killing against a mould that grows through vessels. Delayed source control loses to any drug.",
+    harm: "High-dose liposomal amphotericin: potassium, magnesium, creatinine. The operation is still required. Correct the glucose and the acidosis or the fungus keeps invading.",
+  },
+  {
+    id: "crypto", group: "Other yeasts", title: "Cryptococcal meningitis",
+    story: "HIV, CD4 28, opening pressure 32 cm. CSF antigen is positive. India ink shows encapsulated yeast. This is induction, day 1.",
+    bug: "Cryptococcus neoformans", source: "CSF",
+    mech: "Not a resistance case yet. Induction with one drug selects flucytosine resistance and fails clinically.",
+    ask: "Induction regimen?",
+    options: [
+      { t: "Liposomal amphotericin plus flucytosine 25 mg/kg every 6 hours", grade: "best", why: "Induction is a polyene plus flucytosine, for two weeks if the patient can tolerate it, then fluconazole consolidation 400–800 mg. Check flucytosine levels and the blood count. Repeat lumbar puncture to control pressure. Fluconazole alone is not induction for meningitis." },
+      { t: "Fluconazole 1200 mg daily alone", grade: "bad", why: "High-dose fluconazole monotherapy is inferior induction. It is what you use when amphotericin and flucytosine truly cannot be given, not the regimen you choose first." },
+      { t: "Micafungin", grade: "bad", why: "Echinocandins have no meaningful Cryptococcus activity and do not enter CSF reliably." },
+      { t: "Flucytosine alone", grade: "bad", why: "Flucytosine monotherapy fails and selects resistance within days. It is a partner drug. It also causes marrow suppression and liver injury, and the dose must fall if the kidneys do." },
+    ],
+    pk: "Flucytosine is time above MIC and is renally cleared. Amphotericin is concentration-dependent. Together they are fungicidal in the CSF. Fluconazole consolidation is fungistatic and comes after induction.",
+    harm: "Flucytosine: bone marrow, hepatitis, gastrointestinal toxicity. Amphotericin: kidney, potassium, magnesium. Raised intracranial pressure is treated with lumbar puncture, not with a higher antifungal dose.",
+  },
+];
+
+let screen = "board";
+let caseId = null;
+let picked = null;
+const seen = {};
+function cur() { return CASES.find((c) => c.id === caseId); }
+const app = document.getElementById("app");
+
+function draw() {
+  if (screen === "primer") return primer();
+  if (screen === "case") return showCase();
+  board();
+}
+function board() {
+  const hub = location.hostname.endsWith("github.io") ? '<p><a href="index.html">← All simulators</a></p>' : "";
+  const groups = ["Candida", "Candida auris", "Acquired resistance", "Moulds", "Other yeasts"];
+  app.innerHTML = `<div class="wrap"><div class="hero">${hub}
+    <div style="font-size:13px;letter-spacing:.08em;font-weight:700">INFECTION IN CRITICAL CARE</div>
+    <h1>Antifungal resistance</h1>
+    <p class="lede">Species first, then the mutation. Fluconazole, an echinocandin, and amphotericin fail for different reasons, and a bigger dose does not repair the target.</p>
+    <div class="top"><button id="pk">Patterns and PK/PD</button></div>
+  </div>
+  ${groups.map((g) => `<h2>${g}</h2>` + CASES.filter((c) => c.group === g).map((c) =>
+    `<button class="card" data-id="${c.id}"><b>${c.title}</b><div class="meta">${c.bug}${seen[c.id] ? " · done" : ""}</div></button>`
+  ).join("")).join("")}
+  <p class="meta" style="margin-top:16px">Educational drill from CDC surveillance and candidiasis, aspergillosis, mucormycosis, and cryptococcal practice. Not a prescription. Confirm the MIC, the site, and the level with mycology and pharmacy.</p>
+  </div>`;
+  document.getElementById("pk").onclick = () => { screen = "primer"; draw(); };
+  app.querySelectorAll(".card").forEach((b) => b.onclick = () => {
+    caseId = b.dataset.id; picked = null; screen = "case"; draw();
+  });
+}
+function showCase() {
+  const c = cur();
+  app.innerHTML = `<div class="wrap"><div class="hero">
+    <div style="font-size:13px;letter-spacing:.08em;font-weight:700">${c.group.toUpperCase()}</div>
+    <h1>${c.title}</h1>
+    <div class="top"><button id="back">Cases</button></div>
+  </div>
+  <div class="slip"><p>${c.story}</p></div>
+  <h2>Culture</h2>
+  <div class="slip">
+    <div class="row"><span>Organism</span><b>${c.bug}</b></div>
+    <div class="row"><span>Source</span><b>${c.source}</b></div>
+    <div class="row"><span>Marker</span><b>${c.mech}</b></div>
+  </div>
+  <h2>${c.ask}</h2>
+  <div class="opts" id="opts">${c.options.map((o, i) => `<button data-i="${i}">${o.t}</button>`).join("")}</div>
+  <div class="slip" id="fb" style="display:none"></div>
+  </div>`;
+  document.getElementById("back").onclick = () => { screen = "board"; draw(); };
+  document.getElementById("opts").onclick = (e) => {
+    const b = e.target.closest("button");
+    if (!b || picked) return;
+    picked = c.options[+b.dataset.i];
+    seen[c.id] = true;
+    document.querySelectorAll("#opts button").forEach((btn) => {
+      const g = c.options[+btn.dataset.i].grade;
+      if (g === "best") btn.className = "good";
+      else if (btn === b && g === "bad") btn.className = "bad";
+      else if (btn === b && g === "ok") btn.className = "ok";
+    });
+    const fb = document.getElementById("fb");
+    const label = picked.grade === "best" ? "Right drug." : picked.grade === "ok" ? "Active, not the best fit." : "Not this drug.";
+    fb.style.display = "block";
+    fb.className = "slip " + (picked.grade === "best" ? "good" : picked.grade === "ok" ? "ok" : "bad");
+    fb.innerHTML = `<b>${label}</b><p style="margin-top:8px">${picked.why}</p>
+      <p style="margin-top:10px"><span class="pill">PK/PD</span> ${c.pk}</p>
+      <p style="margin-top:8px"><span class="pill">Harm</span> ${c.harm}</p>`;
+  };
+}
+function primer() {
+  const rows = [
+    ["US C. auris, 2022–2023", "CDC AR Lab Network, 8,033 clinical isolates", "About 95% fluconazole resistant, 15% amphotericin B resistant, 1% echinocandin resistant. Pan-resistant was under 1%. Amphotericin resistance was far higher in the Northeast and Mid-Atlantic than in most other regions.", "Echinocandins stay first-line. FKS1 hotspot mutations remove that option and can cluster."],
+    ["C. glabrata", "Reduced azole susceptibility", "Echinocandin first. Fluconazole only after a susceptible MIC, in a stable patient, often at 800 mg.", "On-treatment failure is often FKS. Change class, do not change echinocandin."],
+    ["C. krusei", "Intrinsic fluconazole resistance", "Echinocandin. Breakthrough on fluconazole prophylaxis is the classic story.", "Raising the fluconazole dose does nothing."],
+    ["C. parapsilosis", "Higher echinocandin MICs", "Prefer fluconazole when it is susceptible. Fluconazole-resistant outbreaks are ERG11 mutants: then keep the echinocandin.", "Do not assume the species result equals a susceptible azole."],
+    ["C. albicans", "Usually fluconazole susceptible", "Echinocandin up front if unstable. Step down to fluconazole 800 mg then 400 mg, or 200 mg if clearance is ≤50, once stable, the line is out, and the eye is clear.", "Echinocandins miss the eye and the CSF."],
+    ["A. fumigatus", "CYP51A", "Voriconazole first if susceptible, with a trough. TR34/L98H and TR46 variants are pan-azole. Switch to liposomal amphotericin.", "Isavuconazole does not fix a resistant CYP51A."],
+    ["Mucorales", "Intrinsic voriconazole failure", "Liposomal amphotericin 5–10 mg/kg and surgery. Posaconazole or isavuconazole later.", "Fluconazole, voriconazole, and echinocandins do not treat it."],
+    ["Cryptococcus", "Induction, not resistance", "Liposomal amphotericin plus flucytosine. Fluconazole is consolidation. Control the opening pressure.", "Flucytosine alone selects resistance and suppresses marrow."],
+  ];
+  app.innerHTML = `<div class="wrap"><div class="hero">
+    <div style="font-size:13px;letter-spacing:.08em;font-weight:700">WHAT THE SURVEILLANCE SHOWS</div>
+    <h1>Patterns and PK/PD</h1>
+    <div class="top"><button id="back">Cases</button></div>
+  </div>
+  ${rows.map((r) => `<div class="slip" style="margin-top:10px"><b>${r[0]}</b><div class="meta">${r[1]}</div><p style="margin-top:6px">${r[2]}</p><p class="meta" style="margin-top:6px">${r[3]}</p></div>`).join("")}
+  </div>`;
+  document.getElementById("back").onclick = () => { screen = "board"; draw(); };
+}
+draw();
+</script>
+</body>
+</html>
