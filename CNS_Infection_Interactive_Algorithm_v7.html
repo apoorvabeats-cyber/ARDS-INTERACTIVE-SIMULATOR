@@ -68,7 +68,10 @@ Select the major presenting features before choosing LP or imaging.
 <label class="check"><input id="immuno" type="checkbox">Severe immunocompromise</label>
 <label class="check"><input id="pregnant" type="checkbox">Pregnancy</label>
 <label class="check"><input id="neurosurgery" type="checkbox">Recent neurosurgery/EVD/shunt</label>
-<label class="check"><input id="shock" type="checkbox">Shock/hemodynamic instability</label>
+<label class="check"><input id="shock" type="checkbox">Shock</label>
+<label class="check"><input id="behaviour" type="checkbox">Behaviour or memory change</label>
+<label class="check"><input id="spinal" type="checkbox">Back pain with leg weakness or a sensory level</label>
+<label class="check"><input id="priorAbx" type="checkbox">Antibiotics already given before LP</label>
 </div>
 
 <div class="grid">
@@ -308,20 +311,54 @@ const wt=Number($('weight').value)||70;
 const dex=Math.min(Math.round(wt*0.15),10);
 const acv=Math.round(wt*10);
 const listeria=age>50||$('pregnant').checked||$('immuno').checked;
-const encephalitis=$('fever').checked&&$('altered').checked&&($('seizure').checked||$('focal').checked||$('cranial').checked);
-let html='';
+const enceph=$('fever').checked&&($('altered').checked||$('behaviour').checked)&&($('seizure').checked||$('focal').checked||$('behaviour').checked||$('cranial').checked);
+const device=$('neurosurgery').checked;
+const spinal=$('spinal').checked;
+const meningitis=$('fever').checked&&($('headache').checked||$('neck').checked);
+const abscess=($('focal').checked||$('seizure').checked)&&!$('neck').checked&&!spinal;
+let kind='unsure';
+if(spinal) kind='spinal';
+else if(device) kind='device';
+else if(abscess&&!meningitis) kind='abscess';
+else if(enceph&&meningitis) kind='meningo';
+else if(enceph) kind='encephalitis';
+else if(meningitis) kind='meningitis';
+const title={
+spinal:'Spinal epidural infection',
+device:'Hospital or device-related CNS infection',
+abscess:'Focal CNS infection',
+meningo:'Meningoencephalitis',
+encephalitis:'Encephalitis',
+meningitis:'Meningitis',
+unsure:'CNS syndrome not yet separated'
+}[kind];
+const community=listeria
+?`Ceftriaxone 2 g IV every 12 hours, vancomycin where resistant pneumococcus is a concern, and ampicillin 2 g IV every 4 hours.`
+:`Ceftriaxone 2 g IV every 12 hours plus vancomycin where resistant pneumococcus is a concern. Ampicillin is not added from the age, pregnancy and immune answers.`;
+let html=`<div class="info"><strong>Syndrome: ${title}.</strong> Fever, headache, neck stiffness, altered consciousness, seizure, a focal sign, behaviour change and raised pressure are the entry features. Name the syndrome before the drug.</div>`;
+html+=`<div class="info"><strong>Immediate bundle.</strong> Airway, oxygen, blood pressure, temperature, GCS and pupils. Two intravenous lines. Bedside glucose. Lactate if the patient is septic. Two sets of blood cultures, then the drug. Do not wait for the bottles if that delays the first dose, and do not wait for the lumbar puncture.</div>`;
 if($('shock').checked){
-html+=`<div class="danger"><strong>Do not transport this patient first.</strong> Resuscitate. Draw blood cultures, give dexamethasone ${dex} mg IV, and start empiric meningitis antibiotics now. CT and LP wait until the patient can be moved safely.</div>`;
+html+=`<div class="danger"><strong>Shock.</strong> Resuscitate before anyone moves the patient to CT. If the pressure stays low after fluid, start norepinephrine. Give the antibiotic for the syndrome during resuscitation. Dexamethasone is not automatic in shock.</div>`;
 }
-if(reasons.length){
-html+=`<div class="warning"><strong>CT before lumbar puncture.</strong> Reason: ${reasons.join(', ')}. The scan must not delay treatment. Blood cultures, dexamethasone ${dex} mg IV, and empiric antibiotics are given first, then CT. Puncture only if the scan shows no mass or shift.</div>`;
-$('lpBtn').querySelector('.small').textContent='Only after CT shows no mass or shift.';
+if(kind==='spinal'){
+html+=`<div class="danger"><strong>Spinal epidural infection.</strong> MRI of the whole spine now. Do not pass a needle through the collection. Blood cultures, then vancomycin plus ceftriaxone. Use cefepime or meropenem instead of ceftriaxone after neurosurgery. Decompress a progressing deficit. Meningitis dexamethasone is the wrong steroid decision here.</div>`;
+}else if(kind==='device'){
+html+=`<div class="warning"><strong>Hospital or device infection.</strong> Vancomycin plus cefepime, ceftazidime or meropenem. Do not start community ceftriaxone and do not give meningitis dexamethasone as a routine. Remove or exchange an infected shunt or drain. ${enceph?`Also start acyclovir ${acv} mg IV every 8 hours, because encephalitis is still possible.`:''}</div>`;
+}else if(kind==='abscess'){
+html+=`<div class="warning"><strong>Focal infection.</strong> MRI, blood cultures and neurosurgical review. Community cover is ceftriaxone plus metronidazole. Add vancomycin after neurosurgery or if MRSA is likely. Steroids only if mass effect is threatening function. Aspiration is source control, not an optional extra.</div>`;
+}else if(kind==='encephalitis'){
+html+=`<div class="warning"><strong>Start acyclovir ${acv} mg IV every 8 hours now, and do not give it alone.</strong> Bacterial meningitis is not excluded, so also give ${community}</div>`;
 }else{
-html+=`<div class="good"><strong>No CT-before-LP criterion is ticked.</strong> Lumbar puncture can be the first test. If bacterial meningitis is still likely and the puncture will be delayed, give blood cultures, dexamethasone ${dex} mg, and antibiotics first.</div>`;
+html+=`<div class="warning"><strong>Community bacterial cover now.</strong> ${community} ${enceph?`Also acyclovir ${acv} mg IV every 8 hours. Do not drop the antibiotic because this might be viral.`:''}</div>`;
+html+=`<div class="warning"><strong>Dexamethasone ${dex} mg IV</strong> with the first antibiotic, or in the minutes before it. Stop it if the CSF is not bacterial. Do not add it if the antibiotic started more than an hour ago.</div>`;
+}
+if(reasons.length&&kind!=='spinal'){
+html+=`<div class="warning"><strong>CT before lumbar puncture.</strong> Reason: ${reasons.join(', ')}. The scan must not delay the drug. Puncture only if the scan shows no mass or shift.</div>`;
+$('lpBtn').querySelector('.small').textContent='Only after CT shows no mass or shift.';
+}else if(kind!=='spinal'){
+html+=`<div class="good"><strong>No CT-before-LP criterion is ticked.</strong> Lumbar puncture can be the first test. If it will be delayed and bacterial meningitis is still likely, the antibiotic still goes in first.</div>`;
 $('lpBtn').querySelector('.small').textContent='Enter CSF and microbiology findings.';
 }
-if(listeria) html+=`<div class="warning"><strong>Add ampicillin.</strong> Age over 50, pregnancy, or immunocompromise is a Listeria risk. Ceftriaxone and vancomycin do not cover it.</div>`;
-if(encephalitis) html+=`<div class="warning"><strong>Start acyclovir ${acv} mg IV every 8 hours now.</strong> Fever with altered consciousness and a seizure or focal sign can be HSV encephalitis. Do not wait for the PCR.</div>`;
 $('routeMsg').innerHTML=html;
 show('route');
 }
@@ -407,11 +444,23 @@ return result(diag(
 false
 ));
 
+const prior=$('priorAbx').checked;
+if(prior&&w>5&&n<50&&r<0.5&&p>100)
+return result(`
+<div class="warning">
+<h2>Do not lock this pattern</h2>
+<p>Antibiotics were given before the puncture. A lymphocytic, low-glucose CSF can be partially treated bacterial meningitis. It can also be tuberculosis or cryptococcus.</p>
+<p>Early viral encephalitis can look neutrophilic, and a treated bacterial infection can look lymphocytic. Send Gram stain, culture, cryptococcal antigen and a TB NAAT before the drug list is narrowed.</p>
+</div>
+<button class="primary" onclick="openManagement('bacterial')">KEEP BACTERIAL COVER →</button>
+<button class="secondary" onclick="openManagement('tb')">OPEN TB MENINGITIS →</button>
+<button class="secondary" onclick="openManagement('crypto')">OPEN CRYPTOCOCCAL MANAGEMENT →</button>`);
+
 if(w>=1000&&n>=50&&r<0.4&&p>100)
 return result(diag(
 'bacterial',
 'Bacterial meningitis',
-'Marked neutrophilic pleocytosis with low CSF glucose ratio and high protein strongly favors bacterial meningitis.'
+'Marked neutrophilic pleocytosis with low CSF glucose and high protein strongly favors bacterial meningitis. This pattern is not absolute: very early viral disease can be neutrophilic.'
 ));
 
 if(w>5&&n<50&&r<0.5&&p>100&&($('immuno').checked||+$('opening').value>=25))
@@ -442,7 +491,7 @@ if(w>5&&n<50&&r>=0.5)
 return result(diag(
 'viral',
 'Viral meningitis or encephalitis',
-'Cells are lymphocytic and glucose is not low. This can be viral. If the patient is febrile and confused, or has had a seizure or a focal sign, keep acyclovir running until HSV PCR and MRI say otherwise.'
+'Cells are lymphocytic and glucose is not low. This can be viral. If antibiotics were given before the puncture, bacterial meningitis can look the same, so do not stop antibiotics on this pattern alone. If the patient is febrile and confused, or has had a seizure, a focal sign or a behaviour change, keep acyclovir running until HSV PCR and MRI say otherwise. A PCR in the first 72 hours can be negative.'
 ));
 
 result(next('CSF'));
@@ -652,7 +701,8 @@ histo:'Histoplasma Meningitis',
 hsv:'HSV Encephalitis',
 viral:'Possible viral meningoencephalitis',
 abscess:'Brain Abscess',
-ventriculitis:'Healthcare-Associated Ventriculitis'
+ventriculitis:'Healthcare-Associated Ventriculitis',
+spinal:'Spinal epidural infection'
 }[t]||'CNS Infection';
 
 let intro={
@@ -667,7 +717,8 @@ histo:'Liposomal amphotericin first, then itraconazole. Echinocandins have no ac
 hsv:'Start IV acyclovir promptly when HSV encephalitis is suspected; adjust for renal function and monitor seizures and cerebral edema.',
 viral:'Keep acyclovir running if encephalitis is still plausible. Stop it only when HSV is unlikely.',
 abscess:'Start appropriate antimicrobial therapy and obtain urgent neurosurgical/source-control assessment when indicated.',
-ventriculitis:'Obtain appropriate CSF/blood cultures and start empiric therapy based on healthcare-associated CNS infection guidance and local susceptibility patterns.'
+ventriculitis:'Obtain appropriate CSF/blood cultures and start empiric therapy based on healthcare-associated CNS infection guidance and local susceptibility patterns.',
+spinal:'Image the whole spine and decompress a progressing deficit. Do not puncture through the collection.'
 }[t];
 
 let doses=t==='tb'?`
@@ -705,6 +756,8 @@ return `
 
 ${doses}
 
+<div class="dose"><strong>Start broad. Name the organism. Read the susceptibilities. Narrow the drug. Finish the right duration.</strong></div>
+
 <h3>Immediate priorities</h3>
 <ul>
 <li>Assess airway, circulation and neurological status.</li>
@@ -717,8 +770,21 @@ CONTINUE TO ${name.toUpperCase()} MANAGEMENT →
 </button>`;
 }
 
+function icuNodes(){
+return `
+<h3>ICU complications</h3>
+<ul>
+<li><strong>Airway.</strong> Intubate when the patient cannot protect it or cannot ventilate.</li>
+<li><strong>Seizure.</strong> Benzodiazepine for the active seizure, then a maintenance antiseizure drug. EEG if coma is unexplained.</li>
+<li><strong>Raised pressure.</strong> Head up, neutral neck, oxygen, treat fever, and do not let the carbon dioxide drift. Osmotherapy if the pressure is still high. Surgery for hydrocephalus or a collection that can be drained.</li>
+<li><strong>Shock.</strong> Sepsis resuscitation, then norepinephrine if the pressure stays low. The drug does not replace source control.</li>
+</ul>
+<div class="dose"><strong>Start broad. Name the organism. Read the susceptibilities. Narrow the drug. Finish the right duration.</strong></div>`;
+}
+
 function continueManagement(t){
 let html=stage2(t);
+if(['bacterial','hsv','viral','abscess','ventriculitis','spinal','tb','crypto'].includes(t)) html+=icuNodes();
 show('management');
 $('managementContent').innerHTML=html;
 $('managementContent').insertAdjacentHTML('beforeend',`<div style="margin-top:20px;display:flex;flex-direction:column;gap:12px"><button class="secondary" onclick="show('route')">← BACK TO STEP 2 • DIAGNOSTIC ROUTE</button><button class="primary" onclick="show('presentation')">↩ BACK TO STEP 1 • INITIAL ASSESSMENT</button></div>`);
@@ -746,9 +812,10 @@ return `
 </ul>
 <h3>2. Dexamethasone</h3>
 <ul>
-<li><strong>Dexamethasone ${dex} mg IV every 6 hours for 4 days</strong> (0.15 mg/kg, maximum 10 mg).</li>
-<li>Give it with the first antibiotic dose, or in the minutes before it. If antibiotics started more than an hour ago, do not add it.</li>
-<li>Stop it if the organism is not Streptococcus pneumoniae. That includes meningococcus. Finish the 4 days only for pneumococcus.</li>
+<li><strong>Dexamethasone ${dex} mg IV every 6 hours for up to 4 days</strong> (0.15 mg/kg, maximum 10 mg), given with the first antibiotic or in the minutes before it.</li>
+<li>Stop it if the CSF is not bacterial. If the result is still uncertain, reassess rather than completing the course by habit.</li>
+<li>The clearest benefit is pneumococcal meningitis. If the organism is not pneumococcus, stop the steroid unless a specialist continues it.</li>
+<li>Do not add it if the antibiotic started more than an hour ago.</li>
 </ul>
 
 <h3>3. Organism-directed therapy</h3>
@@ -923,6 +990,7 @@ return `
 <li><strong>Acyclovir ${acv} mg IV every 8 hours</strong> (10 mg/kg). Use adjusted body weight if the patient is obese.</li>
 <li>Lengthen the interval when the GFR falls, and keep the patient hydrated.</li>
 <li>Continue for 14–21 days when HSV encephalitis is confirmed.</li>
+<li>Do not use acyclovir alone while bacterial meningitis is still possible.</li>
 </ul>
 
 <h3>2. If diagnosis remains uncertain</h3>
@@ -1013,9 +1081,26 @@ return `
 <h2>Possible viral meningoencephalitis</h2>
 <ul>
 <li>No organism has been proven.</li>
-<li>If encephalitis is still plausible, continue acyclovir ${acv} mg IV every 8 hours until HSV PCR and MRI make HSV unlikely. A PCR in the first 72 hours can be falsely negative.</li>
-<li>Stop antibacterial drugs once bacterial meningitis is no longer credible. Do not keep them running for a week out of habit.</li>
+<li>If encephalitis is still plausible, continue acyclovir ${acv} mg IV every 8 hours until HSV PCR and MRI make HSV unlikely. A PCR in the first 72 hours can be falsely negative. Repeat it if the first test was early and suspicion remains.</li>
+<li>Do not use acyclovir alone while bacterial meningitis is still possible. Stop the antibacterial drugs only once that diagnosis is no longer credible.</li>
 <li>If headache is the whole illness and the patient is awake and without focal signs, this is more like viral meningitis and acyclovir is not mandatory.</li>
+</ul>
+`;
+}
+
+if(t==='spinal'){
+const device=$('neurosurgery').checked;
+const cover=device
+?'Vancomycin 15–20 mg/kg IV every 8–12 h plus cefepime 2 g IV every 8 h, or meropenem 2 g IV every 8 h.'
+:'Vancomycin 15–20 mg/kg IV every 8–12 h plus ceftriaxone 2 g IV every 12 h.';
+return `
+<h2>Spinal epidural infection</h2>
+<ul>
+<li><strong>${cover}</strong></li>
+<li>MRI of the whole spine with contrast. A lumbar puncture through the collection is the wrong test.</li>
+<li>Blood cultures before the drug only if they do not delay it. Staphylococcus aureus and streptococci are the usual community organisms.</li>
+<li>A progressing weakness or a sensory level needs decompression. Antibiotics do not replace that operation.</li>
+<li>Usually 4–6 weeks, longer if bone is infected and was not drained. Narrow the drug when the culture and susceptibilities return.</li>
 </ul>
 `;
 }
