@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>High calcium</title><style>
+  :root{--ink:#0f172a;--bg:#fef2f2}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;padding:16px 18px;background:linear-gradient(90deg,#be123c,#9a3412);color:#fff}
+  h1{margin:0;font-size:22px;letter-spacing:-.03em;text-transform:uppercase}
+  header p{margin:2px 0 0;font-size:13px;color:#fff}
+  #limitBadge{background:#fff;color:#be123c;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:800;white-space:nowrap}
+  main{display:grid;grid-template-columns:minmax(260px,380px) 1fr;gap:16px;padding:16px;max-width:1100px;margin:0 auto}
+  @media(max-width:800px){main{grid-template-columns:1fr;padding:12px}}
+  section{background:#fff;border-radius:16px;padding:14px;box-shadow:0 8px 24px #0f172a14}
+  h2{margin:0 0 12px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#be123c}
+  label{display:block;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin:10px 0 4px;color:#334155}
+  input,select{width:100%;font-size:18px;font-weight:700;padding:8px;border:2px solid #cbd5e1;border-radius:10px;background:#fff;color:#0f172a}
+  #target{border-color:#059669;background:#ecfdf5}
+  input[type=range]{padding:0;height:32px;accent-color:#be123c;border:0}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .chips button{border:0;border-radius:999px;font-weight:800;padding:10px 12px;cursor:pointer;font-size:13px;color:#fff}
+  #cal{background:#0891b2}#zol{background:#7c3aed}#dial{background:#be123c}
+  .chips button.on{outline:3px solid #0f172a;outline-offset:2px}
+  .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .num{border-radius:12px;text-align:center;padding:10px 6px;color:#fff}
+  .num:nth-child(1){background:#be123c}.num:nth-child(2){background:#9a3412}.num:nth-child(3){background:#059669}
+  .num.bad{background:#dc2626}
+  .num span{display:block;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.85;margin-bottom:4px}
+  .num b{font-size:26px}
+  #banner{display:none;border-radius:12px;background:#fff7ed;color:#9a3412;font-weight:800;text-align:center;padding:10px;margin:12px 0}
+  #banner.show{display:block}
+  #ods{display:none;margin-top:10px;background:#7f1d1d;color:#fff;border-radius:14px;padding:12px 14px;font-weight:800}
+  #ods.show{display:block}
+  .plot{margin-top:12px;background:#fff;border:2px solid #e2e8f0;border-radius:16px;padding:8px}
+  canvas.chart{width:100%;height:260px;display:block}
+  .ecgbox{margin-top:10px;background:#04130f;border-radius:16px;padding:8px;border:2px solid #115e59}
+  .ecgbox.bad{border-color:#dc2626}
+  canvas.ecg{width:100%;height:120px;display:block}
+  .legend{display:flex;gap:14px;justify-content:center;font-size:12px;font-weight:800;margin:4px 0}
+  .legend i{display:inline-block;width:18px;height:4px;border-radius:4px;margin-right:6px;vertical-align:middle}
+  .lg-k{background:#be123c}.lg-goal{background:#059669}.lg-lim{background:#dc2626}
+  .hours{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:8px;font-size:12px;text-align:center}
+  .hours b{display:block;font-size:16px;color:#be123c}
+  a{color:#be123c}
+  body.embed header, body.embed a[href="index.html"]{display:none}
+  body.embed main{padding:8px}
+</style></head><body>
+<header><div><h1>High calcium</h1><p>Drag the saline. The line is 12 hours.</p></div><div id="limitBadge">Floor 8.5</div></header>
+<main>
+  <section><h2>Treatment</h2>
+    <div class="row">
+  <div><label>Calcium mg/dL</label><input id="val" type="text" inputmode="decimal" value="13.5"></div>
+  <div><label>12 h goal</label><input id="target" type="text" inputmode="decimal" value="10.5"></div>
+</div>
+<label>Saline <b id="rateLabel">200</b> mL/h</label>
+<input id="rate" type="range" min="0" max="300" step="25" value="200">
+<div class="chips">
+  <button type="button" id="cal">Calcitonin</button>
+  <button type="button" id="zol">Zoledronic acid</button>
+  <button type="button" id="dial">Dialysis</button>
+</div>
+  </section>
+  <section>
+    <div class="nums">
+      <div class="num"><span id="aL">—</span><b id="a">—</b></div>
+      <div class="num" id="endBox"><span>At 12 h</span><b id="end">—</b></div>
+      <div class="num" id="deltaBox"><span>Change</span><b id="delta">—</b></div>
+    </div>
+    <div id="banner"></div><div id="ods"></div>
+    <div class="plot"><canvas class="chart" id="chart" width="720" height="260"></canvas>
+      <div class="legend"><span><i class="lg-k"></i>Calcium</span><span id="goalKey"><i class="lg-goal"></i>Goal</span><span><i class="lg-lim"></i>8.5</span></div>
+    </div>
+    <div class="hours" id="hours"></div>
+    <div class="ecgbox" id="ecgBox"><canvas class="ecg" id="ecg" width="720" height="120"></canvas></div>
+    <p><a href="index.html">All simulators</a></p>
+  </section>
+</main>
+<script>
+if(new URLSearchParams(location.search).get('embed')) document.body.classList.add('embed');
+var H=12, phase=0, ecgPath=[0], ecgHour=0, ecgTick=0;
+var NAME={normal:'Normal',longqt:'Long QT',shortqt:'Short QT',torsades:'Torsades',wide:'Wide QRS',sine:'Sine wave',peaked:'Peaked T'};
+function read(id){ var n=parseFloat(String(document.getElementById(id).value||'').replace(',','.')); return Number.isFinite(n)?n:null; }
+function on(id){ return document.getElementById(id).classList.contains('on'); }
+function g(x,c,w,a){ var d=x-c; return a*Math.exp(-(d*d)/(2*w*w)); }
+function sample(t, kind){
+  t=((t%1)+1)%1;
+  if(kind==='sine') return Math.sin(t*Math.PI*2)*0.85;
+  if(kind==='torsades') return Math.sin(t*Math.PI*10)*(0.25+0.75*Math.abs(Math.sin(t*Math.PI*1.5)));
+  if(kind==='wide') return g(t,0.16,0.02,0.05)+g(t,0.28,0.05,0.9)+g(t,0.48,0.04,0.35);
+  var p=0.15, qw=0.012, qa=1, ta=0.32, tw=0.03, tc=0.46;
+  if(kind==='longqt'){ tc=0.68; ta=0.22; tw=0.04; }
+  if(kind==='shortqt'){ tc=0.34; ta=0.5; tw=0.018; }
+  if(kind==='peaked'){ ta=0.9; tw=0.02; }
+  return g(t,0.14,0.018,p)+g(t,0.24,qw*0.45,-0.22*qa)+g(t,0.27,qw,qa)+g(t,tc,tw,ta);
+}
+
+function project(ca, rate){
+  var path=[ca], cur=ca;
+  for(var h=1;h<=H;h++){
+    var drop=rate/100*0.035;
+    if(on('cal')) drop += (h<=6?0.18:0.03);
+    if(on('zol')) drop += (h>=8?0.08:0);
+    if(on('dial')) drop += 0.35;
+    cur=Math.max(6, cur-drop);
+    path.push(cur);
+  }
+  return {path:path, amount:rate, final:path[H]};
+}
+function kindOf(ca){ if(ca>=14) return 'shortqt'; if(ca>=11) return 'shortqt'; if(ca<8) return 'longqt'; return 'normal'; }
+window._kind=kindOf;
+
+function paintChart(path, goal, cross, hour, cap){
+  var c=document.getElementById('chart'), dpr=Math.min(2,devicePixelRatio||1);
+  var W=c.clientWidth||640, Ht=c.clientHeight||260;
+  c.width=W*dpr; c.height=Ht*dpr;
+  var ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,Ht);
+  var vals=path.concat([goal, cap]);
+  var min=Math.min.apply(null,vals)-0.4, max=Math.max.apply(null,vals)+0.4;
+  var L=46,T=16,B=22,R=W-86, n=path.length-1;
+  var X=function(i){ return L+(R-L)*i/n; };
+  var Y=function(v){ return T+(Ht-T-B)*(1-(v-min)/(max-min)); };
+  ctx.font='12px sans-serif'; ctx.fillStyle='#64748b'; ctx.strokeStyle='#e2e8f0';
+  for(var i=0;i<=4;i++){ var v=max-(max-min)*i/4, y=T+(Ht-T-B)*i/4; ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(R,y); ctx.stroke(); ctx.fillText(v.toFixed(1),2,y+4); }
+  ctx.beginPath(); ctx.strokeStyle='#be123c'; ctx.lineWidth=3.5;
+  path.forEach(function(v,i){ var x=X(i), y=Y(v); if(i) ctx.lineTo(x,y); else ctx.moveTo(x,y); });
+  ctx.stroke();
+  ctx.fillStyle='#be123c'; ctx.beginPath(); ctx.arc(X(n),Y(path[n]),5,0,7); ctx.fill();
+  ctx.strokeStyle='#dc2626'; ctx.setLineDash([5,4]); ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(X(0),Y(cap)); ctx.lineTo(R,Y(cap)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='#dc2626'; ctx.fillText(String(cap), X(0)+4, Y(cap)-4);
+  if(cross!=null){ ctx.fillStyle='#dc2626'; ctx.beginPath(); ctx.arc(X(cross),Y(path[cross]),7,0,7); ctx.fill(); }
+  if(hour!=null){ ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(X(hour),T); ctx.lineTo(X(hour),Ht-B); ctx.stroke(); }
+  var y=Y(goal);
+  ctx.strokeStyle='#059669'; ctx.lineWidth=4; ctx.setLineDash([8,5]);
+  ctx.beginPath(); ctx.moveTo(X(0),y); ctx.lineTo(R,y); ctx.stroke(); ctx.setLineDash([]);
+  var label='Goal '+Number(goal).toFixed(1);
+  ctx.font='bold 13px sans-serif';
+  var tw=ctx.measureText(label).width+14, bx=Math.min(W-tw-6,R+4), by=Math.max(4,Math.min(Ht-28,y-12));
+  ctx.fillStyle='#059669'; ctx.fillRect(bx,by,tw,22); ctx.fillStyle='#fff'; ctx.fillText(label,bx+7,by+16);
+}
+function drawStrip(ctx, kd, title){
+  var W=ctx.canvas.clientWidth||640, h=ctx.canvas.clientHeight||120;
+  ctx.fillStyle='#06281f'; ctx.fillRect(0,0,W,h);
+  ctx.strokeStyle='#115e5944';
+  for(var x=0;x<W;x+=24){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+  var bad=kd==='torsades'||kd==='wide'||kd==='sine'||kd==='longqt';
+  ctx.strokeStyle=bad?'#f87171':'#4ade80'; ctx.lineWidth=2; ctx.beginPath();
+  for(var i=0;i<W;i++){
+    var v=sample((i/W)*4+phase, kd);
+    var py=h*0.58-v*h*0.36;
+    if(i) ctx.lineTo(i,py); else ctx.moveTo(i,py);
+  }
+  ctx.stroke();
+  ctx.font='bold 13px sans-serif'; ctx.fillStyle=bad?'#fecaca':'#bbf7d0';
+  ctx.fillText(title+' · '+NAME[kd], 8, 16);
+}
+function frame(){
+  var c=document.getElementById('ecg'), dpr=Math.min(2,devicePixelRatio||1);
+  var W=c.clientWidth||640, Ht=c.clientHeight||120;
+  if(c.width!==Math.floor(W*dpr)){ c.width=W*dpr; c.height=Ht*dpr; }
+  var ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  var k=ecgPath[ecgHour]||ecgPath[0];
+  drawStrip(ctx, window._kind?window._kind(k):'normal', ecgHour+' h · '+Number(k).toFixed(1));
+  phase+=0.012; ecgTick++;
+  if(ecgTick>36 && ecgPath.length){
+    ecgTick=0; ecgHour=(ecgHour+1)%ecgPath.length;
+    if(window._path) paintChart(window._path, window._goal, window._cross, ecgHour, window._cap);
+  }
+  requestAnimationFrame(frame);
+}
+
+function paint(){
+  var ca=read('val'), goal=read('target'), rate=parseFloat(document.getElementById('rate').value)||0;
+  document.getElementById('rateLabel').textContent=String(rate);
+  document.getElementById('aL').textContent='mL/h';
+  if(ca==null) return;
+  if(goal==null) goal=ca;
+  var t=project(ca, rate);
+  var cap=8.5, cross=null;
+  for(var h=1;h<t.path.length;h++) if(t.path[h-1]>cap && t.path[h]<=cap){ cross=h; break; }
+  document.getElementById('a').textContent=String(rate);
+  document.getElementById('end').textContent=t.final.toFixed(1);
+  document.getElementById('delta').textContent=(t.final-ca>=0?'+':'')+(t.final-ca).toFixed(1);
+  document.getElementById('endBox').className='num'+(cross?' bad':'');
+  document.getElementById('deltaBox').className='num'+(cross?' bad':'');
+  var lines=[];
+  if(Math.abs(t.final-goal)>0.35) lines.push('The green line is the goal. This plan does not reach it.');
+  document.getElementById('banner').className=lines.length?'show':'';
+  document.getElementById('banner').textContent=lines.join(' ');
+  var ods=document.getElementById('ods');
+  if(cross){ ods.className='show'; ods.textContent='Overcorrection. Calcium crosses 8.5 at '+cross+' h. Slow the treatment.'; }
+  else { ods.className=''; ods.textContent=''; }
+  document.getElementById('goalKey').innerHTML='<i class="lg-goal"></i>Goal '+goal.toFixed(1);
+  window._path=t.path; window._goal=goal; window._cross=cross; window._cap=cap; ecgPath=t.path;
+  paintChart(t.path, goal, cross, ecgHour, cap);
+  document.getElementById('hours').innerHTML=[0,3,6,9,12].map(function(h){ return '<div>'+h+' h<b>'+t.path[h].toFixed(1)+'</b></div>'; }).join('');
+  document.getElementById('ecgBox').className='ecgbox'+(kindOf(ca)==='shortqt'?' bad':'');
+}
+function applyGoal(){
+  var ca=read('val'), goal=read('target');
+  if(ca==null||goal==null){ paint(); return; }
+  function solve(){
+    var lo=0, hi=300, best=0;
+    for(var i=0;i<14;i++){ var mid=(lo+hi)/2; if(project(ca,mid).final>goal) lo=mid; else hi=mid; best=mid; }
+    return Math.round(best/25)*25;
+  }
+  var rate=solve();
+  if(Math.abs(project(ca,rate).final-goal)>0.4 && !on('cal')){ document.getElementById('cal').classList.add('on'); rate=solve(); }
+  if(Math.abs(project(ca,rate).final-goal)>0.4 && !on('zol')){ document.getElementById('zol').classList.add('on'); rate=solve(); }
+  document.getElementById('rate').value=Math.max(0,Math.min(300,rate));
+  paint();
+}
+document.getElementById('rate').oninput=paint;
+document.getElementById('val').oninput=function(){ var v=read('val'); if(v!=null && v>10.5) document.getElementById('target').value='10.5'; applyGoal(); };
+document.getElementById('target').oninput=applyGoal;
+['cal','zol','dial'].forEach(function(id){ document.getElementById(id).onclick=function(){ this.classList.toggle('on'); applyGoal(); }; });
+
+var q=new URLSearchParams(location.search);
+if(q.get('ca')) document.getElementById('val').value=q.get('ca');
+applyGoal();
+requestAnimationFrame(frame);
+window.addEventListener('resize', paint);
+</script></body></html>
