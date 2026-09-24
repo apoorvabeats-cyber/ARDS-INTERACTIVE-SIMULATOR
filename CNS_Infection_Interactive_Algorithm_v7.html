@@ -331,11 +331,14 @@ show('result');
 $('resultContent').innerHTML=html;
 }
 
-function diag(type,title,text){
+function diag(type,title,text,proven){
+const lead=proven
+?'The laboratory result supports this diagnosis.'
+:'This pattern is compatible. It is not proof. Confirm it before you lock the drug.';
 return `
-<div class="good">
+<div class="${proven?'good':'warning'}">
 <h2>${title}</h2>
-<strong>Diagnostic pathway automatically selected ${title.toLowerCase()}.</strong>
+<strong>${lead}</strong>
 <p>${text}</p>
 </div>
 
@@ -355,40 +358,53 @@ let g=+$('csfG').value||0;
 let sg=+$('serumG').value||100;
 let r=g/sg;
 
-if($('gp').checked||$('gn').checked||$('culture').checked)
-return result(diag(
-'bacterial',
-'Bacterial meningitis',
-'CSF microbiology supports bacterial meningitis. Do not delay appropriate antimicrobial therapy.'
-));
-
 const fungus=$('fungus').value;
 if(fungus==='candida'||fungus==='aspergillus'||fungus==='mucor'||fungus==='cocci'||fungus==='histo')
 return result(diag(
 fungus,
 {candida:'Candida meningitis',aspergillus:'CNS aspergillosis',mucor:'Mucormycosis',cocci:'Coccidioidal meningitis',histo:'Histoplasma meningitis'}[fungus],
-'The identified fungus decides the drug. These regimens are not interchangeable.'
+'The identified fungus decides the drug. A ticked bacterial culture does not override it. These regimens are not interchangeable.',
+true
 ));
 
 if($('crypto').checked||fungus==='crypto')
 return result(diag(
 'crypto',
 'Cryptococcal meningitis',
-'Positive cryptococcal antigen supports cryptococcal CNS disease. Assess opening pressure and immune status.'
+'A cryptococcal antigen, or a lab report that names Cryptococcus, decides the treatment. A ticked bacterial culture does not override it.',
+true
 ));
 
 if($('tb').checked)
 return result(diag(
 'tb',
 'Tuberculous meningitis',
-'Positive TB NAAT/PCR supports TB meningitis in the appropriate clinical setting.'
+'A positive TB NAAT supports TB meningitis. It is not cancelled by a ticked culture box.',
+true
 ));
 
 if($('hsv').checked)
 return result(diag(
 'hsv',
 'HSV encephalitis',
-'Positive HSV PCR supports HSV encephalitis in the appropriate syndrome.'
+'A positive HSV PCR decides the antiviral. It is not cancelled by a ticked culture box.',
+true
+));
+
+if($('gp').checked||$('gn').checked)
+return result(diag(
+'bacterial',
+'Bacterial meningitis',
+'Bacteria on the Gram stain support bacterial meningitis. Do not delay antibiotics.',
+true
+));
+
+if($('culture').checked)
+return result(diag(
+'bacterial',
+'Named bacterial culture',
+'Use this page only if the laboratory named a bacterium. If the culture grew a fungus, set that fungus instead. A positive culture without a name is not automatically bacterial meningitis.',
+false
 ));
 
 if(w>=1000&&n>=50&&r<0.4&&p>100)
@@ -683,7 +699,7 @@ return `
 <h2>${name}</h2>
 
 <div class="good">
-<strong>Diagnostic pathway automatically selected ${name}.</strong>
+<strong>${name}.</strong>
 <p>${intro}</p>
 </div>
 
@@ -732,7 +748,7 @@ return `
 <ul>
 <li><strong>Dexamethasone ${dex} mg IV every 6 hours for 4 days</strong> (0.15 mg/kg, maximum 10 mg).</li>
 <li>Give it with the first antibiotic dose, or in the minutes before it. If antibiotics started more than an hour ago, do not add it.</li>
-<li>Stop it if the CSF and the organism are not bacterial. Continue it when pneumococcus is confirmed.</li>
+<li>Stop it if the organism is not Streptococcus pneumoniae. That includes meningococcus. Finish the 4 days only for pneumococcus.</li>
 </ul>
 
 <h3>3. Organism-directed therapy</h3>
