@@ -66,6 +66,7 @@ Select the major presenting features before choosing LP or imaging.
 <label class="check"><input id="pap" type="checkbox">Papilloedema</label>
 <label class="check"><input id="cranial" type="checkbox">Cranial-nerve deficit</label>
 <label class="check"><input id="immuno" type="checkbox">Severe immunocompromise</label>
+<label class="check"><input id="pregnant" type="checkbox">Pregnancy</label>
 <label class="check"><input id="neurosurgery" type="checkbox">Recent neurosurgery/EVD/shunt</label>
 <label class="check"><input id="shock" type="checkbox">Shock/hemodynamic instability</label>
 </div>
@@ -80,6 +81,10 @@ Select the major presenting features before choosing LP or imaging.
 </select>
 </div>
 
+<div>
+<label>Age (years)</label>
+<input id="age" type="number" value="40" min="1">
+</div>
 <div>
 <label>Patient weight (kg)</label>
 <input id="weight" type="number" value="70" min="1">
@@ -101,7 +106,7 @@ LP/CSF is the main diagnostic test for meningitis when clinically safe.
 Imaging is selected when structural assessment is needed or LP is deferred.
 </div>
 
-<button class="option route" onclick="show('csf')">
+<button class="option route" id="lpBtn" onclick="show('csf')">
 🧪 LUMBAR PUNCTURE / CSF STUDY<br>
 <span class="small">Enter CSF and microbiology findings.</span>
 </button>
@@ -278,13 +283,34 @@ return Math.round(Math.min(d,max||Infinity));
 
 function goRoute(){
 state.lp=state.ct=state.mri=false;
-
-$('routeMsg').innerHTML=
-($('focal').checked||$('pap').checked||$('seizure').checked||$('neurosurgery').checked)
-?
-'<div class="warning"><strong>Imaging may be required before LP.</strong> Assess contraindications and clinical safety before LP.</div>'
-:'';
-
+const reasons=[];
+if($('focal').checked) reasons.push('a focal deficit');
+if($('cranial').checked) reasons.push('a cranial-nerve palsy');
+if($('pap').checked) reasons.push('papilloedema');
+if($('seizure').checked) reasons.push('a new seizure');
+if($('altered').checked) reasons.push('altered consciousness');
+if($('immuno').checked) reasons.push('severe immunocompromise');
+if($('neurosurgery').checked) reasons.push('recent neurosurgery or a device');
+const age=Number($('age').value)||0;
+const wt=Number($('weight').value)||70;
+const dex=Math.min(Math.round(wt*0.15),10);
+const acv=Math.round(wt*10);
+const listeria=age>50||$('pregnant').checked||$('immuno').checked;
+const encephalitis=$('fever').checked&&$('altered').checked&&($('seizure').checked||$('focal').checked||$('cranial').checked);
+let html='';
+if($('shock').checked){
+html+=`<div class="danger"><strong>Do not transport this patient first.</strong> Resuscitate. Draw blood cultures, give dexamethasone ${dex} mg IV, and start empiric meningitis antibiotics now. CT and LP wait until the patient can be moved safely.</div>`;
+}
+if(reasons.length){
+html+=`<div class="warning"><strong>CT before lumbar puncture.</strong> Reason: ${reasons.join(', ')}. The scan must not delay treatment. Blood cultures, dexamethasone ${dex} mg IV, and empiric antibiotics are given first, then CT. Puncture only if the scan shows no mass or shift.</div>`;
+$('lpBtn').querySelector('.small').textContent='Only after CT shows no mass or shift.';
+}else{
+html+=`<div class="good"><strong>No CT-before-LP criterion is ticked.</strong> Lumbar puncture can be the first test. If bacterial meningitis is still likely and the puncture will be delayed, give blood cultures, dexamethasone ${dex} mg, and antibiotics first.</div>`;
+$('lpBtn').querySelector('.small').textContent='Enter CSF and microbiology findings.';
+}
+if(listeria) html+=`<div class="warning"><strong>Add ampicillin.</strong> Age over 50, pregnancy, or immunocompromise is a Listeria risk. Ceftriaxone and vancomycin do not cover it.</div>`;
+if(encephalitis) html+=`<div class="warning"><strong>Start acyclovir ${acv} mg IV every 8 hours now.</strong> Fever with altered consciousness and a seizure or focal sign can be HSV encephalitis. Do not wait for the PCR.</div>`;
+$('routeMsg').innerHTML=html;
 show('route');
 }
 
@@ -352,6 +378,16 @@ return result(diag(
 'Marked neutrophilic pleocytosis with low CSF glucose ratio and high protein strongly favors bacterial meningitis.'
 ));
 
+if(w>5&&n<50&&r<0.5&&p>100&&($('immuno').checked||+$('opening').value>=25))
+return result(`
+<div class="warning">
+<h2>Do not call this TB yet</h2>
+<p>Lymphocytic CSF, low glucose and high protein fit both tuberculous meningitis and cryptococcal meningitis. Opening pressure of 25 cm H₂O or more, or immunocompromise, keeps cryptococcus on the list.</p>
+<p>Send a cryptococcal antigen and a TB NAAT before you lock the diagnosis. Opening pressure is entered in cm of water, not mm.</p>
+</div>
+<button class="primary" onclick="openManagement('crypto')">OPEN CRYPTOCOCCAL MANAGEMENT →</button>
+<button class="secondary" onclick="openManagement('tb')">OPEN TB MENINGITIS MANAGEMENT →</button>`);
+
 if(w>5&&n<50&&r<0.5&&p>100&&$('duration').value!=='acute')
 return result(diag(
 'tb',
@@ -366,11 +402,11 @@ return result(diag(
 'Lymphocytic CSF with low glucose ratio, high protein and raised opening pressure can suggest cryptococcal meningitis, especially with immunosuppression.'
 ));
 
-if(w>5&&n<50&&r>=0.5&&p<150)
+if(w>5&&n<50&&r>=0.5)
 return result(diag(
 'viral',
-'Viral meningitis/encephalitis',
-'The CSF pattern is more compatible with a viral process, but no specific virus is established by these inputs.'
+'Viral meningitis or encephalitis',
+'Cells are lymphocytic and glucose is not low. This can be viral. If the patient is febrile and confused, or has had a seizure or a focal sign, keep acyclovir running until HSV PCR and MRI say otherwise.'
 ));
 
 result(next('CSF'));
@@ -401,7 +437,7 @@ return result(diag(
 'Temporal lobe abnormality can support HSV encephalitis; MRI and CSF HSV PCR are preferred for confirmation.'
 ));
 
-if($('ctVent').checked||$('ctEpend').checked)
+if(($('ctVent').checked||$('ctEpend').checked)&&$('neurosurgery').checked)
 return result(diag(
 'ventriculitis',
 'Healthcare-associated ventriculitis',
@@ -436,7 +472,7 @@ return result(diag(
 'Ring enhancement with central diffusion restriction strongly supports pyogenic abscess in the correct setting.'
 ));
 
-if($('mriVent').checked||$('mriEpend').checked)
+if(($('mriVent').checked||$('mriEpend').checked)&&$('neurosurgery').checked)
 return result(diag(
 'ventriculitis',
 'Healthcare-associated ventriculitis',
@@ -573,6 +609,7 @@ bacterial:'Bacterial Meningitis',
 tb:'Tuberculous Meningitis',
 crypto:'Cryptococcal Meningitis',
 hsv:'HSV Encephalitis',
+viral:'Possible viral meningoencephalitis',
 abscess:'Brain Abscess',
 ventriculitis:'Healthcare-Associated Ventriculitis'
 }[t]||'CNS Infection';
@@ -582,6 +619,7 @@ bacterial:'Start appropriate empiric parenteral antibiotics promptly; obtain mic
 tb:'Start multidrug anti-tubercular therapy using weight-based dosing and adjunctive corticosteroid therapy with guideline-directed taper.',
 crypto:'Assess opening pressure, neurological status and immune status; begin guideline-directed antifungal induction therapy and actively manage symptomatic raised ICP.',
 hsv:'Start IV acyclovir promptly when HSV encephalitis is suspected; adjust for renal function and monitor seizures and cerebral edema.',
+viral:'Keep acyclovir running if encephalitis is still plausible. Stop it only when HSV is unlikely.',
 abscess:'Start appropriate antimicrobial therapy and obtain urgent neurosurgical/source-control assessment when indicated.',
 ventriculitis:'Obtain appropriate CSF/blood cultures and start empiric therapy based on healthcare-associated CNS infection guidance and local susceptibility patterns.'
 }[t];
@@ -642,22 +680,29 @@ $('managementContent').insertAdjacentHTML('beforeend',`<div style="margin-top:20
 
 function stage2(t){
 
-if(t==='bacterial')
+if(t==='bacterial'){
+const age=Number($('age').value)||0;
+const wt=Number($('weight').value)||70;
+const listeria=age>50||$('pregnant').checked||$('immuno').checked;
+const vancoLow=Math.round(wt*15), vancoHigh=Math.round(wt*20);
+const dex=Math.min(Math.round(wt*0.15),10);
+const regimen=listeria
+?`Ceftriaxone 2 g IV every 12 h + vancomycin ${vancoLow}–${vancoHigh} mg IV every 8–12 h + ampicillin 2 g IV every 4 h.`
+:`Ceftriaxone 2 g IV every 12 h + vancomycin ${vancoLow}–${vancoHigh} mg IV every 8–12 h. Ampicillin is not required from the age, pregnancy and immune answers entered.`;
 return `
-<h2>🦠 Bacterial Meningitis — Definitive Management</h2>
-
-<h3>1. Empiric IV antibiotics</h3>
+<h2>Bacterial Meningitis — Management</h2>
+<h3>1. Empiric IV antibiotics for this patient</h3>
 <ul>
-<li><strong>Age 18–50 years:</strong> Ceftriaxone 2 g IV every 12 h + Vancomycin 15–20 mg/kg IV every 8–12 h, dose-adjust to renal function/AUC or trough monitoring.</li>
-<li><strong>Age >50 years, immunocompromised or Listeria risk:</strong> Ceftriaxone 2 g IV every 12 h + Vancomycin 15–20 mg/kg IV every 8–12 h + Ampicillin 2 g IV every 4 h.</li>
-<li>Obtain blood cultures before antibiotics when this does not delay treatment.</li>
+<li><strong>${regimen}</strong></li>
+<li>Draw blood cultures first only when that does not delay the drugs.</li>
 <li>Do not delay antibiotics for CT or LP.</li>
+<li>This is an adult regimen. It does not apply to neonates.</li>
 </ul>
-
 <h3>2. Dexamethasone</h3>
 <ul>
-<li><strong>Dexamethasone 10 mg IV every 6 h for 4 days</strong>, preferably before or with the first antibiotic dose.</li>
-<li>Continue when CSF/organism is compatible with bacterial meningitis; discontinue when findings are not consistent with bacterial meningitis.</li>
+<li><strong>Dexamethasone ${dex} mg IV every 6 hours for 4 days</strong> (0.15 mg/kg, maximum 10 mg).</li>
+<li>Give it with the first antibiotic dose, or in the minutes before it. If antibiotics started more than an hour ago, do not add it.</li>
+<li>Stop it if the CSF and the organism are not bacterial. Continue it when pneumococcus is confirmed.</li>
 </ul>
 
 <h3>3. Organism-directed therapy</h3>
@@ -693,6 +738,7 @@ return `
 <div class="dose"><strong>KEY ICU POINT:</strong><br>
 Start effective antibiotics immediately. Do not allow CT/LP delays to postpone treatment. Narrow therapy once organism and susceptibility are available.</div>
 `;
+}
 
 if(t==='tb')
 return `
@@ -705,17 +751,18 @@ return `
 Isoniazid <strong>${Math.min(dose(5,300))} mg</strong>;
 Rifampicin <strong>${Math.min(dose(10,600))} mg</strong>;
 Pyrazinamide <strong>${Math.min(dose(25,2000))} mg</strong>;
-Ethambutol <strong>${Math.min(dose(15,1600))} mg</strong>.
+Ethambutol <strong>${Math.min(dose(15,1200))} mg</strong>.
 </li>
 <li><strong>Continuation phase:</strong> Isoniazid + Rifampicin.</li>
 <li>TB meningitis generally requires a prolonged course, commonly about <strong>12 months</strong>; follow national TB-program guidance and drug-susceptibility results.</li>
-<li>Add pyridoxine with isoniazid.</li>
+<li>Add pyridoxine with isoniazid. Check vision on ethambutol. The cap here is 1,200 mg/day.</li>
 </ul>
 
 <h3>2. Corticosteroids</h3>
 <ul>
-<li>Dexamethasone or prednisolone should be given as adjunctive therapy and tapered gradually over several weeks.</li>
-<li>Particularly important with cerebral edema, raised ICP, infarction or neurological deterioration.</li>
+<li>Give dexamethasone, or prednisolone, to every patient with TB meningitis and taper it over 6–8 weeks.</li>
+<li>Do not wait for edema or infarction. A higher starting dose is used when the GCS is under 15.</li>
+<li>In HIV-associated TB meningitis, steroids are still given. Do not start antiretroviral therapy in the first weeks without specialist advice.</li>
 </ul>
 
 <h3>3. Complication management</h3>
@@ -734,48 +781,45 @@ Ethambutol <strong>${Math.min(dose(15,1600))} mg</strong>.
 </ul>
 `;
 
-if(t==='crypto')
+if(t==='crypto'){
+const wt=Number($('weight').value)||70;
+const fc=Math.round(wt*25);
+const hiv=$('immuno').checked;
+const preg=$('pregnant').checked;
+const induction=hiv
+?`HIV-associated disease: liposomal amphotericin B 10 mg/kg IV once on day 1, plus flucytosine 100 mg/kg/day (${fc} mg every 6 hours) and fluconazole 1,200 mg/day for 14 days. This single-dose amphotericin schedule is the WHO regimen for HIV. It is not the automatic regimen for everyone else.`
+:`No severe immunocompromise was ticked. Use liposomal amphotericin B 4 mg/kg IV daily plus flucytosine 100 mg/kg/day (${fc} mg every 6 hours) for at least 2 weeks. Do not use the HIV single-dose schedule by default.`;
 return `
-<h2>🍄 Cryptococcal Meningitis — Definitive Management</h2>
-
-<h3>1. Preferred induction regimen</h3>
+<h2>Cryptococcal Meningitis — Management</h2>
+<h3>1. Induction</h3>
 <ul>
-<li><strong>Liposomal amphotericin B 10 mg/kg IV once on day 1</strong> + <strong>Flucytosine 100 mg/kg/day PO divided into 4 doses</strong> + <strong>Fluconazole 1200 mg/day PO</strong> for 14 days.</li>
-<li>Monitor creatinine, potassium, magnesium, CBC and hepatic function.</li>
-<li>Adjust/monitor flucytosine carefully with renal dysfunction and monitor blood counts.</li>
+<li><strong>${induction}</strong></li>
+${preg?'<li><strong>Pregnancy:</strong> flucytosine is teratogenic. Do not use this schedule unchanged. Get specialist advice the same day.</li>':''}
+<li>Check creatinine, potassium, magnesium, blood count and liver tests. Flucytosine needs a longer interval when the kidneys fail.</li>
 </ul>
-
 <h3>2. Intracranial pressure</h3>
 <ul>
-<li>Measure CSF opening pressure at LP.</li>
-<li>If raised ICP with symptoms, perform therapeutic LPs with removal of CSF until symptoms improve.</li>
-<li>Do not routinely use acetazolamide, mannitol or corticosteroids solely for cryptococcal ICP.</li>
+<li>Measure opening pressure in cm of water.</li>
+<li>At 25 cm H₂O or more, with symptoms, remove CSF. Repeat until the pressure and the headache settle.</li>
+<li>Do not use acetazolamide, mannitol or corticosteroids to treat cryptococcal pressure.</li>
 </ul>
-
-<h3>3. Consolidation</h3>
+<h3>3. After induction</h3>
 <ul>
-<li>Fluconazole <strong>800 mg/day</strong> for approximately 8 weeks after successful induction.</li>
+<li>Fluconazole 800 mg/day for about 8 weeks, then 200 mg/day for at least a year in HIV, and until immune recovery.</li>
+<li>In HIV, delay antiretroviral therapy for 4–6 weeks. Earlier treatment raises the risk of IRIS.</li>
 </ul>
-
-<h3>4. Maintenance</h3>
-<ul>
-<li>Fluconazole <strong>200 mg/day</strong>, generally for at least 12 months and until immune recovery criteria are met in people with HIV.</li>
-<li>For HIV-associated disease, coordinate ART initiation with the treating HIV team; avoid very early ART in CNS cryptococcosis because of risk of IRIS.</li>
-</ul>
-
-<div class="dose"><strong>DO NOT MISS:</strong><br>
-Raised ICP is a major cause of morbidity. Repeated therapeutic LPs are a core component of management when symptomatic.</div>
 `;
+}
 
-if(t==='hsv')
+if(t==='hsv'){
+const acv=Math.round((Number($('weight').value)||70)*10);
 return `
-<h2>🧠 HSV Encephalitis — Definitive Management</h2>
-
+<h2>HSV Encephalitis — Management</h2>
 <h3>1. Antiviral therapy</h3>
 <ul>
-<li><strong>Acyclovir 10 mg/kg IV every 8 h</strong> in adults with normal renal function.</li>
-<li>Adjust dose/interval according to renal function and maintain adequate hydration.</li>
-<li>Typical duration: <strong>14–21 days</strong>, individualized to clinical course and immune status.</li>
+<li><strong>Acyclovir ${acv} mg IV every 8 hours</strong> (10 mg/kg). Use adjusted body weight if the patient is obese.</li>
+<li>Lengthen the interval when the GFR falls, and keep the patient hydrated.</li>
+<li>Continue for 14–21 days when HSV encephalitis is confirmed.</li>
 </ul>
 
 <h3>2. If diagnosis remains uncertain</h3>
@@ -793,6 +837,7 @@ return `
 <li>Maintain normoxia, normocapnia, normoglycemia and appropriate temperature control.</li>
 </ul>
 `;
+}
 
 if(t==='abscess')
 return `
@@ -858,6 +903,19 @@ return `
 <li>Repeat imaging for deterioration, hydrocephalus or abscess/empyema.</li>
 </ul>
 `;
+
+if(t==='viral'){
+const acv=Math.round((Number($('weight').value)||70)*10);
+return `
+<h2>Possible viral meningoencephalitis</h2>
+<ul>
+<li>No organism has been proven.</li>
+<li>If encephalitis is still plausible, continue acyclovir ${acv} mg IV every 8 hours until HSV PCR and MRI make HSV unlikely. A PCR in the first 72 hours can be falsely negative.</li>
+<li>Stop antibacterial drugs once bacterial meningitis is no longer credible. Do not keep them running for a week out of habit.</li>
+<li>If headache is the whole illness and the patient is awake and without focal signs, this is more like viral meningitis and acyclovir is not mandatory.</li>
+</ul>
+`;
+}
 
 return `
 <h2>🧠 CNS Infection — Further Management</h2>
