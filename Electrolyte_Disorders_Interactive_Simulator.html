@@ -547,7 +547,7 @@ function showEntry(id){
       <div class="calc-field"><label>${currentIon.name} (${currentIon.unit})</label>
         <input type="number" id="ionValue" step="0.1" inputmode="decimal">
       </div>
-      ${currentIon.id==='sodium'?'<div class="calc-field"><label>Glucose (mg/dL)</label><input type="number" id="ionGlucose" inputmode="decimal" placeholder="Required if the sodium is under 135"></div><p>A sodium under 135 is not treated until the glucose is entered. Corrected sodium = measured sodium + 1.6 for every 100 mg/dL of glucose above 100.</p>':''}
+      ${currentIon.id==='sodium'?'<div class="calc-field"><label>Glucose (mg/dL), optional</label><input type="number" id="ionGlucose" inputmode="decimal" placeholder="Only if you already have it"></div>':''}
       <button class="calc-btn" onclick="useValue()">Use this value</button>
       <div id="ionMsg" class="calc-out"></div>
     </div>`;
@@ -568,13 +568,9 @@ function useValue(){
     const gEl=document.getElementById('ionGlucose');
     const gRaw=gEl?gEl.value:'';
     const g=parseFloat(gRaw);
-    if(gRaw===''||Number.isNaN(g)||g<=0){ msg.textContent='Enter the glucose. A high glucose can make the sodium look low, and 3% saline should not be chosen from the uncorrected number.'; return; }
-    const corr=correctedNa(v, g);
-    if(corr>=135){
-      msg.innerHTML='Measured sodium is '+v+' mmol/L. With a glucose of '+g+' mg/dL the corrected sodium is about <b>'+corr.toFixed(1)+'</b>. That is not a low sodium. Do not give 3% saline for this number.';
-      return;
-    }
-    showDisorder(ion.lowKey, v, ion, {glucose:g, corrected:corr});
+    let url='Hyponatremia_Correction_Simulator.html?na='+encodeURIComponent(v);
+    if(gRaw!=='' && !Number.isNaN(g) && g>0) url+='&glu='+encodeURIComponent(g);
+    location.href=url;
     return;
   }
   if(v<ion.low) showDisorder(ion.lowKey, v, ion);
