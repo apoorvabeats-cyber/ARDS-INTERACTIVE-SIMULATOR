@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Low phosphate</title><style>
+  :root{--ink:#0f172a;--bg:#eff6ff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;padding:16px 18px;background:linear-gradient(90deg,#1d4ed8,#0e7490);color:#fff}
+  h1{margin:0;font-size:22px;letter-spacing:-.03em;text-transform:uppercase}
+  header p{margin:2px 0 0;font-size:13px;color:#fff}
+  #limitBadge{background:#fff;color:#1d4ed8;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:800;white-space:nowrap}
+  main{display:grid;grid-template-columns:minmax(260px,380px) 1fr;gap:16px;padding:16px;max-width:1100px;margin:0 auto}
+  @media(max-width:800px){main{grid-template-columns:1fr;padding:12px}}
+  section{background:#fff;border-radius:16px;padding:14px;box-shadow:0 8px 24px #0f172a14}
+  h2{margin:0 0 12px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#1d4ed8}
+  label{display:block;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin:10px 0 4px;color:#334155}
+  input,select{width:100%;font-size:18px;font-weight:700;padding:8px;border:2px solid #cbd5e1;border-radius:10px;background:#fff;color:#0f172a}
+  #target{border-color:#059669;background:#ecfdf5}
+  input[type=range]{padding:0;height:32px;accent-color:#1d4ed8;border:0}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .chips button{border:0;border-radius:999px;font-weight:800;padding:10px 12px;cursor:pointer;font-size:13px;color:#fff}
+  #b2{background:#1d4ed8}#b4{background:#7c3aed}#oral{background:#0891b2}
+  .chips button.on{outline:3px solid #0f172a;outline-offset:2px}
+  .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .num{border-radius:12px;text-align:center;padding:10px 6px;color:#fff}
+  .num:nth-child(1){background:#1d4ed8}.num:nth-child(2){background:#0e7490}.num:nth-child(3){background:#059669}
+  .num.bad{background:#dc2626}
+  .num span{display:block;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.85;margin-bottom:4px}
+  .num b{font-size:26px}
+  #banner{display:none;border-radius:12px;background:#fff7ed;color:#9a3412;font-weight:800;text-align:center;padding:10px;margin:12px 0}
+  #banner.show{display:block}
+  #ods{display:none;margin-top:10px;background:#7f1d1d;color:#fff;border-radius:14px;padding:12px 14px;font-weight:800}
+  #ods.show{display:block}
+  .plot{margin-top:12px;background:#fff;border:2px solid #e2e8f0;border-radius:16px;padding:8px}
+  canvas.chart{width:100%;height:260px;display:block}
+  .ecgbox{margin-top:10px;background:#04130f;border-radius:16px;padding:8px;border:2px solid #115e59}
+  .ecgbox.bad{border-color:#dc2626}
+  canvas.ecg{width:100%;height:120px;display:block}
+  .legend{display:flex;gap:14px;justify-content:center;font-size:12px;font-weight:800;margin:4px 0}
+  .legend i{display:inline-block;width:18px;height:4px;border-radius:4px;margin-right:6px;vertical-align:middle}
+  .lg-k{background:#1d4ed8}.lg-goal{background:#059669}.lg-lim{background:#dc2626}
+  .hours{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:8px;font-size:12px;text-align:center}
+  .hours b{display:block;font-size:16px;color:#1d4ed8}
+  a{color:#1d4ed8}
+  body.embed header, body.embed a[href="index.html"]{display:none}
+  body.embed main{padding:8px}
+</style></head><body>
+<header><div><h1>Low phosphate</h1><p>Drag the mmol. The line is 6 hours.</p></div><div id="limitBadge">Stop at 4.5</div></header>
+<main>
+  <section><h2>Replacement</h2>
+    <div class="row">
+  <div><label>Phosphate mg/dL</label><input id="val" type="text" inputmode="decimal" value="1.2"></div>
+  <div><label>6 h goal</label><input id="target" type="text" inputmode="decimal" value="2.5"></div>
+</div>
+<label>IV phosphate <b id="rateLabel">3</b> mmol/h</label>
+<input id="rate" type="range" min="0" max="8" step="1" value="3">
+<div class="chips">
+  <button type="button" id="b2">2 mmol/h</button>
+  <button type="button" id="b4">4 mmol/h</button>
+  <button type="button" id="oral">Oral</button>
+</div>
+  </section>
+  <section>
+    <div class="nums">
+      <div class="num"><span id="aL">—</span><b id="a">—</b></div>
+      <div class="num" id="endBox"><span>At 6 h</span><b id="end">—</b></div>
+      <div class="num" id="deltaBox"><span>Change</span><b id="delta">—</b></div>
+    </div>
+    <div id="banner"></div><div id="ods"></div>
+    <div class="plot"><canvas class="chart" id="chart" width="720" height="260"></canvas>
+      <div class="legend"><span><i class="lg-k"></i>Phosphate</span><span id="goalKey"><i class="lg-goal"></i>Goal</span><span><i class="lg-lim"></i>4.5</span></div>
+    </div>
+    <div class="hours" id="hours"></div>
+    <div class="ecgbox" id="ecgBox"><canvas class="ecg" id="ecg" width="720" height="120"></canvas></div>
+    <p><a href="index.html">All simulators</a></p>
+  </section>
+</main>
+<script>
+if(new URLSearchParams(location.search).get('embed')) document.body.classList.add('embed');
+var H=6, phase=0, ecgPath=[0], ecgHour=0, ecgTick=0;
+var NAME={normal:'Normal',longqt:'Long QT',shortqt:'Short QT',torsades:'Torsades',wide:'Wide QRS',sine:'Sine wave',peaked:'Peaked T'};
+function read(id){ var n=parseFloat(String(document.getElementById(id).value||'').replace(',','.')); return Number.isFinite(n)?n:null; }
+function on(id){ return document.getElementById(id).classList.contains('on'); }
+function g(x,c,w,a){ var d=x-c; return a*Math.exp(-(d*d)/(2*w*w)); }
+function sample(t, kind){
+  t=((t%1)+1)%1;
+  if(kind==='sine') return Math.sin(t*Math.PI*2)*0.85;
+  if(kind==='torsades') return Math.sin(t*Math.PI*10)*(0.25+0.75*Math.abs(Math.sin(t*Math.PI*1.5)));
+  if(kind==='wide') return g(t,0.16,0.02,0.05)+g(t,0.28,0.05,0.9)+g(t,0.48,0.04,0.35);
+  var p=0.15, qw=0.012, qa=1, ta=0.32, tw=0.03, tc=0.46;
+  if(kind==='longqt'){ tc=0.68; ta=0.22; tw=0.04; }
+  if(kind==='shortqt'){ tc=0.34; ta=0.5; tw=0.018; }
+  if(kind==='peaked'){ ta=0.9; tw=0.02; }
+  return g(t,0.14,0.018,p)+g(t,0.24,qw*0.45,-0.22*qa)+g(t,0.27,qw,qa)+g(t,tc,tw,ta);
+}
+
+function project(ph, rate){
+  var path=[ph], ca=9, given=0, capath=[9];
+  for(var h=1;h<=H;h++){
+    given+=rate;
+    if(on('oral')&&h<=4) given+=2;
+    var settled=ph+given*0.055;
+    if(rate>4) ca=Math.max(6, ca-(rate-4)*0.12);
+    path.push(settled);
+    capath.push(ca);
+  }
+  return {path:path, ca:capath, amount:given, final:path[H], cal:capath[H]};
+}
+function kindOf(ph){ var ca=window._caNow==null?9:window._caNow; if(ca<7.5) return 'longqt'; if(ca<8.2) return 'longqt'; return 'normal'; }
+window._kind=function(){ return kindOf(0); };
+
+function paintChart(path, goal, cross, hour, cap){
+  var c=document.getElementById('chart'), dpr=Math.min(2,devicePixelRatio||1);
+  var W=c.clientWidth||640, Ht=c.clientHeight||260;
+  c.width=W*dpr; c.height=Ht*dpr;
+  var ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,Ht);
+  var vals=path.concat([goal, cap]);
+  var min=Math.min.apply(null,vals)-0.4, max=Math.max.apply(null,vals)+0.4;
+  var L=46,T=16,B=22,R=W-86, n=path.length-1;
+  var X=function(i){ return L+(R-L)*i/n; };
+  var Y=function(v){ return T+(Ht-T-B)*(1-(v-min)/(max-min)); };
+  ctx.font='12px sans-serif'; ctx.fillStyle='#64748b'; ctx.strokeStyle='#e2e8f0';
+  for(var i=0;i<=4;i++){ var v=max-(max-min)*i/4, y=T+(Ht-T-B)*i/4; ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(R,y); ctx.stroke(); ctx.fillText(v.toFixed(1),2,y+4); }
+  ctx.beginPath(); ctx.strokeStyle='#1d4ed8'; ctx.lineWidth=3.5;
+  path.forEach(function(v,i){ var x=X(i), y=Y(v); if(i) ctx.lineTo(x,y); else ctx.moveTo(x,y); });
+  ctx.stroke();
+  ctx.fillStyle='#1d4ed8'; ctx.beginPath(); ctx.arc(X(n),Y(path[n]),5,0,7); ctx.fill();
+  ctx.strokeStyle='#dc2626'; ctx.setLineDash([5,4]); ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(X(0),Y(cap)); ctx.lineTo(R,Y(cap)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='#dc2626'; ctx.fillText(String(cap), X(0)+4, Y(cap)-4);
+  if(cross!=null){ ctx.fillStyle='#dc2626'; ctx.beginPath(); ctx.arc(X(cross),Y(path[cross]),7,0,7); ctx.fill(); }
+  if(hour!=null){ ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(X(hour),T); ctx.lineTo(X(hour),Ht-B); ctx.stroke(); }
+  var y=Y(goal);
+  ctx.strokeStyle='#059669'; ctx.lineWidth=4; ctx.setLineDash([8,5]);
+  ctx.beginPath(); ctx.moveTo(X(0),y); ctx.lineTo(R,y); ctx.stroke(); ctx.setLineDash([]);
+  var label='Goal '+Number(goal).toFixed(1);
+  ctx.font='bold 13px sans-serif';
+  var tw=ctx.measureText(label).width+14, bx=Math.min(W-tw-6,R+4), by=Math.max(4,Math.min(Ht-28,y-12));
+  ctx.fillStyle='#059669'; ctx.fillRect(bx,by,tw,22); ctx.fillStyle='#fff'; ctx.fillText(label,bx+7,by+16);
+}
+function drawStrip(ctx, kd, title){
+  var W=ctx.canvas.clientWidth||640, h=ctx.canvas.clientHeight||120;
+  ctx.fillStyle='#06281f'; ctx.fillRect(0,0,W,h);
+  ctx.strokeStyle='#115e5944';
+  for(var x=0;x<W;x+=24){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+  var bad=kd==='torsades'||kd==='wide'||kd==='sine'||kd==='longqt';
+  ctx.strokeStyle=bad?'#f87171':'#4ade80'; ctx.lineWidth=2; ctx.beginPath();
+  for(var i=0;i<W;i++){
+    var v=sample((i/W)*4+phase, kd);
+    var py=h*0.58-v*h*0.36;
+    if(i) ctx.lineTo(i,py); else ctx.moveTo(i,py);
+  }
+  ctx.stroke();
+  ctx.font='bold 13px sans-serif'; ctx.fillStyle=bad?'#fecaca':'#bbf7d0';
+  ctx.fillText(title+' · '+NAME[kd], 8, 16);
+}
+function frame(){
+  var c=document.getElementById('ecg'), dpr=Math.min(2,devicePixelRatio||1);
+  var W=c.clientWidth||640, Ht=c.clientHeight||120;
+  if(c.width!==Math.floor(W*dpr)){ c.width=W*dpr; c.height=Ht*dpr; }
+  var ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  var k=ecgPath[ecgHour]||ecgPath[0];
+  drawStrip(ctx, window._kind?window._kind(k):'normal', ecgHour+' h · '+Number(k).toFixed(1));
+  phase+=0.012; ecgTick++;
+  if(ecgTick>36 && ecgPath.length){
+    ecgTick=0; ecgHour=(ecgHour+1)%ecgPath.length;
+    if(window._path) paintChart(window._path, window._goal, window._cross, ecgHour, window._cap);
+  }
+  requestAnimationFrame(frame);
+}
+
+function paint(){
+  var ph=read('val'), goal=read('target'), rate=parseFloat(document.getElementById('rate').value)||0;
+  document.getElementById('rateLabel').textContent=String(rate);
+  document.getElementById('aL').textContent='Calcium';
+  if(ph==null) return;
+  if(goal==null) goal=ph;
+  var t=project(ph, rate);
+  var cap=4.5, cross=null;
+  for(var h=1;h<t.path.length;h++) if(t.path[h-1]<cap && t.path[h]>=cap){ cross=h; break; }
+  var caCross=null;
+  for(var h2=1;h2<t.ca.length;h2++) if(t.ca[h2-1]>=8 && t.ca[h2]<8){ caCross=h2; break; }
+  document.getElementById('a').textContent=t.cal.toFixed(1);
+  document.getElementById('end').textContent=t.final.toFixed(1);
+  document.getElementById('delta').textContent=(t.final-ph>=0?'+':'')+(t.final-ph).toFixed(1);
+  document.getElementById('endBox').className='num'+(cross?' bad':'');
+  document.getElementById('deltaBox').className='num'+(cross||caCross?' bad':'');
+  var lines=[];
+  if(rate>4) lines.push('Fast phosphate. Watch the calcium.');
+  if(Math.abs(t.final-goal)>0.2) lines.push('The green line is the goal. This rate does not reach it.');
+  document.getElementById('banner').className=lines.length?'show':'';
+  document.getElementById('banner').textContent=lines.join(' ');
+  var ods=document.getElementById('ods');
+  if(cross){ ods.className='show'; ods.textContent='Overcorrection. Phosphate crosses 4.5 at '+cross+' h. Slow the infusion.'; }
+  else if(caCross){ ods.className='show'; ods.textContent='The calcium falls under 8 at '+caCross+' h. Slow the phosphate.'; }
+  else { ods.className=''; ods.textContent=''; }
+  document.getElementById('goalKey').innerHTML='<i class="lg-goal"></i>Goal '+goal.toFixed(1);
+  window._path=t.path; window._goal=goal; window._cross=cross; window._cap=cap;
+  window._caPath=t.ca;
+  ecgPath=t.path;
+  window._kind=function(){ var c=window._caPath[ecgHour]; window._caNow=c; return c<8?'longqt':'normal'; };
+  paintChart(t.path, goal, cross, ecgHour, cap);
+  document.getElementById('hours').innerHTML=[0,2,4,6].map(function(h){ return '<div>'+h+' h<b>'+t.path[h].toFixed(1)+'</b></div>'; }).join('');
+  document.getElementById('ecgBox').className='ecgbox'+(caCross?' bad':'');
+}
+function applyGoal(){
+  var ph=read('val'), goal=read('target');
+  if(ph==null||goal==null){ paint(); return; }
+  var lo=0, hi=8, best=0;
+  for(var i=0;i<14;i++){ var mid=(lo+hi)/2; if(project(ph,mid).final<goal) lo=mid; else hi=mid; best=mid; }
+  document.getElementById('rate').value=Math.round(best);
+  paint();
+}
+document.getElementById('rate').oninput=paint;
+document.getElementById('val').oninput=function(){ var v=read('val'); if(v!=null && v<2.5) document.getElementById('target').value='2.5'; applyGoal(); };
+document.getElementById('target').oninput=applyGoal;
+document.getElementById('b2').onclick=function(){ document.getElementById('rate').value=2; paint(); };
+document.getElementById('b4').onclick=function(){ document.getElementById('rate').value=4; paint(); };
+document.getElementById('oral').onclick=function(){ this.classList.toggle('on'); applyGoal(); };
+
+var q=new URLSearchParams(location.search);
+if(q.get('ph')) document.getElementById('val').value=q.get('ph');
+applyGoal();
+requestAnimationFrame(frame);
+window.addEventListener('resize', paint);
+</script></body></html>
