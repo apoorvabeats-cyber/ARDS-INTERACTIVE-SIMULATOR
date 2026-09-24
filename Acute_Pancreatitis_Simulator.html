@@ -120,7 +120,7 @@ function glasgow(){
   return {pts:pts, miss:miss};
 }
 function ctsi(){ if(S.bal==null||S.bal===''||S.necros==null||S.necros==='') return null; return (+S.bal)+(+S.necros); }
-function isInfected(){ return S.infected==='yes'||S.gas==='yes'||S.fever==='yes'||S.relapse==='yes'; }
+function isInfected(){ return S.infected==='yes'||S.gas==='yes'||S.fever==='yes'||S.relapse==='yes'||S.why==='infect'; }
 function comps(){
   if(Array.isArray(S.comp)) return S.comp.filter(function(x){ return x && x!=='none'; });
   return S.comp && S.comp!=='none' ? [S.comp] : [];
@@ -344,94 +344,110 @@ function stepRight(q){
   if(Array.isArray(q.right)) return q.right.indexOf(S[q.key])>=0;
   return S[q.key]===q.right;
 }
-function stepScript(){
+function stepBuild(){
+  var q=[], flag='wait';
   var early=S.weeks==='early', infected=isInfected(), nec=S.nec==='yes';
-  var q=[{key:'stable', text:'Is the patient stable?', opts:[['yes','Stable'],['no','Unstable']], right:null}];
-  if(!S.stable) return q;
-  if(S.stable==='no'){
-    q.push({key:'abx', text:'Next: give an antibiotic.', opts:[['yes','Antibiotic'],['no','No antibiotic']], right:'yes'});
-    if(!stepRight(q[q.length-1])) return q;
-    q.push({key:'drainHow', text:'Next: drain now.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain'],['no','No drain']], right:['endo','perc']});
-    if(!stepRight(q[q.length-1])) return q;
-    q.push({key:'respond', text:'Next: is the drain working?', opts:[['yes','Better'],['no','Not better']], right:null});
-    if(!S.respond) return q;
-    if(S.respond==='no'){
-      q.push({key:'op', text:'Next: necrosectomy. The drain failed.', opts:[['yes','Necrosectomy'],['no','No necrosectomy']], right:'yes'});
-      if(!stepRight(q[q.length-1])) return q;
-      q.push({key:'opFail', text:'Next: did necrosectomy control it?', opts:[['no','Controlled'],['yes','Failed']], right:null});
-      if(S.opFail==='yes') q.push({key:'open', text:'Next: open surgery is last.', opts:[['yes','Open surgery'],['no','Not yet']], right:'yes'});
-    }
-    return q;
+  var symptomatic=S.sym==='yes'||!!S.why;
+  function ended(item){
+    if(item.end) return true;
+    if(item.endOn==null) return false;
+    var v=S[item.key];
+    return Array.isArray(item.endOn)?item.endOn.indexOf(v)>=0:v===item.endOn;
   }
-  if(nec && !infected && early) return q;
+  function ask(item){
+    q.push(item);
+    if(S[item.key]==null||S[item.key]===''){ flag='wait'; return false; }
+    if(!stepRight(item)){ flag='wrong'; return false; }
+    if(ended(item)){ flag='done'; return false; }
+    return true;
+  }
+  function pack(){ return {shown:q, done:flag==='done', wrong:flag==='wrong', last:q[q.length-1]}; }
+  if(!ask({key:'stable', text:'Is the patient stable?', opts:[['yes','Stable'],['no','Unstable']], right:null})) return pack();
+  if(S.stable==='no'){
+    if(!ask({key:'abx', text:'Next: antibiotic now.', opts:[['yes','Antibiotic'],['no','No antibiotic']], right:'yes'})) return pack();
+    if(!ask({key:'drainHow', text:'Next: drain now. Not an operation.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain'],['op','Necrosectomy'],['open','Open surgery']], right:['endo','perc']})) return pack();
+    if(!ask({key:'respond', text:'Next: did the drain control it?', opts:[['yes','Better'],['no','Not better']], right:null, endOn:'yes'})) return pack();
+    if(!ask({key:'op', text:'Next: necrosectomy. The drain failed.', opts:[['yes','Necrosectomy'],['open','Open surgery']], right:'yes'})) return pack();
+    if(!ask({key:'opFail', text:'Next: did necrosectomy control it?', opts:[['no','Controlled'],['yes','Failed']], right:null, endOn:'no'})) return pack();
+    ask({key:'open', text:'Next: open surgery is last.', opts:[['yes','Open surgery'],['no','Stop']], right:'yes', end:true});
+    return pack();
+  }
+  if(nec && !infected && early){ flag='done'; return pack(); }
+  if(!nec && S.why==='bleed'){
+    ask({key:'vesselAct', text:'Next: embolise the vessel.', opts:[['embolise','Embolise'],['drain','Drain only'],['open','Open surgery']], right:'embolise', end:true});
+    return pack();
+  }
+  if(nec && !infected && !early && !symptomatic){ flag='done'; return pack(); }
   if(infected && early){
-    q.push({key:'abx', text:'Next: antibiotic, and wait for a wall.', opts:[['yes','Antibiotic and wait'],['drain','Drain now'],['open','Open surgery']], right:'yes'});
-    if(!stepRight(q[q.length-1])) return q;
-    q.push({key:'worse', text:'Next: drain only if the patient gets worse.', opts:[['no','Still stable'],['yes','Getting worse']], right:null});
-    if(S.worse==='yes') q.push({key:'drainHow', text:'Next: drain now.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain']], right:['endo','perc']});
-    return q;
+    if(!ask({key:'abx', text:'Next: antibiotic.', opts:[['yes','Antibiotic'],['no','No antibiotic']], right:'yes'})) return pack();
+    if(!ask({key:'delay', text:'Next: wait for a wall unless a drain cannot wait.', opts:[['wait','Wait'],['now','Drain now'],['open','Open surgery']], right:['wait','now'], endOn:'wait'})) return pack();
+    ask({key:'drainHow', text:'Next: drain now. No necrosectomy yet.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain'],['op','Necrosectomy']], right:['endo','perc'], end:true});
+    return pack();
   }
   if(infected){
-    q.push({key:'abx', text:'Next: antibiotic.', opts:[['yes','Antibiotic'],['no','No antibiotic']], right:'yes'});
-    if(!stepRight(q[q.length-1])) return q;
-    q.push({key:'drainHow', text:'Next: drain first.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain'],['op','Necrosectomy first']], right:['endo','perc']});
-    if(!stepRight(q[q.length-1])) return q;
-    q.push({key:'respond', text:'Next: check the drain.', opts:[['yes','Better'],['no','Not better']], right:null});
-    if(S.respond==='no'){
-      q.push({key:'op', text:'Next: necrosectomy.', opts:[['yes','Necrosectomy'],['no','Open surgery now']], right:'yes'});
-      if(!stepRight(q[q.length-1])) return q;
-      q.push({key:'opFail', text:'Next: did necrosectomy control it?', opts:[['no','Controlled'],['yes','Failed']], right:null});
-      if(S.opFail==='yes') q.push({key:'open', text:'Next: open surgery is last.', opts:[['yes','Open surgery'],['no','Stop']], right:'yes'});
-    }
-    return q;
+    if(!ask({key:'abx', text:'Next: antibiotic.', opts:[['yes','Antibiotic'],['no','No antibiotic']], right:'yes'})) return pack();
+    if(!ask({key:'drainHow', text:'Next: drain first.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain'],['op','Necrosectomy first']], right:['endo','perc']})) return pack();
+    if(!ask({key:'respond', text:'Next: did the drain work?', opts:[['yes','Better'],['no','Not better']], right:null, endOn:'yes'})) return pack();
+    if(!ask({key:'op', text:'Next: minimally invasive necrosectomy.', opts:[['yes','Necrosectomy'],['open','Open surgery']], right:'yes'})) return pack();
+    if(!ask({key:'opFail', text:'Next: did necrosectomy control it?', opts:[['no','Controlled'],['yes','Failed']], right:null, endOn:'no'})) return pack();
+    ask({key:'open', text:'Next: open surgery is last.', opts:[['yes','Open surgery'],['no','Stop']], right:'yes', end:true});
+    return pack();
   }
-  q.push({key:'drainHow', text:'Next: drain the problem. No surgery first.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain'],['op','Surgery first']], right:['endo','perc']});
-  return q;
-}
-function stepState(){
-  var all=stepScript();
-  var last=all[all.length-1];
-  var answered=S[last.key]!=null && S[last.key]!=='';
-  var good=stepRight(last);
-  return {shown:all, done:answered && good && stepScriptDone(all), wrong:answered && !good, last:last};
-}
-function stepScriptDone(all){
-  var last=all[all.length-1];
-  if(!stepRight(last) || S[last.key]==null || S[last.key]==='') return false;
-  if(last.key==='stable' && S.stable==='yes' && S.nec==='yes' && !isInfected() && S.weeks==='early') return true;
-  if(last.key==='stable') return false;
-  if(last.key==='respond' && S.respond==='yes') return true;
-  if(last.key==='worse' && S.worse==='no') return true;
-  if(last.key==='opFail' && S.opFail==='no') return true;
-  if(last.key==='drainHow' && (S.drainHow==='endo'||S.drainHow==='perc')){
-    if(S.stable==='yes' && !isInfected()) return true;
-    if(S.worse==='yes') return true;
+  if(!ask({key:'drainHow', text:'Next: drain the problem. No surgery first.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain'],['op','Surgery first']], right:['endo','perc']})) return pack();
+  if(nec){
+    if(!ask({key:'respond', text:'Next: is the drain enough?', opts:[['yes','Better'],['no','Not better']], right:null, endOn:'yes'})) return pack();
+    if(!ask({key:'op', text:'Next: necrosectomy.', opts:[['yes','Necrosectomy'],['open','Open surgery']], right:'yes'})) return pack();
+    if(!ask({key:'opFail', text:'Next: did necrosectomy control it?', opts:[['no','Controlled'],['yes','Failed']], right:null, endOn:'no'})) return pack();
+    ask({key:'open', text:'Next: open surgery is last.', opts:[['yes','Open surgery'],['no','Stop']], right:'yes', end:true});
+    return pack();
   }
-  if(last.key==='open') return S.open==='yes';
-  if(last.right!=null) return stepRight(last);
-  return false;
+  flag='done';
+  return pack();
 }
-function stepDone(){ return stepState().done; }
+function stepState(){ return stepBuild(); }
+function stepDone(){ return stepBuild().done; }
 function stepPlan(){
-  var lines=[(bagName()||'Collection')+(S.stable==='no'?'. Unstable.':'. Stable.')];
-  if(S.stable==='yes' && S.nec==='yes' && !isInfected() && S.weeks==='early') return lines.concat(['No antibiotic.','No drain.','No operation.','Wait for walled-off necrosis.']);
-  if(S.abx==='yes' && S.weeks==='early' && isInfected() && S.stable==='yes') lines.push('Antibiotic. Wait toward 4 weeks.');
-  else if(S.abx==='yes') lines.push('Antibiotic.');
-  if(S.worse==='no') lines.push('Still stable, so no drain yet.');
-  if(S.drainHow==='endo') lines.push('Endoscopic drain.');
-  if(S.drainHow==='perc') lines.push('Percutaneous drain.');
-  if(S.respond==='yes') lines.push('The drain is working. Stop there.');
-  if(S.op==='yes') lines.push('Necrosectomy.');
-  if(S.opFail==='no') lines.push('Necrosectomy controlled it.');
-  if(S.open==='yes') lines.push('Open surgery.');
-  return lines;
+  var name=bagName()||'Collection';
+  var drain=S.drainHow==='endo'?'Endoscopic drain.':S.drainHow==='perc'?'Percutaneous drain.':'';
+  if(S.stable==='no'){
+    var lines=[name+'. Unstable.','Antibiotic now.',drain];
+    if(S.respond==='yes') lines.push('The drain controlled it. No necrosectomy.');
+    if(S.op==='yes') lines.push('The drain failed. Necrosectomy.');
+    if(S.opFail==='no') lines.push('Necrosectomy controlled it. No open surgery.');
+    if(S.open==='yes') lines.push('Necrosectomy failed. Open surgery.');
+    return lines;
+  }
+  if(S.nec==='yes' && !isInfected() && S.weeks==='early') return [name+'. Sterile, under 4 weeks.','No antibiotic.','No drain.','No operation.','Wait for walled-off necrosis.'];
+  if(S.vesselAct==='embolise') return [name+'. Bleeding vessel.','Embolise it.','Do not operate first.'];
+  if(S.nec==='yes' && !isInfected() && S.weeks!=='early' && S.sym!=='yes' && !S.why) return [name+'. Sterile and walled off.','No antibiotic.','No drain unless it blocks, hurts, or gets infected.'];
+  if(isInfected() && S.weeks==='early'){
+    var earlyLines=[name+'. Infected, under 4 weeks.','Antibiotic.'];
+    if(S.delay==='wait') earlyLines.push('Wait toward 4 weeks.','No drain and no necrosectomy while the patient allows it.');
+    if(S.delay==='now') earlyLines.push(drain,'No necrosectomy yet.');
+    return earlyLines;
+  }
+  if(isInfected()){
+    var late=[name+'. Infected and walled off.','Antibiotic.',drain];
+    if(S.respond==='yes') late.push('The drain is working. Stop there.');
+    if(S.op==='yes') late.push('The drain failed. Minimally invasive necrosectomy.');
+    if(S.opFail==='no') late.push('Necrosectomy controlled it. No open surgery.');
+    if(S.open==='yes') late.push('Open surgery last.');
+    return late;
+  }
+  var fluid=[name+'.','No antibiotic.',drain];
+  if(S.respond==='yes') fluid.push('Better. Stop there.');
+  if(S.op==='yes') fluid.push('Necrosectomy.');
+  if(S.opFail==='no') fluid.push('Controlled. No open surgery.');
+  if(S.open==='yes') fluid.push('Open surgery last.');
+  return fluid;
 }
 function stepLive(){
   var st=stepState();
-  if(st.wrong) return out('Not that', [st.last.text], true);
+  if(st.wrong) return out('Not the next step', [st.last.text], true);
   if(!st.done) return '';
   return out('Treatment plan', stepPlan(), false);
 }
+
 function thisComp(){ var id=stack[stack.length-1]; return id.indexOf('act-')===0?id.slice(4):''; }
 function actBody(){
   var c=thisComp();
@@ -639,7 +655,7 @@ document.getElementById('view').onclick=function(e){
     show();
     return;
   }
-  var stepKeys=['stable','abx','worse','drainHow','respond','op','opFail','open'];
+  var stepKeys=['stable','abx','delay','drainHow','respond','op','opFail','open','vesselAct','worse'];
   var si=stepKeys.indexOf(box.dataset.k);
   if(si>=0){ for(var j=si+1;j<stepKeys.length;j++) delete S[stepKeys[j]]; }
   S[box.dataset.k]=b.dataset.v;
