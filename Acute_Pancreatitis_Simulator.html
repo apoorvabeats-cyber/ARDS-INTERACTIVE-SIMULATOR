@@ -153,7 +153,7 @@ function ok(id){
   if(id==='comp') return Array.isArray(S.comp) && S.comp.length>0;
   if(id==='bag') return !!S.nec && !!S.weeks;
   if(id==='bagwhy') return !!S.why;
-  if(id==='step') return !!S.stable && (S.drain!=='yes' || !!S.drainHow);
+  if(id==='step') return stepDone();
   if(id.indexOf('act-')===0) return actReady();
   return true;
 }
@@ -263,11 +263,10 @@ function views(){
         +'<div id="live"></div>';
     },
     step:function(){
-      return '<p class="hint">'+(bagName()||'Collection')+'</p>'+yn('stable','Stable')
-        +'<div class="chips"><button type="button" id="abx" class="'+(S.abx==='yes'?'pick':'')+'">Antibiotic</button><button type="button" id="drain" class="'+(S.drain==='yes'?'pick':'')+'">Drain</button><button type="button" id="op" class="'+(S.op==='yes'?'pick':'')+'">Necrosectomy</button><button type="button" id="open" class="'+(S.open==='yes'?'pick':'')+'">Open surgery</button></div>'
-        +(S.drain==='yes'?chips('drainHow',[['endo','Endoscopic drain'],['perc','Percutaneous drain']]):'')
-        +(S.drain==='yes'?yn('respond','Better after the drain'):'')
-        +'<div id="live"></div>';
+      var st=stepState();
+      var html='<p class="hint">'+(bagName()||'Collection')+'</p>';
+      st.shown.forEach(function(s){ html+='<h2>'+s.text+'</h2>'+chips(s.key, s.opts); });
+      return html+'<div id="live"></div>';
     },
     act:function(){ return actBody()+'<div id="live"></div>'; },
     sum:function(){ return summary(); }
@@ -340,43 +339,98 @@ function bagWhyLive(){
   var t={goo:'The stomach is blocked. Drain it.', bile:'The duct is pressed. Drain it, and relieve the duct if the jaundice stays.', infect:'This is infected. Go to the step-up.', bleed:'Look for a bleeding vessel. Embolise it.', rupture:'It has ruptured. Drain it and treat the peritonitis.'};
   return S.why?out(bagName()||'Collection', [t[S.why]]):'';
 }
-function stepLive(){
-  if(!S.stable) return '';
-  var early=S.weeks==='early', infected=isInfected(), unstable=S.stable==='no';
-  var lines=[], bad=false, title='Step up';
-  if(!infected && early && S.nec==='yes'){
-    title='Sterile, under 4 weeks';
-    lines.push('No prophylactic antibiotic.');
-    lines.push('Do not drain or operate yet.');
-    if(S.abx==='yes'||S.drain==='yes'||S.op==='yes'||S.open==='yes'){ lines.push('That is too early.'); bad=true; }
-  } else if(unstable){
-    title='Unstable';
-    lines.push('Antibiotic now.');
-    lines.push('Drain now, endoscopic or percutaneous.');
-    lines.push('Necrosectomy only if the drain fails. Open surgery last.');
-    if(S.drain!=='yes'||S.abx!=='yes') bad=true;
-    if(S.op==='yes'&&S.respond!=='no'){ lines.push('The drain has not failed yet.'); bad=true; }
-    if(S.open==='yes'&&S.op!=='yes'){ lines.push('Open surgery is last.'); bad=true; }
-  } else if(infected && early){
-    title='Infected, not walled off';
-    lines.push('Antibiotic.');
-    lines.push('Wait toward 4 weeks if the patient stays stable.');
-    lines.push('Drain earlier only if they deteriorate.');
-    if(S.open==='yes'){ lines.push('Not open surgery now.'); bad=true; }
-  } else if(infected){
-    title='Infected, walled off';
-    lines.push('Antibiotic, then drain.');
-    lines.push('If the drain fails, endoscopic or minimally invasive necrosectomy.');
-    lines.push('Open surgery only after that fails.');
-    if(S.drain!=='yes') bad=true;
-    if(S.op==='yes'&&S.respond!=='no'){ lines.push('Necrosectomy only after a failed drain.'); bad=true; }
-    if(S.open==='yes'&&!(S.op==='yes'&&S.respond==='no')){ lines.push('Open surgery is last.'); bad=true; }
-  } else {
-    title='Symptomatic collection';
-    lines.push('Drain the problem. Least invasive first.');
-    if(S.op==='yes'||S.open==='yes'){ lines.push('Do not operate first.'); bad=true; }
+function stepRight(q){
+  if(!q || q.right==null) return true;
+  if(Array.isArray(q.right)) return q.right.indexOf(S[q.key])>=0;
+  return S[q.key]===q.right;
+}
+function stepScript(){
+  var early=S.weeks==='early', infected=isInfected(), nec=S.nec==='yes';
+  var q=[{key:'stable', text:'Is the patient stable?', opts:[['yes','Stable'],['no','Unstable']], right:null}];
+  if(!S.stable) return q;
+  if(S.stable==='no'){
+    q.push({key:'abx', text:'Next: give an antibiotic.', opts:[['yes','Antibiotic'],['no','No antibiotic']], right:'yes'});
+    if(!stepRight(q[q.length-1])) return q;
+    q.push({key:'drainHow', text:'Next: drain now.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain'],['no','No drain']], right:['endo','perc']});
+    if(!stepRight(q[q.length-1])) return q;
+    q.push({key:'respond', text:'Next: is the drain working?', opts:[['yes','Better'],['no','Not better']], right:null});
+    if(!S.respond) return q;
+    if(S.respond==='no'){
+      q.push({key:'op', text:'Next: necrosectomy. The drain failed.', opts:[['yes','Necrosectomy'],['no','No necrosectomy']], right:'yes'});
+      if(!stepRight(q[q.length-1])) return q;
+      q.push({key:'opFail', text:'Next: did necrosectomy control it?', opts:[['no','Controlled'],['yes','Failed']], right:null});
+      if(S.opFail==='yes') q.push({key:'open', text:'Next: open surgery is last.', opts:[['yes','Open surgery'],['no','Not yet']], right:'yes'});
+    }
+    return q;
   }
-  return out(title, lines, bad);
+  if(nec && !infected && early) return q;
+  if(infected && early){
+    q.push({key:'abx', text:'Next: antibiotic, and wait for a wall.', opts:[['yes','Antibiotic and wait'],['drain','Drain now'],['open','Open surgery']], right:'yes'});
+    if(!stepRight(q[q.length-1])) return q;
+    q.push({key:'worse', text:'Next: drain only if the patient gets worse.', opts:[['no','Still stable'],['yes','Getting worse']], right:null});
+    if(S.worse==='yes') q.push({key:'drainHow', text:'Next: drain now.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain']], right:['endo','perc']});
+    return q;
+  }
+  if(infected){
+    q.push({key:'abx', text:'Next: antibiotic.', opts:[['yes','Antibiotic'],['no','No antibiotic']], right:'yes'});
+    if(!stepRight(q[q.length-1])) return q;
+    q.push({key:'drainHow', text:'Next: drain first.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain'],['op','Necrosectomy first']], right:['endo','perc']});
+    if(!stepRight(q[q.length-1])) return q;
+    q.push({key:'respond', text:'Next: check the drain.', opts:[['yes','Better'],['no','Not better']], right:null});
+    if(S.respond==='no'){
+      q.push({key:'op', text:'Next: necrosectomy.', opts:[['yes','Necrosectomy'],['no','Open surgery now']], right:'yes'});
+      if(!stepRight(q[q.length-1])) return q;
+      q.push({key:'opFail', text:'Next: did necrosectomy control it?', opts:[['no','Controlled'],['yes','Failed']], right:null});
+      if(S.opFail==='yes') q.push({key:'open', text:'Next: open surgery is last.', opts:[['yes','Open surgery'],['no','Stop']], right:'yes'});
+    }
+    return q;
+  }
+  q.push({key:'drainHow', text:'Next: drain the problem. No surgery first.', opts:[['endo','Endoscopic drain'],['perc','Percutaneous drain'],['op','Surgery first']], right:['endo','perc']});
+  return q;
+}
+function stepState(){
+  var all=stepScript();
+  var last=all[all.length-1];
+  var answered=S[last.key]!=null && S[last.key]!=='';
+  var good=stepRight(last);
+  return {shown:all, done:answered && good && stepScriptDone(all), wrong:answered && !good, last:last};
+}
+function stepScriptDone(all){
+  var last=all[all.length-1];
+  if(!stepRight(last) || S[last.key]==null || S[last.key]==='') return false;
+  if(last.key==='stable' && S.stable==='yes' && S.nec==='yes' && !isInfected() && S.weeks==='early') return true;
+  if(last.key==='stable') return false;
+  if(last.key==='respond' && S.respond==='yes') return true;
+  if(last.key==='worse' && S.worse==='no') return true;
+  if(last.key==='opFail' && S.opFail==='no') return true;
+  if(last.key==='drainHow' && (S.drainHow==='endo'||S.drainHow==='perc')){
+    if(S.stable==='yes' && !isInfected()) return true;
+    if(S.worse==='yes') return true;
+  }
+  if(last.key==='open') return S.open==='yes';
+  if(last.right!=null) return stepRight(last);
+  return false;
+}
+function stepDone(){ return stepState().done; }
+function stepPlan(){
+  var lines=[(bagName()||'Collection')+(S.stable==='no'?'. Unstable.':'. Stable.')];
+  if(S.stable==='yes' && S.nec==='yes' && !isInfected() && S.weeks==='early') return lines.concat(['No antibiotic.','No drain.','No operation.','Wait for walled-off necrosis.']);
+  if(S.abx==='yes' && S.weeks==='early' && isInfected() && S.stable==='yes') lines.push('Antibiotic. Wait toward 4 weeks.');
+  else if(S.abx==='yes') lines.push('Antibiotic.');
+  if(S.worse==='no') lines.push('Still stable, so no drain yet.');
+  if(S.drainHow==='endo') lines.push('Endoscopic drain.');
+  if(S.drainHow==='perc') lines.push('Percutaneous drain.');
+  if(S.respond==='yes') lines.push('The drain is working. Stop there.');
+  if(S.op==='yes') lines.push('Necrosectomy.');
+  if(S.opFail==='no') lines.push('Necrosectomy controlled it.');
+  if(S.open==='yes') lines.push('Open surgery.');
+  return lines;
+}
+function stepLive(){
+  var st=stepState();
+  if(st.wrong) return out('Not that', [st.last.text], true);
+  if(!st.done) return '';
+  return out('Treatment plan', stepPlan(), false);
 }
 function thisComp(){ var id=stack[stack.length-1]; return id.indexOf('act-')===0?id.slice(4):''; }
 function actBody(){
@@ -464,9 +518,8 @@ function summary(){
   var ms=marshall(); if(ms) lines.push('Marshall '+ms.max+'.');
   if(S.cause) lines.push('Cause: '+S.cause+'.');
   if(bagName()) lines.push(bagName()+'.');
-  if(S.nec==='yes' && !isInfected() && S.weeks==='early') lines.push('Sterile necrosis under 4 weeks. No drain yet.');
-  if(isInfected() && S.stable==='no') lines.push('Unstable infected necrosis. Antibiotic and drain now.');
-  if(isInfected() && S.stable==='yes') lines.push('Infected necrosis. Antibiotic, then drain. Operate only if the drain fails.');
+  if(stepDone()) stepPlan().forEach(function(line){ lines.push(line); });
+  else if(S.nec==='yes' && !isInfected() && S.weeks==='early') lines.push('Sterile necrosis under 4 weeks. No drain yet.');
   if(S.why==='goo') lines.push('The collection is blocking the stomach.');
   if(S.why==='bleed'||S.vtype==='pseudo') lines.push('Embolise the bleeding vessel.');
   if(S.o2mode==='vent') lines.push('Ventilate.');
@@ -586,6 +639,9 @@ document.getElementById('view').onclick=function(e){
     show();
     return;
   }
+  var stepKeys=['stable','abx','worse','drainHow','respond','op','opFail','open'];
+  var si=stepKeys.indexOf(box.dataset.k);
+  if(si>=0){ for(var j=si+1;j<stepKeys.length;j++) delete S[stepKeys[j]]; }
   S[box.dataset.k]=b.dataset.v;
   show();
 };
