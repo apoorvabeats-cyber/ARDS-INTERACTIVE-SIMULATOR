@@ -47,6 +47,9 @@
   .num b{font-size:28px}
   #banner{display:none;border-radius:12px;background:#fef2f2;color:#b91c1c;font-weight:800;text-align:center;padding:10px;margin:12px 0}
   #banner.show{display:block}
+  #ods{display:none;margin-top:10px;background:#7f1d1d;color:#fff;border-radius:14px;padding:12px 14px;font-weight:700;line-height:1.35}
+  #ods.show{display:block}
+  #ods b{display:block;font-size:16px;letter-spacing:.03em;margin-bottom:4px}
   .plot{margin-top:12px;background:#fff7ed;border:2px solid #fdba74;border-radius:16px;padding:8px 8px 4px}
   canvas{width:100%;height:340px;display:block}
   .legend{display:flex;gap:14px;justify-content:center;font-size:12px;font-weight:800;margin:4px 0 8px}
@@ -85,7 +88,7 @@
     </div>
     <div class="row">
       <div><label>Sodium now</label><input id="na" type="number" value="160" step="0.1"></div>
-      <div><label>24 h goal</label><input id="target" type="number" value="152" step="0.1"></div>
+      <div><label>24 h goal</label><input id="target" type="text" inputmode="decimal" value="152"></div>
     </div>
     <p class="quiet" id="goalNote"></p>
     <div class="chips" id="modes">
@@ -134,6 +137,7 @@
       <div class="num" id="deltaBox"><span>Change</span><b id="delta">—</b></div>
     </div>
     <div id="banner"></div>
+    <div id="ods"></div>
     <button class="safe" id="safe" type="button" hidden>Slow both rates</button>
     <div class="plot">
       <canvas id="chart" width="720" height="340"></canvas>
@@ -183,7 +187,7 @@ function state(){
     mode:m
   };
 }
-function draw(path, target, limit, start){
+function draw(path, target, limit, start, crossH){
   const c=document.getElementById('chart');
   const dpr=Math.min(2, devicePixelRatio||1);
   const cssW=c.clientWidth||640, cssH=c.clientHeight||340;
@@ -210,6 +214,12 @@ function draw(path, target, limit, start){
   ctx.strokeStyle='#c2410c'; ctx.lineWidth=3.5; ctx.stroke();
   ctx.fillStyle='#c2410c';
   ctx.beginPath(); ctx.arc(X(24), Y(path[24]), 5, 0, Math.PI*2); ctx.fill();
+  if(crossH!=null){
+    ctx.fillStyle='#dc2626';
+    ctx.beginPath(); ctx.arc(X(crossH), Y(path[crossH]), 7, 0, Math.PI*2); ctx.fill();
+    ctx.font='bold 13px sans-serif';
+    ctx.fillText('Too fast', X(Math.min(crossH,18))+8, Y(path[crossH])-10);
+  }
   ctx.strokeStyle='#dc2626'; ctx.setLineDash([5,4]); ctx.lineWidth=1.5;
   ctx.beginPath(); ctx.moveTo(X(0), Y(floor)); ctx.lineTo(plotR, Y(floor)); ctx.stroke();
   ctx.setLineDash([]); ctx.fillStyle='#dc2626'; ctx.font='11px sans-serif';
@@ -262,15 +272,27 @@ function paint(){
   document.getElementById('safe').hidden=!over;
   if(t.bad) lines.push('That urine volume is a daily total. Enter mL per hour.');
   if(t.delta>0.5) lines.push('The sodium rises on this plan. Use more water, or a fluid below the serum sodium.');
-  if(over) lines.push('The fall is more than '+limit+' in 24 hours. Slow the rate.');
-  else if(s.target!=null && s.na-s.target>limit) lines.push('That goal is more than one day.');
-  const deficit=t.tbw*(s.na/140-1);
+  const floor=s.na-limit;
+  let cross=null;
+  for(let h=1;h<t.path.length;h++){
+    if(t.path[h-1]>floor && t.path[h]<=floor){ cross=h; break; }
+  }
+  const ods=document.getElementById('ods');
+  if(cross!=null){
+    ods.className='show';
+    ods.innerHTML='<b>Overcorrection</b>The sodium crosses the limit at '+cross+' h. A fall this fast risks cerebral edema. Slow the free water. This is not ODS — ODS is from correcting a low sodium too fast.';
+  } else {
+    ods.className='';
+    ods.innerHTML='';
+  }
+  if(s.target!=null && Math.abs(t.final-s.target)>1.2) lines.push('This fluid cannot reach that goal. The green line is still your goal.');
   banner.className=lines.length?'show':'';
   banner.textContent=lines.join(' ');
-  draw(t.path, s.target==null?s.na:s.target, limit, s.na);
+  draw(t.path, s.target==null?s.na:s.target, limit, s.na, cross);
   const shown=s.target==null?s.na:s.target;
   document.getElementById('goalKey').innerHTML='<i class="lg-goal"></i>Goal '+Number(shown).toFixed(1);
   document.getElementById('hours').innerHTML=[0,6,12,18,24].map(h=>'<div>'+h+' h<b>'+t.path[h].toFixed(1)+'</b></div>').join('');
+  const deficit=t.tbw*(s.na/140-1);
   const parts=[];
   if(s.mode!=='iv') parts.push('water '+s.fw);
   if(s.mode!=='water') parts.push('IV '+s.iv);
@@ -286,6 +308,54 @@ function setTarget(){
   const na=parseFloat(document.getElementById('na').value);
   if(!(na>0)) return;
   document.getElementById('target').value=String(suggested(na, document.getElementById('acute').classList.contains('on')));
+}
+function readGoal(){
+  const raw=String(document.getElementById('target').value||'').replace(',','.').trim();
+  if(raw===''||raw==='-'||raw==='.') return null;
+  const n=parseFloat(raw);
+  return Number.isFinite(n)?n:null;
+}
+function finalOf(fw, iv){
+  const s=state();
+  return track({weight:s.weight,factor:s.factor,na:s.na,fw:fw,iv:iv,ivNa:s.ivNa,uNa:s.urine&&s.urine.uNa,uK:s.urine&&s.urine.uK,uVol:s.urine&&s.urine.uVol}).final;
+}
+function applyGoal(){
+  const goal=readGoal();
+  const s=state();
+  if(goal==null||!(s.weight>0)||s.na==null||Number.isNaN(s.na)||s.urinePartial){ paint(); return; }
+  const m=s.mode;
+  const fw0=parseFloat(document.getElementById('fwN').value)||0;
+  const iv0=parseFloat(document.getElementById('ivN').value)||0;
+  const bare=m==='both' && fw0===0 && iv0===0;
+  function at(k){
+    if(m==='water'||bare) return finalOf(k, 0);
+    if(m==='iv') return finalOf(0, k);
+    const base=Math.max(fw0, iv0, 1);
+    const sc=k/base;
+    return finalOf(Math.min(300, fw0*sc), Math.min(300, iv0*sc));
+  }
+  const left=at(0), right=at(300);
+  let k;
+  if((left<=right && goal<=left)||(left>right && goal>=left)) k=0;
+  else if((left<=right && goal>=right)||(left>right && goal<=right)) k=300;
+  else {
+    let lo=0, hi=300;
+    for(let i=0;i<22;i++){
+      const mid=(lo+hi)/2;
+      const v=at(mid);
+      if(left<=right ? v<goal : v>goal) lo=mid; else hi=mid;
+    }
+    k=Math.max(0, Math.round(lo/5)*5);
+  }
+  if(m==='water'||bare) document.getElementById('fwN').value=k;
+  else if(m==='iv') document.getElementById('ivN').value=k;
+  else {
+    const base=Math.max(fw0, iv0, 1);
+    const sc=k/base;
+    document.getElementById('fwN').value=Math.max(0, Math.round(Math.min(300, fw0*sc)/5)*5);
+    document.getElementById('ivN').value=Math.max(0, Math.round(Math.min(300, iv0*sc)/5)*5);
+  }
+  paint();
 }
 function setMode(m){
   document.querySelectorAll('#modes button[data-mode]').forEach(b=>b.classList.toggle('on', b.dataset.mode===m));
@@ -303,11 +373,12 @@ document.getElementById('fwN').addEventListener('input', paint);
 document.getElementById('iv').addEventListener('input', e=>{ document.getElementById('ivN').value=e.target.value; paint(); });
 document.getElementById('ivN').addEventListener('input', paint);
 ['wt','who','ivNa','uNa','uK','uVol'].forEach(id=>document.getElementById(id).addEventListener('input', paint));
-document.getElementById('target').addEventListener('input', paint);
-document.getElementById('target').addEventListener('change', paint);
-document.getElementById('na').addEventListener('input', ()=>{ setTarget(); paint(); });
+document.getElementById('target').addEventListener('input', applyGoal);
+document.getElementById('target').addEventListener('keyup', applyGoal);
+document.getElementById('target').addEventListener('change', applyGoal);
+document.getElementById('na').addEventListener('input', ()=>{ setTarget(); applyGoal(); });
 document.querySelectorAll('#modes button[data-mode]').forEach(b=>b.addEventListener('click', ()=>setMode(b.dataset.mode)));
-document.getElementById('acute').onclick=function(){ this.classList.toggle('on'); setTarget(); paint(); };
+document.getElementById('acute').onclick=function(){ this.classList.toggle('on'); setTarget(); applyGoal(); };
 document.getElementById('pWater').onclick=()=>preset('water',100,0,null);
 document.getElementById('pHalf').onclick=()=>preset('iv',0,100,77);
 document.getElementById('pBoth').onclick=()=>preset('both',50,50,77);
