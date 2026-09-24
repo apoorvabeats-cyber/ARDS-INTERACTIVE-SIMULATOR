@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ICU Shock and POCUS Simulator</title>
+<style>
+:root{--ink:#172033;--muted:#5c6b7a;--line:#d7dee6;--card:#fff;--bg:#eef2f6;--blue:#0b4f8a;--red:#9d1c2e;--amber:#8a5a00;--green:#0d6b3a}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{padding:16px 18px 0}
+header h1{margin:0;font-size:22px}
+header p{margin:6px 0 0;color:var(--muted);font-size:14px;max-width:760px}
+.wrap{max-width:1100px;margin:0 auto;padding:14px}
+.presets{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.presets button, .sound{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;font-size:13px;cursor:pointer}
+.presets button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.layout{display:grid;grid-template-columns:320px 1fr;gap:14px}
+.panel,.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+h2{margin:0 0 8px;font-size:16px}
+h3{margin:16px 0 8px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.row{margin:0 0 12px}
+.row label{display:flex;justify-content:space-between;font-size:13px;font-weight:700}
+.row b{color:var(--blue);font-family:ui-monospace,monospace}
+input[type=range]{width:100%}
+select{width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);background:#f8fafc}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.metric{background:#f6f8fb;border-radius:10px;padding:8px;text-align:center}
+.metric span{display:block;font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.metric strong{font-size:26px}
+.badges{display:flex;flex-wrap:wrap;gap:6px}
+.badge{border-radius:999px;padding:6px 10px;font-size:12px;font-weight:700}
+.ok{background:#e5f6ec;color:var(--green)}
+.warn{background:#fff4d6;color:var(--amber)}
+.bad{background:#fde8eb;color:var(--red)}
+.blink{animation:blink 1.2s linear infinite}
+@keyframes blink{50%{opacity:.45}}
+.bar{height:10px;background:#e6ebf1;border-radius:99px;overflow:hidden;margin:4px 0 10px}
+.bar i{display:block;height:100%;background:#7aa2c8;border-radius:99px}
+.top i{background:var(--blue)}
+.item{padding:10px 12px;border-radius:8px;margin:0 0 8px;background:#f6f8fb;border-left:4px solid var(--blue);font-size:14px}
+.item.crit{border-left-color:var(--red);background:#fff5f6}
+.item.dx{border-left-color:#e0a106;background:#fffaf0}
+.note{font-size:12px;color:var(--muted);margin:0 0 8px}
+@media(max-width:800px){.layout{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<header class="wrap">
+  <h1>ICU shock and POCUS</h1>
+  <p>Move the bedside numbers and the RUSH findings. The bars are a pattern match, not a calibrated probability. A pneumothorax is not called a pulmonary embolus.</p>
+  <div class="presets" id="presets">
+    <button type="button" data-id="hypovolemic">Hypovolemia</button>
+    <button type="button" data-id="cardiogenic">Cardiogenic</button>
+    <button type="button" data-id="pe">Massive PE</button>
+    <button type="button" data-id="tamponade">Tamponade</button>
+    <button type="button" data-id="septic_vasoplegic" class="on">Septic, vasodilated</button>
+    <button type="button" data-id="septic_cardiomyopathy">Septic cardiomyopathy</button>
+    <button type="button" data-id="septic_ards">Sepsis and ARDS</button>
+    <button type="button" data-id="neurogenic">Neurogenic</button>
+    <button type="button" class="sound" id="soundBtn">Sound off</button>
+  </div>
+</header>
+<div class="wrap layout">
+  <section class="panel">
+    <h2>Bedside inputs</h2>
+    <h3>Pressure and flow</h3>
+    <div class="row"><label>Systolic <b id="v_sbp"></b></label><input id="sbp" type="range" min="50" max="200" value="84"></div>
+    <div class="row"><label>Diastolic <b id="v_dbp"></b></label><input id="dbp" type="range" min="30" max="120" value="44"></div>
+    <div class="row"><label>Heart rate <b id="v_hr"></b></label><input id="hr" type="range" min="30" max="180" value="116"></div>
+    <div class="row"><label>PPV <b id="v_ppv"></b></label><input id="ppv" type="range" min="2" max="35" value="16"></div>
+    <p class="note">PPV only predicts a fluid response in sinus rhythm, with no spontaneous breaths, a tidal volume of at least 8 mL/kg, and no right-ventricular failure.</p>
+    <div class="row"><label>CVP <b id="v_cvp"></b></label><input id="cvp" type="range" min="0" max="25" value="5"></div>
+    <h3>Perfusion</h3>
+    <div class="row"><label>ScvO₂ <b id="v_scvo2"></b></label><input id="scvo2" type="range" min="30" max="95" value="77"></div>
+    <div class="row"><label>Lactate <b id="v_lactate"></b></label><input id="lactate" type="range" min="0.5" max="15" step="0.1" value="4.1"></div>
+    <h3>RUSH exam</h3>
+    <div class="row"><label>IVC</label><select id="ivc"><option value="small" selected>Small and collapsing</option><option value="normal">Normal</option><option value="plethoric">Plethoric, not collapsing</option></select></div>
+    <div class="row"><label>Lungs</label><select id="luso"><option value="alines" selected>A-lines</option><option value="blines">Bilateral B-lines</option><option value="ards">Patchy B-lines, irregular pleura</option><option value="ptx">No sliding, barcode sign</option></select></div>
+    <div class="row"><label>Left ventricle</label><select id="lvc"><option value="hyper" selected>Hyperdynamic</option><option value="normal">Normal</option><option value="hypo">Poorly contracting</option></select></div>
+    <div class="row"><label>Right heart</label><select id="rvs"><option value="normal" selected>Normal right ventricle</option><option value="dilated">Dilated, D-shaped septum</option><option value="tamponade">Effusion with chamber collapse</option></select></div>
+  </section>
+  <section>
+    <div class="card">
+      <h2>Calculated</h2>
+      <div class="metrics">
+        <div class="metric"><span>MAP</span><strong id="map">57</strong></div>
+        <div class="metric"><span>Shock index</span><strong id="si">1.38</strong></div>
+        <div class="metric"><span>Pulse pressure</span><strong id="pp">40</strong></div>
+      </div>
+      <h3>Flags</h3>
+      <div class="badges" id="badges"></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>Which pattern fits</h2>
+      <div id="bars"></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>What to do</h2>
+      <div id="actions"></div>
+    </div>
+  </section>
+</div>
+<script>
+const presets={
+  hypovolemic:{sbp:80,dbp:50,hr:125,ppv:22,cvp:2,scvo2:58,lactate:6.5,ivc:'small',luso:'alines',lvc:'hyper',rvs:'normal'},
+  cardiogenic:{sbp:82,dbp:60,hr:110,ppv:5,cvp:16,scvo2:48,lactate:7,ivc:'plethoric',luso:'blines',lvc:'hypo',rvs:'normal'},
+  pe:{sbp:85,dbp:62,hr:120,ppv:14,cvp:18,scvo2:52,lactate:5.5,ivc:'plethoric',luso:'alines',lvc:'normal',rvs:'dilated'},
+  tamponade:{sbp:80,dbp:65,hr:125,ppv:18,cvp:19,scvo2:55,lactate:5,ivc:'plethoric',luso:'alines',lvc:'hyper',rvs:'tamponade'},
+  septic_vasoplegic:{sbp:84,dbp:44,hr:116,ppv:16,cvp:5,scvo2:77,lactate:4.1,ivc:'small',luso:'alines',lvc:'hyper',rvs:'normal'},
+  septic_cardiomyopathy:{sbp:86,dbp:50,hr:110,ppv:8,cvp:12,scvo2:62,lactate:5.8,ivc:'plethoric',luso:'blines',lvc:'hypo',rvs:'dilated'},
+  septic_ards:{sbp:88,dbp:46,hr:112,ppv:15,cvp:9,scvo2:72,lactate:4.5,ivc:'normal',luso:'ards',lvc:'normal',rvs:'normal'},
+  neurogenic:{sbp:85,dbp:50,hr:65,ppv:15,cvp:3,scvo2:70,lactate:2.2,ivc:'small',luso:'alines',lvc:'normal',rvs:'normal'}
+};
+const types=[
+  ['hypovolemic','Hypovolemia'],
+  ['cardiogenic','Cardiogenic, left ventricle'],
+  ['pe','Massive pulmonary embolus'],
+  ['tamponade','Tamponade'],
+  ['ptx','Tension pneumothorax'],
+  ['septic_v','Septic, vasodilated'],
+  ['septic_c','Septic cardiomyopathy'],
+  ['ards_leak','Sepsis with ARDS'],
+  ['neurogenic','Neurogenic']
+];
+const ids=['sbp','dbp','hr','ppv','cvp','scvo2','lactate','ivc','luso','lvc','rvs'];
+const $=id=>document.getElementById(id);
+let audioOn=false, actx=null, nextBeat=0, nextAlarm=0, live={hr:116,map:57,critical:false};
+
+function read(){
+  const d={};
+  ids.forEach(id=>{
+    const el=$(id);
+    d[id]=el.tagName==='SELECT'?el.value:parseFloat(el.value);
+  });
+  if(d.dbp>=d.sbp) d.dbp=d.sbp-1;
+  d.map=Math.round((d.sbp+2*d.dbp)/3);
+  d.pp=d.sbp-d.dbp;
+  return d;
+}
+
+function score(d){
+  const s={hypovolemic:0,cardiogenic:0,pe:0,tamponade:0,ptx:0,septic_v:0,septic_c:0,ards_leak:0,neurogenic:0};
+  if(d.ppv>13) s.hypovolemic+=3;
+  if(d.cvp<6) s.hypovolemic+=3;
+  if(d.scvo2<65) s.hypovolemic+=2;
+  if(d.hr>100&&d.sbp<90) s.hypovolemic+=2;
+  if(d.pp<30) s.hypovolemic+=1;
+  if(d.scvo2>75) s.hypovolemic-=5;
+  if(d.cvp>14) s.cardiogenic+=4;
+  if(d.ppv<10) s.cardiogenic+=3;
+  if(d.scvo2<55) s.cardiogenic+=3;
+  if(d.hr>100&&d.sbp<90) s.cardiogenic+=2;
+  if(d.pp<30) s.cardiogenic+=2;
+  if(d.cvp>14) s.pe+=4;
+  if(d.scvo2<60) s.pe+=3;
+  if(d.hr>110) s.pe+=2;
+  if(d.cvp>15) s.tamponade+=4;
+  if(d.ppv>13) s.tamponade+=3;
+  if(d.scvo2<60) s.tamponade+=3;
+  if(d.scvo2>72) s.septic_v+=5;
+  if(d.cvp<10) s.septic_v+=2;
+  if(d.pp>=40&&d.dbp<50) s.septic_v+=4;
+  if(d.cvp>10) s.septic_c+=3;
+  if(d.scvo2<65) s.septic_c+=3;
+  if(d.lactate>3) s.septic_c+=2;
+  if(d.lactate>3) s.ards_leak+=2;
+  if(d.cvp>=8&&d.cvp<=12) s.ards_leak+=2;
+  if(d.hr<80&&d.sbp<90) s.neurogenic+=5;
+  if(d.cvp<5) s.neurogenic+=3;
+  if(d.ppv>13) s.neurogenic+=2;
+  if(d.scvo2>=65&&d.scvo2<=75&&d.lactate<3) s.neurogenic+=2;
+  if(d.ivc==='small'){s.hypovolemic+=5;s.septic_v+=3;s.neurogenic+=4;}
+  if(d.ivc==='plethoric'){s.cardiogenic+=5;s.pe+=5;s.tamponade+=5;s.septic_c+=4;s.hypovolemic-=10;}
+  if(d.luso==='alines'){s.hypovolemic+=3;s.pe+=3;s.tamponade+=3;s.septic_v+=3;s.neurogenic+=3;s.cardiogenic-=8;}
+  if(d.luso==='blines'){s.cardiogenic+=6;s.septic_c+=4;s.hypovolemic-=4;}
+  if(d.luso==='ards') s.ards_leak+=8;
+  if(d.luso==='ptx') s.ptx+=24;
+  if(d.lvc==='hyper'){s.hypovolemic+=5;s.tamponade+=4;s.septic_v+=4;s.pe+=2;s.cardiogenic-=12;s.septic_c-=12;}
+  if(d.lvc==='hypo'){s.cardiogenic+=7;s.septic_c+=7;}
+  if(d.lvc==='normal'){s.neurogenic+=2;s.ards_leak+=2;s.pe+=1;}
+  if(d.rvs==='normal'){s.hypovolemic+=2;s.cardiogenic+=1;s.septic_v+=2;s.neurogenic+=2;s.pe-=8;s.tamponade-=8;}
+  if(d.rvs==='dilated'){s.pe+=10;s.septic_c+=3;s.cardiogenic-=2;}
+  if(d.rvs==='tamponade'){s.tamponade+=14;s.pe-=6;s.hypovolemic-=5;}
+  const total=Object.values(s).reduce((a,n)=>a+Math.max(0,n),0);
+  const pct={};
+  types.forEach(([id])=>{pct[id]=total?Math.round(Math.max(0,s[id])/total*100):0;});
+  return pct;
+}
+
+function topId(pct){
+  return types.slice().sort((a,b)=>pct[b[0]]-pct[a[0]])[0][0];
+}
+
+function actions(d,pct){
+  const top=topId(pct);
+  const wet=d.rvs==='dilated'||d.rvs==='tamponade'||d.ivc==='plethoric'||d.luso==='blines'||d.luso==='ptx';
+  const list=[];
+  if(d.luso==='ptx') list.push(['crit','No lung sliding with a barcode sign. Decompress the chest now. This is not a pulmonary embolus.']);
+  if(d.rvs==='tamponade') list.push(['crit','Chamber collapse. This needs pericardial drainage, not a fluid bolus.']);
+  if(d.map<65) list.push(['crit','MAP is '+d.map+'. The first pressure drug is norepinephrine, aimed above 65.']);
+  if(d.rvs==='dilated'&&d.luso!=='ptx') list.push(['dx','Dilated right ventricle. Get a CT pulmonary angiogram if the patient can travel. Do not give a thrombolytic unless a massive embolus is confirmed and the pressure is falling.']);
+  if(top==='cardiogenic') list.push(['dx','Poor left-ventricular contraction. Get an ECG and a troponin. Mechanical support is for refractory cardiogenic shock, not the first step.']);
+  if(wet) list.push(['crit','Do not give a fluid bolus. The cava, the lungs, or the right heart say the patient is already full or obstructed.']);
+  else if(d.ppv>13&&d.cvp<10&&d.luso==='alines') list.push(['','A fluid challenge of 250–500 mL is reasonable. Repeat the lung ultrasound before a second bolus.']);
+  if(d.lvc==='hypo'&&d.scvo2<65) list.push(['','After the pressure is supported, dobutamine can raise the output. Do not start milrinone while the MAP is below 65.']);
+  if(top==='pe'&&d.scvo2<65) list.push(['','Support the pressure with norepinephrine. Dobutamine is a later option for a failing right ventricle, and only after the MAP is restored.']);
+  if((top==='septic_v'||d.dbp<50)&&d.map<65&&d.scvo2>70) list.push(['','Vasodilated shock. Add vasopressin rather than pushing norepinephrine above about 0.25–0.5 mcg/kg/min.']);
+  if(top==='neurogenic') list.push(['','Neurogenic pattern: low pressure without a fast rate. Use norepinephrine. Give atropine only if the rate itself is causing the low pressure.']);
+  if(d.luso==='ards') list.push(['','If this is ARDS, ventilate at about 6 mL/kg predicted body weight and keep the plateau at or below 30.']);
+  if(d.lactate>=4) list.push(['','Lactate is '+d.lactate.toFixed(1)+'. Recheck it after the pressure and the cause are treated. Do not chase the number with bicarbonate.']);
+  if(!list.length) list.push(['','The pressure and the scan do not show one emergency action. Recheck the history and the right heart.']);
+  return list;
+}
+
+function badges(d){
+  const out=[];
+  const obstructed=d.rvs!=='normal'||d.ivc==='plethoric'||d.luso==='blines'||d.luso==='ptx';
+  if(obstructed) out.push(['bad','Do not fill this patient']);
+  else if(d.ppv>13&&d.cvp<10) out.push(['ok','May respond to fluid, if PPV is valid']);
+  else out.push(['warn','A fluid bolus is unlikely to help']);
+  if(d.ppv>13&&obstructed) out.push(['bad blink','PPV is high but the right heart or the lungs disagree']);
+  if(d.scvo2<60) out.push(['bad','Low ScvO₂: delivery is not meeting demand']);
+  else if(d.scvo2>75) out.push(['warn','High ScvO₂: vasodilation or poor extraction']);
+  if(d.luso==='blines') out.push(['warn','Bilateral B-lines: hydrostatic edema']);
+  if(d.luso==='ards') out.push(['bad','Patchy B-lines: permeability edema']);
+  if(d.luso==='ptx') out.push(['bad blink','Pneumothorax pattern']);
+  if(d.hr/d.sbp>=1) out.push(['bad','Shock index '+(d.hr/d.sbp).toFixed(2)]);
+  if(d.lactate>=4) out.push(['bad','Lactate '+d.lactate.toFixed(1)]);
+  else if(d.lactate>=2) out.push(['warn','Lactate '+d.lactate.toFixed(1)]);
+  if($( 'dbp').valueAsNumber>=$('sbp').valueAsNumber) out.push(['warn','Diastolic was above systolic and was ignored']);
+  return out;
+}
+
+function draw(){
+  const d=read();
+  const units={sbp:' mmHg',dbp:' mmHg',hr:' bpm',ppv:'%',cvp:' mmHg',scvo2:'%',lactate:' mmol/L'};
+  ids.forEach(id=>{const lab=$('v_'+id); if(lab) lab.textContent=$(id).value+(units[id]||'');});
+  const pct=score(d);
+  $('map').textContent=d.map;
+  $('map').style.color=d.map<65?'#9d1c2e':'inherit';
+  $('si').textContent=(d.hr/d.sbp).toFixed(2);
+  $('pp').textContent=d.pp;
+  $('badges').innerHTML=badges(d).map(([c,t])=>'<span class="badge '+c+'">'+t+'</span>').join('');
+  const ranked=types.map(([id,label])=>({id,label,n:pct[id]})).sort((a,b)=>b.n-a.n);
+  $('bars').innerHTML=ranked.map((t,i)=>'<div class="'+(i===0?'top':'')+'"><div style="display:flex;justify-content:space-between;font-size:14px"><span>'+t.label+'</span><b>'+t.n+'%</b></div><div class="bar"><i style="width:'+t.n+'%"></i></div></div>').join('');
+  $('actions').innerHTML=actions(d,pct).map(([k,t])=>'<div class="item '+(k==='crit'?'crit':k==='dx'?'dx':'')+'">'+t+'</div>').join('');
+  live={hr:d.hr,map:d.map,critical:d.map<65||d.luso==='ptx'||d.rvs==='tamponade'};
+}
+
+function applyPreset(id){
+  const p=presets[id];
+  ids.forEach(key=>{$(key).value=p[key];});
+  document.querySelectorAll('.presets button[data-id]').forEach(b=>b.classList.toggle('on',b.dataset.id===id));
+  draw();
+}
+
+let soundLoop=false;
+function beep(freq,dur,when,gain){
+  const o=actx.createOscillator();
+  const g=actx.createGain();
+  o.type='sine';
+  o.frequency.value=freq;
+  g.gain.setValueAtTime(gain,when);
+  g.gain.exponentialRampToValueAtTime(0.001,when+dur);
+  o.connect(g); g.connect(actx.destination);
+  o.start(when); o.stop(when+dur+0.02);
+}
+function soundFrame(){
+  if(!audioOn||!actx){soundLoop=false;return;}
+  const now=actx.currentTime;
+  if(now>=nextBeat){
+    beep(live.hr>100?140:95,0.07,now,0.12);
+    nextBeat=now+Math.max(0.3,60/live.hr);
+  }
+  if(live.critical&&now>=nextAlarm){
+    beep(880,0.12,now,0.08);
+    nextAlarm=now+2.2;
+  }
+  requestAnimationFrame(soundFrame);
+}
+$('soundBtn').onclick=()=>{
+  audioOn=!audioOn;
+  $('soundBtn').textContent=audioOn?'Sound on':'Sound off';
+  if(!audioOn) return;
+  actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+  actx.resume();
+  nextBeat=0; nextAlarm=0;
+  if(!soundLoop){soundLoop=true; soundFrame();}
+};
+
+ids.forEach(id=>$(id).addEventListener('input',()=>{
+  document.querySelectorAll('.presets button[data-id]').forEach(b=>b.classList.remove('on'));
+  draw();
+}));
+document.querySelectorAll('.presets button[data-id]').forEach(b=>b.onclick=()=>applyPreset(b.dataset.id));
+draw();
+</script>
+</body>
+</html>
