@@ -188,7 +188,7 @@ ul.abnorm li b{color:#eaf2f7}
         <input id="fSpO2" type="number" step="0.1" min="50" max="100" placeholder="94–100">
       </div>
       <div class="field">
-        <label>Temperature (°C) <span style="font-size:10px;color:#9db1ba">(for correction)</span></label>
+        <label>Temperature (°C) <span style="font-size:10px;color:#9db1ba">(reported, not used to rewrite the gas)</span></label>
         <input id="fTemp" type="number" step="0.1" min="30" max="42" placeholder="37">
       </div>
     </div>
@@ -201,6 +201,10 @@ ul.abnorm li b{color:#eaf2f7}
           <option value="unknown">Unknown / unclear</option>
         </select>
         <div id="sampleTypeNote" style="font-size:11px;color:#9db1ba;margin-top:3px"></div>
+      </div>
+      <div class="field">
+        <label><span class="tip">Age (years)<span class="tip-box">Used only for the expected A-a gradient. Expected is about age/4 + 4, and at least 15.</span></span></label>
+        <input id="fAge" type="number" step="1" min="1" max="110" placeholder="40">
       </div>
     </div>
     <button class="primary" style="width:100%;margin-top:6px" onclick="interpretABG()">🔬 INTERPRET ABG</button>
@@ -1163,7 +1167,7 @@ function v(id){const el=document.getElementById(id);return el&&el.value!==''?par
    ============================================================ */
 function interpretABG(){
   const pH=v('fpH'),pco2=v('fPaCO2'),pao2=v('fPaO2'),hco3=v('fHCO3'),be=v('fBE');
-  const fio2=v('fFiO2')||0.21,na=v('fNa'),cl=v('fCl'),k=v('fK'),lactate=v('fLactate'),spo2=v('fSpO2');
+  const fio2=v('fFiO2')||0.21,na=v('fNa'),cl=v('fCl'),k=v('fK'),lactate=v('fLactate'),spo2=v('fSpO2'),age=v('fAge');
   const sampleTypeEl=document.getElementById('fSampleType');
   const sampleType=sampleTypeEl?sampleTypeEl.value:'arterial';
 
@@ -1184,53 +1188,66 @@ function interpretABG(){
   res.primaryType='';
 
   if(pH<7.35){
-    // Acidaemia
-    if(pco2>45&&hco3<=26){res.primary='Respiratory Acidosis';res.primaryType='resp';}
-    else if(hco3<22&&pco2<=45){res.primary='Metabolic Acidosis';res.primaryType='met';}
-    else if(pco2>45&&hco3<22){res.primary='Mixed Respiratory + Metabolic Acidosis';res.primaryType='mixed';}
-    else{res.primary='Metabolic Acidosis (compensated)';res.primaryType='met';}
+    if(pco2>45&&hco3<22){res.primary='Mixed Respiratory + Metabolic Acidosis';res.primaryType='mixed';}
+    else if(pco2>45){res.primary='Respiratory Acidosis';res.primaryType='resp';}
+    else if(hco3<22){res.primary='Metabolic Acidosis';res.primaryType='met';}
+    else{res.primary='Acidaemia without a clear CO₂ or bicarbonate change';res.primaryType='unclear';}
   } else if(pH>7.45){
-    // Alkalaemia
-    if(pco2<35&&hco3>=22){res.primary='Respiratory Alkalosis';res.primaryType='resp';}
-    else if(hco3>26&&pco2>=35){res.primary='Metabolic Alkalosis';res.primaryType='met';}
-    else if(pco2<35&&hco3>26){res.primary='Mixed Respiratory + Metabolic Alkalosis';res.primaryType='mixed';}
-    else{res.primary='Metabolic Alkalosis (compensated)';res.primaryType='met';}
+    if(pco2<35&&hco3>26){res.primary='Mixed Respiratory + Metabolic Alkalosis';res.primaryType='mixed';}
+    else if(pco2<35){res.primary='Respiratory Alkalosis';res.primaryType='resp';}
+    else if(hco3>26){res.primary='Metabolic Alkalosis';res.primaryType='met';}
+    else{res.primary='Alkalaemia without a clear CO₂ or bicarbonate change';res.primaryType='unclear';}
+  } else if(pco2>45&&hco3>26){
+    const chron=24+(pco2-40)*3.5/10;
+    const expCO2=0.7*(hco3-24)+40;
+    const fitsResp=Math.abs(hco3-chron)<=3;
+    const fitsMet=Math.abs(pco2-expCO2)<=5;
+    if(hco3>chron+3&&pco2>expCO2+5){res.primary='Mixed respiratory acidosis and metabolic alkalosis';res.primaryType='mixed';}
+    else if(fitsResp&&!fitsMet){res.primary='Compensated respiratory acidosis';res.primaryType='resp';}
+    else if(fitsMet&&!fitsResp){res.primary='Compensated metabolic alkalosis';res.primaryType='met';}
+    else{res.primary='Normal pH with raised CO₂ and HCO₃';res.primaryType='either';}
+  } else if(pco2<35&&hco3<22){
+    const expCO2=1.5*hco3+8;
+    const chron=24-(40-pco2)*5/10;
+    const fitsMet=Math.abs(pco2-expCO2)<=2;
+    const fitsResp=Math.abs(hco3-chron)<=3;
+    if(fitsMet&&!fitsResp){res.primary='Compensated metabolic acidosis';res.primaryType='met';}
+    else if(fitsResp&&!fitsMet){res.primary='Compensated respiratory alkalosis';res.primaryType='resp';}
+    else if(pco2>expCO2+2&&hco3<chron-3){res.primary='Mixed metabolic acidosis and respiratory acidosis';res.primaryType='mixed';}
+    else{res.primary='Normal pH with low CO₂ and HCO₃';res.primaryType='either';}
   } else {
-    // Normal pH — could be compensated or mixed
-    if(pco2>45&&hco3>26){res.primary='Mixed / Compensated (normal pH with raised CO₂ & HCO₃)';res.primaryType='mixed';}
-    else if(pco2<35&&hco3<22){res.primary='Mixed / Compensated (normal pH with low CO₂ & HCO₃)';res.primaryType='mixed';}
-    else{res.primary='Normal ABG';res.primaryType='normal';}
+    res.primary='Normal ABG';res.primaryType='normal';
   }
 
-  /* --- Step 3: Compensation adequacy --- */
   res.comp='Not calculated';
   res.compAdequate=null;
-  if(res.primaryType==='resp'&&pH<7.35){
-    // Resp acidosis: acute HCO3 rises 1 per 10 CO2; chronic 3.5 per 10
-    const acuteHCO3=24+(pco2-40)/10;
-    const chronHCO3=24+(pco2-40)*3.5/10;
-    if(hco3>=chronHCO3-2&&hco3<=chronHCO3+2){res.comp='Chronic (fully compensated)';res.compAdequate=true;}
-    else if(hco3>=acuteHCO3-2&&hco3<=acuteHCO3+2){res.comp='Acute (inadequate metabolic compensation)';res.compAdequate=false;}
-    else if(hco3<acuteHCO3-2){res.comp='Under-compensated or superimposed metabolic acidosis';res.compAdequate=false;}
-    else{res.comp='Over-compensated (metabolic alkalosis component)';res.compAdequate=false;}
-  } else if(res.primaryType==='resp'&&pH>7.45){
-    // Resp alkalosis: HCO3 falls 2 per 10 CO2 acute; 5 per 10 chronic
-    const acuteHCO3=24-(40-pco2)*2/10;
-    const chronHCO3=24-(40-pco2)*5/10;
-    if(hco3<=chronHCO3+2&&hco3>=chronHCO3-2){res.comp='Chronic';res.compAdequate=true;}
-    else if(hco3<=acuteHCO3+2&&hco3>=acuteHCO3-2){res.comp='Acute';res.compAdequate=false;}
-    else{res.comp='Partially compensated';res.compAdequate=false;}
-  } else if(res.primaryType==='met'&&pH<7.35){
-    // Winter's formula: expected PaCO2 = 1.5×HCO3 + 8 ±2
-    const expCO2min=1.5*hco3+6,expCO2max=1.5*hco3+10;
-    if(pco2>=expCO2min&&pco2<=expCO2max){res.comp='Adequate respiratory compensation';res.compAdequate=true;}
-    else if(pco2>expCO2max){res.comp='Insufficient respiratory compensation (co-existing resp acidosis)';res.compAdequate=false;}
-    else{res.comp='Excessive compensation (co-existing resp alkalosis)';res.compAdequate=false;}
-  } else if(res.primaryType==='met'&&pH>7.45){
-    // Expected PaCO2 = 0.7×(HCO3−24)+40 ±5
+  if(res.primaryType==='resp'&&pco2>45){
+    const acute=24+(pco2-40)/10, chron=24+(pco2-40)*3.5/10;
+    if(hco3<acute-2){res.comp='Additional metabolic acidosis — bicarbonate is below the acute expectation';res.compAdequate=false;}
+    else if(hco3>chron+2){res.comp='Additional metabolic alkalosis — bicarbonate is above the chronic expectation';res.compAdequate=false;}
+    else if(Math.abs(hco3-chron)<=2){res.comp='Chronic — bicarbonate matches renal compensation';res.compAdequate=true;}
+    else if(Math.abs(hco3-acute)<=2){res.comp='Acute — bicarbonate matches the acute process';res.compAdequate=true;}
+    else{res.comp='Partial — bicarbonate is between the acute and chronic values';res.compAdequate=true;}
+  } else if(res.primaryType==='resp'&&pco2<35){
+    const acute=24-(40-pco2)*2/10, chron=24-(40-pco2)*5/10;
+    if(hco3>acute+2){res.comp='Additional metabolic alkalosis — bicarbonate has not fallen as expected';res.compAdequate=false;}
+    else if(hco3<chron-2){res.comp='Additional metabolic acidosis — bicarbonate is below the chronic expectation';res.compAdequate=false;}
+    else if(Math.abs(hco3-chron)<=2){res.comp='Chronic — bicarbonate matches renal compensation';res.compAdequate=true;}
+    else if(Math.abs(hco3-acute)<=2){res.comp='Acute — bicarbonate matches the acute process';res.compAdequate=true;}
+    else{res.comp='Partial — bicarbonate is between the acute and chronic values';res.compAdequate=true;}
+  } else if(res.primaryType==='met'&&hco3<22){
+    const expCO2=1.5*hco3+8;
+    if(Math.abs(pco2-expCO2)<=2){res.comp="Adequate — Winter's formula (1.5 × HCO₃ + 8 ±2)";res.compAdequate=true;}
+    else if(pco2>expCO2+2){res.comp='Insufficient respiratory compensation — coexisting respiratory acidosis';res.compAdequate=false;}
+    else{res.comp='CO₂ is lower than Winter’s formula — coexisting respiratory alkalosis';res.compAdequate=false;}
+  } else if(res.primaryType==='met'&&hco3>26){
     const expCO2=0.7*(hco3-24)+40;
-    if(Math.abs(pco2-expCO2)<=5){res.comp='Adequate respiratory compensation';res.compAdequate=true;}
-    else{res.comp='Incomplete/abnormal compensation';res.compAdequate=false;}
+    if(Math.abs(pco2-expCO2)<=5){res.comp='Adequate respiratory compensation for metabolic alkalosis';res.compAdequate=true;}
+    else if(pco2>expCO2+5){res.comp='CO₂ is higher than expected — coexisting respiratory acidosis';res.compAdequate=false;}
+    else{res.comp='CO₂ is lower than expected — coexisting respiratory alkalosis';res.compAdequate=false;}
+  } else if(res.primaryType==='either'){
+    res.comp='The gas alone cannot say which process is primary. Use the history.';
+    res.compAdequate=true;
   }
 
   /* --- Step 4: Oxygenation --- */
@@ -1245,11 +1262,11 @@ function interpretABG(){
   } else if(pao2!==null){
     res.sampleTypeUncertain=(sampleType==='unknown');
     res.pf=pao2/fio2;
-    // A-a gradient: PAO2 = (FiO2 × (760-47)) - PaCO2/0.8
     const pao2_alv=fio2*(760-47)-pco2/0.8;
     res.aaGrad=pao2_alv-pao2;
-    const expectedAA=2.5+0.21*25; // rough age-adjusted: ~7.5 at age 25
-    res.aaHigh=res.aaGrad>15;
+    const roomLimit=age?Math.max(15,age/4+4):20;
+    res.aaLimit=roomLimit+Math.max(0,fio2-0.21)*120;
+    res.aaHigh=res.aaGrad>res.aaLimit;
     // Hypoxaemia classification
     if(pao2<55||res.pf<100){res.hypoxSev='Severe hypoxaemia';}
     else if(pao2<70||res.pf<200){res.hypoxSev='Moderate hypoxaemia';}
@@ -1263,13 +1280,11 @@ function interpretABG(){
     const agCorrected=(k!==null)?na+k-(cl+hco3):res.ag;
     res.agHigh=res.ag>12;
     if(res.agHigh){
-      // Delta-delta ratio = (AG-12)/(24-HCO3)
+      const deltaGap=(res.ag-12)-(24-hco3);
       res.deltaDelta=hco3<24?(res.ag-12)/(24-hco3):null;
-      if(res.deltaDelta!==null){
-        if(res.deltaDelta<1){res.ddInterp='Concomitant NAGMA (HAGMA + normal anion gap acidosis)';}
-        else if(res.deltaDelta>2){res.ddInterp='Concomitant metabolic alkalosis (HAGMA + met alkalosis)';}
-        else{res.ddInterp='Pure HAGMA';}
-      }
+      if(deltaGap>6){res.ddInterp='Concomitant metabolic alkalosis';}
+      else if(deltaGap<-6){res.ddInterp='Concomitant normal anion gap acidosis';}
+      else{res.ddInterp='Pure HAGMA';}
     }
   }
 
@@ -1298,7 +1313,7 @@ function interpretABG(){
   if(be!==null&&be>2) res.abnorm.push({sev:'Mild',text:'Base excess (BE '+be+')'});
   if(res.venousSample) res.abnorm.push({sev:'Note',text:'Sample marked as venous — PaO₂ '+pao2+' reflects tissue O₂ extraction, not oxygenation. P/F ratio and A-a gradient are not calculated; a venous PaO₂ this low is expected and is not hypoxaemia.'});
   else if(pao2!==null&&res.hypoxSev!=='Normal oxygenation') res.abnorm.push({sev:res.hypoxSev.split(' ')[0],text:res.hypoxSev+' (PaO₂ '+pao2+', P/F '+res.pf.toFixed(0)+')'+(res.sampleTypeUncertain?' — sample type unconfirmed, verify arterial before acting on this':'')});
-  if(res.aaHigh) res.abnorm.push({sev:'Moderate',text:'Elevated A-a gradient ('+res.aaGrad.toFixed(1)+' mmHg) — suggests parenchymal cause'});
+  if(res.aaHigh) res.abnorm.push({sev:'Moderate',text:'Elevated A-a gradient ('+res.aaGrad.toFixed(1)+' mmHg, limit '+res.aaLimit.toFixed(0)+' for this FiO₂) — parenchymal or vascular'});
   if(res.agHigh) res.abnorm.push({sev:'Moderate',text:'High anion gap ('+res.ag.toFixed(0)+') — HAGMA'});
   if(res.ddInterp&&res.ddInterp!=='Pure HAGMA') res.abnorm.push({sev:'Moderate',text:'Delta-delta: '+res.ddInterp});
   if(lactate!==null&&lactate>=2) res.abnorm.push({sev:lactate>=4?'Severe':'Moderate',text:res.lactateSev+' ('+lactate+' mmol/L)'});
@@ -1325,31 +1340,33 @@ function buildMgmt(res){
   }
 
   // Respiratory acidosis
-  if(res.primary.includes('Respiratory Acidosis')){
-    add('Respiratory Acidosis','Identify and treat the cause: COPD exacerbation, neuromuscular failure, sedation/opioid effect, pneumothorax, severe pneumonia. '+
-      (c==='ICU'?'In ICU: consider NIV (BiPAP) first for COPD/NMD; intubate if NIV fails or contraindicated. Target pH >7.35, PaCO₂ per patient baseline.':
-       c==='ED'?'In ED: assess work of breathing, GCS and gas exchange trend. Start NIV early in COPD. Prepare for intubation if deteriorating.':
-       'In ward: escalate urgently. Order chest X-ray, ECG. Start controlled oxygen. Early NIV referral if COPD; escalate to HDU/ICU if deteriorating.'));
+  if(res.primary.includes('Respiratory Acidosis')||(res.primaryType==='resp'&&res.pco2>45)){
+    add('Respiratory Acidosis',(res.pH>=7.35?'The pH is normal, so this is not acute ventilatory failure unless the work of breathing is rising. ':'')+'Identify and treat the cause: COPD exacerbation, neuromuscular failure, sedation/opioid effect, pneumothorax, severe pneumonia. '+
+      (c==='ICU'?'In ICU: NIV first for COPD or neuromuscular weakness. Intubate if NIV fails or the airway is unsafe. Do not ventilate a chronic CO₂ retainer down to 40 mmHg. In COPD use oxygen 88–92% and accept hypercapnia while the pH recovers.':
+       c==='ED'?'In ED: look at work of breathing and GCS. Start NIV early in COPD. Do not chase a normal PaCO₂. Prepare for intubation if the patient is tiring.':
+       'In ward: controlled oxygen, chest X-ray and an early NIV referral for COPD. Escalate if the pH is falling or the patient is tiring.'));
   }
 
   // Respiratory alkalosis
-  if(res.primary.includes('Respiratory Alkalosis')){
+  if(res.primary.includes('Respiratory Alkalosis')||(res.primaryType==='resp'&&res.pco2<35)){
     add('Respiratory Alkalosis','Common causes: anxiety/pain, pulmonary embolism, sepsis, pregnancy, liver failure, altitude, iatrogenic over-ventilation. Treat the underlying cause. If mechanically ventilated: reduce RR or Vt. Supplement O₂ if hypoxic. Consider PE if unexplained.');
   }
 
   // Metabolic acidosis
-  if(res.primary.includes('Metabolic Acidosis')){
+  if(res.primary.includes('Metabolic Acidosis')||(res.primaryType==='met'&&res.hco3<22)){
     if(res.agHigh){
-      add('High Anion Gap Metabolic Acidosis (HAGMA)','Mnemonic MUDPILES: Methanol, Uraemia, DKA, Propylene glycol, Isoniazid, Lactic acidosis, Ethylene glycol, Salicylates. '+
-        (res.lactateSev&&res.lactateSev.includes('hyperlact')?'Elevated lactate — assess for sepsis, shock, tissue hypoperfusion, metformin toxicity. Fluid resuscitation, treat source.':'')+
-        ' Treat the underlying cause. In DKA: insulin + fluids + electrolyte replacement. In lactic acidosis: optimise oxygen delivery.');
+      add('High Anion Gap Metabolic Acidosis (HAGMA)','Causes to screen: lactate, ketones, uraemia, methanol, ethylene glycol, and salicylate. '+
+        (res.lactateSev&&res.lactateSev.includes('hyperlact')?'Elevated lactate — look for shock, sepsis, or metformin. Treat the cause. Do not chase the lactate with bicarbonate.':'')+
+        ' In DKA: insulin, fluid, and potassium. In lactic acidosis: restore oxygen delivery.');
+    } else if(res.na===null||res.cl===null){
+      add('Anion gap not entered','Do not call this a normal anion gap acidosis until sodium and chloride are known.');
     } else {
       add('Normal Anion Gap Metabolic Acidosis (NAGMA)','Causes: diarrhoea/GI losses, renal tubular acidosis, acetazolamide, early renal failure, hyperchloraemic states. Check urine anion gap to distinguish renal vs GI cause. Oral/IV bicarbonate replacement may be indicated.');
     }
   }
 
   // Metabolic alkalosis
-  if(res.primary.includes('Metabolic Alkalosis')){
+  if(res.primary.includes('Metabolic Alkalosis')||(res.primaryType==='met'&&res.hco3>26)){
     add('Metabolic Alkalosis','Common causes: vomiting, NG tube losses, diuretics, hyperaldosteronism, hypokalaemia, contraction alkalosis. Correct volume depletion with IV 0.9% NaCl. Replace potassium. Stop offending agent. Acetazolamide in refractory cases. Avoid over-correcting.');
   }
 
@@ -1357,9 +1374,10 @@ function buildMgmt(res){
   if(res.venousSample){
     add('Venous Sample — Oxygenation Not Assessable','PaO₂/sO₂ from venous blood reflect tissue oxygen extraction, not lung oxygenation — P/F ratio and A-a gradient cannot be calculated from this sample. The pH, PaCO₂ and metabolic values above remain usable as a rough guide, but if oxygenation status is actually needed clinically, repeat with an arterial sample.');
   } else if(res.pf!==undefined&&res.hypoxSev!=='Normal oxygenation'){
-    const pfGrade=res.pf<100?'Severe ARDS (P/F <100)':res.pf<200?'Moderate ARDS (P/F 100–200)':res.pf<300?'Mild ARDS / significant hypoxaemia':'Mild hypoxaemia';
-    add('Hypoxaemia — '+pfGrade,(res.sampleTypeUncertain?'⚠ Sample type unconfirmed — verify this is arterial blood before acting on P/F ratio or A-a gradient. ':'')+'Target SpO₂ 94–98% (88–92% in COPD risk). '+(res.pf<200?'Consider HFNC, NIV or intubation based on work of breathing and trajectory. For ARDS: lung-protective ventilation (Vt 4–8 mL/kg PBW, Pplat <30), PEEP individualisation, prone positioning if P/F ≤150.':'Increase FiO₂, position upright, treat cause (PE, pneumonia, atelectasis, pulmonary oedema).'));
-    if(res.aaHigh) add('Raised A-a Gradient','Elevated A-a gradient suggests parenchymal or pulmonary vascular cause (pneumonia, pulmonary oedema, PE, ARDS). Low A-a gradient with hypoxaemia suggests hypoventilation or low FiO₂.');
+    const pfGrade=res.pf<100?'Severe hypoxaemia (P/F <100)':res.pf<200?'Moderate hypoxaemia (P/F 100–200)':res.pf<300?'Mild hypoxaemia (P/F 200–300)':'Hypoxaemia';
+    add('Hypoxaemia — '+pfGrade,(res.sampleTypeUncertain?'Sample type is unconfirmed. Do not act on the P/F ratio until the sample is known to be arterial. ':'')+'A low P/F ratio is not ARDS by itself. ARDS also needs an acute bilateral infiltrate that is not cardiogenic. Target SpO₂ 94–98%, or 88–92% if the patient retains CO₂. '+(res.pf<=150?'If this is ARDS and the P/F stays ≤150, prone the patient. If intubated, use about 6 mL/kg and keep plateau ≤30.':'Increase oxygen, sit the patient up, and treat the cause.'));
+    if(res.aaHigh) add('Raised A-a Gradient','The gradient is above the limit for this FiO₂ ('+res.aaLimit.toFixed(0)+' mmHg). That points to lung or pulmonary vascular disease, not simple hypoventilation.');
+    else if(res.pf<300) add('A-a gradient within the limit','Hypoxaemia with a gradient inside the limit for this FiO₂ is more in keeping with hypoventilation or a low inspired oxygen than with parenchymal disease.');
   }
 
   // High AG causes detail
@@ -1376,7 +1394,7 @@ function buildMgmt(res){
   if(res.kStatus&&!res.kStatus.includes('Normal')){
     if(res.kStatus.includes('hypo')){
       add('Hypokalaemia (K⁺ '+res.k+')',
-        (parseFloat(res.k)<3.0?'Severe: aggressive replacement required. IV KCl via central or peripheral line (max 20 mmol/hr peripherally). Continuous cardiac monitoring. ':'Moderate: oral/IV replacement. ')
+        (parseFloat(res.k)<3.0?'Severe. Replace potassium. A peripheral line is usually limited to 10 mmol/h. 20 mmol/h needs a central line and continuous monitoring. ':'Replace potassium and recheck. ')
         +'Identify cause: diuretics, diarrhoea, alkalosis, hyperaldosteronism. Recheck after each dose. Concurrent hypomagnesaemia is common — check Mg²⁺.');
     } else {
       add('Hyperkalaemia (K⁺ '+res.k+')',
@@ -1388,12 +1406,18 @@ function buildMgmt(res){
   if(res.compAdequate===false){
     add('Incomplete Compensation / Mixed Disorder',''+res.comp+'. Consider whether a second primary process is present. Review clinical context carefully.');
   }
+  if(res.primaryType==='either'){
+    add('Normal pH, two numbers moved together','This can be one compensated disorder or two disorders cancelling out. A stable patient with a high CO₂ and a matching bicarbonate is not in acute ventilatory failure. Do not ventilate the CO₂ to normal.');
+  }
+  if(res.primary==='Mixed respiratory acidosis and metabolic alkalosis'){
+    add('Respiratory acidosis plus metabolic alkalosis','The bicarbonate is above the chronic respiratory expectation and the CO₂ is above the metabolic-alkalosis expectation. Treat both. Do not correct only the CO₂.');
+  }
 
   // Context-specific add-ons
   if(c==='ICU'){
     add('ICU — General Principles','Continuous monitoring: arterial line for serial ABGs, SpO₂, ETCO₂ if intubated. Reassess ABG 30–60 min after any intervention. Document SOFA/APACHE score. Nutritional and fluid management guided by metabolic state.');
   } else if(c==='ED'){
-    add('ED — Immediate Priorities','Ensure airway is secure. High-flow O₂ if hypoxic. IV access × 2, bloods, ECG. Point-of-care lactate. Resuscitation fluids if in shock. Early senior review and disposition decision.');
+    add('ED — Immediate Priorities','Keep the airway safe. Use controlled oxygen if the patient retains CO₂. Otherwise target SpO₂ 94–98%. Two intravenous lines, an ECG, and a lactate. Fluid if the patient is shocked. Decide early who needs NIV or intensive care.');
   } else {
     add('Ward — Escalation Criteria','Escalate to HDU/ICU if: pH <7.25, rising PaCO₂ with fatigue, P/F <200, SpO₂ <90% on ≥40% O₂, lactate ≥4 or rising, altered GCS. Contact outreach/MET team early.');
   }
