@@ -109,7 +109,7 @@ LP/CSF is the main diagnostic test for meningitis when clinically safe.
 Imaging is selected when structural assessment is needed or LP is deferred.
 </div>
 
-<button class="option route" id="lpBtn" onclick="show('csf')">
+<button class="option route" id="lpBtn" onclick="tryLP()">
 🧪 LUMBAR PUNCTURE / CSF STUDY<br>
 <span class="small">Enter CSF and microbiology findings.</span>
 </button>
@@ -289,6 +289,7 @@ function show(id){
 document.querySelectorAll('section').forEach(x=>x.classList.add('hidden'));
 $(id).classList.remove('hidden');
 window.scrollTo(0,0);
+if($('lpBtn')) setLpLock();
 }
 
 function dose(mgkg,max){
@@ -319,9 +320,9 @@ const abscess=($('focal').checked||$('seizure').checked)&&!$('neck').checked&&!s
 let kind='unsure';
 if(spinal) kind='spinal';
 else if(device) kind='device';
-else if(abscess&&!meningitis) kind='abscess';
 else if(enceph&&meningitis) kind='meningo';
 else if(enceph) kind='encephalitis';
+else if(abscess) kind='abscess';
 else if(meningitis) kind='meningitis';
 const title={
 spinal:'Spinal epidural infection',
@@ -353,14 +354,52 @@ html+=`<div class="warning"><strong>Community bacterial cover now.</strong> ${co
 html+=`<div class="warning"><strong>Dexamethasone ${dex} mg IV</strong> with the first antibiotic, or in the minutes before it. Stop it if the CSF is not bacterial. Do not add it if the antibiotic started more than an hour ago.</div>`;
 }
 if(reasons.length&&kind!=='spinal'){
-html+=`<div class="warning"><strong>CT before lumbar puncture.</strong> Reason: ${reasons.join(', ')}. The scan must not delay the drug. Puncture only if the scan shows no mass or shift.</div>`;
-$('lpBtn').querySelector('.small').textContent='Only after CT shows no mass or shift.';
-}else if(kind!=='spinal'){
+html+=`<div class="danger"><strong>Lumbar puncture is locked.</strong> Reason: ${reasons.join(', ')}. CT or MRI first. The puncture stays unavailable until that scan shows no mass and no shift. The scan must not delay the drug.</div>`;
+}else if($('shock').checked){
+html+=`<div class="danger"><strong>Lumbar puncture is locked.</strong> Resuscitate the shock before positioning the patient for a puncture.</div>`;
+}else if(kind==='spinal'){
+html+=`<div class="danger"><strong>Lumbar puncture is locked.</strong> Do not pass a needle through a spinal collection.</div>`;
+}else{
 html+=`<div class="good"><strong>No CT-before-LP criterion is ticked.</strong> Lumbar puncture can be the first test. If it will be delayed and bacterial meningitis is still likely, the antibiotic still goes in first.</div>`;
-$('lpBtn').querySelector('.small').textContent='Enter CSF and microbiology findings.';
 }
 $('routeMsg').innerHTML=html;
+setLpLock();
 show('route');
+}
+
+function lpWhy(){
+if($('shock').checked) return 'The patient is in shock. Resuscitate before a lumbar puncture.';
+if($('spinal').checked) return 'Do not pass a needle through a spinal epidural collection.';
+const mass=$('ctMass').checked||$('ctRing').checked||$('ctHydro').checked||$('mriHydro').checked||$('mriRing').checked;
+if(mass) return 'The scan shows mass effect, hydrocephalus, or a ring lesion. Do not perform a lumbar puncture.';
+const flags=[];
+if($('focal').checked) flags.push('a focal deficit');
+if($('cranial').checked) flags.push('a cranial-nerve palsy');
+if($('pap').checked) flags.push('papilloedema');
+if($('seizure').checked) flags.push('a new seizure');
+if($('altered').checked) flags.push('altered consciousness');
+if($('immuno').checked) flags.push('severe immunocompromise');
+if($('neurosurgery').checked) flags.push('recent neurosurgery or a device');
+if(flags.length&&!state.ct&&!state.mri) return 'CT or MRI is required first because of '+flags.join(', ')+'. Lumbar puncture stays locked until the scan shows no mass and no shift.';
+return '';
+}
+
+function setLpLock(){
+const why=lpWhy();
+const btn=$('lpBtn');
+btn.disabled=!!why;
+btn.style.opacity=why?'0.45':'1';
+btn.style.pointerEvents=why?'none':'auto';
+btn.querySelector('.small').textContent=why||'Enter CSF and microbiology findings.';
+}
+
+function tryLP(){
+const why=lpWhy();
+if(why){
+result(`<div class="danger"><h2>Lumbar puncture locked</h2><p>${why}</p></div><button class="secondary" onclick="show('route')">← BACK</button>`);
+return;
+}
+show('csf');
 }
 
 function result(html){
@@ -530,6 +569,7 @@ return result(diag(
 ));
 
 result(next('CT'));
+setLpLock();
 }
 
 function analyzeMRI(){
@@ -572,6 +612,7 @@ return result(diag(
 ));
 
 result(next('MRI'));
+setLpLock();
 }
 
 function next(source){
@@ -588,17 +629,17 @@ return `
 CONTINUE TO CT / MRI →
 </button>`;
 
-if(source==='CT'&&!state.mri)
+if(source==='CT'&&!state.mri){
+const why=lpWhy();
+const lp=why?'':'<button class="primary" onclick="tryLP()">LUMBAR PUNCTURE IS NOW ALLOWED →</button>';
 return `
-<div class="warning">
-<h2>CT INDETERMINATE / NON-SPECIFIC</h2>
-<p>CT has not established a disease-specific diagnosis.</p>
-<strong>Next investigation → MRI brain</strong>
+<div class="${why?'danger':'warning'}">
+<h2>${why?'Lumbar puncture stays locked':'CT shows no mass or shift'}</h2>
+<p>${why||'CT has not established a disease-specific diagnosis. The puncture can proceed. MRI is the alternative if the syndrome is still unclear.'}</p>
 </div>
-
-<button class="primary" onclick="show('mri')">
-CONTINUE TO MRI →
-</button>`;
+${lp}
+<button class="secondary" onclick="show('mri')">CONTINUE TO MRI →</button>`;
+}
 
 if(source==='MRI'&&!state.lp)
 return `
@@ -608,7 +649,7 @@ return `
 <strong>Next investigation → LP/CSF when clinically safe.</strong>
 </div>
 
-<button class="primary" onclick="show('csf')">
+<button class="primary" onclick="tryLP()">
 CONTINUE TO LP / CSF →
 </button>`;
 
