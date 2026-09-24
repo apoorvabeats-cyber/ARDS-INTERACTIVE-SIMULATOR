@@ -50,8 +50,10 @@
   <section><h2>Treatment</h2>
     <div class="row">
   <div><label>Calcium mg/dL</label><input id="val" type="text" inputmode="decimal" value="13.5"></div>
-  <div><label>12 h goal</label><input id="target" type="text" inputmode="decimal" value="10.5"></div>
+  <div><label>Albumin g/dL</label><input id="alb" type="text" inputmode="decimal" placeholder="4.0"></div>
 </div>
+<label>12 h goal</label>
+<input id="target" type="text" inputmode="decimal" value="10.5">
 <label>Saline <b id="rateLabel">200</b> mL/h</label>
 <input id="rate" type="range" min="0" max="300" step="25" value="200">
 <div class="chips">
@@ -62,7 +64,7 @@
   </section>
   <section>
     <div class="nums">
-      <div class="num"><span id="aL">—</span><b id="a">—</b></div>
+      <div class="num" id="corrBox"><span>Corrected</span><b id="corr">—</b></div>
       <div class="num" id="endBox"><span>At 12 h</span><b id="end">—</b></div>
       <div class="num" id="deltaBox"><span>Change</span><b id="delta">—</b></div>
     </div>
@@ -169,21 +171,28 @@ function frame(){
   requestAnimationFrame(frame);
 }
 
+function startCa(){
+  var ca=read('val'), alb=read('alb');
+  if(ca==null) return null;
+  if(alb==null) return ca;
+  return ca + 0.8*(4-alb);
+}
 function paint(){
-  var ca=read('val'), goal=read('target'), rate=parseFloat(document.getElementById('rate').value)||0;
+  var ca=startCa(), goal=read('target'), rate=parseFloat(document.getElementById('rate').value)||0;
   document.getElementById('rateLabel').textContent=String(rate);
-  document.getElementById('aL').textContent='mL/h';
   if(ca==null) return;
   if(goal==null) goal=ca;
+  document.getElementById('corr').textContent=ca.toFixed(1);
+  document.getElementById('corrBox').className='num'+(ca<8.5||ca>10.5?' bad':'');
   var t=project(ca, rate);
   var cap=8.5, cross=null;
   for(var h=1;h<t.path.length;h++) if(t.path[h-1]>cap && t.path[h]<=cap){ cross=h; break; }
-  document.getElementById('a').textContent=String(rate);
   document.getElementById('end').textContent=t.final.toFixed(1);
   document.getElementById('delta').textContent=(t.final-ca>=0?'+':'')+(t.final-ca).toFixed(1);
   document.getElementById('endBox').className='num'+(cross?' bad':'');
   document.getElementById('deltaBox').className='num'+(cross?' bad':'');
   var lines=[];
+  if(read('alb')!=null && ca>=8.5 && ca<=10.5) lines.push('Corrected calcium is '+ca.toFixed(1)+'.');
   if(Math.abs(t.final-goal)>0.35) lines.push('The green line is the goal. This plan does not reach it.');
   document.getElementById('banner').className=lines.length?'show':'';
   document.getElementById('banner').textContent=lines.join(' ');
@@ -197,7 +206,7 @@ function paint(){
   document.getElementById('ecgBox').className='ecgbox'+(kindOf(ca)==='shortqt'?' bad':'');
 }
 function applyGoal(){
-  var ca=read('val'), goal=read('target');
+  var ca=startCa(), goal=read('target');
   if(ca==null||goal==null){ paint(); return; }
   function solve(){
     var lo=0, hi=300, best=0;
@@ -211,7 +220,8 @@ function applyGoal(){
   paint();
 }
 document.getElementById('rate').oninput=paint;
-document.getElementById('val').oninput=function(){ var v=read('val'); if(v!=null && v>10.5) document.getElementById('target').value='10.5'; applyGoal(); };
+document.getElementById('val').oninput=function(){ var v=startCa(); if(v!=null && v>10.5) document.getElementById('target').value='10.5'; applyGoal(); };
+document.getElementById('alb').oninput=function(){ var v=startCa(); if(v!=null && v>10.5) document.getElementById('target').value='10.5'; applyGoal(); };
 document.getElementById('target').oninput=applyGoal;
 ['cal','zol','dial'].forEach(function(id){ document.getElementById(id).onclick=function(){ this.classList.toggle('on'); applyGoal(); }; });
 
