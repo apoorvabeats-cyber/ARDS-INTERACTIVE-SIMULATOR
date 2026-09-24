@@ -41,7 +41,8 @@ select{width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);bac
 .item{padding:10px 12px;border-radius:8px;margin:0 0 8px;background:#f6f8fb;border-left:4px solid var(--blue);font-size:14px}
 .item.crit{border-left-color:var(--red);background:#fff5f6}
 .item.dx{border-left-color:#e0a106;background:#fffaf0}
-.note{font-size:12px;color:var(--muted);margin:0 0 8px}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:0 0 12px}
+.check input{margin-top:3px}
 @media(max-width:800px){.layout{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
@@ -69,7 +70,7 @@ select{width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);bac
     <div class="row"><label>Diastolic <b id="v_dbp"></b></label><input id="dbp" type="range" min="30" max="120" value="44"></div>
     <div class="row"><label>Heart rate <b id="v_hr"></b></label><input id="hr" type="range" min="30" max="180" value="116"></div>
     <div class="row"><label>PPV <b id="v_ppv"></b></label><input id="ppv" type="range" min="2" max="35" value="16"></div>
-    <p class="note">PPV only predicts a fluid response in sinus rhythm, with no spontaneous breaths, a tidal volume of at least 8 mL/kg, and no right-ventricular failure.</p>
+    <label class="check"><input type="checkbox" id="ppvValid" checked> PPV is valid: sinus rhythm, no spontaneous breaths, and a tidal volume of at least 8 mL/kg</label>
     <div class="row"><label>CVP <b id="v_cvp"></b></label><input id="cvp" type="range" min="0" max="25" value="5"></div>
     <h3>Perfusion</h3>
     <div class="row"><label>ScvO₂ <b id="v_scvo2"></b></label><input id="scvo2" type="range" min="30" max="95" value="77"></div>
@@ -136,19 +137,20 @@ function read(){
   if(d.dbp>=d.sbp) d.dbp=d.sbp-1;
   d.map=Math.round((d.sbp+2*d.dbp)/3);
   d.pp=d.sbp-d.dbp;
+  d.ppvValid=!!($('ppvValid')&&$('ppvValid').checked);
   return d;
 }
 
 function score(d){
   const s={hypovolemic:0,cardiogenic:0,pe:0,tamponade:0,ptx:0,septic_v:0,septic_c:0,ards_leak:0,neurogenic:0};
-  if(d.ppv>13) s.hypovolemic+=3;
+  if(d.ppvValid&&d.ppv>13) s.hypovolemic+=3;
   if(d.cvp<6) s.hypovolemic+=3;
   if(d.scvo2<65) s.hypovolemic+=2;
   if(d.hr>100&&d.sbp<90) s.hypovolemic+=2;
   if(d.pp<30) s.hypovolemic+=1;
   if(d.scvo2>75) s.hypovolemic-=5;
   if(d.cvp>14) s.cardiogenic+=4;
-  if(d.ppv<10) s.cardiogenic+=3;
+  if(d.ppvValid&&d.ppv<10) s.cardiogenic+=3;
   if(d.scvo2<55) s.cardiogenic+=3;
   if(d.hr>100&&d.sbp<90) s.cardiogenic+=2;
   if(d.pp<30) s.cardiogenic+=2;
@@ -156,7 +158,7 @@ function score(d){
   if(d.scvo2<60) s.pe+=3;
   if(d.hr>110) s.pe+=2;
   if(d.cvp>15) s.tamponade+=4;
-  if(d.ppv>13) s.tamponade+=3;
+  if(d.ppvValid&&d.ppv>13) s.tamponade+=3;
   if(d.scvo2<60) s.tamponade+=3;
   if(d.scvo2>72) s.septic_v+=5;
   if(d.cvp<10) s.septic_v+=2;
@@ -168,7 +170,7 @@ function score(d){
   if(d.cvp>=8&&d.cvp<=12) s.ards_leak+=2;
   if(d.hr<80&&d.sbp<90) s.neurogenic+=5;
   if(d.cvp<5) s.neurogenic+=3;
-  if(d.ppv>13) s.neurogenic+=2;
+  if(d.ppvValid&&d.ppv>13) s.neurogenic+=2;
   if(d.scvo2>=65&&d.scvo2<=75&&d.lactate<3) s.neurogenic+=2;
   if(d.ivc==='small'){s.hypovolemic+=5;s.septic_v+=3;s.neurogenic+=4;}
   if(d.ivc==='plethoric'){s.cardiogenic+=5;s.pe+=5;s.tamponade+=5;s.septic_c+=4;s.hypovolemic-=10;}
@@ -199,10 +201,12 @@ function actions(d,pct){
   if(d.luso==='ptx') list.push(['crit','No lung sliding with a barcode sign. Decompress the chest now. This is not a pulmonary embolus.']);
   if(d.rvs==='tamponade') list.push(['crit','Chamber collapse. This needs pericardial drainage, not a fluid bolus.']);
   if(d.map<65) list.push(['crit','MAP is '+d.map+'. The first pressure drug is norepinephrine, aimed above 65.']);
+  if(top==='septic_v'||top==='septic_c'||top==='ards_leak') list.push(['crit','Take blood cultures, then start an antibiotic for the likely source. Do not wait for the ultrasound.']);
   if(d.rvs==='dilated'&&d.luso!=='ptx') list.push(['dx','Dilated right ventricle. Get a CT pulmonary angiogram if the patient can travel. Do not give a thrombolytic unless a massive embolus is confirmed and the pressure is falling.']);
   if(top==='cardiogenic') list.push(['dx','Poor left-ventricular contraction. Get an ECG and a troponin. Mechanical support is for refractory cardiogenic shock, not the first step.']);
   if(wet) list.push(['crit','Do not give a fluid bolus. The cava, the lungs, or the right heart say the patient is already full or obstructed.']);
-  else if(d.ppv>13&&d.cvp<10&&d.luso==='alines') list.push(['','A fluid challenge of 250–500 mL is reasonable. Repeat the lung ultrasound before a second bolus.']);
+  else if(d.ppvValid&&d.ppv>13&&d.cvp<10&&d.luso==='alines') list.push(['','PPV says a 250–500 mL fluid challenge is reasonable. Repeat the lung ultrasound before a second bolus.']);
+  else if(d.ivc==='small'&&d.luso==='alines'&&d.cvp<8) list.push(['','The cava is small and the lungs are dry. A 250–500 mL challenge is reasonable. PPV is not being used for this decision.']);
   if(d.lvc==='hypo'&&d.scvo2<65) list.push(['','After the pressure is supported, dobutamine can raise the output. Do not start milrinone while the MAP is below 65.']);
   if(top==='pe'&&d.scvo2<65) list.push(['','Support the pressure with norepinephrine. Dobutamine is a later option for a failing right ventricle, and only after the MAP is restored.']);
   if((top==='septic_v'||d.dbp<50)&&d.map<65&&d.scvo2>70) list.push(['','Vasodilated shock. Add vasopressin rather than pushing norepinephrine above about 0.25–0.5 mcg/kg/min.']);
@@ -217,9 +221,11 @@ function badges(d){
   const out=[];
   const obstructed=d.rvs!=='normal'||d.ivc==='plethoric'||d.luso==='blines'||d.luso==='ptx';
   if(obstructed) out.push(['bad','Do not fill this patient']);
-  else if(d.ppv>13&&d.cvp<10) out.push(['ok','May respond to fluid, if PPV is valid']);
+  else if(d.ppvValid&&d.ppv>13&&d.cvp<10) out.push(['ok','May respond to fluid']);
+  else if(!d.ppvValid&&d.ivc==='small'&&d.luso==='alines') out.push(['warn','Small cava. PPV is not being used']);
   else out.push(['warn','A fluid bolus is unlikely to help']);
-  if(d.ppv>13&&obstructed) out.push(['bad blink','PPV is high but the right heart or the lungs disagree']);
+  if(!d.ppvValid) out.push(['warn','PPV is off. The number is ignored']);
+  if(d.ppvValid&&d.ppv>13&&obstructed) out.push(['bad blink','PPV is high but the right heart or the lungs disagree']);
   if(d.scvo2<60) out.push(['bad','Low ScvO₂: delivery is not meeting demand']);
   else if(d.scvo2>75) out.push(['warn','High ScvO₂: vasodilation or poor extraction']);
   if(d.luso==='blines') out.push(['warn','Bilateral B-lines: hydrostatic edema']);
@@ -251,6 +257,7 @@ function draw(){
 function applyPreset(id){
   const p=presets[id];
   ids.forEach(key=>{$(key).value=p[key];});
+  $('ppvValid').checked=true;
   document.querySelectorAll('.presets button[data-id]').forEach(b=>b.classList.toggle('on',b.dataset.id===id));
   draw();
 }
@@ -293,6 +300,7 @@ ids.forEach(id=>$(id).addEventListener('input',()=>{
   document.querySelectorAll('.presets button[data-id]').forEach(b=>b.classList.remove('on'));
   draw();
 }));
+$('ppvValid').addEventListener('change',draw);
 document.querySelectorAll('.presets button[data-id]').forEach(b=>b.onclick=()=>applyPreset(b.dataset.id));
 draw();
 </script>
