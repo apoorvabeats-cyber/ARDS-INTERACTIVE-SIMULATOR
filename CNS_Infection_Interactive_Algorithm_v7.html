@@ -196,6 +196,18 @@ Imaging is selected when structural assessment is needed or LP is deferred.
 <label class="check"><input id="crypto" type="checkbox">Cryptococcal antigen positive</label>
 <label class="check"><input id="hsv" type="checkbox">HSV PCR positive</label>
 </div>
+<div>
+<label>Fungus already identified</label>
+<select id="fungus">
+<option value="">Not identified</option>
+<option value="crypto">Cryptococcus</option>
+<option value="candida">Candida</option>
+<option value="aspergillus">Aspergillus</option>
+<option value="mucor">Mucorales</option>
+<option value="cocci">Coccidioides</option>
+<option value="histo">Histoplasma</option>
+</select>
+</div>
 
 <button class="primary" onclick="analyzeCSF()">ANALYZE CSF →</button>
 <button class="secondary" onclick="show('route')">← BACK</button>
@@ -350,7 +362,15 @@ return result(diag(
 'CSF microbiology supports bacterial meningitis. Do not delay appropriate antimicrobial therapy.'
 ));
 
-if($('crypto').checked)
+const fungus=$('fungus').value;
+if(fungus==='candida'||fungus==='aspergillus'||fungus==='mucor'||fungus==='cocci'||fungus==='histo')
+return result(diag(
+fungus,
+{candida:'Candida meningitis',aspergillus:'CNS aspergillosis',mucor:'Mucormycosis',cocci:'Coccidioidal meningitis',histo:'Histoplasma meningitis'}[fungus],
+'The identified fungus decides the drug. These regimens are not interchangeable.'
+));
+
+if($('crypto').checked||fungus==='crypto')
 return result(diag(
 'crypto',
 'Cryptococcal meningitis',
@@ -608,6 +628,11 @@ let name={
 bacterial:'Bacterial Meningitis',
 tb:'Tuberculous Meningitis',
 crypto:'Cryptococcal Meningitis',
+candida:'Candida Meningitis',
+aspergillus:'CNS Aspergillosis',
+mucor:'Mucormycosis',
+cocci:'Coccidioidal Meningitis',
+histo:'Histoplasma Meningitis',
 hsv:'HSV Encephalitis',
 viral:'Possible viral meningoencephalitis',
 abscess:'Brain Abscess',
@@ -618,6 +643,11 @@ let intro={
 bacterial:'Start appropriate empiric parenteral antibiotics promptly; obtain microbiology without harmful delay and consider adjunctive dexamethasone when indicated.',
 tb:'Start multidrug anti-tubercular therapy using weight-based dosing and adjunctive corticosteroid therapy with guideline-directed taper.',
 crypto:'Assess opening pressure, neurological status and immune status; begin guideline-directed antifungal induction therapy and actively manage symptomatic raised ICP.',
+candida:'Use liposomal amphotericin, remove devices, and do not rely on an echinocandin for Candida in the CSF.',
+aspergillus:'Voriconazole is the CNS drug. Fluconazole does not treat Aspergillus.',
+mucor:'Liposomal amphotericin at the CNS dose, plus surgery. Voriconazole does not treat Mucorales.',
+cocci:'A high-dose azole, usually for life. This fungus is not a cause of lymphocytic meningitis without exposure in the Americas.',
+histo:'Liposomal amphotericin first, then itraconazole. Echinocandins have no activity.',
 hsv:'Start IV acyclovir promptly when HSV encephalitis is suspected; adjust for renal function and monitor seizures and cerebral edema.',
 viral:'Keep acyclovir running if encephalitis is still plausible. Stop it only when HSV is unlikely.',
 abscess:'Start appropriate antimicrobial therapy and obtain urgent neurosurgical/source-control assessment when indicated.',
@@ -807,9 +837,66 @@ ${preg?'<li><strong>Pregnancy:</strong> flucytosine is teratogenic. Do not use t
 <ul>
 <li>Fluconazole 800 mg/day for about 8 weeks, then 200 mg/day for at least a year in HIV, and until immune recovery.</li>
 <li>In HIV, delay antiretroviral therapy for 4–6 weeks. Earlier treatment raises the risk of IRIS.</li>
+<li>In a transplant recipient, use the daily amphotericin schedule and reduce immunosuppression if the graft allows. Echinocandins do not treat Cryptococcus.</li>
 </ul>
 `;
 }
+
+if(t==='candida'){
+const fc=Math.round((Number($('weight').value)||70)*25);
+return `
+<h2>Candida meningitis</h2>
+<ul>
+<li><strong>Liposomal amphotericin B 5 mg/kg IV daily</strong>, with or without flucytosine 25 mg/kg (${fc} mg) every 6 hours.</li>
+<li>After the patient improves and the isolate is fluconazole-susceptible, step down to fluconazole 400–800 mg daily.</li>
+<li>Remove infected shunts and ventricular drains. Drugs rarely clear a device that stays in.</li>
+<li>Do not use an echinocandin as the CNS drug. Caspofungin, micafungin, and anidulafungin do not reach the CSF reliably.</li>
+<li>Continue until symptoms, CSF, and imaging have cleared. That is often several weeks, not a fixed 14 days.</li>
+</ul>`;
+}
+
+if(t==='aspergillus')
+return `
+<h2>CNS aspergillosis</h2>
+<ul>
+<li><strong>Voriconazole 6 mg/kg IV every 12 hours for two doses, then 4 mg/kg IV every 12 hours.</strong></li>
+<li>Check a trough. The usual target is about 2–5.5 mg/L. Watch the liver and look for a drug interaction before you start it.</li>
+<li>If voriconazole cannot be given, use liposomal amphotericin B 5 mg/kg IV daily.</li>
+<li>Drain or resect a lesion that a surgeon can reach.</li>
+<li>Fluconazole has no useful Aspergillus activity. An echinocandin is not primary CNS therapy.</li>
+</ul>`;
+
+if(t==='mucor')
+return `
+<h2>Mucormycosis involving the brain or orbit</h2>
+<ul>
+<li><strong>Liposomal amphotericin B 10 mg/kg IV daily.</strong> CNS disease uses this higher dose, not 5 mg/kg.</li>
+<li>Rhino-orbital-cerebral disease needs surgical debridement the same day. Antifungal drugs alone are not source control.</li>
+<li>Correct diabetic ketoacidosis. Stop deferoxamine. Reduce steroids if that is possible.</li>
+<li>Step down only after there is real improvement: isavuconazole 200 mg every 8 hours for 6 doses, then 200 mg daily, or delayed-release posaconazole 300 mg every 12 hours on day 1, then 300 mg daily.</li>
+<li><strong>Voriconazole, fluconazole, and the echinocandins do not treat Mucorales.</strong> A “fungal cover” of voriconazole is the wrong drug.</li>
+</ul>`;
+
+if(t==='cocci')
+return `
+<h2>Coccidioidal meningitis</h2>
+<ul>
+<li><strong>Fluconazole 800–1,200 mg daily</strong> is the usual start. The guideline floor is 400 mg, and most CNS disease is treated higher.</li>
+<li>Plan on lifelong treatment. Stopping is followed by relapse often enough that a trial off therapy needs a specialist and long follow-up.</li>
+<li>Intrathecal amphotericin is for failure. It is not the first drug.</li>
+<li>Hydrocephalus needs a shunt. The shunt does not replace the azole.</li>
+<li>This infection follows exposure in the Americas. Do not diagnose it from a lymphocytic CSF in a patient who has never been there.</li>
+</ul>`;
+
+if(t==='histo')
+return `
+<h2>Histoplasma meningitis</h2>
+<ul>
+<li><strong>Liposomal amphotericin B 5 mg/kg IV daily for 4–6 weeks.</strong></li>
+<li>Then itraconazole 200 mg two or three times daily for at least a year, and until the CSF abnormalities have cleared. Check a drug level.</li>
+<li>Fluconazole is inferior. Echinocandins have no activity against Histoplasma.</li>
+<li>Amphotericin is also the induction drug in pregnancy.</li>
+</ul>`;
 
 if(t==='hsv'){
 const acv=Math.round((Number($('weight').value)||70)*10);
