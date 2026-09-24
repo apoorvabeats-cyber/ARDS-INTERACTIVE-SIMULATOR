@@ -44,9 +44,9 @@
   <button type="button" id="next">Next</button>
 </nav>
 <script>
-var S={age:'60',sex:'male',ht:'170',wt:'70',scr:'1',uo:'50',eff:'25',where:'hospital',source:'vap',sev:'shock',recent:'no',prior:'none',org:'kleb',mech:'ndm',mic:'4',ast:'R',drug:'meropenem',inf:'extended',rrt:'none',load:'load',traj:'stable',vd:'increased',level:'no',identified:'yes',astYes:'yes',resp:'improving',control:'yes'};
+var S={age:'60',sex:'male',ht:'170',wt:'70',scr:'1',uo:'50',eff:'25',where:'hospital',source:'vap',sev:'shock',bact:'yes',blood:'no',srcx:'no',addMrsa:'no',addPseudo:'yes',addAna:'no',recent:'no',prior:'none',org:'kleb',mech:'ndm',mic:'4',ast:'R',drug:'meropenem',inf:'extended',rrt:'none',load:'load',traj:'stable',vd:'increased',level:'no',identified:'yes',astYes:'yes',resp:'improving',control:'yes',po:'no'};
 var stack=['pt'];
-var TITLE={pt:'Patient',bug:'Organism',drug:'Drug and dose',pk:'Exposure',plan:'Plan'};
+var TITLE={pt:'Patient',cover:'Empiric cover',bug:'Organism',drug:'Drug and dose',pk:'Exposure',plan:'Review'};
 function num(id){ var n=parseFloat(String(S[id]==null?'':S[id]).replace(',','.')); return Number.isFinite(n)?n:null; }
 function crcl(){
   var age=num('age'), wt=num('wt'), scr=num('scr'), ht=num('ht');
@@ -133,8 +133,10 @@ function judge(){
   if(block) return {bad:true, title:'Wrong place or wrong bug', lines:[block]};
   if(S.mech==='none'){
     if(S.org==='pseudomonas' && id==='meropenem') return {bad:false, title:'Active if susceptible', lines:['Pseudomonas needs an antipseudomonal drug. Ertapenem would not be one.']};
-    if(ORG[S.org][1]==='mrsa' && (id==='vancomycin'||id==='linezolid')) return {bad:false, title:id==='linezolid'&&S.source==='bsi'?'Weak for the blood':'Fits MRSA', lines:[DRUG[id][2], DRUG[id][3]]};
-    if(ORG[S.org][1]==='vre' && (id==='daptomycin'||id==='linezolid')) return {bad:false, title:'Fits VRE faecium', lines:[DRUG[id][2], DRUG[id][3]]};
+    if(ORG[S.org][1]==='mrsa' && (id==='vancomycin'||id==='linezolid')) return {bad:false, title:id==='linezolid'&&(S.source==='bsi'||S.source==='endo')?'Weak for the blood':'MRSA pathway', lines:[DRUG[id][2], DRUG[id][3]]};
+    if(ORG[S.org][1]==='mrsa' && id==='daptomycin') return {bad:false, title:'MRSA pathway', lines:[DRUG[id][2], DRUG[id][3]]};
+    if(ORG[S.org][1]==='vre' && id==='vancomycin') return {bad:true, title:'Vancomycin does not treat VRE', lines:['Use high-dose daptomycin or linezolid.']};
+    if(ORG[S.org][1]==='vre' && (id==='daptomycin'||id==='linezolid')) return {bad:false, title:'VRE pathway', lines:[DRUG[id][2], DRUG[id][3]]};
     if(ORG[S.org][1]==='mssa' && id==='cefepime') return {bad:true, title:'Too broad', lines:['MSSA bacteremia wants cefazolin or an anti-staphylococcal penicillin, not a Pseudomonas drug.']};
     return {bad:false, title:'No enzyme named', lines:['Use the narrowest susceptible drug for the site.', DRUG[id][3]]};
   }
@@ -351,6 +353,18 @@ function mechWarn(){
   if(m==='ampc' && S.org!=='enterobacter') return 'The classic AmpC risk here is Enterobacter, Klebsiella aerogenes, or Citrobacter freundii.';
   return '';
 }
+function needMrsa(){ return S.prior==='mrsa'||S.source==='line'||S.source==='ssti'||S.source==='endo'||(S.where==='hospital'&&S.source==='vap'); }
+function needPseudo(){ return S.prior==='dtr'||(S.where==='hospital'&&(S.source==='vap'||S.source==='iab'||S.source==='bsi')); }
+function needAna(){ return S.source==='iab'; }
+function coverMiss(){
+  var miss=[];
+  if(S.bact==='no') return ['Not bacterial'];
+  if(needMrsa()!==(S.addMrsa==='yes')) miss.push('MRSA');
+  if(needPseudo()!==(S.addPseudo==='yes')) miss.push('Pseudomonas');
+  if(needAna()!==(S.addAna==='yes')) miss.push('Anaerobes');
+  if((S.sev==='shock'||S.sev==='sepsis') && S.blood!=='yes') miss.push('Cultures');
+  return miss;
+}
 function empiric(){
   var lines=[];
   if(S.prior==='ndm'||S.prior==='vim'||S.prior==='imp') lines.push('A previous MBL is known. Do not rely on meropenem.');
@@ -375,9 +389,19 @@ function views(){
         +sel('where','Where',[['community','Community'],['hospital','Hospital']])
         +sel('source','Source',[['vap','HAP / VAP'],['cap','Severe community pneumonia'],['uti','Urine'],['iab','Abdomen'],['ssti','Skin'],['cns','Brain'],['bsi','Blood'],['line','Line'],['endo','Endocarditis']])
         +sel('sev','How sick',[['shock','Septic shock'],['sepsis','Sepsis'],['stable','Stable'],['low','Low chance of bacterial infection']])
+        +sel('bact','Is this likely bacterial?',[['yes','Yes'],['no','No']])
+        +sel('blood','Blood cultures taken',[['yes','Yes'],['no','Not yet']])
+        +sel('srcx','Source culture taken',[['yes','Yes'],['no','Not yet']])
         +box('age','Age')+sel('sex','Sex',[['male','Male'],['female','Female']])+box('ht','Height cm')+box('wt','Weight kg')+box('scr','Creatinine mg/dL')+box('uo','Urine mL/h')
         +sel('recent','Antibiotics in the last 90 days',[['no','No'],['yes','Yes']])
         +sel('prior','Previous resistant organism',[['none','None'],['mrsa','MRSA'],['esbl','ESBL'],['ampc','AmpC'],['kpc','KPC'],['oxa','OXA-48-like'],['ndm','NDM'],['vim','VIM'],['imp','IMP'],['dtr','Difficult Pseudomonas'],['crab','CRAB']])
+        +'</div><div id="live"></div>';
+    },
+    cover:function(){
+      return '<p class="hint">Add a drug only when this site needs it.</p><div class="grid">'
+        +sel('addMrsa','Add MRSA cover',[['yes','Yes'],['no','No']])
+        +sel('addPseudo','Add Pseudomonas cover',[['yes','Yes'],['no','No']])
+        +sel('addAna','Add anaerobic cover',[['yes','Yes'],['no','No']])
         +'</div><div id="live"></div>';
     },
     bug:function(){
@@ -412,6 +436,7 @@ function views(){
         +sel('astYes','Susceptibility is known',[['yes','Yes'],['no','No']])
         +sel('resp','Course',[['improving','Improving'],['stable','Unchanged'],['worsening','Worse']])
         +sel('control','Source controlled',[['yes','Yes'],['no','No']])
+        +sel('po','Can this become a tablet?',[['yes','Yes, eating and an oral drug exists'],['no','Stay on the vein']])
         +'</div><div id="live"></div><p><a href="index.html">All simulators</a></p>';
     }
   };
@@ -423,7 +448,22 @@ function livePt(){
   lines.unshift(band(c)+'.');
   var u=num('uo'), w=num('wt');
   if(u!=null&&w) lines.push('Urine '+(u/w).toFixed(2)+' mL/kg/h.');
-  return out('Creatinine clearance '+Math.round(c)+' mL/min', lines, c<30||c>130);
+  if(S.bact==='no'||S.sev==='low') lines.unshift('Not a bacterial start. Look for another diagnosis.');
+  if((S.sev==='shock'||S.sev==='sepsis') && S.blood!=='yes') lines.push('Shock. Take blood cultures, then give the antibiotic. Do not wait for the result.');
+  else if(S.sev==='stable' && S.blood!=='yes') lines.push('Stable. Take cultures before the first dose if it is safe to wait.');
+  if(S.source!=='bsi' && S.srcx!=='yes') lines.push('Take a culture from the site as well as the blood.');
+  if(S.prior!=='none') lines.push('A previous isolate is known. Start from that susceptibility, then narrow this culture.');
+  return out('Creatinine clearance '+Math.round(c)+' mL/min', lines, c<30||c>130||S.bact==='no'||((S.sev==='shock'||S.sev==='sepsis')&&S.blood!=='yes'));
+}
+function liveCover(){
+  if(S.bact==='no') return out('Do not start an antibiotic', ['Look for a noninfectious diagnosis.'], true);
+  var lines=[];
+  lines.push(needMrsa()?'MRSA cover is indicated.':'MRSA cover is not indicated.');
+  lines.push(needPseudo()?'Pseudomonas cover is indicated. Ertapenem does not count.':'Pseudomonas cover is not indicated.');
+  lines.push(needAna()?'Anaerobic cover is indicated for the abdomen.':'Anaerobic cover is not indicated.');
+  var miss=coverMiss().filter(function(x){ return x!=='Cultures' && x!=='Not bacterial'; });
+  if(!miss.length) lines.push('This empiric cover matches the site.');
+  return out(miss.length?'Change the cover':'Empiric cover matches', lines, miss.length>0);
 }
 function liveBug(){
   var warn=mechWarn();
@@ -439,7 +479,11 @@ function liveBug(){
   if(S.mech==='crab') lines.push('Sulbactam-durlobactam, or susceptible cefiderocol.');
   if(S.mech==='steno') lines.push('Not meropenem. Trimethoprim-sulfamethoxazole or susceptible cefiderocol.');
   if(pref.length) lines.push('Preferred: '+pref.map(function(x){return DRUG[x][0];}).join(', ')+'.');
-  lines.push('MIC '+(num('mic')==null?'—':num('mic'))+' mg/L. '+(S.ast==='R'?'Resistant.':S.ast==='pending'?'Result still pending.':'Use the MIC with the exposure.'));
+  if(ORG[S.org][1]==='mrsa') lines.push('MRSA pathway: vancomycin for blood or lung. Linezolid for lung. Daptomycin only if the lung is not the source.');
+  if(ORG[S.org][1]==='vre') lines.push('VRE pathway: daptomycin or linezolid. Not vancomycin.');
+  if(S.ast==='I') lines.push('Intermediate. Do not switch yet. Optimize the dose and the infusion, then recheck the exposure.');
+  if(S.ast==='pending') lines.push('No MIC yet. This stays empiric, from the site and any previous isolate.');
+  lines.push('MIC '+(num('mic')==null?'—':num('mic'))+' mg/L. '+(S.ast==='R'?'Resistant. Pick another active drug.':S.ast==='I'?'Intermediate. Optimize the exposure.':S.ast==='pending'?'Result still pending.':'Susceptible. Continue if the exposure is adequate.'));
   return out(ORG[S.org][0]+' · '+MECH[S.mech], lines, !!warn||S.ast==='R');
 }
 function liveDrug(){
@@ -453,6 +497,8 @@ function liveDrug(){
     lines.push('Infusion: '+r.infuseLabel+'.');
     lines.push('PK/PD target: '+r.pk+'.');
     if(r.note) lines.push(r.note);
+    if(S.ast==='I') lines.push('The report is intermediate. Keep this drug only if the exposure can be pushed above the MIC.');
+    if(S.ast==='pending') lines.push('The MIC is not back. Treat this dose as empiric.');
   }
   return out(j.title, lines, j.bad);
 }
@@ -514,7 +560,7 @@ function livePk(){
   if(idx==='fT>MIC'){
     var pct=Math.round(s.above*100);
     lines.push(pct+'% of this dose interval is above the MIC. The target in this patient is '+need+'%.');
-    lines.push(pct>=need?'Target met.':'Target missed. Extend the infusion, shorten the interval, or raise the dose the kidneys allow.');
+    lines.push(pct>=need?'Exposure is adequate. Continue.':'Exposure is not adequate. Change the dose, the interval, or the infusion, then recheck.');
   }
   if(idx==='AUC/MIC') lines.push('Vancomycin and the other AUC drugs need a measured level. The target for vancomycin is an AUC/MIC of 400–600.');
   if(idx==='Cmax/MIC'){
@@ -532,34 +578,38 @@ function livePk(){
   return out(idx, lines, judge().bad||missed);
 }
 function livePlan(){
+  if(S.bact==='no') return out('Stop', ['This is not a bacterial infection. Do not give an antibiotic. Look for another diagnosis.'], true);
   var j=judge();
   var lines=[];
-  lines.push(ORG[S.org][0]+', '+MECH[S.mech]+', MIC '+(num('mic')==null?'—':num('mic'))+'.');
-  lines.push(DRUG[S.drug][0]+'. '+doseLine());
+  if(S.resp==='worsening') lines.push('Worse at 24–72 hours. Recheck the source, the MIC, and the level. Do not add a drug until you know why.');
+  else if(S.resp==='stable') lines.push('Unchanged. Recheck the diagnosis and the source.');
+  else lines.push('Improving. Continue if the drug is active.');
+  if(S.control==='no') lines.push('Source is not controlled. Drain it, remove the line, debride, or relieve the obstruction.');
+  else lines.push('Source is controlled.');
+  if(S.identified==='yes' && S.astYes==='yes' && !j.bad && S.ast!=='R') lines.push('Culture is back. Narrow to '+DRUG[S.drug][0]+' and stop duplicate cover.');
+  else lines.push('Culture is incomplete. Reassess daily. Do not leave the broad drug on by habit.');
   if(j.bad) lines.push(j.title+'.');
-  if(S.resp==='worsening') lines.push('Worse: check the source, the MIC, the level, and a new bug before adding another drug.');
-  else if(S.control==='no') lines.push('The source is not controlled. Drainage or line removal matters more than a broader drug.');
-  else if(S.identified==='yes' && S.astYes==='yes' && !j.bad) lines.push('Narrow to this active drug. Stop duplicate cover. Ask whether the vein can become a tablet.');
-  else lines.push('Cultures are incomplete. Reassess before the broad drug becomes the habit.');
-  var c=crcl(); if(c!=null) lines.push('Clearance '+Math.round(c)+' mL/min.');
-  if(S.resp!=='worsening' && S.control==='yes' && S.identified==='yes'){
+  if(S.resp==='improving' && S.control==='yes' && S.identified==='yes' && !j.bad){
     var stop={cap:'5 days',vap:'7 days',uti:'5 to 7 days',iab:'about 4 days after source control',ssti:'5 to 7 days',bsi:'7 days for a gram-negative that is improving',line:'a short course once the line is out',cns:'often 2 to 3 weeks',endo:'weeks, by the organism'};
-    if(stop[S.source]) lines.push('Usual stop: '+stop[S.source]+'.');
-    if(S.source==='cap'||S.source==='uti'||S.source==='ssti') lines.push('If the patient is eating and an oral drug is active, the vein can stop.');
+    if(S.po==='yes' && (S.source==='cap'||S.source==='uti'||S.source==='ssti')) lines.push('Convert the vein to a tablet.');
+    else lines.push('Stay on the vein.');
+    if(stop[S.source]) lines.push('Usual stop: '+stop[S.source]+'. Then stop the antibiotic.');
   }
-  return out(S.resp==='worsening'||j.bad?'Change the plan':'Stewardship plan', lines, S.resp==='worsening'||S.control==='no'||j.bad);
+  var c=crcl(); if(c!=null) lines.push('Clearance '+Math.round(c)+' mL/min. '+doseLine());
+  var bad=S.resp==='worsening'||S.control==='no'||j.bad;
+  return out(bad?'Change the plan':'Stop when the course is done', lines, bad);
 }
 function refresh(){
   var id=stack[stack.length-1];
   var el=document.getElementById('live');
-  var html=id==='pt'?livePt():id==='bug'?liveBug():id==='drug'?liveDrug():id==='pk'?livePk():livePlan();
+  var html=id==='pt'?livePt():id==='cover'?liveCover():id==='bug'?liveBug():id==='drug'?liveDrug():id==='pk'?livePk():livePlan();
   if(el) el.innerHTML=html;
   var ok=id==='pt'?crcl()!=null:id==='bug'?num('mic')!=null:true;
   document.getElementById('next').disabled=id==='plan'?false:!ok;
 }
 function show(){
   var id=stack[stack.length-1];
-  var order=['pt','bug','drug','pk','plan'];
+  var order=['pt','cover','bug','drug','pk','plan'];
   document.getElementById('stepName').textContent=TITLE[id]+' · '+(order.indexOf(id)+1)+' of 5';
   document.getElementById('view').innerHTML=views()[id]();
   document.getElementById('back').disabled=stack.length<2;
@@ -576,7 +626,7 @@ document.getElementById('back').onclick=function(){ if(stack.length>1){ stack.po
 document.getElementById('next').onclick=function(){
   var id=stack[stack.length-1];
   if(id==='plan'){ location.href='index.html'; return; }
-  var order=['pt','bug','drug','pk','plan'];
+  var order=['pt','cover','bug','drug','pk','plan'];
   stack.push(order[order.indexOf(id)+1]);
   show();
 };
