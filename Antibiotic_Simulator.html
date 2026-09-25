@@ -62,17 +62,13 @@ canvas{width:100%;height:220px;background:#fff;border:2px solid #e2e8f0;border-r
 .clock.green{background:#d1fae5;color:#065f46}
 .matrix{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-weight:800;margin:8px 0}
 .matrix .yes{color:#065f46}.matrix .no{color:#64748b}
-.form-group{margin-bottom:14px}
+.group{margin:14px 0 6px;font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#0f766e}
 
 a{color:#0f766e}
 </style>
 </head>
 <body>
-<div class="header"><div><h1>Antibiotics</h1><p id="stepName">Source · 1 of 8</p></div><div class="presets">
-<button class="btn-preset" onclick="preset('hap')">Severe pneumonia</button>
-<button class="btn-preset" onclick="preset('uti')">Urine, ESBL</button>
-<button class="btn-preset" onclick="preset('crrt')">Shock on CRRT</button>
-</div></div>
+<div class="header"><div><h1>Antibiotics</h1><p id="stepName">Source · 1 of 8</p></div></div>
 <div class="layout">
 <div class="main-panel">
 <div id="step-content"></div>
@@ -86,7 +82,7 @@ a{color:#0f766e}
 </div>
 </div>
 <script>
-var S={age:'60',sex:'male',ht:'170',wt:'70',scr:'1',uo:'50',eff:'25',where:'hospital',source:'vap',sev:'shock',bact:'yes',blood:'yes',srcx:'yes',addMrsa:'yes',addPseudo:'yes',addAna:'no',allergy:'no',recent:'no',prior:'none',risks:[],sources:['vap'],press:'no',mental:'clear',clinical:'high',pctTrend:'same',culture:'pending',altDx:'no',ecmo:'no',liver:'no',albumin:'normal',icu:'no',immuno:'no',abxLong:'no',hospLong:'no',colon:'no',surg:'no',tpn:'no',cvc:'no',sbp:'',map:'',lact:'',temp:'',hr:'',rr:'',spo:'',tlc:'',anc:'',pct:'',crp:'',plt:'',why:'off',org:'kleb',mech:'esbl',mic:'',hasmic:'no',ast:'S',drug:'meropenem',inf:'extended',rrt:'none',load:'load',traj:'stable',vd:'increased',level:'no',identified:'yes',astYes:'yes',resp:'improving',control:'yes',po:'no'};
+var S={age:'60',sex:'male',ht:'170',wt:'70',scr:'1',uo:'50',eff:'25',where:'hospital',source:'vap',sev:'shock',bact:'yes',blood:'yes',srcx:'yes',addMrsa:'yes',addPseudo:'yes',addAna:'no',allergy:'no',recent:'no',prior:'none',risks:[],sources:[],press:'no',mental:'clear',clinical:'high',pctTrend:'same',culture:'pending',altDx:'no',ecmo:'no',liver:'no',albumin:'normal',icu:'no',immuno:'no',abxLong:'no',hospLong:'no',colon:'no',surg:'no',tpn:'no',cvc:'no',sbp:'',map:'',lact:'',temp:'',hr:'',rr:'',spo:'',tlc:'',anc:'',pct:'',crp:'',plt:'',why:'off',org:'kleb',mech:'esbl',mic:'',hasmic:'no',ast:'S',drug:'meropenem',inf:'extended',rrt:'none',load:'load',traj:'stable',vd:'increased',level:'no',identified:'yes',astYes:'yes',resp:'improving',control:'yes',po:'no'};
 function num(id){ var n=parseFloat(String(S[id]==null?'':S[id]).replace(',','.')); return Number.isFinite(n)?n:null; }
 function crcl(){
   var age=num('age'), wt=num('wt'), scr=num('scr'), ht=num('ht');
@@ -477,20 +473,66 @@ function mechWarn(){
   return '';
 }
 function hasRisk(x){ return S.risks && S.risks.indexOf(x)>=0; }
-function needMrsa(){ return S.prior==='mrsa'||hasRisk('MRSA')||hasSource('line')||hasSource('ssti')||hasSource('nec')||hasSource('endo')||hasSource('bone')||(S.where==='hospital'&&hasSource('vap')); }
-function needPseudo(){ return S.prior==='dtr'||hasRisk('DTR')||hasSource('neutro')||(S.where==='hospital'&&(hasSource('vap')||hasSource('iab')||hasSource('unk')||hasSource('postop'))); }
+function needMrsa(){ return S.prior==='mrsa'||hasRisk('MRSA')||!!(S.flags&&S.flags.mrsa); }
+function needPseudo(){ return S.prior==='dtr'||hasRisk('DTR')||S.neutro==='yes'||!!(S.flags&&S.flags.pseudo); }
 function needVre(){ return hasRisk('VRE')||S.prior==='vre'||(S.culture==='pos'&&ORG[S.org][1]==='vre'); }
-function needAna(){ return hasSource('iab')||hasSource('nec'); }
+function needAna(){ return !!(S.flags&&S.flags.ana); }
 function hasSource(x){ return !!(S.sources && S.sources.indexOf(x)>=0); }
+var SRC={
+  cap:{engine:'cap',where:'community'},
+  vap:{engine:'vap',where:'hospital',mrsa:1,pseudo:1},
+  asp:{engine:'asp',where:'community',ana:1,note:'Aspiration. Anaerobes belong. This is not the same as a lung abscess.'},
+  lungabs:{engine:'asp',where:'community',ana:1,note:'Drain an empyema. A lung abscess is weeks, not 5 days.'},
+  cyst:{engine:'uti',where:'community'},
+  pyelo:{engine:'uti',where:'community'},
+  urosep:{engine:'uti',where:'community'},
+  cauti:{engine:'uti',where:'hospital',pseudo:1,note:'Change the catheter and culture the new one.'},
+  chol:{engine:'iab',where:'community',ana:1,note:'Biliary infection needs source control, not a broader drug alone.'},
+  app:{engine:'iab',where:'community',ana:1},
+  perit:{engine:'iab',where:'community',ana:1},
+  iaabs:{engine:'iab',where:'community',ana:1,note:'Drain the abscess. The clock starts after that.'},
+  paiab:{engine:'iab',where:'hospital',ana:1,pseudo:1},
+  cell:{engine:'ssti',where:'community'},
+  skabs:{engine:'ssti',where:'community',mrsa:1,note:'Drain the abscess.'},
+  dfi:{engine:'ssti',where:'community',mrsa:1,ana:1,note:'A severe diabetic foot needs MRSA, gram-negatives, and anaerobes.'},
+  nec:{engine:'ssti',where:'community',mrsa:1,ana:1,nec:1,note:'Necrotizing infection is a surgical emergency.'},
+  wound:{engine:'ssti',where:'hospital',mrsa:1,ana:1},
+  men:{engine:'cns',where:'community'},
+  enceph:{engine:'cns',where:'community',note:'Start acyclovir 10 mg/kg IV every 8 hours, and adjust it for the kidneys. Keep a bacterial regimen until the spinal fluid says otherwise.'},
+  brainabs:{engine:'cns',where:'community',ana:1,note:'A brain abscess needs drainage when it is safe, then weeks of antibiotics, including anaerobes.'},
+  neuro:{engine:'neuro',where:'hospital',mrsa:1,pseudo:1,note:'After neurosurgery, ceftriaxone alone is the wrong drug. Externalize or remove the drain.'},
+  bact:{engine:'bsi',where:'community'},
+  clabsi:{engine:'line',where:'hospital',mrsa:1,note:'Remove the line.'},
+  endo:{engine:'endo',where:'community',mrsa:1},
+  prosth:{engine:'endo',where:'hospital',mrsa:1,note:'A device infection is not cured by antibiotics alone. Plan removal.'},
+  osteo:{engine:'bone',where:'community',mrsa:1},
+  septicj:{engine:'bone',where:'community',mrsa:1,note:'Drain the joint.'},
+  pji:{engine:'bone',where:'hospital',mrsa:1,note:'The operation decides the duration. Rifampin is later, not the first drug.'},
+  ssi:{engine:'ssti',where:'hospital',mrsa:1},
+  postsep:{engine:'unk',where:'hospital',pseudo:1},
+  device:{engine:'line',where:'hospital',mrsa:1,pseudo:1,note:'Remove the device.'},
+  neut:{engine:'unk',where:'hospital',neutro:1,pseudo:1},
+  trans:{engine:'unk',where:'hospital',neutro:1,pseudo:1,note:'Cover bacteria first. A transplant is not a reason to add an antifungal automatically.'},
+  immuno:{engine:'unk',where:'hospital',pseudo:1,note:'The threshold for Pseudomonas is lower. Still no automatic antifungal.'},
+  unk:{engine:'unk',where:'community'}
+};
 function syncPrimary(){
-  var order=['cns','endo','vap','iab','line','bone','uti','cap','ssti','unk'];
+  var order=['neuro','cns','endo','vap','asp','iab','line','bone','uti','cap','ssti','bsi','unk'];
+  var f={mrsa:0,pseudo:0,ana:0,neutro:0,nec:0,hospital:S.icu==='yes'};
+  (S.sources||[]).forEach(function(id){
+    var m=SRC[id]; if(!m) return;
+    if(m.mrsa) f.mrsa=1; if(m.pseudo) f.pseudo=1; if(m.ana) f.ana=1; if(m.neutro) f.neutro=1; if(m.nec) f.nec=1;
+    if(m.where==='hospital') f.hospital=1;
+  });
   var s='';
-  for(var i=0;i<order.length;i++) if(hasSource(order[i])){ s=order[i]; break; }
-  S.nec=hasSource('nec')?'yes':'no';
-  S.neutro=hasSource('neutro')?'yes':'no';
-  if(S.nec==='yes' && (s===''||s==='unk'||s==='ssti')) s='ssti';
+  for(var i=0;i<order.length;i++){
+    if((S.sources||[]).some(function(id){ return SRC[id]&&SRC[id].engine===order[i]; })){ s=order[i]; break; }
+  }
+  S.flags=f;
+  S.nec=f.nec?'yes':'no';
+  S.neutro=f.neutro?'yes':'no';
   S.source=s||'unk';
-  S.where=(hasSource('vap')||hasSource('line')||hasSource('postop')||hasSource('neutro')||S.icu==='yes')?'hospital':'community';
+  S.where=f.hospital?'hospital':'community';
 }
 function coverMiss(){
   var miss=[];
@@ -530,6 +572,7 @@ function empiricNow(){
   var src=S.source, hosp=S.where==='hospital', shock=S.sev==='shock'||S.sev==='sepsis';
   var broad=S.recent==='yes'||S.sev==='shock';
   var gnb=null, lines=[], hard=false;
+  if(hasSource('cyst') && S.sources.length===1 && !shock) return ['Uncomplicated cystitis. A tablet for 3 to 5 days. Do not start a Pseudomonas drug.'];
   var p=S.prior;
   if(p==='none'){
     if(hasRisk('CRAB')) p='crab';
@@ -547,17 +590,19 @@ function empiricNow(){
   else if(p==='ampc') gnb='cefepime';
   else if(p==='dtr') gnb='ceftolozane';
   else if(p==='crab') gnb='sulbactam';
-  else if(S.nec==='yes') gnb='piptazo';
+  else if(S.nec==='yes' || (src==='ssti' && needAna())) gnb='piptazo';
   else if(S.neutro==='yes') gnb=broad?'meropenem':'cefepime';
+  else if(src==='neuro') gnb=broad?'meropenem':'cefepime';
   else if(src==='unk') gnb=hosp?(broad?'meropenem':'cefepime'):'ctx';
   else if(src==='bone') gnb='ctx';
   else if(src==='vap'||(src==='uti'&&hosp)||(src==='bsi'&&hosp)) gnb=broad?'meropenem':'cefepime';
   else if(src==='iab') gnb=hosp?'meropenem':'piptazo';
+  else if(src==='asp') gnb='ctx';
   else if(src==='cap'||src==='uti'||src==='endo'||src==='bsi') gnb='ctx';
   else if(src==='cns') gnb='ctx-cns';
-  else if(src==='ssti'&&shock) gnb='piptazo';
+  else if(src==='ssti') gnb='cefazolin';
   var ana=S.allergy==='anaphylaxis';
-  var ordinary=gnb==='meropenem'||gnb==='cefepime'||gnb==='piptazo'||gnb==='ctx'||gnb==='ctx-cns';
+  var ordinary=gnb==='meropenem'||gnb==='cefepime'||gnb==='piptazo'||gnb==='ctx'||gnb==='ctx-cns'||gnb==='cefazolin';
   var special=gnb==='aztavi'||gnb==='ceftazavi'||gnb==='ceftolozane'||gnb==='sulbactam';
   if(ana && special){
     lines.push('The organism from before still needs a beta-lactam. Do not give it until the allergy is reviewed.');
@@ -566,7 +611,10 @@ function empiricNow(){
     if(gnb==='ctx-cns'){
       lines.push('Do not give ceftriaxone. Keep vancomycin. Ask before any beta-lactam, including meropenem.');
       gnb=null;
-    } else if(src==='cap'){
+    } else if(gnb==='cefazolin'){
+      lines.push('Penicillin anaphylaxis. Do not give cefazolin. Vancomycin replaces it.');
+      gnb=null;
+    } else if(src==='cap'||src==='asp'){
       lines.push(doseFor('levofloxacin')+' This replaces ceftriaxone.');
       gnb=null;
     } else {
@@ -578,17 +626,19 @@ function empiricNow(){
   if(gnb==='ctx' && src==='cap') lines.push(doseFor('azithromycin')+' This is only the atypical partner.');
   if(gnb && DRUG[gnb]) lines.push(doseFor(gnb));
   if(needAna() && gnb!=='meropenem' && gnb!=='piptazo' && gnb!=='aztavi') lines.push(doseFor('metronidazole')+' This is the anaerobe drug. It does not replace the other one.');
-  if(needVre() && src!=='cns'){
-    if(src==='vap'||src==='cap') lines.push(doseFor('linezolid')+' Previous VRE. Not vancomycin, and not daptomycin in the lung.');
+  if(needVre() && src!=='cns' && src!=='neuro'){
+    if(src==='vap'||src==='cap'||src==='asp') lines.push(doseFor('linezolid')+' Previous VRE. Not vancomycin, and not daptomycin in the lung.');
     else lines.push(doseFor('daptomycin')+' Previous VRE. Not vancomycin.');
-  } else if((needMrsa()||S.prior==='mrsa') && src!=='cns') lines.push(doseFor('vancomycin')+' This is the MRSA drug.');
-  if(src==='cns'){
-    lines.push(doseFor('vancomycin')+' This is for resistant pneumococcus, not MRSA.');
-    if((num('age')||0)>=50 && !ana) lines.push(doseFor('ampicillin')+' For Listeria.');
-    if((num('age')||0)>=50 && ana) lines.push('Age 50 or more, but penicillin anaphylaxis: do not add ampicillin.');
+  } else if((needMrsa()||S.prior==='mrsa'||(ana && src==='ssti')) && src!=='cns' && src!=='neuro') lines.push(doseFor('vancomycin')+' This is the MRSA drug.');
+  if(src==='cns'||src==='neuro'){
+    if(needVre()) lines.push(doseFor('linezolid')+' Previous VRE. Vancomycin will not treat it, and daptomycin does not enter this space.');
+    else lines.push(doseFor('vancomycin')+(src==='neuro'?' This is for the hospital gram-positive, including MRSA.':' This is for resistant pneumococcus, not MRSA.'));
+    if(src==='cns' && !hasSource('brainabs') && (num('age')||0)>=50 && !ana) lines.push(doseFor('ampicillin')+' For Listeria.');
+    if(src==='cns' && !hasSource('brainabs') && (num('age')||0)>=50 && ana) lines.push('Age 50 or more, but penicillin anaphylaxis: do not add ampicillin.');
   }
   if(src==='endo' && !needVre() && !(needMrsa()||S.prior==='mrsa')) lines.push(doseFor('vancomycin')+' Until the culture names the gram-positive.');
   if(src==='line' && !needMrsa() && !needVre()) lines.push(doseFor('vancomycin')+' Then remove the line.');
+  (S.sources||[]).forEach(function(id){ if(SRC[id]&&SRC[id].note) lines.push(SRC[id].note); });
   return lines;
 }
 function series(){
@@ -723,7 +773,7 @@ function infectionProb(){
 function candidaRisk(){
   var n=0;
   ['immuno','abxLong','hospLong','colon','surg','tpn','cvc'].forEach(function(k){ if(S[k]==='yes') n++; });
-  if(hasSource('iab')) n++;
+  if((S.sources||[]).some(function(id){ return SRC[id]&&SRC[id].engine==='iab'; })) n++;
   return n>=4?'High':n>=2?'Intermediate':'Low';
 }
 function go(n){ S.step=n; render(); }
@@ -736,9 +786,9 @@ function renderStepper(){
 function stepHtml(){
   var n=S.step, h='';
   if(n===1){
-    var srcs=[['cap','Community lung'],['vap','Hospital lung'],['uti','Urine'],['iab','Abdomen'],['cns','Brain'],['ssti','Skin'],['nec','Necrotizing skin'],['endo','Valve or blood'],['line','Catheter'],['bone','Bone or joint'],['postop','After surgery'],['neutro','Neutropenic'],['unk','Unknown']];
-    h='<div class="step-title">Where is the infection?</div><div class="step-desc">Tap every source that is real. The drug follows the source, not the procalcitonin.</div><div class="checkbox-group">'
-      +srcs.map(function(s){return '<div class="chip-option'+onSrc(s[0])+'" data-src="'+s[0]+'">'+s[1]+'</div>';}).join('')+'</div>'
+    var groups=[['A','Respiratory',[['cap','CAP'],['vap','HAP / VAP'],['asp','Aspiration pneumonia'],['lungabs','Lung abscess / empyema']]],['B','Urinary',[['cyst','Cystitis'],['pyelo','Pyelonephritis / complicated UTI'],['urosep','Urosepsis'],['cauti','CAUTI']]],['C','Intra-abdominal',[['chol','Cholangitis / cholecystitis'],['app','Appendicitis / diverticulitis'],['perit','Peritonitis'],['iaabs','Intra-abdominal abscess'],['paiab','Post-operative abdominal infection']]],['D','Skin and soft tissue',[['cell','Cellulitis'],['skabs','Abscess'],['dfi','Diabetic foot infection'],['nec','Necrotizing soft-tissue infection'],['wound','Infected wound / pressure injury']]],['E','CNS',[['men','Meningitis'],['enceph','Encephalitis'],['brainabs','Brain abscess'],['neuro','Post-neurosurgical meningitis / ventriculitis']]],['F','Bloodstream / endovascular',[['bact','Bacteremia'],['clabsi','CLABSI / CRBSI'],['endo','Infective endocarditis'],['prosth','Prosthetic / device infection']]],['G','Bone and joint',[['osteo','Osteomyelitis'],['septicj','Septic arthritis'],['pji','Prosthetic joint infection']]],['H','Post-operative / healthcare-associated',[['ssi','Surgical-site infection'],['postsep','Post-operative sepsis'],['device','Device-associated infection']]],['I','Immunocompromised / special host',[['neut','Neutropenic sepsis'],['trans','Transplant-associated infection'],['immuno','Immunosuppression-associated infection']]],['J','Unknown source',[['unk','Sepsis / septic shock — source not identified']]]];
+    h='<div class="step-title">Where is the infection?</div><div class="step-desc">Tap every source that fits.</div>'
+      +groups.map(function(g){ return '<div class="group">'+g[0]+'. '+g[1]+'</div><div class="checkbox-group">'+g[2].map(function(s){return '<div class="chip-option'+onSrc(s[0])+'" data-src="'+s[0]+'">'+s[1]+'</div>';}).join('')+'</div>'; }).join('')
       +'<div class="form-group" style="margin-top:14px"><label class="form-label">Penicillin allergy</label><div class="radio-group">'+chip('allergy','no','None')+chip('allergy','rash','Rash only')+chip('allergy','anaphylaxis','Anaphylaxis')+'</div></div>';
   }
   if(n===2){
@@ -840,8 +890,8 @@ function hardCourse(){
   return false;
 }
 function oralLine(){
-  var vein=hasSource('endo')||hasSource('cns')||hasSource('bone')||hasSource('vap')||hasSource('nec')||S.source==='endo'||S.source==='cns'||S.source==='bsi'||S.source==='line'||S.source==='vap'||S.source==='bone';
-  var tablet=hasSource('uti')||hasSource('ssti')||hasSource('cap')||S.source==='uti'||S.source==='ssti'||S.source==='cap';
+  var vein=S.source==='endo'||S.source==='cns'||S.source==='neuro'||S.source==='bone'||S.source==='vap'||S.source==='line'||S.source==='asp'||S.nec==='yes';
+  var tablet=S.source==='uti'||S.source==='ssti'||S.source==='cap';
   if(S.eating!=='yes') return '';
   if(vein||!tablet) return 'This site stays on the vein. Blood, brain, a valve, bone, and hospital lung do not become a tablet.';
   if(S.resp!=='improving'||S.control!=='yes') return 'Not yet. The patient has to be better, eating, and the source controlled.';
@@ -871,7 +921,11 @@ function durationLines(){
   if(S.sev==='low') return {bad:true, lines:['This is not a reason to start an antibiotic.']};
   if(S.control!=='yes'){ lines.push('The source is not controlled. Do not start the clock.'); bad=true; }
   if(S.resp==='worsening'){ lines.push('The patient is worse. Do not stop on a calendar.'); bad=true; }
-  if(src==='endo') text='Endocarditis is weeks. The valve and the organism decide the stop.';
+  if(hasSource('lungabs')) text='A lung abscess or empyema is weeks, and only after it is drained.';
+  else if(hasSource('brainabs')) text='A brain abscess is often 4 to 8 weeks, after drainage when it is safe.';
+  else if(hasSource('pji')) text='A prosthetic joint is decided by the operation. Antibiotics alone do not cure a retained prosthesis.';
+  else if(hasSource('cyst') && S.sources.length===1) text='Uncomplicated cystitis is 3 to 5 days.';
+  else if(src==='endo') text='Endocarditis is weeks. The valve and the organism decide the stop.';
   else if(src==='cns') text='Meningitis is often 2 to 3 weeks.';
   else if(src==='bone') text='Bone and joint infection is often 4 to 6 weeks, and longer if the bone is not drained.';
   else if((kind==='mrsa'||kind==='mssa') && (src==='bsi'||src==='line'||src==='endo')) text='Staphylococcus aureus in the blood is at least 14 days from the first negative culture, after a clear echo and line removal.';
