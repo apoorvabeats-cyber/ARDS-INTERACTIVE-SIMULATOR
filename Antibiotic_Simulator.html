@@ -163,7 +163,8 @@ var DRUG={
   metronidazole:['Metronidazole','AUC/MIC','Nitroimidazole. Anaerobes only. Not automatic for every aspiration.','It does not treat gram-negative aerobes. Neuropathy if the course is long.'],
   ampsulba:['Ampicillin-sulbactam','fT>MIC','Aspiration without a separate abscess, and some skin or abdominal infections.','A penicillin. No Pseudomonas activity.'],
   clindamycin:['Clindamycin','AUC/MIC','Toxin suppression in necrotizing infection. Not MRSA treatment by itself.','C. difficile. Liver clears it.'],
-  polymyxin:['Polymyxin B','AUC/MIC','Polymyxin. Last drug for some carbapenem-resistant gram-negatives.','Kidney injury. It does not reach the urine.']
+  polymyxin:['Polymyxin B','AUC/MIC','Polymyxin B for a carbapenem-resistant organism outside the urine.','Kidney injury. It does not reach the urine.'],
+  colistin:['Colistin','AUC/MIC','Colistin for a carbapenem-resistant organism in the urine.','Kidney injury. Use it for urine, not for other sites.']
 };
 var BETA={meropenem:1,cefepime:1,piptazo:1,ceftazavi:1,merovab:1,imirele:1,ceftolozane:1,cefiderocol:1,aztavi:1,cazazi:1,sulbactam:1,aztreonam:1,ceftriaxone:1,cefazolin:1,ampicillin:1,ampsulba:1};
 function prefList(){ return PREF[S.mech]||[]; }
@@ -172,7 +173,8 @@ function siteBlock(id){
   if((id==='tigecycline'||id==='eravacycline'||id==='azithromycin') && (S.source==='bsi'||S.source==='endo'||S.source==='line')) return 'Blood levels are too low.';
   if(id==='daptomycin' && (S.source==='vap'||S.source==='cap')) return 'Surfactant in the lung inactivates daptomycin.';
   if(id==='cefazolin' && S.source==='cns') return 'Cefazolin does not treat meningitis.';
-  if(id==='polymyxin' && S.source==='uti') return 'Polymyxin B does not reach the urine.';
+  if(id==='polymyxin' && S.source==='uti') return 'Polymyxin B does not reach the urine. Use colistin.';
+  if(id==='colistin' && S.source!=='uti') return 'Colistin is the urine drug. Use polymyxin B at other sites.';
   if(id==='metronidazole' && S.source!=='iab' && S.source!=='cns') return 'Metronidazole does not treat this site.';
   if(id==='azithromycin' && S.source!=='cap') return 'A macrolide is not the drug for this site.';
   if(id==='ciprofloxacin' && (S.source==='vap'||S.source==='cap')) return 'Ciprofloxacin is a weak pneumonia drug.';
@@ -217,7 +219,9 @@ function judge(){
     if(ORG[S.org][1]==='mssa' && id==='cefepime') return {bad:true, title:'Too broad', lines:['MSSA bacteremia wants cefazolin or an anti-staphylococcal penicillin, not a Pseudomonas drug.']};
     return {bad:false, title:'No enzyme named', lines:['Use the narrowest susceptible drug for the site.', DRUG[id][3]]};
   }
-  if(id==='polymyxin') return {bad:true, title:'Last drug, not the first', lines:['Use a polymyxin only when the newer active drug cannot be given. It injures the kidneys, and polymyxin B does not treat urine.']};
+  if(id==='polymyxin' && S.source==='uti') return {bad:true, title:'Not for urine', lines:['Polymyxin B does not reach the urine. Use colistin.']};
+  if(id==='colistin' && S.source!=='uti') return {bad:true, title:'Not outside the urine', lines:['Use polymyxin B outside the urine.']};
+  if(id==='polymyxin'||id==='colistin') return {bad:false, title:id==='colistin'?'Colistin for urine':'Polymyxin B outside the urine', lines:['This is the carbapenem-resistant choice used here. Polymyxin B does not treat urine. Colistin does.']};
   if(pref.indexOf(id)>=0) return {bad:false, title:'Fits '+MECH[S.mech], lines:[DRUG[id][2], DRUG[id][3]]};
   if(S.mech==='esbl' && id==='piptazo') return {bad:true, title:'Not for ESBL in the blood', lines:['A susceptible piperacillin result is not enough for ESBL bacteremia. Use a carbapenem.']};
   if(S.mech==='ampc' && id==='piptazo') return {bad:true, title:'Tazobactam does not hold AmpC', lines:['Cefepime is the narrower active choice when the MIC allows it.']};
@@ -443,7 +447,14 @@ function regimen(){
     var kg=dw||wt||70;
     row=[Math.round(kg*1.25/10)*10,12];
     loadMg=Math.round(kg*2.5/10)*10;
-    note='Do not reduce this dose for a low creatinine. The kidney injury is a toxicity. Polymyxin B does not treat urine.';
+    note='Polymyxin B. Not adjusted for the creatinine. It does not reach the urine.';
+  } else if(id==='colistin'){
+    var mu=4.5;
+    if(t==='hd'||(c!=null&&c<15 && t!=='crrt' && t!=='arc')){ mu=2; after=t==='hd'; }
+    else if(c!=null&&c<30 && t!=='crrt' && t!=='arc') mu=2.5;
+    else if(c!=null&&c<50 && t!=='crrt' && t!=='arc') mu=3;
+    note='Colistin, as million IU of the prodrug. For urine. The load is 9 million IU.';
+    return {mg:mu, every:12, infH:0.5, load:'9 million IU IV once', maint:mu+' million IU IV every 12 hours'+(after?', plus a dose after dialysis':''), infuseLabel:'30 minutes', note:note, pk:'AUC/MIC'};
   }
   if(!row) return null;
   every=row[1];
@@ -618,9 +629,9 @@ function empiricNow(){
   else if(src==='cap'||src==='uti'||src==='endo'||src==='bsi') gnb='ctx';
   else if(src==='cns') gnb='ctx-cns';
   else if(src==='ssti') gnb='cefazolin';
-  if(hasRisk('CRE') && gnb){
-    lines.push('A carbapenem-resistant organism was found before. The enzyme is not known. Do not start meropenem or the usual beta-lactams until the old report, or this culture, names an active drug.');
-    gnb=null;
+  if(hasRisk('CRE')||S.prior==='ndm'||S.prior==='kpc'||S.prior==='oxa'||S.prior==='crab'||S.prior==='dtr'){
+    gnb=S.source==='uti'?'colistin':'polymyxin';
+    lines.push(S.source==='uti'?'A carbapenem-resistant organism was found before. The infection is in the urine, so this is colistin.':'A carbapenem-resistant organism was found before. This is not urine, so this is polymyxin B.');
   } else if(hasRisk('DTR') && (gnb==='cefepime'||gnb==='piptazo')){
     lines.push('Previous MDR Pseudomonas. Start meropenem and check the last susceptibility. Do not guess a newer drug.');
     gnb='meropenem';
@@ -727,7 +738,7 @@ function draw(){
 
 function labOf(id){
   var m=S.mech, kind=ORG[S.org][1];
-  if(id==='polymyxin') return (m==='kpc'||m==='oxa48'||m==='ndm'||m==='vim'||m==='imp'||m==='crab'||m==='dtr'||kind==='acineto')?'S':'R';
+  if(id==='polymyxin'||id==='colistin') return (m==='kpc'||m==='oxa48'||m==='ndm'||m==='vim'||m==='imp'||m==='crab'||m==='dtr'||kind==='acineto')?'S':'R';
   if(id==='metronidazole') return 'S';
   if(kind==='mssa') return (id==='cefazolin'||id==='vancomycin'||id==='linezolid'||id==='daptomycin')?'S':'R';
   if(kind==='mrsa') return (id==='vancomycin'||id==='linezolid'||id==='daptomycin')?'S':'R';
@@ -913,6 +924,8 @@ function stdDose(id){
   if(id==='sulbactam') return 'Sulbactam-durlobactam 1 g / 1 g IV, renal-adjusted';
   if(id==='tmp') return '8–12 mg/kg/day of trimethoprim, divided';
   if(id==='clindamycin') return '900 mg IV every 8 hours';
+  if(id==='polymyxin') return '2.5 mg/kg IV once, then 1.25 mg/kg every 12 hours';
+  if(id==='colistin') return '9 million IU IV once, then 4.5 million IU every 12 hours';
   return 'Standard adult dose';
 }
 function shownDose(id){
@@ -929,10 +942,9 @@ function bugPlan(ids){
   ids.forEach(function(id){ has[id]=1; });
   function add(id){ if(id && drugs.indexOf(id)<0) drugs.push(id); }
   var gn=null;
-  if(has.ndm) gn='aztavi';
-  else if(has.kpc||has.oxa) gn='ceftazavi';
-  else if(has.dtr) gn='ceftolozane';
-  else if(has.crab) gn='sulbactam';
+  var cro=has.kpc||has.ndm||has.oxa||has.dtr||has.crab;
+  var urine=S.source==='uti';
+  if(cro) gn=urine?'colistin':'polymyxin';
   else if(has.esbl) gn='meropenem';
   else if(has.pseudo && (has.bacteroides||has.anaerobe)) gn='piptazo';
   else if(has.pseudo||has.enterobacter||has.serratia) gn='cefepime';
@@ -947,11 +959,7 @@ function bugPlan(ids){
   if(has.strep && drugs.indexOf('ceftriaxone')<0 && drugs.indexOf('cefepime')<0 && drugs.indexOf('meropenem')<0) add('ceftriaxone');
   if(has.legionella) add('azithromycin');
   if(has.steno) add('tmp');
-  if(has.kpc) notes.push('KPC. Meropenem does not treat it. Ceftazidime-avibactam or meropenem-vaborbactam.');
-  if(has.ndm) notes.push('NDM. Not meropenem. Aztreonam-avibactam, or ceftazidime-avibactam plus aztreonam. Cefiderocol if it is susceptible.');
-  if(has.oxa) notes.push('OXA-48-like. Ceftazidime-avibactam.');
-  if(has.dtr) notes.push('Difficult Pseudomonas. Check the report. Pneumonia needs the 3 g ceftolozane dose.');
-  if(has.crab) notes.push('CRAB. Sulbactam-durlobactam. Colistin is a reserve drug, not the first.');
+  if(has.kpc||has.ndm||has.oxa||has.dtr||has.crab) notes.push(urine?'Carbapenem-resistant organism in the urine. Colistin. Polymyxin B does not reach the urine.':'Carbapenem-resistant organism outside the urine. Polymyxin B. Colistin is kept for urine.');
   if(has.acineto && !has.crab) notes.push('Ampicillin-sulbactam only if this Acinetobacter is susceptible.');
   if(has.enterobacter||has.serratia) notes.push('Ceftriaxone is the wrong drug. AmpC can appear on treatment. Use cefepime.');
   if(has.esbl && !has.pseudo && S.sev!=='shock') notes.push('Ertapenem 1 g every 24 hours is an alternative only if the patient is stable and Pseudomonas is not a concern.');
