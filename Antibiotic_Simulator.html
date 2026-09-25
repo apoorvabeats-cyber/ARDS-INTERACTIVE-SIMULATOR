@@ -44,7 +44,7 @@
   <button type="button" id="next">Next</button>
 </nav>
 <script>
-var S={age:'60',sex:'male',ht:'170',wt:'70',scr:'1',uo:'50',eff:'25',where:'hospital',source:'vap',sev:'shock',bact:'yes',blood:'no',srcx:'no',addMrsa:'no',addPseudo:'yes',addAna:'no',recent:'no',prior:'none',org:'kleb',mech:'ndm',mic:'4',ast:'R',drug:'meropenem',inf:'extended',rrt:'none',load:'load',traj:'stable',vd:'increased',level:'no',identified:'yes',astYes:'yes',resp:'improving',control:'yes',po:'no'};
+var S={age:'60',sex:'male',ht:'170',wt:'70',scr:'1',uo:'50',eff:'25',where:'hospital',source:'vap',sev:'shock',bact:'yes',blood:'no',srcx:'no',addMrsa:'no',addPseudo:'yes',addAna:'no',allergy:'no',recent:'no',prior:'none',org:'kleb',mech:'ndm',mic:'4',ast:'R',drug:'meropenem',inf:'extended',rrt:'none',load:'load',traj:'stable',vd:'increased',level:'no',identified:'yes',astYes:'yes',resp:'improving',control:'yes',po:'no'};
 var stack=['bact'];
 var TITLE={bact:'Bacterial?',sick:'How sick',site:'Site',micro:'Cultures',mdr:'MDR risk',cover:'Empiric cover',bug:'Mechanism',ast:'MIC',body:'Patient PK',drug:'Drug and dose',pk:'Exposure',review:'24–72 h',src:'Source control',narrow:'De-escalation',po:'IV to oral',stop:'Duration',non:'Not bacterial'};
 function route(){
@@ -120,8 +120,10 @@ var DRUG={
   tmp:['Trimethoprim-sulfamethoxazole','AUC/MIC','Stenotrophomonas. Dose on the trimethoprim.','Potassium rises, kidneys worsen, marrow falls, severe rash.'],
   sulbactam:['Sulbactam-durlobactam','fT>MIC','CRAB.','Still needs a susceptibility check.'],
   tigecycline:['Tigecycline','AUC/MIC','Some intra-abdominal CRE. Not the blood.','Low blood levels. Nausea. Higher death in some bloodstream uses.'],
-  eravacycline:['Eravacycline','AUC/MIC','Selected CRE or CRAB outside the blood.','Not a bloodstream drug.']
+  eravacycline:['Eravacycline','AUC/MIC','Selected CRE or CRAB outside the blood.','Not a bloodstream drug.'],
+  aztreonam:['Aztreonam','fT>MIC','Gram-negatives, including Pseudomonas, after penicillin anaphylaxis.','No anaerobic cover. An ESBL or a metallo-enzyme can destroy it.']
 };
+var BETA={meropenem:1,cefepime:1,piptazo:1,ceftazavi:1,merovab:1,imirele:1,ceftolozane:1,cefiderocol:1,aztavi:1,cazazi:1,sulbactam:1};
 function prefList(){ return PREF[S.mech]||[]; }
 function siteBlock(id){
   if((id==='tigecycline'||id==='eravacycline') && (S.source==='bsi'||S.source==='endo'||S.source==='line')) return 'Blood levels are too low.';
@@ -134,8 +136,11 @@ function siteBlock(id){
 function judge(){
   var id=S.drug, pref=prefList(), block=siteBlock(id);
   if(S.ast==='R') return {bad:true, title:'Lab says resistant', lines:['Do not use a drug the report marks resistant.']};
+  if(S.allergy==='anaphylaxis' && BETA[id]) return {bad:true, title:'Penicillin anaphylaxis', lines:['This is a beta-lactam. Do not start it until the allergy is reviewed. Aztreonam is the gram-negative substitute when the organism is still susceptible to it.']};
   if(block) return {bad:true, title:'Wrong place or wrong bug', lines:[block]};
   if(S.mech==='none'){
+    if(id==='aztreonam' && S.allergy!=='anaphylaxis') return {bad:true, title:'Not the first choice', lines:['Aztreonam is for penicillin anaphylaxis. It misses anaerobes and many resistant gram-negatives.']};
+    if(id==='aztreonam') return {bad:false, title:'Anaphylaxis substitute', lines:[DRUG.aztreonam[2], DRUG.aztreonam[3]]};
     if(S.org==='pseudomonas' && id==='meropenem') return {bad:false, title:'Active if susceptible', lines:['Pseudomonas needs an antipseudomonal drug. Ertapenem would not be one.']};
     if(ORG[S.org][1]==='mrsa' && (id==='vancomycin'||id==='linezolid')) return {bad:false, title:id==='linezolid'&&(S.source==='bsi'||S.source==='endo')?'Weak for the blood':'MRSA pathway', lines:[DRUG[id][2], DRUG[id][3]]};
     if(ORG[S.org][1]==='mrsa' && id==='daptomycin') return {bad:false, title:'MRSA pathway', lines:[DRUG[id][2], DRUG[id][3]]};
@@ -273,6 +278,12 @@ function regimen(){
     else if(c!=null && c<30 && t!=='crrt' && t!=='arc'){ az=1000; ev=8; }
     row=[az,ev];
     note=id==='cazazi'?'Give this aztreonam with the ceftazidime-avibactam dose for the same clearance, both over 3 hours.':'Avibactam is the matching product amount, in the same bag, over 3 hours.';
+  } else if(id==='aztreonam'){
+    var az2=2000, ev2=8;
+    if(t==='hd'|| (c!=null && c<10)){ az2=500; ev2=8; after=t==='hd'; }
+    else if(c!=null && c<30 && t!=='crrt' && t!=='arc'){ az2=1000; ev2=8; }
+    row=[az2,ev2];
+    note='No anaerobic cover. An ESBL or a metallo-enzyme can destroy it.';
   } else if(id==='vancomycin'){
     var kg=wt||70;
     loadMg=Math.min(3000, Math.round(kg*(S.sev==='shock'?25:20)/250)*250);
@@ -331,7 +342,7 @@ function regimen(){
   var pk=DRUG[id][1];
   if(pk==='fT>MIC'){
     if(S.inf==='continuous') infH=every;
-    else if(S.inf==='extended'||id==='cefiderocol'||id==='merovab'||id==='sulbactam'||id==='aztavi'||id==='cazazi') infH=Math.min(3, every-0.25);
+    else if(S.inf==='extended'||id==='cefiderocol'||id==='merovab'||id==='sulbactam'||id==='aztavi'||id==='cazazi'||id==='aztreonam') infH=Math.min(3, every-0.25);
     else if(id==='ceftazavi') infH=Math.min(S.inf==='extended'?3:2, every-0.25);
     else if(id==='ceftolozane') infH=S.inf==='extended'?Math.min(3, every-0.25):1;
     else infH=0.5;
@@ -402,7 +413,8 @@ function views(){
       +sel('prior','Known from before',[['none','None'],['mrsa','MRSA'],['esbl','ESBL'],['ampc','AmpC'],['kpc','KPC'],['oxa','OXA-48-like'],['ndm','NDM'],['vim','VIM'],['imp','IMP'],['dtr','Difficult Pseudomonas'],['crab','CRAB']])
       +sel('recent','Antibiotics in 90 days',[['no','No'],['yes','Yes']])
       +'</div><div id="live"></div>'; },
-    cover:function(){ return '<h2>What extra cover?</h2><div class="grid">'
+    cover:function(){ return '<h2>What do you start now?</h2><div class="grid">'
+      +sel('allergy','Penicillin allergy',[['no','None'],['rash','Rash only'],['anaphylaxis','Anaphylaxis']])
       +sel('addMrsa','MRSA',[['yes','Add'],['no','Do not add']])
       +sel('addPseudo','Pseudomonas',[['yes','Add'],['no','Do not add']])
       +sel('addAna','Anaerobes',[['yes','Add'],['no','Do not add']])
@@ -477,15 +489,71 @@ function liveMdr(){
   if(S.recent==='yes') lines.push('Recent antibiotics raise the chance of resistance.');
   return out(S.prior==='none'?'No prior MDR':'Use the previous organism', lines, S.prior!=='none');
 }
+function doseFor(id){
+  var prev=S.drug, r;
+  S.drug=id; r=regimen(); S.drug=prev;
+  if(!r) return DRUG[id][0];
+  var line=DRUG[id][0]+': '+r.load+', then '+r.maint+', over '+r.infuseLabel+'.';
+  if((id==='aztavi'||id==='cazazi') && r.note) line+=' '+r.note;
+  return line;
+}
+function empiricNow(){
+  var src=S.source, hosp=S.where==='hospital', shock=S.sev==='shock'||S.sev==='sepsis';
+  var broad=S.recent==='yes'||S.sev==='shock';
+  var gnb=null, lines=[], hard=false;
+  if(S.prior==='ndm'||S.prior==='vim'||S.prior==='imp') gnb='aztavi';
+  else if(S.prior==='kpc'||S.prior==='oxa') gnb='ceftazavi';
+  else if(S.prior==='esbl') gnb='meropenem';
+  else if(S.prior==='ampc') gnb='cefepime';
+  else if(S.prior==='dtr') gnb='ceftolozane';
+  else if(S.prior==='crab') gnb='sulbactam';
+  else if(src==='vap'||(src==='uti'&&hosp)||(src==='bsi'&&hosp)) gnb=broad?'meropenem':'cefepime';
+  else if(src==='iab') gnb=hosp?'meropenem':'piptazo';
+  else if(src==='cap'||src==='uti'||src==='endo'||src==='bsi') gnb='ctx';
+  else if(src==='cns') gnb='ctx-cns';
+  else if(src==='ssti'&&shock) gnb='piptazo';
+  var ana=S.allergy==='anaphylaxis';
+  var ordinary=gnb==='meropenem'||gnb==='cefepime'||gnb==='piptazo'||gnb==='ctx'||gnb==='ctx-cns';
+  var special=gnb==='aztavi'||gnb==='ceftazavi'||gnb==='ceftolozane'||gnb==='sulbactam';
+  if(ana && special){
+    lines.push('The organism from before still needs a beta-lactam. Do not give it until the allergy is reviewed.');
+    hard=true; gnb=null;
+  } else if(ana && ordinary){
+    if(gnb==='ctx-cns'){
+      lines.push('Do not give ceftriaxone. Keep vancomycin. Ask before any beta-lactam, including meropenem.');
+      gnb=null;
+    } else if(src==='cap'){
+      lines.push('Levofloxacin 750 mg IV daily, instead of ceftriaxone.');
+      gnb=null;
+    } else {
+      gnb='aztreonam';
+      if(src==='iab'||src==='ssti') lines.push('Metronidazole 500 mg IV every 8 hours. Aztreonam misses anaerobes.');
+    }
+  }
+  if(shock) lines.unshift('Shock. Draw the cultures, then give this now.');
+  if(gnb==='ctx') lines.push(src==='endo'?'Ceftriaxone 2 g IV daily.':'Ceftriaxone 2 g IV daily.');
+  if(gnb==='ctx' && src==='cap') lines.push('Azithromycin 500 mg IV daily.');
+  if(gnb==='ctx-cns') lines.push('Ceftriaxone 2 g IV every 12 hours.');
+  if(gnb && DRUG[gnb]) lines.push(doseFor(gnb));
+  if(needMrsa()||S.prior==='mrsa'){ if(src!=='cns') lines.push(doseFor('vancomycin')+' This is the MRSA drug.'); }
+  if(src==='cns'){
+    lines.push(doseFor('vancomycin')+' This is for resistant pneumococcus, not MRSA.');
+    if((num('age')||0)>=50 && !ana) lines.push('Age 50 or more: ampicillin 2 g IV every 4 hours for Listeria.');
+    if((num('age')||0)>=50 && ana) lines.push('Age 50 or more, but penicillin anaphylaxis: do not add ampicillin.');
+  }
+  if(src==='endo' && !(needMrsa()||S.prior==='mrsa')) lines.push(doseFor('vancomycin')+' Until the culture names the gram-positive.');
+  if(src==='line' && !needMrsa()) lines.push(doseFor('vancomycin')+' Then remove the line.');
+  return lines;
+}
 function liveCover(){
   if(S.bact==='no') return out('Do not start an antibiotic', ['Look for a noninfectious diagnosis.'], true);
-  var lines=[];
-  lines.push(needMrsa()?'MRSA cover is indicated.':'MRSA cover is not indicated.');
-  lines.push(needPseudo()?'Pseudomonas cover is indicated. Ertapenem does not count.':'Pseudomonas cover is not indicated.');
-  lines.push(needAna()?'Anaerobic cover is indicated for the abdomen.':'Anaerobic cover is not indicated.');
+  var lines=empiricNow();
+  if(S.allergy==='rash') lines.unshift('A rash without anaphylaxis is not a reason to avoid every beta-lactam.');
+  lines.push(needMrsa()?'MRSA cover belongs.':'MRSA cover does not belong.');
+  lines.push(needPseudo()?'Pseudomonas cover belongs. Ertapenem does not count.':'Pseudomonas cover does not belong.');
+  lines.push(needAna()?'Anaerobic cover belongs.':'Anaerobic cover does not belong.');
   var miss=coverMiss().filter(function(x){ return x!=='Cultures' && x!=='Not bacterial'; });
-  if(!miss.length) lines.push('This empiric cover matches the site.');
-  return out(miss.length?'Change the cover':'Empiric cover matches', lines, miss.length>0);
+  return out(miss.length?'Change the cover, then give this':'Give this now', lines, miss.length>0);
 }
 function liveBug(){
   var warn=mechWarn();
@@ -662,13 +730,21 @@ function livePo(){
   return out('Stay on the vein', ['No oral switch.']);
 }
 function liveStop(){
-  var stop={cap:'5 days',vap:'7 days',uti:'5 to 7 days',iab:'about 4 days after source control',ssti:'5 to 7 days',bsi:'7 days if a gram-negative is improving',line:'a short course once the line is out',cns:'often 2 to 3 weeks',endo:'weeks, by the organism'};
-  var lines=[];
-  if(S.control!=='yes') lines.push('Do not start the clock until the source is controlled.');
-  if(S.resp==='worsening') lines.push('Do not stop a failing course on a calendar.');
-  lines.push('Usual duration: '+(stop[S.source]||'by the syndrome')+'.');
-  if(S.control==='yes' && S.resp==='improving' && S.identified==='yes' && !judge().bad) lines.push('When that time is done, stop the antibiotic.');
-  return out('Then stop', lines, S.control!=='yes'||S.resp==='worsening');
+  var kind=ORG[S.org][1], src=S.source, lines=[], bad=false, text;
+  if(S.control!=='yes'){ lines.push('The source is not controlled. Do not start the clock.'); bad=true; }
+  if(S.resp==='worsening'){ lines.push('The patient is worse. Do not stop on a calendar.'); bad=true; }
+  if(src==='endo') text='Endocarditis is weeks. The organism and the valve decide the stop.';
+  else if(src==='cns') text='Meningitis is often 2 to 3 weeks. Some organisms run longer.';
+  else if(S.identified==='yes' && (kind==='mrsa'||kind==='mssa') && (src==='bsi'||src==='line')) text='Staphylococcus aureus in the blood is at least 14 days from the first negative culture, and only after the echo is clear and the line is out.';
+  else if(S.identified==='yes' && kind==='vre' && (src==='bsi'||src==='line')) text='Enterococcus in the blood is often 7 to 14 days once the source is gone. A valve is weeks.';
+  else if(src==='bsi') text='About 7 days only if this is uncomplicated gram-negative bacteremia. Staphylococcus aureus is at least 14 days.';
+  else {
+    var stop={cap:'5 days',vap:'7 days',uti:'5 to 7 days',iab:'about 4 days after source control',ssti:'5 to 7 days',line:'a short course once the line is out'};
+    text='Usual duration: '+(stop[src]||'by the syndrome')+'.';
+  }
+  lines.push(text);
+  if(!bad && S.resp==='improving') lines.push('When that time is done, stop the antibiotic.');
+  return out(bad?'Do not stop yet':'Then stop', lines, bad);
 }
 function liveNon(){ return out('Look elsewhere', ['No antibiotic. Search for a noninfectious diagnosis.'], true); }
 function refresh(){
