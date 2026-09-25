@@ -13,9 +13,11 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,B
 .header h1{margin:0;font-size:18px;letter-spacing:.04em;text-transform:uppercase}
 .presets{display:flex;gap:8px;flex-wrap:wrap}
 .btn-preset{background:#ecfdf5;color:#115e59;border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}
-.layout{display:grid;grid-template-columns:240px 1fr 320px;gap:14px;padding:14px;max-width:1180px;margin:0 auto}
-@media(max-width:980px){.layout{grid-template-columns:1fr}}
-.stepper,.main-panel,.output-panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px}
+.layout{max-width:760px;margin:0 auto;padding:14px 14px 92px}
+.main-panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+#stepName{margin:4px 0 0;font-weight:700}
+.btn-nav{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;margin:0;padding:10px;background:#fff;border-top:1px solid var(--border)}
+.btn-nav .btn{flex:1}
 .step-item{display:flex;gap:8px;align-items:center;padding:8px;border-radius:10px;cursor:pointer;font-weight:700;color:var(--secondary);font-size:14px}
 .step-item.active{background:#ecfdf5;color:var(--primary-dark)}
 .step-number{width:22px;height:22px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:12px;flex:none}
@@ -66,15 +68,22 @@ a{color:#0f766e}
 </style>
 </head>
 <body>
-<div class="header"><h1>Antibiotics</h1><div class="presets">
+<div class="header"><div><h1>Antibiotics</h1><p id="stepName">Source · 1 of 8</p></div><div class="presets">
 <button class="btn-preset" onclick="preset('hap')">Severe pneumonia</button>
 <button class="btn-preset" onclick="preset('uti')">Urine, ESBL</button>
 <button class="btn-preset" onclick="preset('crrt')">Shock on CRRT</button>
 </div></div>
 <div class="layout">
-<div class="stepper" id="stepper"></div>
-<div class="main-panel"><div id="step-content"></div><div class="btn-nav"><button class="btn btn-prev" id="btn-prev" type="button">Previous</button><button class="btn btn-next" id="btn-next" type="button">Next step</button></div></div>
-<div class="output-panel"><div class="output-title"><span>What to do</span><span class="badge badge-success" id="status-badge">Empiric</span></div><div id="recommendation-content"></div><div class="output-title">This patient</div><div id="summary-list"></div><p><a href="index.html">All simulators</a></p></div>
+<div class="main-panel">
+<div id="step-content"></div>
+<div id="answer">
+<div class="output-title"><span>What to do</span><span class="badge badge-success" id="status-badge">Empiric</span></div>
+<div id="recommendation-content"></div>
+<div id="summary-list"></div>
+<p><a href="index.html">All simulators</a></p>
+</div>
+<div class="btn-nav"><button class="btn btn-prev" id="btn-prev" type="button">Previous</button><button class="btn btn-next" id="btn-next" type="button">Next</button></div>
+</div>
 </div>
 <script>
 var S={age:'60',sex:'male',ht:'170',wt:'70',scr:'1',uo:'50',eff:'25',where:'hospital',source:'vap',sev:'shock',bact:'yes',blood:'yes',srcx:'yes',addMrsa:'yes',addPseudo:'yes',addAna:'no',allergy:'no',recent:'no',prior:'none',risks:[],sources:['vap'],press:'no',mental:'clear',clinical:'high',pctTrend:'same',culture:'pending',altDx:'no',ecmo:'no',liver:'no',albumin:'normal',icu:'no',immuno:'no',abxLong:'no',hospLong:'no',colon:'no',surg:'no',tpn:'no',cvc:'no',sbp:'',map:'',lact:'',temp:'',hr:'',rr:'',spo:'',tlc:'',anc:'',pct:'',crp:'',plt:'',why:'off',org:'kleb',mech:'esbl',mic:'',hasmic:'no',ast:'S',drug:'meropenem',inf:'extended',rrt:'none',load:'load',traj:'stable',vd:'increased',level:'no',identified:'yes',astYes:'yes',resp:'improving',control:'yes',po:'no'};
@@ -922,18 +931,20 @@ function renderRec(){
 }
 function render(){
   if(S.step<1) S.step=1; if(S.step>8) S.step=8;
-  renderStepper();
+  document.getElementById('stepName').textContent=STEPS[S.step-1]+' · '+S.step+' of '+STEPS.length;
   document.getElementById('step-content').innerHTML=stepHtml();
+  document.getElementById('answer').style.display=S.step>=5?'':'none';
   document.getElementById('btn-prev').disabled=S.step===1;
   document.getElementById('btn-next').textContent=S.step===8?'Done':'Next';
   renderRec();
+  window.scrollTo(0,0);
 }
 function preset(name){
   var base={step:1,bact:'yes',blood:'yes',srcx:'yes',allergy:'no',recent:'no',hasmic:'no',mic:'',inf:'extended',resp:'improving',control:'yes',po:'no',sex:'male',age:'60',ht:'170',wt:'80',uo:'40',eff:'25',clinical:'high',mental:'clear',pctTrend:'same',culture:'pending',altDx:'no',ecmo:'no',liver:'no',albumin:'normal',icu:'yes',immuno:'no',abxLong:'no',hospLong:'no',colon:'no',surg:'no',tpn:'no',cvc:'no',why:'off',vd:'increased'};
   if(name==='hap') Object.assign(S, base, {sources:['vap'],press:'yes',sbp:'82',map:'58',lact:'4.2',temp:'38.9',hr:'126',rr:'30',spo:'90',mental:'altered',risks:['MRSA','ESBL'],prior:'esbl',org:'kleb',mech:'esbl',traj:'arc',scr:'0.5',rrt:'none',recent:'yes'});
   if(name==='uti') Object.assign(S, base, {sources:['uti'],press:'no',sbp:'118',map:'82',lact:'1.1',temp:'38.4',hr:'96',rr:'18',spo:'97',icu:'no',risks:['ESBL'],prior:'esbl',org:'ecoli',mech:'esbl',traj:'stable',scr:'1',vd:'normal',rrt:'none',recent:'no'});
   if(name==='crrt') Object.assign(S, base, {sources:['iab'],press:'yes',sbp:'78',map:'54',lact:'5',temp:'38.2',hr:'130',rr:'26',spo:'94',mental:'altered',risks:['CRE'],prior:'ndm',org:'kleb',mech:'ndm',traj:'aki',scr:'3.2',rrt:'crrt',eff:'30',recent:'yes'});
-  syncPrimary(); syncDrug(); render();
+  syncPrimary(); syncDrug(); S.step=5; render();
 }
 document.body.addEventListener('click', function(e){
   var step=e.target.closest('[data-step]');
