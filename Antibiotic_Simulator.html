@@ -105,7 +105,7 @@ function out(title,lines,bad){
 var ORG={
   ecoli:['Escherichia coli','entero'], kleb:['Klebsiella pneumoniae','entero'], enterobacter:['Enterobacter cloacae complex','entero'],
   pseudomonas:['Pseudomonas aeruginosa','pseudo'], acinetobacter:['Acinetobacter baumannii','acineto'], steno:['Stenotrophomonas maltophilia','steno'],
-  mrsa:['MRSA','mrsa'], mssa:['MSSA','mssa'], enterococcus:['Enterococcus faecium','vre'], unknown:['Unknown gram-negative','entero']
+  mrsa:['MRSA','mrsa'], mssa:['MSSA','mssa'], faecalis:['Enterococcus faecalis','faecalis'], enterococcus:['Enterococcus faecium','vre'], unknown:['Unknown gram-negative','entero']
 };
 var MECH={
   none:'No enzyme named', esbl:'ESBL', ampc:'AmpC', kpc:'KPC', oxa48:'OXA-48-like',
@@ -142,16 +142,33 @@ var DRUG={
   sulbactam:['Sulbactam-durlobactam','fT>MIC','CRAB.','Still needs a susceptibility check.'],
   tigecycline:['Tigecycline','AUC/MIC','Some intra-abdominal CRE. Not the blood.','Low blood levels. Nausea. Higher death in some bloodstream uses.'],
   eravacycline:['Eravacycline','AUC/MIC','Selected CRE or CRAB outside the blood.','Not a bloodstream drug.'],
-  aztreonam:['Aztreonam','fT>MIC','Gram-negatives, including Pseudomonas, after penicillin anaphylaxis.','No anaerobic cover. An ESBL or a metallo-enzyme can destroy it.']
+  aztreonam:['Aztreonam','fT>MIC','Gram-negatives, including Pseudomonas, after penicillin anaphylaxis.','No anaerobic cover. An ESBL or a metallo-enzyme can destroy it.'],
+  ceftriaxone:['Ceftriaxone','fT>MIC','Third-generation cephalosporin. Community lung, urine, and meningitis.','Does not treat Pseudomonas, AmpC, or ESBL.'],
+  cefazolin:['Cefazolin','fT>MIC','First-generation cephalosporin. The narrow drug for MSSA.','Does not treat MRSA, Pseudomonas, or meningitis.'],
+  ampicillin:['Ampicillin','fT>MIC','Aminopenicillin. Susceptible Enterococcus faecalis, and Listeria in meningitis.','Does not treat ESBL, Pseudomonas, or Enterococcus faecium.'],
+  levofloxacin:['Levofloxacin','AUC/MIC','Fluoroquinolone. A reserve drug for community lung when a beta-lactam cannot be given.','Tendons, a long QT, and C. difficile.'],
+  ciprofloxacin:['Ciprofloxacin','AUC/MIC','Fluoroquinolone with Pseudomonas activity, mostly for urine.','Weak for pneumonia. Same harms as levofloxacin.'],
+  azithromycin:['Azithromycin','AUC/MIC','Macrolide. The atypical partner in community pneumonia.','Not a drug for bacteremia.'],
+  metronidazole:['Metronidazole','AUC/MIC','Nitroimidazole. Anaerobes only.','It does not treat gram-negative aerobes. Neuropathy if the course is long.'],
+  polymyxin:['Polymyxin B','AUC/MIC','Polymyxin. Last drug for some carbapenem-resistant gram-negatives.','Kidney injury. It does not reach the urine.']
 };
-var BETA={meropenem:1,cefepime:1,piptazo:1,ceftazavi:1,merovab:1,imirele:1,ceftolozane:1,cefiderocol:1,aztavi:1,cazazi:1,sulbactam:1};
+var BETA={meropenem:1,cefepime:1,piptazo:1,ceftazavi:1,merovab:1,imirele:1,ceftolozane:1,cefiderocol:1,aztavi:1,cazazi:1,sulbactam:1,aztreonam:1,ceftriaxone:1,cefazolin:1,ampicillin:1};
 function prefList(){ return PREF[S.mech]||[]; }
 function siteBlock(id){
-  if((id==='tigecycline'||id==='eravacycline') && (S.source==='bsi'||S.source==='endo'||S.source==='line')) return 'Blood levels are too low.';
+  var kind=ORG[S.org][1];
+  if((id==='tigecycline'||id==='eravacycline'||id==='azithromycin') && (S.source==='bsi'||S.source==='endo'||S.source==='line')) return 'Blood levels are too low.';
   if(id==='daptomycin' && (S.source==='vap'||S.source==='cap')) return 'Surfactant in the lung inactivates daptomycin.';
-  if(id==='meropenem' && S.org==='pseudomonas' && S.mech==='none') return '';
-  if((id==='vancomycin'||id==='linezolid'||id==='daptomycin') && ORG[S.org][1]!=='mrsa' && ORG[S.org][1]!=='vre' && ORG[S.org][1]!=='mssa') return 'This is not a gram-positive drug for this culture.';
-  if(id!=='vancomycin' && id!=='linezolid' && id!=='daptomycin' && id!=='tmp' && (ORG[S.org][1]==='mrsa' || ORG[S.org][1]==='vre')) return 'This gram-negative drug does not treat this gram-positive culture.';
+  if(id==='cefazolin' && S.source==='cns') return 'Cefazolin does not treat meningitis.';
+  if(id==='polymyxin' && S.source==='uti') return 'Polymyxin B does not reach the urine.';
+  if(id==='metronidazole' && S.source!=='iab' && S.source!=='cns') return 'Metronidazole does not treat this site.';
+  if(id==='azithromycin' && S.source!=='cap') return 'A macrolide is not the drug for this site.';
+  if(id==='ciprofloxacin' && (S.source==='vap'||S.source==='cap')) return 'Ciprofloxacin is a weak pneumonia drug.';
+  var gp={vancomycin:1,linezolid:1,daptomycin:1,cefazolin:1,ampicillin:1};
+  if(gp[id] && kind!=='mrsa' && kind!=='vre' && kind!=='mssa' && kind!=='faecalis'){
+    if(id==='ampicillin' && S.source==='cns') return '';
+    return 'This is a gram-positive drug. It does not treat this culture.';
+  }
+  if(!gp[id] && id!=='tmp' && id!=='metronidazole' && (kind==='mrsa'||kind==='vre'||kind==='mssa'||kind==='faecalis')) return 'This drug does not treat this gram-positive culture.';
   return '';
 }
 function judge(){
@@ -165,8 +182,20 @@ function judge(){
   if(S.allergy==='anaphylaxis' && BETA[id]) return {bad:true, title:'Penicillin anaphylaxis', lines:['This is a beta-lactam. Do not start it until the allergy is reviewed. Aztreonam is the gram-negative substitute when the organism is still susceptible to it.']};
   if(block) return {bad:true, title:'Wrong place or wrong bug', lines:[block]};
   if(S.mech==='none'){
+    if(id==='polymyxin') return {bad:true, title:'Last drug, not the first', lines:['A polymyxin is not the first drug when no enzyme is named.']};
     if(id==='aztreonam' && S.allergy!=='anaphylaxis') return {bad:true, title:'Not the first choice', lines:['Aztreonam is for penicillin anaphylaxis. It misses anaerobes and many resistant gram-negatives.']};
     if(id==='aztreonam') return {bad:false, title:'Anaphylaxis substitute', lines:[DRUG.aztreonam[2], DRUG.aztreonam[3]]};
+    if(id==='cefazolin' && ORG[S.org][1]==='mssa') return {bad:false, title:'MSSA drug', lines:[DRUG.cefazolin[2], DRUG.cefazolin[3]]};
+    if(id==='vancomycin' && ORG[S.org][1]==='mssa') return {bad:true, title:'Too broad once MSSA is known', lines:['Switch to cefazolin.']};
+    if(id==='ampicillin' && ORG[S.org][1]==='faecalis') return {bad:false, title:'Faecalis drug', lines:[DRUG.ampicillin[2], DRUG.ampicillin[3]]};
+    if(id==='ampicillin') return {bad:true, title:'Too narrow', lines:['Ampicillin is for susceptible Enterococcus faecalis, or Listeria in meningitis.']};
+    if(id==='ceftriaxone' && ORG[S.org][1]==='pseudo') return {bad:true, title:'No Pseudomonas activity', lines:['Ceftriaxone does not treat Pseudomonas.']};
+    if(id==='ceftriaxone' && (S.source==='vap'||S.where==='hospital') && S.source!=='cns') return {bad:true, title:'Too narrow for a hospital infection', lines:['Ceftriaxone misses Pseudomonas and AmpC.']};
+    if(id==='levofloxacin' && S.allergy!=='anaphylaxis') return {bad:true, title:'Not the first drug', lines:['A fluoroquinolone is a reserve. Tendons, a long QT, and C. difficile.']};
+    if(id==='levofloxacin') return {bad:false, title:'Anaphylaxis reserve', lines:[DRUG.levofloxacin[2], DRUG.levofloxacin[3]]};
+    if(id==='ciprofloxacin' && S.allergy!=='anaphylaxis') return {bad:true, title:'Not the first drug', lines:['Save ciprofloxacin. It is weak for pneumonia and it harms tendons, the QT, and the gut.']};
+    if(id==='azithromycin') return {bad:false, title:'Partner only', lines:['Azithromycin covers atypicals. It does not replace the beta-lactam.']};
+    if(id==='metronidazole') return {bad:false, title:'Anaerobes only', lines:['Keep the gram-negative drug. Metronidazole does not replace it.']};
     if(S.org==='pseudomonas' && id==='meropenem') return {bad:false, title:'Active if susceptible', lines:['Pseudomonas needs an antipseudomonal drug. Ertapenem would not be one.']};
     if(ORG[S.org][1]==='mrsa' && (id==='vancomycin'||id==='linezolid')) return {bad:false, title:id==='linezolid'&&(S.source==='bsi'||S.source==='endo')?'Weak for the blood':'MRSA pathway', lines:[DRUG[id][2], DRUG[id][3]]};
     if(ORG[S.org][1]==='mrsa' && id==='daptomycin') return {bad:false, title:'MRSA pathway', lines:[DRUG[id][2], DRUG[id][3]]};
@@ -175,6 +204,7 @@ function judge(){
     if(ORG[S.org][1]==='mssa' && id==='cefepime') return {bad:true, title:'Too broad', lines:['MSSA bacteremia wants cefazolin or an anti-staphylococcal penicillin, not a Pseudomonas drug.']};
     return {bad:false, title:'No enzyme named', lines:['Use the narrowest susceptible drug for the site.', DRUG[id][3]]};
   }
+  if(id==='polymyxin') return {bad:true, title:'Last drug, not the first', lines:['Use a polymyxin only when the newer active drug cannot be given. It injures the kidneys, and polymyxin B does not treat urine.']};
   if(pref.indexOf(id)>=0) return {bad:false, title:'Fits '+MECH[S.mech], lines:[DRUG[id][2], DRUG[id][3]]};
   if(S.mech==='esbl' && id==='piptazo') return {bad:true, title:'Not for ESBL in the blood', lines:['A susceptible piperacillin result is not enough for ESBL bacteremia. Use a carbapenem.']};
   if(S.mech==='ampc' && id==='piptazo') return {bad:true, title:'Tazobactam does not hold AmpC', lines:['Cefepime is the narrower active choice when the MIC allows it.']};
@@ -213,7 +243,7 @@ function tier(){
 function wantLoad(){ return S.load==='load' || S.vd!=='normal' || S.sev==='shock'; }
 function regimen(){
   var t=tier(), c=crcl(), id=S.drug, wt=num('wt'), dw=doseWt();
-  if(t==null || (id!=='linezolid' && id!=='tigecycline' && c==null && S.rrt==='none')) return null;
+  if(t==null || (id!=='linezolid' && id!=='tigecycline' && id!=='azithromycin' && id!=='metronidazole' && c==null && S.rrt==='none')) return null;
   var mic=num('mic')||1;
   var high=S.source==='cns' || mic>=4 || S.sev==='shock';
   var lung=S.source==='vap'||S.source==='cap';
@@ -357,16 +387,53 @@ function regimen(){
     row=[50,12]; loadMg=100;
   } else if(id==='eravacycline'){
     row=[Math.max(10, Math.round((dw||wt||70)*1/10)*10),12];
+  } else if(id==='ceftriaxone'){
+    row=S.source==='cns'?[2000,12]:[2000,24];
+    note='Cleared by the liver and the kidney. Ordinary renal failure does not change this dose.';
+  } else if(id==='cefazolin'){
+    var evz=8;
+    if(t==='hd'){ evz=24; after=true; }
+    else if(t!=='crrt' && t!=='arc' && c!=null && c<30) evz=24;
+    else if(t!=='crrt' && t!=='arc' && c!=null && c<50) evz=12;
+    row=[2000,evz];
+  } else if(id==='ampicillin'){
+    var eva=(S.source==='cns'||S.source==='endo'||S.source==='bsi')?4:6;
+    if(t==='hd'){ eva=12; after=true; }
+    else if(t!=='crrt' && t!=='arc' && c!=null && c<30) eva=12;
+    else if(t!=='crrt' && t!=='arc' && c!=null && c<50) eva=8;
+    row=[2000,eva];
+  } else if(id==='levofloxacin'){
+    var evl=(t==='hd'||(t!=='crrt'&&t!=='arc'&&c!=null&&c<50))?48:24;
+    row=[750,evl];
+    note='Tendons, a long QT, and C. difficile.';
+  } else if(id==='ciprofloxacin'){
+    var evc=8;
+    if(t==='hd'){ evc=24; after=true; }
+    else if(t!=='crrt'&&t!=='arc'&&c!=null&&c<30) evc=12;
+    row=[400,evc];
+    note='Weak for pneumonia.';
+  } else if(id==='azithromycin'){
+    row=[500,24];
+    note='Partner for community pneumonia. Not a bacteremia drug.';
+  } else if(id==='metronidazole'){
+    row=[500,8];
+    note='Anaerobes only.';
+  } else if(id==='polymyxin'){
+    var kg=dw||wt||70;
+    row=[Math.round(kg*1.25/10)*10,12];
+    loadMg=Math.round(kg*2.5/10)*10;
+    note='Do not reduce this dose for a low creatinine. The kidney injury is a toxicity. Polymyxin B does not treat urine.';
   }
   if(!row) return null;
   every=row[1];
   var mg=row[0];
   if(loadMg==null && wantLoad() && (id==='meropenem'||id==='cefepime') && mg<2000 && t!=='hd' && !(typeof t==='number' && t<30)) loadMg=2000;
   if(loadMg==null) loadMg=mg;
-  var loadText=(wantLoad()||id==='vancomycin'||id==='tigecycline')?g(loadMg)+' IV once':'No extra load. Start with '+g(mg);
+  var loadText=(wantLoad()||id==='vancomycin'||id==='tigecycline'||id==='polymyxin')?g(loadMg)+' IV once':'No extra load. Start with '+g(mg);
   var infH=0.5;
   var pk=DRUG[id][1];
-  if(pk==='fT>MIC'){
+  if(id==='ceftriaxone'||id==='cefazolin'||id==='ampicillin') infH=0.5;
+  else if(pk==='fT>MIC'){
     if(S.inf==='continuous') infH=every;
     else if(S.inf==='extended'||id==='cefiderocol'||id==='merovab'||id==='sulbactam'||id==='aztavi'||id==='cazazi'||id==='aztreonam') infH=Math.min(3, every-0.25);
     else if(id==='ceftazavi') infH=Math.min(S.inf==='extended'?3:2, every-0.25);
@@ -469,22 +536,21 @@ function empiricNow(){
       lines.push('Do not give ceftriaxone. Keep vancomycin. Ask before any beta-lactam, including meropenem.');
       gnb=null;
     } else if(src==='cap'){
-      lines.push('Levofloxacin 750 mg IV daily, instead of ceftriaxone.');
+      lines.push(doseFor('levofloxacin')+' This replaces ceftriaxone.');
       gnb=null;
     } else {
       gnb='aztreonam';
-      if(src==='iab'||src==='ssti') lines.push('Metronidazole 500 mg IV every 8 hours. Aztreonam misses anaerobes.');
+      if(src==='iab'||src==='ssti') lines.push(doseFor('metronidazole')+' Aztreonam misses anaerobes.');
     }
   }
   if(shock) lines.unshift('Shock. Draw the cultures, then give this now.');
-  if(gnb==='ctx') lines.push(src==='endo'?'Ceftriaxone 2 g IV daily.':'Ceftriaxone 2 g IV daily.');
-  if(gnb==='ctx' && src==='cap') lines.push('Azithromycin 500 mg IV daily.');
-  if(gnb==='ctx-cns') lines.push('Ceftriaxone 2 g IV every 12 hours.');
+  if(gnb==='ctx'||gnb==='ctx-cns') lines.push(doseFor('ceftriaxone'));
+  if(gnb==='ctx' && src==='cap') lines.push(doseFor('azithromycin')+' This is only the atypical partner.');
   if(gnb && DRUG[gnb]) lines.push(doseFor(gnb));
   if(needMrsa()||S.prior==='mrsa'){ if(src!=='cns') lines.push(doseFor('vancomycin')+' This is the MRSA drug.'); }
   if(src==='cns'){
     lines.push(doseFor('vancomycin')+' This is for resistant pneumococcus, not MRSA.');
-    if((num('age')||0)>=50 && !ana) lines.push('Age 50 or more: ampicillin 2 g IV every 4 hours for Listeria.');
+    if((num('age')||0)>=50 && !ana) lines.push(doseFor('ampicillin')+' For Listeria.');
     if((num('age')||0)>=50 && ana) lines.push('Age 50 or more, but penicillin anaphylaxis: do not add ampicillin.');
   }
   if(src==='endo' && !(needMrsa()||S.prior==='mrsa')) lines.push(doseFor('vancomycin')+' Until the culture names the gram-positive.');
@@ -543,8 +609,19 @@ function draw(){
 
 function labOf(id){
   var m=S.mech, kind=ORG[S.org][1];
-  if(kind==='mrsa'||kind==='mssa') return (id==='vancomycin'||id==='linezolid'||id==='daptomycin')?'S':'R';
+  if(id==='polymyxin') return (m==='kpc'||m==='oxa48'||m==='ndm'||m==='vim'||m==='imp'||m==='crab'||m==='dtr'||kind==='acineto')?'S':'R';
+  if(id==='metronidazole') return 'S';
+  if(kind==='mssa') return (id==='cefazolin'||id==='vancomycin'||id==='linezolid'||id==='daptomycin')?'S':'R';
+  if(kind==='mrsa') return (id==='vancomycin'||id==='linezolid'||id==='daptomycin')?'S':'R';
   if(kind==='vre') return (id==='linezolid'||id==='daptomycin')?'S':'R';
+  if(kind==='faecalis') return (id==='ampicillin'||id==='vancomycin')?'S':'R';
+  if(id==='ceftriaxone') return (m==='none' && kind==='entero')?'S':'R';
+  if(id==='ciprofloxacin'||id==='levofloxacin'){
+    if(m!=='none') return 'R';
+    if(kind==='entero') return 'S';
+    if(kind==='pseudo' && id==='ciprofloxacin') return 'S';
+    return 'R';
+  }
   if(m==='esbl'){
     if(id==='cefepime') return 'I';
     if(id==='meropenem'||id==='ceftazavi'||id==='merovab'||id==='imirele') return 'S';
@@ -563,18 +640,22 @@ function labOf(id){
   return 'R';
 }
 function reportDrugs(){
-  var m=S.mech, kind=ORG[S.org][1];
-  if(kind==='mrsa'||kind==='mssa'||kind==='vre') return ['vancomycin','linezolid','daptomycin'];
-  if(m==='esbl') return ['meropenem','piptazo','cefepime','ceftazavi'];
-  if(m==='ampc') return ['cefepime','piptazo','meropenem'];
-  if(m==='kpc') return ['meropenem','ceftazavi','merovab','imirele','cefiderocol'];
-  if(m==='oxa48') return ['meropenem','merovab','ceftazavi','cefiderocol'];
-  if(m==='ndm'||m==='vim'||m==='imp') return ['meropenem','ceftazavi','aztavi','cazazi','cefiderocol'];
-  if(m==='dtr') return ['meropenem','cefepime','piptazo','ceftolozane','ceftazavi','imirele','cefiderocol'];
-  if(m==='crab'||kind==='acineto') return ['meropenem','sulbactam','cefiderocol'];
-  if(m==='steno'||kind==='steno') return ['meropenem','tmp','cefiderocol'];
-  if(kind==='pseudo') return ['meropenem','cefepime','piptazo','ceftolozane'];
-  return ['meropenem','cefepime','piptazo','ceftazavi'];
+  var m=S.mech, kind=ORG[S.org][1], list;
+  if(kind==='mssa') list=['cefazolin','vancomycin','linezolid'];
+  else if(kind==='mrsa'||kind==='vre') list=['vancomycin','linezolid','daptomycin'];
+  else if(kind==='faecalis') list=['ampicillin','vancomycin'];
+  else if(m==='esbl') list=['ceftriaxone','meropenem','piptazo','cefepime','levofloxacin'];
+  else if(m==='ampc') list=['ceftriaxone','cefepime','piptazo','meropenem'];
+  else if(m==='kpc') list=['meropenem','ceftazavi','merovab','imirele','cefiderocol','polymyxin'];
+  else if(m==='oxa48') list=['meropenem','merovab','ceftazavi','cefiderocol','polymyxin'];
+  else if(m==='ndm'||m==='vim'||m==='imp') list=['meropenem','ceftazavi','aztavi','cazazi','cefiderocol','polymyxin'];
+  else if(m==='dtr') list=['meropenem','cefepime','piptazo','ciprofloxacin','ceftolozane','ceftazavi','imirele','cefiderocol','polymyxin'];
+  else if(m==='crab'||kind==='acineto') list=['meropenem','sulbactam','cefiderocol','polymyxin'];
+  else if(m==='steno'||kind==='steno') list=['meropenem','tmp','cefiderocol'];
+  else if(kind==='pseudo') list=['meropenem','cefepime','piptazo','ciprofloxacin','ceftolozane'];
+  else list=['ceftriaxone','cefepime','piptazo','meropenem','levofloxacin'];
+  if(S.source==='iab' && list.indexOf('metronidazole')<0) list.push('metronidazole');
+  return list;
 }
 function syncDrug(){
   var list=reportDrugs().filter(function(id){ return labOf(id)==='S'; });
@@ -669,7 +750,7 @@ function durationLines(){
   if(src==='endo') text='Endocarditis is weeks. The valve and the organism decide the stop.';
   else if(src==='cns') text='Meningitis is often 2 to 3 weeks.';
   else if((kind==='mrsa'||kind==='mssa') && (src==='bsi'||src==='line')) text='Staphylococcus aureus in the blood is at least 14 days from the first negative culture, after a clear echo and line removal.';
-  else if(kind==='vre' && (src==='bsi'||src==='line')) text='Enterococcus in the blood is often 7 to 14 days once the source is gone. A valve is weeks.';
+  else if((kind==='vre'||kind==='faecalis') && (src==='bsi'||src==='line')) text='Enterococcus in the blood is often 7 to 14 days once the source is gone. A valve is weeks.';
   else if(src==='bsi') text='About 7 days only for uncomplicated gram-negative bacteremia. Staphylococcus aureus is at least 14 days.';
   else {
     var stop={cap:'5 days',vap:'7 days',uti:'5 to 7 days',iab:'about 4 days after source control',ssti:'5 to 7 days',line:'a short course once the line is out'};
