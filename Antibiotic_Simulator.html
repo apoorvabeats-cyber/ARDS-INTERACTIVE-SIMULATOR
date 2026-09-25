@@ -470,6 +470,8 @@ function mechWarn(){
 function hasRisk(x){ return S.risks && S.risks.indexOf(x)>=0; }
 function needMrsa(){ return S.prior==='mrsa'||hasRisk('MRSA')||hasSource('line')||hasSource('ssti')||hasSource('nec')||hasSource('endo')||hasSource('bone')||(S.where==='hospital'&&hasSource('vap')); }
 function needPseudo(){ return S.prior==='dtr'||hasRisk('DTR')||hasSource('neutro')||(S.where==='hospital'&&(hasSource('vap')||hasSource('iab')||hasSource('unk')||hasSource('postop'))); }
+function needVre(){ return hasRisk('VRE')||S.prior==='vre'||(S.culture==='pos'&&ORG[S.org][1]==='vre'); }
+function poorPseudo(){ var n=num('psaPct'); return S.where==='hospital'&&n!=null&&n<70; }
 function needAna(){ return hasSource('iab')||hasSource('nec'); }
 function hasSource(x){ return !!(S.sources && S.sources.indexOf(x)>=0); }
 function syncPrimary(){
@@ -547,6 +549,10 @@ function empiricNow(){
   else if(src==='cap'||src==='uti'||src==='endo'||src==='bsi') gnb='ctx';
   else if(src==='cns') gnb='ctx-cns';
   else if(src==='ssti'&&shock) gnb='piptazo';
+  if(poorPseudo() && (gnb==='cefepime'||gnb==='piptazo')){
+    lines.push('Only '+num('psaPct')+'% of your ICU Pseudomonas is susceptible to cefepime. Do not start cefepime or piperacillin.');
+    gnb='meropenem';
+  }
   var ana=S.allergy==='anaphylaxis';
   var ordinary=gnb==='meropenem'||gnb==='cefepime'||gnb==='piptazo'||gnb==='ctx'||gnb==='ctx-cns';
   var special=gnb==='aztavi'||gnb==='ceftazavi'||gnb==='ceftolozane'||gnb==='sulbactam';
@@ -569,14 +575,17 @@ function empiricNow(){
   if(gnb==='ctx' && src==='cap') lines.push(doseFor('azithromycin')+' This is only the atypical partner.');
   if(gnb && DRUG[gnb]) lines.push(doseFor(gnb));
   if(needAna() && gnb!=='meropenem' && gnb!=='piptazo' && gnb!=='aztavi') lines.push(doseFor('metronidazole')+' This is the anaerobe drug. It does not replace the other one.');
-  if(needMrsa()||S.prior==='mrsa'){ if(src!=='cns') lines.push(doseFor('vancomycin')+' This is the MRSA drug.'); }
+  if(needVre() && src!=='cns'){
+    if(src==='vap'||src==='cap') lines.push(doseFor('linezolid')+' Previous VRE. Not vancomycin, and not daptomycin in the lung.');
+    else lines.push(doseFor('daptomycin')+' Previous VRE. Not vancomycin.');
+  } else if((needMrsa()||S.prior==='mrsa') && src!=='cns') lines.push(doseFor('vancomycin')+' This is the MRSA drug.');
   if(src==='cns'){
     lines.push(doseFor('vancomycin')+' This is for resistant pneumococcus, not MRSA.');
     if((num('age')||0)>=50 && !ana) lines.push(doseFor('ampicillin')+' For Listeria.');
     if((num('age')||0)>=50 && ana) lines.push('Age 50 or more, but penicillin anaphylaxis: do not add ampicillin.');
   }
-  if(src==='endo' && !(needMrsa()||S.prior==='mrsa')) lines.push(doseFor('vancomycin')+' Until the culture names the gram-positive.');
-  if(src==='line' && !needMrsa()) lines.push(doseFor('vancomycin')+' Then remove the line.');
+  if(src==='endo' && !needVre() && !(needMrsa()||S.prior==='mrsa')) lines.push(doseFor('vancomycin')+' Until the culture names the gram-positive.');
+  if(src==='line' && !needMrsa() && !needVre()) lines.push(doseFor('vancomycin')+' Then remove the line.');
   return lines;
 }
 function series(){
@@ -752,8 +761,8 @@ function stepHtml(){
       +'<div class="form-group"><label class="form-label">Candida risks. Shock alone is not one of them.</label><div class="checkbox-group">'
       +[['immuno','Immunosuppressed'],['abxLong','Long antibiotics'],['hospLong','Long hospital stay'],['colon','Candida colonized'],['surg','Recent surgery'],['tpn','Parenteral nutrition'],['cvc','Central line']].map(function(c){return '<div class="chip-option'+(S[c[0]]==='yes'?' selected':'')+'" data-k="'+c[0]+'" data-v="'+(S[c[0]]==='yes'?'no':'yes')+'">'+c[1]+'</div>';}).join('')
       +'</div></div>'
-      +'<div class="grid">'+box('esblPct','Your ICU ESBL %')+box('mrsaPct','Your ICU MRSA %')+'</div>'
-      +'<p class="step-desc">At 20% or more, a hospital infection picks up that cover. Leave blank if you do not know.</p>';
+      +'<div class="grid">'+box('esblPct','Your ICU ESBL %')+box('mrsaPct','Your ICU MRSA %')+box('psaPct','Pseudomonas susceptible to cefepime %')+'</div>'
+      +'<p class="step-desc">ESBL or MRSA at 20% or more adds that cover for a hospital infection. If fewer than 70% of Pseudomonas isolates are susceptible to cefepime, do not start cefepime or piperacillin. Leave a box blank if you do not know the number.</p>';
   }
   if(n===5){
     h='<div class="step-title">What has to be covered</div><div class="step-desc">The regimen is on the right. These buttons only explain it.</div><div class="radio-group">'
@@ -797,7 +806,7 @@ function stepHtml(){
       +'<div class="form-group"><label class="form-label">Culture</label><div class="radio-group">'+chip('culture','pending','Pending')+chip('culture','pos','Positive')+chip('culture','neg','Negative')+chip('culture','contam','Contaminant')+'</div></div>'
       +'<div class="form-group"><label class="form-label">Source</label><div class="radio-group">'+chip('control','yes','Controlled')+chip('control','no','Open')+'</div></div>'
       +'<div class="form-group"><label class="form-label">Procalcitonin since the start</label><div class="radio-group">'+chip('pctTrend','down','Falling')+chip('pctTrend','same','Unchanged')+chip('pctTrend','up','Rising')+'</div></div>'
-      +'<div class="form-group"><label class="form-label">Another diagnosis now fits</label><div class="radio-group">'+chip('altDx','no','No')+chip('altDx','yes','Yes')+'</div></div>'
+      +'<div class="form-group"><label class="form-label">Eating, and an oral drug is active</label><div class="radio-group">'+chip('eating','no','Not yet')+chip('eating','yes','Yes')+'</div></div>'
       +'<div id="duration"></div>';
   }
   return h;
@@ -816,25 +825,46 @@ function whyLines(){
   var cand=candidaRisk();
   lines.push('Candida risk is '+cand.toLowerCase()+'. '+(cand==='High'?'An echinocandin can be considered.':'Do not add an antifungal for shock alone.'));
   if(S.prior!=='none') lines.push('A previous '+S.prior+' changes the first drug.');
-  if(num('esblPct')!=null) lines.push('Your ICU ESBL rate is '+num('esblPct')+'%.');
+  if(needVre()) lines.push('A previous VRE replaces vancomycin with linezolid or daptomycin.');
+  if(num('psaPct')!=null) lines.push(num('psaPct')+'% of ICU Pseudomonas is susceptible to cefepime.');
   var c=crcl();
   if(c!=null&&c>130) lines.push('Clearance is high. A normal dose can fall short.');
   lines.push('This is the starting regimen. Change it when the culture names the bug.');
   return lines;
 }
 function row(name, yes){ return '<span>'+name+'</span><span class="'+(yes?'yes':'no')+'">'+(yes?'Yes':'No')+'</span>'; }
+function hardCourse(){
+  var kind=ORG[S.org][1], src=S.source;
+  if(src==='endo'||hasSource('endo')||src==='cns'||src==='bone') return true;
+  if((kind==='mrsa'||kind==='mssa') && (src==='bsi'||src==='line'||src==='endo'||hasSource('line')||hasSource('endo'))) return true;
+  return false;
+}
+function oralLine(){
+  var vein=hasSource('endo')||hasSource('cns')||hasSource('bone')||hasSource('vap')||hasSource('nec')||S.source==='endo'||S.source==='cns'||S.source==='bsi'||S.source==='line'||S.source==='vap'||S.source==='bone';
+  var tablet=hasSource('uti')||hasSource('ssti')||hasSource('cap')||S.source==='uti'||S.source==='ssti'||S.source==='cap';
+  if(S.eating!=='yes') return '';
+  if(vein||!tablet) return 'This site stays on the vein. Blood, brain, a valve, bone, and hospital lung do not become a tablet.';
+  if(S.resp!=='improving'||S.control!=='yes') return 'Not yet. The patient has to be better, eating, and the source controlled.';
+  return 'Urine, skin, or community lung can leave the vein once an oral drug on the report is active.';
+}
 function planAction(){
-  var j=judge();
-  if(S.control!=='yes') return {act:'Do not stop', bad:true, lines:['The source is open. Drain it, remove the line, or debride.']};
+  var j=judge(), lines=[];
+  if(S.control!=='yes') return {act:'Do not stop', bad:true, lines:['The source is open. Drain it, remove the line, or debride. A falling procalcitonin does not start the clock.']};
   if(S.resp==='worsening') return {act:'Escalate', bad:true, lines:['The patient is worse. Recheck the source and the resistance before you add a drug.']};
   if((S.culture==='neg'||S.culture==='contam'||S.altDx==='yes') && S.resp==='improving'){
-    var lines=['The culture does not support continuing, and the patient is better.'];
-    if(S.pctTrend==='down') lines.push('The procalcitonin is falling. That can support a stop when the duration is otherwise unclear. It is not the stop by itself.');
+    lines.push('The culture does not support continuing, and the patient is better.');
+    if(S.pctTrend==='down') lines.push('The procalcitonin is falling. That supports a stop. It is not the stop by itself.');
+    var oral=oralLine(); if(oral) lines.push(oral);
     return {act:'Stop', bad:false, lines:lines};
   }
-  if(S.culture==='pos' && S.ast==='S' && !j.bad) return {act:'Narrow', bad:false, lines:['Use '+DRUG[S.drug][0]+' and stop the other antibiotics.']};
-  if(S.resp==='stable') return {act:'Recheck', bad:true, lines:['Unchanged. Recheck the diagnosis and the source.']};
-  return {act:'Continue', bad:false, lines:['Keep the active drug and set the stop date.']};
+  if(S.culture==='pos' && S.ast==='S' && !j.bad) lines.push('Narrow to '+DRUG[S.drug][0]+' and stop the other antibiotics.');
+  else if(S.culture==='pos') lines.push('Do not narrow to a drug the culture does not support.');
+  if(hardCourse()) lines.push('A falling procalcitonin does not shorten Staphylococcus aureus in the blood, endocarditis, meningitis, or bone infection.');
+  else if(S.pctTrend==='down' && S.resp==='improving') lines.push('The source is controlled and the patient is better. A falling procalcitonin can support a stop when the right duration is otherwise unclear. It does not erase a course that is already fixed.');
+  if(S.resp==='stable'){ lines.push('Unchanged. Recheck the diagnosis and the source.'); var oral=oralLine(); if(oral) lines.push(oral); return {act:'Recheck', bad:true, lines:lines}; }
+  var oral2=oralLine(); if(oral2) lines.push(oral2);
+  if(!lines.length) lines.push('Keep the active drug and set the stop date.');
+  return {act:S.resp==='improving'?'Continue':'Recheck', bad:false, lines:lines};
 }
 function durationLines(){
   var kind=ORG[S.org][1], src=S.source, lines=[], bad=false, text;
