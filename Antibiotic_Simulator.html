@@ -172,6 +172,8 @@ function prefList(){ return PREF[S.mech]||[]; }
 function siteBlock(id){
   var kind=ORG[S.org][1];
   if((id==='tigecycline'||id==='eravacycline'||id==='azithromycin') && (S.source==='bsi'||S.source==='endo'||S.source==='line')) return 'Blood levels are too low.';
+  if(id==='tigecycline' && S.source==='uti') return 'Tigecycline does not reach the urine.';
+  if(id==='tigecycline' && (S.source==='vap'||S.source==='cap')) return 'Tigecycline is a poor pneumonia drug.';
   if(id==='daptomycin' && (S.source==='vap'||S.source==='cap')) return 'Surfactant in the lung inactivates daptomycin.';
   if(id==='cefazolin' && S.source==='cns') return 'Cefazolin does not treat meningitis.';
   if(id==='polymyxin' && S.source==='uti') return 'Polymyxin B does not reach the urine. Use colistin.';
@@ -402,7 +404,8 @@ function regimen(){
     row=[1000,evs];
     note='1 g sulbactam with 1 g durlobactam.';
   } else if(id==='tigecycline'){
-    row=[50,12]; loadMg=100;
+    if(S.highTige){ row=[100,12]; loadMg=200; note='High-dose tigecycline. Use it only where it reaches the infection. Not for blood, urine, or pneumonia.'; }
+    else { row=[50,12]; loadMg=100; }
   } else if(id==='eravacycline'){
     row=[Math.max(10, Math.round((dw||wt||70)*1/10)*10),12];
   } else if(id==='ceftriaxone'){
@@ -938,6 +941,7 @@ function stdDose(id){
   if(id==='polymyxin') return '2.5 mg/kg IV once, then 1.25 mg/kg every 12 hours';
   if(id==='colistin') return '9 million IU IV once, then 4.5 million IU every 12 hours';
   if(id==='minocycline') return '200 mg IV every 12 hours';
+  if(id==='tigecycline') return S.highTige?'200 mg IV once, then 100 mg every 12 hours':'100 mg IV once, then 50 mg every 12 hours';
   return 'Standard adult dose';
 }
 function shownDose(id){
@@ -953,9 +957,10 @@ function bugPlan(ids){
   var has={}, drugs=[], notes=[];
   ids.forEach(function(id){ has[id]=1; });
   function add(id){ if(id && drugs.indexOf(id)<0) drugs.push(id); }
+  S.highSul=0; S.crabMero=0; S.highTige=0;
   var urine=S.source==='uti';
   function poly(){ return urine?'colistin':'polymyxin'; }
-  S.highSul=0; S.crabMero=0;
+  function tigeOk(){ return S.source==='iab'||S.source==='ssti'||S.source==='asp'; }
   var pseudoOnly=has.pseudo&&!has.ecoli&&!has.kleb&&!has.proteus&&!has.enterobacter&&!has.serratia&&!has.esbl&&!has.kpc&&!has.oxa&&!has.creunk;
   if(has.kpc){
     add('ceftazavi');
@@ -981,16 +986,33 @@ function bugPlan(ids){
     else if(S.crabRole!=='invasive') notes.push('CRAB. Say if this is colonization or an invasive infection.');
     else if(S.crabMbl==='yes'){
       notes.push('CRAB with an MBL. Do not use sulbactam.');
-      if(S.crabPartner) add(S.crabPartner==='polymyxin'?poly():S.crabPartner);
-      else notes.push('Pick cefiderocol, minocycline, or polymyxin B.');
+      if(S.fideAvail==='no'){
+        notes.push('Cefiderocol is not available. Use minocycline, polymyxin B, or tigecycline only if the site can take it.');
+        if(S.crabPartner==='tigecycline' && tigeOk()){ S.highTige=1; add('tigecycline'); }
+        else if(S.crabPartner==='tigecycline') notes.push('Tigecycline does not fit blood, urine, or pneumonia.');
+        else if(S.crabPartner && S.crabPartner!=='cefiderocol') add(S.crabPartner==='polymyxin'?poly():S.crabPartner);
+        else notes.push(tigeOk()?'Pick minocycline, polymyxin B, or tigecycline.':'Pick minocycline or polymyxin B. Tigecycline does not fit this site.');
+      } else if(S.fideAvail==='yes'){
+        if(S.crabPartner && S.crabPartner!=='tigecycline') add(S.crabPartner==='polymyxin'?poly():S.crabPartner);
+        else notes.push('Pick cefiderocol, minocycline, or polymyxin B.');
+      } else notes.push('Can you get cefiderocol?');
     } else if(S.sdAvail==='yes'){
       add('sulbactam'); S.crabMero=1; add('meropenem');
       notes.push('Invasive CRAB. Sulbactam-durlobactam plus meropenem.');
     } else if(S.sdAvail==='no'){
-      S.highSul=1; add('ampsulba');
-      notes.push('Sulbactam-durlobactam is not available. High-dose ampicillin-sulbactam plus one active agent.');
-      if(S.crabPartner) add(S.crabPartner==='polymyxin'?poly():S.crabPartner);
-      else notes.push('Add cefiderocol, minocycline, or polymyxin B.');
+      if(S.fideAvail==='no'){
+        S.highSul=1; add('ampsulba');
+        notes.push('Cefiderocol is not available. High-dose ampicillin-sulbactam plus one susceptible agent.');
+        if(S.crabPartner==='tigecycline' && tigeOk()){ S.highTige=1; add('tigecycline'); notes.push('Tigecycline fits this site.'); }
+        else if(S.crabPartner==='tigecycline') notes.push('Tigecycline does not fit blood, urine, or pneumonia. Use minocycline or polymyxin B.');
+        else if(S.crabPartner && S.crabPartner!=='cefiderocol') add(S.crabPartner==='polymyxin'?poly():S.crabPartner);
+        else notes.push(tigeOk()?'Add minocycline, polymyxin B, or tigecycline.':'Add minocycline or polymyxin B. Tigecycline does not fit this site.');
+      } else if(S.fideAvail==='yes'){
+        S.highSul=1; add('ampsulba');
+        notes.push('Sulbactam-durlobactam is not available. High-dose ampicillin-sulbactam plus one active agent.');
+        if(S.crabPartner) add(S.crabPartner==='polymyxin'?poly():S.crabPartner);
+        else notes.push('Add cefiderocol, minocycline, or polymyxin B.');
+      } else notes.push('Can you get cefiderocol?');
     } else notes.push('Is sulbactam-durlobactam available?');
     if(urine && (S.crabPartner==='polymyxin')) notes.push('Urine, so colistin replaces polymyxin B.');
   }
@@ -1144,7 +1166,13 @@ function stepHtml(){
       if(S.crabRole==='invasive'){
         ask+='<div class="form-group"><label class="form-label">Sulbactam-durlobactam available</label><div class="radio-group">'+chip('sdAvail','yes','Yes')+chip('sdAvail','no','No')+'</div></div>';
         ask+='<div class="form-group"><label class="form-label">NDM or another MBL</label><div class="radio-group">'+chip('crabMbl','no','No')+chip('crabMbl','yes','Yes')+'</div></div>';
-        if(S.crabMbl==='yes'||S.sdAvail==='no') ask+='<div class="form-group"><label class="form-label">Active partner</label><div class="radio-group">'+chip('crabPartner','cefiderocol','Cefiderocol')+chip('crabPartner','minocycline','Minocycline')+chip('crabPartner','polymyxin','Polymyxin B')+'</div></div>';
+        if(S.crabMbl==='yes'||S.sdAvail==='no'){
+          ask+='<div class="form-group"><label class="form-label">Cefiderocol available</label><div class="radio-group">'+chip('fideAvail','yes','Yes')+chip('fideAvail','no','No')+'</div></div>';
+          var partners=chip('crabPartner','minocycline','Minocycline')+chip('crabPartner','polymyxin','Polymyxin B');
+          if(S.fideAvail==='yes') partners=chip('crabPartner','cefiderocol','Cefiderocol')+partners;
+          else if(S.fideAvail==='no' && (S.source==='iab'||S.source==='ssti'||S.source==='asp')) partners+=chip('crabPartner','tigecycline','Tigecycline');
+          if(S.fideAvail==='yes'||S.fideAvail==='no') ask+='<div class="form-group"><label class="form-label">Active partner</label><div class="radio-group">'+partners+'</div></div>';
+        }
       }
     }
     if((S.bugs||[]).indexOf('dtr')>=0) ask+='<div class="group">Pseudomonas, which drug is susceptible</div><div class="radio-group">'+chip('psaDrug','ceftolozane','Ceftolozane-tazobactam')+chip('psaDrug','ceftazavi','Ceftazidime-avibactam')+chip('psaDrug','imirele','Imipenem-relebactam')+chip('psaDrug','cefiderocol','Cefiderocol')+'</div>';
