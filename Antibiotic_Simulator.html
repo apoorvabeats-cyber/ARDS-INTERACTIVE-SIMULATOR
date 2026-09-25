@@ -33,30 +33,44 @@
   nav{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;padding:10px;background:#fff;border-top:1px solid #e2e8f0}
   nav button{flex:1;border:0;border-radius:12px;padding:14px;font-weight:800;font-size:16px;background:#0f766e;color:#fff}
   nav button:disabled{background:#cbd5e1;color:#64748b}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+  .chips button,.report button{border:2px solid #cbd5e1;background:#fff;color:#14213d;font-weight:800}
+  .chips button{border-radius:999px;padding:10px 12px;font-size:14px}
+  .chips button.on{background:#0f766e;border-color:#0f766e;color:#fff}
+  .report{display:flex;flex-direction:column;gap:8px}
+  .report button{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;border-radius:12px;padding:12px 14px;font-size:16px}
+  .report button.on{border-color:#0f766e;background:#ecfdf5}
+  .report button.on.bad{border-color:#be123c;background:#fff1f2}
+  .tag{border-radius:8px;padding:2px 8px;font-size:14px}
+  .tag.S{background:#d1fae5;color:#065f46}
+  .tag.I{background:#fef3c7;color:#92400e}
+  .tag.R{background:#ffe4e6;color:#9f1239}
+  .q>span{display:block;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#334155;margin-bottom:6px}
   a{color:#0f766e}
 </style>
 </head>
 <body>
 <header>
   <h1>Antibiotics</h1>
-  <p id="stepName">Change the patient. The regimen changes with it.</p>
+  <p id="stepName">Tap a choice. The regimen answers.</p>
 </header>
 <main>
   <section><div id="patient"></div></section>
   <section id="now"></section>
   <section>
     <div id="culture"></div>
+    <div id="slip"></div>
     <div id="fit"></div>
-    <h2>Level against the MIC</h2>
+    <h2 id="micHead">Level against the MIC</h2>
     <canvas id="chart" width="720" height="220"></canvas>
-    <div class="legend"><span><i></i>Free level</span><span><i class="red"></i>MIC</span></div>
+    <div class="legend" id="legend"><span><i></i>Free level</span><span><i class="red"></i>MIC</span></div>
     <div id="exp"></div>
     <div id="plan"></div>
     <p><a href="index.html">All simulators</a></p>
   </section>
 </main>
 <script>
-var S={age:'60',sex:'male',ht:'170',wt:'70',scr:'1',uo:'50',eff:'25',where:'hospital',source:'vap',sev:'shock',bact:'yes',blood:'yes',srcx:'yes',addMrsa:'yes',addPseudo:'yes',addAna:'no',allergy:'no',recent:'no',prior:'none',org:'kleb',mech:'none',mic:'1',ast:'pending',drug:'meropenem',inf:'extended',rrt:'none',load:'load',traj:'stable',vd:'increased',level:'no',identified:'yes',astYes:'yes',resp:'improving',control:'yes',po:'no'};
+var S={age:'60',sex:'male',ht:'170',wt:'70',scr:'1',uo:'50',eff:'25',where:'hospital',source:'vap',sev:'shock',bact:'yes',blood:'yes',srcx:'yes',addMrsa:'yes',addPseudo:'yes',addAna:'no',allergy:'no',recent:'no',prior:'none',org:'kleb',mech:'esbl',mic:'',hasmic:'no',ast:'S',drug:'meropenem',inf:'extended',rrt:'none',load:'load',traj:'stable',vd:'increased',level:'no',identified:'yes',astYes:'yes',resp:'improving',control:'yes',po:'no'};
 function num(id){ var n=parseFloat(String(S[id]==null?'':S[id]).replace(',','.')); return Number.isFinite(n)?n:null; }
 function crcl(){
   var age=num('age'), wt=num('wt'), scr=num('scr'), ht=num('ht');
@@ -513,8 +527,54 @@ function draw(){
   s.pts.forEach(function(v,i){ if(i) g.lineTo(X(i),Y(v)); else g.moveTo(X(i),Y(v)); });
   g.stroke();
 }
+function chips(key,label,opts){
+  return '<div class="q"><span>'+label+'</span><div class="chips">'+opts.map(function(o){
+    return '<button type="button" data-k="'+key+'" data-v="'+o[0]+'">'+o[1]+'</button>';
+  }).join('')+'</div></div>';
+}
+function labOf(id){
+  var m=S.mech, kind=ORG[S.org][1];
+  if(kind==='mrsa'||kind==='mssa') return (id==='vancomycin'||id==='linezolid'||id==='daptomycin')?'S':'R';
+  if(kind==='vre') return (id==='linezolid'||id==='daptomycin')?'S':'R';
+  if(m==='esbl'){
+    if(id==='meropenem'||id==='ceftazavi'||id==='merovab'||id==='imirele') return 'S';
+    if(id==='piptazo'||id==='cefepime') return 'S';
+    return 'R';
+  }
+  if(m==='ampc') return (id==='cefepime'||id==='meropenem'||id==='piptazo')?'S':'R';
+  if(m==='kpc') return (id==='ceftazavi'||id==='merovab'||id==='imirele'||id==='cefiderocol')?'S':'R';
+  if(m==='oxa48') return (id==='ceftazavi'||id==='cefiderocol'||id==='aztavi')?'S':'R';
+  if(m==='ndm'||m==='vim'||m==='imp') return (id==='aztavi'||id==='cazazi'||id==='cefiderocol')?'S':'R';
+  if(m==='dtr') return (id==='ceftolozane'||id==='ceftazavi'||id==='imirele'||id==='cefiderocol')?'S':'R';
+  if(m==='crab'||kind==='acineto') return (id==='sulbactam'||id==='cefiderocol')?'S':'R';
+  if(m==='steno'||kind==='steno') return (id==='tmp'||id==='cefiderocol')?'S':'R';
+  if(kind==='pseudo') return (id==='meropenem'||id==='cefepime'||id==='piptazo'||id==='ceftolozane'||id==='ceftazavi'||id==='cefiderocol')?'S':'R';
+  if(id==='meropenem'||id==='cefepime'||id==='piptazo'||id==='ceftazavi') return 'S';
+  return 'R';
+}
+function reportDrugs(){
+  var m=S.mech, kind=ORG[S.org][1];
+  if(kind==='mrsa'||kind==='mssa'||kind==='vre') return ['vancomycin','linezolid','daptomycin'];
+  if(m==='esbl') return ['meropenem','piptazo','cefepime','ceftazavi'];
+  if(m==='ampc') return ['cefepime','piptazo','meropenem'];
+  if(m==='kpc') return ['meropenem','ceftazavi','merovab','imirele','cefiderocol'];
+  if(m==='oxa48') return ['meropenem','merovab','ceftazavi','cefiderocol'];
+  if(m==='ndm'||m==='vim'||m==='imp') return ['meropenem','ceftazavi','aztavi','cazazi','cefiderocol'];
+  if(m==='dtr') return ['meropenem','cefepime','piptazo','ceftolozane','ceftazavi','imirele','cefiderocol'];
+  if(m==='crab'||kind==='acineto') return ['meropenem','sulbactam','cefiderocol'];
+  if(m==='steno'||kind==='steno') return ['meropenem','tmp','cefiderocol'];
+  if(kind==='pseudo') return ['meropenem','cefepime','piptazo','ceftolozane'];
+  return ['meropenem','cefepime','piptazo','ceftazavi'];
+}
+function syncDrug(){
+  var list=reportDrugs().filter(function(id){ return labOf(id)==='S'; });
+  S.drug=list[0]||reportDrugs()[0];
+  S.ast=labOf(S.drug);
+}
 function paint(){
   S.load = (S.sev==='shock' || S.vd!=='normal') ? 'load' : 'standard';
+  S.ast = labOf(S.drug);
+  document.querySelectorAll('button[data-k]').forEach(function(b){ b.classList.toggle('on', S[b.dataset.k]===b.dataset.v); });
   var now = document.getElementById('now');
   if(S.sev==='low'){
     now.innerHTML = out('Do not start an antibiotic', ['This does not look bacterial. Look for another diagnosis.'], true);
@@ -526,7 +586,16 @@ function paint(){
     else lines.push('Creatinine clearance '+Math.round(c)+' mL/min.');
     now.innerHTML = out('Start this now', lines, false);
   }
+  var slip='<h2>Culture report</h2><p class="hint">Tap the drug you would give. S, I, and R are the whole report unless an MIC is printed.</p><div class="report">';
+  reportDrugs().forEach(function(id){
+    var letter=labOf(id);
+    var prev=S.drug; S.drug=id; S.ast=letter; var bad=judge().bad; S.drug=prev; S.ast=labOf(prev);
+    slip+='<button type="button" data-drug="'+id+'" class="'+(S.drug===id?'on':'')+(S.drug===id&&bad?' bad':'')+'"><span>'+DRUG[id][0]+'</span><b class="tag '+letter+'">'+letter+'</b></button>';
+  });
+  document.getElementById('slip').innerHTML=slip+'</div>';
+  S.ast=labOf(S.drug);
   var j = judge(), r = regimen(), fit = j.lines.slice();
+  fit.unshift('Report: '+(S.ast==='S'?'susceptible':S.ast==='I'?'intermediate':'resistant')+'. No MIC on the line'+(S.hasmic==='yes'&&num('mic')!=null?'. MIC entered: '+num('mic')+' mg/L.':'.'));
   if(!r) fit.push('The dose needs the body numbers.');
   else {
     fit.push('Load '+r.load+'.');
@@ -534,28 +603,39 @@ function paint(){
     fit.push('Infuse over '+r.infuseLabel+'.');
     if(r.note) fit.push(r.note);
   }
-  if(S.ast==='pending') fit.push('The MIC is not back. Keep this as the empiric drug until it is.');
-  if(S.ast==='I') fit.push('Intermediate. Lengthen the infusion before you abandon the drug.');
+  if(S.ast==='I') fit.push('Intermediate with no MIC still means the ordinary dose is not enough. Use the high dose and tap a 3-hour infusion.');
   document.getElementById('fit').innerHTML = out(j.title, fit, j.bad);
-  draw();
-  var s = series(), idx = DRUG[S.drug][1], exp = [], missed = false;
-  var need = (S.sev==='shock'||S.sev==='sepsis') ? 100 : 70;
-  if(idx==='fT>MIC'){
-    var pct = Math.round(s.above*100);
-    exp.push(pct+'% of this interval is above the MIC. This patient needs '+need+'%.');
-    exp.push(pct>=need ? 'The level holds.' : 'The level falls short. Extend the infusion or shorten the interval.');
-    missed = pct<need;
-  } else if(idx==='AUC/MIC'){
-    exp.push('This sketch is not an AUC. Vancomycin still needs a measured level, target 400–600.');
+  var showMic=S.hasmic==='yes' && num('mic')!=null;
+  document.getElementById('micbox').style.display=S.hasmic==='yes'?'':'none';
+  document.getElementById('micHead').style.display=showMic?'':'none';
+  document.getElementById('chart').style.display=showMic?'':'none';
+  document.getElementById('legend').style.display=showMic?'':'none';
+  if(!showMic){
+    var exp=S.hasmic==='yes'
+      ? ['Type the MIC from the report. Until then, decide from S, I, or R.']
+      : [S.ast==='R'?'Resistant, and no MIC to rescue it. Tap a drug marked S.':S.ast==='I'?'Intermediate, and no MIC printed. Push the dose and the infusion.':'Susceptible, and no MIC printed. The standard dose for this clearance is the dose.'];
+    document.getElementById('exp').innerHTML = out(S.hasmic==='yes'?'MIC not typed yet':'No MIC on this report', exp, S.ast!=='S'||j.bad);
   } else {
-    var ratio = s.mic ? s.peak/s.mic : 0;
-    exp.push('Peak is about '+ratio.toFixed(1)+' times the MIC. An aminoglycoside wants 8–10.');
-    missed = ratio<8;
+    draw();
+    var s = series(), idx = DRUG[S.drug][1], exp = [], missed = false;
+    var need = (S.sev==='shock'||S.sev==='sepsis') ? 100 : 70;
+    if(idx==='fT>MIC'){
+      var pct = Math.round(s.above*100);
+      exp.push(pct+'% of this interval is above the MIC. This patient needs '+need+'%.');
+      exp.push(pct>=need ? 'The level holds.' : 'The level falls short. Tap a longer infusion or a shorter interval.');
+      missed = pct<need;
+    } else if(idx==='AUC/MIC'){
+      exp.push('This sketch is not an AUC. Vancomycin still needs a measured level, target 400–600.');
+    } else {
+      var ratio = s.mic ? s.peak/s.mic : 0;
+      exp.push('Peak is about '+ratio.toFixed(1)+' times the MIC. An aminoglycoside wants 8–10.');
+      missed = ratio<8;
+    }
+    if(S.traj==='arc') exp.push('Clearance is high. The level can fall through before the next dose.');
+    if(S.traj==='aki') exp.push('The kidneys are changing. Recalculate tomorrow.');
+    if(j.bad) exp.push('A level above the MIC does not rescue a drug the enzyme destroys.');
+    document.getElementById('exp').innerHTML = out(idx, exp, j.bad||missed);
   }
-  if(S.traj==='arc') exp.push('Clearance is high. The level can fall through before the next dose.');
-  if(S.traj==='aki') exp.push('The kidneys are changing. Recalculate tomorrow.');
-  if(j.bad) exp.push('A level above the MIC does not rescue a drug the enzyme destroys.');
-  document.getElementById('exp').innerHTML = out(idx, exp, j.bad||missed);
   var plan = [], bad = false, kind = ORG[S.org][1], src = S.source;
   if(S.resp==='worsening'){ plan.push('Worse. Recheck the source and the level before you add a drug.'); bad = true; }
   else if(S.resp==='stable') plan.push('Unchanged. Recheck the diagnosis and the source.');
@@ -579,38 +659,48 @@ function paint(){
   document.getElementById('plan').innerHTML = out(bad?'Not time to stop':'Then stop', plan, bad);
 }
 function build(){
-  document.getElementById('patient').innerHTML = '<h2>This patient</h2><div class="grid">'
-    +sel('where','Setting',[['community','Community'],['hospital','Hospital']])
-    +sel('source','Site',[['vap','Hospital lung'],['cap','Community lung'],['uti','Urine'],['iab','Abdomen'],['cns','Brain'],['ssti','Skin'],['bsi','Blood'],['line','Line'],['endo','Valve']])
-    +sel('sev','How sick',[['shock','Septic shock'],['sepsis','Sepsis'],['stable','Stable'],['low','Does not look bacterial']])
-    +sel('allergy','Penicillin allergy',[['no','None'],['rash','Rash only'],['anaphylaxis','Anaphylaxis']])
-    +sel('prior','Previous resistant bug',[['none','None'],['mrsa','MRSA'],['esbl','ESBL'],['ampc','AmpC'],['kpc','KPC'],['oxa','OXA-48-like'],['ndm','NDM'],['vim','VIM'],['imp','IMP'],['dtr','Difficult Pseudomonas'],['crab','CRAB']])
-    +sel('recent','Antibiotics in 90 days',[['no','No'],['yes','Yes']])
-    +box('age','Age')+sel('sex','Sex',[['male','Male'],['female','Female']])+box('ht','Height cm')+box('wt','Weight kg')+box('scr','Creatinine')+box('uo','Urine mL/h')
-    +sel('traj','Clearance',[['stable','Steady'],['arc','Augmented'],['aki','Falling']])
-    +sel('rrt','Replacement',[['none','None'],['crrt','CRRT'],['ihd','Hemodialysis'],['sled','SLED']])
-    +box('eff','CRRT mL/kg/h')
-    +sel('vd','Volume',[['normal','Normal'],['increased','Increased'],['marked','Very increased']])
-    +'</div>';
-  document.getElementById('culture').innerHTML = '<h2>When the culture returns</h2><div class="grid">'
-    +sel('org','Organism',Object.keys(ORG).map(function(k){return [k,ORG[k][0]];}))
-    +sel('mech','Enzyme',Object.keys(MECH).map(function(k){return [k,MECH[k]];}))
-    +box('mic','MIC mg/L')
-    +sel('ast','Report',[['pending','Not back'],['S','Susceptible'],['I','Intermediate'],['R','Resistant']])
-    +sel('drug','Antibiotic you would give',Object.keys(DRUG).map(function(k){return [k,DRUG[k][0]];}))
-    +sel('inf','Infusion',[['standard','30 minutes'],['extended','3 hours'],['continuous','Continuous']])
-    +sel('resp','Since starting',[['improving','Improving'],['stable','Unchanged'],['worsening','Worse']])
-    +sel('control','Source',[['yes','Controlled'],['no','Not controlled']])
-    +'</div>';
+  document.getElementById('patient').innerHTML = '<h2>This patient</h2>'
+    +chips('where','Setting',[['community','Community'],['hospital','Hospital']])
+    +chips('source','Site',[['vap','Hospital lung'],['cap','Community lung'],['uti','Urine'],['iab','Abdomen'],['cns','Brain'],['ssti','Skin'],['bsi','Blood'],['line','Line'],['endo','Valve']])
+    +chips('sev','How sick',[['shock','Shock'],['sepsis','Sepsis'],['stable','Stable'],['low','Not bacterial']])
+    +chips('allergy','Penicillin allergy',[['no','None'],['rash','Rash'],['anaphylaxis','Anaphylaxis']])
+    +chips('prior','Previous resistant bug',[['none','None'],['mrsa','MRSA'],['esbl','ESBL'],['ampc','AmpC'],['kpc','KPC'],['oxa','OXA-48'],['ndm','NDM'],['vim','VIM'],['imp','IMP'],['dtr','Difficult Pseudomonas'],['crab','CRAB']])
+    +chips('recent','Antibiotics in 90 days',[['no','No'],['yes','Yes']])
+    +'<div class="grid">'+box('age','Age')+chips('sex','Sex',[['male','Male'],['female','Female']])+box('ht','Height cm')+box('wt','Weight kg')+box('scr','Creatinine')+box('uo','Urine mL/h')+box('eff','CRRT mL/kg/h')+'</div>'
+    +chips('traj','Clearance',[['stable','Steady'],['arc','Augmented'],['aki','Falling']])
+    +chips('rrt','Kidney replacement',[['none','None'],['crrt','CRRT'],['ihd','Hemodialysis'],['sled','SLED']])
+    +chips('vd','Volume',[['normal','Normal'],['increased','Large'],['marked','Very large']]);
+  document.getElementById('culture').innerHTML = '<h2>Organism</h2>'
+    +chips('org','Bug',Object.keys(ORG).map(function(k){return [k,ORG[k][0]];}))
+    +chips('mech','Enzyme',Object.keys(MECH).map(function(k){return [k,MECH[k]];}))
+    +chips('hasmic','Does the report print an MIC?',[['no','No, only S / I / R'],['yes','Yes, an MIC is printed']])
+    +'<div id="micbox">'+box('mic','MIC mg/L')+'</div>'
+    +chips('inf','Infusion you choose',[['standard','30 minutes'],['extended','3 hours'],['continuous','Continuous']])
+    +chips('resp','Since the drug started',[['improving','Improving'],['stable','Unchanged'],['worsening','Worse']])
+    +chips('control','Source',[['yes','Controlled'],['no','Not controlled']]);
 }
-document.getElementById('patient').oninput = document.getElementById('culture').parentNode.oninput = function(e){
+document.querySelector('main').onclick=function(e){
+  var b=e.target.closest('button');
+  if(!b) return;
+  if(b.dataset.k){
+    S[b.dataset.k]=b.dataset.v;
+    if(b.dataset.k==='org'||b.dataset.k==='mech') syncDrug();
+    if(b.dataset.k==='hasmic' && S.hasmic==='no') S.mic='';
+    paint();
+  }
+  if(b.dataset.drug){
+    S.drug=b.dataset.drug;
+    S.ast=labOf(S.drug);
+    paint();
+  }
+};
+document.querySelector('main').oninput=function(e){
   if(!e.target.id || !(e.target.id in S)) return;
-  S[e.target.id] = e.target.value;
+  S[e.target.id]=e.target.value;
   paint();
 };
 build();
 paint();
-
 </script>
 </body>
 </html>
