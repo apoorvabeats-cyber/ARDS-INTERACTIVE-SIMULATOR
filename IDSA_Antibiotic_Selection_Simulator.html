@@ -1,1082 +1,695 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IDSA 2024 Clinical Antibiotic Selection & Resistance Simulator</title>
-  
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Lucide Icons CDN -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  
-  <!-- Google Fonts: Inter & JetBrains Mono -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
-          },
-          colors: {
-            brand: {
-              50: '#f0fdfa',
-              100: '#ccfbf1',
-              500: '#14b8a6',
-              600: '#0d9488',
-              700: '#0f766e',
-              800: '#115e59',
-              900: '#134e4a',
-            },
-            clinical: {
-              dark: '#0b1329',
-              card: '#162032',
-              border: '#2a3853',
-              accent: '#38bdf8',
-            }
-          }
-        }
-      }
-    }
-  </script>
-
-  <style>
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #0f172a;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #334155;
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #0d9488;
-    }
-
-    .glass-panel {
-      background: rgba(22, 32, 50, 0.85);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .light .glass-panel {
-      background: rgba(255, 255, 255, 0.9);
-      border: 1px solid rgba(0, 0, 0, 0.08);
-    }
-
-    .matrix-cell {
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .matrix-cell:hover {
-      transform: translateY(-2px) scale(1.04);
-      z-index: 20;
-    }
-
-    .pulse-glow-green {
-      box-shadow: 0 0 15px rgba(34, 197, 94, 0.25);
-    }
-    .pulse-glow-red {
-      box-shadow: 0 0 15px rgba(239, 68, 68, 0.25);
-    }
-    .pulse-glow-yellow {
-      box-shadow: 0 0 15px rgba(234, 179, 8, 0.25);
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDSA Antibiotic Selection and Resistance</title>
+<style>
+:root {
+  --bg:#0b132b; --card:#162032; --card2:#10192b; --ink:#e8eef7; --muted:#93a4bd;
+  --line:#2a3853; --teal:#5eead4; --teal-dim:#134e4a; --amber:#fbbf24; --bad:#fca5a5;
+  --good:#86efac; --input:#0b1224; --chip:#1e293b; --shadow:0 10px 30px rgba(0,0,0,.25);
+  color-scheme:dark;
+}
+html.light {
+  --bg:#f4f7fb; --card:#ffffff; --card2:#f8fafc; --ink:#0f172a; --muted:#475569;
+  --line:#d5deea; --teal:#0f766e; --teal-dim:#ccfbf1; --amber:#92400e; --bad:#991b1b;
+  --good:#166534; --input:#ffffff; --chip:#eef2f7; --shadow:0 8px 24px rgba(15,23,42,.06);
+  color-scheme:light;
+}
+* { box-sizing:border-box; }
+body { margin:0; font-family:"Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--ink); }
+button, select, input { font:inherit; color:inherit; }
+button { cursor:pointer; }
+a { color:var(--teal); }
+header { position:sticky; top:0; z-index:20; background:var(--card); border-bottom:1px solid var(--line); }
+.wrap { max-width:1120px; margin:0 auto; padding:14px 16px 28px; }
+.top { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap; }
+h1 { font-size:20px; margin:0 0 4px; }
+.sub { margin:0; color:var(--muted); font-size:13px; }
+.hub { font-size:13px; font-weight:700; text-decoration:none; }
+.controls { display:flex; flex-wrap:wrap; gap:8px; align-items:end; }
+label.mini { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+select, input[type="number"] { background:var(--input); border:1px solid var(--line); border-radius:8px; padding:8px 10px; min-height:38px; }
+.stock { display:flex; gap:8px; align-items:center; background:var(--card2); border:1px solid var(--line); border-radius:10px; padding:8px 10px; font-size:13px; color:var(--ink); text-transform:none; letter-spacing:0; font-weight:600; }
+.ghost { background:var(--chip); border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+nav { display:flex; gap:8px; overflow:auto; padding-top:12px; }
+.tab-btn { border:1px solid var(--line); background:var(--chip); color:var(--muted); border-radius:10px; padding:8px 12px; white-space:nowrap; font-size:13px; font-weight:700; }
+.tab-btn.active { background:var(--teal-dim); color:var(--ink); border-color:var(--teal); }
+.hidden { display:none !important; }
+.layout { display:grid; grid-template-columns:minmax(280px,5fr) minmax(0,7fr); gap:16px; }
+.narrow { grid-template-columns:minmax(260px,4fr) minmax(0,8fr); }
+@media (max-width:860px) { .layout, .narrow { grid-template-columns:1fr; } }
+.panel { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; box-shadow:var(--shadow); }
+h2 { font-size:13px; letter-spacing:.06em; text-transform:uppercase; margin:0 0 12px; color:var(--teal); }
+.field { margin:0 0 12px; }
+.field span, .checks legend { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:700; }
+select.full, input.full { width:100%; }
+.two { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+@media (max-width:560px) { .two { grid-template-columns:1fr; } }
+.checks { border:0; margin:0; padding:0; }
+.check { display:flex; gap:8px; align-items:flex-start; background:var(--card2); border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin:0 0 8px; font-size:13px; }
+.card { border:1px solid var(--line); background:var(--card2); border-radius:12px; padding:12px; margin-top:12px; }
+.card.good { border-color:var(--teal); }
+.card.warn { border-color:var(--amber); }
+.card.bad { border-color:var(--bad); }
+.kicker { font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
+.good .kicker { color:var(--teal); }
+.warn .kicker { color:var(--amber); }
+.bad .kicker { color:var(--bad); }
+.dose { font-family:ui-monospace,monospace; font-size:16px; font-weight:700; margin:6px 0; line-height:1.4; }
+.note { font-size:13px; color:var(--muted); line-height:1.45; margin:0; }
+.badges { display:flex; flex-wrap:wrap; gap:6px; }
+.badge { font-size:11px; font-weight:800; border:1px solid var(--line); background:var(--chip); color:var(--teal); border-radius:999px; padding:3px 8px; }
+.mech { width:100%; text-align:left; background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:10px; margin:0 0 8px; }
+.mech.on { border-color:var(--teal); background:var(--teal-dim); }
+.mech b { display:block; }
+.mech small { color:var(--muted); }
+.scroll { overflow:auto; }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+th, td { border-bottom:1px solid var(--line); padding:8px; text-align:center; }
+th:first-child, td:first-child { text-align:left; }
+.cell { border-radius:8px; padding:4px 6px; font-weight:800; border:1px solid var(--line); }
+.cell.active { background:#14532d; color:#bbf7d0; }
+.cell.variable { background:#78350f; color:#fde68a; }
+.cell.resistant { background:#7f1d1d; color:#fecaca; }
+.cell.unstocked { background:var(--chip); color:var(--muted); }
+html.light .cell.active { background:#dcfce7; color:#166534; }
+html.light .cell.variable { background:#fef3c7; color:#92400e; }
+html.light .cell.resistant { background:#fee2e2; color:#991b1b; }
+#pkpdCanvas { width:100%; height:280px; display:block; background:var(--input); border-radius:12px; border:1px solid var(--line); }
+.modal { position:fixed; inset:0; background:rgba(2,6,23,.72); display:flex; align-items:center; justify-content:center; padding:16px; z-index:30; }
+.sheet { background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:16px; max-width:520px; width:100%; padding:16px; position:relative; }
+.close { position:absolute; top:8px; right:8px; }
+.legend { display:flex; flex-wrap:wrap; gap:10px; color:var(--muted); font-size:12px; margin-top:10px; }
+.sw { width:10px; height:10px; display:inline-block; border-radius:2px; margin-right:4px; }
+</style>
 </head>
-<body class="bg-[#0b132b] text-slate-100 font-sans min-h-screen antialiased transition-colors duration-300 light:bg-slate-50 light:text-slate-900" id="appBody">
-
-  <header class="border-b border-slate-800 bg-slate-900/90 sticky top-0 z-40 backdrop-blur-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        
-        <!-- Logo & Title -->
-        <div class="flex items-center space-x-3">
-          <div class="p-2.5 bg-teal-500/10 border border-teal-500/30 rounded-xl text-teal-400">
-            <i data-lucide="dna" class="w-7 h-7"></i>
-          </div>
-          <div>
-            <div class="flex items-center space-x-2">
-              <h1 class="text-xl font-bold tracking-tight text-white">IDSA Antibiotic Selection & Resistance Simulator</h1>
-              <span class="px-2 py-0.5 text-xs font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/30 rounded-full">IDSA 2023–2024 Guidelines</span>
-            </div>
-            <p class="text-xs text-slate-400">Clinical decision support for Gram-Negative Carbapenemases, DTR-Pseudomonas & PK/PD optimization</p>
-          </div>
-        </div>
-
-        <!-- Preset Quick Loader & Theme Toggle -->
-        <div class="flex items-center space-x-3 self-end md:self-auto">
-          <div class="relative">
-            <select id="presetSelect" onchange="loadScenarioPreset(this.value)" class="bg-slate-800 text-xs font-medium text-teal-300 border border-teal-500/30 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer">
-              <option value="">⚡ Quick Load Clinical Scenario...</option>
-              <option value="oxa48_uti">OXA-48 Klebsiella pneumoniae cUTI</option>
-              <option value="ndm_sepsis">NDM-1 Metallo-Beta-Lactamase Septic Shock</option>
-              <option value="dual_producer">Dual NDM + OXA-48 Enterobacterales</option>
-              <option value="crab_vap">CRAB Acinetobacter VAP (ICU)</option>
-              <option value="ampc_bacteremia">AmpC Derepressed Enterobacter cloacae</option>
-              <option value="dtr_p_aeruginosa">DTR Pseudomonas aeruginosa HAP</option>
-            </select>
-          </div>
-
-          <button onclick="toggleTheme()" class="p-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition" title="Toggle Light/Dark Theme">
-            <i data-lucide="sun" id="themeIcon" class="w-4 h-4"></i>
-          </button>
-        </div>
-
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <a class="hub" href="hub.html">Back to hub</a>
+        <h1>IDSA antibiotic selection and resistance</h1>
+        <p class="sub">Empiric regimen, directed therapy, resistance matrix, and a teaching PK sketch. Cefiderocol stays off unless you say it is in stock.</p>
       </div>
-
-      <nav class="flex space-x-2 mt-4 border-t border-slate-800/80 pt-3 overflow-x-auto pb-1" id="mainTabs">
-        <button onclick="switchTab('empirical')" id="tab-empirical" class="tab-btn flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-teal-600 text-white shadow-lg shadow-teal-900/30">
-          <i data-lucide="stethoscope" class="w-4 h-4"></i>
-          <span>Mode 1: Empirical Selection</span>
-        </button>
-
-        <button onclick="switchTab('directed')" id="tab-directed" class="tab-btn flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white">
-          <i data-lucide="shield-alert" class="w-4 h-4"></i>
-          <span>Mode 2: Directed Therapy & Carbapenemases</span>
-        </button>
-
-        <button onclick="switchTab('matrix')" id="tab-matrix" class="tab-btn flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white">
-          <i data-lucide="grid" class="w-4 h-4"></i>
-          <span>Mode 3: Resistance Spectrum Matrix</span>
-        </button>
-
-        <button onclick="switchTab('pkpd')" id="tab-pkpd" class="tab-btn flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white">
-          <i data-lucide="activity" class="w-4 h-4"></i>
-          <span>Mode 4: PK/PD & Dosing Calculator</span>
-        </button>
-      </nav>
+      <div class="controls">
+        <label class="mini">Clearance
+          <select id="renalBand" onchange="refreshAll()">
+            <option value="normal">More than 50 mL/min</option>
+            <option value="moderate">30 to 50</option>
+            <option value="severe">15 to 29</option>
+            <option value="hd">Hemodialysis</option>
+            <option value="crrt">CRRT</option>
+            <option value="arc">Augmented, over 130</option>
+          </select>
+        </label>
+        <label class="mini">Weight kg
+          <input id="wtKg" type="number" min="30" max="200" value="70" oninput="refreshAll()">
+        </label>
+        <label class="stock"><input id="fideStock" type="checkbox" onchange="refreshAll()"> Cefiderocol is in stock</label>
+        <select id="presetSelect" onchange="loadScenarioPreset(this.value)">
+          <option value="">Load a case</option>
+          <option value="oxa48_uti">OXA-48 urine infection</option>
+          <option value="ndm_sepsis">NDM septic shock</option>
+          <option value="dual_producer">NDM plus OXA-48</option>
+          <option value="crab_vap">CRAB pneumonia</option>
+          <option value="ampc_bacteremia">AmpC bacteremia</option>
+          <option value="dtr_p_aeruginosa">Difficult Pseudomonas</option>
+        </select>
+        <button class="ghost" id="themeIcon" onclick="toggleTheme()">Light</button>
+      </div>
     </div>
-  </header>
-
-  <!-- MAIN CONTAINER -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-
-    <section id="view-empirical" class="tab-view block space-y-6">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        <!-- Left Panel: Empirical Inputs -->
-        <div class="lg:col-span-5 glass-panel rounded-2xl p-5 border border-slate-700/60 space-y-5">
-          <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
-            <h2 class="text-sm font-bold text-teal-400 uppercase tracking-wider flex items-center gap-2">
-              <i data-lucide="sliders" class="w-4 h-4"></i> Patient Empirical Risk Profile
-            </h2>
-            <span class="text-xs text-slate-400">Step 1 of 2</span>
-          </div>
-
-          <!-- Infection Source -->
-          <div>
-            <label class="block text-xs font-medium text-slate-300 mb-1.5">Primary Infection Source</label>
-            <select id="empSource" onchange="updateEmpirical()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 focus:ring-2 focus:ring-teal-500 focus:outline-none">
-              <option value="hap_vap">Hospital-Acquired / Ventilator Pneumonia (HAP/VAP)</option>
-              <option value="cuti">Complicated UTI / Pyelonephritis (cUTI)</option>
-              <option value="ciai">Complicated Intra-Abdominal Infection (cIAI)</option>
-              <option value="sepsis_unknown">Sepsis / Septic Shock (Unknown Source)</option>
-              <option value="ssti">Severe Skin & Soft Tissue Infection / Necrotizing</option>
-            </select>
-          </div>
-
-          <!-- Care Setting & Renal Function Grid -->
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1.5">Setting / Acuity</label>
-              <select id="empSetting" onchange="updateEmpirical()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 focus:ring-2 focus:ring-teal-500 focus:outline-none">
-                <option value="icu">ICU / Septic Shock</option>
-                <option value="ward">Inpatient Ward</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1.5">Renal eGFR</label>
-              <select id="empEGFR" onchange="updateEmpirical()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 focus:ring-2 focus:ring-teal-500 focus:outline-none">
-                <option value="normal">&gt; 50 mL/min (Normal)</option>
-                <option value="moderate">30–50 mL/min (Moderate)</option>
-                <option value="severe">&lt; 30 mL/min (Severe Renal Impairment)</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Allergy Switch -->
-          <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center justify-between">
-            <div>
-              <div class="text-xs font-semibold text-slate-200">Severe Beta-Lactam Allergy</div>
-              <div class="text-[11px] text-slate-400">Anaphylaxis, Angioedema, or SJS history</div>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="empAllergy" onchange="updateEmpirical()" class="sr-only peer">
-              <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-            </label>
-          </div>
-
-          <!-- Risk Factors -->
-          <div class="space-y-2 pt-2 border-t border-slate-800">
-            <span class="text-xs font-semibold text-slate-400 block uppercase tracking-wider">Pathogen Risk Vectors</span>
-            
-            <label class="flex items-center space-x-3 p-2.5 bg-slate-900/40 rounded-lg border border-slate-800 cursor-pointer hover:bg-slate-900">
-              <input type="checkbox" id="riskMRSA" onchange="updateEmpirical()" class="w-4 h-4 text-teal-600 bg-slate-800 border-slate-600 rounded focus:ring-teal-500">
-              <span class="text-xs font-medium text-slate-200">MRSA Risk (Prior colonization, recent IV antibiotics, high local ICU prevalence)</span>
-            </label>
-
-            <label class="flex items-center space-x-3 p-2.5 bg-slate-900/40 rounded-lg border border-slate-800 cursor-pointer hover:bg-slate-900">
-              <input type="checkbox" id="riskPseudo" onchange="updateEmpirical()" class="w-4 h-4 text-teal-600 bg-slate-800 border-slate-600 rounded focus:ring-teal-500">
-              <span class="text-xs font-medium text-slate-200">Pseudomonas / DTR Risk (Structural lung disease, recent hospitalization)</span>
-            </label>
-
-            <label class="flex items-center space-x-3 p-2.5 bg-slate-900/40 rounded-lg border border-slate-800 cursor-pointer hover:bg-slate-900">
-              <input type="checkbox" id="riskESBL" onchange="updateEmpirical()" class="w-4 h-4 text-teal-600 bg-slate-800 border-slate-600 rounded focus:ring-teal-500">
-              <span class="text-xs font-medium text-slate-200">ESBL / AmpC High Risk (Prior travel, recurrent UTI, prior 3rd gen cephalosporins)</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Right Panel: Empirical Recommendation Output -->
-        <div class="lg:col-span-7 space-y-5">
-          <div class="glass-panel rounded-2xl p-5 border border-slate-700/60">
-            <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
-              <h2 class="text-sm font-bold text-teal-400 uppercase tracking-wider flex items-center gap-2">
-                <i data-lucide="pill" class="w-4 h-4"></i> IDSA Guidelines Empiric Regimen
-              </h2>
-              <span class="px-2.5 py-1 text-xs font-bold rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30" id="empMatchTag">Empiric Matched</span>
-            </div>
-
-            <!-- Primary Regimen Card -->
-            <div class="mt-4 p-4 rounded-xl bg-slate-900/80 border border-teal-500/40 space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold uppercase tracking-wider text-teal-400">Primary Preferred Regimen</span>
-                <span class="text-xs font-mono text-slate-400" id="empDosageNote">Renal Dosage Adjusted</span>
-              </div>
-              <div class="text-lg font-bold text-white font-mono" id="empPrimaryRegimen">
-                Cefepime 2g IV q8h + Vancomycin 15-20 mg/kg IV q8-12h
-              </div>
-              <div class="flex flex-wrap gap-2 pt-1" id="empCoverageBadges">
-                <!-- Badges populated by JS -->
-              </div>
-            </div>
-
-            <!-- Alternative Regimen Card -->
-            <div class="mt-4 p-4 rounded-xl bg-slate-900/50 border border-slate-700/80 space-y-2">
-              <div class="text-xs font-bold uppercase tracking-wider text-amber-400">Alternative Regimen (Severe Allergy / Renal Alternative)</div>
-              <div class="text-sm font-semibold text-slate-200 font-mono" id="empAltRegimen">
-                Aztreonam 2g IV q8h + Vancomycin 15 mg/kg IV q12h
-              </div>
-            </div>
-
-            <!-- Clinical Rationale Box -->
-            <div class="mt-4 p-4 rounded-xl bg-slate-900/40 border border-slate-800 space-y-2">
-              <h3 class="text-xs font-bold uppercase text-slate-300 flex items-center gap-2">
-                <i data-lucide="info" class="w-4 h-4 text-teal-400"></i> Guideline Clinical Rationale
-              </h3>
-              <p class="text-xs text-slate-300 leading-relaxed" id="empRationale">
-                Regimen selected to ensure broad spectrum coverage for Gram-negative bacilli (including Pseudomonas aeruginosa) and Staphylococcus aureus based on high acuity and MRSA risk vectors.
-              </p>
-            </div>
-          </div>
-        </div>
-
+    <nav>
+      <button class="tab-btn active" id="tab-empirical" onclick="switchTab('empirical')">1. Empiric</button>
+      <button class="tab-btn" id="tab-directed" onclick="switchTab('directed')">2. Directed</button>
+      <button class="tab-btn" id="tab-matrix" onclick="switchTab('matrix')">3. Matrix</button>
+      <button class="tab-btn" id="tab-pkpd" onclick="switchTab('pkpd')">4. PK sketch</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+<section id="view-empirical" class="tab-view">
+  <div class="layout">
+    <div class="panel">
+      <h2>Empiric risk</h2>
+      <label class="field"><span>Source</span>
+        <select id="empSource" class="full" onchange="updateEmpirical()">
+          <option value="hap_vap">Hospital or ventilator pneumonia</option>
+          <option value="cuti">Complicated urine infection</option>
+          <option value="ciai">Complicated abdominal infection</option>
+          <option value="sepsis_unknown">Sepsis, source not known</option>
+          <option value="ssti">Severe skin or soft tissue</option>
+        </select>
+      </label>
+      <label class="field"><span>Setting</span>
+        <select id="empSetting" class="full" onchange="updateEmpirical()">
+          <option value="icu">ICU or shock</option>
+          <option value="ward">Ward</option>
+        </select>
+      </label>
+      <label class="check"><input id="empAllergy" type="checkbox" onchange="updateEmpirical()"> Severe beta-lactam allergy. Anaphylaxis, swelling, or a severe rash.</label>
+      <fieldset class="checks">
+        <legend>Risk</legend>
+        <label class="check"><input id="riskMRSA" type="checkbox" onchange="updateEmpirical()"> MRSA</label>
+        <label class="check"><input id="riskPseudo" type="checkbox" onchange="updateEmpirical()"> Pseudomonas</label>
+        <label class="check"><input id="riskESBL" type="checkbox" onchange="updateEmpirical()"> ESBL or AmpC</label>
+      </fieldset>
+    </div>
+    <div class="panel">
+      <h2>Empiric regimen</h2>
+      <p class="note" id="empDosageNote"></p>
+      <div class="card good">
+        <div class="kicker">Give this</div>
+        <div class="dose" id="empPrimaryRegimen"></div>
+        <div class="badges" id="empCoverageBadges"></div>
       </div>
-    </section>
-
-    <section id="view-directed" class="tab-view hidden space-y-6">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        <!-- Left Column: Enzymatic Mechanism Selector -->
-        <div class="lg:col-span-5 glass-panel rounded-2xl p-5 border border-slate-700/60 space-y-4">
-          <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
-            <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
-              <i data-lucide="microscope" class="w-4 h-4"></i> Culture Mechanism & Enzyme Profile
-            </h2>
-            <span class="text-xs text-slate-400">IDSA Directed</span>
-          </div>
-
-          <p class="text-xs text-slate-300">Select the phenotypic or genotypic resistance mechanism reported from PCR / rapid diagnostic blood culture panels:</p>
-
-          <div class="space-y-2" id="mechanismSelector">
-            <!-- Selector Buttons generated or updated via JS -->
-          </div>
-        </div>
-
-        <!-- Right Column: Directed Recommendations -->
-        <div class="lg:col-span-7 space-y-5">
-          <div class="glass-panel rounded-2xl p-5 border border-slate-700/60 space-y-4">
-            
-            <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
-              <div>
-                <h2 class="text-base font-bold text-white flex items-center gap-2" id="dirMechanismTitle">
-                  OXA-48-like Carbapenemase
-                </h2>
-                <span class="text-xs text-slate-400" id="dirAmblerClass">Ambler Class D Serine Beta-Lactamase</span>
-              </div>
-              <span class="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30" id="dirEnzymeBadge">Class D Serine</span>
-            </div>
-
-            <!-- First-Line Directed Drug Choice -->
-            <div class="p-4 rounded-xl bg-teal-950/40 border border-teal-500/50 space-y-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-teal-400 flex items-center gap-1.5">
-                <i data-lucide="check-circle-2" class="w-4 h-4"></i> IDSA Preferred First-Line Directed Therapy
-              </span>
-              <div class="text-lg font-bold text-white font-mono" id="dirPreferredDrug">
-                Ceftazidime-avibactam (CZA) 2.5g IV q8h
-              </div>
-              <p class="text-xs text-slate-300" id="dirPreferredNote">
-                Avibactam effectively inhibits OXA-48 carbapenemases. Cefiderocol is an alternative preferred agent.
-              </p>
-            </div>
-
-            <!-- Important Ineffectiveness Warning Box -->
-            <div class="p-4 rounded-xl bg-red-950/40 border border-red-500/40 space-y-2" id="dirWarningContainer">
-              <span class="text-xs font-bold uppercase tracking-wider text-red-400 flex items-center gap-1.5">
-                <i data-lucide="alert-triangle" class="w-4 h-4"></i> Critical Guideline Pitfall / Ineffective Agents
-              </span>
-              <p class="text-xs text-red-200 leading-relaxed" id="dirWarningText">
-                <strong>Do NOT use Meropenem-vaborbactam or Imipenem-relebactam for OXA-48.</strong> Neither Vaborbactam nor Relebactam inhibit Class D OXA-48 enzymes, leading to treatment failure!
-              </p>
-            </div>
-
-            <!-- Alternative Agents -->
-            <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-700/80 space-y-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Alternative IDSA Agents</span>
-              <div class="text-sm font-semibold text-teal-300 font-mono" id="dirAltDrugs">
-                Cefiderocol 2g IV q8h (over 3 hours)
-              </div>
-            </div>
-
-            <!-- Stewardship & De-escalation Advice -->
-            <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800 space-y-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                <i data-lucide="shield-check" class="w-4 h-4 text-teal-400"></i> Antimicrobial Stewardship & De-escalation Path
-              </span>
-              <p class="text-xs text-slate-300 leading-relaxed" id="dirStewardship">
-                Discontinue empiric Vancomycin and empiric double Gram-negative coverage immediately upon confirmation of directed therapy. Obtain follow-up blood cultures to document clearance.
-              </p>
-            </div>
-
-          </div>
-        </div>
-
+      <div class="card warn">
+        <div class="kicker">If that drug cannot be given</div>
+        <div class="dose" id="empAltRegimen"></div>
       </div>
-    </section>
-
-    <section id="view-matrix" class="tab-view hidden space-y-6">
-      <div class="glass-panel rounded-2xl p-5 border border-slate-700/60 space-y-4">
-        
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-700/60 pb-3">
-          <div>
-            <h2 class="text-base font-bold text-white flex items-center gap-2">
-              <i data-lucide="grid" class="w-5 h-5 text-teal-400"></i> Novel Beta-Lactamase Inhibitor Spectrum Matrix
-            </h2>
-            <p class="text-xs text-slate-400">Comparative activity against major resistant phenotypes (IDSA 2023–2024)</p>
-          </div>
-
-          <!-- Matrix Filters -->
-          <div class="flex items-center space-x-2">
-            <span class="text-xs text-slate-400">Filter View:</span>
-            <button onclick="filterMatrix('all')" id="btn-filter-all" class="px-2.5 py-1 text-xs rounded-lg font-medium bg-teal-600 text-white">All Enzymes</button>
-            <button onclick="filterMatrix('carbapenemase')" id="btn-filter-carbapenemase" class="px-2.5 py-1 text-xs rounded-lg font-medium bg-slate-800 text-slate-300 hover:bg-slate-700">Carbapenemases Only</button>
-          </div>
-        </div>
-
-        <!-- Matrix Table Container -->
-        <div class="overflow-x-auto">
-          <table class="w-full text-xs text-left text-slate-300">
-            <thead class="text-[11px] font-bold uppercase bg-slate-900/90 text-slate-300 border-b border-slate-700">
-              <tr>
-                <th scope="col" class="py-3 px-4 min-w-[160px]">Resistance / Organism</th>
-                <th scope="col" class="py-3 px-3 text-center">CZA<br><span class="text-[9px] font-normal text-slate-400">Ceftaz-Avibactam</span></th>
-                <th scope="col" class="py-3 px-3 text-center">MEV<br><span class="text-[9px] font-normal text-slate-400">Mero-Vaborbactam</span></th>
-                <th scope="col" class="py-3 px-3 text-center">I-R<br><span class="text-[9px] font-normal text-slate-400">Imi-Relebactam</span></th>
-                <th scope="col" class="py-3 px-3 text-center">C/T<br><span class="text-[9px] font-normal text-slate-400">Ceftoloz-Tazo</span></th>
-                <th scope="col" class="py-3 px-3 text-center">SUL-DUR<br><span class="text-[9px] font-normal text-slate-400">Sulb-Durlobactam</span></th>
-                <th scope="col" class="py-3 px-3 text-center">FDC<br><span class="text-[9px] font-normal text-slate-400">Cefiderocol</span></th>
-                <th scope="col" class="py-3 px-3 text-center">ATM-AVI / CZA+ATM<br><span class="text-[9px] font-normal text-slate-400">Aztreonam-Avibactam</span></th>
-              </tr>
-            </thead>
-            <tbody id="matrixTableBody" class="divide-y divide-slate-800 font-medium">
-              <!-- Rendered dynamically by JS -->
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Matrix Legend & Note -->
-        <div class="flex flex-wrap items-center justify-between gap-4 pt-3 text-xs border-t border-slate-800 text-slate-400">
-          <div class="flex items-center space-x-4">
-            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-emerald-500"></span> Active (First Line)</span>
-            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-amber-500"></span> Variable / Conditional</span>
-            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-red-500"></span> Inactive / Resistance</span>
-          </div>
-          <div>Click any cell in matrix for full biochemical mechanism detail.</div>
-        </div>
-
-      </div>
-    </section>
-
-    <section id="view-pkpd" class="tab-view hidden space-y-6">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        <!-- Controls Column -->
-        <div class="lg:col-span-4 glass-panel rounded-2xl p-5 border border-slate-700/60 space-y-4">
-          <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
-            <h2 class="text-sm font-bold text-teal-400 uppercase tracking-wider flex items-center gap-2">
-              <i data-lucide="sliders" class="w-4 h-4"></i> PK/PD Simulation Parameters
-            </h2>
-            <span class="text-xs text-slate-400">Beta-Lactam T &gt; MIC</span>
-          </div>
-
-          <!-- Drug Selection -->
-          <div>
-            <label class="block text-xs font-medium text-slate-300 mb-1">Select Beta-Lactam Agent</label>
-            <select id="pkDrug" onchange="drawPKPDGraph()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200">
-              <option value="meropenem">Meropenem (2g q8h)</option>
-              <option value="cefepime">Cefepime (2g q8h)</option>
-              <option value="piptazo">Piperacillin-Tazobactam (4.5g q6h)</option>
-              <option value="ceftazidime">Ceftazidime (2g q8h)</option>
-            </select>
-          </div>
-
-          <!-- Infusion Mode -->
-          <div>
-            <label class="block text-xs font-medium text-slate-300 mb-1">Infusion Protocol</label>
-            <select id="pkInfusion" onchange="drawPKPDGraph()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200">
-              <option value="extended">Extended Infusion (3–4 Hours)</option>
-              <option value="bolus">Standard Bolus (30 Minutes)</option>
-              <option value="continuous">Continuous 24-Hour Infusion</option>
-            </select>
-          </div>
-
-          <!-- Pathogen MIC slider -->
-          <div>
-            <div class="flex justify-between items-center mb-1">
-              <label class="text-xs font-medium text-slate-300">Pathogen MIC Target (mg/L)</label>
-              <span class="text-xs font-mono font-bold text-teal-400" id="micVal">4.0 mg/L</span>
-            </div>
-            <input type="range" id="pkMIC" min="0.5" max="16" step="0.5" value="4" oninput="document.getElementById('micVal').textContent = this.value + ' mg/L'; drawPKPDGraph();" class="w-full accent-teal-500 bg-slate-800 rounded-lg h-2 cursor-pointer">
-          </div>
-
-          <!-- Renal Function Adjustment -->
-          <div>
-            <label class="block text-xs font-medium text-slate-300 mb-1">Patient Renal Clearance (CrCl)</label>
-            <select id="pkCrCl" onchange="drawPKPDGraph()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200">
-              <option value="120">CrCl &gt; 90 mL/min (Normal / Hyperdynamic)</option>
-              <option value="45">CrCl 30–50 mL/min (Moderate Impairment)</option>
-              <option value="20">CrCl &lt; 30 mL/min (Severe Impairment)</option>
-            </select>
-          </div>
-
-          <!-- Target Metric Cards -->
-          <div class="grid grid-cols-2 gap-3 pt-2">
-            <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800">
-              <div class="text-[10px] text-slate-400 font-semibold uppercase">% Time &gt; MIC</div>
-              <div class="text-xl font-bold font-mono text-emerald-400 mt-1" id="timeAboveMICVal">100%</div>
-            </div>
-            <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800">
-              <div class="text-[10px] text-slate-400 font-semibold uppercase">PK/PD Target Goal</div>
-              <div class="text-xs font-bold font-mono text-teal-300 mt-1" id="targetGoalStatus">Achieved (&gt;40–100%)</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Canvas Visualizer Column -->
-        <div class="lg:col-span-8 glass-panel rounded-2xl p-5 border border-slate-700/60 flex flex-col justify-between space-y-4">
-          <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
-            <div>
-              <h2 class="text-base font-bold text-white flex items-center gap-2">
-                <i data-lucide="activity" class="w-5 h-5 text-teal-400"></i> Serum Concentration Curve over 24 Hours
-              </h2>
-              <p class="text-xs text-slate-400">Simulated plasma levels relative to MIC threshold in ICU sepsis</p>
-            </div>
-            <span class="text-xs font-mono px-2.5 py-1 bg-teal-500/10 text-teal-300 border border-teal-500/30 rounded-lg" id="pkDrugLabel">Meropenem 2g q8h (Extended)</span>
-          </div>
-
-          <!-- Canvas Graph Container -->
-          <div class="relative w-full h-[300px] bg-slate-950 rounded-xl border border-slate-800 p-2 overflow-hidden">
-            <canvas id="pkpdCanvas" class="w-full h-full block"></canvas>
-          </div>
-
-          <!-- Dynamic Rationale Explanation -->
-          <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-            <h3 class="text-xs font-bold text-teal-400 uppercase tracking-wider mb-1">Clinical PK/PD Pearl</h3>
-            <p class="text-xs text-slate-300 leading-relaxed" id="pkpdPearl">
-              Beta-lactam antibiotics exhibit time-dependent bactericidal killing. Extended infusions (3-4 hours) or continuous infusions optimize %T > MIC without increasing total daily dose, significantly improving clinical cure rates in critically ill patients with severe infections or elevated MIC organisms.
-            </p>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-  </main>
-
-  <div id="detailModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative">
-      <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
-        <i data-lucide="x" class="w-5 h-5"></i>
-      </button>
-      <div id="modalContent">
-        <!-- Dynamically injected content -->
+      <div class="card">
+        <div class="kicker">Why</div>
+        <p class="note" id="empRationale"></p>
       </div>
     </div>
   </div>
-
-  <!-- JS SCRIPT SECTION -->
-  <script>
-
-    // Global App State
-    let currentTab = 'empirical';
-    let currentFilter = 'all';
-
-    // Empirical Clinical Rules Matrix (IDSA Guidelines)
-    const empiricalRules = {
-      hap_vap: {
-        standard: { primary: "Cefepime 2g IV q8h OR Piperacillin-tazobactam 4.5g IV q6h", alt: "Levofloxacin 750mg IV q24h", rationale: "Provides empirical coverage for Gram-negative bacilli including Pseudomonas aeruginosa and MSSA." },
-        mrsa: { primary: "Cefepime 2g IV q8h + Vancomycin 15-20 mg/kg IV q8-12h", alt: "Aztreonam 2g IV q8h + Linezolid 600mg IV q12h", rationale: "Empiric Vancomycin added due to MRSA risk factors or local ICU MRSA prevalence > 10-20%." },
-        esbl: { primary: "Meropenem 1g IV q8h (Extended Infusion over 3h) + Vancomycin 15-20 mg/kg", alt: "Ceftazidime-avibactam 2.5g IV q8h + Vancomycin", rationale: "Carbapenem or novel B-lactamase inhibitor required due to high ESBL/AmpC risk vector." }
-      },
-      cuti: {
-        standard: { primary: "Ceftriaxone 1g IV q24h OR Ciprofloxacin 400mg IV q12h", alt: "Gentamicin 5mg/kg IV q24h", rationale: "Standard coverage for E. coli, Klebsiella, and Proteus in pyelonephritis/cUTI." },
-        mrsa: { primary: "Ceftriaxone 1g IV q24h + Vancomycin 15 mg/kg IV q12h", alt: "Aztreonam 2g IV q8h + Vancomycin", rationale: "MRSA coverage added for urological instrumentation or known MRSA colonization." },
-        esbl: { primary: "Ertapenem 1g IV q24h OR Meropenem 1g IV q8h", alt: "Ceftazidime-avibactam 2.5g IV q8h", rationale: "Carbapenem is IDSA preferred first-line for ESBL pyelonephritis/cUTI." }
-      },
-      ciai: {
-        standard: { primary: "Piperacillin-tazobactam 4.5g IV q6h OR (Ceftriaxone 2g q24h + Metronidazole 500mg q8h)", alt: "Ciprofloxacin 400mg q12h + Metronidazole 500mg q8h", rationale: "Requires combined coverage for enteric Gram-negative bacilli and anaerobes (Bacteroides fragilis)." },
-        mrsa: { primary: "Piperacillin-tazobactam 4.5g IV q6h + Vancomycin 15 mg/kg IV q12h", alt: "Aztreonam 2g q8h + Metronidazole 500mg + Vancomycin", rationale: "Empiric MRSA added for healthcare-associated intra-abdominal infection or prior surgery." },
-        esbl: { primary: "Meropenem 1g IV q8h + Metronidazole (if additional anaerobic boost needed)", alt: "Ertapenem 1g IV q24h", rationale: "Meropenem provides stable activity against ESBL/AmpC producers with intrinsic B. fragilis activity." }
-      },
-      sepsis_unknown: {
-        standard: { primary: "Piperacillin-tazobactam 4.5g IV q6h OR Cefepime 2g IV q8h", alt: "Levofloxacin 750mg IV q24h + Metronidazole 500mg IV q8h", rationale: "Broad-spectrum coverage for sepsis of undetermined origin." },
-        mrsa: { primary: "Cefepime 2g IV q8h + Vancomycin 15-20 mg/kg IV q8-12h", alt: "Aztreonam 2g IV q8h + Linezolid 600mg IV q12h", rationale: "Broad Gram-negative coverage plus mandatory empiric MRSA coverage in septic shock." },
-        esbl: { primary: "Meropenem 2g IV q8h (Extended Infusion) + Vancomycin 15-20 mg/kg IV", alt: "Ceftazidime-avibactam 2.5g IV q8h + Vancomycin", rationale: "High-dose carbapenem infusion for septic shock with ESBL/Pseudomonas risk vectors." }
-      },
-      ssti: {
-        standard: { primary: "Cefazolin 2g IV q8h OR Cefuroxime 1.5g IV q8h", alt: "Clindamycin 600mg IV q8h", rationale: "Coverage for Streptococcus pyogenes and MSSA in uncomplicated SSTI." },
-        mrsa: { primary: "Vancomycin 15-20 mg/kg IV q8-12h OR Daptomycin 6-8 mg/kg IV q24h", alt: "Linezolid 600mg IV q12h", rationale: "Targeted coverage for purulent SSTI or severe necrotizing MRSA infection." },
-        esbl: { primary: "Piperacillin-tazobactam 4.5g IV q6h + Vancomycin 15-20 mg/kg IV", alt: "Meropenem 1g IV q8h + Vancomycin", rationale: "Polymicrobial necrotizing fasciitis requiring broad Gram-negative, ESBL, and MRSA coverage." }
-      }
-    };
-
-    // Directed Resistance Enzyme Mechanisms (IDSA 2023–2024 Guidance)
-    const directedMechanisms = {
-      kpc: {
-        title: "KPC (Klebsiella pneumoniae Carbapenemase)",
-        ambler: "Ambler Class A Serine Carbapenemase",
-        badge: "Class A Serine",
-        preferred: "Meropenem-vaborbactam 4g IV q8h (over 3h) OR Ceftazidime-avibactam 2.5g IV q8h",
-        preferredNote: "Meropenem-vaborbactam and Ceftazidime-avibactam are IDSA preferred agents. Imipenem-relebactam is an alternative.",
-        warning: "Avoid Ceftolozane-tazobactam (C/T) and piperacillin-tazobactam. Tazobactam does NOT inhibit KPC carbapenemase!",
-        alts: "Imipenem-relebactam 1.25g IV q6h OR Cefiderocol 2g IV q8h",
-        stewardship: "De-escalate from polymyxins/colistin immediately. Mono-therapy with novel B-lactam/BLI is superior and less toxic."
-      },
-      oxa48: {
-        title: "OXA-48-like Carbapenemase",
-        ambler: "Ambler Class D Serine Carbapenemase",
-        badge: "Class D Serine",
-        preferred: "Ceftazidime-avibactam (CZA) 2.5g IV q8h",
-        preferredNote: "Avibactam binds and neutralizes OXA-48 enzymes effectively. Cefiderocol is preferred alternative.",
-        warning: "CRITICAL PITFALL: Do NOT use Meropenem-vaborbactam or Imipenem-relebactam for OXA-48! Vaborbactam and Relebactam do NOT inhibit Class D OXA-48, leading to carbapenem hydrolysis and therapeutic failure.",
-        alts: "Cefiderocol 2g IV q8h (over 3 hours)",
-        stewardship: "Verify whether co-production of MBLs (e.g. NDM) exists in endemic travel cases before relying on CZA monotherapy."
-      },
-      ndm_mbl: {
-        title: "NDM / VIM / IMP (Metallo-Beta-Lactamase)",
-        ambler: "Ambler Class B Metallo-Beta-Lactamase (Zinc-dependent)",
-        badge: "Class B MBL",
-        preferred: "Ceftazidime-avibactam (CZA) 2.5g IV q8h + Aztreonam (ATM) 2g IV q8h (Synergy / Dual Infusion) OR Aztreonam-avibactam",
-        preferredNote: "MBLs hydrolyze all B-lactams EXCEPT Aztreonam. However, MBL strains almost always co-produce ESBLs/AmpC which destroy Aztreonam. Avibactam (from CZA) protects Aztreonam from ESBLs, letting Aztreonam kill the MBL producer!",
-        warning: "Aztreonam monotherapy FAILS in >95% of MBL isolates due to co-produced ESBL/AmpC enzymes. CZA + ATM combination is mandatory.",
-        alts: "Cefiderocol 2g IV q8h (over 3 hours)",
-        stewardship: "When administering CZA + ATM, run simultaneous extended infusions to maintain concurrent synergistic blood levels."
-      },
-      dual_ndm_oxa: {
-        title: "Dual Producer (NDM + OXA-48)",
-        ambler: "Class B (MBL) + Class D (OXA-48) Co-Producers",
-        badge: "Dual Enzyme",
-        preferred: "Ceftazidime-avibactam (CZA) 2.5g q8h + Aztreonam (ATM) 2g q8h OR Cefiderocol 2g q8h",
-        preferredNote: "Aztreonam resists NDM; Avibactam (CZA) inhibits OXA-48 and co-produced ESBLs. Cefiderocol retains siderophore-mediated stability against both.",
-        warning: "All single-agent carbapenemase inhibitors (Vaborbactam, Relebactam, Tazobactam) fail completely against dual producers.",
-        alts: "Cefiderocol 2g IV q8h + Combination secondary agent (e.g. Fosfomycin or Colistin if critical)",
-        stewardship: "Strict contact isolation required; obtain infectious disease & clinical pharmacy consult immediately."
-      },
-      ampc: {
-        title: "AmpC Hyperproducer (Enterobacter, Citrobacter, Serratia)",
-        ambler: "Ambler Class C Beta-Lactamase",
-        badge: "Class C AmpC",
-        preferred: "Cefepime 2g IV q8h (if MIC ≤ 2 mg/L) OR Meropenem 1g IV q8h",
-        preferredNote: "Cefepime resists AmpC hydrolysis due to low binding affinity and rapid outer membrane penetration.",
-        warning: "AVOID Ceftriaxone, Cefotaxime, or Piperacillin-tazobactam even if susceptible in vitro! High risk of AmpC gene derepression during therapy leading to emergent resistance.",
-        alts: "Ceftazidime-avibactam 2.5g IV q8h OR Ertapenem 1g IV q24h",
-        stewardship: "If Cefepime MIC is > 2 mg/L, switch immediately to Meropenem or Ertapenem."
-      },
-      dtr_p_aeruginosa: {
-        title: "DTR-Pseudomonas aeruginosa (Difficult-to-Treat)",
-        ambler: "Non-Fermenter OprD Loss + AmpC / Efflux Hyperexpression",
-        badge: "DTR Pseudomonas",
-        preferred: "Ceftolozane-tazobactam (C/T) 3g IV q8h OR Ceftazidime-avibactam 2.5g IV q8h",
-        preferredNote: "Ceftolozane-tazobactam possesses high intrinsic affinity for Pseudomonas PBP3 and resists efflux pump upregulation.",
-        warning: "Avoid conventional Carbapenems (Meropenem/Imipenem) if OprD porin mutation is present.",
-        alts: "Imipenem-relebactam 1.25g IV q6h OR Cefiderocol 2g IV q8h",
-        stewardship: "Reserve Cefiderocol for strains resistant to both Ceftolozane-tazobactam and Ceftazidime-avibactam."
-      },
-      crab: {
-        title: "CRAB (Carbapenem-Resistant Acinetobacter baumannii)",
-        ambler: "Class D OXA-23 / OXA-24/40 + Class C Hyperproducer",
-        badge: "CRAB",
-        preferred: "Sulbactam-durlobactam (SUL-DUR) 1g/1g IV q6h (in combination with Meropenem)",
-        preferredNote: "Durlobactam is a novel diazabicyclooctane that inhibits Class A, C, and D carbapenemases in Acinetobacter.",
-        warning: "Polymyxin B monotherapy is associated with high mortality and severe nephrotoxicity. SUL-DUR combination is IDSA preferred.",
-        alts: "High-Dose Ampicillin-sulbactam (9g IV q8h extended infusion) + Cefiderocol OR Minocycline",
-        stewardship: "Ensure Meropenem is co-administered with SUL-DUR as per FDA trial protocol even if strain is carbapenem-resistant."
-      },
-      mrsa_vre: {
-        title: "MRSA / VRE (Gram-Positive Resistant)",
-        ambler: "mecA Gene (PBP2a Alteration) / vanA Operon",
-        badge: "Gram-Positive",
-        preferred: "MRSA: Vancomycin (AUC/MIC 400-600) OR Daptomycin 6-10 mg/kg | VRE: Linezolid 600mg IV q12h OR Daptomycin (High Dose 10-12 mg/kg)",
-        preferredNote: "Daptomycin high-dose is preferred for VRE E. faecium bacteremia or endocarditis.",
-        warning: "Do NOT use Daptomycin for MRSA/VRE Pneumonia! Pulmonary surfactant inactivates daptomycin instantly.",
-        alts: "Ceftaroline 600mg IV q8h (MRSA) | Oritavancin / Dalbavancin",
-        stewardship: "Monitor Vancomycin AUC via Bayesian software or peak/trough pairs to prevent nephrotoxicity."
-      }
-    };
-
-    // Matrix Spectrum Data (Novel Agents vs Enzymes)
-    const spectrumMatrixData = [
-      { id: "kpc", name: "KPC (Class A)", category: "carbapenemase", cza: "active", mev: "active", ir: "active", ct: "resistant", suldur: "resistant", fdc: "active", atmavi: "active" },
-      { id: "oxa48", name: "OXA-48-like (Class D)", category: "carbapenemase", cza: "active", mev: "resistant", ir: "resistant", ct: "resistant", suldur: "resistant", fdc: "active", atmavi: "active" },
-      { id: "ndm", name: "NDM / MBL (Class B)", category: "carbapenemase", cza: "resistant", mev: "resistant", ir: "resistant", ct: "resistant", suldur: "resistant", fdc: "active", atmavi: "active" },
-      { id: "dual", name: "Dual (NDM + OXA-48)", category: "carbapenemase", cza: "resistant", mev: "resistant", ir: "resistant", ct: "resistant", suldur: "resistant", fdc: "active", atmavi: "active" },
-      { id: "esbl", name: "ESBL (CTX-M / SHV)", category: "other", cza: "active", mev: "active", ir: "active", ct: "active", suldur: "resistant", fdc: "active", atmavi: "active" },
-      { id: "ampc", name: "AmpC Hyperproducer", category: "other", cza: "active", mev: "active", ir: "active", ct: "variable", suldur: "resistant", fdc: "active", atmavi: "active" },
-      { id: "dtr_p", name: "DTR-Pseudomonas", category: "other", cza: "active", mev: "variable", ir: "active", ct: "active", suldur: "resistant", fdc: "active", atmavi: "variable" },
-      { id: "crab", name: "CRAB (Acinetobacter)", category: "other", cza: "resistant", mev: "resistant", ir: "resistant", ct: "resistant", suldur: "active", fdc: "active", atmavi: "resistant" }
-    ];
-
-
-    function switchTab(tabId) {
-      currentTab = tabId;
-      document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('bg-teal-600', 'text-white', 'shadow-lg');
-        btn.classList.add('bg-slate-800', 'text-slate-300');
-      });
-
-      document.getElementById(`view-${tabId}`).classList.remove('hidden');
-      const activeBtn = document.getElementById(`tab-${tabId}`);
-      activeBtn.classList.remove('bg-slate-800', 'text-slate-300');
-      activeBtn.classList.add('bg-teal-600', 'text-white', 'shadow-lg');
-
-      if (tabId === 'pkpd') {
-        setTimeout(drawPKPDGraph, 50);
-      }
+</section>
+<section id="view-directed" class="tab-view hidden">
+  <div class="layout">
+    <div class="panel">
+      <h2>Organism and enzyme</h2>
+      <label class="field"><span>Site</span>
+        <select id="dirSite" class="full" onchange="renderDirected()">
+          <option value="lung">Lung</option>
+          <option value="urine">Urine</option>
+          <option value="abdomen">Abdomen</option>
+          <option value="blood">Blood</option>
+          <option value="skin">Skin</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <div id="mechanismSelector"></div>
+      <div id="crabBox" class="hidden">
+        <label class="field"><span>CRAB</span>
+          <select id="crabRole" class="full" onchange="renderDirected()">
+            <option value="">Choose</option>
+            <option value="colon">Colonization</option>
+            <option value="invasive">Invasive infection</option>
+          </select>
+        </label>
+        <label class="field"><span>Sulbactam-durlobactam</span>
+          <select id="sdAvail" class="full" onchange="renderDirected()">
+            <option value="">Not answered</option>
+            <option value="yes">Available</option>
+            <option value="no">Not available</option>
+          </select>
+        </label>
+        <label class="field"><span>NDM or another MBL</span>
+          <select id="crabMbl" class="full" onchange="renderDirected()">
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+        </label>
+        <label class="field"><span>Partner</span>
+          <select id="crabPartner" class="full" onchange="renderDirected()">
+            <option value="">Choose</option>
+            <option value="minocycline">Minocycline</option>
+            <option value="polymyxin">Polymyxin B</option>
+            <option value="tigecycline">Tigecycline</option>
+            <option value="cefiderocol">Cefiderocol</option>
+          </select>
+        </label>
+      </div>
+      <div id="dtrBox" class="hidden">
+        <label class="field"><span>Which Pseudomonas drug is susceptible</span>
+          <select id="dtrChoice" class="full" onchange="renderDirected()"></select>
+        </label>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="kicker" id="dirEnzymeBadge"></div>
+      <h2 id="dirMechanismTitle" style="text-transform:none;letter-spacing:0;font-size:20px;color:var(--ink)">Directed therapy</h2>
+      <p class="note" id="dirAmblerClass"></p>
+      <div class="card good">
+        <div class="kicker">Preferred</div>
+        <div class="dose" id="dirPreferredDrug"></div>
+        <p class="note" id="dirPreferredNote"></p>
+      </div>
+      <div class="card bad" id="dirWarningContainer">
+        <div class="kicker">Do not do this</div>
+        <p class="note" id="dirWarningText"></p>
+      </div>
+      <div class="card">
+        <div class="kicker">Alternative</div>
+        <div class="dose" id="dirAltDrugs"></div>
+      </div>
+      <div class="card">
+        <div class="kicker">Stewardship</div>
+        <p class="note" id="dirStewardship"></p>
+      </div>
+    </div>
+  </div>
+</section>
+<section id="view-matrix" class="tab-view hidden">
+  <div class="panel">
+    <div class="top">
+      <div>
+        <h2>Resistance matrix</h2>
+        <p class="note">Activity of the newer agents. Cefiderocol shows as not stocked until you tick it at the top.</p>
+      </div>
+      <div>
+        <button id="btn-filter-all" class="tab-btn active" onclick="filterMatrix('all')">All</button>
+        <button id="btn-filter-carbapenemase" class="tab-btn" onclick="filterMatrix('carbapenemase')">Carbapenemases</button>
+      </div>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Enzyme</th><th>CZA</th><th>MEV</th><th>I-R</th><th>C/T</th><th>SUL-DUR</th><th>FDC</th><th>ATM-AVI</th>
+          </tr>
+        </thead>
+        <tbody id="matrixTableBody"></tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <span><i class="sw" style="background:#166534"></i>Active</span>
+      <span><i class="sw" style="background:#b45309"></i>Variable</span>
+      <span><i class="sw" style="background:#991b1b"></i>Inactive</span>
+      <span><i class="sw" style="background:#64748b"></i>Not stocked</span>
+    </div>
+  </div>
+</section>
+<section id="view-pkpd" class="tab-view hidden">
+  <div class="narrow layout">
+    <div class="panel">
+      <h2>Teaching sketch</h2>
+      <p class="note">This is not a measured level. One compartment, the dose from the clearance at the top, and a target of 100% of the interval in shock or 70% on the ward.</p>
+      <label class="field"><span>Drug</span>
+        <select id="pkDrug" class="full" onchange="drawPKPDGraph()">
+          <option value="meropenem">Meropenem</option>
+          <option value="cefepime">Cefepime</option>
+          <option value="piptazo">Piperacillin-tazobactam</option>
+          <option value="ceftazidime">Ceftazidime</option>
+        </select>
+      </label>
+      <label class="field"><span>Infusion</span>
+        <select id="pkInfusion" class="full" onchange="drawPKPDGraph()">
+          <option value="extended">3 hours</option>
+          <option value="bolus">30 minutes</option>
+          <option value="continuous">Continuous</option>
+        </select>
+      </label>
+      <label class="field"><span>MIC mg/L <b id="micVal">4</b></span>
+        <input id="pkMIC" type="range" min="0.5" max="16" step="0.5" value="4" oninput="document.getElementById('micVal').textContent=this.value; drawPKPDGraph();">
+      </label>
+      <div class="two">
+        <div class="card"><div class="kicker">Time above MIC</div><div class="dose" id="timeAboveMICVal">—</div></div>
+        <div class="card"><div class="kicker">Teaching target</div><p class="note" id="targetGoalStatus"></p></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="top"><h2>Concentration sketch</h2><span class="badge" id="pkDrugLabel"></span></div>
+      <canvas id="pkpdCanvas" width="800" height="320"></canvas>
+      <p class="note" id="pkpdPearl"></p>
+    </div>
+  </div>
+</section>
+</main>
+<div id="detailModal" class="modal hidden" onclick="if(event.target===this)closeModal()">
+  <div class="sheet">
+    <button class="ghost close" onclick="closeModal()">Close</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+<script>
+var currentTab='empirical', currentFilter='all', currentMechanism='oxa48';
+var BETA={cefepime:1,piptazo:1,meropenem:1,ceftriaxone:1,ertapenem:1,cefazolin:1,aztreonam:1,ceftazavi:1,merovab:1,imirele:1,ceftolozane:1,cefiderocol:1,sulbactam:1};
+function $(id){ return document.getElementById(id); }
+function band(){ return $('renalBand').value; }
+function fideOn(){ return $('fideStock').checked; }
+function wt(){ var n=parseFloat($('wtKg').value); return n>20?n:70; }
+function icuOn(){ return $('empSetting').value==='icu'; }
+function renalName(){
+  return {normal:'Clearance over 50 mL/min.',moderate:'Clearance 30 to 50.',severe:'Clearance 15 to 29.',hd:'Hemodialysis.',crrt:'CRRT. The label often has no CRRT dose. This is the usual ICU dose.',arc:'Augmented clearance, over 130.'}[band()];
+}
+function doseOf(id,o){
+  o=o||{};
+  var b=o.band||band(), lung=!!o.lung, high=!!o.high||!!o.icu||lung, inf=o.icu?' over 3 hours':' over 30 minutes';
+  function pick(map){ return map[b]||map.normal; }
+  if(id==='cefepime') return pick({normal:'Cefepime 2 g IV every 8 hours'+inf,arc:'Cefepime 2 g IV every 6 hours'+inf,moderate:'Cefepime 2 g IV every 12 hours'+inf,severe:'Cefepime 2 g IV every 24 hours'+inf,hd:'Cefepime 1 g IV every 24 hours, after dialysis',crrt:'Cefepime 2 g IV every 8 hours'+inf});
+  if(id==='piptazo') return pick({normal:'Piperacillin-tazobactam 4.5 g IV every 6 hours'+inf,arc:'Piperacillin-tazobactam 4.5 g IV every 6 hours'+inf,moderate:'Piperacillin-tazobactam 3.375 g IV every 6 hours'+inf,severe:'Piperacillin-tazobactam 2.25 g IV every 6 hours'+inf,hd:'Piperacillin-tazobactam 2.25 g IV every 8 hours, plus a dose after dialysis',crrt:'Piperacillin-tazobactam 4.5 g IV every 8 hours'+inf});
+  if(id==='meropenem'){
+    if(high) return pick({normal:'Meropenem 2 g IV every 8 hours'+inf,arc:'Meropenem 2 g IV every 8 hours'+inf,moderate:'Meropenem 2 g IV every 12 hours'+inf,severe:'Meropenem 1 g IV every 12 hours'+inf,hd:'Meropenem 1 g IV after dialysis',crrt:'Meropenem 2 g IV every 8 hours'+inf});
+    return pick({normal:'Meropenem 1 g IV every 8 hours'+inf,arc:'Meropenem 2 g IV every 8 hours'+inf,moderate:'Meropenem 1 g IV every 12 hours'+inf,severe:'Meropenem 500 mg IV every 12 hours'+inf,hd:'Meropenem 500 mg IV every 24 hours, after dialysis',crrt:'Meropenem 1 g IV every 8 hours'+inf});
+  }
+  if(id==='ceftriaxone') return 'Ceftriaxone 2 g IV every 24 hours. Creatinine does not change this dose.';
+  if(id==='ertapenem') return pick({normal:'Ertapenem 1 g IV every 24 hours',arc:'Ertapenem 1 g IV every 24 hours',moderate:'Ertapenem 1 g IV every 24 hours',severe:'Ertapenem 500 mg IV every 24 hours',hd:'Ertapenem 500 mg IV every 24 hours, after dialysis',crrt:'Ertapenem is a poor CRRT drug. Use meropenem.'});
+  if(id==='vancomycin') return pick({normal:'Vancomycin 15 to 20 mg/kg IV, then by the AUC. A level decides the next dose.',arc:'Vancomycin 15 to 20 mg/kg IV every 8 hours, then by the AUC.',moderate:'Vancomycin 15 to 20 mg/kg IV every 24 hours, then by the AUC.',severe:'Vancomycin 15 to 20 mg/kg IV once, then check a level before the next dose.',hd:'Vancomycin 15 to 20 mg/kg IV, then by the level. Give it after dialysis.',crrt:'Vancomycin 15 to 20 mg/kg IV every 24 hours, then by the level.'});
+  if(id==='linezolid') return 'Linezolid 600 mg IV or by mouth every 12 hours. Creatinine does not change this dose.';
+  if(id==='aztreonam') return pick({normal:'Aztreonam 2 g IV every 8 hours over 3 hours',arc:'Aztreonam 2 g IV every 6 hours over 3 hours',moderate:'Aztreonam 1 g IV every 8 hours over 3 hours',severe:'Aztreonam 1 g IV every 8 hours over 3 hours',hd:'Aztreonam 500 mg IV every 8 hours, plus a dose after dialysis',crrt:'Aztreonam 2 g IV every 8 hours over 3 hours'});
+  if(id==='levofloxacin') return pick({normal:'Levofloxacin 750 mg IV every 24 hours',arc:'Levofloxacin 750 mg IV every 24 hours',moderate:'Levofloxacin 750 mg IV once, then 750 mg every 48 hours',severe:'Levofloxacin 750 mg IV once, then 750 mg every 48 hours',hd:'Levofloxacin 750 mg IV once, then 750 mg every 48 hours, after dialysis',crrt:'Levofloxacin 750 mg IV every 24 hours'});
+  if(id==='ciprofloxacin') return pick({normal:'Ciprofloxacin 400 mg IV every 12 hours',arc:'Ciprofloxacin 400 mg IV every 8 hours',moderate:'Ciprofloxacin 400 mg IV every 12 hours',severe:'Ciprofloxacin 400 mg IV every 24 hours',hd:'Ciprofloxacin 400 mg IV every 24 hours, after dialysis',crrt:'Ciprofloxacin 400 mg IV every 12 hours'});
+  if(id==='gentamicin') return b==='normal'||b==='arc'?'Gentamicin 5 mg/kg IV every 24 hours. Get a level.':'Do not use once-daily gentamicin at this clearance. Pick another drug or get a pharmacy level.';
+  if(id==='metronidazole') return 'Metronidazole 500 mg IV every 8 hours. Creatinine does not change this dose.';
+  if(id==='ceftazavi') return pick({normal:'Ceftazidime-avibactam 2.5 g IV every 8 hours over 3 hours',arc:'Ceftazidime-avibactam 2.5 g IV every 8 hours over 3 hours',moderate:'Ceftazidime-avibactam 1.25 g IV every 8 hours over 3 hours',severe:'Ceftazidime-avibactam 0.94 g IV every 12 hours over 3 hours',hd:'Ceftazidime-avibactam 0.94 g IV every 24 hours, after dialysis',crrt:'Ceftazidime-avibactam 2.5 g IV every 8 hours over 3 hours'});
+  if(id==='merovab') return pick({normal:'Meropenem-vaborbactam 4 g IV every 8 hours over 3 hours',arc:'Meropenem-vaborbactam 4 g IV every 8 hours over 3 hours',moderate:'Meropenem-vaborbactam 2 g IV every 8 hours over 3 hours',severe:'Meropenem-vaborbactam 2 g IV every 12 hours over 3 hours',hd:'Meropenem-vaborbactam 1 g IV every 12 hours, after dialysis',crrt:'Meropenem-vaborbactam 4 g IV every 8 hours over 3 hours'});
+  if(id==='imirele') return pick({normal:'Imipenem-relebactam 1.25 g IV every 6 hours',arc:'Imipenem-relebactam 1.25 g IV every 6 hours',moderate:'Imipenem-relebactam 0.75 g IV every 6 hours',severe:'Imipenem-relebactam 0.5 g IV every 6 hours',hd:'Imipenem-relebactam 0.5 g IV every 6 hours, after dialysis',crrt:'Imipenem-relebactam 1.25 g IV every 6 hours'});
+  if(id==='ceftolozane'){
+    if(lung) return pick({normal:'Ceftolozane-tazobactam 3 g IV every 8 hours',arc:'Ceftolozane-tazobactam 3 g IV every 8 hours',moderate:'Ceftolozane-tazobactam 1.5 g IV every 8 hours',severe:'Ceftolozane-tazobactam 750 mg IV every 8 hours',hd:'Ceftolozane-tazobactam 2.25 g once, then 450 mg every 8 hours, after dialysis',crrt:'Ceftolozane-tazobactam 3 g IV every 8 hours'});
+    return pick({normal:'Ceftolozane-tazobactam 1.5 g IV every 8 hours',arc:'Ceftolozane-tazobactam 1.5 g IV every 8 hours',moderate:'Ceftolozane-tazobactam 750 mg IV every 8 hours',severe:'Ceftolozane-tazobactam 375 mg IV every 8 hours',hd:'Ceftolozane-tazobactam 750 mg once, then 150 mg every 8 hours, after dialysis',crrt:'Ceftolozane-tazobactam 1.5 g IV every 8 hours'});
+  }
+  if(id==='sulbactam') return pick({normal:'Sulbactam-durlobactam 1 g / 1 g IV every 6 hours',arc:'Sulbactam-durlobactam 1 g / 1 g IV every 4 hours',moderate:'Sulbactam-durlobactam 1 g / 1 g IV every 8 hours',severe:'Sulbactam-durlobactam 1 g / 1 g IV every 12 hours',hd:'Sulbactam-durlobactam 1 g / 1 g IV every 12 hours, after dialysis',crrt:'Sulbactam-durlobactam 1 g / 1 g IV every 6 hours'});
+  if(id==='cefiderocol') return pick({normal:'Cefiderocol 2 g IV every 8 hours over 3 hours',arc:'Cefiderocol 2 g IV every 6 hours over 3 hours',moderate:'Cefiderocol 1.5 g IV every 8 hours over 3 hours',severe:'Cefiderocol 1 g IV every 8 hours over 3 hours',hd:'Cefiderocol 0.75 g IV every 12 hours, after dialysis',crrt:'Cefiderocol 2 g IV every 8 hours over 3 hours'});
+  if(id==='colistin') return 'Colistin load 9 million IU IV once, then '+pick({normal:'4.5 million IU every 12 hours',arc:'4.5 million IU every 12 hours',moderate:'3 million IU every 12 hours',severe:'2.5 million IU every 12 hours',hd:'2 million IU every 12 hours, plus a dose after dialysis',crrt:'4.5 million IU every 12 hours'})+'. For urine. Polymyxin B does not reach the urine.';
+  if(id==='polymyxin'){
+    var load=Math.round(wt()*2.5/10)*10, maint=Math.round(wt()*1.25/10)*10;
+    return 'Polymyxin B '+load+' mg IV once, then '+maint+' mg every 12 hours. Do not reduce this for the creatinine. It does not reach the urine.';
+  }
+  if(id==='minocycline') return 'Minocycline 200 mg IV every 12 hours.';
+  if(id==='tigecycline') return 'Tigecycline 200 mg IV once, then 100 mg every 12 hours. Only for abdomen or skin. Not for blood, urine, or pneumonia.';
+  if(id==='ampsulba') return pick({normal:'Ampicillin-sulbactam 9 g IV every 8 hours. That is 6 g of ampicillin plus 3 g of sulbactam.',arc:'Ampicillin-sulbactam 9 g IV every 8 hours.',moderate:'Ampicillin-sulbactam 9 g IV every 8 hours.',severe:'Ampicillin-sulbactam 9 g IV every 12 hours.',hd:'Ampicillin-sulbactam 9 g IV every 12 hours, after dialysis.',crrt:'Ampicillin-sulbactam 9 g IV every 8 hours.'})+' Do not drop this to the 3 g skin dose.';
+  if(id==='daptomycin') return pick({normal:'Daptomycin 8 to 10 mg/kg IV every 24 hours',arc:'Daptomycin 8 to 10 mg/kg IV every 24 hours',moderate:'Daptomycin 8 to 10 mg/kg IV every 24 hours',severe:'Daptomycin 8 to 10 mg/kg IV every 48 hours',hd:'Daptomycin 8 to 10 mg/kg IV every 48 hours, after dialysis',crrt:'Daptomycin 8 to 10 mg/kg IV every 24 hours'})+'. Not for pneumonia.';
+  if(id==='cefazolin') return pick({normal:'Cefazolin 2 g IV every 8 hours',arc:'Cefazolin 2 g IV every 6 hours',moderate:'Cefazolin 2 g IV every 12 hours',severe:'Cefazolin 1 g IV every 12 hours',hd:'Cefazolin 2 g IV after dialysis',crrt:'Cefazolin 2 g IV every 8 hours'});
+  if(id==='clindamycin') return 'Clindamycin 900 mg IV every 8 hours. Creatinine does not change this dose.';
+  return id;
+}
+function rescue(urine){ return urine?doseOf('colistin'):doseOf('polymyxin'); }
+function tigeOk(){ var s=$('dirSite').value; return s==='abdomen'||s==='skin'; }
+var directedMechanisms={
+  kpc:{title:'KPC',ambler:'Class A serine carbapenemase',badge:'Class A',warning:'Do not use ceftolozane-tazobactam or piperacillin-tazobactam. Tazobactam does not inhibit KPC.',stewardship:'Stop a polymyxin once an active newer beta-lactam is known.'},
+  oxa48:{title:'OXA-48-like',ambler:'Class D serine carbapenemase',badge:'Class D',warning:'Do not use meropenem-vaborbactam or imipenem-relebactam. Vaborbactam and relebactam do not inhibit OXA-48.',stewardship:'Ask whether an NDM is also present before ceftazidime-avibactam alone is trusted.'},
+  ndm_mbl:{title:'NDM, VIM, or IMP',ambler:'Class B metallo-beta-lactamase',badge:'Class B',warning:'Aztreonam alone fails when an ESBL or AmpC is also there. Ceftazidime-avibactam alone does not stop an MBL.',stewardship:'Infuse ceftazidime-avibactam and aztreonam over the same 3 hours.'},
+  dual_ndm_oxa:{title:'NDM plus OXA-48',ambler:'Class B and class D together',badge:'Dual',warning:'Meropenem-vaborbactam, imipenem-relebactam, and tazobactam do not cover this pair.',stewardship:'Avibactam covers the OXA-48 and the co-produced ESBL. Aztreonam covers the NDM.'},
+  ampc:{title:'AmpC hyperproducer',ambler:'Class C beta-lactamase',badge:'AmpC',warning:'Do not use ceftriaxone or piperacillin-tazobactam, even if the report says susceptible. AmpC can appear on treatment.',stewardship:'If the cefepime MIC is above 2 mg/L, use a carbapenem.'},
+  dtr_p_aeruginosa:{title:'Difficult Pseudomonas',ambler:'Porin loss, AmpC, or efflux',badge:'DTR',warning:'A usual carbapenem has already failed if the porin is gone. Do not raise the meropenem dose and call it treatment.',stewardship:'Use the agent the report marks susceptible. Pneumonia needs the 3 g ceftolozane dose.'},
+  crab:{title:'CRAB',ambler:'Carbapenem-resistant Acinetobacter',badge:'CRAB',warning:'Polymyxin B alone is a weak regimen. Do not use it by itself when another active drug can be paired with it.',stewardship:'Colonization does not get an antibiotic. An MBL does not get a sulbactam strategy.'},
+  mrsa_vre:{title:'MRSA or VRE',ambler:'mecA or vanA',badge:'Gram-positive',warning:'Do not use daptomycin for pneumonia. Surfactant in the lung inactivates it.',stewardship:'Stop vancomycin when the organism is MSSA. VRE is not treated with vancomycin.'}
+};
+function updateEmpirical(){
+  var source=$('empSource').value, icu=$('empSetting').value==='icu', allergy=$('empAllergy').checked;
+  var mrsa=$('riskMRSA').checked, pseudoRisk=$('riskPseudo').checked, esbl=$('riskESBL').checked;
+  var lung=source==='hap_vap', urine=source==='cuti', abdomen=source==='ciai', skin=source==='ssti', unknown=source==='sepsis_unknown';
+  var pseudo=pseudoRisk||lung||unknown;
+  var o={icu:icu,lung:lung,high:icu||lung};
+  var ids=[], why=[];
+  if(skin && !esbl && !pseudoRisk && !icu){ ids.push('cefazolin'); why.push('Skin infection on the ward, without Pseudomonas or ESBL risk. Cefazolin.'); }
+  else if(urine && esbl && !pseudoRisk && !icu){ ids.push('ertapenem'); why.push('ESBL urine infection, not in shock, and Pseudomonas is not ticked. Ertapenem.'); }
+  else if(urine && !esbl && !pseudoRisk && !icu){ ids.push('ceftriaxone'); why.push('Urine infection without ESBL or Pseudomonas risk, and not in shock. Ceftriaxone.'); }
+  else if(abdomen && !esbl && !pseudo && !icu){ ids.push('ceftriaxone','metronidazole'); why.push('Abdominal infection on the ward without Pseudomonas risk. Ceftriaxone plus metronidazole.'); }
+  else if(esbl && (pseudo||lung||unknown)){ ids.push('meropenem'); why.push('ESBL risk and a Pseudomonas source, or the source is not known. Meropenem. Ertapenem does not cover Pseudomonas.'); }
+  else if(esbl){ ids.push('meropenem'); why.push('ESBL risk. A carbapenem.'); }
+  else if(abdomen && (pseudoRisk||icu)){ ids.push('piptazo'); why.push(pseudoRisk?'Pseudomonas is ticked, so ceftriaxone is the wrong abdominal drug.':'ICU abdominal infection. Piperacillin-tazobactam.'); }
+  else if(skin && (pseudoRisk||icu)){ ids.push(pseudoRisk?'piptazo':'piptazo'); why.push(pseudoRisk?'Pseudomonas is ticked, so cefazolin is the wrong skin drug.':'ICU skin infection. Piperacillin-tazobactam until the source is clear.'); }
+  else {
+    ids.push('cefepime');
+    if(lung) why.push('Hospital pneumonia needs an antipseudomonal drug.');
+    else if(urine) why.push('Pseudomonas is ticked, so ceftriaxone is the wrong urine drug.');
+    else if(skin) why.push('Pseudomonas is ticked, so cefazolin is the wrong skin drug.');
+    else why.push('The source is not known. Cefepime until it is.');
+  }
+  if(icu && band()!=='hd') why.push('ICU or shock. The beta-lactam is infused over 3 hours. A ward patient gets 30 minutes.');
+  if(abdomen && ids.indexOf('metronidazole')<0 && ids.indexOf('meropenem')<0 && ids.indexOf('piptazo')<0) ids.push('metronidazole');
+  var needMrsa=mrsa || (icu && (lung||unknown||skin));
+  if(needMrsa){
+    ids.push(lung?'linezolid':'vancomycin');
+    why.push(mrsa?(lung?'MRSA risk and a lung infection. Linezolid. Daptomycin is inactivated in the lung.':'MRSA risk. Vancomycin, then the AUC.'):(lung?'ICU pneumonia. MRSA coverage until the culture is back. Linezolid.':'ICU, and the source is skin or not known. Vancomycin until the culture is back.'));
+  }
+  if(esbl && mrsa) why.push('Both risks are ticked, so the regimen keeps the carbapenem and the MRSA drug.');
+  var blocked=allergy && ids.some(function(id){ return BETA[id]; });
+  var primary, alt;
+  if(blocked && esbl){
+    primary='Severe beta-lactam allergy, and an ESBL is likely. Do not start meropenem or another beta-lactam until the allergy is reviewed.';
+    alt='A quinolone does not reliably treat ESBL. Review the allergy first.';
+  } else if(blocked){
+    var repl=urine?'ciprofloxacin':(abdomen?'ciprofloxacin':'aztreonam');
+    var kept=ids.filter(function(id){ return !BETA[id] && id!=='metronidazole'; });
+    var parts=[doseOf(repl,o)];
+    if(abdomen) parts.push(doseOf('metronidazole',o));
+    kept.forEach(function(id){ parts.push(doseOf(id,o)); });
+    primary=parts.join(' + ');
+    alt=(lung||unknown?doseOf('levofloxacin',o):doseOf('ciprofloxacin',o))+(abdomen?' + '+doseOf('metronidazole',o):'')+(needMrsa?' + '+doseOf(lung?'linezolid':'vancomycin',o):'');
+    why.push('Severe beta-lactam allergy. The beta-lactam is replaced. ESBL is not ticked.');
+  } else {
+    primary=ids.map(function(id){ return doseOf(id,o); }).join(' + ');
+    var gn=ids.filter(function(id){ return BETA[id] && id!=='metronidazole'; })[0];
+    var altId=gn==='cefepime'?'piptazo':gn==='piptazo'?'cefepime':gn==='meropenem'?(pseudo?'ceftazavi':'ertapenem'):gn==='ertapenem'?'meropenem':gn==='ceftriaxone'?'ciprofloxacin':gn==='cefazolin'?'clindamycin':null;
+    var altIds=ids.slice();
+    if(altId){ altIds=altIds.map(function(id){ return id===gn?altId:id; }); }
+    alt=altIds.map(function(id){ return doseOf(id,o); }).join(' + ');
+  }
+  $('empPrimaryRegimen').textContent=primary;
+  $('empAltRegimen').textContent=alt;
+  $('empDosageNote').textContent=renalName()+' Weight '+wt()+' kg is used only for polymyxin B.';
+  $('empRationale').textContent=why.join(' ');
+  var tags=['Gram-negative'];
+  if(pseudo) tags.push('Pseudomonas');
+  if(esbl) tags.push('ESBL');
+  if(needMrsa) tags.push('MRSA');
+  if(abdomen) tags.push('Anaerobes');
+  if(icu) tags.push('Extended infusion');
+  $('empCoverageBadges').innerHTML=tags.map(function(t){ return '<span class="badge">'+t+'</span>'; }).join('');
+}
+function fillDtr(){
+  var sel=$('dtrChoice'), prev=sel.value;
+  var opts=[['ceftolozane','Ceftolozane-tazobactam'],['ceftazavi','Ceftazidime-avibactam'],['imirele','Imipenem-relebactam'],['none','None of these is susceptible']];
+  if(fideOn()) opts.splice(3,0,['cefiderocol','Cefiderocol']);
+  sel.innerHTML=opts.map(function(x){ return '<option value="'+x[0]+'">'+x[1]+'</option>'; }).join('');
+  if(opts.some(function(x){ return x[0]===prev; })) sel.value=prev;
+  else if(prev==='cefiderocol') sel.value='none';
+}
+function fillPartner(){
+  var sel=$('crabPartner'), prev=sel.value;
+  var opts=[['','Choose'],['minocycline','Minocycline'],['polymyxin','Polymyxin B']];
+  if(tigeOk()) opts.push(['tigecycline','Tigecycline']);
+  if(fideOn()) opts.push(['cefiderocol','Cefiderocol']);
+  sel.innerHTML=opts.map(function(x){ return '<option value="'+x[0]+'">'+x[1]+'</option>'; }).join('');
+  if(opts.some(function(x){ return x[0]===prev; })) sel.value=prev;
+}
+function renderDirectedSelectors(){
+  var box=$('mechanismSelector');
+  box.innerHTML=Object.keys(directedMechanisms).map(function(key){
+    var m=directedMechanisms[key];
+    return '<button type="button" class="mech'+(key===currentMechanism?' on':'')+'" id="mech-btn-'+key+'" onclick="selectMechanism(\''+key+'\')"><b>'+m.title+'</b><small>'+m.ambler+'</small></button>';
+  }).join('');
+}
+function selectMechanism(key){
+  currentMechanism=key;
+  renderDirectedSelectors();
+  var m=directedMechanisms[key];
+  $('dirMechanismTitle').textContent=m.title;
+  $('dirAmblerClass').textContent=m.ambler;
+  $('dirEnzymeBadge').textContent=m.badge;
+  $('dirWarningText').textContent=m.warning;
+  $('dirStewardship').textContent=m.stewardship;
+  $('crabBox').classList.toggle('hidden', key!=='crab');
+  $('dtrBox').classList.toggle('hidden', key!=='dtr_p_aeruginosa');
+  renderDirected();
+}
+function renderDirected(){
+  fillDtr(); fillPartner();
+  var key=currentMechanism, urine=$('dirSite').value==='urine', lung=$('dirSite').value==='lung';
+  var o={icu:icuOn(),lung:lung,high:lung||icuOn()};
+  var preferred='', note='', alts='';
+  if(key==='kpc'){
+    preferred=doseOf('ceftazavi',o)+'. Or '+doseOf('merovab',o)+'.';
+    note='KPC. Ceftazidime-avibactam or meropenem-vaborbactam.';
+    alts=doseOf('imirele',o)+(fideOn()?'. Cefiderocol is in stock: '+doseOf('cefiderocol',o):'. Cefiderocol is not in stock. If none of these can be given, '+rescue(urine));
+  } else if(key==='oxa48'){
+    preferred=doseOf('ceftazavi',o);
+    note='OXA-48-like. Ceftazidime-avibactam.';
+    alts=fideOn()?doseOf('cefiderocol',o):'Cefiderocol is not in stock. If ceftazidime-avibactam cannot be given, '+rescue(urine);
+  } else if(key==='ndm_mbl'||key==='dual_ndm_oxa'){
+    preferred=doseOf('ceftazavi',o)+' plus '+doseOf('aztreonam',o)+'.';
+    note=key==='dual_ndm_oxa'?'NDM plus OXA-48. Avibactam covers the OXA-48. Aztreonam covers the NDM.':'NDM or another MBL. Ceftazidime-avibactam plus aztreonam. Cefiderocol is not the default.';
+    alts=fideOn()?'Cefiderocol is in stock and the report says susceptible: '+doseOf('cefiderocol',o):'Cefiderocol is not in stock. Do not use ceftazidime-avibactam alone.';
+  } else if(key==='ampc'){
+    preferred='If the cefepime MIC is 2 mg/L or less: '+doseOf('cefepime',o)+'. If it is higher: '+doseOf('meropenem',o)+'.';
+    note='AmpC. Cefepime only when the MIC allows it.';
+    alts=doseOf('ertapenem',o)+' only if Pseudomonas is not a concern. '+doseOf('ceftazavi',o);
+  } else if(key==='dtr_p_aeruginosa'){
+    var choice=$('dtrChoice').value||'ceftolozane';
+    if(choice==='none'||(choice==='cefiderocol'&&!fideOn())){
+      preferred=rescue(urine);
+      note=urine?'None of the newer agents is active, and this is urine. Colistin.':'None of the newer agents is active. Polymyxin B. Not for urine.';
+    } else if(choice==='cefiderocol'){
+      preferred=doseOf('cefiderocol',o);
+      note='Cefiderocol is in stock and the report says susceptible.';
+    } else {
+      preferred=doseOf(choice,o);
+      note=lung?'Pneumonia uses the 3 g ceftolozane dose when that drug is chosen.':'Use the susceptible drug. This is not pneumonia, so ceftolozane is 1.5 g.';
     }
-
-    function toggleTheme() {
-      const body = document.getElementById('appBody');
-      const icon = document.getElementById('themeIcon');
-      if (body.classList.contains('dark')) {
-        body.classList.remove('dark');
-        body.classList.add('light');
-        icon.setAttribute('data-lucide', 'moon');
-      } else {
-        body.classList.remove('light');
-        body.classList.add('dark');
-        icon.setAttribute('data-lucide', 'sun');
-      }
-      lucide.createIcons();
+    alts=fideOn() && choice!=='cefiderocol' ? 'Cefiderocol, if susceptible: '+doseOf('cefiderocol',o) : 'Cefiderocol is not in stock.';
+  } else if(key==='crab'){
+    var role=$('crabRole').value, sd=$('sdAvail').value, mbl=$('crabMbl').value==='yes', partner=$('crabPartner').value;
+    if(role==='colon'){
+      preferred='No antibiotic.';
+      note='CRAB colonization. Do not treat it.';
+      alts='None.';
+    } else if(role!=='invasive'){
+      preferred='Say whether this is colonization or an invasive infection.';
+      note='';
+      alts='';
+    } else if(mbl){
+      note='CRAB with an MBL. Do not use sulbactam.';
+      if(!fideOn() && partner==='cefiderocol') partner='';
+      if(partner==='tigecycline' && !tigeOk()){ preferred='Tigecycline does not fit blood, urine, or pneumonia.'; alts='Use minocycline, or '+rescue(urine); }
+      else if(partner==='polymyxin'){ preferred=rescue(urine); alts='Minocycline if the report says susceptible: '+doseOf('minocycline'); }
+      else if(partner){ preferred=doseOf(partner,o); alts=''; }
+      else { preferred=fideOn()?'Pick cefiderocol, minocycline, or polymyxin B.':'Cefiderocol is not in stock. Pick minocycline or polymyxin B'+(tigeOk()?', or tigecycline at this site.':'. Tigecycline does not fit this site.'); alts=''; }
+    } else if(sd==='yes'){
+      preferred=doseOf('sulbactam',o)+' plus '+doseOf('meropenem',{icu:true,lung:true,high:true})+'.';
+      note='Invasive CRAB. Sulbactam-durlobactam plus meropenem.';
+      alts='';
+    } else if(sd==='no'){
+      note='Sulbactam-durlobactam is not available. High-dose ampicillin-sulbactam plus one susceptible agent.';
+      if(!fideOn() && partner==='cefiderocol') partner='';
+      if(partner==='tigecycline' && !tigeOk()){ preferred=doseOf('ampsulba',o)+'. Tigecycline does not fit this site.'; alts='Add minocycline, or '+rescue(urine); }
+      else if(partner==='polymyxin'){ preferred=doseOf('ampsulba',o)+' plus '+rescue(urine); alts=''; }
+      else if(partner){ preferred=doseOf('ampsulba',o)+' plus '+doseOf(partner,o); alts=''; }
+      else { preferred=doseOf('ampsulba',o); alts=fideOn()?'Add cefiderocol, minocycline, or polymyxin B.':'Cefiderocol is not in stock. Add minocycline or polymyxin B'+(tigeOk()?', or tigecycline.':'.'); }
+    } else {
+      preferred='Is sulbactam-durlobactam available?';
+      note='';
+      alts='';
     }
-
-
-    function updateEmpirical() {
-      const source = document.getElementById('empSource').value;
-      const setting = document.getElementById('empSetting').value;
-      const egfr = document.getElementById('empEGFR').value;
-      const hasAllergy = document.getElementById('empAllergy').checked;
-      const riskMRSA = document.getElementById('riskMRSA').checked;
-      const riskPseudo = document.getElementById('riskPseudo').checked;
-      const riskESBL = document.getElementById('riskESBL').checked;
-
-      let key = 'standard';
-      if (riskESBL) key = 'esbl';
-      else if (riskMRSA) key = 'mrsa';
-
-      const rule = empiricalRules[source][key];
-
-      let primaryRegimen = rule.primary;
-      let altRegimen = rule.alt;
-      let dosageNote = "eGFR > 50 mL/min (Standard Dosing)";
-
-      // Renal Dosing Adjustment Logic
-      if (egfr === 'moderate') {
-        dosageNote = "eGFR 30–50 mL/min: Reduce dose by 25–50%";
-        primaryRegimen = primaryRegimen.replace("2g IV q8h", "1g-2g IV q12h").replace("4.5g IV q6h", "3.375g IV q6h");
-      } else if (egfr === 'severe') {
-        dosageNote = "eGFR < 30 mL/min: Severe Renal Adjustment Needed";
-        primaryRegimen = primaryRegimen.replace("2g IV q8h", "1g IV q24h").replace("4.5g IV q6h", "2.25g IV q6h");
-      }
-
-      if (hasAllergy) {
-        primaryRegimen = "⚠️ Severe Allergy Triggered: " + altRegimen;
-      }
-
-      document.getElementById('empPrimaryRegimen').textContent = primaryRegimen;
-      document.getElementById('empAltRegimen').textContent = altRegimen;
-      document.getElementById('empDosageNote').textContent = dosageNote;
-      document.getElementById('empRationale').textContent = rule.rationale;
-
-      // Update Badges
-      const badgesContainer = document.getElementById('empCoverageBadges');
-      badgesContainer.innerHTML = '';
-
-      const tags = ['Gram-Negative Bacilli'];
-      if (riskMRSA) tags.push('MRSA Covered');
-      if (riskPseudo || source === 'hap_vap') tags.push('Antipseudomonal');
-      if (riskESBL) tags.push('ESBL / AmpC Stable');
-      if (source === 'ciai') tags.push('Anaerobic (B. fragilis)');
-
-      tags.forEach(tag => {
-        const span = document.createElement('span');
-        span.className = 'px-2 py-0.5 text-[10px] font-bold rounded bg-slate-800 text-teal-300 border border-slate-700';
-        span.textContent = tag;
-        badgesContainer.appendChild(span);
-      });
-    }
-
-
-    function renderDirectedSelectors() {
-      const container = document.getElementById('mechanismSelector');
-      container.innerHTML = '';
-
-      Object.keys(directedMechanisms).forEach(key => {
-        const mech = directedMechanisms[key];
-        const btn = document.createElement('button');
-        btn.onclick = () => selectMechanism(key);
-        btn.className = `w-full text-left p-3 rounded-xl border transition flex items-center justify-between ${key === 'oxa48' ? 'border-amber-500/50 bg-amber-500/10' : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'}`;
-        btn.id = `mech-btn-${key}`;
-        btn.innerHTML = `
-          <div>
-            <div class="text-xs font-bold text-white">${mech.title}</div>
-            <div class="text-[10px] text-slate-400">${mech.ambler}</div>
-          </div>
-          <span class="text-[10px] px-2 py-0.5 rounded font-mono bg-slate-800 text-slate-300 border border-slate-700">${mech.badge}</span>
-        `;
-        container.appendChild(btn);
-      });
-
-      selectMechanism('oxa48');
-    }
-
-    function selectMechanism(key) {
-      const mech = directedMechanisms[key];
-
-      document.querySelectorAll('#mechanismSelector button').forEach(b => {
-        b.classList.remove('border-teal-500', 'bg-teal-500/10', 'border-amber-500', 'bg-amber-500/10');
-        b.classList.add('border-slate-800', 'bg-slate-900/60');
-      });
-
-      const activeBtn = document.getElementById(`mech-btn-${key}`);
-      if (activeBtn) {
-        activeBtn.classList.remove('border-slate-800', 'bg-slate-900/60');
-        activeBtn.classList.add('border-teal-500', 'bg-teal-500/10');
-      }
-
-      document.getElementById('dirMechanismTitle').textContent = mech.title;
-      document.getElementById('dirAmblerClass').textContent = mech.ambler;
-      document.getElementById('dirEnzymeBadge').textContent = mech.badge;
-      document.getElementById('dirPreferredDrug').textContent = mech.preferred;
-      document.getElementById('dirPreferredNote').textContent = mech.preferredNote;
-      document.getElementById('dirWarningText').innerHTML = mech.warning;
-      document.getElementById('dirAltDrugs').textContent = mech.alts;
-      document.getElementById('dirStewardship').textContent = mech.stewardship;
-    }
-
-
-    function renderMatrix() {
-      const tbody = document.getElementById('matrixTableBody');
-      tbody.innerHTML = '';
-
-      spectrumMatrixData.forEach(row => {
-        if (currentFilter === 'carbapenemase' && row.category !== 'carbapenemase') return;
-
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-800/50 transition';
-
-        tr.innerHTML = `
-          <td class="py-3 px-4 font-bold text-white flex items-center justify-between">
-            <span>${row.name}</span>
-            <button onclick="showMatrixDetail('${row.id}')" class="text-slate-400 hover:text-teal-400 ml-2">
-              <i data-lucide="info" class="w-3.5 h-3.5"></i>
-            </button>
-          </td>
-          ${getCellHTML(row.cza, 'CZA', row.name)}
-          ${getCellHTML(row.mev, 'MEV', row.name)}
-          ${getCellHTML(row.ir, 'I-R', row.name)}
-          ${getCellHTML(row.ct, 'C/T', row.name)}
-          ${getCellHTML(row.suldur, 'SUL-DUR', row.name)}
-          ${getCellHTML(row.fdc, 'FDC', row.name)}
-          ${getCellHTML(row.atmavi, 'ATM-AVI / CZA+ATM', row.name)}
-        `;
-
-        tbody.appendChild(tr);
-      });
-
-      lucide.createIcons();
-    }
-
-    function getCellHTML(status, drug, bug) {
-      let bg = "bg-red-500/20 text-red-300 border-red-500/30";
-      let icon = "x";
-      let label = "Inactive";
-
-      if (status === 'active') {
-        bg = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
-        icon = "check";
-        label = "Active";
-      } else if (status === 'variable') {
-        bg = "bg-amber-500/20 text-amber-300 border-amber-500/30";
-        icon = "alert-circle";
-        label = "Variable";
-      }
-
-      return `
-        <td class="py-2 px-2 text-center">
-          <div onclick="showCellDetail('${drug}', '${bug}', '${status}')" class="matrix-cell cursor-pointer inline-flex items-center justify-center space-x-1 px-2 py-1 rounded-md border ${bg} text-[10px] font-bold w-full">
-            <i data-lucide="${icon}" class="w-3 h-3"></i>
-            <span class="hidden sm:inline">${label}</span>
-          </div>
-        </td>
-      `;
-    }
-
-    function filterMatrix(type) {
-      currentFilter = type;
-      document.getElementById('btn-filter-all').className = type === 'all' ? 'px-2.5 py-1 text-xs rounded-lg font-medium bg-teal-600 text-white' : 'px-2.5 py-1 text-xs rounded-lg font-medium bg-slate-800 text-slate-300 hover:bg-slate-700';
-      document.getElementById('btn-filter-carbapenemase').className = type === 'carbapenemase' ? 'px-2.5 py-1 text-xs rounded-lg font-medium bg-teal-600 text-white' : 'px-2.5 py-1 text-xs rounded-lg font-medium bg-slate-800 text-slate-300 hover:bg-slate-700';
-      renderMatrix();
-    }
-
-
-    function showCellDetail(drug, bug, status) {
-      const content = document.getElementById('modalContent');
-      content.innerHTML = `
-        <div class="space-y-3">
-          <div class="flex items-center justify-between border-b border-slate-700 pb-2">
-            <h3 class="text-base font-bold text-white">${drug} vs. ${bug}</h3>
-            <span class="px-2.5 py-0.5 text-xs font-bold rounded ${status === 'active' ? 'bg-emerald-500/20 text-emerald-300' : status === 'variable' ? 'bg-amber-500/20 text-amber-300' : 'bg-red-500/20 text-red-300'}">${status.toUpperCase()}</span>
-          </div>
-          <p class="text-xs text-slate-300 leading-relaxed">
-            Biochemical mechanism profile for <strong>${drug}</strong> against <strong>${bug}</strong> based on IDSA 2023–2024 Antimicrobial Guidance:
-          </p>
-          <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs font-mono text-teal-300">
-            ${getBiochemicalExplanation(drug, bug, status)}
-          </div>
-          <button onclick="closeModal()" class="w-full py-2 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-700">Close Window</button>
-        </div>
-      `;
-      document.getElementById('detailModal').classList.remove('hidden');
-      lucide.createIcons();
-    }
-
-    function getBiochemicalExplanation(drug, bug, status) {
-      if (drug === 'MEV' && bug.includes('OXA-48')) {
-        return "Vaborbactam is a cyclic boronic acid inhibitor that binds Class A KPC enzymes effectively, but lacks steric binding affinity for Class D OXA-48 enzymes. OXA-48 hydrolyzes meropenem unimpeded.";
-      }
-      if (drug === 'CZA' && bug.includes('OXA-48')) {
-        return "Avibactam is a non-beta-lactam diazabicyclooctane (DBO) inhibitor that forms a reversible covalent bond with the active site serine of Class D OXA-48, preventing carbapenem destruction.";
-      }
-      if (drug.includes('ATM') && bug.includes('NDM')) {
-        return "Metallo-beta-lactamases (NDM) require zinc to hydrolyze beta-lactams but cannot hydrolyze monobactams (Aztreonam). Avibactam protects Aztreonam from co-produced ESBLs or AmpC.";
-      }
-      if (drug === 'SUL-DUR' && bug.includes('CRAB')) {
-        return "Durlobactam is a broad-spectrum DBO inhibitor that neutralizes Class A, C, and D (OXA-23/24) carbapenemases in Acinetobacter, restoring sulbactam's intrinsic antibacterial activity against PBP3.";
-      }
-      return `${drug} demonstration of ${status} activity against ${bug}. Consult IDSA 2024 guideline algorithms for specific MIC breakpoints.`;
-    }
-
-    function closeModal() {
-      document.getElementById('detailModal').classList.add('hidden');
-    }
-
-
-    function drawPKPDGraph() {
-      const canvas = document.getElementById('pkpdCanvas');
-      if (!canvas) return;
-
-      const ctx = canvas.getContext('2d');
-      const dpr = window.devicePixelRatio || 1;
-      
-      const width = canvas.parentElement.clientWidth;
-      const height = canvas.parentElement.clientHeight;
-
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      ctx.scale(dpr, dpr);
-
-      const drug = document.getElementById('pkDrug').value;
-      const infusion = document.getElementById('pkInfusion').value;
-      const mic = parseFloat(document.getElementById('pkMIC').value);
-      const crcl = parseFloat(document.getElementById('pkCrCl').value);
-
-      // Clear Canvas
-      ctx.clearRect(0, 0, width, height);
-
-      // Grid Lines
-      ctx.strokeStyle = '#1e293b';
-      ctx.lineWidth = 1;
-      for (let x = 0; x < width; x += width / 8) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
-        ctx.stroke();
-      }
-      for (let y = 0; y < height; y += height / 5) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
-      }
-
-      // Calculate Pharmacokinetics over 24 Hours
-      const timePoints = 100;
-      const maxConc = 64; // Y-axis max mg/L
-      const points = [];
-
-      let halfLife = 1.0; // hours (Meropenem)
-      if (drug === 'cefepime') halfLife = 2.0;
-      if (drug === 'piptazo') halfLife = 1.1;
-
-      // Adjust for renal function
-      if (crcl < 30) halfLife *= 3.5;
-      else if (crcl < 50) halfLife *= 1.8;
-
-      const ke = Math.LN2 / halfLife;
-      const interval = drug === 'piptazo' ? 6 : 8; // Dose interval in hours
-
-      let timeAboveMICCount = 0;
-
-      for (let i = 0; i <= timePoints; i++) {
-        const t = (i / timePoints) * 24; // 0 to 24 hours
-        const cycleTime = t % interval;
-        let conc = 0;
-
-        if (infusion === 'continuous') {
-          conc = mic * 2.5 + 8; // Steady state
-        } else if (infusion === 'extended') {
-          const infTime = 3.0; // 3 hour extended infusion
-          if (cycleTime <= infTime) {
-            conc = (45 / infTime) * cycleTime;
-          } else {
-            conc = 45 * Math.exp(-ke * (cycleTime - infTime));
-          }
-        } else {
-          // Standard Bolus (30 min)
-          const infTime = 0.5;
-          if (cycleTime <= infTime) {
-            conc = (60 / infTime) * cycleTime;
-          } else {
-            conc = 60 * Math.exp(-ke * (cycleTime - infTime));
-          }
-        }
-
-        if (conc >= mic) timeAboveMICCount++;
-
-        const x = (t / 24) * width;
-        const y = height - (conc / maxConc) * height;
-        points.push({ x, y, conc });
-      }
-
-      // Draw MIC Threshold Line
-      const micY = height - (mic / maxConc) * height;
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath();
-      ctx.moveTo(0, micY);
-      ctx.lineTo(width, micY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Label MIC Line
-      ctx.fillStyle = '#f87171';
-      ctx.font = '10px JetBrains Mono';
-      ctx.fillText(`Target MIC Threshold (${mic} mg/L)`, 10, micY - 6);
-
-      // Draw Concentration Curve
-      ctx.strokeStyle = '#14b8a6';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      points.forEach((pt, idx) => {
-        if (idx === 0) ctx.moveTo(pt.x, pt.y);
-        else ctx.lineTo(pt.x, pt.y);
-      });
-      ctx.stroke();
-
-      // Fill Area under Curve above MIC
-      ctx.fillStyle = 'rgba(20, 184, 166, 0.15)';
-      ctx.beginPath();
-      ctx.moveTo(0, height);
-      points.forEach(pt => ctx.lineTo(pt.x, pt.y));
-      ctx.lineTo(width, height);
-      ctx.closePath();
-      ctx.fill();
-
-      // Calculate %T > MIC
-      const pctAbove = Math.min(100, Math.round((timeAboveMICCount / timePoints) * 100));
-      document.getElementById('timeAboveMICVal').textContent = pctAbove + '%';
-      
-      const statusEl = document.getElementById('targetGoalStatus');
-      if (pctAbove >= 70) {
-        statusEl.textContent = 'Optimized (≥70%)';
-        statusEl.className = 'text-xs font-bold font-mono text-emerald-400 mt-1';
-      } else {
-        statusEl.textContent = 'Suboptimal (<70%)';
-        statusEl.className = 'text-xs font-bold font-mono text-red-400 mt-1';
-      }
-
-      document.getElementById('pkDrugLabel').textContent = `${drug.toUpperCase()} (${infusion.toUpperCase()})`;
-    }
-
-
-    function loadScenarioPreset(presetKey) {
-      if (!presetKey) return;
-
-      if (presetKey === 'oxa48_uti') {
-        switchTab('directed');
-        selectMechanism('oxa48');
-      } else if (presetKey === 'ndm_sepsis') {
-        switchTab('directed');
-        selectMechanism('ndm_mbl');
-      } else if (presetKey === 'dual_producer') {
-        switchTab('directed');
-        selectMechanism('dual_ndm_oxa');
-      } else if (presetKey === 'crab_vap') {
-        switchTab('directed');
-        selectMechanism('crab');
-      } else if (presetKey === 'ampc_bacteremia') {
-        switchTab('directed');
-        selectMechanism('ampc');
-      } else if (presetKey === 'dtr_p_aeruginosa') {
-        switchTab('directed');
-        selectMechanism('dtr_p_aeruginosa');
-      }
-    }
-
-    // Initialize Application
-    window.onload = function() {
-      updateEmpirical();
-      renderDirectedSelectors();
-      renderMatrix();
-      lucide.createIcons();
-
-      window.addEventListener('resize', () => {
-        if (currentTab === 'pkpd') drawPKPDGraph();
-      });
-    };
-  </script>
+  } else if(key==='mrsa_vre'){
+    preferred=lung?('MRSA in the lung: '+doseOf('linezolid')):('MRSA: '+doseOf('vancomycin')+'. If the lung or the marrow makes that a poor fit: '+doseOf('linezolid'));
+    note=lung?'Daptomycin is not used in the lung.':'Vancomycin is dosed by the AUC, not a fixed trough.';
+    alts=lung?('VRE in the lung: '+doseOf('linezolid')+'. Not vancomycin, and not daptomycin.'):('VRE: '+doseOf('daptomycin')+'. Not vancomycin.');
+  }
+  $('dirPreferredDrug').textContent=preferred;
+  $('dirPreferredNote').textContent=note;
+  $('dirAltDrugs').textContent=alts;
+}
+var spectrumMatrixData=[
+  {id:'kpc',name:'KPC',category:'carbapenemase',cza:'active',mev:'active',ir:'active',ct:'resistant',suldur:'resistant',fdc:'active',atmavi:'active'},
+  {id:'oxa48',name:'OXA-48-like',category:'carbapenemase',cza:'active',mev:'resistant',ir:'resistant',ct:'resistant',suldur:'resistant',fdc:'active',atmavi:'active'},
+  {id:'ndm',name:'NDM / MBL',category:'carbapenemase',cza:'resistant',mev:'resistant',ir:'resistant',ct:'resistant',suldur:'resistant',fdc:'active',atmavi:'active'},
+  {id:'dual',name:'NDM plus OXA-48',category:'carbapenemase',cza:'resistant',mev:'resistant',ir:'resistant',ct:'resistant',suldur:'resistant',fdc:'active',atmavi:'active'},
+  {id:'esbl',name:'ESBL',category:'other',cza:'active',mev:'active',ir:'active',ct:'active',suldur:'resistant',fdc:'active',atmavi:'active'},
+  {id:'ampc',name:'AmpC',category:'other',cza:'active',mev:'active',ir:'active',ct:'variable',suldur:'resistant',fdc:'active',atmavi:'active'},
+  {id:'dtr_p',name:'Difficult Pseudomonas',category:'other',cza:'active',mev:'variable',ir:'active',ct:'active',suldur:'resistant',fdc:'variable',atmavi:'variable'},
+  {id:'crab',name:'CRAB',category:'other',cza:'resistant',mev:'resistant',ir:'resistant',ct:'resistant',suldur:'active',fdc:'active',atmavi:'resistant'}
+];
+function shownStatus(row,key){ if(key==='fdc' && !fideOn()) return 'unstocked'; return row[key]; }
+function renderMatrix(){
+  var keys=['cza','mev','ir','ct','suldur','fdc','atmavi'];
+  var names={cza:'CZA',mev:'MEV',ir:'I-R',ct:'C/T',suldur:'SUL-DUR',fdc:'FDC',atmavi:'ATM-AVI'};
+  $('matrixTableBody').innerHTML=spectrumMatrixData.filter(function(row){ return currentFilter==='all'||row.category==='carbapenemase'; }).map(function(row){
+    return '<tr><td><button class="ghost" onclick="showMatrixDetail(\''+row.id+'\')">'+row.name+'</button></td>'+keys.map(function(k){
+      var st=shownStatus(row,k), label=st==='active'?'Active':st==='variable'?'Variable':st==='unstocked'?'Not stocked':'Inactive';
+      return '<td><button class="cell '+st+'" onclick="showCellDetail(\''+names[k]+'\',\''+row.name+'\',\''+st+'\')">'+label+'</button></td>';
+    }).join('')+'</tr>';
+  }).join('');
+}
+function filterMatrix(type){
+  currentFilter=type;
+  $('btn-filter-all').classList.toggle('active', type==='all');
+  $('btn-filter-carbapenemase').classList.toggle('active', type==='carbapenemase');
+  renderMatrix();
+}
+function explain(drug,bug,status){
+  if(status==='unstocked') return 'Cefiderocol may be active, but it is not in stock. Do not choose it.';
+  if(drug==='MEV'&&bug.indexOf('OXA-48')>=0) return 'Vaborbactam inhibits KPC. It does not inhibit OXA-48. Meropenem is hydrolyzed.';
+  if(drug==='CZA'&&bug.indexOf('OXA-48')>=0) return 'Avibactam inhibits OXA-48. Ceftazidime-avibactam is the serine-enzyme drug.';
+  if(drug==='ATM-AVI'&&bug.indexOf('NDM')>=0) return 'The MBL does not hydrolyze aztreonam. Avibactam protects aztreonam from the ESBL or AmpC that is usually there too. In practice this is ceftazidime-avibactam plus aztreonam.';
+  if(drug==='SUL-DUR'&&bug.indexOf('CRAB')>=0) return 'Durlobactam inhibits the Acinetobacter carbapenemases and lets sulbactam bind its target. Give meropenem with it.';
+  if(drug==='CZA'&&bug.indexOf('NDM')>=0) return 'Avibactam does not inhibit an MBL. Ceftazidime-avibactam alone fails.';
+  return drug+' is '+status+' against '+bug+'. Confirm the report before you treat.';
+}
+function showCellDetail(drug,bug,status){
+  $('modalContent').innerHTML='<h2 style="text-transform:none;letter-spacing:0;color:var(--ink)">'+drug+' and '+bug+'</h2><p class="note">'+explain(drug,bug,status)+'</p>';
+  $('detailModal').classList.remove('hidden');
+}
+function showMatrixDetail(id){
+  var row=spectrumMatrixData.filter(function(r){ return r.id===id; })[0];
+  var keys=['cza','mev','ir','ct','suldur','fdc','atmavi'];
+  $('modalContent').innerHTML='<h2 style="text-transform:none;letter-spacing:0;color:var(--ink)">'+row.name+'</h2><p class="note">'+keys.map(function(k){ return k.toUpperCase()+': '+shownStatus(row,k); }).join('. ')+'.</p>';
+  $('detailModal').classList.remove('hidden');
+}
+function closeModal(){ $('detailModal').classList.add('hidden'); }
+function pkSpec(){
+  var id=$('pkDrug').value, b=band(), icu=icuOn();
+  var base={meropenem:{mg:icu||b==='arc'?2000:1000,every:8,vd:0.25*wt(),th:1,name:'Meropenem'},cefepime:{mg:2000,every:8,vd:0.25*wt(),th:2,name:'Cefepime'},piptazo:{mg:4000,every:6,vd:0.2*wt(),th:1,name:'Piperacillin'},ceftazidime:{mg:2000,every:8,vd:0.23*wt(),th:1.8,name:'Ceftazidime'}};
+  var s=base[id];
+  if(b==='moderate'){ s.th*=1.8; if(id==='meropenem') s.every=12; if(id==='cefepime') s.every=12; }
+  else if(b==='severe'){ s.th*=3.2; s.mg=id==='meropenem'?500:id==='piptazo'?2000:1000; s.every=id==='piptazo'?6:12; }
+  else if(b==='hd'){ s.th*=5; s.mg=id==='meropenem'?500:1000; s.every=24; }
+  else if(b==='crrt'){ s.th*=1.25; }
+  else if(b==='arc'){ s.th*=0.55; if(id==='cefepime') s.every=6; }
+  s.inf=$('pkInfusion').value==='bolus'?0.5:$('pkInfusion').value==='continuous'?s.every:Math.min(3,s.every-0.25);
+  s.mode=$('pkInfusion').value;
+  return s;
+}
+function drawPKPDGraph(){
+  var canvas=$('pkpdCanvas'); if(!canvas) return;
+  var ctx=canvas.getContext('2d');
+  var css=getComputedStyle(document.documentElement);
+  var w=canvas.width, h=canvas.height;
+  ctx.clearRect(0,0,w,h);
+  var s=pkSpec(), mic=parseFloat($('pkMIC').value)||4, ke=Math.LN2/s.th, c=0, dt=0.05, pts=[], above=0, n=0, peak=1;
+  for(var t=0;t<=24;t+=dt){
+    var cycle=t%s.every, R=0;
+    if(s.mode==='continuous'||cycle<s.inf) R=s.mg/s.inf;
+    if(s.mode==='continuous') R=s.mg/s.every;
+    c=Math.max(0, c+((R/s.vd)-ke*c)*dt);
+    if(c>peak) peak=c;
+    if(c>=mic) above++;
+    n++;
+    pts.push(c);
+  }
+  var max=Math.max(peak*1.15, mic*1.4, 8);
+  ctx.strokeStyle=css.getPropertyValue('--line')||'#334155';
+  ctx.strokeRect(0,0,w,h);
+  var ymic=h-(mic/max)*h;
+  ctx.strokeStyle=css.getPropertyValue('--bad')||'#fca5a5';
+  ctx.setLineDash([5,4]); ctx.beginPath(); ctx.moveTo(0,ymic); ctx.lineTo(w,ymic); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle=css.getPropertyValue('--muted')||'#93a4bd';
+  ctx.font='12px sans-serif';
+  ctx.fillText('MIC '+mic+' mg/L', 8, Math.max(14, ymic-6));
+  ctx.strokeStyle=css.getPropertyValue('--teal')||'#5eead4';
+  ctx.lineWidth=2; ctx.beginPath();
+  pts.forEach(function(v,i){ var x=i/(pts.length-1)*w, y=h-(v/max)*h; if(i) ctx.lineTo(x,y); else ctx.moveTo(x,y); });
+  ctx.stroke();
+  var pct=Math.round(above/n*100), goal=icuOn()?100:70;
+  $('timeAboveMICVal').textContent=pct+'%';
+  $('targetGoalStatus').textContent=(pct>=goal?'The sketch clears ':'The sketch is short of ')+'the teaching target of '+goal+'%. '+(icuOn()?'Shock uses 100% of the interval.':'The ward target used here is 70%.');
+  $('pkDrugLabel').textContent=s.name+' '+s.mg+' mg every '+s.every+' h';
+  $('pkpdPearl').textContent='Teaching sketch, not a measured blood level. '+renalName()+' A longer infusion raises time above the MIC. It does not prove the patient is treated. Volume of distribution is estimated from '+wt()+' kg.';
+}
+function switchTab(tabId){
+  currentTab=tabId;
+  document.querySelectorAll('.tab-view').forEach(function(el){ el.classList.add('hidden'); });
+  document.querySelectorAll('.tab-btn').forEach(function(el){ el.classList.remove('active'); });
+  $('view-'+tabId).classList.remove('hidden');
+  var btn=$('tab-'+tabId); if(btn) btn.classList.add('active');
+  if(tabId==='pkpd') setTimeout(drawPKPDGraph, 30);
+  if(tabId==='directed') renderDirected();
+  if(tabId==='matrix') renderMatrix();
+}
+function toggleTheme(){
+  document.documentElement.classList.toggle('light');
+  $('themeIcon').textContent=document.documentElement.classList.contains('light')?'Dark':'Light';
+  if(currentTab==='pkpd') drawPKPDGraph();
+}
+function refreshAll(){ updateEmpirical(); renderDirected(); renderMatrix(); if(currentTab==='pkpd') drawPKPDGraph(); }
+function loadScenarioPreset(key){
+  if(!key) return;
+  var map={oxa48_uti:['oxa48','urine'],ndm_sepsis:['ndm_mbl','blood'],dual_producer:['dual_ndm_oxa','blood'],crab_vap:['crab','lung'],ampc_bacteremia:['ampc','blood'],dtr_p_aeruginosa:['dtr_p_aeruginosa','lung']};
+  var m=map[key]; if(!m) return;
+  $('dirSite').value=m[1];
+  if(key==='crab_vap') $('crabRole').value='invasive';
+  if(key==='ndm_sepsis') $('empSetting').value='icu';
+  switchTab('directed');
+  selectMechanism(m[0]);
+}
+renderDirectedSelectors();
+selectMechanism('oxa48');
+updateEmpirical();
+renderMatrix();
+</script>
 </body>
 </html>
