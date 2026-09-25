@@ -798,7 +798,7 @@ function severity(){
   var sbp=num('sbp'), map=mapNow();
   var shock=(sbp!=null&&sbp<90)||(map!=null&&map<65);
   var organ=(num('rr')!=null&&num('rr')>=22)||(num('spo')!=null&&num('spo')<92)||(num('plt')!=null&&num('plt')<100)||(num('scr')!=null&&num('scr')>=2)||(num('bili')!=null&&num('bili')>=2);
-  if(shock) return {band:'red', name:'Septic shock', sev:'shock', clock:'Shock. The systolic pressure is under 90, or the mean pressure is under 65. Take cultures, then give the antibiotic now.'};
+  if(shock) return {band:'red', name:'Shock', sev:'shock', clock:'Shock is present. Take cultures, then give the antibiotic now.'};
   if(organ) return {band:'yellow', name:'Sepsis', sev:'sepsis', clock:'Sepsis. An organ is failing, but the pressure is holding. Do not wait for a procalcitonin.'};
   return {band:'green', name:'Not shock', sev:'stable', clock:'Not shock. The pressure is holding and no organ failure is entered yet.'};
 }
@@ -986,11 +986,12 @@ function stepHtml(){
   var n=S.step, h='';
   if(n===1){
     var sev=severity();
-    h='<div class="step-title">Patient</div><div id="shockline" class="clock '+sev.band+'">'+sev.name+'. '+sev.clock+'</div>'
+    h='<div class="step-title">Patient</div>'
       +'<div class="group">Symptoms</div><div class="checkbox-group">'
       +[['cough','Cough or sputum'],['breath','Breathlessness'],['urine','Burning urine or flank pain'],['abd','Abdominal pain'],['cns','Headache or neck stiffness'],['skin','Red or painful skin'],['diarrhea','Diarrhea']].map(function(s){return '<div class="chip-option'+(hasSx(s[0])?' selected':'')+'" data-sx="'+s[0]+'">'+s[1]+'</div>';}).join('')
       +'</div><div class="group">Vitals</div><div class="grid">'+box('temp','Temperature °C')+box('hr','Pulse')+box('rr','Respiratory rate')+box('sbp','Systolic')+box('dbp','Diastolic')+box('spo','SpO2')+'</div>'
-      +'<div class="form-group"><label class="form-label">Oxygen</label><div class="radio-group">'+chip('o2','nc','Nasal cannula')+chip('o2','mask','Oxygen mask')+chip('o2','hfnc','HFNC')+chip('o2','niv','NIV')+chip('o2','tube','Intubated')+'</div></div>';
+      +'<div class="form-group"><label class="form-label">Oxygen</label><div class="radio-group">'+chip('o2','nc','Nasal cannula')+chip('o2','mask','Oxygen mask')+chip('o2','hfnc','HFNC')+chip('o2','niv','NIV')+chip('o2','tube','Intubated')+'</div></div>'
+      +'<div id="shockline" class="clock red" style="'+(sev.sev==='shock'?'':'display:none')+'">Shock is present.</div>';
   }
   if(n===2){
     h='<div class="step-title">Are the labs back?</div><div class="radio-group">'+chip('labsOn','no','Not yet')+chip('labsOn','yes','Yes')+'</div>';
@@ -1131,7 +1132,7 @@ document.body.addEventListener('input', function(e){
   if(!e.target.id) return;
   S[e.target.id]=e.target.value;
   var line=document.getElementById('shockline');
-  if(line){ var sev=severity(); line.className='clock '+sev.band; line.textContent=sev.name+'. '+sev.clock; }
+  if(line){ var sev=severity(); line.style.display=sev.sev==='shock'?'':'none'; line.textContent='Shock is present.'; }
   renderRec();
 });
 document.getElementById('btn-prev').onclick=function(){ if(S.step>1) go(S.step-1); };
