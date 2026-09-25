@@ -785,22 +785,21 @@ function syncDrug(){
 
 
 
-var STEPS=['Patient','Labs and films','Antibiotic','Culture','Antifungal'];
+var STEPS=['Patient','Labs and films','Antibiotic','Culture','Antifungal','Diagnosis'];
 function chip(key,val,label){ return '<div class="chip-option'+(String(S[key])===String(val)?' selected':'')+'" data-k="'+key+'" data-v="'+val+'">'+label+'</div>'; }
 function go(n){ S.step=n; render(); }
 function mapNow(){
-  if(num('map')!=null) return num('map');
   var s=num('sbp'), d=num('dbp');
   if(s==null||d==null) return null;
   return d+(s-d)/3;
 }
 function severity(){
-  var sbp=num('sbp'), map=mapNow();
-  var shock=(sbp!=null&&sbp<90)||(map!=null&&map<65);
+  var map=mapNow();
+  var shock=map!=null&&map<65;
   var organ=(num('rr')!=null&&num('rr')>=22)||(num('spo')!=null&&num('spo')<92)||(num('plt')!=null&&num('plt')<100)||(num('scr')!=null&&num('scr')>=2)||(num('bili')!=null&&num('bili')>=2);
-  if(shock) return {band:'red', name:'Shock', sev:'shock', clock:'Shock is present. Take cultures, then give the antibiotic now.'};
-  if(organ) return {band:'yellow', name:'Sepsis', sev:'sepsis', clock:'Sepsis. An organ is failing, but the pressure is holding. Do not wait for a procalcitonin.'};
-  return {band:'green', name:'Not shock', sev:'stable', clock:'Not shock. The pressure is holding and no organ failure is entered yet.'};
+  if(shock) return {band:'red', name:'Shock', sev:'shock', clock:'Shock is present.'};
+  if(organ) return {band:'yellow', name:'Sepsis', sev:'sepsis', clock:'An organ is failing. The mean pressure is at least 65.'};
+  return {band:'green', name:'Not shock', sev:'stable', clock:'Shock is not present.'};
 }
 function crBad(){ var c=num('scr'); return c!=null && (c>1.2 || c<0.6); }
 function applyLabs(){
@@ -812,43 +811,52 @@ function applyLabs(){
   if(S.o2==='tube'||S.ettCx==='pos'){ if(!S.acqTouch) S.acq='hospital'; }
 }
 function hasSx(x){ return S.sx && S.sx.indexOf(x)>=0; }
+function hasCxr(x){ return S.cxrs && S.cxrs.indexOf(x)>=0; }
+function hasCt(x){ return S.cts && S.cts.indexOf(x)>=0; }
+var CXR=[['clear','Clear'],['uni','One lung, infiltrate'],['consol','One lung, consolidation'],['effusion','One lung, effusion'],['cavity','One lung, cavity'],['collapse','One lung, collapse'],['ptx','One lung, pneumothorax'],['bilat','Both lungs, infiltrates'],['ards','Both lungs, ARDS'],['edema','Both lungs, edema'],['cardio','Cardiomegaly']];
+var CTF=[['oneinf','One lung, infiltrate'],['oneconsol','One lung, consolidation'],['oneeff','One lung, effusion'],['onecav','One lung, cavity'],['both','Both lungs, infiltrates'],['ards','Both lungs, ARDS'],['edema','Both lungs, edema'],['collection','Abdominal collection'],['biliary','Biliary obstruction'],['divert','Appendicitis or diverticulitis'],['pyelo','Pyelonephritis'],['panc','Pancreatitis'],['perf','Perforation'],['brain','Brain abscess'],['necro','Necrotizing soft tissue'],['none','No acute source']];
+function filmLabel(list, id){ var row=list.filter(function(x){return x[0]===id;})[0]; return row?row[1]:id; }
 function suggest(){
   var ids=[], why=[];
-  var one=S.cxr==='uni'||S.cxr==='consol'||S.cxr==='effusion'||S.cxr==='cavity'||S.ctChest==='one';
-  var both=S.cxr==='bilat'||S.cxr==='ards'||S.ctChest==='both';
+  var one=hasCxr('uni')||hasCxr('consol')||hasCxr('effusion')||hasCxr('cavity')||hasCxr('collapse')||hasCxr('ptx')||hasCt('oneinf')||hasCt('oneconsol')||hasCt('oneeff')||hasCt('onecav');
+  var both=hasCxr('bilat')||hasCxr('ards')||hasCxr('edema')||hasCt('both')||hasCt('ards')||hasCt('edema');
   var lung=one||both;
   var tube=S.o2==='tube';
   var hospital=S.acq==='hospital'||S.acq==='device'||tube||S.ettCx==='pos';
-  if(S.cxr==='cavity'||S.cxr==='effusion'){ ids.push('lungabs'); why.push('One lung has a cavity or a pleural collection. It needs drainage.'); }
+  if(hasCxr('cavity')||hasCxr('effusion')||hasCt('onecav')||hasCt('oneeff')){ ids.push('lungabs'); why.push('There is a cavity or a pleural collection. It needs drainage.'); }
   else if(lung && (tube||S.ettCx==='pos')){ ids.push('vap'); why.push((both?'Both lungs are involved':'One lung is involved')+', and the patient is intubated.'); }
   else if(lung && hospital){ ids.push('hap'); why.push(both?'Both lungs are involved. This is hospital pneumonia.':'One lung is involved. This is hospital pneumonia.'); }
   else if(lung){ ids.push('cap'); why.push(both?'Both lungs are involved. This is community pneumonia.':'One lung is involved. This is community pneumonia.'); }
-  else if(S.cxr!=='clear' && (hasSx('cough')||hasSx('breath'))){
+  else if(!hasCxr('clear') && (hasSx('cough')||hasSx('breath'))){
     ids.push(tube?'vap':(hospital?'hap':'cap'));
-    why.push(tube?'Cough or breathlessness, and the patient is intubated. The chest film is not back.':'Cough or breathlessness. The chest film is not back.');
+    why.push(tube?'Cough or breathlessness, and the patient is intubated. No film is selected yet.':'Cough or breathlessness. No film is selected yet.');
   }
-  if(S.urineDx==='pyuria'||S.urineDx==='nitrite'||S.ct==='pyelo'||S.urineCx==='pos'||hasSx('urine')){
+  if(S.urineDx==='pyuria'||S.urineDx==='nitrite'||hasCt('pyelo')||S.urineCx==='pos'||hasSx('urine')){
     ids.push(S.cath==='yes'||S.acq==='device'?'cauti':'pyelo');
-    why.push(hasSx('urine')&&S.urineDx==='notdone'?'Urinary symptoms. The urine result is not back.':'The urine points to a urinary source.');
+    why.push(hasSx('urine')&&S.urineDx==='notdone'&&!hasCt('pyelo')?'Urinary symptoms. The urine result is not back.':'The urine points to a urinary source.');
   }
-  if(S.ct==='biliary'){ ids.push('chol'); why.push('CT shows biliary obstruction.'); }
-  if(S.ct==='divert'){ ids.push('app'); why.push('CT shows diverticulitis or appendicitis.'); }
-  if(S.ct==='collection'){ ids.push('iaabs'); why.push('CT shows an abdominal collection. Drain it.'); }
-  if(S.ct==='brain'){ ids.push('brainabs'); why.push('CT shows a brain abscess.'); }
-  if(S.ct==='necro'){ ids.push('nec'); why.push('CT fits a necrotizing soft-tissue infection. Call surgery.'); }
-  if(hasSx('cns') && S.ct!=='brain' && ids.indexOf('men')<0 && ids.indexOf('brainabs')<0){ ids.push('men'); why.push('Headache or neck stiffness. This may be meningitis.'); }
-  if(hasSx('skin') && S.ct!=='necro' && ids.indexOf('nec')<0){ ids.push('cell'); why.push('Skin symptoms. Not necrotizing unless the examination or the scan says so.'); }
-  if(hasSx('abd') && S.ct==='notdone' && ids.indexOf('chol')<0 && ids.indexOf('app')<0 && ids.indexOf('iaabs')<0) why.push('Abdominal pain. CT is not back, so the abdominal source is not named yet.');
+  if(hasCt('biliary')){ ids.push('chol'); why.push('CT shows biliary obstruction.'); }
+  if(hasCt('divert')){ ids.push('app'); why.push('CT shows diverticulitis or appendicitis.'); }
+  if(hasCt('collection')||hasCt('panc')){ ids.push(hasCt('collection')?'iaabs':'unk'); if(hasCt('collection')) why.push('CT shows an abdominal collection. Drain it.'); if(hasCt('panc')) why.push('CT shows pancreatitis. Antibiotics are not automatic.'); }
+  if(hasCt('perf')){ ids.push('perit'); why.push('CT shows a perforation. This needs source control.'); }
+  if(hasCt('brain')){ ids.push('brainabs'); why.push('CT shows a brain abscess.'); }
+  if(hasCt('necro')){ ids.push('nec'); why.push('CT fits a necrotizing soft-tissue infection. Call surgery.'); }
+  if(hasSx('cns') && !hasCt('brain') && ids.indexOf('men')<0 && ids.indexOf('brainabs')<0){ ids.push('men'); why.push('Headache or neck stiffness. This may be meningitis.'); }
+  if(hasSx('skin') && !hasCt('necro') && ids.indexOf('nec')<0){ ids.push('cell'); why.push('Skin symptoms. Not necrotizing unless the examination or the scan says so.'); }
+  if(hasSx('abd') && !hasCt('biliary') && !hasCt('divert') && !hasCt('collection') && !hasCt('perf') && !hasCt('panc')) why.push('Abdominal pain. CT has not named an abdominal source.');
   if(S.bloodCx==='pos' && !ids.length){ ids.push('bact'); why.push('The blood culture is positive and no source is on the films. Name the organism next.'); }
   else if(S.bloodCx==='pos') why.push('The blood culture is also positive. Name that organism on the culture page.');
   if(!ids.length){ ids.push('unk'); why.push('Nothing localizes the infection. The source is unknown.'); }
-  return {ids:ids, why:why};
+  var clean=[]; ids.forEach(function(id){ if(id!=='unk' && clean.indexOf(id)<0) clean.push(id); });
+  if(clean.length) ids=clean; else if(ids.indexOf('unk')<0) ids=['unk'];
+  return {ids:ids.filter(function(id,i){return ids.indexOf(id)===i;}), why:why};
 }
 function activeSources(){ return suggest().ids; }
 function page1Infer(){
-  var lines=[];
-  if(severity().sev==='shock') lines.push('Shock is present.');
-  else if(num('sbp')!=null||num('dbp')!=null) lines.push('Shock is not present.');
+  var lines=[], m=mapNow();
+  if(m!=null) lines.push('Mean pressure '+Math.round(m)+'.');
+  if(m!=null&&m<65) lines.push('Shock is present.');
+  else if(m!=null) lines.push('Shock is not present.');
   if(S.o2==='tube') lines.push('The patient is intubated.');
   else if(S.o2==='niv') lines.push('NIV. Not intubated.');
   else if(S.o2==='hfnc') lines.push('High-flow oxygen. Not intubated.');
@@ -859,7 +867,7 @@ function page1Infer(){
   if(hasSx('cns')) lines.push('Symptoms point to the nervous system.');
   if(hasSx('skin')) lines.push('Symptoms point to the skin.');
   if(hasSx('diarrhea')) lines.push('Diarrhea is present. It does not name the source by itself.');
-  if(num('temp')!=null&&num('temp')>=38) lines.push('Temperature is high.');
+  if(num('temp')!=null&&num('temp')>=100.4) lines.push('Temperature is high.');
   if(num('spo')!=null&&num('spo')<92) lines.push('Oxygen saturation is low.');
   if(!lines.length) lines.push('Nothing to infer yet.');
   return lines;
@@ -1006,6 +1014,31 @@ function abxHtml(){
     +'<div id="doseout">'+picks.map(function(id){return '<div class="rec-box"><h4>'+DRUG[id][0]+'</h4><p>'+shownDose(id)+'</p></div>';}).join('')+'</div>'
     +(severity().sev==='shock'?'<p class="step-desc">Shock is present.</p>':'');
 }
+function summaryHtml(){
+  refreshSources();
+  var sug=suggest(), m=mapNow(), sc=candidaScore();
+  var bugs=S.bugs||[], fungi=S.fungi||[];
+  var bug=bugPlan(bugs), fung=fungusPlan(fungi);
+  var lines=empiricNow();
+  var cx=(S.cxrs||[]).map(function(id){return filmLabel(CXR,id);});
+  var ct=(S.cts||[]).map(function(id){return filmLabel(CTF,id);});
+  var bugNames={mssa:'MSSA',mrsa:'MRSA',strep:'Streptococcus',pneumo:'S. pneumoniae',hflu:'H. influenzae',ecoli:'E. coli',kleb:'Klebsiella',proteus:'Proteus',enterobacter:'Enterobacter',serratia:'Serratia',faecalis:'E. faecalis',vre:'VRE',pseudo:'Pseudomonas',acineto:'Acinetobacter',steno:'Stenotrophomonas',bacteroides:'Bacteroides',legionella:'Legionella',anaerobe:'Mixed anaerobes',esbl:'ESBL',kpc:'KPC',ndm:'NDM',oxa:'OXA-48',dtr:'Difficult Pseudomonas',crab:'CRAB'};
+  var funNames={albicans:'Candida albicans',glabrata:'Candida glabrata',parapsilosis:'Candida parapsilosis',auris:'Candida auris',aspergillus:'Aspergillus',mucor:'Mucorales',crypto:'Cryptococcus',pjp:'Pneumocystis'};
+  var org=bugs.length?bugs.map(function(id){return bugNames[id]||id;}).join(', '):'No organism selected';
+  var fun=fungi.length?fungi.map(function(id){return funNames[id]||id;}).join(', '):'No fungus selected';
+  return '<div class="rec-box"><h4>Diagnosis</h4><ul>'
+    +'<li>'+(m==null?'Mean pressure not calculated.':('Mean pressure '+Math.round(m)+'. '+(m<65?'Shock is present.':'Shock is not present.')))+'</li>'
+    +'<li>Temperature '+(num('temp')==null?'not entered':num('temp')+' °F')+'.</li>'
+    +'<li>Source: '+sug.ids.map(srcName).join(', ')+'.</li>'
+    +sug.why.map(function(w){return '<li>'+w+'</li>';}).join('')
+    +'<li>Chest film: '+(cx.length?cx.join(', '):'not selected')+'.</li>'
+    +'<li>CT: '+(ct.length?ct.join(', '):'not selected')+'.</li>'
+    +'</ul></div>'
+    +'<div class="rec-box"><h4>Antibiotic</h4><ul>'+lines.map(function(l){return '<li>'+l+'</li>';}).join('')+'</ul></div>'
+    +'<div class="rec-box"><h4>Culture</h4><p>'+org+'</p><ul>'+bug.drugs.map(function(id){return '<li>'+(DRUG[id]?DRUG[id][0]:id)+'. '+shownDose(id)+'</li>';}).join('')+bug.notes.map(function(l){return '<li>'+l+'</li>';}).join('')+'</ul></div>'
+    +'<div class="rec-box"><h4>Antifungal</h4><p>Candida score '+sc.n+'. '+(sc.start?'An echinocandin can be considered.':'Do not start an antifungal from the score.')+'</p><p>'+fun+'</p><ul>'+fung.lines.map(function(l){return '<li>'+l+'</li>';}).join('')+'</ul></div>'
+    +'<p class="step-desc">Check this before you give it.</p>';
+}
 function cultureHtml(){
   refreshSources();
   var plan=bugPlan(S.bugs||[]);
@@ -1019,7 +1052,8 @@ function stepHtml(){
     h='<div class="step-title">Patient</div>'
       +'<div class="group">Symptoms</div><div class="checkbox-group">'
       +[['cough','Cough or sputum'],['breath','Breathlessness'],['urine','Burning urine or flank pain'],['abd','Abdominal pain'],['cns','Headache or neck stiffness'],['skin','Red or painful skin'],['diarrhea','Diarrhea']].map(function(s){return '<div class="chip-option'+(hasSx(s[0])?' selected':'')+'" data-sx="'+s[0]+'">'+s[1]+'</div>';}).join('')
-      +'</div><div class="group">Vitals</div><div class="grid">'+box('temp','Temperature °C')+box('hr','Pulse')+box('rr','Respiratory rate')+box('sbp','Systolic')+box('dbp','Diastolic')+box('spo','SpO2')+'</div>'
+      +'</div><div class="group">Vitals</div><div class="grid">'+box('temp','Temperature °F')+box('hr','Pulse')+box('rr','Respiratory rate')+box('sbp','Systolic')+box('dbp','Diastolic')+box('spo','SpO2')+'</div>'
+      +'<p id="mapline" class="step-desc">'+(mapNow()==null?'Enter systolic and diastolic to calculate the mean pressure.':'Mean pressure '+Math.round(mapNow())+'.'+(mapNow()<65?' Shock is present.':' Shock is not present.'))+'</p>'
       +'<div class="form-group"><label class="form-label">Oxygen</label><div class="radio-group">'+chip('o2','nc','Nasal cannula')+chip('o2','mask','Oxygen mask')+chip('o2','hfnc','HFNC')+chip('o2','niv','NIV')+chip('o2','tube','Intubated')+'</div></div>'
       +'<div id="infer1" class="rec-box">'+inferInner(page1Infer())+'</div>';
   }
@@ -1035,14 +1069,11 @@ function stepHtml(){
       if(num('pct')!=null) h+='<p class="step-desc">Procalcitonin is '+num('pct')+'. It does not choose the antibiotic.</p>';
       if(num('hb')!=null && num('hb')<7) h+='<p class="step-desc">Hemoglobin is low. It does not change the antibiotic.</p>';
     } else if(S.labsOn==='no') h+='<p class="step-desc">The blood numbers are not back. The films can still be entered.</p>';
-    h+='<div class="group">Chest film</div>'
-      +'<div class="radio-group">'+chip('cxr','none','Not done')+chip('cxr','clear','Clear')+'</div>'
-      +'<div class="group">One lung</div><div class="radio-group">'+chip('cxr','uni','Infiltrate')+chip('cxr','consol','Consolidation')+chip('cxr','effusion','Effusion')+chip('cxr','cavity','Cavity')+'</div>'
-      +'<div class="group">Both lungs</div><div class="radio-group">'+chip('cxr','bilat','Infiltrates in both lungs')+chip('cxr','ards','ARDS pattern')+'</div>'
-      +'<div class="group">CT, one lung</div><div class="radio-group">'+chip('ctChest','one','One lung')+'</div>'
-      +'<div class="group">CT, both lungs</div><div class="radio-group">'+chip('ctChest','both','Both lungs')+'</div>'
-      +'<div class="group">CT, other</div><div class="radio-group">'+chip('ct','notdone','Not done')+chip('ct','none','No source')+chip('ct','collection','Abdominal collection')+chip('ct','biliary','Biliary obstruction')+chip('ct','divert','Diverticulitis or appendicitis')+chip('ct','pyelo','Pyelonephritis')+chip('ct','brain','Brain abscess')+chip('ct','necro','Necrotizing soft tissue')+'</div>'
-      +'<div id="infer2" class="rec-box">'+inferInner(page2Infer())+'</div>';
+    h+='<div class="group">Chest film</div><div class="step-desc">Tap every finding that is present.</div><div class="checkbox-group">'
+      +CXR.map(function(x){return '<div class="chip-option'+(hasCxr(x[0])?' selected':'')+'" data-cxr="'+x[0]+'">'+x[1]+'</div>';}).join('')
+      +'</div><div class="group">CT</div><div class="step-desc">Tap every finding that is present.</div><div class="checkbox-group">'
+      +CTF.map(function(x){return '<div class="chip-option'+(hasCt(x[0])?' selected':'')+'" data-ct="'+x[0]+'">'+x[1]+'</div>';}).join('')
+      +'</div><div id="infer2" class="rec-box">'+inferInner(page2Infer())+'</div>';
   }
   if(n===3) h='<div class="step-title">Antibiotic</div><div id="live">'+abxHtml()+'</div>';
   if(n===4){
@@ -1054,8 +1085,7 @@ function stepHtml(){
     var sc=candidaScore();
     var risks=[['abd','Recent abdominal surgery, perforation, or leak'],['panc','Necrotizing pancreatitis'],['abx','Prolonged broad-spectrum antibiotics'],['icu','Prolonged ICU stay'],['tpn','TPN'],['cvc','Central line'],['rrt','CRRT or hemodialysis'],['immuno','Immunosuppression or neutropenia'],['colon','Candida at more than one site']];
     var fungi=[['albicans','Candida albicans'],['glabrata','Candida glabrata'],['parapsilosis','Candida parapsilosis'],['auris','Candida auris'],['aspergillus','Aspergillus'],['mucor','Mucorales'],['crypto','Cryptococcus'],['pjp','Pneumocystis']];
-    var advice=sc.start?'Score 3 or more. An echinocandin can be considered. A central line or TPN alone is not the reason.':(hasAf('abd')||hasAf('panc')?'A leak or necrotic pancreas is a high-risk abdomen. The score is still '+sc.n+'. Do not start a drug for a line or for antibiotics alone.':'Score under 3. Do not start an antifungal.');
-    h='<div class="step-title">Antifungal</div><div class="clock '+(sc.start?'yellow':'green')+'">'+advice+'</div>'
+    h='<div class="step-title">Antifungal</div>'
       +'<div class="group">Any major Candida risk</div><div class="step-desc">Tap every one that applies.</div><div class="checkbox-group">'
       +risks.map(function(r){return '<div class="chip-option'+(hasAf(r[0])?' selected':'')+'" data-af="'+r[0]+'">'+r[1]+'</div>';}).join('')
       +'</div><div class="group">Candida score</div>'
@@ -1069,6 +1099,7 @@ function stepHtml(){
       +fungi.map(function(f){return '<div class="chip-option'+((S.fungi||[]).indexOf(f[0])>=0?' selected':'')+'" data-fungus="'+f[0]+'">'+f[1]+'</div>';}).join('')+'</div>'
       +'<div id="livefungus"></div>';
   }
+  if(n===6) h='<div class="step-title">Diagnosis</div>'+summaryHtml();
   return h;
 }
 function renderRec(){
@@ -1085,13 +1116,13 @@ function renderRec(){
 function render(){
   try{
   if(!S.step||S.step<1) S.step=1;
-  if(S.step>5) S.step=5;
+  if(S.step>6) S.step=6;
   document.getElementById('stepName').textContent=STEPS[S.step-1]+' · '+S.step+' of '+STEPS.length;
   document.getElementById('step-content').innerHTML=stepHtml();
   var ans=document.getElementById('answer');
   if(ans) ans.style.display='none';
   document.getElementById('btn-prev').disabled=S.step===1;
-  document.getElementById('btn-next').textContent=S.step===5?'Done':'Next';
+  document.getElementById('btn-next').textContent=S.step===6?'Done':'Next';
   renderRec();
   }catch(err){
     var box=document.getElementById('step-content');
@@ -1126,6 +1157,20 @@ document.body.addEventListener('click', function(e){
     if(!S.fungi) S.fungi=[];
     var i=S.fungi.indexOf(fu.dataset.fungus);
     if(i>=0) S.fungi.splice(i,1); else S.fungi.push(fu.dataset.fungus);
+    render(); return;
+  }
+  var film=e.target.closest('[data-cxr]');
+  if(film){
+    if(!S.cxrs) S.cxrs=[];
+    var i=S.cxrs.indexOf(film.dataset.cxr);
+    if(i>=0) S.cxrs.splice(i,1); else S.cxrs.push(film.dataset.cxr);
+    render(); return;
+  }
+  var ctf=e.target.closest('[data-ct]');
+  if(ctf){
+    if(!S.cts) S.cts=[];
+    var j=S.cts.indexOf(ctf.dataset.ct);
+    if(j>=0) S.cts.splice(j,1); else S.cts.push(ctf.dataset.ct);
     render(); return;
   }
   var sx=e.target.closest('[data-sx]');
@@ -1164,6 +1209,11 @@ document.body.addEventListener('input', function(e){
   S[e.target.id]=e.target.value;
   var i1=document.getElementById('infer1');
   if(i1) i1.innerHTML=inferInner(page1Infer());
+  var mapline=document.getElementById('mapline');
+  if(mapline){
+    var m=mapNow();
+    mapline.textContent=m==null?'Enter systolic and diastolic to calculate the mean pressure.':'Mean pressure '+Math.round(m)+'.'+(m<65?' Shock is present.':' Shock is not present.');
+  }
   var i2=document.getElementById('infer2');
   if(i2) i2.innerHTML=inferInner(page2Infer());
   var dose=document.getElementById('doseout');
@@ -1174,11 +1224,12 @@ document.body.addEventListener('input', function(e){
   }
 });
 document.getElementById('btn-prev').onclick=function(){ if(S.step>1) go(S.step-1); };
-document.getElementById('btn-next').onclick=function(){ if(S.step<5) go(S.step+1); else location.href='index.html'; };
+document.getElementById('btn-next').onclick=function(){ if(S.step<6) go(S.step+1); else location.href='index.html'; };
 S.step=1;
 S.labsOn=S.labsOn||'';
 S.ctChest=S.ctChest||'';
-S.cxr=S.cxr||'none';
+S.cxrs=S.cxrs||[];
+S.cts=S.cts||[];
 S.ct=S.ct||'notdone';
 S.urineDx=S.urineDx||'notdone';
 S.bloodCx=S.bloodCx||'notsent';
