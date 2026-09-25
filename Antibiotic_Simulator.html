@@ -164,7 +164,8 @@ var DRUG={
   ampsulba:['Ampicillin-sulbactam','fT>MIC','Aspiration without a separate abscess, and some skin or abdominal infections.','A penicillin. No Pseudomonas activity.'],
   clindamycin:['Clindamycin','AUC/MIC','Toxin suppression in necrotizing infection. Not MRSA treatment by itself.','C. difficile. Liver clears it.'],
   polymyxin:['Polymyxin B','AUC/MIC','Polymyxin B for a carbapenem-resistant organism outside the urine.','Kidney injury. It does not reach the urine.'],
-  colistin:['Colistin','AUC/MIC','Colistin for a carbapenem-resistant organism in the urine.','Kidney injury. Use it for urine, not for other sites.']
+  colistin:['Colistin','AUC/MIC','Colistin for a carbapenem-resistant organism in the urine.','Kidney injury. Use it for urine, not for other sites.'],
+  minocycline:['Minocycline','AUC/MIC','High-dose minocycline for invasive CRAB when it is the active partner.','Dizziness and pigmentation. Not a drug for the blood by itself.']
 };
 var BETA={meropenem:1,cefepime:1,piptazo:1,ceftazavi:1,merovab:1,imirele:1,ceftolozane:1,cefiderocol:1,aztavi:1,cazazi:1,sulbactam:1,aztreonam:1,ceftriaxone:1,cefazolin:1,ampicillin:1,ampsulba:1};
 function prefList(){ return PREF[S.mech]||[]; }
@@ -435,11 +436,18 @@ function regimen(){
   } else if(id==='metronidazole'){
     row=[500,8];
   } else if(id==='ampsulba'){
+    if(S.highSul){
+      var evh=8;
+      if(t==='hd'||(c!=null&&c<30 && t!=='crrt' && t!=='arc')){ evh=12; after=t==='hd'; }
+      row=[9000,evh];
+      note='9 g is 6 g of ampicillin plus 3 g of sulbactam. This is the invasive CRAB dose.';
+    } else {
     var evs=6;
     if(t==='hd'||(c!=null&&c<15)){ evs=24; after=t==='hd'; }
     else if(c!=null&&c<30 && t!=='crrt' && t!=='arc') evs=12;
     row=[3000,evs];
     note='3 g is 2 g of ampicillin plus 1 g of sulbactam. It does not cover Pseudomonas.';
+    }
   } else if(id==='clindamycin'){
     row=[900,8];
     note=S.liver==='yes'?'The liver is failing. Do not increase clindamycin.':'Suppresses toxin. It is not the MRSA drug, and it can cause C. difficile.';
@@ -455,6 +463,9 @@ function regimen(){
     else if(c!=null&&c<50 && t!=='crrt' && t!=='arc') mu=3;
     note='Colistin, as million IU of the prodrug. For urine. The load is 9 million IU.';
     return {mg:mu, every:12, infH:0.5, load:'9 million IU IV once', maint:mu+' million IU IV every 12 hours'+(after?', plus a dose after dialysis':''), infuseLabel:'30 minutes', note:note, pk:'AUC/MIC'};
+  } else if(id==='minocycline'){
+    row=[200,12];
+    note='200 mg every 12 hours. This is the CRAB partner dose, not a skin dose.';
   }
   if(!row) return null;
   every=row[1];
@@ -903,14 +914,14 @@ function refreshSources(){
   syncPrimary();
 }
 function stdDose(id){
-  if(id==='meropenem') return (S.source==='vap'||S.source==='cns'||S.sev==='shock'||S.nec==='yes')?'2 g IV every 8 hours':'1 g IV every 8 hours';
+  if(id==='meropenem') return (S.crabMero||S.source==='vap'||S.source==='cns'||S.sev==='shock'||S.nec==='yes')?'2 g IV every 8 hours':'1 g IV every 8 hours';
   if(id==='cefepime') return '2 g IV every 8 hours';
   if(id==='piptazo') return '4.5 g IV every 6 hours';
   if(id==='ceftriaxone') return (S.source==='cns')?'2 g IV every 12 hours':'2 g IV every 24 hours';
   if(id==='vancomycin') return '15–20 mg/kg IV, then by the AUC';
   if(id==='linezolid') return '600 mg IV or by mouth every 12 hours';
   if(id==='daptomycin') return '8–10 mg/kg IV every 24 hours';
-  if(id==='ampsulba') return '3 g IV every 6 hours';
+  if(id==='ampsulba') return S.highSul?'9 g IV every 8 hours, which is 6 g of ampicillin plus 3 g of sulbactam':'3 g IV every 6 hours';
   if(id==='metronidazole') return '500 mg IV every 8 hours';
   if(id==='cefazolin') return '2 g IV every 8 hours';
   if(id==='ampicillin') return '2 g IV every 4 hours';
@@ -926,6 +937,7 @@ function stdDose(id){
   if(id==='clindamycin') return '900 mg IV every 8 hours';
   if(id==='polymyxin') return '2.5 mg/kg IV once, then 1.25 mg/kg every 12 hours';
   if(id==='colistin') return '9 million IU IV once, then 4.5 million IU every 12 hours';
+  if(id==='minocycline') return '200 mg IV every 12 hours';
   return 'Standard adult dose';
 }
 function shownDose(id){
@@ -941,17 +953,60 @@ function bugPlan(ids){
   var has={}, drugs=[], notes=[];
   ids.forEach(function(id){ has[id]=1; });
   function add(id){ if(id && drugs.indexOf(id)<0) drugs.push(id); }
-  var gn=null;
-  var cro=has.kpc||has.ndm||has.oxa||has.dtr||has.crab;
   var urine=S.source==='uti';
-  if(cro) gn=urine?'colistin':'polymyxin';
-  else if(has.esbl) gn='meropenem';
-  else if(has.pseudo && (has.bacteroides||has.anaerobe)) gn='piptazo';
-  else if(has.pseudo||has.enterobacter||has.serratia) gn='cefepime';
-  else if(has.acineto) gn='ampsulba';
-  else if(has.ecoli||has.kleb||has.proteus||has.hflu||has.pneumo) gn='ceftriaxone';
-  if(gn) add(gn);
-  if((has.bacteroides||has.anaerobe) && gn!=='meropenem' && gn!=='piptazo' && gn!=='aztavi') add('metronidazole');
+  function poly(){ return urine?'colistin':'polymyxin'; }
+  S.highSul=0; S.crabMero=0;
+  var pseudoOnly=has.pseudo&&!has.ecoli&&!has.kleb&&!has.proteus&&!has.enterobacter&&!has.serratia&&!has.esbl&&!has.kpc&&!has.oxa&&!has.creunk;
+  if(has.kpc){
+    add('ceftazavi');
+    notes.push('KPC. Ceftazidime-avibactam, or meropenem-vaborbactam, or imipenem-relebactam, if that one is susceptible.');
+  } else if(has.oxa){
+    add('ceftazavi');
+    notes.push('OXA-48-like. Ceftazidime-avibactam.');
+  } else if(has.ndm && !has.crab && !pseudoOnly){
+    add('aztavi');
+    notes.push('NDM or another MBL. Aztreonam-avibactam, or cefiderocol if that is the susceptible one.');
+  } else if(has.creunk){
+    notes.push('Enzyme not known. Do the susceptibility and a carbapenemase test. Do not guess a drug.');
+  } else if(has.esbl){
+    add('meropenem');
+  } else if(has.enterobacter||has.serratia){
+    add('cefepime');
+    notes.push('Ceftriaxone is the wrong drug. AmpC can appear on treatment.');
+  } else if(has.ecoli||has.kleb||has.proteus||has.hflu||has.pneumo){
+    add('ceftriaxone');
+  }
+  if(has.crab){
+    if(S.crabRole==='colon') notes.push('CRAB colonization. No treatment.');
+    else if(S.crabRole!=='invasive') notes.push('CRAB. Say if this is colonization or an invasive infection.');
+    else if(S.crabMbl==='yes'){
+      notes.push('CRAB with an MBL. Do not use sulbactam.');
+      if(S.crabPartner) add(S.crabPartner==='polymyxin'?poly():S.crabPartner);
+      else notes.push('Pick cefiderocol, minocycline, or polymyxin B.');
+    } else if(S.sdAvail==='yes'){
+      add('sulbactam'); S.crabMero=1; add('meropenem');
+      notes.push('Invasive CRAB. Sulbactam-durlobactam plus meropenem.');
+    } else if(S.sdAvail==='no'){
+      S.highSul=1; add('ampsulba');
+      notes.push('Sulbactam-durlobactam is not available. High-dose ampicillin-sulbactam plus one active agent.');
+      if(S.crabPartner) add(S.crabPartner==='polymyxin'?poly():S.crabPartner);
+      else notes.push('Add cefiderocol, minocycline, or polymyxin B.');
+    } else notes.push('Is sulbactam-durlobactam available?');
+    if(urine && (S.crabPartner==='polymyxin')) notes.push('Urine, so colistin replaces polymyxin B.');
+  }
+  if(has.dtr){
+    if(S.psaDrug) add(S.psaDrug);
+    else notes.push('Difficult Pseudomonas. Use whichever the report marks susceptible: ceftolozane-tazobactam, ceftazidime-avibactam, imipenem-relebactam, or cefiderocol.');
+  } else if(has.pseudo && (has.ndm||S.psaMech==='mbl')){
+    add('cefiderocol');
+    notes.push('Pseudomonas with an MBL. Cefiderocol if it is susceptible.');
+  } else if(has.pseudo){
+    add((has.bacteroides||has.anaerobe)?'piptazo':'cefepime');
+  } else if(has.acineto && !has.crab){
+    add('ampsulba');
+    notes.push('Ampicillin-sulbactam only if this Acinetobacter is susceptible. Tap CRAB if it is carbapenem resistant.');
+  }
+  if((has.bacteroides||has.anaerobe) && drugs.indexOf('meropenem')<0 && drugs.indexOf('piptazo')<0 && drugs.indexOf('aztavi')<0) add('metronidazole');
   if(has.mssa) add('cefazolin');
   if(has.mrsa) add('vancomycin');
   if(has.faecalis) add('ampicillin');
@@ -959,13 +1014,10 @@ function bugPlan(ids){
   if(has.strep && drugs.indexOf('ceftriaxone')<0 && drugs.indexOf('cefepime')<0 && drugs.indexOf('meropenem')<0) add('ceftriaxone');
   if(has.legionella) add('azithromycin');
   if(has.steno) add('tmp');
-  if(has.kpc||has.ndm||has.oxa||has.dtr||has.crab) notes.push(urine?'Carbapenem-resistant organism in the urine. Colistin. Polymyxin B does not reach the urine.':'Carbapenem-resistant organism outside the urine. Polymyxin B. Colistin is kept for urine.');
-  if(has.acineto && !has.crab) notes.push('Ampicillin-sulbactam only if this Acinetobacter is susceptible.');
-  if(has.enterobacter||has.serratia) notes.push('Ceftriaxone is the wrong drug. AmpC can appear on treatment. Use cefepime.');
-  if(has.esbl && !has.pseudo && S.sev!=='shock') notes.push('Ertapenem 1 g every 24 hours is an alternative only if the patient is stable and Pseudomonas is not a concern.');
-  if(has.mssa) notes.push('MSSA. Cefazolin. Oxacillin 2 g every 4 hours is the other choice. Stop vancomycin once this is known.');
-  if(has.mrsa) notes.push('MRSA. Vancomycin by the AUC. Linezolid 600 mg every 12 hours if the lung or the marrow makes vancomycin a poor fit. Teicoplanin is an alternative where it is used.');
-  if(has.faecalis) notes.push('Enterococcus faecalis. Ampicillin if susceptible. Gentamicin is not automatic.');
+  if(has.esbl && !has.kpc && !has.ndm && !has.oxa && !has.pseudo) notes.push('Ertapenem 1 g every 24 hours is an alternative only if the patient is stable and Pseudomonas is not a concern.');
+  if(has.mssa) notes.push('MSSA. Cefazolin. Stop vancomycin once this is known.');
+  if(has.mrsa) notes.push('MRSA. Vancomycin by the AUC. Linezolid 600 mg every 12 hours if the lung or the marrow makes vancomycin a poor fit.');
+  if(has.faecalis) notes.push('Enterococcus faecalis. Ampicillin if susceptible.');
   if(has.vre) notes.push('VRE. Not vancomycin. Linezolid, or daptomycin if it is not pneumonia.');
   if(!ids.length) notes.push('Select every organism on the report. More than one is allowed.');
   return {drugs:drugs, notes:notes};
@@ -1030,7 +1082,7 @@ function summaryHtml(){
   var lines=empiricNow();
   var cx=(S.cxrs||[]).map(function(id){return filmLabel(CXR,id);});
   var ct=(S.cts||[]).map(function(id){return filmLabel(CTF,id);});
-  var bugNames={mssa:'MSSA',mrsa:'MRSA',strep:'Streptococcus',pneumo:'S. pneumoniae',hflu:'H. influenzae',ecoli:'E. coli',kleb:'Klebsiella',proteus:'Proteus',enterobacter:'Enterobacter',serratia:'Serratia',faecalis:'E. faecalis',vre:'VRE',pseudo:'Pseudomonas',acineto:'Acinetobacter',steno:'Stenotrophomonas',bacteroides:'Bacteroides',legionella:'Legionella',anaerobe:'Mixed anaerobes',esbl:'ESBL',kpc:'KPC',ndm:'NDM',oxa:'OXA-48',dtr:'Difficult Pseudomonas',crab:'CRAB'};
+  var bugNames={mssa:'MSSA',mrsa:'MRSA',strep:'Streptococcus',pneumo:'S. pneumoniae',hflu:'H. influenzae',ecoli:'E. coli',kleb:'Klebsiella',proteus:'Proteus',enterobacter:'Enterobacter',serratia:'Serratia',faecalis:'E. faecalis',vre:'VRE',pseudo:'Pseudomonas',acineto:'Acinetobacter',steno:'Stenotrophomonas',bacteroides:'Bacteroides',legionella:'Legionella',anaerobe:'Mixed anaerobes',esbl:'ESBL',kpc:'KPC',ndm:'NDM',oxa:'OXA-48',dtr:'Difficult Pseudomonas',crab:'CRAB',creunk:'CRE, enzyme not known'};
   var funNames={albicans:'Candida albicans',glabrata:'Candida glabrata',parapsilosis:'Candida parapsilosis',auris:'Candida auris',aspergillus:'Aspergillus',mucor:'Mucorales',crypto:'Cryptococcus',pjp:'Pneumocystis'};
   var org=bugs.length?bugs.map(function(id){return bugNames[id]||id;}).join(', '):'No organism selected';
   var fun=fungi.length?fungi.map(function(id){return funNames[id]||id;}).join(', '):'No fungus selected';
@@ -1085,9 +1137,19 @@ function stepHtml(){
   }
   if(n===3) h='<div class="step-title">Antibiotic</div><div id="live">'+abxHtml()+'</div>';
   if(n===4){
-    var bugs=[['mssa','MSSA'],['mrsa','MRSA'],['strep','Streptococcus'],['pneumo','S. pneumoniae'],['hflu','H. influenzae'],['ecoli','E. coli'],['kleb','Klebsiella'],['proteus','Proteus'],['enterobacter','Enterobacter'],['serratia','Serratia'],['faecalis','E. faecalis'],['vre','VRE'],['pseudo','Pseudomonas'],['acineto','Acinetobacter'],['steno','Stenotrophomonas'],['bacteroides','Bacteroides'],['legionella','Legionella'],['anaerobe','Mixed anaerobes'],['esbl','ESBL E. coli or Klebsiella'],['kpc','KPC'],['ndm','NDM'],['oxa','OXA-48'],['dtr','Difficult Pseudomonas'],['crab','CRAB']];
-    h='<div class="step-title">Organisms on the report</div><div class="step-desc">Tap every organism that grew. The dose changes only if the creatinine is deranged.</div><div class="checkbox-group">'
-      +bugs.map(function(b){return '<div class="chip-option'+((S.bugs||[]).indexOf(b[0])>=0?' selected':'')+'" data-bug="'+b[0]+'">'+b[1]+'</div>';}).join('')+'</div><div id="live">'+cultureHtml()+'</div>';
+    var bugs=[['mssa','MSSA'],['mrsa','MRSA'],['strep','Streptococcus'],['pneumo','S. pneumoniae'],['hflu','H. influenzae'],['ecoli','E. coli'],['kleb','Klebsiella'],['proteus','Proteus'],['enterobacter','Enterobacter'],['serratia','Serratia'],['faecalis','E. faecalis'],['vre','VRE'],['pseudo','Pseudomonas'],['acineto','Acinetobacter'],['steno','Stenotrophomonas'],['bacteroides','Bacteroides'],['legionella','Legionella'],['anaerobe','Mixed anaerobes'],['esbl','ESBL'],['kpc','KPC'],['oxa','OXA-48'],['ndm','NDM or MBL'],['creunk','CRE, enzyme not known'],['dtr','Difficult Pseudomonas'],['crab','CRAB']];
+    var ask='';
+    if((S.bugs||[]).indexOf('crab')>=0){
+      ask+='<div class="group">CRAB</div><div class="radio-group">'+chip('crabRole','colon','Colonization')+chip('crabRole','invasive','Invasive infection')+'</div>';
+      if(S.crabRole==='invasive'){
+        ask+='<div class="form-group"><label class="form-label">Sulbactam-durlobactam available</label><div class="radio-group">'+chip('sdAvail','yes','Yes')+chip('sdAvail','no','No')+'</div></div>';
+        ask+='<div class="form-group"><label class="form-label">NDM or another MBL</label><div class="radio-group">'+chip('crabMbl','no','No')+chip('crabMbl','yes','Yes')+'</div></div>';
+        if(S.crabMbl==='yes'||S.sdAvail==='no') ask+='<div class="form-group"><label class="form-label">Active partner</label><div class="radio-group">'+chip('crabPartner','cefiderocol','Cefiderocol')+chip('crabPartner','minocycline','Minocycline')+chip('crabPartner','polymyxin','Polymyxin B')+'</div></div>';
+      }
+    }
+    if((S.bugs||[]).indexOf('dtr')>=0) ask+='<div class="group">Pseudomonas, which drug is susceptible</div><div class="radio-group">'+chip('psaDrug','ceftolozane','Ceftolozane-tazobactam')+chip('psaDrug','ceftazavi','Ceftazidime-avibactam')+chip('psaDrug','imirele','Imipenem-relebactam')+chip('psaDrug','cefiderocol','Cefiderocol')+'</div>';
+    h='<div class="step-title">Organism identified</div><div class="step-desc">Tap every organism that grew.</div><div class="checkbox-group">'
+      +bugs.map(function(b){return '<div class="chip-option'+((S.bugs||[]).indexOf(b[0])>=0?' selected':'')+'" data-bug="'+b[0]+'">'+b[1]+'</div>';}).join('')+'</div>'+ask+'<div id="live">'+cultureHtml()+'</div>';
   }
   if(n===5){
     var sc=candidaScore();
