@@ -168,7 +168,7 @@ var DRUG={
   minocycline:['Minocycline','AUC/MIC','High-dose minocycline for invasive CRAB when it is the active partner.','Dizziness and pigmentation. Not a drug for the blood by itself.']
 };
 var BETA={meropenem:1,cefepime:1,piptazo:1,ceftazavi:1,merovab:1,imirele:1,ceftolozane:1,cefiderocol:1,aztavi:1,cazazi:1,sulbactam:1,aztreonam:1,ceftriaxone:1,cefazolin:1,ampicillin:1,ampsulba:1};
-function prefList(){ return PREF[S.mech]||[]; }
+function prefList(){ return (PREF[S.mech]||[]).filter(function(id){ return id!=='cefiderocol' || S.fideAvail==='yes'; }); }
 function siteBlock(id){
   var kind=ORG[S.org][1];
   if((id==='tigecycline'||id==='eravacycline'||id==='azithromycin') && (S.source==='bsi'||S.source==='endo'||S.source==='line')) return 'Blood levels are too low.';
@@ -228,12 +228,12 @@ function judge(){
   if(pref.indexOf(id)>=0) return {bad:false, title:'Fits '+MECH[S.mech], lines:[DRUG[id][2], DRUG[id][3]]};
   if(S.mech==='esbl' && id==='piptazo') return {bad:true, title:'Not for ESBL in the blood', lines:['A susceptible piperacillin result is not enough for ESBL bacteremia. Use a carbapenem.']};
   if(S.mech==='ampc' && id==='piptazo') return {bad:true, title:'Tazobactam does not hold AmpC', lines:['Cefepime is the narrower active choice when the MIC allows it.']};
-  if((S.mech==='ndm'||S.mech==='vim'||S.mech==='imp') && id==='ceftazavi') return {bad:true, title:'Avibactam alone does not stop an MBL', lines:['Add aztreonam, or use aztreonam-avibactam or susceptible cefiderocol.']};
+  if((S.mech==='ndm'||S.mech==='vim'||S.mech==='imp') && id==='ceftazavi') return {bad:true, title:'Avibactam alone does not stop an MBL', lines:['Add aztreonam. Cefiderocol only if it is actually in stock.']};
   if((S.mech==='oxa48') && id==='merovab') return {bad:true, title:'Vaborbactam is for KPC', lines:['OXA-48-like needs ceftazidime-avibactam.']};
   if(S.mech==='kpc' && id==='meropenem') return {bad:true, title:'KPC hydrolyzes meropenem', lines:['A longer infusion does not replace avibactam, vaborbactam, or relebactam.']};
   if(S.mech==='dtr' && (id==='meropenem'||id==='cefepime'||id==='piptazo')) return {bad:true, title:'The usual Pseudomonas drugs have already failed', lines:['Use a susceptible newer antipseudomonal agent.']};
-  if(S.mech==='crab' && id==='meropenem') return {bad:true, title:'Not a CRAB drug', lines:['Use sulbactam-durlobactam or susceptible cefiderocol.']};
-  if(S.mech==='steno' && (id==='meropenem'||id==='cefepime')) return {bad:true, title:'Inactive against Stenotrophomonas', lines:['Trimethoprim-sulfamethoxazole or susceptible cefiderocol.']};
+  if(S.mech==='crab' && id==='meropenem') return {bad:true, title:'Not a CRAB drug', lines:['Meropenem alone does not treat CRAB. Pair sulbactam-durlobactam with it, or use high-dose ampicillin-sulbactam plus another active drug.']};
+  if(S.mech==='steno' && (id==='meropenem'||id==='cefepime')) return {bad:true, title:'Inactive against Stenotrophomonas', lines:['Trimethoprim-sulfamethoxazole. Minocycline or levofloxacin only if the report says susceptible.']};
   return {bad:true, title:'Does not match '+MECH[S.mech], lines:['Preferred: '+pref.map(function(x){return DRUG[x][0];}).join(', ')+'.']};
 }
 function doseWt(){
@@ -933,6 +933,7 @@ function stdDose(id){
   if(id==='ceftazavi') return '2.5 g IV every 8 hours';
   if(id==='merovab') return '4 g IV every 8 hours';
   if(id==='aztavi') return 'Aztreonam-avibactam, both drugs, every 8 hours';
+  if(id==='cazazi') return 'Ceftazidime-avibactam 2.5 g plus aztreonam 2 g, both every 8 hours, each over 3 hours';
   if(id==='cefiderocol') return '2 g IV every 8 hours';
   if(id==='ceftolozane') return (S.source==='vap'||S.source==='cap')?'3 g IV every 8 hours':'1.5 g IV every 8 hours';
   if(id==='sulbactam') return 'Sulbactam-durlobactam 1 g / 1 g IV, renal-adjusted';
@@ -969,8 +970,13 @@ function bugPlan(ids){
     add('ceftazavi');
     notes.push('OXA-48-like. Ceftazidime-avibactam.');
   } else if(has.ndm && !has.crab && !pseudoOnly){
-    add('aztavi');
-    notes.push('NDM or another MBL. Aztreonam-avibactam, or cefiderocol if that is the susceptible one.');
+    if(S.fideAvail==='yes'){
+      add('aztavi');
+      notes.push('NDM or another MBL. Cefiderocol is in stock, so use it only if the report says susceptible. Otherwise aztreonam-avibactam.');
+    } else {
+      add('cazazi');
+      notes.push('NDM or another MBL. Cefiderocol is not stocked. Ceftazidime-avibactam plus aztreonam.');
+    }
   } else if(has.creunk){
     notes.push('Enzyme not known. Do the susceptibility and a carbapenemase test. Do not guess a drug.');
   } else if(has.esbl){
@@ -1017,11 +1023,19 @@ function bugPlan(ids){
     if(urine && (S.crabPartner==='polymyxin')) notes.push('Urine, so colistin replaces polymyxin B.');
   }
   if(has.dtr){
-    if(S.psaDrug) add(S.psaDrug);
-    else notes.push('Difficult Pseudomonas. Use whichever the report marks susceptible: ceftolozane-tazobactam, ceftazidime-avibactam, imipenem-relebactam, or cefiderocol.');
+    if(S.psaDrug==='cefiderocol' && S.fideAvail!=='yes'){
+      add(poly());
+      notes.push(urine?'Cefiderocol is not stocked. This is urine, so colistin.':'Cefiderocol is not stocked. Polymyxin B.');
+    } else if(S.psaDrug) add(S.psaDrug);
+    else notes.push(S.fideAvail==='yes'?'Difficult Pseudomonas. Use whichever the report marks susceptible: ceftolozane-tazobactam, ceftazidime-avibactam, imipenem-relebactam, or cefiderocol.':'Difficult Pseudomonas. Cefiderocol is not stocked. Use whichever is susceptible: ceftolozane-tazobactam, ceftazidime-avibactam, or imipenem-relebactam. If none is active, use '+(urine?'colistin.':'polymyxin B.'));
   } else if(has.pseudo && (has.ndm||S.psaMech==='mbl')){
-    add('cefiderocol');
-    notes.push('Pseudomonas with an MBL. Cefiderocol if it is susceptible.');
+    if(S.fideAvail==='yes'){
+      add('cefiderocol');
+      notes.push('Pseudomonas with an MBL. Cefiderocol is in stock. Use it only if the report says susceptible.');
+    } else {
+      add(poly());
+      notes.push(urine?'Pseudomonas with an MBL. Cefiderocol is not stocked. Colistin, because this is urine.':'Pseudomonas with an MBL. Cefiderocol is not stocked. Polymyxin B.');
+    }
   } else if(has.pseudo){
     add((has.bacteroides||has.anaerobe)?'piptazo':'cefepime');
   } else if(has.acineto && !has.crab){
@@ -1035,7 +1049,10 @@ function bugPlan(ids){
   if(has.vre) add((S.source==='vap'||S.source==='cap')?'linezolid':'daptomycin');
   if(has.strep && drugs.indexOf('ceftriaxone')<0 && drugs.indexOf('cefepime')<0 && drugs.indexOf('meropenem')<0) add('ceftriaxone');
   if(has.legionella) add('azithromycin');
-  if(has.steno) add('tmp');
+  if(has.steno){
+    add('tmp');
+    notes.push(S.fideAvail==='yes'?'Stenotrophomonas. Trimethoprim-sulfamethoxazole. Cefiderocol only if the report says susceptible.':'Stenotrophomonas. Trimethoprim-sulfamethoxazole. Cefiderocol is not stocked. Minocycline or levofloxacin only if the report says susceptible.');
+  }
   if(has.esbl && !has.kpc && !has.ndm && !has.oxa && !has.pseudo) notes.push('Ertapenem 1 g every 24 hours is an alternative only if the patient is stable and Pseudomonas is not a concern.');
   if(has.mssa) notes.push('MSSA. Cefazolin. Stop vancomycin once this is known.');
   if(has.mrsa) notes.push('MRSA. Vancomycin by the AUC. Linezolid 600 mg every 12 hours if the lung or the marrow makes vancomycin a poor fit.');
@@ -1160,22 +1177,29 @@ function stepHtml(){
   if(n===3) h='<div class="step-title">Antibiotic</div><div id="live">'+abxHtml()+'</div>';
   if(n===4){
     var bugs=[['mssa','MSSA'],['mrsa','MRSA'],['strep','Streptococcus'],['pneumo','S. pneumoniae'],['hflu','H. influenzae'],['ecoli','E. coli'],['kleb','Klebsiella'],['proteus','Proteus'],['enterobacter','Enterobacter'],['serratia','Serratia'],['faecalis','E. faecalis'],['vre','VRE'],['pseudo','Pseudomonas'],['acineto','Acinetobacter'],['steno','Stenotrophomonas'],['bacteroides','Bacteroides'],['legionella','Legionella'],['anaerobe','Mixed anaerobes'],['esbl','ESBL'],['kpc','KPC'],['oxa','OXA-48'],['ndm','NDM or MBL'],['creunk','CRE, enzyme not known'],['dtr','Difficult Pseudomonas'],['crab','CRAB']];
+    var picked=S.bugs||[];
     var ask='';
-    if((S.bugs||[]).indexOf('crab')>=0){
+    if(picked.some(function(id){return id==='ndm'||id==='crab'||id==='dtr'||id==='pseudo'||id==='steno';})){
+      ask+='<div class="group">Cefiderocol in stock</div><div class="radio-group">'+chip('fideAvail','no','No')+chip('fideAvail','yes','Yes')+'</div>';
+    }
+    if(picked.indexOf('crab')>=0){
       ask+='<div class="group">CRAB</div><div class="radio-group">'+chip('crabRole','colon','Colonization')+chip('crabRole','invasive','Invasive infection')+'</div>';
       if(S.crabRole==='invasive'){
         ask+='<div class="form-group"><label class="form-label">Sulbactam-durlobactam available</label><div class="radio-group">'+chip('sdAvail','yes','Yes')+chip('sdAvail','no','No')+'</div></div>';
         ask+='<div class="form-group"><label class="form-label">NDM or another MBL</label><div class="radio-group">'+chip('crabMbl','no','No')+chip('crabMbl','yes','Yes')+'</div></div>';
         if(S.crabMbl==='yes'||S.sdAvail==='no'){
-          ask+='<div class="form-group"><label class="form-label">Cefiderocol available</label><div class="radio-group">'+chip('fideAvail','yes','Yes')+chip('fideAvail','no','No')+'</div></div>';
           var partners=chip('crabPartner','minocycline','Minocycline')+chip('crabPartner','polymyxin','Polymyxin B');
           if(S.fideAvail==='yes') partners=chip('crabPartner','cefiderocol','Cefiderocol')+partners;
-          else if(S.fideAvail==='no' && (S.source==='iab'||S.source==='ssti'||S.source==='asp')) partners+=chip('crabPartner','tigecycline','Tigecycline');
-          if(S.fideAvail==='yes'||S.fideAvail==='no') ask+='<div class="form-group"><label class="form-label">Active partner</label><div class="radio-group">'+partners+'</div></div>';
+          else if(S.source==='iab'||S.source==='ssti'||S.source==='asp') partners+=chip('crabPartner','tigecycline','Tigecycline');
+          ask+='<div class="form-group"><label class="form-label">Active partner</label><div class="radio-group">'+partners+'</div></div>';
         }
       }
     }
-    if((S.bugs||[]).indexOf('dtr')>=0) ask+='<div class="group">Pseudomonas, which drug is susceptible</div><div class="radio-group">'+chip('psaDrug','ceftolozane','Ceftolozane-tazobactam')+chip('psaDrug','ceftazavi','Ceftazidime-avibactam')+chip('psaDrug','imirele','Imipenem-relebactam')+chip('psaDrug','cefiderocol','Cefiderocol')+'</div>';
+    if(picked.indexOf('dtr')>=0){
+      var psa=chip('psaDrug','ceftolozane','Ceftolozane-tazobactam')+chip('psaDrug','ceftazavi','Ceftazidime-avibactam')+chip('psaDrug','imirele','Imipenem-relebactam');
+      if(S.fideAvail==='yes') psa+=chip('psaDrug','cefiderocol','Cefiderocol');
+      ask+='<div class="group">Pseudomonas, which drug is susceptible</div><div class="radio-group">'+psa+'</div>';
+    }
     h='<div class="step-title">Organism identified</div><div class="step-desc">Tap every organism that grew.</div><div class="checkbox-group">'
       +bugs.map(function(b){return '<div class="chip-option'+((S.bugs||[]).indexOf(b[0])>=0?' selected':'')+'" data-bug="'+b[0]+'">'+b[1]+'</div>';}).join('')+'</div>'+ask+'<div id="live">'+cultureHtml()+'</div>';
   }
@@ -1338,6 +1362,7 @@ S.sx=S.sx||[];
 S.afRisks=S.afRisks||[];
 S.cath=S.cath||'no';
 S.bugs=S.bugs||[];
+S.fideAvail=S.fideAvail||'no';
 S.fungi=S.fungi||[];
 S.off=S.off||[];
 S.picked=S.picked||[];
