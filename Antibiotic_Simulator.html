@@ -77,7 +77,7 @@ a{color:#0f766e}
 <div class="output-panel"><div class="output-title"><span>What to do</span><span class="badge badge-success" id="status-badge">Empiric</span></div><div id="recommendation-content"></div><div class="output-title">This patient</div><div id="summary-list"></div><p><a href="index.html">All simulators</a></p></div>
 </div>
 <script>
-var S={age:'60',sex:'male',ht:'170',wt:'70',scr:'1',uo:'50',eff:'25',where:'hospital',source:'vap',sev:'shock',bact:'yes',blood:'yes',srcx:'yes',addMrsa:'yes',addPseudo:'yes',addAna:'no',allergy:'no',recent:'no',prior:'none',risks:[],sources:['vap'],press:'no',mental:'clear',clinical:'high',pctTrend:'same',culture:'pending',altDx:'no',ecmo:'no',liver:'no',albumin:'normal',icu:'no',immuno:'no',abxLong:'no',hospLong:'no',colon:'no',surg:'no',tpn:'no',cvc:'no',sbp:'',map:'',lact:'',temp:'',hr:'',rr:'',spo:'',tlc:'',anc:'',pct:'',crp:'',plt:'',esblPct:'',mrsaPct:'',psaPct:'',why:'off',org:'kleb',mech:'esbl',mic:'',hasmic:'no',ast:'S',drug:'meropenem',inf:'extended',rrt:'none',load:'load',traj:'stable',vd:'increased',level:'no',identified:'yes',astYes:'yes',resp:'improving',control:'yes',po:'no'};
+var S={age:'60',sex:'male',ht:'170',wt:'70',scr:'1',uo:'50',eff:'25',where:'hospital',source:'vap',sev:'shock',bact:'yes',blood:'yes',srcx:'yes',addMrsa:'yes',addPseudo:'yes',addAna:'no',allergy:'no',recent:'no',prior:'none',risks:[],sources:['vap'],press:'no',mental:'clear',clinical:'high',pctTrend:'same',culture:'pending',altDx:'no',ecmo:'no',liver:'no',albumin:'normal',icu:'no',immuno:'no',abxLong:'no',hospLong:'no',colon:'no',surg:'no',tpn:'no',cvc:'no',sbp:'',map:'',lact:'',temp:'',hr:'',rr:'',spo:'',tlc:'',anc:'',pct:'',crp:'',plt:'',why:'off',org:'kleb',mech:'esbl',mic:'',hasmic:'no',ast:'S',drug:'meropenem',inf:'extended',rrt:'none',load:'load',traj:'stable',vd:'increased',level:'no',identified:'yes',astYes:'yes',resp:'improving',control:'yes',po:'no'};
 function num(id){ var n=parseFloat(String(S[id]==null?'':S[id]).replace(',','.')); return Number.isFinite(n)?n:null; }
 function crcl(){
   var age=num('age'), wt=num('wt'), scr=num('scr'), ht=num('ht');
@@ -471,7 +471,6 @@ function hasRisk(x){ return S.risks && S.risks.indexOf(x)>=0; }
 function needMrsa(){ return S.prior==='mrsa'||hasRisk('MRSA')||hasSource('line')||hasSource('ssti')||hasSource('nec')||hasSource('endo')||hasSource('bone')||(S.where==='hospital'&&hasSource('vap')); }
 function needPseudo(){ return S.prior==='dtr'||hasRisk('DTR')||hasSource('neutro')||(S.where==='hospital'&&(hasSource('vap')||hasSource('iab')||hasSource('unk')||hasSource('postop'))); }
 function needVre(){ return hasRisk('VRE')||S.prior==='vre'||(S.culture==='pos'&&ORG[S.org][1]==='vre'); }
-function poorPseudo(){ var n=num('psaPct'); return S.where==='hospital'&&n!=null&&n<70; }
 function needAna(){ return hasSource('iab')||hasSource('nec'); }
 function hasSource(x){ return !!(S.sources && S.sources.indexOf(x)>=0); }
 function syncPrimary(){
@@ -532,7 +531,6 @@ function empiricNow(){
       if(S.mech==='kpc'||S.mech==='oxa48'||S.mech==='ndm'||S.mech==='vim'||S.mech==='imp') p=S.mech==='oxa48'?'oxa':S.mech;
       else lines.push('CRE risk. Do not start meropenem until the enzyme is known.');
     }
-    else if(S.where==='hospital' && num('esblPct')!=null && num('esblPct')>=20 && (src==='vap'||src==='iab'||src==='uti'||src==='unk')) p='esbl';
   }
   if(p==='ndm'||p==='vim'||p==='imp') gnb='aztavi';
   else if(p==='kpc'||p==='oxa') gnb='ceftazavi';
@@ -549,10 +547,6 @@ function empiricNow(){
   else if(src==='cap'||src==='uti'||src==='endo'||src==='bsi') gnb='ctx';
   else if(src==='cns') gnb='ctx-cns';
   else if(src==='ssti'&&shock) gnb='piptazo';
-  if(poorPseudo() && (gnb==='cefepime'||gnb==='piptazo')){
-    lines.push('Only '+num('psaPct')+'% of your ICU Pseudomonas is susceptible to cefepime. Do not start cefepime or piperacillin.');
-    gnb='meropenem';
-  }
   var ana=S.allergy==='anaphylaxis';
   var ordinary=gnb==='meropenem'||gnb==='cefepime'||gnb==='piptazo'||gnb==='ctx'||gnb==='ctx-cns';
   var special=gnb==='aztavi'||gnb==='ceftazavi'||gnb==='ceftolozane'||gnb==='sulbactam';
@@ -760,9 +754,7 @@ function stepHtml(){
       +chip('recent','yes','Antibiotics in 90 days')+chip('recent','no','No recent antibiotics')+chip('icu','yes','In the ICU')+chip('icu','no','Not in the ICU')+'</div></div>'
       +'<div class="form-group"><label class="form-label">Candida risks. Shock alone is not one of them.</label><div class="checkbox-group">'
       +[['immuno','Immunosuppressed'],['abxLong','Long antibiotics'],['hospLong','Long hospital stay'],['colon','Candida colonized'],['surg','Recent surgery'],['tpn','Parenteral nutrition'],['cvc','Central line']].map(function(c){return '<div class="chip-option'+(S[c[0]]==='yes'?' selected':'')+'" data-k="'+c[0]+'" data-v="'+(S[c[0]]==='yes'?'no':'yes')+'">'+c[1]+'</div>';}).join('')
-      +'</div></div>'
-      +'<div class="grid">'+box('esblPct','Your ICU ESBL %')+box('mrsaPct','Your ICU MRSA %')+box('psaPct','Pseudomonas susceptible to cefepime %')+'</div>'
-      +'<p class="step-desc">ESBL or MRSA at 20% or more adds that cover for a hospital infection. If fewer than 70% of Pseudomonas isolates are susceptible to cefepime, do not start cefepime or piperacillin. Leave a box blank if you do not know the number.</p>';
+      +'</div></div>';
   }
   if(n===5){
     h='<div class="step-title">What has to be covered</div><div class="step-desc">The regimen is on the right. These buttons only explain it.</div><div class="radio-group">'
@@ -826,7 +818,6 @@ function whyLines(){
   lines.push('Candida risk is '+cand.toLowerCase()+'. '+(cand==='High'?'An echinocandin can be considered.':'Do not add an antifungal for shock alone.'));
   if(S.prior!=='none') lines.push('A previous '+S.prior+' changes the first drug.');
   if(needVre()) lines.push('A previous VRE replaces vancomycin with linezolid or daptomycin.');
-  if(num('psaPct')!=null) lines.push(num('psaPct')+'% of ICU Pseudomonas is susceptible to cefepime.');
   var c=crcl();
   if(c!=null&&c>130) lines.push('Clearance is high. A normal dose can fall short.');
   lines.push('This is the starting regimen. Change it when the culture names the bug.');
@@ -913,7 +904,7 @@ function renderRec(){
     if(crcl()!=null && crcl()>130) extra+='<p>Augmented clearance. The level can fall through before the next dose.</p>';
     var act=planAction();
     boxEl.innerHTML='<div class="clock '+sev.band+'">'+sev.clock+'</div>'
-      +'<div class="matrix">'+row('MRSA',needMrsa())+row('Pseudomonas',needPseudo())+row('ESBL',S.prior==='esbl'||hasRisk('ESBL')||(S.where==='hospital'&&num('esblPct')!=null&&num('esblPct')>=20))+row('Anaerobes',needAna())+row('Candida',cand==='High')+'</div>'
+      +'<div class="matrix">'+row('MRSA',needMrsa())+row('Pseudomonas',needPseudo())+row('ESBL',S.prior==='esbl'||hasRisk('ESBL'))+row('Anaerobes',needAna())+row('Candida',cand==='High')+'</div>'
       +'<div class="rec-box"><h4>Start this</h4><ul>'+lines.map(function(l){return '<li>'+l+'</li>';}).join('')+'</ul>'
       +(cand==='High'?'<p>Candida risk is high. An echinocandin can be added. Do not add one for shock alone.</p>':'')
       +'</div>'
