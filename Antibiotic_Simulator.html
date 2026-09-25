@@ -13,10 +13,10 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,B
 .header h1{margin:0;font-size:18px;letter-spacing:.04em;text-transform:uppercase}
 .presets{display:flex;gap:8px;flex-wrap:wrap}
 .btn-preset{background:#ecfdf5;color:#115e59;border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}
-.layout{max-width:760px;margin:0 auto;padding:14px 14px 92px}
+.layout{max-width:760px;margin:0 auto;padding:14px}
 .main-panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
 #stepName{margin:4px 0 0;font-weight:700}
-.btn-nav{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;margin:0;padding:10px;background:#fff;border-top:1px solid var(--border)}
+.btn-nav{position:static;display:flex;justify-content:space-between;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
 .btn-nav .btn{flex:1}
 .step-item{display:flex;gap:8px;align-items:center;padding:8px;border-radius:10px;cursor:pointer;font-weight:700;color:var(--secondary);font-size:14px}
 .step-item.active{background:#ecfdf5;color:var(--primary-dark)}
@@ -785,7 +785,7 @@ function syncDrug(){
 
 
 
-var STEPS=['Vitals','Labs','Source','Antibiotics','Culture','Antifungal'];
+var STEPS=['Patient','Labs and films','Antibiotic','Culture','Antifungal'];
 function chip(key,val,label){ return '<div class="chip-option'+(String(S[key])===String(val)?' selected':'')+'" data-k="'+key+'" data-v="'+val+'">'+label+'</div>'; }
 function go(n){ S.step=n; render(); }
 function mapNow(){
@@ -814,13 +814,15 @@ function applyLabs(){
 function hasSx(x){ return S.sx && S.sx.indexOf(x)>=0; }
 function suggest(){
   var ids=[], why=[];
-  var lung=S.cxr==='uni'||S.cxr==='bilat'||S.cxr==='consol'||S.cxr==='ards';
+  var one=S.cxr==='uni'||S.cxr==='consol'||S.cxr==='effusion'||S.cxr==='cavity'||S.ctChest==='one';
+  var both=S.cxr==='bilat'||S.cxr==='ards'||S.ctChest==='both';
+  var lung=one||both;
   var tube=S.o2==='tube';
   var hospital=S.acq==='hospital'||S.acq==='device'||tube||S.ettCx==='pos';
-  if(S.cxr==='cavity'||S.cxr==='effusion'){ ids.push('lungabs'); why.push('The chest film shows a cavity or a pleural collection. It needs drainage.'); }
-  else if(lung && (tube||S.ettCx==='pos')){ ids.push('vap'); why.push('Intubated, and the chest film is abnormal. This is VAP.'); }
-  else if(lung && hospital){ ids.push('hap'); why.push('Hospital pneumonia. The chest film is abnormal.'); }
-  else if(lung){ ids.push('cap'); why.push('Community pneumonia. The chest film is abnormal.'); }
+  if(S.cxr==='cavity'||S.cxr==='effusion'){ ids.push('lungabs'); why.push('One lung has a cavity or a pleural collection. It needs drainage.'); }
+  else if(lung && (tube||S.ettCx==='pos')){ ids.push('vap'); why.push((both?'Both lungs are involved':'One lung is involved')+', and the patient is intubated.'); }
+  else if(lung && hospital){ ids.push('hap'); why.push(both?'Both lungs are involved. This is hospital pneumonia.':'One lung is involved. This is hospital pneumonia.'); }
+  else if(lung){ ids.push('cap'); why.push(both?'Both lungs are involved. This is community pneumonia.':'One lung is involved. This is community pneumonia.'); }
   else if(S.cxr!=='clear' && (hasSx('cough')||hasSx('breath'))){
     ids.push(tube?'vap':(hospital?'hap':'cap'));
     why.push(tube?'Cough or breathlessness, and the patient is intubated. The chest film is not back.':'Cough or breathlessness. The chest film is not back.');
@@ -842,13 +844,40 @@ function suggest(){
   if(!ids.length){ ids.push('unk'); why.push('Nothing localizes the infection. The source is unknown.'); }
   return {ids:ids, why:why};
 }
-function activeSources(){
-  var sug=suggest().ids, out=[];
-  sug.concat(S.picked||[]).forEach(function(id){
-    if(out.indexOf(id)<0 && (S.off||[]).indexOf(id)<0) out.push(id);
-  });
-  return out;
+function activeSources(){ return suggest().ids; }
+function page1Infer(){
+  var lines=[];
+  if(severity().sev==='shock') lines.push('Shock is present.');
+  else if(num('sbp')!=null||num('dbp')!=null) lines.push('Shock is not present.');
+  if(S.o2==='tube') lines.push('The patient is intubated.');
+  else if(S.o2==='niv') lines.push('NIV. Not intubated.');
+  else if(S.o2==='hfnc') lines.push('High-flow oxygen. Not intubated.');
+  else if(S.o2==='mask'||S.o2==='nc') lines.push('Oxygen by cannula or mask.');
+  if(hasSx('cough')||hasSx('breath')) lines.push('Symptoms point to the lung.');
+  if(hasSx('urine')) lines.push('Symptoms point to the urine.');
+  if(hasSx('abd')) lines.push('Symptoms point to the abdomen.');
+  if(hasSx('cns')) lines.push('Symptoms point to the nervous system.');
+  if(hasSx('skin')) lines.push('Symptoms point to the skin.');
+  if(hasSx('diarrhea')) lines.push('Diarrhea is present. It does not name the source by itself.');
+  if(num('temp')!=null&&num('temp')>=38) lines.push('Temperature is high.');
+  if(num('spo')!=null&&num('spo')<92) lines.push('Oxygen saturation is low.');
+  if(!lines.length) lines.push('Nothing to infer yet.');
+  return lines;
 }
+function srcName(id){
+  var names={cap:'Community pneumonia',hap:'Hospital pneumonia',vap:'Ventilator pneumonia',lungabs:'Lung abscess or empyema',pyelo:'Pyelonephritis',cauti:'Catheter urine infection',uti:'Urine infection',chol:'Cholangitis',app:'Appendicitis or diverticulitis',iaabs:'Abdominal collection',men:'Meningitis',brainabs:'Brain abscess',nec:'Necrotizing soft-tissue infection',cell:'Cellulitis',bact:'Bacteremia',unk:'Source not identified'};
+  return names[id]||id;
+}
+function page2Infer(){
+  var sug=suggest(), lines=[];
+  if(severity().sev==='shock') lines.push('Shock is present.');
+  lines.push('Suspected source: '+sug.ids.map(srcName).join(', ')+'.');
+  sug.why.forEach(function(w){ lines.push(w); });
+  if(num('scr')!=null&&num('scr')>1.2) lines.push('Creatinine is high. The dose will be reduced.');
+  if(num('bili')!=null&&num('bili')>=2) lines.push('Bilirubin is high.');
+  return lines;
+}
+function inferInner(lines){ return '<h4>Inference</h4><ul>'+lines.map(function(l){return '<li>'+l+'</li>';}).join('')+'</ul>'; }
 function refreshSources(){
   S.sources=activeSources();
   applyLabs();
@@ -970,11 +999,12 @@ function abxHtml(){
   if(crBad()||S.rrt!=='none'){
     demo='<div class="step-desc">Creatinine is '+(num('scr')==null?'missing':num('scr'))+'. Clearance uses age, sex, height, and weight. Change them if they are wrong.</div><div class="grid">'+box('age','Age')+box('ht','Height cm')+box('wt','Weight kg')+'</div><div class="form-group"><label class="form-label">Sex</label><div class="radio-group">'+chip('sex','male','Male')+chip('sex','female','Female')+'</div></div><div class="form-group"><label class="form-label">Kidney replacement</label><div class="radio-group">'+chip('rrt','none','No')+chip('rrt','crrt','CRRT')+chip('rrt','ihd','Hemodialysis')+'</div></div>'+(S.rrt==='crrt'?'<div class="grid">'+box('eff','CRRT mL/kg/h')+'</div>':'');
   }
-  return '<div class="clock '+sev.band+'">'+sev.name+'. '+sev.clock+'</div>'
+  return '<div class="form-group"><label class="form-label">Penicillin allergy</label><div class="radio-group">'+chip('allergy','no','None')+chip('allergy','rash','Rash')+chip('allergy','anaphylaxis','Anaphylaxis')+'</div></div>'
+    +'<div class="form-group"><label class="form-label">Where it was caught</label><div class="radio-group">'+chip('acq','community','Community')+chip('acq','hospital','Hospital')+'</div></div>'
     +'<div class="rec-box"><h4>Start this</h4><ul>'+lines.map(function(l){return '<li>'+l+'</li>';}).join('')+'</ul></div>'
     +demo
-    +picks.map(function(id){return '<div class="rec-box"><h4>'+DRUG[id][0]+'</h4><p>'+shownDose(id)+'</p></div>';}).join('')
-    +'<p class="step-desc">Empiric. Change it when the organism is named. A procalcitonin did not choose this.</p>';
+    +'<div id="doseout">'+picks.map(function(id){return '<div class="rec-box"><h4>'+DRUG[id][0]+'</h4><p>'+shownDose(id)+'</p></div>';}).join('')+'</div>'
+    +(severity().sev==='shock'?'<p class="step-desc">Shock is present.</p>':'');
 }
 function cultureHtml(){
   refreshSources();
@@ -991,7 +1021,7 @@ function stepHtml(){
       +[['cough','Cough or sputum'],['breath','Breathlessness'],['urine','Burning urine or flank pain'],['abd','Abdominal pain'],['cns','Headache or neck stiffness'],['skin','Red or painful skin'],['diarrhea','Diarrhea']].map(function(s){return '<div class="chip-option'+(hasSx(s[0])?' selected':'')+'" data-sx="'+s[0]+'">'+s[1]+'</div>';}).join('')
       +'</div><div class="group">Vitals</div><div class="grid">'+box('temp','Temperature °C')+box('hr','Pulse')+box('rr','Respiratory rate')+box('sbp','Systolic')+box('dbp','Diastolic')+box('spo','SpO2')+'</div>'
       +'<div class="form-group"><label class="form-label">Oxygen</label><div class="radio-group">'+chip('o2','nc','Nasal cannula')+chip('o2','mask','Oxygen mask')+chip('o2','hfnc','HFNC')+chip('o2','niv','NIV')+chip('o2','tube','Intubated')+'</div></div>'
-      +'<div id="shockline" class="clock red" style="'+(sev.sev==='shock'?'':'display:none')+'">Shock is present.</div>';
+      +'<div id="infer1" class="rec-box">'+inferInner(page1Infer())+'</div>';
   }
   if(n===2){
     h='<div class="step-title">Are the labs back?</div><div class="radio-group">'+chip('labsOn','no','Not yet')+chip('labsOn','yes','Yes')+'</div>';
@@ -1004,27 +1034,23 @@ function stepHtml(){
         +'<div class="form-group"><label class="form-label">Tracheal culture</label><div class="radio-group">'+chip('ettCx','notsent','Not sent')+chip('ettCx','pending','Pending')+chip('ettCx','neg','Negative')+chip('ettCx','pos','Positive')+'</div></div>';
       if(num('pct')!=null) h+='<p class="step-desc">Procalcitonin is '+num('pct')+'. It does not choose the antibiotic.</p>';
       if(num('hb')!=null && num('hb')<7) h+='<p class="step-desc">Hemoglobin is low. It does not change the antibiotic.</p>';
-    } else if(S.labsOn==='no') h+='<p class="step-desc">The blood numbers are not back. Radiology can still be entered below.</p>';
-    h+='<div class="group">Radiology</div>'
-      +'<div class="form-group"><label class="form-label">Chest film</label><div class="radio-group">'+chip('cxr','none','Not done')+chip('cxr','clear','Clear')+chip('cxr','uni','One-sided infiltrate')+chip('cxr','bilat','Both lungs')+chip('cxr','consol','Consolidation')+chip('cxr','effusion','Effusion')+chip('cxr','cavity','Cavity')+chip('cxr','ards','ARDS pattern')+'</div></div>'
-      +'<div class="form-group"><label class="form-label">CT</label><div class="radio-group">'+chip('ct','notdone','Not done')+chip('ct','none','No source')+chip('ct','collection','Abdominal collection')+chip('ct','biliary','Biliary obstruction')+chip('ct','divert','Diverticulitis or appendicitis')+chip('ct','pyelo','Pyelonephritis')+chip('ct','brain','Brain abscess')+chip('ct','necro','Necrotizing soft tissue')+'</div></div>';
+    } else if(S.labsOn==='no') h+='<p class="step-desc">The blood numbers are not back. The films can still be entered.</p>';
+    h+='<div class="group">Chest film</div>'
+      +'<div class="radio-group">'+chip('cxr','none','Not done')+chip('cxr','clear','Clear')+'</div>'
+      +'<div class="group">One lung</div><div class="radio-group">'+chip('cxr','uni','Infiltrate')+chip('cxr','consol','Consolidation')+chip('cxr','effusion','Effusion')+chip('cxr','cavity','Cavity')+'</div>'
+      +'<div class="group">Both lungs</div><div class="radio-group">'+chip('cxr','bilat','Infiltrates in both lungs')+chip('cxr','ards','ARDS pattern')+'</div>'
+      +'<div class="group">CT, one lung</div><div class="radio-group">'+chip('ctChest','one','One lung')+'</div>'
+      +'<div class="group">CT, both lungs</div><div class="radio-group">'+chip('ctChest','both','Both lungs')+'</div>'
+      +'<div class="group">CT, other</div><div class="radio-group">'+chip('ct','notdone','Not done')+chip('ct','none','No source')+chip('ct','collection','Abdominal collection')+chip('ct','biliary','Biliary obstruction')+chip('ct','divert','Diverticulitis or appendicitis')+chip('ct','pyelo','Pyelonephritis')+chip('ct','brain','Brain abscess')+chip('ct','necro','Necrotizing soft tissue')+'</div>'
+      +'<div id="infer2" class="rec-box">'+inferInner(page2Infer())+'</div>';
   }
-  if(n===3){
-    var sug=suggest();
-    var extra=[['cap','CAP'],['hap','HAP'],['vap','VAP'],['asp','Aspiration'],['lungabs','Lung abscess'],['uti','UTI'],['pyelo','Pyelonephritis'],['cauti','CAUTI'],['chol','Cholangitis'],['app','Appendix or diverticulitis'],['perit','Peritonitis'],['iaabs','Abdominal abscess'],['cell','Cellulitis'],['skabs','Skin abscess'],['dfi','Diabetic foot'],['nec','Necrotizing skin'],['men','Meningitis'],['brainabs','Brain abscess'],['neuro','Post-neurosurgery'],['bact','Bacteremia'],['clabsi','Line infection'],['endo','Endocarditis'],['osteo','Osteomyelitis'],['septicj','Septic arthritis'],['pji','Prosthetic joint'],['neut','Neutropenic sepsis'],['unk','Unknown']];
-    h='<div class="step-title">Suspected source</div><div class="rec-box"><h4>From the vitals and the films</h4><ul>'+sug.why.map(function(l){return '<li>'+l+'</li>';}).join('')+'</ul></div>'
-      +'<div class="checkbox-group">'+sug.ids.map(function(id){var lab=(extra.filter(function(x){return x[0]===id;})[0]||[id,id])[1]; return '<div class="chip-option'+(activeSources().indexOf(id)>=0?' selected':'')+'" data-src="'+id+'">'+lab+'</div>';}).join('')+'</div>'
-      +'<div class="group">Add a source the films missed</div><div class="checkbox-group">'+extra.filter(function(x){return sug.ids.indexOf(x[0])<0;}).map(function(x){return '<div class="chip-option'+(activeSources().indexOf(x[0])>=0?' selected':'')+'" data-src="'+x[0]+'">'+x[1]+'</div>';}).join('')+'</div>'
-      +'<div class="form-group"><label class="form-label">Where it was caught</label><div class="radio-group">'+chip('acq','community','Community')+chip('acq','hospital','Hospital')+chip('acq','device','Device or healthcare')+'</div></div>'
-      +'<div class="form-group"><label class="form-label">Penicillin allergy</label><div class="radio-group">'+chip('allergy','no','None')+chip('allergy','rash','Rash')+chip('allergy','anaphylaxis','Anaphylaxis')+'</div></div>';
-  }
-  if(n===4) h='<div class="step-title">Antibiotic</div><div id="live">'+abxHtml()+'</div>';
-  if(n===5){
+  if(n===3) h='<div class="step-title">Antibiotic</div><div id="live">'+abxHtml()+'</div>';
+  if(n===4){
     var bugs=[['mssa','MSSA'],['mrsa','MRSA'],['strep','Streptococcus'],['pneumo','S. pneumoniae'],['hflu','H. influenzae'],['ecoli','E. coli'],['kleb','Klebsiella'],['proteus','Proteus'],['enterobacter','Enterobacter'],['serratia','Serratia'],['faecalis','E. faecalis'],['vre','VRE'],['pseudo','Pseudomonas'],['acineto','Acinetobacter'],['steno','Stenotrophomonas'],['bacteroides','Bacteroides'],['legionella','Legionella'],['anaerobe','Mixed anaerobes'],['esbl','ESBL E. coli or Klebsiella'],['kpc','KPC'],['ndm','NDM'],['oxa','OXA-48'],['dtr','Difficult Pseudomonas'],['crab','CRAB']];
     h='<div class="step-title">Organisms on the report</div><div class="step-desc">Tap every organism that grew. The dose changes only if the creatinine is deranged.</div><div class="checkbox-group">'
       +bugs.map(function(b){return '<div class="chip-option'+((S.bugs||[]).indexOf(b[0])>=0?' selected':'')+'" data-bug="'+b[0]+'">'+b[1]+'</div>';}).join('')+'</div><div id="live">'+cultureHtml()+'</div>';
   }
-  if(n===6){
+  if(n===5){
     var sc=candidaScore();
     var risks=[['abd','Recent abdominal surgery, perforation, or leak'],['panc','Necrotizing pancreatitis'],['abx','Prolonged broad-spectrum antibiotics'],['icu','Prolonged ICU stay'],['tpn','TPN'],['cvc','Central line'],['rrt','CRRT or hemodialysis'],['immuno','Immunosuppression or neutropenia'],['colon','Candida at more than one site']];
     var fungi=[['albicans','Candida albicans'],['glabrata','Candida glabrata'],['parapsilosis','Candida parapsilosis'],['auris','Candida auris'],['aspergillus','Aspergillus'],['mucor','Mucorales'],['crypto','Cryptococcus'],['pjp','Pneumocystis']];
@@ -1048,8 +1074,8 @@ function stepHtml(){
 function renderRec(){
   applyLabs();
   var live=document.getElementById('live');
-  if(live && S.step===4) live.innerHTML=abxHtml();
-  if(live && S.step===5) live.innerHTML=cultureHtml();
+  if(live && S.step===3) live.innerHTML=abxHtml();
+  if(live && S.step===4) live.innerHTML=cultureHtml();
   var fg=document.getElementById('livefungus');
   if(fg){
     var plan=fungusPlan(S.fungi||[]);
@@ -1057,18 +1083,23 @@ function renderRec(){
   }
 }
 function render(){
+  try{
   if(!S.step||S.step<1) S.step=1;
-  if(S.step>6) S.step=6;
+  if(S.step>5) S.step=5;
   document.getElementById('stepName').textContent=STEPS[S.step-1]+' · '+S.step+' of '+STEPS.length;
   document.getElementById('step-content').innerHTML=stepHtml();
   var ans=document.getElementById('answer');
   if(ans) ans.style.display='none';
   document.getElementById('btn-prev').disabled=S.step===1;
-  document.getElementById('btn-next').textContent=S.step===6?'Done':'Next';
+  document.getElementById('btn-next').textContent=S.step===5?'Done':'Next';
   renderRec();
-  window.scrollTo(0,0);
+  }catch(err){
+    var box=document.getElementById('step-content');
+    if(box) box.innerHTML='<div class="rec-box"><h4>This page did not open</h4><p>'+String(err&&err.message||err)+'</p></div>';
+  }
 }
 document.body.addEventListener('click', function(e){
+  if(e.target.closest('#btn-next')||e.target.closest('#btn-prev')) return;
   var src=e.target.closest('[data-src]');
   if(src){
     var id=src.dataset.src, sug=suggest().ids;
@@ -1131,14 +1162,22 @@ document.body.addEventListener('click', function(e){
 document.body.addEventListener('input', function(e){
   if(!e.target.id) return;
   S[e.target.id]=e.target.value;
-  var line=document.getElementById('shockline');
-  if(line){ var sev=severity(); line.style.display=sev.sev==='shock'?'':'none'; line.textContent='Shock is present.'; }
-  renderRec();
+  var i1=document.getElementById('infer1');
+  if(i1) i1.innerHTML=inferInner(page1Infer());
+  var i2=document.getElementById('infer2');
+  if(i2) i2.innerHTML=inferInner(page2Infer());
+  var dose=document.getElementById('doseout');
+  if(dose){
+    refreshSources();
+    var picks=S.picks||[];
+    dose.innerHTML=picks.map(function(id){return '<div class="rec-box"><h4>'+DRUG[id][0]+'</h4><p>'+shownDose(id)+'</p></div>';}).join('');
+  }
 });
 document.getElementById('btn-prev').onclick=function(){ if(S.step>1) go(S.step-1); };
-document.getElementById('btn-next').onclick=function(){ if(S.step<6) go(S.step+1); else location.href='index.html'; };
+document.getElementById('btn-next').onclick=function(){ if(S.step<5) go(S.step+1); else location.href='index.html'; };
 S.step=1;
 S.labsOn=S.labsOn||'';
+S.ctChest=S.ctChest||'';
 S.cxr=S.cxr||'none';
 S.ct=S.ct||'notdone';
 S.urineDx=S.urineDx||'notdone';
