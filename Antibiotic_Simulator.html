@@ -160,10 +160,12 @@ var DRUG={
   levofloxacin:['Levofloxacin','AUC/MIC','Fluoroquinolone. A reserve drug for community lung when a beta-lactam cannot be given.','Tendons, a long QT, and C. difficile.'],
   ciprofloxacin:['Ciprofloxacin','AUC/MIC','Fluoroquinolone with Pseudomonas activity, mostly for urine.','Weak for pneumonia. Same harms as levofloxacin.'],
   azithromycin:['Azithromycin','AUC/MIC','Macrolide. The atypical partner in community pneumonia.','Not a drug for bacteremia.'],
-  metronidazole:['Metronidazole','AUC/MIC','Nitroimidazole. Anaerobes only.','It does not treat gram-negative aerobes. Neuropathy if the course is long.'],
+  metronidazole:['Metronidazole','AUC/MIC','Nitroimidazole. Anaerobes only. Not automatic for every aspiration.','It does not treat gram-negative aerobes. Neuropathy if the course is long.'],
+  ampsulba:['Ampicillin-sulbactam','fT>MIC','Aspiration without a separate abscess, and some skin or abdominal infections.','A penicillin. No Pseudomonas activity.'],
+  clindamycin:['Clindamycin','AUC/MIC','Toxin suppression in necrotizing infection. Not MRSA treatment by itself.','C. difficile. Liver clears it.'],
   polymyxin:['Polymyxin B','AUC/MIC','Polymyxin. Last drug for some carbapenem-resistant gram-negatives.','Kidney injury. It does not reach the urine.']
 };
-var BETA={meropenem:1,cefepime:1,piptazo:1,ceftazavi:1,merovab:1,imirele:1,ceftolozane:1,cefiderocol:1,aztavi:1,cazazi:1,sulbactam:1,aztreonam:1,ceftriaxone:1,cefazolin:1,ampicillin:1};
+var BETA={meropenem:1,cefepime:1,piptazo:1,ceftazavi:1,merovab:1,imirele:1,ceftolozane:1,cefiderocol:1,aztavi:1,cazazi:1,sulbactam:1,aztreonam:1,ceftriaxone:1,cefazolin:1,ampicillin:1,ampsulba:1};
 function prefList(){ return PREF[S.mech]||[]; }
 function siteBlock(id){
   var kind=ORG[S.org][1];
@@ -254,9 +256,9 @@ function tier(){
 function wantLoad(){ return S.load==='load' || S.vd!=='normal' || S.sev==='shock'; }
 function regimen(){
   var t=tier(), c=crcl(), id=S.drug, wt=num('wt'), dw=doseWt();
-  if(t==null || (id!=='linezolid' && id!=='tigecycline' && id!=='azithromycin' && id!=='metronidazole' && c==null && S.rrt==='none')) return null;
+  if(t==null || (id!=='linezolid' && id!=='tigecycline' && id!=='azithromycin' && id!=='metronidazole' && id!=='clindamycin' && c==null && S.rrt==='none')) return null;
   var mic=num('mic')||1;
-  var high=S.source==='cns' || mic>=4 || S.sev==='shock';
+  var high=S.source==='cns'||S.source==='neuro'||S.source==='vap'||S.nec==='yes'||mic>=4||S.sev==='shock';
   var lung=S.source==='vap'||S.source==='cap';
   var row, loadMg, every, after=false, note='';
   function pick(rows){ return rows; }
@@ -281,7 +283,7 @@ function regimen(){
     else if(c>=11) row=[2000,24];
     else row=[1000,24];
   } else if(id==='piptazo'){
-    var big=lung||S.sev==='shock'||S.sev==='sepsis';
+    var big=lung||S.source==='iab'||S.nec==='yes'||S.sev==='shock'||S.sev==='sepsis';
     if(t==='arc'||t==='crrt') row=[4500,6];
     else if(t==='crrtLow'||t==='sled') row=[4500,8];
     else if(t==='hd'){ row=[2250,8]; after=true; }
@@ -428,7 +430,15 @@ function regimen(){
     note='Partner for community pneumonia. Not a bacteremia drug.';
   } else if(id==='metronidazole'){
     row=[500,8];
-    note='Anaerobes only.';
+  } else if(id==='ampsulba'){
+    var evs=6;
+    if(t==='hd'||(c!=null&&c<15)){ evs=24; after=t==='hd'; }
+    else if(c!=null&&c<30 && t!=='crrt' && t!=='arc') evs=12;
+    row=[3000,evs];
+    note='3 g is 2 g of ampicillin plus 1 g of sulbactam. It does not cover Pseudomonas.';
+  } else if(id==='clindamycin'){
+    row=[900,8];
+    note=S.liver==='yes'?'The liver is failing. Do not increase clindamycin.':'Suppresses toxin. It is not the MRSA drug, and it can cause C. difficile.';
   } else if(id==='polymyxin'){
     var kg=dw||wt||70;
     row=[Math.round(kg*1.25/10)*10,12];
@@ -443,7 +453,7 @@ function regimen(){
   var loadText=(wantLoad()||id==='vancomycin'||id==='tigecycline'||id==='polymyxin')?g(loadMg)+' IV once':'No extra load. Start with '+g(mg);
   var infH=0.5;
   var pk=DRUG[id][1];
-  if(id==='ceftriaxone'||id==='cefazolin'||id==='ampicillin') infH=0.5;
+  if(id==='ceftriaxone'||id==='cefazolin'||id==='ampicillin'||id==='ampsulba'||id==='clindamycin'||id==='metronidazole') infH=0.5;
   else if(pk==='fT>MIC'){
     if(S.inf==='continuous') infH=every;
     else if(S.inf==='extended'||id==='cefiderocol'||id==='merovab'||id==='sulbactam'||id==='aztavi'||id==='cazazi'||id==='aztreonam') infH=Math.min(3, every-0.25);
@@ -481,7 +491,7 @@ function hasSource(x){ return !!(S.sources && S.sources.indexOf(x)>=0); }
 var SRC={
   cap:{engine:'cap',where:'community'},
   vap:{engine:'vap',where:'hospital',mrsa:1,pseudo:1},
-  asp:{engine:'asp',where:'community',ana:1,note:'Aspiration. Anaerobes belong. This is not the same as a lung abscess.'},
+  asp:{engine:'asp',where:'community',note:'Do not add metronidazole to every aspiration. Add it only for a lung abscess, empyema, or another anaerobic source.'},
   lungabs:{engine:'asp',where:'community',ana:1,note:'Drain an empyema. A lung abscess is weeks, not 5 days.'},
   cyst:{engine:'uti',where:'community'},
   pyelo:{engine:'uti',where:'community'},
@@ -503,7 +513,7 @@ var SRC={
   neuro:{engine:'neuro',where:'hospital',mrsa:1,pseudo:1,note:'After neurosurgery, ceftriaxone alone is the wrong drug. Externalize or remove the drain.'},
   bact:{engine:'bsi',where:'community'},
   clabsi:{engine:'line',where:'hospital',mrsa:1,note:'Remove the line.'},
-  endo:{engine:'endo',where:'community',mrsa:1},
+  endo:{engine:'endo',where:'community',mrsa:1,note:'Gentamicin is not automatic. Use 1 mg/kg every 8 hours only when a synergy regimen needs it.'},
   prosth:{engine:'endo',where:'hospital',mrsa:1,note:'A device infection is not cured by antibiotics alone. Plan removal.'},
   osteo:{engine:'bone',where:'community',mrsa:1},
   septicj:{engine:'bone',where:'community',mrsa:1,note:'Drain the joint.'},
@@ -590,19 +600,21 @@ function empiricNow(){
   else if(p==='ampc') gnb='cefepime';
   else if(p==='dtr') gnb='ceftolozane';
   else if(p==='crab') gnb='sulbactam';
-  else if(S.nec==='yes' || (src==='ssti' && needAna())) gnb='piptazo';
+  else if(S.nec==='yes') gnb=broad?'meropenem':'piptazo';
+  else if(src==='ssti' && needAna()) gnb='piptazo';
   else if(S.neutro==='yes') gnb=broad?'meropenem':'cefepime';
   else if(src==='neuro') gnb=broad?'meropenem':'cefepime';
   else if(src==='unk') gnb=hosp?(broad?'meropenem':'cefepime'):'ctx';
   else if(src==='bone') gnb='ctx';
   else if(src==='vap'||(src==='uti'&&hosp)||(src==='bsi'&&hosp)) gnb=broad?'meropenem':'cefepime';
   else if(src==='iab') gnb=hosp?'meropenem':'piptazo';
+  else if(src==='asp' && !needAna()) gnb='ampsulba';
   else if(src==='asp') gnb='ctx';
   else if(src==='cap'||src==='uti'||src==='endo'||src==='bsi') gnb='ctx';
   else if(src==='cns') gnb='ctx-cns';
   else if(src==='ssti') gnb='cefazolin';
   var ana=S.allergy==='anaphylaxis';
-  var ordinary=gnb==='meropenem'||gnb==='cefepime'||gnb==='piptazo'||gnb==='ctx'||gnb==='ctx-cns'||gnb==='cefazolin';
+  var ordinary=gnb==='meropenem'||gnb==='cefepime'||gnb==='piptazo'||gnb==='ctx'||gnb==='ctx-cns'||gnb==='cefazolin'||gnb==='ampsulba';
   var special=gnb==='aztavi'||gnb==='ceftazavi'||gnb==='ceftolozane'||gnb==='sulbactam';
   if(ana && special){
     lines.push('The organism from before still needs a beta-lactam. Do not give it until the allergy is reviewed.');
@@ -610,6 +622,9 @@ function empiricNow(){
   } else if(ana && ordinary){
     if(gnb==='ctx-cns'){
       lines.push('Do not give ceftriaxone. Keep vancomycin. Ask before any beta-lactam, including meropenem.');
+      gnb=null;
+    } else if(gnb==='ampsulba'){
+      lines.push('Penicillin anaphylaxis. Do not give ampicillin-sulbactam.');
       gnb=null;
     } else if(gnb==='cefazolin'){
       lines.push('Penicillin anaphylaxis. Do not give cefazolin. Vancomycin replaces it.');
@@ -625,7 +640,11 @@ function empiricNow(){
   if(gnb==='ctx'||gnb==='ctx-cns') lines.push(doseFor('ceftriaxone'));
   if(gnb==='ctx' && src==='cap') lines.push(doseFor('azithromycin')+' This is only the atypical partner.');
   if(gnb && DRUG[gnb]) lines.push(doseFor(gnb));
-  if(needAna() && gnb!=='meropenem' && gnb!=='piptazo' && gnb!=='aztavi') lines.push(doseFor('metronidazole')+' This is the anaerobe drug. It does not replace the other one.');
+  if(needAna() && gnb!=='meropenem' && gnb!=='piptazo' && gnb!=='aztavi' && gnb!=='ampsulba') lines.push(doseFor('metronidazole')+' This is the anaerobe drug. It does not replace the other one.');
+  if(S.nec==='yes'){
+    lines.unshift('Urgent source control. Call surgery now.');
+    lines.push(doseFor('clindamycin')+' For the toxin, not for MRSA.');
+  }
   if(needVre() && src!=='cns' && src!=='neuro'){
     if(src==='vap'||src==='cap'||src==='asp') lines.push(doseFor('linezolid')+' Previous VRE. Not vancomycin, and not daptomycin in the lung.');
     else lines.push(doseFor('daptomycin')+' Previous VRE. Not vancomycin.');
@@ -971,7 +990,7 @@ function renderRec(){
       +'<div class="rec-box"><h4>Start this</h4><ul>'+lines.map(function(l){return '<li>'+l+'</li>';}).join('')+'</ul>'
       +(cand==='High'?'<p>Candida risk is high. An echinocandin can be added. Do not add one for shock alone.</p>':'')
       +'</div>'
-      +'<div class="rec-box" style="border-left-color:'+(j.bad?'#be123c':'#0f766e')+'"><h4>'+(S.culture==='pos'?j.title:'Until the culture returns')+'</h4><p>'+DRUG[S.drug][0]+'. '+(S.hasmic==='yes'&&num('mic')!=null?('MIC '+num('mic')+' mg/L.'):'No MIC, so the letter decides.')+'</p><p>'+dose+'</p>'+extra+'</div>'
+      +'<div class="rec-box" style="border-left-color:'+(j.bad?'#be123c':'#0f766e')+'"><h4>'+(S.culture==='pos'?j.title:'Until the culture returns')+'</h4><p>'+DRUG[S.drug][0]+'. '+(S.hasmic==='yes'&&num('mic')!=null?('MIC '+num('mic')+' mg/L.'):'No MIC, so the letter decides.')+'</p><p>'+dose+'</p><p>The textbook dose is only the start. This line is already changed for clearance, dialysis, shock, and the infusion.</p>'+extra+'</div>'
       +'<div class="rec-box" style="border-left-color:'+(act.bad?'#be123c':'#0f766e')+'"><h4>'+act.act+'</h4><ul>'+act.lines.concat(durationLines().lines).map(function(l){return '<li>'+l+'</li>';}).join('')+'</ul></div>';
   }
   var c=crcl();
