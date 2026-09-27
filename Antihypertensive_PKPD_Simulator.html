@@ -1,0 +1,1787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#070d16" />
+<title>ICU Antihypertensive PK/PD Simulator</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#070d16; --panel:#0e1726; --panel2:#131f33; --border:#1e2f47;
+  --text:#e2e8f0; --muted:#8ba0bb; --accent:#38bdf8; --accent2:#a78bfa;
+  --ok:#34d399; --warn:#fbbf24; --danger:#f87171; --radius:14px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:radial-gradient(1200px 600px at 15% -10%, #0d1b2e 0%, #070d16 60%) fixed, #070d16;
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:15px; line-height:1.45; -webkit-text-size-adjust:100%;
+  padding-bottom:60px; overflow-x:hidden;
+}
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:14px 18px;border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,#0c1524 0%,#0a1220 100%);
+  position:sticky;top:0;z-index:30;backdrop-filter:blur(8px);
+}
+.brand{display:flex;align-items:center;gap:12px;min-width:0;}
+.logo{
+  width:44px;height:44px;flex:0 0 44px;border-radius:12px;
+  background:linear-gradient(135deg,#0ea5e9,#6366f1);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:13px;letter-spacing:.5px;color:#fff;
+  box-shadow:0 6px 18px rgba(14,165,233,.28);
+}
+.brand-text{min-width:0;}
+.brand-text h1{margin:0;font-size:16px;font-weight:700;letter-spacing:.2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.brand-text p{margin:1px 0 0;font-size:11.5px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar-actions{display:flex;gap:8px;flex:0 0 auto;}
+.btn{
+  appearance:none;border:1px solid var(--border);background:var(--panel2);color:var(--text);
+  padding:9px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;
+  text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  transition:background .15s,border-color .15s,transform .08s;
+  -webkit-tap-highlight-color:transparent;
+}
+.btn:hover{background:#1a2a42;border-color:#2b4260;}
+.btn:active{transform:scale(.97);}
+.btn.primary{background:linear-gradient(135deg,#0284c7,#4f46e5);border-color:transparent;color:#fff;}
+.btn.ghost{background:transparent;}
+.disclaimer{
+  margin:14px 18px 0;padding:11px 14px;border:1px solid #4a3410;
+  background:linear-gradient(180deg,rgba(251,191,36,.10),rgba(251,191,36,.04));
+  border-radius:var(--radius);font-size:12.5px;color:#fcd9a0;line-height:1.5;
+}
+.disclaimer strong{color:#fbbf24;}
+.layout{
+  display:grid;grid-template-columns:400px minmax(0,1fr);gap:16px;
+  padding:16px 18px 0;align-items:start;
+}
+@media (max-width:1040px){.layout{grid-template-columns:1fr;padding:14px 12px 0;gap:14px;}}
+.panel{
+  background:linear-gradient(180deg,var(--panel) 0%,#0b1421 100%);
+  border:1px solid var(--border);border-radius:var(--radius);padding:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,.28);min-width:0;
+}
+.panel + .panel{margin-top:14px;}
+.panel h2{
+  margin:0 0 12px;font-size:13px;font-weight:700;letter-spacing:.9px;
+  text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:8px;
+}
+.panel h2::before{content:'';width:3px;height:14px;border-radius:2px;
+  background:linear-gradient(180deg,var(--accent),var(--accent2));}
+.panel h3{
+  margin:16px 0 9px;font-size:11.5px;font-weight:700;letter-spacing:.8px;
+  text-transform:uppercase;color:var(--muted);border-top:1px solid var(--border);padding-top:12px;
+}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:11px;min-width:0;}
+.field label{font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.3px;}
+.field .hint{font-size:10.5px;color:#6b819c;}
+input[type=number],input[type=text],select{
+  width:100%;padding:9px 11px;border-radius:10px;background:#0a1421;
+  border:1px solid var(--border);color:var(--text);font-size:14px;font-family:inherit;
+  outline:none;transition:border-color .15s,box-shadow .15s;-webkit-appearance:none;appearance:none;
+}
+select{
+  background-image:url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238ba0bb' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 9px center;background-size:16px;padding-right:32px;
+}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(56,189,248,.14);}
+input[readonly]{background:#0d1a29;color:var(--accent);font-weight:700;cursor:default;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 11px;}
+@media (max-width:420px){.grid2{grid-template-columns:1fr;}}
+.preset-row{display:flex;gap:8px;overflow-x:auto;padding:2px 18px 4px;margin-top:12px;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.preset-row::-webkit-scrollbar{display:none;}
+.preset-btn{
+  flex:0 0 auto;padding:8px 13px;border-radius:999px;font-size:12px;font-weight:600;
+  background:var(--panel2);border:1px solid var(--border);color:#b9cde4;cursor:pointer;
+  white-space:nowrap;transition:all .15s;-webkit-tap-highlight-color:transparent;
+}
+.preset-btn:hover{border-color:var(--accent);color:#fff;background:#16263c;}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(122px,1fr));gap:9px;}
+.metric{
+  background:#0a1421;border:1px solid var(--border);border-radius:11px;
+  padding:10px 11px;display:flex;flex-direction:column;gap:3px;min-width:0;
+}
+.metric-label{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);font-weight:600;}
+.metric-value{font-size:19px;font-weight:800;letter-spacing:-.3px;font-variant-numeric:tabular-nums;}
+.metric-value small{font-size:11px;font-weight:600;color:var(--muted);margin-left:2px;}
+.metric.good .metric-value{color:var(--ok);}
+.metric.warn .metric-value{color:var(--warn);}
+.metric.bad .metric-value{color:var(--danger);}
+.metric.neutral .metric-value{color:var(--accent);}
+.chart-wrap{position:relative;width:100%;height:290px;}
+@media (max-width:640px){.chart-wrap{height:245px;}}
+.chart-note{font-size:11px;color:var(--muted);margin:8px 0 0;line-height:1.5;}
+.warn-item{display:flex;gap:10px;padding:11px 12px;border-radius:11px;margin-bottom:9px;
+  border:1px solid;font-size:13px;line-height:1.5;}
+.warn-item:last-child{margin-bottom:0;}
+.warn-item .wi-icon{flex:0 0 18px;font-size:14px;line-height:1.35;font-weight:800;}
+.warn-item .wi-body{min-width:0;}
+.warn-item .wi-title{font-weight:700;display:block;margin-bottom:2px;}
+.warn-item.info{background:rgba(56,189,248,.07);border-color:rgba(56,189,248,.32);color:#bfe4fb;}
+.warn-item.info .wi-icon,.warn-item.info .wi-title{color:#38bdf8;}
+.warn-item.ok{background:rgba(52,211,153,.07);border-color:rgba(52,211,153,.32);color:#c3f3e0;}
+.warn-item.ok .wi-icon,.warn-item.ok .wi-title{color:#34d399;}
+.warn-item.warn{background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.34);color:#fbe6b8;}
+.warn-item.warn .wi-icon,.warn-item.warn .wi-title{color:#fbbf24;}
+.warn-item.danger{background:rgba(248,113,113,.09);border-color:rgba(248,113,113,.38);color:#fbd0d0;}
+.warn-item.danger .wi-icon,.warn-item.danger .wi-title{color:#f87171;}
+.info-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.info-table td{padding:7px 0;vertical-align:top;border-bottom:1px solid rgba(30,47,71,.6);}
+.info-table td:first-child{width:132px;color:var(--muted);font-weight:600;padding-right:12px;
+  font-size:11px;letter-spacing:.3px;text-transform:uppercase;}
+.info-table tr:last-child td{border-bottom:none;}
+@media (max-width:520px){
+  .info-table td:first-child{width:104px;font-size:10px;}
+  .info-table{font-size:12px;}
+}
+.badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:10.5px;font-weight:700;
+  letter-spacing:.4px;text-transform:uppercase;margin-right:6px;}
+.badge.good{background:rgba(52,211,153,.16);color:#34d399;border:1px solid rgba(52,211,153,.4);}
+.badge.bad{background:rgba(248,113,113,.16);color:#f87171;border:1px solid rgba(248,113,113,.4);}
+.badge.neutral{background:rgba(56,189,248,.14);color:#38bdf8;border:1px solid rgba(56,189,248,.35);}
+.scenario-box{background:#0a1421;border:1px solid var(--border);border-left:3px solid var(--accent);
+  border-radius:10px;padding:11px 13px;font-size:12.5px;color:#c6d8ea;line-height:1.55;}
+.scenario-box b{color:#fff;}
+.scenario-box .sb-title{color:var(--accent);font-weight:700;display:block;margin-bottom:5px;
+  font-size:11.5px;letter-spacing:.6px;text-transform:uppercase;}
+.scenario-box ul{margin:6px 0 0;padding-left:17px;}
+.scenario-box li{margin-bottom:4px;}
+.interp{font-size:13.5px;line-height:1.65;color:#cbd9e8;}
+.interp p{margin:0 0 10px;}
+.interp p:last-child{margin-bottom:0;}
+.interp b{color:#fff;}
+.interp .hl{color:var(--accent);font-weight:700;}
+.interp .hl-warn{color:var(--warn);font-weight:700;}
+.interp .hl-danger{color:var(--danger);font-weight:700;}
+.model-note{font-size:11.5px;color:var(--muted);line-height:1.6;background:#0a1421;
+  border:1px dashed var(--border);border-radius:10px;padding:11px 13px;}
+.model-note code{color:#9fd6f5;font-size:11px;}
+.print-only{display:none;}
+@media print{
+  body{background:#fff !important;color:#111 !important;padding:0;font-size:11.5px;}
+  .no-print,.preset-row,.topbar-actions{display:none !important;}
+  .print-only{display:block !important;}
+  .topbar{position:static;background:#fff;border-bottom:2px solid #222;padding:8px 0;}
+  .logo{background:#222 !important;color:#fff !important;box-shadow:none;}
+  .brand-text h1{color:#000;font-size:15px;}
+  .brand-text p{color:#444;}
+  .layout{display:block;padding:8px 0 0;}
+  .panel{background:#fff !important;border:1px solid #bbb !important;box-shadow:none !important;
+    break-inside:avoid;page-break-inside:avoid;margin-bottom:10px;padding:10px;}
+  .panel h2{color:#000 !important;border-bottom:1px solid #ccc;padding-bottom:4px;}
+  .panel h2::before{background:#000 !important;}
+  .panel h3{color:#333 !important;border-top-color:#ddd;}
+  .metric{background:#f7f7f7 !important;border-color:#ccc !important;}
+  .metric-value{color:#000 !important;font-size:15px;}
+  .metric-label{color:#555 !important;}
+  .warn-item{background:#fff !important;border-color:#999 !important;color:#000 !important;padding:7px;}
+  .warn-item .wi-title{color:#000 !important;}
+  .warn-item .wi-icon{color:#000 !important;}
+  .info-table td{color:#000;border-bottom-color:#ddd;}
+  .info-table td:first-child{color:#555;}
+  .scenario-box,.model-note{background:#f7f7f7 !important;border-color:#ccc !important;color:#000 !important;}
+  .interp{color:#000;}
+  .interp b{color:#000;}
+  .disclaimer{background:#fff !important;border-color:#999 !important;color:#000 !important;}
+  .chart-wrap{height:230px;}
+  a{color:#000;text-decoration:none;}
+}
+
+:root{--ink:#eaf2fb;--muted:#91a5bc;--faint:#647b96;--line:rgba(147,174,207,.16);--panel:rgba(13,25,42,.84);--panel-hi:rgba(18,34,55,.94);--cyan:#63e6d8;--blue:#6ea8ff;--coral:#ff8c82;--gold:#f5c66b;--danger:#ff7676;--shadow:0 18px 50px rgba(0,0,0,.25)}
+*{box-sizing:border-box}html,body{min-height:100%;background:#07111f}body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:radial-gradient(circle at 84% -10%,rgba(39,93,145,.32),transparent 33rem),radial-gradient(circle at -10% 35%,rgba(24,78,86,.22),transparent 30rem),#07111f;letter-spacing:-.01em}.topbar{border-bottom:1px solid var(--line);background:rgba(7,17,31,.72);backdrop-filter:blur(18px)}.app-topbar{min-height:82px;padding:18px clamp(18px,4vw,54px);align-items:center}.logo{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#72eee0,#3e8cf0);color:#07111f;display:grid;place-items:center;font-weight:900;letter-spacing:.06em;box-shadow:0 8px 24px rgba(99,230,216,.2);position:relative}.logo-pulse i{position:absolute;width:7px;height:7px;background:#fff;border-radius:50%;right:6px;top:6px;box-shadow:0 0 0 5px rgba(255,255,255,.18)}.brand-text h1{font-size:18px;letter-spacing:-.035em}.brand-text p{color:var(--muted);font-size:12px}.eyebrow,.section-kicker,.hero-kicker{font-size:10px;font-weight:800;letter-spacing:.13em;color:var(--faint);text-transform:uppercase}.eyebrow{color:var(--cyan);margin-bottom:4px}.topbar-actions{gap:9px}.live-chip{display:inline-flex;align-items:center;gap:7px;color:var(--cyan);font-size:11px;font-weight:700;margin-right:8px}.live-dot,.tiny-pulse{width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 0 4px rgba(99,230,216,.12)}.btn{border-radius:10px!important;font-weight:700!important;font-size:12px!important;padding:10px 13px!important}.btn-icon{font-size:16px;line-height:0;vertical-align:-1px;margin-right:4px}.compact-disclaimer{margin:18px auto 0;max-width:1440px;width:calc(100% - 36px);padding:11px 15px;display:flex;gap:11px;align-items:flex-start;border:1px solid rgba(245,198,107,.2);background:rgba(53,43,24,.43);color:#c9baa0;font-size:11px;line-height:1.5;border-radius:12px}.compact-disclaimer strong{color:#f5d489}.disclaimer-mark{display:grid;place-items:center;min-width:20px;height:20px;border-radius:50%;background:rgba(245,198,107,.13);color:var(--gold);font-weight:900}.preset-strip{max-width:1440px;width:calc(100% - 36px);margin:16px auto 0;display:flex;align-items:center;gap:16px}.strip-label{min-width:122px;display:flex;flex-direction:column;gap:2px;color:#c8d4e1;font-size:12px;font-weight:700}.strip-kicker{font-size:9px;letter-spacing:.13em;color:var(--cyan)}.preset-row{padding:0;display:flex;gap:8px;overflow-x:auto;flex:1}.preset-btn{white-space:nowrap!important;border:1px solid var(--line)!important;background:rgba(17,32,52,.75)!important;color:#b7c9dd!important;border-radius:10px!important;padding:9px 12px!important;font-size:11px!important;font-weight:650!important;transition:.18s ease!important}.preset-btn:hover,.preset-btn:focus{border-color:rgba(99,230,216,.7)!important;color:#f0ffff!important;background:rgba(35,67,81,.8)!important;transform:translateY(-1px)}.native-select-wrap{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;overflow:hidden}.simulator-shell{max-width:1440px;width:calc(100% - 36px);margin:18px auto 60px;display:grid;grid-template-columns:370px minmax(0,1fr);gap:18px;align-items:start}.control-deck,.panel{background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:18px}.control-deck{overflow:hidden;position:sticky;top:16px}.deck-header{display:flex;justify-content:space-between;padding:22px 22px 18px;background:linear-gradient(135deg,rgba(28,54,78,.7),rgba(12,25,42,.3));border-bottom:1px solid var(--line)}.deck-header h2,.stage-intro h2{font-size:21px;letter-spacing:-.04em;margin-top:4px}.step-count{color:var(--faint);font-size:11px;font-weight:800;margin-top:6px}.deck-section{padding:18px 20px;border-bottom:1px solid var(--line)}.deck-section:last-child{border-bottom:0}.section-heading{display:flex;gap:11px;align-items:flex-start;margin-bottom:14px}.section-heading h3{font-size:13px;margin:0 0 3px;color:#dce8f4}.section-heading p{color:var(--faint);font-size:11px;margin:0;line-height:1.35}.step-number{display:grid;place-items:center;width:23px;height:23px;border-radius:8px;background:rgba(99,230,216,.1);color:var(--cyan);font-size:10px;font-weight:850}.agent-rail{display:grid;grid-template-columns:1fr 1fr;gap:7px;max-height:224px;overflow:auto;padding:1px}.agent-card{border:1px solid rgba(147,174,207,.13);background:rgba(8,19,32,.55);border-radius:10px;padding:10px;text-align:left;color:#94a9c0;cursor:pointer;transition:.18s ease;min-height:48px}.agent-card:hover{border-color:rgba(99,230,216,.55);color:#dffdfa;background:rgba(30,64,73,.45)}.agent-card.active{border-color:var(--cyan);background:linear-gradient(135deg,rgba(37,104,104,.58),rgba(23,45,61,.7));color:#f4fffe;box-shadow:0 0 0 2px rgba(99,230,216,.1)}.agent-card-index{color:var(--cyan);font-size:9px;font-weight:800;display:block;margin-bottom:4px}.agent-card-name{font-size:11px;font-weight:750;line-height:1.1;display:block}.native-field,.native-field label{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;overflow:hidden}.agent-signal{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);margin-top:13px;padding-top:11px}.signal-icon{display:grid;place-items:center;border-radius:9px;width:28px;height:28px;background:rgba(110,168,255,.12);color:var(--blue);font-size:20px}.agent-signal b{display:block;color:#e7f1fc;font-size:12px}.agent-signal span:last-child{display:block;color:var(--faint);font-size:10px;margin-top:2px}.scenario-rail{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px}.scenario-card{border:1px solid rgba(147,174,207,.13);background:rgba(8,19,32,.55);border-radius:10px;padding:9px 10px;color:#9db0c5;cursor:pointer;text-align:left;white-space:nowrap;font-size:10px;font-weight:700;transition:.18s ease}.scenario-card:hover,.scenario-card.active{border-color:var(--blue);color:#edf5ff;background:rgba(39,75,118,.48)}.scenario-card.active{box-shadow:0 0 0 2px rgba(110,168,255,.1)}.vitals-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.input-card,.readout-card{position:relative;background:rgba(7,18,31,.66);border:1px solid rgba(147,174,207,.13);border-radius:11px;padding:10px 10px 8px;min-height:68px}.input-card>span,.readout-card>span{display:block;font-size:10px;color:var(--muted);font-weight:700}.input-card small{color:var(--faint);font-weight:500}.input-card input{border:0!important;background:transparent!important;box-shadow:none!important;padding:5px 0 0!important;font-size:21px!important;font-weight:760!important;width:100%;color:#f1f7ff!important}.input-unit{position:absolute;right:10px;bottom:12px;font-size:9px;color:var(--faint)}.readout-card strong{display:inline-block;padding-top:8px;font-size:21px;color:var(--cyan)}.readout-card small{font-size:9px;color:var(--faint);margin-left:4px}.advanced-details{margin-top:12px;border-top:1px solid var(--line);padding-top:11px}.advanced-details summary,.reference-panel summary,.model-panel summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;color:#a9bbce;font-size:11px;font-weight:700}.advanced-details summary::-webkit-details-marker,.reference-panel summary::-webkit-details-marker,.model-panel summary::-webkit-details-marker{display:none}.advanced-details summary b{font-size:17px;color:var(--cyan);font-weight:400}.advanced-details[open] summary b{transform:rotate(45deg)}.advanced-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.field{display:flex;flex-direction:column;gap:6px;min-width:0}.field>span{font-size:10px;color:var(--muted);font-weight:650}.field input,.field select,.dose-grid input,.dose-grid select,.loading-wrap input{width:100%;border:1px solid rgba(147,174,207,.14)!important;background:#0b1a2c!important;color:#dceafb!important;border-radius:8px!important;padding:9px!important;font-size:12px!important;box-shadow:none!important}.field input:focus,.field select:focus,.dose-grid input:focus,.dose-grid select:focus,.loading-wrap input:focus{border-color:var(--cyan)!important;outline:none}.dose-feature{border:1px solid rgba(99,230,216,.22);border-radius:12px;background:linear-gradient(135deg,rgba(30,71,76,.45),rgba(8,22,35,.7));padding:13px}.dose-topline{display:flex;justify-content:space-between;align-items:center;color:#d7e8ee;font-size:11px;font-weight:750}.dose-topline span{color:var(--cyan);font-size:10px}.dose-control{display:flex;align-items:center;gap:12px}.dose-control #dose1{border:0!important;background:transparent!important;color:#f4ffff!important;box-shadow:none!important;padding:3px 0!important;font-size:25px!important;font-weight:800!important;width:96px}.dose-dial{height:4px;flex:1;accent-color:var(--cyan);cursor:pointer}.hint{display:block;color:var(--faint);font-size:9px;margin-top:3px}.dose-grid{display:grid;grid-template-columns:1.3fr 1fr 1.1fr;gap:8px;margin-top:9px}.dose-grid .field{padding:10px;border:1px solid rgba(147,174,207,.13);border-radius:10px;background:rgba(7,18,31,.55)}.dose-grid small,.dose-grid em{font-size:9px;color:var(--cyan);font-style:normal}.dose-grid em{color:var(--faint);display:block;line-height:1.2}.loading-wrap{display:none;margin-top:10px;padding:10px;border:1px solid rgba(245,198,107,.2);border-radius:10px;color:var(--gold);font-size:10px}.loading-wrap>div{display:flex;align-items:center;gap:8px;margin-top:6px}.loading-wrap span{color:var(--faint)}.auto-run-note{font-size:10px;color:var(--faint);margin-top:12px;display:flex;align-items:center;gap:8px}.tiny-pulse{display:inline-block}.results-stage{min-width:0}.stage-intro{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;padding:4px 3px 15px}.stage-intro p{font-size:11px;color:var(--muted);margin-top:7px}.model-status{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:10px;white-space:nowrap;padding-bottom:4px}.status-check{display:grid;place-items:center;width:21px;height:21px;border-radius:50%;background:rgba(99,230,216,.12);color:var(--cyan);font-weight:800}.panel{padding:19px}.scenario-hero{display:grid;grid-template-columns:minmax(0,1fr) 185px;gap:20px;background:linear-gradient(105deg,rgba(25,60,74,.75),rgba(14,28,48,.85) 66%);border-color:rgba(99,230,216,.22);margin-bottom:16px}.hero-copy #scenarioBox{margin-top:7px}.hero-copy #scenarioBox .sb-title{font-size:18px;color:#f2fbff;font-weight:780;letter-spacing:-.03em}.hero-copy #scenarioBox>div{font-size:11px;color:#afc3d5;margin-top:6px}.hero-copy #scenarioBox ul{margin:10px 0 0;padding:0;display:flex;gap:7px;flex-wrap:wrap;list-style:none}.hero-copy #scenarioBox li{border:1px solid rgba(147,174,207,.16);border-radius:999px;padding:5px 8px;color:#b9cde0;font-size:10px}.hero-agent{padding-left:18px;border-left:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;gap:5px}.hero-agent strong{font-size:18px;color:var(--cyan);letter-spacing:-.035em}.hero-agent>span:last-child{font-size:10px;color:var(--muted);line-height:1.35}.panel-heading-row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px}.panel-heading-row h2{font-size:15px;letter-spacing:-.03em;margin-top:4px}.panel-note{font-size:10px;color:var(--faint);padding-top:6px}.metrics-panel{margin-bottom:16px}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.metric{background:rgba(7,18,31,.62)!important;border:1px solid rgba(147,174,207,.12)!important;border-radius:11px!important;padding:12px!important;min-height:80px}.metric-label{color:var(--faint)!important;font-size:9px!important;text-transform:uppercase;letter-spacing:.08em}.metric-value{font-size:22px!important;line-height:1.05!important;margin-top:10px;color:#edf7ff!important}.metric-value small{font-size:9px!important;color:var(--muted)!important}.metric.good{border-color:rgba(99,230,216,.35)!important}.metric.good .metric-value{color:var(--cyan)!important}.metric.warn{border-color:rgba(245,198,107,.35)!important}.metric.warn .metric-value{color:var(--gold)!important}.metric.bad{border-color:rgba(255,118,118,.35)!important}.metric.bad .metric-value{color:var(--coral)!important}.insight-grid,.charts-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;margin-bottom:16px}.safety-panel,.target-panel{min-height:212px}.warn-item{background:rgba(7,18,31,.46)!important;border-radius:10px!important;margin:7px 0!important;padding:10px!important;border:1px solid rgba(147,174,207,.1)!important;font-size:10px!important;color:#9fb4c9!important}.warn-item .wi-title{font-size:10px!important;color:#dae7f2!important}.target-visual{display:flex;align-items:center;gap:18px;min-height:125px}.target-ring{width:112px;height:112px;border-radius:50%;display:grid;place-items:center;align-content:center;flex:none;border:8px solid rgba(99,230,216,.12);box-shadow:inset 0 0 0 2px rgba(99,230,216,.25),0 0 0 1px rgba(99,230,216,.12);background:radial-gradient(circle,rgba(99,230,216,.12),transparent 66%)}.target-ring span{font-size:9px;color:var(--faint);letter-spacing:.1em;font-weight:800}.target-ring strong{font-size:24px;color:var(--cyan);margin-top:3px}.target-readout p{font-size:11px;color:var(--muted);line-height:1.45;margin:0}.chart-panel{min-width:0}.charts-grid{grid-template-columns:1fr 1fr}.chart-panel .chart-wrap{height:255px;padding:6px 0 0}.chart-note{color:var(--faint)!important;font-size:10px!important;line-height:1.45!important;margin-top:10px}.legend-dot{font-size:10px;color:var(--faint);padding-top:6px}.legend-dot:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;background:var(--coral)}.legend-dot.cyan:before{background:var(--cyan)}.interpretation-panel{margin-bottom:16px}.interpretation-badge{font-size:9px;color:var(--gold);border:1px solid rgba(245,198,107,.26);border-radius:999px;padding:5px 8px}.interp{font-size:12px!important;line-height:1.7!important;color:#b9cada!important;background:rgba(7,18,31,.4);border-radius:11px;padding:14px!important}.interp p{margin:0 0 9px}.interp p:last-child{margin-bottom:0}.interp b{color:#edf7ff}.reference-panel,.model-panel{margin-bottom:16px;padding:0;overflow:hidden}.reference-panel summary,.model-panel summary{padding:18px 19px}.reference-panel summary h2,.model-panel summary h2{font-size:15px;color:#e0ebf5;margin-top:4px}.summary-agent{font-size:11px;color:var(--cyan);font-weight:500}.details-chevron{color:var(--cyan);font-size:18px;transition:.2s}.reference-panel[open] .details-chevron,.model-panel[open] .details-chevron{transform:rotate(180deg)}.reference-panel>#drugInfo,.model-panel>.model-note{padding:0 19px 19px}.info-table{font-size:11px!important;background:rgba(7,18,31,.45);border-radius:10px;overflow:hidden}.info-table td{border-color:rgba(147,174,207,.1)!important;padding:10px!important}.info-table td:first-child{color:var(--faint)!important;width:23%}.info-table td:last-child{color:#bfd1e1}.model-note{color:#9eb2c7!important;font-size:11px!important;line-height:1.65!important}.model-note code{color:var(--cyan)!important;background:rgba(99,230,216,.08)!important}.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+@media(max-width:1120px){.simulator-shell{grid-template-columns:320px minmax(0,1fr)}.dose-grid{grid-template-columns:1fr 1fr}.dose-grid .field:last-child{grid-column:span 2}.metrics{grid-template-columns:repeat(3,1fr)}}@media(max-width:860px){.simulator-shell{display:block}.control-deck{position:static;margin-bottom:18px}.scenario-hero{grid-template-columns:1fr}.hero-agent{border-left:0;border-top:1px solid var(--line);padding:13px 0 0}.charts-grid{grid-template-columns:1fr}}@media(max-width:600px){.app-topbar{align-items:flex-start}.topbar-actions{flex-wrap:wrap;justify-content:flex-end}.live-chip{width:100%;justify-content:flex-end;margin:0}.preset-strip{align-items:flex-start;flex-direction:column;gap:8px}.strip-label{min-width:auto}.simulator-shell,.compact-disclaimer,.preset-strip{width:calc(100% - 24px)}.simulator-shell{margin-top:12px}.metrics{grid-template-columns:1fr 1fr}.insight-grid{grid-template-columns:1fr}.stage-intro{align-items:flex-start;flex-direction:column;gap:8px}.model-status{padding:0}.panel{padding:15px}.brand-text h1{font-size:16px}.brand-text p{max-width:220px}.topbar-actions .btn{padding:8px 9px!important}.dose-grid{grid-template-columns:1fr}.dose-grid .field:last-child{grid-column:auto}}@media print{.simulator-shell{display:block}.control-deck,.no-print{display:none!important}.results-stage{width:100%}.scenario-hero{grid-template-columns:1fr 180px}.panel{box-shadow:none}}
+
+</style>
+</head>
+<body>
+<header class="topbar app-topbar">
+  <div class="brand">
+    <div class="logo logo-pulse"><span>ICU</span><i></i></div>
+    <div class="brand-text">
+      <div class="eyebrow">CRITICAL CARE / PK-PD LAB</div>
+      <h1>Antihypertensive simulator</h1>
+      <p>Explore how agent choice, patient physiology, and titration shape the curve.</p>
+    </div>
+  </div>
+  <div class="topbar-actions no-print">
+    <span class="live-chip"><span class="live-dot"></span>Live model</span>
+    <button id="resetBtn" class="btn ghost" type="button"><span class="btn-icon">↺</span> Reset</button>
+    <button id="printBtn" class="btn primary" type="button"><span class="btn-icon">↗</span> Print summary</button><a class="btn ghost" href="index.html"><span class="btn-icon">←</span> Hub</a>
+  </div>
+</header>
+
+<div class="disclaimer compact-disclaimer">
+  <span class="disclaimer-mark">!</span>
+  <div><strong>Educational simulation only.</strong> Illustrative PK/PD values are not patient-specific and must never guide real dosing. Follow local protocols, current guidelines, and bedside clinical judgement.</div>
+</div>
+
+<div class="preset-strip no-print">
+  <div class="strip-label"><span class="strip-kicker">START HERE</span><span>Jump into a case</span></div>
+  <div class="preset-row" id="presetRow"></div>
+  <div class="native-select-wrap"><label for="presetSelect">Preset</label><select id="presetSelect" aria-label="Preset case"></select></div>
+</div>
+
+<main class="simulator-shell">
+  <aside class="control-deck no-print" id="controlsPanel">
+    <div class="deck-header">
+      <div><span class="section-kicker">CASE BUILDER</span><h2>Set the scene</h2></div>
+      <span class="step-count">01—04</span>
+    </div>
+
+    <section class="deck-section agent-section">
+      <div class="section-heading"><span class="step-number">01</span><div><h3>Choose an agent</h3><p>Tap a card to compare its profile.</p></div></div>
+      <div id="agentRail" class="agent-rail" role="list" aria-label="Antihypertensive agents"></div>
+      <div class="native-field">
+        <label for="drug">Antihypertensive agent</label><select id="drug"></select>
+      </div>
+      <div class="agent-signal"><span class="signal-icon">⌁</span><div><b id="agentName">Nicardipine</b><span id="agentMicrocopy">Fast, titratable arterial control</span></div></div>
+    </section>
+
+    <section class="deck-section scenario-section">
+      <div class="section-heading"><span class="step-number">02</span><div><h3>Define the scenario</h3><p>Targets and guardrails update with it.</p></div></div>
+      <div id="scenarioRail" class="scenario-rail" role="list" aria-label="Clinical scenarios"></div>
+      <div class="native-field">
+        <label for="scenario">Clinical scenario</label><select id="scenario"></select>
+      </div>
+    </section>
+
+    <section class="deck-section patient-section">
+      <div class="section-heading"><span class="step-number">03</span><div><h3>Shape the patient</h3><p>Baseline physiology drives the model.</p></div></div>
+      <div class="vitals-grid">
+        <label class="input-card"><span>SBP <small>mmHg</small></span><input id="sbp" type="number" min="60" max="300" step="1" value="200" inputmode="numeric"><b class="input-unit">mmHg</b></label>
+        <label class="input-card"><span>DBP <small>mmHg</small></span><input id="dbp" type="number" min="30" max="180" step="1" value="110" inputmode="numeric"><b class="input-unit">mmHg</b></label>
+        <label class="input-card"><span>Heart rate <small>bpm</small></span><input id="hr" type="number" min="30" max="200" step="1" value="92" inputmode="numeric"><b class="input-unit">bpm</b></label>
+        <div class="readout-card"><span>Calculated MAP</span><strong id="mapOut">—</strong><small>mmHg</small></div>
+      </div>
+      <details class="advanced-details">
+        <summary><span>Patient & organ function</span><b>+</b></summary>
+        <div class="advanced-grid">
+          <label class="field"><span>Weight (kg)</span><input id="weight" type="number" min="30" max="200" step="1" value="70" inputmode="numeric"></label>
+          <label class="field"><span>Age (years)</span><input id="age" type="number" min="18" max="110" step="1" value="65" inputmode="numeric"></label>
+          <label class="field"><span>Sex</span><select id="sex"><option value="male">Male</option><option value="female">Female</option></select></label>
+          <label class="field"><span>Creatinine</span><input id="creat" type="number" min="0.2" max="20" step="0.1" value="1.0" inputmode="decimal"></label>
+          <label class="field"><span>Est. GFR</span><input id="egfrOut" type="text" readonly value="—"></label>
+          <label class="field"><span>Hepatic function</span><select id="hepatic"><option value="1">Normal</option><option value="0.8">Mild (Child-Pugh A)</option><option value="0.6">Moderate (Child-Pugh B)</option><option value="0.4">Severe (Child-Pugh C)</option></select></label>
+        </div>
+      </details>
+    </section>
+
+    <section class="deck-section dose-section">
+      <div class="section-heading"><span class="step-number">04</span><div><h3>Run the titration</h3><p>Change a value and watch the model recalculate.</p></div></div>
+      <div class="dose-feature">
+        <div class="dose-topline"><label for="dose1" id="dose1Label">Initial dose</label><span id="dose1Unit">—</span></div>
+        <div class="dose-control"><input id="dose1" type="number" inputmode="decimal"><input id="doseDial" class="dose-dial" type="range" min="0" max="100" step="1" value="0" aria-label="Adjust initial dose"></div>
+        <span class="hint" id="d1Range">—</span>
+      </div>
+      <div class="dose-grid">
+        <label class="field"><span id="dose2Label">Titrated dose</span><input id="dose2" type="number" inputmode="decimal"><small id="dose2Unit">—</small><em id="d2Range">—</em></label>
+        <label class="field"><span>Reassess at (min)</span><input id="titrateTime" type="number" min="1" max="1440" step="1" value="10" inputmode="numeric"></label>
+        <label class="field"><span>Simulation duration</span><select id="duration"><option value="30">30 min</option><option value="60" selected>60 min</option><option value="120">2 hours</option><option value="240">4 hours</option><option value="360">6 hours</option><option value="720">12 hours</option></select></label>
+      </div>
+      <div id="loadingWrap" class="loading-wrap"><label for="loadingDose" id="loadingLabel">Loading dose</label><div><input id="loadingDose" type="number" inputmode="decimal"><span id="loadingUnit">—</span></div></div>
+      <div class="auto-run-note"><span class="tiny-pulse"></span> Auto-updating after every change</div>
+    </section>
+  </aside>
+
+  <section class="results-stage" id="resultsColumn">
+    <div class="stage-intro">
+      <div><span class="section-kicker">SIMULATION OUTPUT</span><h2>Hemodynamic response</h2><p id="printMeta">—</p></div>
+      <div class="model-status"><span class="status-check">✓</span><span id="simStatus">Ready · recalculates automatically</span></div>
+    </div>
+
+    <div class="scenario-hero panel">
+      <div class="hero-copy"><span class="hero-kicker">CURRENT CASE</span><div id="scenarioBox">—</div></div>
+      <div class="hero-agent"><span class="hero-kicker">ACTIVE AGENT</span><strong id="activeAgentDisplay">Nicardipine</strong><span id="activeAgentRoute">IV infusion</span></div>
+    </div>
+
+    <div class="metrics-panel panel">
+      <div class="panel-heading-row"><div><span class="hero-kicker">AT A GLANCE</span><h2>Response metrics</h2></div><span class="panel-note">Modelled values</span></div>
+      <div class="metrics" id="metricsGrid"></div>
+    </div>
+
+    <div class="insight-grid">
+      <div class="panel safety-panel"><div class="panel-heading-row"><div><span class="hero-kicker">GUARDRAILS</span><h2>Safety & appropriateness</h2></div></div><div id="warningsBox"></div></div>
+      <div class="panel target-panel"><div class="panel-heading-row"><div><span class="hero-kicker">ORIENTATION</span><h2>Scenario target</h2></div></div><div class="target-visual"><div class="target-ring"><span>MAP</span><strong id="targetMapValue">—</strong></div><div id="targetReadout"><p>Targets appear here after the model runs.</p></div></div></div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="panel chart-panel"><div class="panel-heading-row"><div><span class="hero-kicker">PHARMACOKINETICS</span><h2>Concentration vs time</h2></div><span class="legend-dot cyan">Effect site</span></div><div class="chart-wrap"><canvas id="pkChart"></canvas></div><p class="chart-note">Concentration is shown as % of the agent's modelled EC<sub>50</sub>. This is a teaching output, not a measured level.</p></div>
+      <div class="panel chart-panel"><div class="panel-heading-row"><div><span class="hero-kicker">HEMODYNAMICS</span><h2>Blood pressure & heart rate</h2></div><span class="legend-dot coral">SBP / DBP</span></div><div class="chart-wrap"><canvas id="bpChart"></canvas></div><p class="chart-note">SBP, DBP and MAP are simulated independently; HR includes direct drug effect and agent-specific baroreflex.</p></div>
+    </div>
+
+    <div class="panel interpretation-panel"><div class="panel-heading-row"><div><span class="hero-kicker">READ THE CURVE</span><h2>Clinical interpretation</h2></div><span class="interpretation-badge">Educational</span></div><div class="interp" id="interpretation">—</div></div>
+
+    <details class="panel reference-panel"><summary><div><span class="hero-kicker">REFERENCE</span><h2>Drug profile <span class="summary-agent" id="summaryAgent">· Nicardipine</span></h2></div><b class="details-chevron">⌄</b></summary><div id="drugInfo">—</div></details>
+    <details class="panel model-panel"><summary><div><span class="hero-kicker">UNDER THE HOOD</span><h2>Model structure</h2></div><b class="details-chevron">⌄</b></summary><div class="model-note"> <b>PK layer.</b> A one-compartment disposition model with an effect-site (biophase) link. Infusions are modelled as a constant input rate <code>R</code> with <code>Css = R / CL</code>; boluses as an instantaneous central-compartment input; oral doses via a first-order absorption compartment (<code>k<sub>a</sub></code>, bioavailability <code>F</code>). Apparent clearance is adjusted for renal and hepatic function using drug-specific fractional contributions. Integration uses small fixed time steps with exact exponential updates, so results are stable at any selected duration.<br><br><b>PD layer.</b> Effect-site concentration drives a sigmoid Emax / Hill relationship <code>E = C<sup>h</sup> / (EC<sub>50</sub><sup>h</sup> + EC<sub>50</sub><sup>h</sup>)</code>. Separate Emax terms for SBP and DBP produce the pressure curve; MAP is then computed as <code>(SBP + 2·DBP) / 3</code>. Heart rate = baseline + direct drug effect + baroreflex gain × MAP fall.<br><br><b>Limitations.</b> No inter-individual variability, no active metabolites, no reflex-adaptation or tolerance, no ICP/CO/PA-pressure modelling, and no interaction with sedatives or vasopressors. Parameter values are teaching approximations and must not be interpreted as patient-specific kinetics.</div></details>
+  </section>
+</main>
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+  function numOr(v, fb) { var n = parseFloat(v); return Number.isFinite(n) ? n : fb; }
+  function fmt(v, d) {
+    if (!Number.isFinite(v)) return '—';
+    return v.toFixed(d === undefined ? 1 : d);
+  }
+  function hillEffect(c, ec50, hill) {
+    if (!(c > 0) || !(ec50 > 0)) return 0;
+    var x = c / ec50;
+    if (x > 1e6) return 1;
+    var xh = Math.pow(x, hill);
+    if (!Number.isFinite(xh)) return 1;
+    return xh / (1 + xh);
+  }
+  function ckdepi2021(scr, age, female) {
+    if (!(scr > 0) || !(age > 0)) return NaN;
+    var k = female ? 0.7 : 0.9;
+    var a = female ? -0.241 : -0.302;
+    var mn = Math.min(scr / k, 1);
+    var mx = Math.max(scr / k, 1);
+    var e = 142 * Math.pow(mn, a) * Math.pow(mx, -1.2) * Math.pow(0.9938, age);
+    if (female) e *= 1.012;
+    return e;
+  }
+
+  var DRUGS = {
+    nicardipine: {
+      key:'nicardipine', name:'Nicardipine',
+      route:'IV infusion (peripheral or central line)',
+      mode:'infusion', doseUnit:'mg/h',
+      d1:{min:2.5,max:15,step:0.5,def:5,label:'Initial infusion rate'},
+      d2:{min:0,max:15,step:0.5,def:7.5,label:'Titrated infusion rate'},
+      defTitrate:10,
+      rangeText:'2.5–15 mg/h (start 5 mg/h; titrate in 2.5 mg/h steps)',
+      onset:'5–15 minutes',
+      halfLife:'≈ 2–4 h (hepatic; effect offset is faster than plasma t½)',
+      titration:'Highly titratable; re-assess every 5–15 min',
+      mechanism:'Dihydropyridine L-type calcium-channel blocker — arteriolar vasodilation, minimal venodilation',
+      hrEffect:'Mild reflex tachycardia (+5 to +15 bpm)',
+      renal:'No renal dose adjustment required',
+      hepatic:'Extensive CYP3A4 hepatic metabolism — reduce dose in cirrhosis',
+      cautions:'Advanced aortic stenosis, cardiogenic shock, intracranial mass effect (relative)',
+      preferred:['hypertensive_emergency','ais_ivt','ais_no_reperfusion','ich','pulmonary_edema','aki','acs'],
+      pk:{cl:0.5,vd:1.5,ke0:4.0,ka:0,F:1,renalFrac:0,hepaticFrac:0.9},
+      pd:{ec50:100,hill:1.6,emaxSBP:50,emaxDBP:27,emaxHR:0,baroreflex:1.0}
+    },
+    clevidipine: {
+      key:'clevidipine', name:'Clevidipine',
+      route:'IV infusion (dedicated line preferred)',
+      mode:'infusion', doseUnit:'mg/h',
+      d1:{min:1,max:16,step:0.5,def:4,label:'Initial infusion rate'},
+      d2:{min:0,max:32,step:0.5,def:8,label:'Titrated infusion rate'},
+      defTitrate:5,
+      rangeText:'1–32 mg/h (start 1–2 mg/h; double the rate every 2–5 min to effect)',
+      onset:'2–4 minutes',
+      halfLife:'≈ 1 minute (red-blood-cell and plasma esterases)',
+      titration:'Ultra-short acting — titrate every 2–5 min; offset within minutes',
+      mechanism:'Third-generation dihydropyridine calcium-channel blocker — selective arteriolar vasodilation',
+      hrEffect:'Mild to moderate reflex tachycardia',
+      renal:'No renal adjustment (non-renal metabolism)',
+      hepatic:'No hepatic adjustment (esterase metabolism); caution with lipid emulsion in severe hyperlipidaemia',
+      cautions:'Egg/soy or lipid emulsion allergy, defective lipid metabolism, severe aortic stenosis, pancreatitis',
+      preferred:['hypertensive_emergency','ais_ivt','ich','pulmonary_edema','aki','acs'],
+      pk:{cl:15,vd:0.5,ke0:30,ka:0,F:1,renalFrac:0,hepaticFrac:0},
+      pd:{ec50:3.0,hill:1.8,emaxSBP:55,emaxDBP:30,emaxHR:0,baroreflex:0.8}
+    },
+    labetalol: {
+      key:'labetalol', name:'Labetalol',
+      route:'IV bolus (or continuous infusion 0.5–2 mg/min)',
+      mode:'bolus', doseUnit:'mg',
+      d1:{min:10,max:80,step:5,def:20,label:'Initial IV bolus'},
+      d2:{min:0,max:80,step:5,def:40,label:'Repeat bolus at titration time'},
+      defTitrate:10,
+      rangeText:'10–20 mg IV, then 20–80 mg every 10 min; max cumulative 300 mg',
+      onset:'2–5 minutes (IV bolus)',
+      halfLife:'≈ 5–8 h',
+      titration:'Moderately titratable; cumulative effect — allow time between boluses',
+      mechanism:'Combined selective α₁-blockade and non-selective β-blockade (α:β ≈ 1:7 IV)',
+      hrEffect:'Heart rate decreases; blunts reflex tachycardia',
+      renal:'No dose adjustment required',
+      hepatic:'Hepatic metabolism — reduce dose in significant hepatic impairment',
+      cautions:'Asthma/COPD, bradycardia, 2nd/3rd-degree heart block, decompensated heart failure, cocaine-associated hypertension',
+      preferred:['hypertensive_emergency','aortic_syndrome','ais_ivt','ais_no_reperfusion','ich','acs','eclampsia','aki'],
+      pk:{cl:1.0,vd:9.0,ke0:6.0,ka:0,F:1,renalFrac:0.05,hepaticFrac:0.9},
+      pd:{ec50:25,hill:1.2,emaxSBP:45,emaxDBP:25,emaxHR:-22,baroreflex:0}
+    },
+    esmolol: {
+      key:'esmolol', name:'Esmolol',
+      route:'IV bolus + continuous infusion',
+      mode:'infusion', doseUnit:'mcg/kg/min',
+      d1:{min:25,max:200,step:5,def:50,label:'Initial infusion rate'},
+      d2:{min:0,max:300,step:5,def:100,label:'Titrated infusion rate'},
+      defTitrate:5,
+      rangeText:'50–200 mcg/kg/min (max 300 mcg/kg/min); loading bolus 500 mcg/kg optional',
+      loadingBolus:{unit:'mcg/kg',min:0,max:1000,step:50,def:500,label:'Optional loading bolus (mcg/kg)'},
+      onset:'1–2 minutes',
+      halfLife:'≈ 9 minutes (red-blood-cell esterases)',
+      titration:'Very short acting — titrate every 3–5 min; effect wears off within 10–20 min',
+      mechanism:'Cardioselective β₁-adrenergic antagonist; reduces heart rate, contractility and dP/dt',
+      hrEffect:'Heart rate decreases; blunts reflex tachycardia',
+      renal:'No renal adjustment (non-renal metabolism; acid metabolite renally cleared)',
+      hepatic:'No hepatic adjustment required',
+      cautions:'Sinus bradycardia, 2nd/3rd-degree heart block, cardiogenic shock, decompensated heart failure, reactive airway disease (relative)',
+      preferred:['aortic_syndrome','acs','hypertensive_emergency'],
+      pk:{cl:2.5,vd:0.5,ke0:20,ka:0,F:1,renalFrac:0.05,hepaticFrac:0.05},
+      pd:{ec50:800,hill:1.0,emaxSBP:35,emaxDBP:18,emaxHR:-30,baroreflex:0}
+    },
+    nitroprusside: {
+      key:'nitroprusside', name:'Sodium nitroprusside',
+      route:'IV infusion (protected from light; dedicated line)',
+      mode:'infusion', doseUnit:'mcg/kg/min',
+      d1:{min:0.3,max:10,step:0.1,def:0.5,label:'Initial infusion rate'},
+      d2:{min:0,max:10,step:0.1,def:2,label:'Titrated infusion rate'},
+      defTitrate:5,
+      rangeText:'0.3–10 mcg/kg/min (typical max 10 mcg/kg/min for ≤ 10 min; keep ≤ 2–4 mcg/kg/min where possible)',
+      onset:'Immediate (< 1 minute)',
+      halfLife:'≈ 2 minutes',
+      titration:'Extremely titratable; requires continuous intra-arterial BP monitoring',
+      mechanism:'Releases nitric oxide → activates guanylate cyclase → balanced arterial and venous vasodilation',
+      hrEffect:'Reflex tachycardia (often marked)',
+      renal:'No direct renal clearance, but thiocyanate accumulates in renal failure — avoid',
+      hepatic:'Cyanide is detoxified to thiocyanate in the liver — avoid in hepatic failure',
+      cautions:'Renal or hepatic failure, raised ICP, coronary steal, pregnancy, co-administration with other antihypertensives, prolonged high-dose infusion (cyanide toxicity)',
+      preferred:['hypertensive_emergency','pulmonary_edema'],
+      pk:{cl:12,vd:0.4,ke0:30,ka:0,F:1,renalFrac:0,hepaticFrac:0},
+      pd:{ec50:3.0,hill:1.5,emaxSBP:60,emaxDBP:30,emaxHR:0,baroreflex:1.2}
+    },
+nitroglycerin: {
+      key:'nitroglycerin', name:'Nitroglycerin',
+      route:'IV infusion (non-adsorptive tubing; dedicated line)',
+      mode:'infusion', doseUnit:'mcg/min',
+      d1:{min:5,max:200,step:5,def:20,label:'Initial infusion rate'},
+      d2:{min:0,max:400,step:5,def:80,label:'Titrated infusion rate'},
+      defTitrate:5,
+      rangeText:'5–200 mcg/min initially; titrate by 5–20 mcg/min every 3–5 min (higher rates may be used in selected ICU protocols)',
+      onset:'1–5 minutes',
+      halfLife:'≈ 1–4 minutes',
+      titration:'Highly titratable; tolerance can develop with prolonged exposure',
+      mechanism:'Nitric oxide donor — predominant venodilation with arterial dilation at higher doses; lowers preload and afterload',
+      hrEffect:'Mild reflex tachycardia; may improve myocardial oxygen balance in ACS',
+      renal:'No direct renal dose adjustment required',
+      hepatic:'Hepatic metabolism; no routine adjustment, but monitor response',
+      cautions:'Hypotension, RV infarction or preload-dependent states, PDE-5 inhibitor use, severe aortic stenosis, methemoglobinaemia',
+      preferred:['hypertensive_emergency','pulmonary_edema','acs'],
+      pk:{cl:2,vd:0.5,ke0:12,ka:0,F:1,renalFrac:0,hepaticFrac:0.8},
+      pd:{ec50:400,hill:1.2,emaxSBP:38,emaxDBP:20,emaxHR:0,baroreflex:0.9}
+    },
+        hydralazine: {
+      key:'hydralazine', name:'Hydralazine',
+      route:'IV bolus (IM or oral alternatives)',
+      mode:'bolus', doseUnit:'mg',
+      d1:{min:5,max:20,step:1,def:10,label:'Initial IV bolus'},
+      d2:{min:0,max:20,step:1,def:10,label:'Repeat bolus at titration time'},
+      defTitrate:240,
+      rangeText:'5–20 mg IV every 4–6 h (onset 10–20 min, duration 2–6 h)',
+      onset:'10–20 minutes (IV); slower and less predictable IM/oral',
+      halfLife:'≈ 2–4 h (effect duration often longer than plasma t½)',
+      titration:'Poorly titratable — delayed, prolonged and unpredictable response; avoid as first-line emergency therapy',
+      mechanism:'Direct arteriolar smooth-muscle relaxation (mechanism incompletely defined)',
+      hrEffect:'Marked reflex tachycardia; increases myocardial oxygen demand',
+      renal:'Prolonged exposure in renal impairment — reduce dose and extend interval',
+      hepatic:'Acetylated and metabolised hepatically — reduce dose in hepatic impairment',
+      cautions:'Coronary artery disease, aortic dissection, tachycardia, systemic lupus erythematosus, raised ICP',
+      preferred:['eclampsia'],
+      pk:{cl:0.5,vd:1.5,ke0:1.5,ka:0,F:1,renalFrac:0.2,hepaticFrac:0.7},
+      pd:{ec50:70,hill:1.0,emaxSBP:50,emaxDBP:25,emaxHR:0,baroreflex:1.6}
+    },
+    enalaprilat: {
+      key:'enalaprilat', name:'Enalaprilat',
+      route:'IV bolus (slow push over 5 min)',
+      mode:'bolus', doseUnit:'mg',
+      d1:{min:0.625,max:5,step:0.125,def:1.25,label:'Initial IV dose'},
+      d2:{min:0,max:5,step:0.125,def:1.25,label:'Repeat dose at titration time'},
+      defTitrate:360,
+      rangeText:'0.625–1.25 mg IV every 6 h; up to 5 mg every 6 h has been used',
+      onset:'15 minutes (peak 1–4 h)',
+      halfLife:'≈ 11 h (effective duration up to 6 h per dose)',
+      titration:'Slow onset and long duration — poor agent for minute-to-minute titration',
+      mechanism:'Active ACE inhibitor — reduces angiotensin II and aldosterone, lowers systemic vascular resistance',
+      hrEffect:'Little direct heart-rate effect',
+      renal:'Renally eliminated — reduce dose in renal impairment; risk of hyperkalaemia and worsening AKI',
+      hepatic:'Minimal hepatic dependence',
+      cautions:'Pregnancy, bilateral renal-artery stenosis, hereditary angioedema, hyperkalaemia, acute kidney injury, volume depletion',
+      preferred:['pulmonary_edema','hypertensive_emergency'],
+      pk:{cl:0.05,vd:0.5,ke0:1.0,ka:0,F:1,renalFrac:0.9,hepaticFrac:0.05},
+      pd:{ec50:25,hill:1.5,emaxSBP:40,emaxDBP:22,emaxHR:3,baroreflex:0.4}
+    },
+    phentolamine: {
+      key:'phentolamine', name:'Phentolamine',
+      route:'IV bolus (or infusion 0.2–1 mg/min)',
+      mode:'bolus', doseUnit:'mg',
+      d1:{min:1,max:5,step:0.5,def:5,label:'Initial IV bolus'},
+      d2:{min:0,max:5,step:0.5,def:5,label:'Repeat bolus at titration time'},
+      defTitrate:10,
+      rangeText:'1–5 mg IV bolus, repeat as needed; infusion 0.2–1 mg/min',
+      onset:'1–2 minutes',
+      halfLife:'≈ 19 minutes',
+      titration:'Short acting but causes marked tachycardia — use with β-blockade where appropriate',
+      mechanism:'Non-selective α-adrenergic antagonist — reverses catecholamine-mediated vasoconstriction',
+      hrEffect:'Marked reflex tachycardia',
+      renal:'Use with caution in renal impairment',
+      hepatic:'Partially hepatically metabolised',
+      cautions:'Coronary artery disease, unopposed tachycardia, aortic dissection (monotherapy), co-administration with β-blockers in phaeochromocytoma (must β-block first)',
+      preferred:['hypertensive_emergency'],
+      pk:{cl:3.0,vd:1.5,ke0:8.0,ka:0,F:1,renalFrac:0.3,hepaticFrac:0.5},
+      pd:{ec50:40,hill:1.3,emaxSBP:55,emaxDBP:28,emaxHR:0,baroreflex:1.3}
+    },
+    clonidine: {
+      key:'clonidine', name:'Clonidine',
+      route:'Oral (also transdermal / IV)',
+      mode:'oral', doseUnit:'mg',
+      d1:{min:0.05,max:0.3,step:0.05,def:0.2,label:'Initial oral dose'},
+      d2:{min:0,max:0.3,step:0.05,def:0.1,label:'Second oral dose at titration time'},
+      defTitrate:240,
+      rangeText:'0.1–0.2 mg PO initially, then 0.1 mg hourly to a maximum of 0.6–0.8 mg/day',
+      onset:'30–60 minutes (peak 2–4 h)',
+      halfLife:'≈ 6–24 h',
+      titration:'Slow onset — unsuitable for minute-to-minute control of a true hypertensive emergency',
+      mechanism:'Central α₂-adrenergic agonist — reduces sympathetic outflow; also reduces heart rate and salivation',
+      hrEffect:'Heart rate decreases; may cause bradycardia',
+      renal:'~50% excreted unchanged — reduce dose in renal impairment, accumulation occurs',
+      hepatic:'Partially hepatically metabolised',
+      cautions:'Rebound hypertension on abrupt cessation, sedation, dry mouth, depression, heart block, pregnancy (limited data)',
+      preferred:['hypertensive_emergency'],
+      pk:{cl:0.25,vd:2.5,ke0:1.5,ka:1.5,F:0.9,renalFrac:0.5,hepaticFrac:0.5},
+      pd:{ec50:0.6,hill:1.4,emaxSBP:35,emaxDBP:18,emaxHR:-8,baroreflex:0.2}
+    },
+    amlodipine: {
+      key:'amlodipine', name:'Amlodipine',
+      route:'Oral',
+      mode:'oral', doseUnit:'mg',
+      d1:{min:2.5,max:10,step:1,def:5,label:'Initial oral dose'},
+      d2:{min:0,max:10,step:1,def:5,label:'Second oral dose at titration time'},
+      defTitrate:240,
+      rangeText:'5–10 mg PO once daily (2.5 mg in the elderly or hepatic impairment)',
+      onset:'30–60 min for initial effect; full effect over 3–5 days',
+      halfLife:'≈ 30–50 h',
+      titration:'Not titratable — no role in acute hypertensive emergency management; used for oral transition',
+      mechanism:'Long-acting dihydropyridine calcium-channel blocker — arteriolar vasodilation',
+      hrEffect:'Minimal to mild reflex tachycardia',
+      renal:'No renal dose adjustment required',
+      hepatic:'Extensively hepatically metabolised — start at 2.5 mg in hepatic impairment',
+      cautions:'Severe aortic stenosis, cardiogenic shock, peripheral oedema, gingival hyperplasia',
+      preferred:['hypertensive_emergency'],
+      pk:{cl:0.45,vd:21,ke0:0.8,ka:1.2,F:0.64,renalFrac:0,hepaticFrac:0.9},
+      pd:{ec50:1.5,hill:1.5,emaxSBP:40,emaxDBP:22,emaxHR:0,baroreflex:0.6}
+    }
+  };
+
+  var DRUG_ORDER = ['nicardipine','clevidipine','labetalol','esmolol','nitroprusside','nitroglycerin',
+                    'hydralazine','enalaprilat','phentolamine','clonidine','amlodipine'];
+
+  var SCENARIOS = {
+    hypertensive_emergency: {
+      key:'hypertensive_emergency', name:'Hypertensive emergency (general)',
+      sbpLow:140,sbpHigh:160,dbpLow:90,dbpHigh:100,hrLow:50,hrHigh:110,maxMapDrop1h:25,
+      targetText:'Reduce MAP by no more than 25 % during the first hour; aim for roughly 160/100 mmHg over 2–6 h; then gradual normalisation over 24–48 h.',
+      notes:[
+        'Cerebral, coronary and renal autoregulation is right-shifted — abrupt normalisation causes ischaemia.',
+        'A mathematical MAP fall within range does <b>not</b> by itself make the response clinically safe; end-organ perfusion, mental status, urine output and ECG must be assessed at the bedside.',
+        'Prefer titratable intravenous agents with a short offset.'
+      ],
+      avoid:{}
+    },
+    aortic_syndrome: {
+      key:'aortic_syndrome', name:'Acute aortic syndrome / dissection',
+      sbpLow:100,sbpHigh:120,dbpLow:60,dbpHigh:80,hrLow:50,hrHigh:60,maxMapDrop1h:25,
+      requiresBetaBlockade:true,
+      targetText:'Target SBP 100–120 mmHg and HR 50–60 bpm. <b>Beta-blockade first</b>, then add a vasodilator for residual hypertension.',
+      notes:[
+        'The therapeutic goal is <b>anti-impulse therapy</b> — reduce dP/dt and aortic wall shear stress, not just pressure.',
+        '<b>Vasodilator monotherapy is not equivalent to beta-blockade</b> in this scenario: pure afterload reduction triggers reflex tachycardia and increases dP/dt, raising wall stress.',
+        'In true beta-blocker intolerance, a cardioselective agent or a combined α/β agent is preferred over a pure vasodilator.'
+      ],
+      avoid:{
+        hydralazine:'Hydralazine causes marked reflex tachycardia and increases dP/dt — it directly opposes anti-impulse therapy in aortic dissection.',
+        nitroprusside:'Nitroprusside as monotherapy produces reflex tachycardia and increased aortic wall stress. If used at all, a beta-blocker must be established first.',
+        nicardipine:'Nicardipine monotherapy does not blunt the reflex tachycardia that raises dP/dt. Beta-blockade should be established first.',
+        clevidipine:'Clevidipine monotherapy does not blunt the reflex tachycardia that raises dP/dt. Beta-blockade should be established first.',
+        clonidine:'Oral clonidine has too slow an onset for acute anti-impulse control in aortic dissection.',
+        amlodipine:'Oral amlodipine has no role in the acute management of aortic dissection.'
+      }
+    },
+    ais_ivt: {
+      key:'ais_ivt', name:'Acute ischaemic stroke — IV thrombolysis candidate',
+      sbpLow:130,sbpHigh:180,dbpLow:70,dbpHigh:105,hrLow:50,hrHigh:110,maxMapDrop1h:25,
+      preThresholdSBP:185,preThresholdDBP:110,postThresholdSBP:180,postThresholdDBP:105,
+      targetText:'Pre-thrombolysis BP must be <b>&lt; 185/110 mmHg</b>. For 24 h after thrombolysis keep BP <b>≤ 180/105 mmHg</b>.',
+      notes:[
+        'These are <b>eligibility thresholds</b>, not a long-term BP target. They exist to reduce the risk of symptomatic intracranial haemorrhage after reperfusion.',
+        'Lowering BP below these thresholds confers no additional reperfusion benefit and may worsen penumbral perfusion.',
+        'Long-term BP management after the 24-hour post-thrombolysis window follows separate, individualised targets.'
+      ],
+      avoid:{
+        clonidine:'Oral clonidine has too slow and unpredictable an onset for the time-critical pre-thrombolysis BP threshold.',
+        amlodipine:'Oral amlodipine cannot achieve the pre-thrombolysis threshold in a time-critical window.',
+        hydralazine:'Hydralazine has an unpredictable, delayed and prolonged effect — difficult to control within the thrombolysis window.'
+      }
+    },
+    ais_no_reperfusion: {
+      key:'ais_no_reperfusion', name:'Acute ischaemic stroke — no reperfusion therapy',
+      sbpLow:140,sbpHigh:220,dbpLow:80,dbpHigh:120,hrLow:50,hrHigh:110,maxMapDrop1h:15,
+      targetText:'Permissive hypertension: unless BP exceeds <b>220/120 mmHg</b>, do not lower blood pressure. If treatment is required, reduce by no more than <b>15 %</b> in the first 24 hours.',
+      notes:[
+        'In ischaemic penumbra, perfusion pressure is critically dependent on systemic BP — a right-shifted autoregulation curve means "normal" BP may be ischaemic for the brain.',
+        'Rapid or excessive reduction can extend the infarct.',
+        'Antihypertensive treatment is generally reserved for BP > 220/120 mmHg, or for specific comorbid indications (e.g. aortic dissection, acute coronary syndrome, heart failure).'
+      ],
+      avoid:{
+        hydralazine:'Hydralazine produces an unpredictable, prolonged fall in BP that is difficult to reverse — undesirable when permissive hypertension is the goal.',
+        clonidine:'Oral clonidine has a slow, sustained effect that is difficult to reverse if over-shoot occurs.',
+        amlodipine:'Oral amlodipine has an extremely long duration of action — poorly controllable if over-shoot occurs.'
+      }
+    },
+    ich: {
+      key:'ich', name:'Intracerebral haemorrhage',
+      sbpLow:130,sbpHigh:140,dbpLow:70,dbpHigh:90,hrLow:50,hrHigh:110,maxMapDrop1h:25,mapFloor:70,
+      targetText:'Target SBP <b>130–140 mmHg</b> (intensive lowering). Avoid SBP <b>&lt; 130 mmHg</b>. Maintain cerebral perfusion pressure.',
+      notes:[
+        'CPP = MAP − ICP. With raised ICP, excessive MAP reduction can drop CPP below the 60–70 mmHg range and cause secondary ischaemic injury.',
+        'Continuous monitoring of neurological status is essential; a mathematically "on-target" BP can still be inadequate for an individual patient.',
+        'Avoid drugs that raise ICP (e.g. nitroprusside) and avoid wide BP swings.'
+      ],
+      avoid:{
+        nitroprusside:'Nitroprusside can raise intracranial pressure and produces wide, poorly controlled BP swings — generally avoided in intracerebral haemorrhage.',
+        hydralazine:'Hydralazine produces delayed, prolonged and unpredictable hypotension — hazardous when a tight SBP window is required.',
+        clonidine:'Oral clonidine is too slow and too sustained for the tight SBP target required in acute ICH.',
+        amlodipine:'Oral amlodipine cannot achieve the tight, rapidly adjustable SBP target required in acute ICH.'
+      }
+    },
+    pulmonary_edema: {
+      key:'pulmonary_edema', name:'Acute pulmonary oedema / LV failure',
+      sbpLow:100,sbpHigh:140,dbpLow:60,dbpHigh:90,hrLow:50,hrHigh:110,maxMapDrop1h:25,mapFloor:65,
+      targetText:'Rapid afterload reduction with maintenance of organ perfusion. Keep SBP ≈ 100–140 mmHg and MAP ≥ 65 mmHg while decongesting.',
+      notes:[
+        'The goal is combined afterload and preload reduction — balanced vasodilation is preferable to pure arteriolar dilation.',
+        'β-blockade is generally harmful in decompensated systolic heart failure with pulmonary oedema (negative inotropy).',
+        'Diuresis, oxygen/non-invasive ventilation and, where indicated, inotropic support run in parallel with BP control.'
+      ],
+      avoid:{
+        esmolol:'β₁-blockade has negative inotropic effects and can precipitate cardiogenic shock in decompensated acute heart failure with pulmonary oedema.',
+        labetalol:'Labetalol has non-selective β-blocking activity with negative inotropy — hazardous in decompensated acute heart failure.',
+        hydralazine:'Hydralazine causes marked reflex tachycardia, increasing myocardial oxygen demand without providing preload reduction.',
+        clonidine:'Oral clonidine is too slow and causes sedation, which may compromise respiratory status.',
+        amlodipine:'Oral amlodipine is far too slow in onset for acute pulmonary oedema.'
+      }
+    },
+    acs: {
+      key:'acs', name:'ACS / acute myocardial ischaemia',
+      sbpLow:100,sbpHigh:140,dbpLow:60,dbpHigh:90,hrLow:50,hrHigh:70,maxMapDrop1h:25,mapFloor:65,
+      targetText:'Target SBP <b>&lt; 140 mmHg</b> and HR <b>50–60 bpm</b> to reduce myocardial oxygen demand. Maintain DBP high enough to preserve coronary perfusion.',
+      notes:[
+        'β-blockade reduces heart rate, contractility and myocardial oxygen demand and is first-line when not contraindicated.',
+        'Excessive DBP reduction compromises coronary perfusion — a diastolic pressure that is "on target" numerically may still be inadequate.',
+        'Avoid agents causing reflex tachycardia and avoid coronary steal.'
+      ],
+      avoid:{
+        hydralazine:'Hydralazine produces reflex tachycardia and increases myocardial oxygen demand — directly harmful in myocardial ischaemia.',
+        nitroprusside:'Nitroprusside can cause coronary steal and reflex tachycardia in the setting of myocardial ischaemia.',
+        phentolamine:'Phentolamine causes marked reflex tachycardia, increasing myocardial oxygen demand.',
+        clonidine:'Oral clonidine has too slow an onset for acute titration in ACS, and may cause excessive sedation.',
+        amlodipine:'Oral amlodipine is not appropriate for acute titration in ACS.'
+      }
+    },
+    eclampsia: {
+      key:'eclampsia', name:'Eclampsia / severe pregnancy hypertension',
+      sbpLow:130,sbpHigh:150,dbpLow:80,dbpHigh:100,hrLow:50,hrHigh:120,maxMapDrop1h:25,
+      treatThresholdSBP:160,treatThresholdDBP:110,
+      targetText:'Treat BP ≥ <b>160/110 mmHg</b> urgently. Target <b>130–150 / 80–100 mmHg</b>. Avoid dropping MAP too rapidly — uteroplacental perfusion is pressure-dependent.',
+      notes:[
+        'Magnesium sulfate is indicated for seizure prophylaxis and treatment; it is not an antihypertensive.',
+        'Continuous fetal heart-rate monitoring is required during acute BP reduction.',
+        'Agents with fetal toxicity (ACE inhibitors, ARBs, nitroprusside) are contraindicated.'
+      ],
+      avoid:{
+        enalaprilat:'ACE inhibitors are contraindicated in pregnancy — fetal renal toxicity, oligohydramnios and fetal death.',
+        nitroprusside:'Nitroprusside carries a risk of cyanide accumulation in the fetus and is avoided in pregnancy.',
+        esmolol:'Experience with esmolol in pregnancy is limited; it is generally not a first-line agent for eclampsia.',
+        clonidine:'Clonidine has limited safety data in pregnancy and crosses the placenta.',
+        amlodipine:'Amlodipine has limited data in acute severe pregnancy hypertension and a very long duration of action.',
+        clevidipine:'Clevidipine safety data in pregnancy are limited; labetalol or hydralazine are preferred.'
+      }
+    },
+    aki: {
+      key:'aki', name:'Hypertensive emergency with AKI',
+      sbpLow:130,sbpHigh:160,dbpLow:80,dbpHigh:100,hrLow:50,hrHigh:110,maxMapDrop1h:25,mapFloor:65,
+      targetText:'Controlled MAP reduction of no more than <b>25 %</b> in the first hour, maintaining MAP ≥ <b>65 mmHg</b> to preserve renal perfusion while avoiding nephrotoxic drug accumulation.',
+      notes:[
+        'Renal autoregulation is impaired in AKI — renal perfusion becomes pressure-dependent, so excessive lowering worsens injury.',
+        'Avoid drugs that accumulate in renal failure (thiocyanate, clonidine) and those that aggravate renal hypoperfusion (ACE inhibitors in volume depletion).',
+        'Monitor urine output, creatinine and potassium closely during therapy.'
+      ],
+      avoid:{
+        nitroprusside:'Nitroprusside metabolites (cyanide → thiocyanate) accumulate in renal failure and can cause life-threatening toxicity.',
+        enalaprilat:'ACE inhibition in AKI can worsen renal perfusion, cause hyperkalaemia and precipitate further decline — particularly in volume depletion or bilateral renal artery stenosis.',
+        clonidine:'Clonidine is ~50 % renally excreted unchanged and accumulates in renal impairment, causing prolonged sedation and bradycardia.'
+      }
+    }
+  };
+
+  var SCENARIO_ORDER = ['hypertensive_emergency','aortic_syndrome','ais_ivt','ais_no_reperfusion',
+                        'ich','pulmonary_edema','acs','eclampsia','aki'];
+
+  var PRESETS = [
+    { id:'aortic', label:'Aortic dissection',
+      cfg:{scenario:'aortic_syndrome',drug:'esmolol',sbp:180,dbp:100,hr:95,weight:80,age:58,sex:'male',creat:1.0,hepatic:'1',dose1:50,dose2:100,titrate:5,duration:360,loading:500} },
+    { id:'ich', label:'ICH, SBP 200',
+      cfg:{scenario:'ich',drug:'nicardipine',sbp:200,dbp:110,hr:80,weight:75,age:66,sex:'male',creat:1.1,hepatic:'1',dose1:5,dose2:10,titrate:10,duration:360} },
+    { id:'ais', label:'AIS — tPA candidate',
+      cfg:{scenario:'ais_ivt',drug:'labetalol',sbp:190,dbp:105,hr:88,weight:78,age:71,sex:'female',creat:0.9,hepatic:'1',dose1:20,dose2:40,titrate:10,duration:360} },
+    { id:'eclampsia', label:'Eclampsia',
+      cfg:{scenario:'eclampsia',drug:'labetalol',sbp:172,dbp:112,hr:100,weight:82,age:29,sex:'female',creat:0.8,hepatic:'1',dose1:20,dose2:40,titrate:10,duration:360} },
+    { id:'apoe', label:'Acute pulmonary oedema',
+      cfg:{scenario:'pulmonary_edema',drug:'clevidipine',sbp:195,dbp:110,hr:120,weight:88,age:74,sex:'male',creat:1.4,hepatic:'1',dose1:2,dose2:8,titrate:5,duration:360} },
+    { id:'acs', label:'ACS with hypertension',
+      cfg:{scenario:'acs',drug:'esmolol',sbp:168,dbp:96,hr:108,weight:82,age:62,sex:'male',creat:1.0,hepatic:'1',dose1:50,dose2:120,titrate:5,duration:360,loading:500} },
+    { id:'aki', label:'Hypertensive emergency + AKI',
+      cfg:{scenario:'aki',drug:'nicardipine',sbp:205,dbp:115,hr:92,weight:70,age:70,sex:'female',creat:3.2,hepatic:'1',dose1:5,dose2:10,titrate:10,duration:360} },
+    { id:'snpcrisis', label:'Crisis — nitroprusside (renal risk)',
+      cfg:{scenario:'hypertensive_emergency',drug:'nitroprusside',sbp:220,dbp:130,hr:104,weight:76,age:68,sex:'male',creat:2.6,hepatic:'1',dose1:0.5,dose2:3,titrate:5,duration:120} },
+    { id:'oral', label:'Oral transition — clonidine',
+      cfg:{scenario:'hypertensive_emergency',drug:'clonidine',sbp:178,dbp:102,hr:88,weight:70,age:60,sex:'male',creat:1.0,hepatic:'1',dose1:0.2,dose2:0.1,titrate:240,duration:720} }
+  ];
+
+  if (typeof Chart !== 'undefined') {
+    Chart.defaults.color = '#8ba0bb';
+    Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif";
+    Chart.defaults.font.size = 11;
+  }
+  var GRID_COLOR = 'rgba(148,163,184,0.10)';
+  var TICK_COLOR = '#8ba0bb';
+  var pkChart = null;
+  var bpChart = null;
+
+  function baseChartOptions(yTitle) {
+    return {
+      responsive:true, maintainAspectRatio:false, animation:false,
+      interaction:{mode:'nearest',intersect:false},
+      plugins:{
+        legend:{labels:{boxWidth:12,boxHeight:12,usePointStyle:true,padding:12}},
+        tooltip:{backgroundColor:'#0e1726',borderColor:'#1e2f47',borderWidth:1,
+          titleColor:'#e2e8f0',bodyColor:'#cbd9e8',padding:10,displayColors:true}
+      },
+      scales:{
+        x:{type:'linear',title:{display:true,text:'Time (minutes)',color:TICK_COLOR},
+          grid:{color:GRID_COLOR},ticks:{color:TICK_COLOR,maxTicksLimit:10}},
+        y:{title:{display:true,text:yTitle,color:TICK_COLOR},grid:{color:GRID_COLOR},ticks:{color:TICK_COLOR}}
+      },
+      elements:{point:{radius:0},line:{borderWidth:2,tension:0.15}}
+    };
+  }
+
+  function initCharts() {
+    if (typeof Chart === 'undefined') return;
+    var pkCanvas = $('pkChart');
+    var bpCanvas = $('bpChart');
+    if (!pkCanvas || !bpCanvas) return;
+
+    pkChart = new Chart(pkCanvas.getContext('2d'), {
+      type:'line',
+      data:{datasets:[
+        {label:'Plasma concentration (% EC50)',data:[],borderColor:'#38bdf8',
+         backgroundColor:'rgba(56,189,248,0.12)',fill:true,pointRadius:0,borderWidth:2},
+        {label:'Effect-site concentration (% EC50)',data:[],borderColor:'#a78bfa',
+         borderDash:[6,4],fill:false,pointRadius:0,borderWidth:2},
+        {label:'EC50 (100 %)',data:[],borderColor:'rgba(251,191,36,0.85)',
+         borderDash:[3,4],fill:false,pointRadius:0,borderWidth:1.2}
+      ]},
+      options: baseChartOptions('% of EC50')
+    });
+
+    var bpOpts = baseChartOptions('Blood pressure (mmHg)');
+    bpOpts.scales.y2 = {
+      position:'right',
+      title:{display:true,text:'Heart rate (bpm)',color:TICK_COLOR},
+      grid:{drawOnChartArea:false},ticks:{color:TICK_COLOR}
+    };
+    bpChart = new Chart(bpCanvas.getContext('2d'), {
+      type:'line',
+      data:{datasets:[
+        {label:'SBP (mmHg)',data:[],borderColor:'#f87171',fill:false,pointRadius:0,borderWidth:2},
+        {label:'MAP (mmHg)',data:[],borderColor:'#38bdf8',fill:false,pointRadius:0,borderWidth:2.5},
+        {label:'DBP (mmHg)',data:[],borderColor:'#34d399',fill:false,pointRadius:0,borderWidth:2},
+        {label:'HR (bpm)',data:[],borderColor:'#fbbf24',borderDash:[5,4],fill:false,pointRadius:0,borderWidth:2,yAxisID:'y2'}
+      ]},
+      options: bpOpts
+    });
+  }
+
+  function simulate(cfg) {
+    var d = DRUGS[cfg.drug];
+    var renalF = clamp((Number.isFinite(cfg.egfr) ? cfg.egfr : 100) / 100, 0.12, 1.3);
+    var hepF = clamp(cfg.hepaticFactor, 0.1, 1);
+    var cl = d.pk.cl * (1 - d.pk.renalFrac * (1 - renalF)) * (1 - d.pk.hepaticFrac * (1 - hepF));
+    if (!(cl > 1e-6)) cl = 1e-6;
+
+    var vd = d.pk.vd;
+    var ke = cl / vd / 60;
+    var ke0 = d.pk.ke0 / 60;
+    var ka = d.pk.ka / 60;
+
+    var duration = clamp(cfg.duration, 5, 2880);
+    var dt = Math.min(0.2, Math.max(0.02, duration / 20000));
+    var N = Math.ceil(duration / dt) + 1;
+    var stride = Math.max(1, Math.ceil(N / 1500));
+
+    var sbp0 = cfg.sbp, dbp0 = cfg.dbp, hr0 = cfg.hr;
+    var map0 = (sbp0 + 2 * dbp0) / 3;
+
+    var C = 0, Ce = 0, Agut = 0;
+    var given1 = false, given2 = false, givenLoad = false;
+    var tArr = [], cArr = [], ceArr = [], sbpArr = [], dbpArr = [], mapArr = [], hrArr = [];
+    var minMAP = Infinity, minMAPt = 0, minSBP = Infinity, minSBPt = 0;
+    var maxHR = -Infinity, minHR = Infinity;
+    var peakC = 0, peakCe = 0;
+    var mapSum = 0, mapSum2 = 0, mapCnt = 0;
+    var mapAt60 = null, firstHourMaxDrop = 0;
+
+    for (var i = 0; i < N; i++) {
+      var t = i * dt;
+
+      if (!given1) {
+        if (d.mode === 'bolus') C += (cfg.dose1 * 1000) / cfg.weight / vd;
+        else if (d.mode === 'oral') Agut += (cfg.dose1 * 1000) / cfg.weight;
+        given1 = true;
+      }
+      if (!givenLoad && d.loadingBolus) {
+        if (cfg.loadingDose > 0) C += cfg.loadingDose / vd;
+        givenLoad = true;
+      }
+      if (!given2 && cfg.dose2 > 0 && t >= cfg.tTitrate && cfg.tTitrate > 0) {
+        if (d.mode === 'bolus') C += (cfg.dose2 * 1000) / cfg.weight / vd;
+        else if (d.mode === 'oral') Agut += (cfg.dose2 * 1000) / cfg.weight;
+        given2 = true;
+      }
+
+      var inputPerMin = 0;
+      if (d.mode === 'infusion') {
+        var rate = (t < cfg.tTitrate) ? cfg.dose1 : cfg.dose2;
+        if (!(rate >= 0)) rate = 0;
+        var R_per_h = 0;
+        if (d.doseUnit === 'mg/h') R_per_h = (rate * 1000) / cfg.weight;
+        else if (d.doseUnit === 'mcg/kg/min') R_per_h = rate * 60;
+        else if (d.doseUnit === 'mcg/min') R_per_h = (rate * 60) / cfg.weight;
+        inputPerMin = (R_per_h / 60) / vd;
+      } else if (d.mode === 'oral') {
+        var absorbed = Agut * (1 - Math.exp(-ka * dt));
+        if (absorbed < 0) absorbed = 0;
+        Agut -= absorbed;
+        if (Agut < 0) Agut = 0;
+        inputPerMin = (d.pk.F * absorbed / dt) / vd;
+      }
+      if (!Number.isFinite(inputPerMin) || inputPerMin < 0) inputPerMin = 0;
+
+      var cssStep = (ke > 0 && Number.isFinite(inputPerMin / ke)) ? (inputPerMin / ke) : 0;
+      C = cssStep + (C - cssStep) * Math.exp(-ke * dt);
+      if (!Number.isFinite(C) || C < 0) C = 0;
+
+      Ce += (C - Ce) * (1 - Math.exp(-ke0 * dt));
+      if (!Number.isFinite(Ce) || Ce < 0) Ce = 0;
+
+      if (C > peakC) peakC = C;
+      if (Ce > peakCe) peakCe = Ce;
+
+      var E = hillEffect(Ce, d.pd.ec50, d.pd.hill);
+      var sbp = sbp0 - d.pd.emaxSBP * E;
+      var dbp = dbp0 - d.pd.emaxDBP * E;
+      dbp = Math.max(dbp, 20);
+      sbp = Math.max(sbp, dbp + 8);
+      var map = (sbp + 2 * dbp) / 3;
+      var mapDrop = Math.max(0, map0 - map);
+      var hr = hr0 + d.pd.emaxHR * E + d.pd.baroreflex * mapDrop * 0.5;
+      hr = clamp(hr, 25, 200);
+
+      if (map < minMAP) { minMAP = map; minMAPt = t; }
+      if (sbp < minSBP) { minSBP = sbp; minSBPt = t; }
+      if (hr > maxHR) maxHR = hr;
+      if (hr < minHR) minHR = hr;
+      if (t >= 5) { mapSum += map; mapSum2 += map * map; mapCnt++; }
+      if (mapAt60 === null && t >= 60) mapAt60 = map;
+      if (t <= 60 && map0 > 0) {
+        var dropPct = ((map0 - map) / map0) * 100;
+        if (dropPct > firstHourMaxDrop) firstHourMaxDrop = dropPct;
+      }
+      if (i % stride === 0 || i === N - 1) {
+        tArr.push(t);
+        cArr.push(C);
+        ceArr.push(Ce);
+        sbpArr.push(sbp);
+        dbpArr.push(dbp);
+        mapArr.push(map);
+        hrArr.push(hr);
+      }
+    }
+
+    var n = tArr.length;
+    var finalSBP = sbpArr[n - 1];
+    var finalDBP = dbpArr[n - 1];
+    var finalMAP = mapArr[n - 1];
+    var finalHR = hrArr[n - 1];
+    if (mapAt60 === null) mapAt60 = finalMAP;
+
+    var pctMAP60 = map0 > 0 ? ((map0 - mapAt60) / map0) * 100 : 0;
+    var mapSd = mapCnt > 1
+      ? Math.sqrt(Math.max(0, (mapSum2 / mapCnt) - Math.pow(mapSum / mapCnt, 2)))
+      : 0;
+
+    return {
+      t:tArr, c:cArr, ce:ceArr, sbp:sbpArr, dbp:dbpArr, map:mapArr, hr:hrArr,
+      baseline:{sbp:sbp0,dbp:dbp0,map:map0,hr:hr0},
+      finalSBP:finalSBP, finalDBP:finalDBP, finalMAP:finalMAP, finalHR:finalHR,
+      pulsePressure:finalSBP - finalDBP,
+      minMAP:minMAP, minMAPt:minMAPt, minSBP:minSBP, minSBPt:minSBPt,
+      maxHR:maxHR, minHR:minHR, peakC:peakC, peakCe:peakCe,
+      mapAt60:mapAt60, pctMAP60:pctMAP60, firstHourMaxDrop:firstHourMaxDrop,
+      mapSd:mapSd, duration:duration, cl:cl, vd:vd, ke:ke * 60,
+      renalF:renalF, hepF:hepF
+    };
+  }
+
+  function buildWarnings(cfg, sim, d, sc) {
+    var out = [];
+    function push(level, title, text) { out.push({level:level,title:title,text:text}); }
+
+    var allowed = sc.maxMapDrop1h || 25;
+    if (sim.firstHourMaxDrop > allowed) {
+      var lvl = sim.firstHourMaxDrop > allowed + 15 ? 'danger' : 'warn';
+      push(lvl, 'Excessive blood-pressure reduction',
+        'Peak MAP reduction within the first hour was <b>' + fmt(sim.firstHourMaxDrop, 1) +
+        '%</b>, exceeding the ' + allowed + '% limit recommended for <b>' + sc.name +
+        '</b>. Overshoot risks cerebral, coronary and renal ischaemia.');
+    } else {
+      push('ok', 'First-hour MAP reduction within target',
+        'Peak MAP reduction in the first hour was <b>' + fmt(sim.firstHourMaxDrop, 1) +
+        '%</b>, within the ' + allowed + '% guidance for this scenario.');
+    }
+
+    if (sim.minMAP < 55) {
+      push('danger', 'Severe hypotension — MAP ' + fmt(sim.minMAP, 0) + ' mmHg',
+        'Minimum simulated MAP was <b>' + fmt(sim.minMAP, 0) + ' mmHg</b> at t = ' +
+        fmt(sim.minMAPt, 0) + ' min. Organ perfusion is critically compromised. Reduce or stop the agent immediately.');
+    } else if (sim.minMAP < 65) {
+      push('danger', 'MAP below 65 mmHg',
+        'Minimum simulated MAP was <b>' + fmt(sim.minMAP, 0) + ' mmHg</b> at t = ' +
+        fmt(sim.minMAPt, 0) + ' min. MAP < 65 mmHg is generally below the threshold for reliable organ perfusion.');
+    } else if (sc.mapFloor && sim.minMAP < sc.mapFloor) {
+      push('warn', 'MAP below scenario-specific floor',
+        'Minimum simulated MAP was <b>' + fmt(sim.minMAP, 0) +
+        ' mmHg</b>, below the ' + sc.mapFloor + ' mmHg floor recommended for <b>' + sc.name + '</b>.');
+    } else {
+      push('ok', 'MAP floor preserved',
+        'Minimum simulated MAP was <b>' + fmt(sim.minMAP, 0) + ' mmHg</b> — above the 65 mmHg perfusion threshold.');
+    }
+
+    if (sim.minSBP < 90) {
+      push('danger', 'Severe hypotension — SBP ' + fmt(sim.minSBP, 0) + ' mmHg',
+        'Minimum simulated SBP was <b>' + fmt(sim.minSBP, 0) + ' mmHg</b> at t = ' + fmt(sim.minSBPt, 0) +
+        ' min. This is a medical emergency requiring immediate reduction or cessation of therapy and assessment for shock.');
+    }
+
+    if (sim.minHR < 40) {
+      push('danger', 'Severe bradycardia — HR ' + fmt(sim.minHR, 0) + ' bpm',
+        'Simulated heart rate fell to <b>' + fmt(sim.minHR, 0) +
+        ' bpm</b>. Consider atropine, and review the need for continued β-blockade. Exclude high-grade AV block.');
+    } else if (sim.minHR < 50) {
+      push('warn', 'Bradycardia — HR ' + fmt(sim.minHR, 0) + ' bpm',
+        'Simulated heart rate fell to <b>' + fmt(sim.minHR, 0) +
+        ' bpm</b>. Reassess rate-control targets, particularly in aortic dissection where HR 50–60 bpm is intentional.');
+    }
+
+    if (sim.maxHR > 140) {
+      push('danger', 'Severe tachycardia — HR ' + fmt(sim.maxHR, 0) + ' bpm',
+        'Simulated heart rate rose to <b>' + fmt(sim.maxHR, 0) +
+        ' bpm</b>. Reflex tachycardia of this magnitude increases myocardial oxygen demand and, in aortic dissection, dP/dt.');
+    } else if (sim.maxHR > 120) {
+      push('warn', 'Tachycardia — HR ' + fmt(sim.maxHR, 0) + ' bpm',
+        'Simulated heart rate rose to <b>' + fmt(sim.maxHR, 0) +
+        ' bpm</b>. Consider adjunctive rate control where clinically appropriate.');
+    }
+
+    if (sim.mapSd > 25) {
+      push('danger', 'Marked blood-pressure variability (SD ' + fmt(sim.mapSd, 0) + ' mmHg)',
+        'The standard deviation of MAP after the first 5 minutes was <b>' + fmt(sim.mapSd, 0) +
+        ' mmHg</b>. Wide swings are independently associated with worse neurological and renal outcomes.');
+    } else if (sim.mapSd > 15) {
+      push('warn', 'Increased blood-pressure variability (SD ' + fmt(sim.mapSd, 0) + ' mmHg)',
+        'The standard deviation of MAP after the first 5 minutes was <b>' + fmt(sim.mapSd, 0) +
+        ' mmHg</b>. Consider smoother titration and a shorter-acting, more controllable agent.');
+    }
+
+    var isBeta = (cfg.drug === 'esmolol' || cfg.drug === 'labetalol');
+    if (sc.requiresBetaBlockade && !isBeta) {
+      push('danger', 'Vasodilator without beta-blockade in aortic dissection',
+        '<b>' + d.name + '</b> is a vasodilator. In acute aortic syndrome, reflex tachycardia and increased dP/dt ' +
+        'raise aortic wall stress. <b>Beta-blockade must be established first</b> (e.g. esmolol or labetalol), ' +
+        'with a vasodilator added only for residual hypertension.');
+    }
+    if (isBeta && cfg.scenario === 'pulmonary_edema') {
+      push('danger', 'Inappropriate β-blockade in decompensated heart failure',
+        '<b>' + d.name + '</b> produces negative inotropy and can precipitate cardiogenic shock in acute ' +
+        'pulmonary oedema with LV failure. Prefer an afterload-reducing vasodilator.');
+    }
+    if (isBeta && cfg.scenario === 'eclampsia' && cfg.drug === 'esmolol') {
+      push('warn', 'Esmolol is not first-line in eclampsia',
+        'Experience with esmolol in severe pregnancy hypertension is limited. Labetalol or hydralazine are the ' +
+        'conventional first-line agents.');
+    }
+    if (isBeta && cfg.drug === 'esmolol' && sim.minHR < 55 && cfg.scenario === 'acs') {
+      push('info', 'Rate control achieved',
+        'Heart rate fell to <b>' + fmt(sim.minHR, 0) + ' bpm</b>. Target HR in ACS is typically 50–60 bpm — ' +
+        'avoid going below 50 bpm without a specific indication.');
+    }
+
+if (cfg.drug === 'nitroglycerin' && cfg.scenario === 'aortic_syndrome') {
+      push('danger', 'Nitroglycerin is not a substitute for beta-blockade',
+        'In acute aortic syndrome, nitroglycerin can lower pressure without controlling heart rate or dP/dt. Establish beta-blockade first and use a titratable arterial vasodilator only for residual hypertension.');
+    }
+    if (cfg.drug === 'nitroglycerin' && cfg.scenario === 'acs') {
+      push('info', 'Confirm nitrate suitability in ACS',
+        'Before starting nitroglycerin, confirm adequate preload and no recent PDE-5 inhibitor exposure; reassess for right-ventricular infarction, hypotension and evolving ischemia.');
+    }
+
+        if (cfg.drug === 'nitroprusside') {
+      var maxRate = Math.max(cfg.dose1, cfg.dose2);
+      if (maxRate > 4) {
+        push('warn', 'Nitroprusside dose above 4 mcg/kg/min',
+          'A rate of <b>' + fmt(maxRate, 1) + ' mcg/kg/min</b> exceeds the usual safety ceiling. Cyanide ' +
+          'accumulation is dose- and duration-dependent; monitor acid–base status, lactate and mixed venous ' +
+          'oxygen saturation, and consider an alternative agent.');
+      }
+      if (cfg.egfr < 30) {
+        push('danger', 'Nitroprusside in renal impairment',
+          'Estimated GFR is <b>' + fmt(cfg.egfr, 0) + ' mL/min/1.73m²</b>. Thiocyanate — the terminal metabolite ' +
+          'of nitroprusside — is cleared renally and accumulates in renal failure, causing weakness, psychosis, ' +
+          'tinnitus, hyperreflexia and seizures. Avoid or use only briefly at low dose with level monitoring.');
+      }
+      if (cfg.hepaticFactor < 1) {
+        push('warn', 'Nitroprusside in hepatic impairment',
+          'Hepatic impairment reduces conversion of cyanide to thiocyanate, increasing the risk of cyanide ' +
+          'toxicity. Use only if no alternative exists, at the lowest effective dose and for the shortest time.');
+      }
+      push('info', 'Nitroprusside monitoring requirements',
+        'Nitroprusside requires continuous intra-arterial blood-pressure monitoring, protection from light, and ' +
+        'close surveillance for cyanide toxicity (unexplained metabolic acidosis, elevated lactate, ' +
+        'reduced mixed venous oxygen saturation, tachyphylaxis).');
+      if (cfg.scenario === 'ich') {
+        push('warn', 'Nitroprusside may raise intracranial pressure',
+          'Nitroprusside is generally avoided in intracerebral haemorrhage because it can increase ICP and ' +
+          'produce wide BP swings.');
+      }
+    }
+
+    if (d.pk.renalFrac >= 0.3 && cfg.egfr < 30) {
+      push('warn', 'Renal accumulation risk — ' + d.name,
+        'Estimated GFR is <b>' + fmt(cfg.egfr, 0) + ' mL/min/1.73m²</b> and approximately ' +
+        fmt(d.pk.renalFrac * 100, 0) + '% of this drug\'s modelled clearance is renal-dependent. ' +
+        'Simulated exposure is increased; in practice reduce the dose, extend the interval, and monitor closely.');
+    }
+
+    if (d.pk.hepaticFrac >= 0.5 && cfg.hepaticFactor < 1) {
+      push('warn', 'Hepatic impairment — altered ' + d.name + ' handling',
+        'This agent depends substantially on hepatic metabolism (≈ ' + fmt(d.pk.hepaticFrac * 100, 0) +
+        '% of modelled clearance). Reduced clearance is simulated, producing higher exposure. ' +
+        'Reduce the dose and titrate cautiously.');
+    }
+
+    if (sc.avoid && sc.avoid[cfg.drug]) {
+      push('danger', d.name + ' is not preferred in ' + sc.name, sc.avoid[cfg.drug]);
+    } else if (d.preferred && d.preferred.indexOf(cfg.scenario) !== -1) {
+      push('ok', d.name + ' is a recognised option for ' + sc.name,
+        'This agent appears in the usual first- or second-line options for this scenario. Confirm against local ' +
+        'protocols and patient-specific contraindications.');
+    }
+
+    if (cfg.scenario === 'ais_ivt') {
+      if (cfg.sbp >= 185 || cfg.dbp >= 110) {
+        push('danger', 'Does not meet pre-thrombolysis BP threshold',
+          'Baseline BP is <b>' + fmt(cfg.sbp, 0) + '/' + fmt(cfg.dbp, 0) +
+          ' mmHg</b>, which is ≥ 185/110 mmHg. IV thrombolysis is contraindicated until BP is lowered below ' +
+          '185/110 mmHg and remains stable.');
+      }
+      if (sim.finalSBP > 180 || sim.finalDBP > 105) {
+        push('warn', 'Above post-thrombolysis BP threshold at end of simulation',
+          'Final simulated BP was <b>' + fmt(sim.finalSBP, 0) + '/' + fmt(sim.finalDBP, 0) +
+          ' mmHg</b>. For 24 h after thrombolysis, BP should be maintained ≤ 180/105 mmHg.');
+      } else {
+        push('ok', 'Within post-thrombolysis BP threshold',
+          'Final simulated BP was <b>' + fmt(sim.finalSBP, 0) + '/' + fmt(sim.finalDBP, 0) +
+          ' mmHg</b>, at or below the 180/105 mmHg post-thrombolysis ceiling.');
+      }
+      push('info', 'Threshold ≠ long-term target',
+        'The 185/110 and 180/105 mmHg figures are <b>eligibility thresholds</b> for reperfusion therapy. They are ' +
+        'not a long-term blood-pressure target. Long-term management after the 24-hour post-thrombolysis window ' +
+        'follows separate, individualised goals.');
+    }
+
+    if (cfg.scenario === 'ich') {
+      if (sim.minSBP < 130) {
+        push('warn', 'SBP below the ICH target range',
+          'Simulated SBP reached <b>' + fmt(sim.minSBP, 0) +
+          ' mmHg</b>, below the 130 mmHg lower bound. Excessive lowering reduces cerebral perfusion pressure and ' +
+          'may cause secondary ischaemic injury, particularly with raised ICP.');
+      }
+      if (sim.minMAP < 70) {
+        push('warn', 'Cerebral perfusion pressure concern',
+          'Simulated MAP reached <b>' + fmt(sim.minMAP, 0) + ' mmHg</b>. With raised intracranial pressure, ' +
+          'CPP = MAP − ICP may fall below the 60–70 mmHg target, risking secondary brain injury.');
+      }
+      push('info', 'ICH — CPP / ICP context',
+        'In intracerebral haemorrhage, blood-pressure targets exist to limit haematoma expansion while preserving ' +
+        'cerebral perfusion. Where ICP is elevated, the acceptable MAP is higher, not lower. Continuous ' +
+        'neurological assessment and, where available, ICP monitoring guide individual targets.');
+    }
+
+    if (cfg.scenario === 'eclampsia') {
+      if (cfg.sbp >= 160 || cfg.dbp >= 110) {
+        push('warn', 'Severe-range hypertension in pregnancy',
+          'Baseline BP is <b>' + fmt(cfg.sbp, 0) + '/' + fmt(cfg.dbp, 0) +
+          ' mmHg</b>. Values ≥ 160/110 mmHg require urgent treatment. Magnesium sulfate is indicated for seizure ' +
+          'prophylaxis and is not itself an antihypertensive.');
+      }
+      if (sim.finalDBP < 80) {
+        push('warn', 'Diastolic pressure below pregnancy target',
+          'Simulated DBP fell to <b>' + fmt(sim.finalDBP, 0) +
+          ' mmHg</b>. Diastolic pressure below ~80 mmHg may compromise uteroplacental perfusion. Maintain ' +
+          '130–150 / 80–100 mmHg.');
+      }
+    }
+
+    if (cfg.scenario === 'aortic_syndrome') {
+      if (sim.finalHR > 60) {
+        push('warn', 'Heart rate above anti-impulse target',
+          'Simulated final HR was <b>' + fmt(sim.finalHR, 0) +
+          ' bpm</b>. The anti-impulse target in aortic dissection is 50–60 bpm; additional β-blockade is usually ' +
+          'required before or alongside any vasodilator.');
+      } else {
+        push('ok', 'Anti-impulse heart-rate target met',
+          'Simulated final HR was <b>' + fmt(sim.finalHR, 0) + ' bpm</b>, within the 50–60 bpm anti-impulse target.');
+      }
+      if (sim.finalSBP > 120) {
+        push('warn', 'SBP above aortic dissection target',
+          'Simulated final SBP was <b>' + fmt(sim.finalSBP, 0) +
+          ' mmHg</b>, above the 100–120 mmHg target. Escalate therapy once adequate rate control is established.');
+      }
+    }
+
+    if (cfg.scenario === 'hypertensive_emergency') {
+      if (sim.pctMAP60 > 0 && sim.pctMAP60 <= 25 && sim.finalMAP >= 65) {
+        push('info', 'Mathematical model — not a safety certificate',
+          'The simulated trajectory stays within the recommended first-hour reduction and does not breach the ' +
+          'MAP floor. This does <b>not</b> by itself establish clinical safety: end-organ perfusion, neurological ' +
+          'status, urine output, ECG and the underlying cause must all be assessed at the bedside.');
+      }
+    }
+
+    if (cfg.scenario === 'pulmonary_edema' && sim.finalSBP < 100) {
+      push('warn', 'SBP below the pulmonary-oedema target',
+        'Simulated final SBP was <b>' + fmt(sim.finalSBP, 0) +
+        ' mmHg</b>. Afterload reduction must not compromise systemic perfusion — consider inotropic support and ' +
+        'reassess the need for continued vasodilation.');
+    }
+
+    if (cfg.scenario === 'acs' && sim.finalDBP < 60) {
+      push('warn', 'Low diastolic pressure — coronary perfusion concern',
+        'Simulated final DBP was <b>' + fmt(sim.finalDBP, 0) +
+        ' mmHg</b>. Coronary perfusion occurs predominantly during diastole; excessive DBP reduction can worsen ' +
+        'myocardial ischaemia even when SBP appears acceptable.');
+    }
+
+    if (cfg.scenario === 'aki' && sim.minMAP < 65) {
+      push('warn', 'Renal perfusion pressure at risk',
+        'Simulated MAP reached <b>' + fmt(sim.minMAP, 0) +
+        ' mmHg</b>. In acute kidney injury, renal autoregulation is impaired and renal blood flow becomes ' +
+        'pressure-dependent — maintaining MAP ≥ 65 mmHg is important to avoid further injury.');
+    }
+
+    push('info', 'Model limitation',
+      'These outputs derive from a mathematical PK/PD model with fixed, illustrative parameters. There is no ' +
+      'inter-individual variability, no active-metabolite modelling and no representation of compensatory ' +
+      'physiology. Do not use these numbers to make dosing decisions.');
+
+    return out;
+  }
+
+  function buildInterpretation(cfg, sim, d, sc) {
+    var b = sim.baseline;
+    var parts = [];
+    var doseDesc;
+    if (d.mode === 'infusion') {
+      doseDesc = fmt(cfg.dose1, 2).replace(/\.00$/, '') + ' ' + d.doseUnit + ' initially' +
+        (cfg.dose2 > 0 ? (', titrated to ' + fmt(cfg.dose2, 2).replace(/\.00$/, '') + ' ' + d.doseUnit +
+        ' at ' + fmt(cfg.tTitrate, 0) + ' min') : ', no titration');
+      if (d.loadingBolus && cfg.loadingDose > 0) {
+        doseDesc += ', with a ' + fmt(cfg.loadingDose, 0) + ' ' + d.loadingBolus.unit + ' loading bolus';
+      }
+    } else if (d.mode === 'bolus') {
+      doseDesc = fmt(cfg.dose1, 2).replace(/\.00$/, '') + ' mg IV' +
+        (cfg.dose2 > 0 ? (', then ' + fmt(cfg.dose2, 2).replace(/\.00$/, '') + ' mg at ' +
+        fmt(cfg.tTitrate, 0) + ' min') : ', single dose');
+    } else {
+      doseDesc = fmt(cfg.dose1, 2).replace(/\.00$/, '') + ' mg PO' +
+        (cfg.dose2 > 0 ? (', then ' + fmt(cfg.dose2, 2).replace(/\.00$/, '') + ' mg at ' +
+        fmt(cfg.tTitrate, 0) + ' min') : ', single dose');
+    }
+
+    parts.push('<p><b>' + d.name + '</b> given as <b>' + doseDesc +
+      '</b> in a ' + fmt(cfg.weight, 0) + ' kg patient with a baseline of <b>' +
+      fmt(b.sbp, 0) + '/' + fmt(b.dbp, 0) + ' mmHg</b> (MAP ' + fmt(b.map, 1) + ' mmHg) and HR ' +
+      fmt(b.hr, 0) + ' bpm.</p>');
+
+    parts.push('<p>At 60 minutes the simulated MAP had fallen by <span class="' +
+      (sim.pctMAP60 > (sc.maxMapDrop1h || 25) ? 'hl-danger' : 'hl') + '">' +
+      fmt(sim.pctMAP60, 1) + '%</span> (to ' + fmt(sim.mapAt60, 1) + ' mmHg). ' +
+      'At the end of the ' + fmt(sim.duration, 0) + '-minute simulation the pressure was <b>' +
+      fmt(sim.finalSBP, 0) + '/' + fmt(sim.finalDBP, 0) + ' mmHg</b> with MAP <b>' + fmt(sim.finalMAP, 1) +
+      ' mmHg</b>, pulse pressure ' + fmt(sim.pulsePressure, 0) + ' mmHg and HR <b>' + fmt(sim.finalHR, 0) +
+      ' bpm</b>.</p>');
+
+    var hrDir = sim.finalHR - b.hr;
+    var hrWord = hrDir > 3 ? 'increased' : (hrDir < -3 ? 'decreased' : 'remained essentially unchanged');
+    parts.push('<p>Heart rate ' + hrWord + ' by ' + fmt(Math.abs(hrDir), 0) + ' bpm. ' +
+      'Peak heart rate was <b>' + fmt(sim.maxHR, 0) + ' bpm</b> and the nadir was <b>' + fmt(sim.minHR, 0) +
+      ' bpm</b>. ' + (d.hrEffect ? d.hrEffect + '.' : '') + '</p>');
+
+    parts.push('<p>Effect-site concentration peaked at <span class="hl">' + fmt(sim.peakCe / d.pd.ec50 * 100, 0) +
+      '% of the modelled EC<sub>50</sub></span>. Because effect is linked to concentration through a sigmoid ' +
+      'E<sub>max</sub> relationship, the pressure response is <b>' +
+      (sim.peakCe / d.pd.ec50 > 1
+        ? 'approaching the top of the dose–response curve — further dose escalation yields diminishing returns'
+        : 'still on the steep part of the dose–response curve — dose changes produce relatively large pressure changes') +
+      '</b>. Onset is governed by the effect-site equilibration rate; offset by clearance. ' +
+      'For ' + d.name + ': ' + d.onset + ' onset, ' + d.halfLife + ' half-life.</p>');
+
+    var minMAPClass = sim.minMAP < 55 ? 'hl-danger' : (sim.minMAP < 65 ? 'hl-warn' : 'hl');
+    parts.push('<p>The lowest simulated MAP was <span class="' + minMAPClass + '">' + fmt(sim.minMAP, 0) +
+      ' mmHg</span> at t = ' + fmt(sim.minMAPt, 0) + ' min. ' +
+      (sim.minMAP < 65
+        ? 'This breaches the 65 mmHg threshold generally regarded as the lower limit for reliable organ perfusion.'
+        : 'This remains above the 65 mmHg perfusion threshold.') +
+      ' Blood-pressure variability after the first 5 minutes had a standard deviation of ' + fmt(sim.mapSd, 0) +
+      ' mmHg.</p>');
+
+    var closing = '';
+    switch (cfg.scenario) {
+      case 'aortic_syndrome':
+        closing = 'In acute aortic syndrome the therapeutic endpoint is <b>anti-impulse control</b>: ' +
+          'HR 50–60 bpm and SBP 100–120 mmHg. Beta-blockade must be established before any vasodilator, because ' +
+          'unopposed vasodilation increases dP/dt and aortic wall stress. Vasodilator monotherapy is not ' +
+          'equivalent to beta-blockade in this setting.';
+        break;
+      case 'ais_ivt':
+        closing = 'For IV thrombolysis candidates, the 185/110 mmHg pre-treatment and 180/105 mmHg ' +
+          'post-treatment figures are <b>eligibility thresholds</b>, not long-term targets. Lowering pressure ' +
+          'below these values confers no additional reperfusion benefit and may compromise penumbral perfusion. ' +
+          'Long-term blood-pressure management is a separate decision made after the 24-hour post-thrombolysis window.';
+        break;
+      case 'ais_no_reperfusion':
+        closing = 'Without reperfusion therapy, permissive hypertension is generally appropriate. Treatment is ' +
+          'reserved for BP above 220/120 mmHg or for specific comorbid indications, and any reduction in the ' +
+          'first 24 hours should not exceed 15 %. Aggressive lowering can extend the infarct.';
+        break;
+      case 'ich':
+        closing = 'In intracerebral haemorrhage the goal is to limit haematoma expansion while preserving ' +
+          'cerebral perfusion. CPP = MAP − ICP, so with raised ICP the acceptable MAP is higher rather than lower. ' +
+          'Avoid excessive lowering and avoid agents that raise ICP or produce wide BP swings.';
+        break;
+      case 'pulmonary_edema':
+        closing = 'In acute pulmonary oedema the objective is rapid afterload and preload reduction while ' +
+          'preserving systemic perfusion. β-blockade is generally harmful in decompensated systolic failure. ' +
+          'Maintain SBP ≥ 100 mmHg and MAP ≥ 65 mmHg.';
+        break;
+      case 'acs':
+        closing = 'In acute coronary syndrome, reducing heart rate and contractility lowers myocardial oxygen ' +
+          'demand, while adequate diastolic pressure preserves coronary perfusion. Target HR 50–60 bpm and ' +
+          'SBP < 140 mmHg, but avoid over-lowering DBP.';
+        break;
+      case 'eclampsia':
+        closing = 'In eclampsia the trigger for treatment is BP ≥ 160/110 mmHg. Target 130–150/80–100 mmHg, ' +
+          'reducing pressure gradually to protect uteroplacental perfusion. Magnesium sulfate is given for ' +
+          'seizure prophylaxis and is not an antihypertensive. ACE inhibitors and nitroprusside are contraindicated.';
+        break;
+      case 'aki':
+        closing = 'With acute kidney injury, renal autoregulation is impaired and perfusion becomes ' +
+          'pressure-dependent. Maintain MAP ≥ 65 mmHg, avoid agents whose metabolites accumulate in renal ' +
+          'failure, and avoid drugs that worsen renal perfusion.';
+        break;
+      default:
+        closing = 'In a generic hypertensive emergency the aim is controlled, staged reduction — not abrupt ' +
+          'normalisation. A mathematically on-target pressure does not by itself establish clinical safety: ' +
+          'end-organ perfusion, neurological status and the underlying cause must be assessed at the bedside.';
+    }
+    parts.push('<p>' + closing + '</p>');
+    parts.push('<p style="font-size:12px;color:#8ba0bb;"><b>Reminder:</b> these values come from an educational ' +
+      'mathematical model with fixed, illustrative parameters. They are not patient-specific pharmacokinetics ' +
+      'and must not be used to guide real dosing.</p>');
+    return parts.join('');
+  }
+
+  function metricCard(label, value, unit, cls) {
+    var unitHtml = unit ? '<small>' + unit + '</small>' : '';
+    return '<div class="metric ' + (cls || 'neutral') + '">' +
+      '<span class="metric-label">' + label + '</span>' +
+      '<span class="metric-value">' + value + unitHtml + '</span></div>';
+  }
+
+  function renderMetrics(sim, sc) {
+    var grid = $('metricsGrid');
+    if (!grid) return;
+    var mapCls = sim.finalMAP < 65 ? 'bad' : (sim.finalMAP < 70 ? 'warn' : 'neutral');
+    var minMapCls = sim.minMAP < 65 ? 'bad' : (sim.minMAP < 70 ? 'warn' : 'good');
+    var hrCls = (sim.finalHR < 50 || sim.finalHR > 120) ? 'bad' : (sim.finalHR < 60 || sim.finalHR > 100 ? 'warn' : 'good');
+    var pctCls = sim.pctMAP60 > (sc.maxMapDrop1h || 25) ? 'bad' : 'good';
+    var sdCls = sim.mapSd > 25 ? 'bad' : (sim.mapSd > 15 ? 'warn' : 'good');
+    var drugKey = $('drug').value;
+    var ec50 = DRUGS[drugKey] ? DRUGS[drugKey].pd.ec50 : 1;
+
+    var html = '';
+    html += metricCard('Final SBP', fmt(sim.finalSBP, 0), 'mmHg', 'neutral');
+    html += metricCard('Final DBP', fmt(sim.finalDBP, 0), 'mmHg', 'neutral');
+    html += metricCard('Final MAP', fmt(sim.finalMAP, 1), 'mmHg', mapCls);
+    html += metricCard('Final HR', fmt(sim.finalHR, 0), 'bpm', hrCls);
+    html += metricCard('Pulse pressure', fmt(sim.pulsePressure, 0), 'mmHg', 'neutral');
+    html += metricCard('Minimum MAP', fmt(sim.minMAP, 0), 'mmHg', minMapCls);
+    html += metricCard('Time of min MAP', fmt(sim.minMAPt, 0), 'min', 'neutral');
+    html += metricCard('Maximum HR', fmt(sim.maxHR, 0), 'bpm', sim.maxHR > 120 ? 'warn' : 'neutral');
+    html += metricCard('Minimum HR', fmt(sim.minHR, 0), 'bpm', sim.minHR < 50 ? 'warn' : 'neutral');
+    html += metricCard('MAP reduction @ 60 min', fmt(sim.pctMAP60, 1), '%', pctCls);
+    html += metricCard('MAP variability (SD)', fmt(sim.mapSd, 1), 'mmHg', sdCls);
+    html += metricCard('Peak effect-site conc.', fmt(sim.peakCe / ec50 * 100, 0), '% EC50', 'neutral');
+    grid.innerHTML = html;
+  }
+
+  function renderWarnings(warnings) {
+    var box = $('warningsBox');
+    if (!box) return;
+    if (!warnings.length) {
+      box.innerHTML = '<div class="warn-item info"><span class="wi-icon">i</span>' +
+        '<div class="wi-body"><span class="wi-title">No checks triggered</span>' +
+        'No safety rule was triggered by the current parameter set.</div></div>';
+      return;
+    }
+    var icons = {info:'i', ok:'✓', warn:'!', danger:'✕'};
+    var html = '';
+    for (var i = 0; i < warnings.length; i++) {
+      var w = warnings[i];
+      html += '<div class="warn-item ' + w.level + '">' +
+        '<span class="wi-icon">' + (icons[w.level] || 'i') + '</span>' +
+        '<div class="wi-body"><span class="wi-title">' + w.title + '</span>' + w.text + '</div></div>';
+    }
+    box.innerHTML = html;
+  }
+
+  function renderScenarioBox(sc, d, cfg) {
+    var box = $('scenarioBox');
+    if (!box) return;
+    var badges = '';
+    if (d.preferred && d.preferred.indexOf(cfg.scenario) !== -1) {
+      badges += '<span class="badge good">Preferred option</span>';
+    }
+    if (sc.avoid && sc.avoid[cfg.drug]) {
+      badges += '<span class="badge bad">Not preferred here</span>';
+    }
+    var html = '<span class="sb-title">' + sc.name + '</span>';
+    html += '<div><b>Target:</b> ' + sc.targetText + '</div>';
+    if (sc.sbpLow != null) {
+      html += '<div style="margin-top:6px;color:#8ba0bb;font-size:11.5px;">' +
+        'Simulated BP window for this scenario: <b style="color:#c6d8ea;">' +
+        fmt(sc.sbpLow, 0) + '–' + fmt(sc.sbpHigh, 0) + ' / ' +
+        fmt(sc.dbpLow, 0) + '–' + fmt(sc.dbpHigh, 0) + ' mmHg</b>' +
+        (sc.hrLow != null ? ' · HR ' + fmt(sc.hrLow, 0) + '–' + fmt(sc.hrHigh, 0) + ' bpm' : '') +
+        ' · max first-hour MAP reduction <b style="color:#c6d8ea;">' + fmt(sc.maxMapDrop1h, 0) + '%</b>' +
+        '</div>';
+    }
+    if (badges) html += '<div style="margin-top:9px;">' + badges + '</div>';
+    html += '<ul>';
+    for (var i = 0; i < sc.notes.length; i++) html += '<li>' + sc.notes[i] + '</li>';
+    html += '</ul>';
+    box.innerHTML = html;
+  }
+
+  function renderDrugInfo(d) {
+    var box = $('drugInfo');
+    if (!box) return;
+    function scenarioNames(keys) {
+      if (!keys || !keys.length) return '—';
+      var names = [];
+      for (var i = 0; i < keys.length; i++) {
+        if (SCENARIOS[keys[i]]) names.push(SCENARIOS[keys[i]].name);
+      }
+      return names.join(' · ');
+    }
+    var rows = [
+      ['Agent', d.name],
+      ['Route', d.route],
+      ['Dose range', d.rangeText + ' <span style="color:#6b819c;">[' + d.doseUnit + ']</span>'],
+      ['Onset', d.onset],
+      ['Half-life', d.halfLife],
+      ['Titration', d.titration],
+      ['Mechanism', d.mechanism],
+      ['HR effect', d.hrEffect],
+      ['Renal', d.renal],
+      ['Hepatic', d.hepatic],
+      ['Cautions', d.cautions],
+      ['Preferred scenarios', scenarioNames(d.preferred)]
+    ];
+    var html = '<table class="info-table">';
+    for (var i = 0; i < rows.length; i++) {
+      html += '<tr><td>' + rows[i][0] + '</td><td>' + rows[i][1] + '</td></tr>';
+    }
+    html += '</table>';
+    box.innerHTML = html;
+  }
+
+  function updateCharts(cfg, sim, d) {
+    if (!pkChart || !bpChart) return;
+    var ec50 = d.pd.ec50;
+    var pkData = [], ceData = [], refData = [];
+    for (var i = 0; i < sim.t.length; i++) {
+      var t = sim.t[i];
+      pkData.push({x:t, y:(sim.c[i] / ec50) * 100});
+      ceData.push({x:t, y:(sim.ce[i] / ec50) * 100});
+      refData.push({x:t, y:100});
+    }
+    pkChart.data.datasets[0].data = pkData;
+    pkChart.data.datasets[1].data = ceData;
+    pkChart.data.datasets[2].data = refData;
+    pkChart.data.datasets[0].label = 'Plasma conc. (% EC50) — ' + d.name;
+    pkChart.update('none');
+
+    var sbpData = [], dbpData = [], mapData = [], hrData = [];
+    for (var j = 0; j < sim.t.length; j++) {
+      sbpData.push({x:sim.t[j], y:sim.sbp[j]});
+      dbpData.push({x:sim.t[j], y:sim.dbp[j]});
+      mapData.push({x:sim.t[j], y:sim.map[j]});
+      hrData.push({x:sim.t[j], y:sim.hr[j]});
+    }
+    bpChart.data.datasets[0].data = sbpData;
+    bpChart.data.datasets[1].data = mapData;
+    bpChart.data.datasets[2].data = dbpData;
+    bpChart.data.datasets[3].data = hrData;
+    bpChart.update('none');
+  }
+
+  function renderPrintMeta(cfg, d, sc) {
+    var el = $('printMeta');
+    if (!el) return;
+    el.innerHTML =
+      '<div style="font-size:11.5px;color:#333;border-top:1px solid #ccc;padding-top:8px;margin-top:8px;">' +
+      '<b>Case summary:</b> ' + sc.name + ' · ' + d.name + ' · ' +
+      fmt(cfg.sbp, 0) + '/' + fmt(cfg.dbp, 0) + ' mmHg (MAP ' + fmt((cfg.sbp + 2 * cfg.dbp) / 3, 1) + ') · ' +
+      'HR ' + fmt(cfg.hr, 0) + ' bpm · ' + fmt(cfg.weight, 0) + ' kg · ' + fmt(cfg.age, 0) + ' y · ' +
+      cfg.sex + ' · Cr ' + fmt(cfg.creat, 1) + ' mg/dL · eGFR ' + fmt(cfg.egfr, 0) +
+      ' mL/min/1.73m² · hepatic function: ' + cfg.hepaticLabel + ' · duration ' + fmt(cfg.duration, 0) + ' min.' +
+      '</div>';
+  }
+
+  function updateMAPDisplay() {
+    var s = numOr($('sbp').value, NaN);
+    var dd = numOr($('dbp').value, NaN);
+    if (!Number.isFinite(s) || !Number.isFinite(dd)) { $('mapOut').value = '—'; return; }
+    var m = (s + 2 * dd) / 3;
+    $('mapOut').value = Number.isFinite(m) ? m.toFixed(1) : '—';
+  }
+
+  function updateEGFRDisplay() {
+    var scr = numOr($('creat').value, NaN);
+    var age = numOr($('age').value, NaN);
+    var female = $('sex').value === 'female';
+    var e = ckdepi2021(scr, age, female);
+    $('egfrOut').value = Number.isFinite(e) ? e.toFixed(0) : '—';
+  }
+
+  function applyDrugDefaults() {
+    var d = DRUGS[$('drug').value];
+    if (!d) return;
+    var dose1 = $('dose1'), dose2 = $('dose2');
+    dose1.min = d.d1.min; dose1.max = d.d1.max; dose1.step = d.d1.step; dose1.value = d.d1.def;
+    dose2.min = d.d2.min; dose2.max = d.d2.max; dose2.step = d.d2.step; dose2.value = d.d2.def;
+    $('dose1Label').textContent = d.d1.label;
+    $('dose2Label').textContent = d.d2.label;
+    $('dose1Unit').textContent = 'Units: ' + d.doseUnit;
+    $('dose2Unit').textContent = 'Units: ' + d.doseUnit;
+    $('d1Range').textContent = 'Range ' + d.d1.min + '–' + d.d1.max + ' ' + d.doseUnit;
+    $('d2Range').textContent = 'Range ' + d.d2.min + '–' + d.d2.max + ' ' + d.doseUnit;
+    $('titrateTime').value = d.defTitrate;
+
+    var lw = $('loadingWrap');
+    var ld = $('loadingDose');
+    if (d.loadingBolus) {
+      lw.style.display = '';
+      $('loadingLabel').textContent = d.loadingBolus.label;
+      ld.min = d.loadingBolus.min;
+      ld.max = d.loadingBolus.max;
+      ld.step = d.loadingBolus.step;
+      ld.value = d.loadingBolus.def;
+      $('loadingUnit').textContent = 'Range ' + d.loadingBolus.min + '–' + d.loadingBolus.max + ' ' + d.loadingBolus.unit;
+    } else {
+      lw.style.display = 'none';
+      ld.value = 0;
+    }
+  }
+
+  function readInputs() {
+    var drugKey = $('drug').value;
+    var d = DRUGS[drugKey];
+    if (!d) return null;
+    var scKey = $('scenario').value;
+    if (!SCENARIOS[scKey]) return null;
+
+    var weight = clamp(numOr($('weight').value, 70), 30, 200);
+    var sbp = clamp(numOr($('sbp').value, 180), 60, 300);
+    var dbpRaw = clamp(numOr($('dbp').value, 100), 30, 180);
+    var dbp = Math.min(dbpRaw, sbp - 5);
+    var hr = clamp(numOr($('hr').value, 90), 30, 200);
+    var age = clamp(numOr($('age').value, 65), 18, 110);
+    var sex = $('sex').value === 'female' ? 'female' : 'male';
+    var creat = clamp(numOr($('creat').value, 1.0), 0.2, 20);
+    var egfr = ckdepi2021(creat, age, sex === 'female');
+    if (!Number.isFinite(egfr)) egfr = 100;
+
+    var hepaticEl = $('hepatic');
+    var hepaticFactor = clamp(numOr(hepaticEl.value, 1), 0.1, 1);
+    var hepaticLabel = hepaticEl.options[hepaticEl.selectedIndex]
+      ? hepaticEl.options[hepaticEl.selectedIndex].text : 'Normal';
+
+    var dose1 = clamp(numOr($('dose1').value, d.d1.def), d.d1.min, d.d1.max);
+    var dose2 = clamp(numOr($('dose2').value, d.d2.def), d.d2.min, d.d2.max);
+    var tTitrate = clamp(numOr($('titrateTime').value, d.defTitrate), 1, 2000);
+    var duration = clamp(numOr($('duration').value, 360), 10, 2880);
+
+    var loadingDose = 0;
+    if (d.loadingBolus) {
+      loadingDose = clamp(numOr($('loadingDose').value, 0), d.loadingBolus.min, d.loadingBolus.max);
+    }
+
+    return {
+      scenario:scKey, drug:drugKey, weight:weight,
+      sbp:sbp, dbp:dbp, hr:hr, age:age, sex:sex, creat:creat, egfr:egfr,
+      hepaticFactor:hepaticFactor, hepaticLabel:hepaticLabel,
+      dose1:dose1, dose2:dose2, tTitrate:tTitrate, duration:duration, loadingDose:loadingDose
+    };
+  }
+
+  var runTimer = null;
+  var isInitialised = false;
+
+  function scheduleRun() {
+    if (runTimer) clearTimeout(runTimer);
+    runTimer = setTimeout(function () { runTimer = null; runNow(); }, 90);
+  }
+
+  function runNow() {
+    if (!isInitialised) return;
+    var cfg = readInputs();
+    if (!cfg) return;
+    var d = DRUGS[cfg.drug];
+    var sc = SCENARIOS[cfg.scenario];
+    if (!d || !sc) return;
+
+    var sim;
+    try { sim = simulate(cfg); }
+    catch (err) { console.error('Simulation error:', err); return; }
+    if (!sim || !sim.t || sim.t.length < 2) return;
+
+    renderScenarioBox(sc, d, cfg);
+    renderMetrics(sim, sc);
+    renderWarnings(buildWarnings(cfg, sim, d, sc));
+    renderDrugInfo(d);
+    renderPrintMeta(cfg, d, sc);
+
+    var interpEl = $('interpretation');
+    if (interpEl) interpEl.innerHTML = buildInterpretation(cfg, sim, d, sc);
+
+    try { updateCharts(cfg, sim, d); }
+    catch (chartErr) { console.error('Chart update error:', chartErr); }
+  }
+
+  function resetToDefaults() {
+    $('scenario').value = 'hypertensive_emergency';
+    $('drug').value = 'nicardipine';
+    $('sbp').value = 200;
+    $('dbp').value = 110;
+    $('hr').value = 92;
+    $('weight').value = 70;
+    $('age').value = 65;
+    $('sex').value = 'male';
+    $('creat').value = 1.0;
+    $('hepatic').value = '1';
+    $('duration').value = 360;
+    $('presetSelect').value = '';
+    applyDrugDefaults();
+    updateMAPDisplay();
+    updateEGFRDisplay();
+    runNow();
+  }
+
+  function applyPreset(p) {
+    var c = p.cfg;
+    if (!$('scenario').querySelector('option[value="' + c.scenario + '"]')) return;
+    $('scenario').value = c.scenario;
+    $('drug').value = c.drug;
+    applyDrugDefaults();
+    $('sbp').value = c.sbp;
+    $('dbp').value = c.dbp;
+    $('hr').value = c.hr;
+    $('weight').value = c.weight;
+    $('age').value = c.age;
+    $('sex').value = c.sex;
+    $('creat').value = c.creat;
+    $('hepatic').value = c.hepatic;
+    $('duration').value = c.duration;
+    if (c.dose1 !== undefined) $('dose1').value = c.dose1;
+    if (c.dose2 !== undefined) $('dose2').value = c.dose2;
+    if (c.titrate !== undefined) $('titrateTime').value = c.titrate;
+    if (c.loading !== undefined) {
+      var d = DRUGS[c.drug];
+      if (d && d.loadingBolus) $('loadingDose').value = c.loading;
+    }
+    updateMAPDisplay();
+    updateEGFRDisplay();
+    runNow();
+  }
+
+  function buildSelectOptions() {
+    var scSel = $('scenario');
+    var dgSel = $('drug');
+    var pSel = $('presetSelect');
+    var pRow = $('presetRow');
+    var i, opt;
+
+    for (i = 0; i < SCENARIO_ORDER.length; i++) {
+      opt = document.createElement('option');
+      opt.value = SCENARIO_ORDER[i];
+      opt.textContent = SCENARIOS[SCENARIO_ORDER[i]].name;
+      scSel.appendChild(opt);
+    }
+    for (i = 0; i < DRUG_ORDER.length; i++) {
+      opt = document.createElement('option');
+      opt.value = DRUG_ORDER[i];
+      opt.textContent = DRUGS[DRUG_ORDER[i]].name;
+      dgSel.appendChild(opt);
+    }
+    for (i = 0; i < PRESETS.length; i++) {
+      opt = document.createElement('option');
+      opt.value = PRESETS[i].id;
+      opt.textContent = PRESETS[i].label;
+      pSel.appendChild(opt);
+
+      (function (preset) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'preset-btn';
+        btn.textContent = preset.label;
+        btn.addEventListener('click', function () {
+          pSel.value = preset.id;
+          applyPreset(preset);
+        });
+        pRow.appendChild(btn);
+      })(PRESETS[i]);
+    }
+  }
+
+  function init() {
+    buildSelectOptions();
+
+    var panel = $('controlsPanel');
+    panel.addEventListener('input', function (e) {
+      var id = e.target && e.target.id;
+      if (id === 'sbp' || id === 'dbp') updateMAPDisplay();
+      if (id === 'creat' || id === 'age' || id === 'sex') updateEGFRDisplay();
+      if (id === 'drug') applyDrugDefaults();
+      scheduleRun();
+    });
+    panel.addEventListener('change', function (e) {
+      var id = e.target && e.target.id;
+      if (id === 'presetSelect') {
+        var found = null;
+        for (var i = 0; i < PRESETS.length; i++) {
+          if (PRESETS[i].id === e.target.value) { found = PRESETS[i]; break; }
+        }
+        if (found) { applyPreset(found); return; }
+      }
+      scheduleRun();
+    });
+
+    $('resetBtn').addEventListener('click', function () { resetToDefaults(); });
+    $('printBtn').addEventListener('click', function () { runNow(); window.print(); });
+
+    $('scenario').value = 'hypertensive_emergency';
+    $('drug').value = 'nicardipine';
+    applyDrugDefaults();
+    updateMAPDisplay();
+    updateEGFRDisplay();
+
+    initCharts();
+    isInitialised = true;
+    runNow();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+<script>
+(function(){
+  'use strict';
+  var $=function(id){return document.getElementById(id);};
+  var micro={
+    Nicardipine:'Fast, titratable arterial control',Clevidipine:'Ultra-short, minute-to-minute control',Labetalol:'Alpha + beta blockade for pressure and rate',Esmolol:'Rapid beta-1 control when rate matters','Sodium nitroprusside':'Immediate balanced arterial / venous dilation',Nitroglycerin:'Venodilation for pulmonary edema and ischemia',Hydralazine:'Longer, less predictable bolus response',Enalaprilat:'ACE inhibition with a slower offset',Phentolamine:'Alpha blockade for catecholamine excess',Clonidine:'Central sympatholysis with delayed offset',Amlodipine:'Long-acting oral calcium-channel blocker'
+  };
+  function buildRails(){
+    var drug=$('drug'), scenario=$('scenario');
+    if(drug && $('agentRail') && !$('agentRail').children.length){
+      Array.prototype.forEach.call(drug.options,function(opt,i){
+        var b=document.createElement('button'); b.type='button'; b.className='agent-card'; b.dataset.agent=opt.value; b.setAttribute('role','listitem');
+        b.innerHTML='<span class="agent-card-index">'+String(i+1).padStart(2,'0')+'</span><span class="agent-card-name">'+opt.textContent+'</span>';
+        $('agentRail').appendChild(b);
+      });
+    }
+    if(scenario && $('scenarioRail') && !$('scenarioRail').children.length){
+      Array.prototype.forEach.call(scenario.options,function(opt){
+        var b=document.createElement('button'); b.type='button'; b.className='scenario-card'; b.dataset.scenario=opt.value; b.textContent=opt.textContent; b.setAttribute('role','listitem'); $('scenarioRail').appendChild(b);
+      });
+    }
+  }
+  function sync(){
+    var drug=$('drug'), scenario=$('scenario');
+    if(!drug) return;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-agent]'),function(b){b.classList.toggle('active',b.dataset.agent===drug.value);});
+    Array.prototype.forEach.call(document.querySelectorAll('[data-scenario]'),function(b){b.classList.toggle('active',b.dataset.scenario===scenario.value);});
+    var opt=drug.options[drug.selectedIndex], name=opt?opt.textContent:'—';
+    if($('agentName')) $('agentName').textContent=name;
+    if($('activeAgentDisplay')) $('activeAgentDisplay').textContent=name;
+    if($('summaryAgent')) $('summaryAgent').textContent='· '+name;
+    if($('agentMicrocopy')) $('agentMicrocopy').textContent=micro[name]||'Selected agent profile';
+    if($('activeAgentRoute')) $('activeAgentRoute').textContent=(name==='Nicardipine'||name==='Clevidipine'||name==='Esmolol'||name==='Sodium nitroprusside'||name==='Nitroglycerin')?'IV infusion / titration':'IV or enteral route · see profile';
+    var d1=$('dose1'), dial=$('doseDial');
+    if(d1&&dial){var min=d1.min||0,max=d1.max||100,step=d1.step||1;dial.min=min;dial.max=max;dial.step=step;dial.value=d1.value;}
+    if($('simStatus')) $('simStatus').textContent='Live · model updated';
+    var scenarioBox=$('scenarioBox'), target=$('targetReadout');
+    if(scenarioBox&&target){var text=scenarioBox.innerText||'';var match=text.match(/(\d+)–(\d+) \/ (\d+)–(\d+) mmHg/);if(match){target.innerHTML='<p><b>'+match[1]+'–'+match[2]+' / '+match[3]+'–'+match[4]+' mmHg</b><br>Scenario BP window</p>';if($('targetMapValue'))$('targetMapValue').textContent=Math.round((Number(match[1])+2*Number(match[3]))/3);}}}
+  document.addEventListener('click',function(e){
+    var agent=e.target.closest&&e.target.closest('[data-agent]');
+    if(agent&&$('drug')){$('drug').value=agent.dataset.agent;$('drug').dispatchEvent(new Event('input',{bubbles:true}));$('drug').dispatchEvent(new Event('change',{bubbles:true}));setTimeout(sync,30);return;}
+    var scenario=e.target.closest&&e.target.closest('[data-scenario]');
+    if(scenario&&$('scenario')){$('scenario').value=scenario.dataset.scenario;$('scenario').dispatchEvent(new Event('change',{bubbles:true}));setTimeout(sync,30);}
+  });
+  document.addEventListener('input',function(e){if(e.target&&e.target.id==='doseDial'&&$('dose1')){$('dose1').value=e.target.value;$('dose1').dispatchEvent(new Event('input',{bubbles:true}));}sync();});
+  document.addEventListener('change',sync);
+  buildRails(); sync(); setTimeout(sync,180);
+})();
+</script>
+</body>
+</html>
