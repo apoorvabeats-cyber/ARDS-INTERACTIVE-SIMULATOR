@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Multi-Modal ICU Shock Simulator</title>
+<style>
+:root {
+  --bg:#090d16; --card:#131b2e; --ink:#e8eef7; --muted:#93a4bd; --line:#243044;
+  --teal:#38bdf8; --red:#ff6b6b; --ok:#38ef7d; --warn:#fbbf24; --input:#0b1120;
+}
+* { box-sizing:border-box; }
+html, body { margin:0; background:var(--bg); color:var(--ink); font-family:"Segoe UI",system-ui,sans-serif; }
+button, select, input { font:inherit; color:inherit; }
+button { cursor:pointer; }
+a { color:var(--teal); }
+.wrap { max-width:1280px; margin:0 auto; padding:14px 14px 90px; }
+.top { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+h1 { font-size:clamp(20px,4vw,28px); margin:0 0 4px; }
+.sub { margin:0; color:var(--muted); font-size:13px; max-width:52rem; }
+.row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.ghost, .primary, .navbtn {
+  min-height:44px; border-radius:10px; border:1px solid var(--line); background:var(--card); padding:8px 12px; font-weight:700;
+}
+.primary { background:var(--teal); color:#041018; border-color:var(--teal); }
+.navbtn:disabled { opacity:.35; cursor:default; }
+.badges { display:flex; flex-wrap:wrap; gap:8px; }
+.badge { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:8px 12px; min-width:120px; }
+.badge b { display:block; font-size:11px; color:var(--muted); letter-spacing:.04em; text-transform:uppercase; }
+.badge span { font-weight:800; }
+.grid { display:grid; grid-template-columns:minmax(260px,340px) minmax(0,1fr) minmax(260px,360px); gap:12px; }
+@media (max-width:1100px) { .grid { grid-template-columns:1fr; } }
+.panel { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; }
+h2 { margin:0 0 10px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--teal); }
+.two { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); font-weight:700; }
+input[type=number], select { background:var(--input); border:1px solid var(--line); border-radius:8px; padding:8px; min-height:40px; }
+input[type=range] { width:100%; accent-color:var(--teal); }
+.val { color:var(--teal); font-weight:800; }
+.metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:8px; margin-bottom:10px; }
+.m { background:var(--input); border:1px solid var(--line); border-radius:12px; padding:10px; }
+.m small { display:block; color:var(--muted); font-size:11px; text-transform:uppercase; }
+.m b { font-family:ui-monospace,monospace; font-size:18px; }
+.wave { position:relative; background:#050811; border:1px solid var(--line); border-radius:12px; height:160px; overflow:hidden; margin:0 0 10px; }
+.wave canvas { display:block; width:100%; height:100%; }
+.wlab { position:absolute; top:8px; left:10px; font-size:11px; font-weight:800; color:var(--teal); }
+.bar { height:10px; background:var(--input); border-radius:6px; overflow:hidden; border:1px solid var(--line); }
+.fill { height:100%; width:0; }
+.item { margin:0 0 10px; }
+.item span { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); }
+.alert { border-radius:12px; padding:10px 12px; font-size:13px; line-height:1.45; border:1px solid var(--line); }
+.alert.warn { border-color:var(--warn); color:#fde68a; }
+.alert.bad { border-color:var(--red); color:#fecaca; }
+.alert.ok { border-color:var(--ok); color:#bbf7d0; }
+.note { font-size:12px; color:var(--muted); line-height:1.45; }
+.chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+.chip { border:1px solid var(--line); background:var(--input); border-radius:999px; padding:6px 10px; min-height:36px; font-size:12px; }
+.chip.on { border-color:var(--teal); color:var(--teal); }
+.check { display:flex; gap:8px; align-items:center; font-size:13px; color:var(--ink); margin:8px 0; }
+.sound { position:fixed; left:50%; bottom:14px; transform:translateX(-50%); z-index:9; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <a href="hub.html">Back to hub</a>
+      <h1>Multi-modal ICU shock</h1>
+      <p class="sub" id="caseSub">Live arterial line, IVC ultrasound, and a 6-hour resuscitation sketch. Numbers are a teaching model, not a measured cardiac output.</p>
+    </div>
+    <div class="row">
+      <button class="navbtn" id="prevBtn" onclick="shiftCase(-1)">Previous case</button>
+      <button class="navbtn" id="nextBtn" onclick="shiftCase(1)">Next case</button>
+    </div>
+  </div>
+  <div class="chips" id="caseChips"></div>
+  <div class="badges">
+    <div class="badge"><b>SCAI</b><span id="scaiBadge">—</span></div>
+    <div class="badge"><b>Primary pattern</b><span id="primaryDiagBadge">—</span></div>
+    <div class="badge"><b>Fluid response</b><span id="fluidRespBadge">—</span></div>
+    <div class="badge"><b>Ea,dyn</b><span id="eadynBadge">—</span></div>
+  </div>
+  <div class="grid" style="margin-top:12px">
+    <div class="panel">
+      <h2>What you measure</h2>
+      <div class="two">
+        <label>Height cm <input id="inHt" type="number" value="175"></label>
+        <label>Weight kg <input id="inWt" type="number" value="70"></label>
+        <label>SBP <input id="inSbp" type="number" value="82"></label>
+        <label>DBP <input id="inDbp" type="number" value="48"></label>
+        <label>PPV % <input id="inPpv" type="number" value="18"></label>
+        <label>SVV % <input id="inSvv" type="number" value="16"></label>
+        <label>IVC max cm <input id="inIvcMax" type="number" step="0.1" value="1.1"></label>
+        <label>IVC min cm <input id="inIvcMin" type="number" step="0.1" value="0.3"></label>
+        <label>pH <input id="inPh" type="number" step="0.01" value="7.24"></label>
+        <label>Lactate <input id="inLactate" type="number" step="0.1" value="5.2"></label>
+        <label>ScvO2 % <input id="inScvo2" type="number" value="58"></label>
+        <label>Hb g/dL <input id="inHb" type="number" step="0.1" value="8.5"></label>
+      </div>
+      <label style="margin-top:8px">Heart rate <span class="val" id="hrVal">124</span>
+        <input id="inHr" type="range" min="40" max="180" value="124">
+      </label>
+      <label>Upstroke (teaching slope) <span class="val" id="dpdtVal">0.8</span>
+        <input id="inDpdt" type="range" min="0.3" max="2.5" step="0.1" value="0.8">
+      </label>
+      <label>Dicrotic notch % of pulse pressure <span class="val" id="notchVal">35%</span>
+        <input id="inNotch" type="range" min="15" max="70" value="35">
+      </label>
+      <label>Ventilation
+        <select id="inVent">
+          <option value="spont">Spontaneous breathing</option>
+          <option value="mech">Controlled ventilation</option>
+        </select>
+      </label>
+      <label class="check"><input id="inAf" type="checkbox"> Atrial fibrillation (PPV and SVV are invalid)</label>
+    </div>
+    <div class="panel">
+      <div class="metrics">
+        <div class="m"><small>MAP</small><b id="mMap">—</b></div>
+        <div class="m"><small>Shock index</small><b id="mSi">—</b></div>
+        <div class="m"><small>Teaching CI</small><b id="mCi">—</b></div>
+        <div class="m"><small>Teaching SVRI</small><b id="mSvri">—</b></div>
+        <div class="m"><small>IVC index</small><b id="mIvcCi">—</b></div>
+        <div class="m"><small>Pulse pressure</small><b id="mPp">—</b></div>
+      </div>
+      <div class="wave"><div class="wlab">Arterial line</div><canvas id="artCanvas"></canvas></div>
+      <div class="wave" style="height:140px"><div class="wlab">IVC cross-section</div><canvas id="ivcCanvas"></canvas></div>
+      <h2>6-hour sketch</h2>
+      <div class="wave" style="height:180px"><canvas id="trajChart"></canvas></div>
+      <p class="note">MAP teal, lactate red, cardiac index green. This is a sketch from the current drugs, not a blood level.</p>
+    </div>
+    <div class="panel">
+      <h2>Pattern probabilities</h2>
+      <div class="item"><span>Distributive <b id="probDist">0%</b></span><div class="bar"><div class="fill" id="barDist" style="background:#c084fc"></div></div></div>
+      <div class="item"><span>Hypovolemic <b id="probHypo">0%</b></span><div class="bar"><div class="fill" id="barHypo" style="background:var(--teal)"></div></div></div>
+      <div class="item"><span>Cardiogenic <b id="probCard">0%</b></span><div class="bar"><div class="fill" id="barCard" style="background:var(--red)"></div></div></div>
+      <div class="item"><span>Obstructive <b id="probObs">0%</b></span><div class="bar"><div class="fill" id="barObs" style="background:var(--warn)"></div></div></div>
+      <p class="note" id="whyBox"></p>
+      <h2>Resuscitation</h2>
+      <label>Crystalloid or blood <span class="val" id="fluidVal">0 mL</span>
+        <input id="txFluid" type="range" min="0" max="3000" step="250" value="0">
+      </label>
+      <label>Norepinephrine <span class="val" id="norepiVal">0.00</span>
+        <input id="txNorepi" type="range" min="0" max="1" step="0.05" value="0">
+      </label>
+      <label>Dobutamine <span class="val" id="dobutVal">0</span>
+        <input id="txDobut" type="range" min="0" max="20" step="2.5" value="0">
+      </label>
+      <label>Procedure
+        <select id="txProc">
+          <option value="none">None</option>
+          <option value="antibiotics">Antibiotics</option>
+          <option value="hemostasis">Stop the bleed / transfuse</option>
+          <option value="pericardio">Pericardiocentesis</option>
+          <option value="thrombolysis">Thrombolysis / embolectomy</option>
+        </select>
+      </label>
+      <div class="alert warn" id="alertBox"><div id="alertText">Set the numbers, then treat.</div></div>
+    </div>
+  </div>
+</div>
+<button class="primary sound" id="soundBtn" type="button">Sound off</button>
+<script>
+var CASES=[
+  {id:"sepsis",name:"Septic / vasoplegic",sub:"Warm shock. Wide pulse pressure, collapsed IVC, high ScvO2.",ht:175,wt:70,sbp:82,dbp:48,hr:124,dpdt:1.4,ppv:18,svv:16,notch:28,ivcMax:1.1,ivcMin:0.3,vent:"spont",ph:7.24,lactate:5.2,scvo2:78,hb:10.5,af:false,fluid:0,norepi:0,dobut:0,proc:"none"},
+  {id:"bleed",name:"Hemorrhagic",sub:"Empty tank. Tiny IVC, low ScvO2, low hemoglobin.",ht:170,wt:68,sbp:78,dbp:52,hr:132,dpdt:1.3,ppv:22,svv:20,notch:42,ivcMax:0.8,ivcMin:0.2,vent:"spont",ph:7.28,lactate:4.8,scvo2:46,hb:6.4,af:false,fluid:0,norepi:0,dobut:0,proc:"none"},
+  {id:"pump",name:"Cardiogenic",sub:"Failing pump. Narrow pulse pressure, plump IVC, low upstroke, low ScvO2.",ht:172,wt:80,sbp:86,dbp:66,hr:118,dpdt:0.5,ppv:8,svv:7,notch:58,ivcMax:2.4,ivcMin:2.2,vent:"mech",ph:7.22,lactate:5.8,scvo2:42,hb:13.2,af:false,fluid:0,norepi:0,dobut:0,proc:"none"},
+  {id:"tamp",name:"Tamponade",sub:"Obstruction outside the heart. A plump IVC that barely moves. Drain, do not fill.",ht:168,wt:72,sbp:78,dbp:62,hr:126,dpdt:0.6,ppv:24,svv:10,notch:50,ivcMax:2.6,ivcMin:2.5,vent:"spont",ph:7.26,lactate:4.2,scvo2:50,hb:12.1,af:false,fluid:0,norepi:0,dobut:0,proc:"none"},
+  {id:"pe",name:"Massive PE",sub:"RV obstruction. High IVC, low CI. Pressors buy time for reperfusion.",ht:178,wt:86,sbp:84,dbp:58,hr:132,dpdt:0.7,ppv:12,svv:11,notch:52,ivcMax:2.3,ivcMin:2.1,vent:"mech",ph:7.32,lactate:3.8,scvo2:45,hb:13.0,af:false,fluid:0,norepi:0,dobut:0,proc:"none"},
+  {id:"mixed",name:"Septic cardiomyopathy",sub:"Vasoplegia plus a weak pump. Fill a little, then norepi, then a little inotrope.",ht:165,wt:62,sbp:80,dbp:50,hr:128,dpdt:0.7,ppv:14,svv:13,notch:32,ivcMax:1.6,ivcMin:1.1,vent:"mech",ph:7.21,lactate:6.4,scvo2:62,hb:9.8,af:false,fluid:0,norepi:0,dobut:0,proc:"none"},
+];
+var caseIndex=0, tOff=0, shown=null, soundOn=false, audio=null, pulseAt=0, alarmAt=0;
+function $(id){ return document.getElementById(id); }
+function n(id){ return parseFloat($(id).value); }
+function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
+function paintChips(){
+  $("caseChips").innerHTML=CASES.map(function(c,i){
+    return '<button type="button" class="chip'+(i===caseIndex?' on':'')+'" onclick="loadCase('+i+')">'+c.name+'</button>';
+  }).join("");
+  $("prevBtn").disabled=caseIndex===0;
+  $("nextBtn").disabled=caseIndex===CASES.length-1;
+}
+function loadCase(i){
+  caseIndex=clamp(i,0,CASES.length-1);
+  var c=CASES[caseIndex];
+  var map={Ht:"ht",Wt:"wt",Sbp:"sbp",Dbp:"dbp",Hr:"hr",Dpdt:"dpdt",Ppv:"ppv",Svv:"svv",Notch:"notch",IvcMax:"ivcMax",IvcMin:"ivcMin",Ph:"ph",Lactate:"lactate",Scvo2:"scvo2",Hb:"hb"};
+  Object.keys(map).forEach(function(k){ $("in"+k).value=c[map[k]]; });
+  $("inVent").value=c.vent; $("inAf").checked=c.af;
+  $("txFluid").value=c.fluid; $("txNorepi").value=c.norepi; $("txDobut").value=c.dobut; $("txProc").value=c.proc;
+  $("caseSub").textContent=c.sub;
+  paintChips(); calculate();
+}
+function shiftCase(d){ loadCase(caseIndex+d); }
+function readBase(){
+  return {
+    ht:n("inHt"), wt:n("inWt"), sbp:n("inSbp"), dbp:n("inDbp"), hr:n("inHr"),
+    dpdt:n("inDpdt"), ppv:n("inPpv"), svv:n("inSvv"), notch:n("inNotch"),
+    ivcMax:n("inIvcMax"), ivcMin:n("inIvcMin"), vent:$("inVent").value, af:$("inAf").checked,
+    ph:n("inPh"), lactate:n("inLactate"), scvo2:n("inScvo2"), hb:n("inHb"),
+    fluid:n("txFluid"), norepi:n("txNorepi"), dobut:n("txDobut"), proc:$("txProc").value
+  };
+}
+function physFrom(b){
+  var bsa=Math.sqrt((b.ht*b.wt)/3600)||1.7;
+  var map=b.dbp+(b.sbp-b.dbp)/3, pp=b.sbp-b.dbp;
+  var ivcIndex=b.vent==="spont"?((b.ivcMax-b.ivcMin)/Math.max(0.1,b.ivcMax))*100:((b.ivcMax-b.ivcMin)/Math.max(0.1,b.ivcMin))*100;
+  var eadyn=b.svv? b.ppv/b.svv : 0;
+  var sv=(pp*0.85)*(b.dpdt/1.0);
+  if(b.notch<30) sv*=1.15;
+  if(b.notch>50) sv*=0.85;
+  var ci=((sv*b.hr)/1000)/bsa;
+  var cvp=b.ivcMax>2.1?14:(b.ivcMax<1.2?3:8);
+  var svri=((map-cvp)/Math.max(0.4,ci))*80;
+  var ppvValid=b.vent==="mech" && !b.af;
+  var fluidLikely=false, fluidWhy="";
+  if(b.af){ fluidWhy="Atrial fibrillation. Do not use PPV or SVV."; }
+  else if(b.vent==="spont"){
+    fluidLikely=ivcIndex>50 && b.ivcMax<2.1;
+    fluidWhy=fluidLikely?"Spontaneous breathing. Collapsibility over 50% with a small IVC. Fluids may help.":"Spontaneous breathing. PPV is not valid. The IVC is not collapsing enough to call this fluid responsive.";
+  } else {
+    fluidLikely=b.ppv>13 || b.svv>12;
+    fluidWhy=fluidLikely?"Controlled ventilation. PPV or SVV is high. Fluids may raise stroke volume.":"Controlled ventilation. PPV and SVV are low. More fluid is unlikely to raise stroke volume.";
+  }
+  var eaNote="";
+  if(ppvValid){
+    eaNote=eadyn>=1?"Ea,dyn at or above 1. A vasopressor is more likely to raise MAP than another bag of fluid.":"Ea,dyn below 1. Arterial load is low. Fluid may raise MAP more than norepi alone.";
+  } else eaNote="Ea,dyn needs valid PPV and SVV. It is not used on spontaneous breathing or atrial fibrillation.";
+  return {bsa:bsa,map:map,pp:pp,ivcIndex:ivcIndex,eadyn:eadyn,ci:ci,svri:svri,cvp:cvp,ppvValid:ppvValid,fluidLikely:fluidLikely,fluidWhy:fluidWhy,eaNote:eaNote,si:b.hr/Math.max(1,b.sbp)};
+}
+function applyTx(b){
+  var p=physFrom(b);
+  var s=Object.assign({},b);
+  var fluidL=b.fluid/1000;
+  var empty=p.fluidLikely || b.ivcMax<1.3;
+  var wet=b.ivcMax>2.1 && p.ci<2.2 && b.dpdt<0.8;
+  if(empty){
+    s.sbp+=fluidL*8; s.dbp+=fluidL*4; s.hr-=fluidL*6;
+    s.ivcMax=Math.min(2.4,s.ivcMax+fluidL*0.35); s.ivcMin=Math.min(s.ivcMax-0.1,s.ivcMin+fluidL*0.25);
+    s.ppv=Math.max(4,s.ppv-fluidL*4); s.svv=Math.max(4,s.svv-fluidL*3);
+    s.lactate=Math.max(0.8,s.lactate-fluidL*0.4);
+  } else if(wet && fluidL>0.5){
+    s.sbp-=fluidL*4; s.lactate+=fluidL*0.3; s.ivcMax+=fluidL*0.2;
+  } else if(fluidL>0){
+    s.sbp+=fluidL*2; s.ivcMax+=fluidL*0.15; s.ppv=Math.max(4,s.ppv-fluidL*1.5);
+  }
+  s.dbp+=b.norepi*28; s.sbp+=b.norepi*18; s.notch=clamp(s.notch+b.norepi*12,15,70);
+  if(p.ci<2 && b.norepi>0.3) s.dpdt=Math.max(0.3,s.dpdt-0.1);
+  s.hr+=b.dobut*0.8; s.dpdt=Math.min(2.5,s.dpdt+b.dobut*0.04); s.sbp+=b.dobut*0.6;
+  if(b.proc==="pericardio" && b.ivcMax>2){
+    s.ivcMax=1.6; s.ivcMin=1.1; s.sbp+=18; s.dpdt=Math.min(2.5,s.dpdt+0.4); s.ppv=8; s.lactate=Math.max(1.5,s.lactate-1.2);
+  }
+  if(b.proc==="thrombolysis" && b.ivcMax>2){
+    s.ivcMax=1.8; s.ivcMin=1.3; s.sbp+=12; s.dpdt=Math.min(2.5,s.dpdt+0.3); s.lactate=Math.max(1.4,s.lactate-0.8);
+  }
+  if(b.proc==="hemostasis"){
+    s.hb=Math.min(11, s.hb+2.5); s.sbp+=10; s.hr-=8; s.lactate=Math.max(1.2,s.lactate-1);
+  }
+  if(b.proc==="antibiotics") s.lactate=Math.max(1.2,s.lactate*0.85);
+  s.sbp=clamp(s.sbp,40,200); s.dbp=clamp(s.dbp,20,s.sbp-8); s.hr=clamp(s.hr,40,180);
+  var after=physFrom(s);
+  after.base=b; after.shown=s;
+  return after;
+}
+function classify(p){
+  var b=p.shown, s=p;
+  var dist=8,hypo=8,card=8,obs=8;
+  if(s.svri<1500) dist+=35; if(b.notch<34) dist+=20; if(s.ci>2.5) dist+=20; if(b.scvo2>70) dist+=20;
+  if(b.ivcMax<1.4) hypo+=30; if(s.ivcIndex>50 && b.vent==="spont") hypo+=20; if(b.hb<8) hypo+=25; if(b.scvo2<55 && b.ivcMax<1.6) hypo+=15;
+  if(s.ci<2.0) card+=25; if(b.dpdt<0.7) card+=30; if(b.notch>50) card+=15; if(b.scvo2<50 && b.ivcMax>2) card+=10;
+  if(b.ivcMax>2.2 && s.ivcIndex<12) obs+=35; if(b.vent==="spont" && b.ppv>18 && b.ivcMax>2) obs+=25;
+  if(b.dpdt>=0.65 && b.ivcMax>2 && s.ci<2.3) obs+=20;
+  if(b.scvo2>70){ hypo=Math.max(0,hypo-20); card=Math.max(0,card-15); }
+  if(b.dpdt<0.65 && b.notch>55){ card+=20; obs=Math.max(0,obs-20); }
+  if(s.ivcIndex<8 && b.ivcMax>2.3){ obs+=25; card=Math.max(0,card-15); }
+  if(b.hb<7.5){ dist=Math.max(0,dist-10); }
+  var tot=dist+hypo+card+obs||1;
+  dist=Math.round(dist/tot*100); hypo=Math.round(hypo/tot*100); card=Math.round(card/tot*100); obs=Math.max(0,100-dist-hypo-card);
+  var names=[["Distributive",dist],["Hypovolemic",hypo],["Cardiogenic",card],["Obstructive",obs]].sort(function(a,c){ return c[1]-a[1]; });
+  var mixed=names[1][1]>=28;
+  return {dist:dist,hypo:hypo,card:card,obs:obs,primary:mixed?names[0][0]+" + "+names[1][0]:names[0][0],why:buildWhy(p,names,mixed)};
+}
+function buildWhy(p,names,mixed){
+  var b=p.shown, bits=[];
+  bits.push("MAP "+Math.round(p.map)+" mmHg. Teaching CI "+p.ci.toFixed(1)+". SVRI "+Math.round(p.svri)+".");
+  bits.push(p.fluidWhy);
+  bits.push(p.eaNote);
+  if(b.hb<7) bits.push("Hemoglobin "+b.hb.toFixed(1)+". In bleeding, give blood, not only crystalloid.");
+  if(mixed) bits.push("Second pattern is close. Treat both, do not pick one and stop.");
+  return bits.join(" ");
+}
+function scai(p){
+  var b=p.shown, map=p.map, lac=b.lactate, press=b.norepi;
+  if(lac>=8 || b.ph<7.15 || map<50) return ["Stage E — extremis", "var(--red)"];
+  if(press>=0.2 && (lac>2 || map<65)) return ["Stage D — deteriorating", "var(--warn)"];
+  if(lac>=2 || map<65 || b.sbp<90) return ["Stage C — classic shock", "#c084fc"];
+  if(b.hr>100 || press>0) return ["Stage B — beginning", "var(--teal)"];
+  return ["Stage A — at risk", "var(--ok)"];
+}
+function alerts(p,cl){
+  var b=p.shown, msgs=[], kind="ok";
+  if(p.ci<1.9 && b.fluid>1000 && cl.card>=cl.hypo){ msgs.push("Hazard. A lot of fluid into a weak pump. The lung will fill."); kind="bad"; }
+  if(cl.hypo>=40 && b.dobut>0 && b.fluid<500){ msgs.push("Inotrope on an empty tank. Fill or stop the bleed first."); kind="bad"; }
+  if(cl.obs>=40 && b.proc==="none"){ msgs.push("Obstruction is likely. Drugs do not fix tamponade or a massive PE."); kind=kind==="bad"?kind:"warn"; }
+  if(b.hb<7 && b.proc!=="hemostasis"){ msgs.push("Hemoglobin under 7. Blood, not another litre of saline."); kind=kind==="bad"?kind:"warn"; }
+  if(p.map>=65 && b.lactate<2.2 && kind==="ok") msgs.push("Targets in range: MAP at least 65 and lactate falling.");
+  else if(!msgs.length) msgs.push("MAP still under 65 or lactate still high. Change the treatment, then look at the sketch.");
+  if(kind==="ok" && (p.map<65 || b.lactate>=2.2)) kind="warn";
+  return {kind:kind,text:msgs.join(" ")};
+}
+function calculate(){
+  $("hrVal").textContent=$("inHr").value;
+  $("dpdtVal").textContent=Number($("inDpdt").value).toFixed(1);
+  $("notchVal").textContent=$("inNotch").value+"%";
+  $("fluidVal").textContent=$("txFluid").value+" mL";
+  $("norepiVal").textContent=Number($("txNorepi").value).toFixed(2)+" mcg/kg/min";
+  $("dobutVal").textContent=Number($("txDobut").value).toFixed(1)+" mcg/kg/min";
+  var b=readBase();
+  var p=applyTx(b);
+  shown=p;
+  $("mMap").textContent=Math.round(p.map)+" mmHg";
+  $("mSi").textContent=p.si.toFixed(2);
+  $("mCi").textContent=p.ci.toFixed(1);
+  $("mSvri").textContent=Math.round(p.svri);
+  $("mIvcCi").textContent=p.ivcIndex.toFixed(0)+"% "+(b.vent==="spont"?"CI":"DI");
+  $("mPp").textContent=Math.round(p.pp);
+  var cl=classify(p);
+  $("probDist").textContent=cl.dist+"%"; $("barDist").style.width=cl.dist+"%";
+  $("probHypo").textContent=cl.hypo+"%"; $("barHypo").style.width=cl.hypo+"%";
+  $("probCard").textContent=cl.card+"%"; $("barCard").style.width=cl.card+"%";
+  $("probObs").textContent=cl.obs+"%"; $("barObs").style.width=cl.obs+"%";
+  $("primaryDiagBadge").textContent=cl.primary;
+  $("whyBox").textContent=cl.why;
+  var sc=scai(p); $("scaiBadge").textContent=sc[0]; $("scaiBadge").style.color=sc[1];
+  $("fluidRespBadge").textContent=p.fluidLikely?"Likely":"Unlikely";
+  $("fluidRespBadge").style.color=p.fluidLikely?"var(--ok)":"var(--red)";
+  $("eadynBadge").textContent=p.ppvValid?p.eadyn.toFixed(2):"Invalid";
+  var al=alerts(p,cl);
+  $("alertBox").className="alert "+al.kind;
+  $("alertText").textContent=al.text;
+  drawTraj(p);
+}
+function size(c){
+  var r=c.parentElement.getBoundingClientRect();
+  var d=window.devicePixelRatio||1;
+  c.width=Math.max(20,r.width)*d; c.height=Math.max(20,r.height)*d;
+  c.getContext("2d").setTransform(d,0,0,d,0,0);
+  return {w:r.width,h:r.height,ctx:c.getContext("2d")};
+}
+function drawArt(){
+  var c=$("artCanvas"); if(!c||!shown) return;
+  var g=size(c), ctx=g.ctx, w=g.w, h=g.h, b=shown.shown;
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle="#38bdf8"; ctx.lineWidth=2; ctx.beginPath();
+  var cyc=(60/Math.max(40,b.hr))*70;
+  tOff+=2;
+  for(var x=0;x<w;x++){
+    var phase=((x+tOff)%cyc)/cyc;
+    var swing=shown.ppvValid?Math.sin((x+tOff)*0.02)*(b.ppv/100):Math.sin((x+tOff)*0.012)*(b.ppv/220);
+    var sbp=b.sbp*(1+swing), dbp=b.dbp;
+    var yS=h-((sbp/200)*h*0.78+16), yD=h-((dbp/200)*h*0.78+16);
+    var yN=yD-(yD-yS)*(b.notch/100), y=yD;
+    if(phase<0.15) y=yD-(yD-yS)*Math.pow(phase/0.15,1/Math.max(0.3,b.dpdt));
+    else if(phase<0.35) y=yS+(yN-yS)*((phase-0.15)/0.2);
+    else if(phase<0.4) y=yN-5*Math.sin((phase-0.35)*Math.PI/0.05);
+    else y=yN+(yD-yN)*((phase-0.4)/0.6);
+    if(x) ctx.lineTo(x,y); else ctx.moveTo(x,y);
+  }
+  ctx.stroke();
+  ctx.fillStyle="#94a3b8"; ctx.font="11px sans-serif";
+  ctx.fillText(Math.round(b.sbp)+" / "+Math.round(b.dbp)+"  HR "+Math.round(b.hr), 10, h-10);
+}
+function drawIvc(){
+  var c=$("ivcCanvas"); if(!c||!shown) return;
+  var g=size(c), ctx=g.ctx, w=g.w, h=g.h, b=shown.shown;
+  ctx.clearRect(0,0,w,h);
+  var ph=(Math.sin(tOff*0.03)+1)/2;
+  var d=b.ivcMin+(b.ivcMax-b.ivcMin)*ph;
+  var ry=(d/3.5)*(h*0.34), rx=ry*1.8;
+  ctx.beginPath(); ctx.ellipse(w/2,h/2,rx,ry,0,0,Math.PI*2);
+  ctx.fillStyle="#02040a"; ctx.fill(); ctx.strokeStyle="#38bdf8"; ctx.lineWidth=3; ctx.stroke();
+  ctx.fillStyle="#94a3b8"; ctx.font="11px sans-serif";
+  ctx.fillText("Diameter "+d.toFixed(2)+" cm", 12, h-10);
+}
+function drawTraj(p){
+  var c=$("trajChart"); if(!c) return;
+  var g=size(c), ctx=g.ctx, w=g.w, h=g.h, b=p.shown;
+  var maps=[p.map], cis=[p.ci], lacs=[b.lactate];
+  for(var i=1;i<=6;i++){
+    var m=maps[i-1]+(b.norepi*8)+(p.fluidLikely?b.fluid/1000*3:0);
+    var ci=cis[i-1]+b.dobut*0.05+(b.proc==="pericardio"||b.proc==="thrombolysis"?0.15:0);
+    var lac=lacs[i-1]*(b.proc==="antibiotics"||b.proc==="hemostasis"?0.72:0.88);
+    if(p.ci<1.8 && b.fluid>1500){ m-=4; lac+=0.2; }
+    maps.push(clamp(m,40,110)); cis.push(clamp(ci,0.6,4.5)); lacs.push(clamp(lac,0.8,12));
+  }
+  ctx.clearRect(0,0,w,h);
+  function line(arr,max,col){
+    ctx.strokeStyle=col; ctx.lineWidth=2; ctx.beginPath();
+    arr.forEach(function(v,i){ var x=20+i*((w-36)/6), y=h-18-(v/max)*(h-36); if(i) ctx.lineTo(x,y); else ctx.moveTo(x,y); });
+    ctx.stroke();
+  }
+  line(maps,120,"#38bdf8"); line(lacs,12,"#ff6b6b"); line(cis,5,"#38ef7d");
+  ctx.fillStyle="#94a3b8"; ctx.font="11px sans-serif";
+  for(var hr=0;hr<=6;hr++) ctx.fillText(hr+"h", 16+hr*((w-36)/6), h-4);
+}
+function beep(freq,dur,gain,type){
+  if(!soundOn) return;
+  var C=window.AudioContext||window.webkitAudioContext; if(!C) return;
+  if(!audio) audio=new C();
+  if(audio.state!=="running") audio.resume();
+  var o=audio.createOscillator(), g=audio.createGain(), t=audio.currentTime;
+  o.type=type||"sine"; o.frequency.value=freq; g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  o.connect(g); g.connect(audio.destination); o.start(t); o.stop(t+dur+0.02);
+}
+function tickAudio(){
+  if(!shown||!soundOn) return;
+  var now=performance.now(), hr=shown.shown.hr, gap=60000/Math.max(40,hr);
+  if(now-pulseAt>gap){ pulseAt=now; var weak=shown.map<65||shown.pp<25; beep(weak?480:880,0.06,weak?0.12:0.22,"sine"); }
+  if(shown.map<65 && now-alarmAt>1400){ alarmAt=now; beep(880,0.14,0.18,"square"); setTimeout(function(){ beep(620,0.16,0.18,"square"); },160); }
+}
+function loop(){ drawArt(); drawIvc(); tickAudio(); requestAnimationFrame(loop); }
+document.querySelectorAll("input,select").forEach(function(el){ el.addEventListener("input", calculate); });
+$("soundBtn").onclick=function(){
+  soundOn=!soundOn; this.textContent=soundOn?"Sound on":"Sound off";
+  var C=window.AudioContext||window.webkitAudioContext; if(C){ if(!audio) audio=new C(); audio.resume(); }
+};
+window.addEventListener("resize", function(){ if(shown) drawTraj(shown); });
+paintChips(); loadCase(0); loop();
+</script>
+</body>
+</html>
