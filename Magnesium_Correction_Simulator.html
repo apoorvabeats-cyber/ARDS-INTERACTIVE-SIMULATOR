@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Electrolyte Management — Magnesium (DRAFT)</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  tailwind.config = { corePlugins: { preflight: false } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#eef4f7; --bg2:#e1ecf1; --line:#c3d5de; --ink:#2b4756; --ink-dim:#5d7986;
+    --title:#0b2230; --accent:#1f6d8a; --accent-dark:#1f6d8a; --nav-prev:#d3e2e9;
+    --card:#ffffff; --card-ink:#122733;
+    --high:#c0392b; --high-bg:#fdecea;
+    --low:#1f6d8a; --low-bg:#e9f4f8;
+    --warn:#a06f00; --warn-bg:#fdf6e3;
+    --good:#1e7d4f; --good-bg:#e8f6ee;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0b1a20; --bg2:#0f2530; --line:#2e4d5c; --ink:#bcd4dc; --ink-dim:#7fa0ac;
+      --title:#ffffff; --accent:#3fa9c9; --nav-prev:#1c3844;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b1a20; --bg2:#0f2530; --line:#2e4d5c; --ink:#bcd4dc; --ink-dim:#7fa0ac;
+    --title:#ffffff; --accent:#3fa9c9; --nav-prev:#1c3844;
+  }
+  *{box-sizing:border-box}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--ink);min-height:100%;
+  }
+  .draft-banner{
+    background:#5a1a1a;color:#ffd9d0;text-align:center;font-size:12px;font-weight:700;
+    letter-spacing:.3px;padding:7px 10px;
+  }
+  header{padding:18px 16px 14px;text-align:center;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--bg2),var(--bg))}
+  header h1{margin:0 0 3px;font-size:19px;color:var(--title)}
+  header p{margin:0;font-size:12.5px;color:var(--ink-dim)}
+  .wrap{max-width:640px;margin:0 auto;padding:16px 16px 110px}
+
+  .phase{display:none}
+  .phase.active{display:block}
+
+  .step-tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--accent);margin-bottom:4px}
+  .step-title{color:var(--title);font-size:20px;margin:0 0 14px}
+
+  .card{background:var(--card);color:var(--card-ink);border-radius:12px;padding:16px;margin-bottom:12px;border-left:4px solid var(--accent-dark);border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .card h3{margin:0 0 10px;font-size:14px;color:var(--accent-dark)}
+  .card p{margin:0 0 8px;font-size:14px;line-height:1.55}
+  .card p:last-child{margin-bottom:0}
+  .muted{color:#5a6d75;font-size:12.5px}
+
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:#5a6d75;margin-bottom:4px}
+  .field input,.field select{
+    width:100%;padding:10px;border:1px solid #cfd9dd;border-radius:8px;font-size:15px;
+    background:#fbfdfe;color:var(--card-ink);
+  }
+  .field-row{display:flex;gap:10px}
+  .field-row .field{flex:1;min-width:0}
+
+  .btn{
+    display:block;width:100%;background:var(--accent-dark);color:#fff;border:none;border-radius:9px;
+    padding:12px;font-size:14px;font-weight:600;margin-bottom:8px;cursor:pointer;text-align:center;
+  }
+  .btn:active{background:#164f65}
+  .btn.choice{background:#fbfdfe;color:var(--card-ink);border:1.5px solid #cfd9dd}
+  .btn.choice.correct{background:var(--good-bg);border-color:var(--good);color:var(--good)}
+  .btn.choice.incorrect{background:var(--high-bg);border-color:var(--high);color:var(--high)}
+  .btn.choice.picked{background:var(--low-bg);border-color:var(--low);color:var(--low)}
+  .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  .choice-grid.one{grid-template-columns:1fr}
+
+  .result{border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.55;margin-top:8px}
+  .result.high{background:var(--high-bg);color:var(--high)}
+  .result.warn{background:var(--warn-bg);color:var(--warn)}
+  .result.good{background:var(--good-bg);color:var(--good)}
+  .result.info{background:var(--low-bg);color:var(--low)}
+  .result b{font-weight:700}
+  .result ul{margin:6px 0 0;padding-left:18px}
+  .next-action{font-weight:700;margin-top:6px;display:block}
+
+  .checkbox-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13.5px;color:var(--card-ink)}
+  .checkbox-row input{width:auto}
+  .checkbox-row label{margin:0;font-size:13.5px;color:var(--card-ink)}
+
+  table.mini{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+  table.mini th{color:#5a6d75;text-align:left;font-weight:600;padding:3px 4px 3px 0}
+  table.mini td{padding:3px 4px 3px 0;border-top:1px solid rgba(0,0,0,.08)}
+
+  .nav-bar{
+    position:fixed;left:0;right:0;bottom:0;background:var(--bg2);border-top:1px solid var(--line);
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));
+    display:flex;gap:10px;max-width:640px;margin:0 auto;z-index:20;
+  }
+  .nav-bar button{
+    flex:1;padding:12px;border-radius:9px;border:none;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .nav-prev{background:var(--nav-prev);color:var(--ink)}
+  .nav-next{background:var(--accent-dark);color:#fff}
+  .nav-bar button:disabled{opacity:.4}
+
+  .hidden{display:none}
+  .tag-lo{color:#1f6d8a}
+  .tag-hi{color:#c0392b}
+  body.embed .draft-banner, body.embed header{display:none}
+  body.embed .wrap{padding-top:10px}
+</style>
+</head>
+<body>
+
+<div class="draft-banner">⚠ DRAFT — decision-support aid for review; verify doses against local protocol</div>
+
+<header>
+  <h1>Electrolyte Management — Magnesium</h1>
+  <p>Step-by-step case-driven algorithm (draft)</p>
+</header>
+
+<div class="wrap">
+
+  <!-- INTRO -->
+  <div class="phase active" id="p-intro">
+    <div class="step-tag">ELECTROLYTE CASE SIMULATOR</div>
+    <h2 class="step-title">Serum Magnesium</h2>
+    <div class="card">
+      <p>This is a dynamic, case-driven walkthrough. Enter the serum magnesium on the next page — the simulator will determine whether this is hypomagnesaemia or hypermagnesaemia and route the case accordingly.</p>
+      <p>Tap <b>NEXT</b> below to begin.</p>
+    </div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="phase" id="p-step1">
+    <div class="step-tag">STEP 1</div>
+    <h2 class="step-title">Enter Magnesium Level</h2>
+    <div class="card">
+      <div class="field">
+        <label>Serum Mg²⁺ (mg/dL) — normal 1.7–2.5 (1 mg/dL = 0.41 mmol/L)</label>
+        <input type="number" id="s1_mg" step="0.1" placeholder="e.g. 1.1 or 7.5" oninput="onStep1Input()">
+      </div>
+      <div id="s1_result"></div>
+    </div>
+  </div>
+
+  <!-- ================= HYPOMAGNESAEMIA PATH ================= -->
+
+  <!-- ML STEP 2 -->
+  <div class="phase" id="p-ml2">
+    <div class="step-tag tag-lo">STEP 2 · HYPOMAGNESAEMIA</div>
+    <h2 class="step-title">Urgency &amp; Risk Assessment</h2>
+    <div class="card">
+      <p class="muted">Decides whether replacement can be oral or needs IV, and whether an immediate bolus is needed. Arrhythmia and seizures drive urgency more than the number.</p>
+      <div class="field">
+        <label>12-lead ECG / rhythm</label>
+        <select id="ml_ecg" onchange="onMl2Input()">
+          <option value="unknown">ECG not yet done — get one now</option>
+          <option value="normal">Normal ECG</option>
+          <option value="qt">Prolonged QT / wide QRS / frequent ectopy</option>
+          <option value="arr">Torsades / VT / VF</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Neuromuscular / CNS features</label>
+        <select id="ml_neuro" onchange="onMl2Input()">
+          <option value="none">None</option>
+          <option value="mild">Tremor, cramps, hyperreflexia, Chvostek / Trousseau sign</option>
+          <option value="severe">Seizure, delirium or severe tetany</option>
+        </select>
+      </div>
+      <div class="checkbox-row"><input type="checkbox" id="ml_dig" onchange="onMl2Input()"> <label for="ml_dig">On digoxin</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ml_gut" checked onchange="onMl2Input()"> <label for="ml_gut">Gut usable (tolerating oral / enteral intake)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ml_hypok" onchange="onMl2Input()"> <label for="ml_hypok">Hypokalaemia present (K⁺ &lt;3.5)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ml_hypoca" onchange="onMl2Input()"> <label for="ml_hypoca">Hypocalcaemia present (Ca²⁺ &lt;8.5 mg/dL)</label></div>
+      <div class="field" style="margin-top:6px">
+        <label>Renal function</label>
+        <select id="ml_renal" onchange="onMl2Input()">
+          <option value="normal">Normal / mildly reduced</option>
+          <option value="impaired">eGFR &lt;30, AKI or oliguric</option>
+        </select>
+      </div>
+      <div id="ml2_result"></div>
+    </div>
+  </div>
+
+  <!-- ML STEP 3 -->
+  <div class="phase" id="p-ml3">
+    <div class="step-tag tag-lo">STEP 3 · HYPOMAGNESAEMIA</div>
+    <h2 class="step-title">Determine the Mechanism</h2>
+    <div class="card">
+      <p class="muted">Fractional excretion of Mg²⁺ (FEMg) separates renal wasting from GI / extrarenal loss. Use a urine sample taken <i>before</i> a large Mg²⁺ dose. FEMg is unreliable right after IV magnesium.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Urine Mg²⁺ (mg/dL)</label>
+          <input type="number" step="0.1" id="ml_umg" placeholder="e.g. 4.0" oninput="onMl3Input()">
+        </div>
+        <div class="field">
+          <label>Urine creatinine (mg/dL)</label>
+          <input type="number" step="1" id="ml_ucr" placeholder="e.g. 90" oninput="onMl3Input()">
+        </div>
+      </div>
+      <div class="field">
+        <label>Serum creatinine (mg/dL)</label>
+        <input type="number" step="0.1" id="ml_scr" placeholder="e.g. 0.9" oninput="onMl3Input()">
+      </div>
+      <p class="muted" style="margin-bottom:6px">History (tick all that apply):</p>
+      <div class="checkbox-row"><input type="checkbox" id="ml_h_ppi" onchange="onMl3Input()"> <label for="ml_h_ppi">Long-term PPI</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ml_h_diur" onchange="onMl3Input()"> <label for="ml_h_diur">Loop / thiazide diuretic</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ml_h_nephro" onchange="onMl3Input()"> <label for="ml_h_nephro">Aminoglycoside, amphotericin B, cisplatin, cetuximab or calcineurin inhibitor</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ml_h_alc" onchange="onMl3Input()"> <label for="ml_h_alc">Chronic alcohol use</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ml_h_gi" onchange="onMl3Input()"> <label for="ml_h_gi">Diarrhoea, malabsorption, short gut or pancreatitis</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ml_h_crrt" onchange="onMl3Input()"> <label for="ml_h_crrt">CRRT / dialysis, massive transfusion or poor intake / TPN without Mg²⁺</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ml_h_dm" onchange="onMl3Input()"> <label for="ml_h_dm">Uncontrolled diabetes / DKA, refeeding or hypercalcaemia</label></div>
+      <div id="ml3_result"></div>
+      <p class="muted" style="margin-top:10px;font-size:11.5px">
+        <b>A. Extrarenal</b> — GI loss, PPIs (impaired gut absorption), pancreatitis, poor intake / TPN, CRRT, massive transfusion (citrate)<br>
+        <b>B. Renal</b> — diuretics, aminoglycosides, amphotericin B, cisplatin, cetuximab, tacrolimus / ciclosporin, alcohol, hypercalcaemia, osmotic diuresis, Gitelman
+      </p>
+    </div>
+  </div>
+
+  <!-- ML STEP 4 -->
+  <div class="phase" id="p-ml4">
+    <div class="step-tag tag-lo">STEP 4 · HYPOMAGNESAEMIA</div>
+    <h2 class="step-title">Calculate Replacement</h2>
+    <div class="card">
+      <div class="field-row">
+        <div class="field">
+          <label>Current Mg²⁺ (mg/dL)</label>
+          <input type="number" step="0.1" id="ml4_mg" oninput="onMl4Input()">
+        </div>
+        <div class="field">
+          <label>Target Mg²⁺ (mg/dL)</label>
+          <input type="number" step="0.1" id="ml4_target" value="2.0" oninput="onMl4Input()">
+        </div>
+      </div>
+      <p class="muted" style="margin-top:-4px">Serum Mg²⁺ reflects &lt;1% of body stores, so the deficit is a rough guide. Replace beyond the point where the level normalises.</p>
+      <div id="ml4_result"></div>
+      <div id="ml4_routeWrap" class="hidden">
+        <p style="font-size:13px;color:#5a6d75;margin:10px 0 6px">Select route of replacement:</p>
+        <div class="choice-grid one">
+          <button class="btn choice" data-route="oral" onclick="chooseMlRoute('oral',this)">Oral / enteral magnesium</button>
+          <button class="btn choice" data-route="iv" onclick="chooseMlRoute('iv',this)">IV MgSO₄ — planned infusion</button>
+          <button class="btn choice" data-route="bolus" onclick="chooseMlRoute('bolus',this)">IV MgSO₄ — emergency bolus</button>
+        </div>
+        <div id="ml4_routeResult"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ML DASHBOARD -->
+  <div class="phase" id="p-mldash">
+    <div class="step-tag tag-lo">QUICK DASHBOARD</div>
+    <h2 class="step-title">Hypomagnesemia Clinical Engine</h2>
+    <div id="mlRoot" class="text-slate-800" style="background:#f8fafc;border-radius:14px;padding:14px;margin:0 -2px">
+
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <p class="text-xs text-slate-500 font-medium">Mg²⁺ Deficit Planner • Oral / IV MgSO₄ Replacement Simulator</p>
+        <div class="flex items-center gap-2">
+          <button onclick="openModal('mlGuide')" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200">📖 Clinical Protocols</button>
+          <button onclick="resetMlDefaults()" class="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200">🔄 Reset</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+        <section class="lg:col-span-5 space-y-5">
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">1</span>
+                Serum Mg²⁺ &amp; Target
+              </h2>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <div class="flex justify-between items-center mb-1.5">
+                  <label class="text-xs font-bold text-slate-700">Current Serum Mg²⁺</label>
+                  <div class="flex items-center gap-1 bg-sky-50 border border-sky-200 rounded-lg px-2 py-0.5">
+                    <input type="number" step="0.1" id="mlMgNum" min="0.3" max="1.6" value="1.0" class="w-12 text-sm font-black text-sky-700 bg-transparent text-right focus:outline-none">
+                    <span class="text-xs font-bold text-sky-800">mg/dL</span>
+                  </div>
+                </div>
+                <input type="range" id="mlMgSlider" min="0.3" max="1.6" step="0.1" value="1.0" class="mt-1 w-full accent-sky-600 cursor-pointer">
+                <div class="flex justify-between text-[10px] text-slate-400 font-semibold mt-1">
+                  <span>0.3 (Critical)</span><span>1.0 (Severe)</span><span>1.6 (Mild)</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Target Mg²⁺ (mg/dL)</label>
+                  <input type="number" step="0.1" id="mlTarget" value="2.0" min="1.7" max="2.5" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Renal function</label>
+                  <select id="mlRenal" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="normal">Normal / mild ↓</option>
+                    <option value="impaired">eGFR &lt;30 / AKI (dose ×0.5)</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Quick Target Presets:</span>
+                <div class="grid grid-cols-3 gap-1.5">
+                  <button onclick="setMlTarget(1.8)" class="py-1 px-2 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200">1.8</button>
+                  <button onclick="setMlTarget(2.0)" class="py-1 px-2 text-[11px] font-bold bg-sky-100 hover:bg-sky-200 text-sky-800 rounded border border-sky-200">2.0</button>
+                  <button onclick="setMlTarget(2.2)" class="py-1 px-2 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200">2.2</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">2</span>
+                Route, Product &amp; Ongoing Losses
+              </h2>
+            </div>
+            <div class="space-y-4">
+              <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button id="mlBtnOral" onclick="setMlRoute('oral')" class="py-2 px-1 text-[11px] font-bold rounded-lg">💊 Oral</button>
+                <button id="mlBtnIv" onclick="setMlRoute('iv')" class="py-2 px-1 text-[11px] font-bold rounded-lg">💉 IV MgSO₄</button>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1" id="mlConcLabel">Product</label>
+                <select id="mlConc" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2.5"></select>
+                <p class="text-[10px] text-slate-400 mt-1" id="mlConcNote"></p>
+              </div>
+              <div id="mlIvWrap">
+                <div class="flex justify-between mb-1">
+                  <label class="text-xs font-bold text-slate-700">Infusion rate (g MgSO₄/h)</label>
+                  <span id="mlRateDisp" class="text-xs font-bold text-sky-700">0.5</span>
+                </div>
+                <input type="range" id="mlRate" min="0.25" max="2" step="0.25" value="0.5" class="w-full accent-sky-600 cursor-pointer">
+              </div>
+              <div id="mlOralWrap" class="hidden">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Doses per day</label>
+                <select id="mlFreq" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                  <option value="1">1 (daily)</option>
+                  <option value="2" selected>2 (q12h)</option>
+                  <option value="3">3 (q8h)</option>
+                </select>
+              </div>
+              <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Ongoing Mg²⁺ losses (g MgSO₄-equivalent/day) — optional</label>
+                <input type="number" step="0.5" min="0" id="mlLoss" value="0" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                <p class="text-[10px] text-slate-500 mt-1 leading-tight">Diarrhoea, high-output fistula, CRRT effluent, diuretics or tubulopathy. Subtracted from net delivery.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lg:col-span-7 space-y-5">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">MgSO₄ to Target</span>
+              <div class="mt-2"><span id="outMlDef" class="text-lg font-black text-sky-700 tracking-tight">3–6</span><span class="text-xs font-bold text-sky-600 ml-0.5">g</span></div>
+              <p class="text-[10px] text-slate-400 mt-1">Estimated range</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Plan Replacement</span>
+              <div class="mt-2"><span id="outMlPlan" class="text-xl font-black text-slate-900 tracking-tight">6</span><span class="text-xs font-bold text-slate-500 ml-0.5">g</span></div>
+              <p class="text-[10px] text-slate-400 mt-1">Low end, then recheck</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Max Safe Rate</span>
+              <div class="mt-2"><span id="outMlCap" class="text-xl font-black text-slate-900 tracking-tight">1</span><span class="text-xs font-bold text-slate-500 ml-0.5" id="outMlCapUnit">g/h</span></div>
+              <p class="text-[10px] text-slate-400 mt-1" id="outMlCapSub">Planned infusion</p>
+            </div>
+            <div class="bg-white border-2 border-sky-300 bg-sky-50/40 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-sky-900 uppercase tracking-wider">Prescribed</span>
+              <div class="mt-1"><span id="outMlPresc" class="text-2xl font-black text-sky-700 tracking-tight">12</span><span id="outMlPrescUnit" class="text-xs font-bold text-sky-800 ml-0.5">mL/hr</span></div>
+              <p id="outMlPrescSub" class="text-[10px] font-bold text-sky-800 mt-0.5">0.5 g/h</p>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📈 24-Hour Estimated Serum Mg²⁺ Band</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Upper vs lower estimate. Roughly half of an IV dose is excreted in urine, so real rises are small — recheck Mg²⁺, don't extrapolate.</p>
+              <div class="flex flex-wrap items-center gap-3 text-[10px] font-bold mt-1.5">
+                <span class="flex items-center gap-1 text-sky-700"><span class="w-2.5 h-2.5 rounded-full bg-sky-600 inline-block"></span> Upper estimate</span>
+                <span class="flex items-center gap-1 text-slate-600"><span class="w-2.5 h-2.5 rounded-full bg-slate-500 inline-block"></span> Lower estimate</span>
+                <span class="flex items-center gap-1 text-rose-600"><span class="w-2.5 h-0.5 bg-rose-600 inline-block"></span> 2.5 ceiling</span>
+              </div>
+            </div>
+            <div class="h-60 w-full relative"><canvas id="mlChart"></canvas></div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider mb-3">🗂️ Predictive Timeline Breakdown</h2>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                    <th class="p-2.5">Time</th><th class="p-2.5">Est. Mg²⁺ range</th><th class="p-2.5">Net given</th><th class="p-2.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="mlTbody" class="text-xs font-medium text-slate-700 divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📝 Clinical Prescription &amp; Action Plan</h2>
+              <button onclick="copyText('mlOrder','mlCopyTxt')" class="px-2.5 py-1 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md border border-slate-200">📋 <span id="mlCopyTxt">Copy Order</span></button>
+            </div>
+            <div id="mlSafety" class="mb-4"></div>
+            <div class="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-xs leading-relaxed border border-slate-800">
+              <div class="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-2 mb-2 text-[10px] uppercase font-bold tracking-wider">
+                <span>🩺 Medical Order draft</span><span id="mlOrderTime">Updated Live</span>
+              </div>
+              <pre id="mlOrder" class="whitespace-pre-wrap font-mono text-xs text-emerald-400"></pre>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="mlGuide" class="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+        <div class="p-5 border-b border-slate-200 flex justify-between items-center sticky top-0 bg-white z-10">
+          <h3 class="text-base font-extrabold text-slate-900">📖 Hypomagnesemia Protocols &amp; References</h3>
+          <button onclick="closeModal('mlGuide')" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600">✕</button>
+        </div>
+        <div class="p-6 space-y-5 text-xs text-slate-700 leading-relaxed">
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">1. Replacement Safety Limits</h4>
+            <ul class="list-disc list-inside space-y-1 font-semibold text-slate-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+              <li><strong>Planned IV infusion:</strong> MgSO₄ at ≤1 g/h (4% = 40 mg/mL or more dilute). Slower infusion loses less in urine.</li>
+              <li><strong>Emergency (torsades, seizure):</strong> 2 g IV over 5–15 min, then a planned infusion. Pulseless torsades: 1–2 g IV push.</li>
+              <li><strong>eGFR &lt;30 / AKI / oliguria:</strong> halve the dose and recheck the level before repeating — hypermagnesaemia risk.</li>
+              <li>Stop if patellar reflexes fade, RR &lt;12, hypotension or urine output &lt;30 mL/h.</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">2. Deficit Estimate Used Here</h4>
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1 font-mono text-[11px]">
+              <div>1 g MgSO₄·7H₂O = 8.1 mEq = 4.06 mmol ≈ 98.6 mg elemental Mg</div>
+              <div>Serum rise ≈ 0.08–0.15 mg/dL per g retained</div>
+              <div>FEMg = (UMg × SCr) / (0.7 × PMg × UCr) × 100</div>
+            </div>
+            <p class="mt-2">Serum Mg²⁺ reflects &lt;1% of total body Mg²⁺, so these are approximations. About half of an IV dose is excreted within hours; stores take days to refill — continue replacement for 1–2 days after the level normalises.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">3. Oral Magnesium</h4>
+            <p>Only for mild, asymptomatic cases with a working gut. Absorption is ~30% and diarrhoea limits the dose; organic salts (glycinate, citrate, lactate) are often better tolerated than oxide.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">4. Refractory Hypokalaemia / Hypocalcaemia</h4>
+            <p>Low Mg²⁺ causes renal K⁺ wasting and PTH resistance. Potassium and calcium will often not correct until Mg²⁺ is replaced — give it concurrently.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">5. Monitoring</h4>
+            <ul class="list-disc list-inside space-y-1 text-slate-600">
+              <li>Check Mg²⁺ about 6 h after an infusion ends (immediate levels overestimate), then daily.</li>
+              <li>Continuous ECG if arrhythmia or QT prolongation; keep K⁺ ≥4.0 and avoid QT-prolonging drugs.</li>
+              <li>Check reflexes, respiratory rate and BP during infusion, especially with renal impairment.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+          <button onclick="closeModal('mlGuide')" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold">Close Guide</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ML STEP 5 -->
+  <div class="phase" id="p-ml5">
+    <div class="step-tag tag-lo">STEP 5 · HYPOMAGNESAEMIA</div>
+    <h2 class="step-title">Dynamic Reassessment</h2>
+    <div class="card">
+      <div id="ml5_intro"></div>
+      <div class="field-row">
+        <div class="field">
+          <label>Hours since last check</label>
+          <input type="number" step="0.5" id="ml5_hours" placeholder="e.g. 6 or 24">
+        </div>
+        <div class="field">
+          <label>New serum Mg²⁺ (mg/dL)</label>
+          <input type="number" step="0.1" id="ml5_new" placeholder="e.g. 1.6">
+        </div>
+      </div>
+      <div class="field">
+        <label>Patellar reflexes</label>
+        <select id="ml5_reflex">
+          <option value="normal">Normal</option>
+          <option value="reduced">Reduced</option>
+          <option value="absent">Absent</option>
+        </select>
+      </div>
+      <button class="btn" onclick="logMlReading()">Log this reading</button>
+      <div id="ml5_result"></div>
+      <div id="ml5_log"></div>
+    </div>
+  </div>
+
+  <!-- ================= HYPERMAGNESAEMIA PATH ================= -->
+
+  <!-- MH STEP 2 -->
+  <div class="phase" id="p-mh2">
+    <div class="step-tag tag-hi">STEP 2 · HYPERMAGNESAEMIA</div>
+    <h2 class="step-title">Severity &amp; Clinical Risk</h2>
+    <div class="card">
+      <p class="muted">Symptoms track the level: reflexes fade first, then breathing and conduction fail. Examine reflexes and respiratory effort now.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Deep tendon reflexes</label>
+          <select id="mh_reflex" onchange="onMh2Input()">
+            <option value="normal">Normal</option>
+            <option value="reduced">Reduced</option>
+            <option value="absent">Absent</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Breathing</label>
+          <select id="mh_resp" onchange="onMh2Input()">
+            <option value="normal">Normal</option>
+            <option value="low">RR &lt;12 / hypoventilation</option>
+            <option value="apnoea">Apnoea / respiratory failure</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>12-lead ECG</label>
+        <select id="mh_ecg" onchange="onMh2Input()">
+          <option value="unknown">ECG not yet done — get one now</option>
+          <option value="normal">Normal ECG</option>
+          <option value="mild">Long PR / wide QRS / bradycardia</option>
+          <option value="severe">Complete heart block / asystole / arrest</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Renal function</label>
+        <select id="mh_renal" onchange="onMh2Input()">
+          <option value="normal">Normal / mildly reduced</option>
+          <option value="impaired">AKI or eGFR &lt;30</option>
+          <option value="anuric">Oliguric / anuric / dialysis-dependent</option>
+        </select>
+      </div>
+      <div class="checkbox-row"><input type="checkbox" id="mh_hypot" onchange="onMh2Input()"> <label for="mh_hypot">Hypotension</label></div>
+      <p class="muted" style="margin:4px 0 6px">Magnesium source (tick all that apply):</p>
+      <div class="checkbox-row"><input type="checkbox" id="mh_s_inf" onchange="onMh2Input()"> <label for="mh_s_inf">MgSO₄ infusion (e.g. pre-eclampsia) or IV replacement</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="mh_s_ant" onchange="onMh2Input()"> <label for="mh_s_ant">Mg-containing antacids, laxatives, enemas or Epsom salts</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="mh_s_tpn" onchange="onMh2Input()"> <label for="mh_s_tpn">TPN / replacement dosing error or lithium use</label></div>
+      <div id="mh2_result"></div>
+    </div>
+  </div>
+
+  <!-- MH STEP 3 -->
+  <div class="phase" id="p-mh3">
+    <div class="step-tag tag-hi">STEP 3 · HYPERMAGNESAEMIA</div>
+    <h2 class="step-title">Stop the Source &amp; Antagonise</h2>
+    <div class="card">
+      <div id="mh3_status"></div>
+      <p style="font-size:13px;color:#5a6d75;margin:12px 0 6px">Which agent comes <b>first</b> for hypermagnesaemia with respiratory depression or conduction changes?</p>
+      <div class="choice-grid">
+        <button class="btn choice" onclick="chooseMhAgent('ca',this)">IV calcium</button>
+        <button class="btn choice" onclick="chooseMhAgent('lasix',this)">Saline + furosemide</button>
+        <button class="btn choice" onclick="chooseMhAgent('hd',this)">Haemodialysis</button>
+        <button class="btn choice" onclick="chooseMhAgent('ins',this)">Insulin + dextrose</button>
+        <button class="btn choice" onclick="chooseMhAgent('bic',this)">Sodium bicarbonate</button>
+        <button class="btn choice" onclick="chooseMhAgent('stop',this)">Just stop Mg sources</button>
+      </div>
+      <div id="mh3_agentResult"></div>
+    </div>
+  </div>
+
+  <!-- MH STEP 4 -->
+  <div class="phase" id="p-mh4">
+    <div class="step-tag tag-hi">STEP 4 · HYPERMAGNESAEMIA</div>
+    <h2 class="step-title">Eliminate Magnesium</h2>
+    <div class="card">
+      <p class="muted">Calcium buys 30–60 minutes only. Mg²⁺ is cleared by the kidney (or dialysis) — pick the route that matches renal function.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Urine output</label>
+          <select id="mh_uo" onchange="onMh4Input()">
+            <option value="">— select —</option>
+            <option value="good">Adequate (&gt;0.5 mL/kg/h)</option>
+            <option value="low">Reduced / oliguric</option>
+            <option value="none">Anuric</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Volume status</label>
+          <select id="mh_vol" onchange="onMh4Input()">
+            <option value="">— select —</option>
+            <option value="hypo">Hypovolaemic</option>
+            <option value="eu">Euvolaemic</option>
+            <option value="hyper">Hypervolaemic</option>
+          </select>
+        </div>
+      </div>
+      <div id="mh4_result"></div>
+    </div>
+  </div>
+
+  <!-- MH DASHBOARD -->
+  <div class="phase" id="p-mhdash">
+    <div class="step-tag tag-hi">QUICK DASHBOARD</div>
+    <h2 class="step-title">Hypermagnesemia Clinical Engine</h2>
+    <div id="mhRoot" class="text-slate-800" style="background:#f8fafc;border-radius:14px;padding:14px;margin:0 -2px">
+
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <p class="text-xs text-slate-500 font-medium">Antagonise • Clear • Dialyse — Indicative Mg²⁺ Timeline &amp; Order Builder</p>
+        <div class="flex items-center gap-2">
+          <button onclick="openModal('mhGuide')" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200">📖 Clinical Protocols</button>
+          <button onclick="resetMhDefaults()" class="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200">🔄 Reset</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+        <section class="lg:col-span-5 space-y-5">
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">1</span>
+                Patient Mg²⁺ &amp; Physiology
+              </h2>
+              <span id="mhSevTag" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">Severe</span>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <div class="flex justify-between items-center mb-1.5">
+                  <label class="text-xs font-bold text-slate-700">Current Serum Mg²⁺</label>
+                  <div class="flex items-center gap-1 bg-rose-50 border border-rose-200 rounded-lg px-2 py-0.5">
+                    <input type="number" step="0.1" id="mhMgNum" min="2.6" max="20" value="9.0" class="w-12 text-sm font-black text-rose-600 bg-transparent text-right focus:outline-none">
+                    <span class="text-xs font-bold text-rose-700">mg/dL</span>
+                  </div>
+                </div>
+                <input type="range" id="mhMgSlider" min="2.6" max="20" step="0.1" value="9" class="mt-1 w-full accent-rose-600 cursor-pointer">
+                <div class="flex justify-between text-[10px] text-slate-400 font-semibold mt-1">
+                  <span>2.6 (Mild)</span><span>5 (Moderate)</span><span>9+ (Severe)</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Renal function</label>
+                  <select id="mhRenal" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="normal">Normal / mild ↓</option>
+                    <option value="impaired">AKI / eGFR &lt;30</option>
+                    <option value="anuric">Anuric / dialysis</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Ongoing Mg²⁺ intake</label>
+                  <select id="mhLoad" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="0">Source stopped</option>
+                    <option value="0.1">Slow (+0.1 mg/dL/h)</option>
+                    <option value="0.3">Ongoing infusion (+0.3/h)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="checkbox-row" style="margin-bottom:0">
+                <input type="checkbox" id="mhSym" class="w-4 h-4"> <label for="mhSym" class="text-xs font-bold text-slate-700">Areflexia, respiratory depression or ECG changes</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">2</span>
+                Therapies to Model
+              </h2>
+            </div>
+            <div class="space-y-2.5 text-xs">
+              <label class="flex items-start gap-2 p-2 bg-amber-50/60 border border-amber-200 rounded-lg cursor-pointer"><input type="checkbox" id="mhCa" class="mt-0.5" checked> <span><b>IV calcium</b> — antagonises the neuromuscular and cardiac effects for 30–60 min; does not lower Mg²⁺ (not in curve)</span></label>
+              <label class="flex items-start gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer"><input type="checkbox" id="mhLoop" class="mt-0.5" checked> <span><b>Saline + loop diuretic</b> — about doubles renal clearance; needs urine output</span></label>
+              <div class="p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="mhHd"> <span><b>Haemodialysis</b> — fastest clearance over a ~4 h session, partial rebound after</span></label>
+                <div class="mt-2">
+                  <label class="block text-[10px] font-bold text-slate-600 mb-1">Time until dialysis starts</label>
+                  <select id="mhHdDelay" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="0">Immediately</option>
+                    <option value="1">In 1 h</option>
+                    <option value="2" selected>In 2 h</option>
+                    <option value="4">In 4 h</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lg:col-span-7 space-y-5">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-white border border-amber-200 bg-amber-50/40 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-amber-900 uppercase tracking-wider">IV Calcium</span>
+              <div class="mt-2"><span class="text-xl font-black text-amber-700 tracking-tight">10–20</span><span class="text-xs font-bold text-amber-800 ml-0.5">mL</span></div>
+              <p class="text-[10px] text-slate-500 mt-1">10% Ca gluconate</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Furosemide</span>
+              <div class="mt-2"><span class="text-xl font-black text-slate-900 tracking-tight">20–40</span><span class="text-xs font-bold text-slate-500 ml-0.5">mg IV</span></div>
+              <p id="outMhFur" class="text-[10px] text-slate-400 mt-1">After 1–2 L saline</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Est. Mg²⁺ at 2 h</span>
+              <div class="mt-2"><span id="outMh2" class="text-xl font-black text-blue-600 tracking-tight">8.1</span><span class="text-xs font-bold text-blue-500 ml-0.5">mg/dL</span></div>
+              <p class="text-[10px] text-slate-400 mt-1">Early response</p>
+            </div>
+            <div class="bg-white border-2 border-rose-300 bg-rose-50/40 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-rose-900 uppercase tracking-wider">Est. Mg²⁺ at 12 h</span>
+              <div class="mt-1"><span id="outMh12" class="text-2xl font-black text-rose-600 tracking-tight">4.0</span><span class="text-xs font-bold text-rose-800 ml-0.5">mg/dL</span></div>
+              <p id="outMh12Sub" class="text-[10px] font-bold text-rose-800 mt-0.5">Clearance check</p>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📈 24-Hour Indicative Serum Mg²⁺ Trajectory</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Illustrates how fast clearance acts for the renal state and therapies chosen. It is not a prediction — recheck Mg²⁺.</p>
+              <div class="flex flex-wrap items-center gap-3 text-[10px] font-bold mt-1.5">
+                <span class="flex items-center gap-1 text-rose-600"><span class="w-2.5 h-2.5 rounded-full bg-rose-600 inline-block"></span> Indicative Mg²⁺</span>
+                <span class="flex items-center gap-1 text-red-800"><span class="w-2.5 h-0.5 bg-red-800 inline-block"></span> 9 areflexia / respiratory risk</span>
+                <span class="flex items-center gap-1 text-amber-600"><span class="w-2.5 h-0.5 bg-amber-500 inline-block"></span> 5 symptom threshold</span>
+              </div>
+            </div>
+            <div class="h-60 w-full relative"><canvas id="mhChart"></canvas></div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider mb-3">🗂️ Predictive Timeline Breakdown</h2>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                    <th class="p-2.5">Time</th><th class="p-2.5">Indicative Mg²⁺</th><th class="p-2.5">Δ from start</th><th class="p-2.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="mhTbody" class="text-xs font-medium text-slate-700 divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📝 Clinical Prescription &amp; Action Plan</h2>
+              <button onclick="copyText('mhOrder','mhCopyTxt')" class="px-2.5 py-1 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md border border-slate-200">📋 <span id="mhCopyTxt">Copy Order</span></button>
+            </div>
+            <div id="mhSafety" class="mb-4"></div>
+            <div class="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-xs leading-relaxed border border-slate-800">
+              <div class="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-2 mb-2 text-[10px] uppercase font-bold tracking-wider">
+                <span>🩺 Medical Order draft</span><span id="mhOrderTime">Updated Live</span>
+              </div>
+              <pre id="mhOrder" class="whitespace-pre-wrap font-mono text-xs text-emerald-400"></pre>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="mhGuide" class="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+        <div class="p-5 border-b border-slate-200 flex justify-between items-center sticky top-0 bg-white z-10">
+          <h3 class="text-base font-extrabold text-slate-900">📖 Hypermagnesemia Protocols &amp; References</h3>
+          <button onclick="closeModal('mhGuide')" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600">✕</button>
+        </div>
+        <div class="p-6 space-y-5 text-xs text-slate-700 leading-relaxed">
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">1. Level vs Clinical Picture (approximate)</h4>
+            <ul class="list-disc list-inside space-y-1 font-semibold text-slate-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+              <li><strong>2.6–4.9 mg/dL:</strong> usually silent; nausea, flushing, weakness.</li>
+              <li><strong>5–8.9:</strong> hypotension, drowsiness, reduced reflexes.</li>
+              <li><strong>≥9:</strong> areflexia, respiratory depression, long PR / wide QRS, bradycardia.</li>
+              <li><strong>≥12–15:</strong> paralysis, complete heart block, cardiac arrest.</li>
+              <li>Pre-eclampsia therapeutic range is about 4.8–8.4 mg/dL — stop the infusion if reflexes are lost, RR &lt;12 or urine output &lt;30 mL/h.</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">2. Treatment Order</h4>
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2 text-[11px]">
+              <div><strong>Stop sources:</strong> MgSO₄, antacids, laxatives, enemas, Epsom salts, Mg-containing TPN.</div>
+              <div><strong>Antagonise:</strong> 10% calcium gluconate 10–20 mL (1–2 g) IV over ~10 min; over 3 min if arrest or eclamptic toxicity. Repeat as needed. Effect lasts 30–60 min.</div>
+              <div><strong>Support:</strong> ventilate early if respiratory depression; pace for symptomatic bradycardia; treat hypotension.</div>
+              <div><strong>Clear:</strong> 0.9% saline 1–2 L (if not overloaded) + furosemide 20–40 mg IV with adequate renal function; replace urine losses (K⁺, Ca²⁺ are wasted too).</div>
+              <div><strong>Dialyse:</strong> renal failure, anuria, level ≥9–12 with symptoms, ECG changes, or refractory.</div>
+            </div>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">3. Dialysis Notes</h4>
+            <p>Haemodialysis removes magnesium rapidly; use a low- or Mg-free dialysate. Expect a rebound of roughly 10–25% afterwards — recheck at 2–4 h.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">4. Monitoring</h4>
+            <ul class="list-disc list-inside space-y-1 text-slate-600">
+              <li>Continuous ECG and SpO₂; reflexes and RR every 30–60 min until improving.</li>
+              <li>Mg²⁺ at 1–2 h, 4 h, 6 h, then every 6–12 h until normal and stable.</li>
+              <li>Watch K⁺ and Ca²⁺ during forced diuresis.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+          <button onclick="closeModal('mhGuide')" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold">Close Guide</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MH STEP 5 -->
+  <div class="phase" id="p-mh5">
+    <div class="step-tag tag-hi">STEP 5 · HYPERMAGNESAEMIA</div>
+    <h2 class="step-title">Dynamic Reassessment</h2>
+    <div class="card">
+      <div id="mh5_intro"></div>
+      <div class="field-row">
+        <div class="field">
+          <label>Hours since last check</label>
+          <input type="number" step="0.5" id="mh5_hours" placeholder="e.g. 2 or 6">
+        </div>
+        <div class="field">
+          <label>New serum Mg²⁺ (mg/dL)</label>
+          <input type="number" step="0.1" id="mh5_new" placeholder="e.g. 6.2">
+        </div>
+      </div>
+      <div class="field">
+        <label>Deep tendon reflexes</label>
+        <select id="mh5_reflex">
+          <option value="normal">Normal</option>
+          <option value="reduced">Reduced</option>
+          <option value="absent">Absent</option>
+        </select>
+      </div>
+      <button class="btn" onclick="logMhReading()">Log this reading</button>
+      <div id="mh5_result"></div>
+      <div id="mh5_log"></div>
+    </div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="phase" id="p-summary">
+    <div class="step-tag">SUMMARY</div>
+    <h2 class="step-title">Case Recap</h2>
+    <div class="card" id="summaryOut"></div>
+  </div>
+
+</div>
+
+<div class="nav-bar">
+  <button class="nav-prev" id="navPrev" onclick="goPrev()">← PREVIOUS</button>
+  <button class="nav-next" id="navNext" onclick="goNext()">NEXT →</button>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+let currentPageId='p-intro';
+
+const state={
+  mg:null,
+  lo:{urgent:false,needIV:false,gut:true,emergency:false,renalImpaired:false,ecg:'unknown',triggers:[],
+      hypoK:false,hypoCa:false,mech:null,target:2.0,route:null,defLow:null,defHigh:null},
+  hi:{emergency:false,urgent:false,renal:'normal',ecg:'unknown',reflex:'normal',resp:'normal',
+      src:[],dialysis:false,uo:'',vol:'',agent:null},
+  history:[]
+};
+
+function getPageOrder(){
+  const base=['p-intro','p-step1'];
+  if(state.mg==null) return base;
+  if(state.mg<1.7) return base.concat(['p-ml2','p-ml3','p-ml4','p-mldash','p-ml5','p-summary']);
+  if(state.mg>2.5) return base.concat(['p-mh2','p-mh3','p-mh4','p-mhdash','p-mh5','p-summary']);
+  return base.concat(['p-summary']);
+}
+function showPageById(id){
+  document.querySelectorAll('.phase').forEach(el=>el.classList.remove('active'));
+  const t=$(id); if(t) t.classList.add('active');
+  currentPageId=id;
+  window.scrollTo({top:0,behavior:'smooth'});
+  const order=getPageOrder(), idx=order.indexOf(id);
+  $('navPrev').disabled=idx<=0;
+  $('navNext').textContent=(idx>=0&&idx===order.length-1)?'RESTART':'NEXT →';
+  if(id==='p-ml2') onMl2Input();
+  if(id==='p-ml3') onMl3Input();
+  if(id==='p-ml4') initMl4();
+  if(id==='p-mldash') showMlDash();
+  if(id==='p-ml5') renderMl5Intro();
+  if(id==='p-mh2') onMh2Input();
+  if(id==='p-mh3') renderMh3();
+  if(id==='p-mh4') onMh4Input();
+  if(id==='p-mhdash') showMhDash();
+  if(id==='p-mh5') renderMh5Intro();
+  if(id==='p-summary') renderSummary();
+}
+function goPrev(){ const o=getPageOrder(),i=o.indexOf(currentPageId); if(i>0) showPageById(o[i-1]); }
+function goNext(){
+  if(currentPageId==='p-step1'&&state.mg==null){ $('s1_result').innerHTML='<div class="result warn">Enter a serum Mg²⁺ value first.</div>'; return; }
+  const o=getPageOrder(),i=o.indexOf(currentPageId);
+  if(i===-1){ showPageById(o[o.length-1]); return; }
+  if(i===o.length-1){ location.reload(); return; }
+  showPageById(o[i+1]);
+}
+function openModal(id){ $(id).classList.remove('hidden'); }
+function closeModal(id){ $(id).classList.add('hidden'); }
+function copyText(preId,labelId){
+  const text=$(preId).textContent;
+  const done=()=>{ $(labelId).textContent='Copied!'; setTimeout(()=>{ $(labelId).textContent='Copy Order'; },2000); };
+  const fb=()=>{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); done(); }catch(e){ $(labelId).textContent='Select & copy manually'; }
+    document.body.removeChild(ta); };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done,fb); else fb();
+}
+function alertCard(tone,icon,title,text){
+  const t={rose:['bg-rose-50 border-rose-200','text-rose-900','text-rose-800'],amber:['bg-amber-50 border-amber-200','text-amber-900','text-amber-800'],
+    emerald:['bg-emerald-50 border-emerald-200','text-emerald-900','text-emerald-800'],sky:['bg-sky-50 border-sky-200','text-sky-900','text-sky-800']}[tone];
+  return '<div class="p-3.5 '+t[0]+' border rounded-xl flex gap-3 items-start mb-2"><span>'+icon+'</span><div><h4 class="text-xs font-bold '+t[1]+'">'+title+'</h4><p class="text-xs '+t[2]+' mt-0.5">'+text+'</p></div></div>';
+}
+function statusBadge(label,tone){
+  const m={ok:'bg-emerald-50 text-emerald-700 border-emerald-200',warn:'bg-amber-50 text-amber-700 border-amber-200',bad:'bg-rose-50 text-rose-700 border-rose-200 font-bold',info:'bg-sky-50 text-sky-700 border-sky-200'};
+  return '<span class="px-2 py-0.5 rounded text-[10px] border '+m[tone]+'">'+label+'</span>';
+}
+function ensureBaseline(){
+  if(state.history.length>1&&state.history[0].v!==state.mg) state.history=[];
+  if(!state.history.length) state.history.push({v:state.mg,hours:0,label:'Baseline (Step 1)'});
+  else if(state.history.length===1) state.history[0].v=state.mg;
+}
+function renderHistoryLog(elId){
+  const el=$(elId);
+  if(state.history.length<=1){ el.innerHTML=''; return; }
+  const rows=state.history.map((h,i)=>{
+    if(i===0) return '<tr><td>'+h.label+'</td><td>'+h.v+'</td><td>—</td></tr>';
+    const d=+(h.v-state.history[i-1].v).toFixed(1);
+    return '<tr><td>+'+h.hours+'h</td><td>'+h.v+'</td><td>'+(d>0?'+':'')+d+'</td></tr>';
+  }).join('');
+  el.innerHTML='<p style="font-size:12px;color:#5a6d75;margin:14px 0 4px"><b>Reading log</b></p><table class="mini"><tr><th>Interval</th><th>Mg²⁺</th><th>Δ</th></tr>'+rows+'</table>';
+}
+
+/* ---------------- STEP 1 ---------------- */
+function onStep1Input(){
+  const v=parseFloat($('s1_mg').value), out=$('s1_result');
+  if(isNaN(v)){ state.mg=null; out.innerHTML=''; return; }
+  state.mg=v;
+  const odd=(v<0.3||v>20)?'<div class="result warn">Unusually extreme value — confirm it is not a unit or entry error (mg/dL here; 1 mmol/L = 2.43 mg/dL).</div>':'';
+  if(v<1.7){
+    let sev,cls,icon;
+    if(v<1.0){sev='Severe';cls='high';icon='🔴';} else if(v<1.2){sev='Moderate';cls='warn';icon='🟠';} else{sev='Mild';cls='good';icon='🟡';}
+    out.innerHTML='<div class="result '+cls+'">'+icon+' <b>'+sev+' hypomagnesaemia detected</b> (Mg²⁺ '+v+' mg/dL, &lt;1.7).'+(v<1.0?' Arrhythmia and seizure risk — IV replacement is likely needed.':'')+
+      '<span class="next-action">Next step → Assess urgency (ECG, neuro features, K⁺ / Ca²⁺).</span></div>'+odd; return;
+  }
+  if(v<=2.5){ out.innerHTML='<div class="result good">✅ Mg²⁺ '+v+' mg/dL — within the usual range (1.7–2.5). No magnesium correction indicated.</div>'+odd; return; }
+  let sev,cls,icon;
+  if(v>=9){sev='Severe';cls='high';icon='🔴';} else if(v>=5){sev='Moderate';cls='warn';icon='🟠';} else{sev='Mild';cls='good';icon='🟡';}
+  out.innerHTML='<div class="result '+cls+'">'+icon+' <b>'+sev+' hypermagnesaemia detected</b> (Mg²⁺ '+v+' mg/dL, &gt;2.5).'+(v>=9?' Respiratory and cardiac risk — check reflexes, breathing and ECG now.':'')+
+    '<span class="next-action">Next step → Severity and clinical-risk assessment.</span></div>'+odd;
+}
+
+/* ================= HYPOMAGNESAEMIA ================= */
+function onMl2Input(){
+  const mg=state.mg; if(mg==null) return;
+  const ecg=$('ml_ecg').value, neuro=$('ml_neuro').value;
+  const dig=$('ml_dig').checked, gut=$('ml_gut').checked, hk=$('ml_hypok').checked, hca=$('ml_hypoca').checked;
+  const renal=$('ml_renal').value;
+  const ecgAbn=(ecg==='qt'||ecg==='arr');
+  const emergency=(ecg==='arr'||neuro==='severe');
+  const tr=[];
+  if(mg<1.0) tr.push('Mg²⁺ &lt;1.0 mg/dL');
+  if(ecgAbn) tr.push(ecg==='arr'?'torsades / VT / VF':'QT prolongation, wide QRS or ectopy');
+  if(neuro==='severe') tr.push('seizure, delirium or severe tetany');
+  if(mg<1.2&&dig) tr.push('Mg²⁺ &lt;1.2 on digoxin');
+  const urgent=tr.length>0, needIV=urgent||!gut;
+  Object.assign(state.lo,{urgent,needIV,gut,emergency,renalImpaired:renal==='impaired',ecg,triggers:tr,hypoK:hk,hypoCa:hca});
+
+  let h='';
+  if(ecg==='unknown') h+='<div class="result warn">⚠ No ECG yet — record a 12-lead ECG now. QT prolongation or torsades would make this an emergency.</div>';
+  if(ecg==='arr') h+='<div class="result high">🔴 <b>Torsades / VT.</b> Give MgSO₄ 2 g IV over 5–15 min now regardless of the level (1–2 g IV push if pulseless). Keep K⁺ ≥4.0, stop QT-prolonging drugs, consider overdrive pacing if recurrent.</div>';
+  if(neuro==='severe') h+='<div class="result high">🔴 <b>Seizure / severe tetany.</b> MgSO₄ 2 g IV over 5–10 min, then a planned infusion. Check calcium.</div>';
+  if(urgent) h+='<div class="result high">🔴 <b>High-risk hypomagnesaemia</b> (Mg²⁺ '+mg+' mg/dL) — '+tr.join('; ')+'.<span class="next-action">NEXT ACTION → IV replacement with ECG monitoring. Oral alone is not enough.</span></div>';
+  else if(!gut) h+='<div class="result warn">🟠 Gut not usable — oral magnesium is unreliable.<span class="next-action">NEXT ACTION → IV MgSO₄ infusion.</span></div>';
+  else h+='<div class="result good">✅ No high-risk features. <b>Oral replacement is reasonable</b> for mild cases (Mg²⁺ '+mg+' mg/dL); IV is faster if the level is below ~1.2.<span class="next-action">NEXT ACTION → Find the cause, then replace and recheck.</span></div>';
+  if(hk) h+='<div class="result info">Hypokalaemia will not correct reliably until Mg²⁺ is replaced (renal K⁺ wasting). Replace both.</div>';
+  if(hca) h+='<div class="result info">Hypocalcaemia is likely Mg²⁺-driven (PTH resistance and release failure). Correct Mg²⁺ first.</div>';
+  if(dig) h+='<div class="result info">Low Mg²⁺ potentiates digoxin toxicity — correct promptly and keep K⁺ ≥4.0.</div>';
+  if(renal==='impaired') h+='<div class="result info">Impaired renal function — halve doses and recheck the level before repeating (hypermagnesaemia risk).</div>';
+  $('ml2_result').innerHTML=h;
+}
+function onMl3Input(){
+  const umg=parseFloat($('ml_umg').value), ucr=parseFloat($('ml_ucr').value), scr=parseFloat($('ml_scr').value);
+  const g=id=>$(id).checked;
+  const ppi=g('ml_h_ppi'),diur=g('ml_h_diur'),neph=g('ml_h_nephro'),alc=g('ml_h_alc'),gi=g('ml_h_gi'),crrt=g('ml_h_crrt'),dm=g('ml_h_dm');
+  const out=$('ml3_result');
+  const ren=[]; if(diur) ren.push('loop / thiazide diuretics'); if(neph) ren.push('nephrotoxic drugs'); if(alc) ren.push('alcohol'); if(dm) ren.push('osmotic diuresis / hypercalcaemia');
+  const ext=[]; if(gi) ext.push('GI loss / malabsorption'); if(ppi) ext.push('PPI (reduced gut absorption)'); if(crrt) ext.push('CRRT, transfusion or low intake');
+  if(isNaN(umg)||isNaN(ucr)||isNaN(scr)||ucr<=0){
+    out.innerHTML=(ren.length||ext.length)?'<div class="result info">History noted'+(ren.length?' — renal-loss suspects: '+ren.join(', '):'')+(ext.length?' — extrarenal suspects: '+ext.join(', '):'')+'. Enter urine Mg²⁺, urine creatinine and serum creatinine to calculate FEMg.</div>':'';
+    state.lo.mech=null; return;
+  }
+  const fe=(umg*scr)/(0.7*state.mg*ucr)*100;
+  const renal=fe>2;
+  let t,c,b,a,label;
+  if(renal){
+    c='warn'; label='Renal Mg²⁺ wasting';
+    t='<b>Renal Mg²⁺ wasting</b> (FEMg '+fe.toFixed(1)+'%, &gt;2%)';
+    b=ren.length?'Likely contributors: '+ren.join(', ')+'.':'Think diuretics, aminoglycosides, amphotericin B, cisplatin, cetuximab, tacrolimus / ciclosporin, alcohol, hypercalcaemia, osmotic diuresis, or Gitelman syndrome.';
+    a='NEXT ACTION → Stop or minimise the offending drug where possible; replace Mg²⁺ (ongoing losses mean higher or repeated doses); consider a K⁺-sparing agent (amiloride) for diuretic-related loss.';
+  } else {
+    c='warn'; label='Extrarenal loss / low intake';
+    t='<b>Extrarenal loss or low intake</b> (FEMg '+fe.toFixed(1)+'%, &lt;2% — kidney is conserving)';
+    b=ext.length?'Likely contributors: '+ext.join(', ')+'.':'Think GI loss, malabsorption, PPIs, pancreatitis, poor intake / TPN without Mg²⁺, CRRT or massive transfusion.';
+    a='NEXT ACTION → Replace Mg²⁺ and treat the source (review PPI need, control diarrhoea, add Mg²⁺ to TPN / CRRT fluids).';
+  }
+  state.lo.mech=label;
+  out.innerHTML='<div class="result info">FEMg = (UMg × SCr) / (0.7 × PMg × UCr) × 100 = <b>'+fe.toFixed(1)+'%</b>.</div><div class="result '+c+'">'+t+'.<br>'+b+'<span class="next-action">'+a+'</span></div>';
+}
+
+/* Deficit model: ~0.08–0.15 mg/dL serum rise per g MgSO4 retained */
+const ML_UP=0.15, ML_LO=0.08;
+function initMl4(){ if($('ml4_mg').value==='') $('ml4_mg').value=state.mg; onMl4Input(); }
+function ml4Need(){
+  const m=parseFloat($('ml4_mg').value), t=parseFloat($('ml4_target').value);
+  if(isNaN(m)||isNaN(t)) return null;
+  return {m,t,low:Math.max(0,(t-m)/ML_UP),high:Math.max(0,(t-m)/ML_LO)};
+}
+function onMl4Input(){
+  const n=ml4Need(), out=$('ml4_result'), wrap=$('ml4_routeWrap');
+  if(!n){ out.innerHTML=''; wrap.classList.add('hidden'); return; }
+  state.lo.target=n.t; state.lo.defLow=n.low; state.lo.defHigh=n.high;
+  if(n.low<=0){ out.innerHTML='<div class="result good">Current Mg²⁺ is already at or above the target.</div>'; wrap.classList.add('hidden'); return; }
+  out.innerHTML='<div class="result info"><b>Estimated MgSO₄ needed (Mg²⁺ '+n.m+' → '+n.t+'):</b> ≈'+n.low.toFixed(1)+'–'+n.high.toFixed(1)+' g<br>'+
+    '<b>Plan first:</b> ≈'+Math.ceil(n.low)+' g (low end), then recheck — about half of each IV dose is lost in urine<br>'+
+    '<b>Remember:</b> body stores refill over days — keep replacing for 1–2 days after the level normalises.'+
+    '<span class="next-action">NEXT STEP → Select your route of replacement.</span></div>';
+  wrap.classList.remove('hidden');
+  if(state.lo.route){ const b=document.querySelector('#ml4_routeWrap .btn[data-route="'+state.lo.route+'"]'); if(b) chooseMlRoute(state.lo.route,b); }
+}
+function mlIvPlan(){
+  const n=ml4Need(), imp=state.lo.renalImpaired;
+  let total=clamp(Math.ceil(n.low/2)*2,2,8); if(imp) total=Math.max(1,total/2);
+  const hours=clamp(total*2,2,24), rate=total/hours;
+  return '<b>MgSO₄ '+total+' g</b> in 100–250 mL 0.9% saline or D5W (or 4% premix) over <b>'+hours+' h</b> = '+rate.toFixed(2)+' g/h (≈'+(rate/0.04).toFixed(0)+' mL/h of 4%).<br>'+
+    'Check Mg²⁺ ~6 h after the infusion ends. Repeat daily for 1–2 days after the level normalises. Watch reflexes, RR and BP.'+(imp?'<br>Dose halved for impaired renal function.':'');
+}
+function mlOralPlan(){
+  const n=ml4Need(), imp=state.lo.renalImpaired;
+  let per=n.m>=1.4?480:720; if(imp) per=Math.round(per/2);
+  const tabs=Math.max(1,Math.round(per/240));
+  return '<b>Oral / enteral magnesium:</b> ≈<b>'+per+' mg elemental/day</b> — e.g. Mg oxide 400 mg (≈240 mg elemental) × '+tabs+' tablet(s) daily, split q12h.<br>'+
+    'Absorption is ~30%; diarrhoea limits the dose (organic salts are often better tolerated). Recheck Mg²⁺ in 24–48 h.'+(imp?'<br>Dose halved for impaired renal function.':'');
+}
+function chooseMlRoute(route,btn){
+  state.lo.route=route;
+  document.querySelectorAll('#ml4_routeWrap .btn.choice').forEach(b=>b.classList.remove('correct','incorrect','picked'));
+  const out=$('ml4_routeResult');
+  const next='<span class="next-action">NEXT STEP → Open the dashboard to simulate and finalise the order.</span>';
+  if(route==='oral'&&state.lo.urgent){ btn.classList.add('incorrect'); out.innerHTML='<div class="result high">❌ Not the best choice. Oral magnesium is too slow and poorly absorbed for high-risk hypomagnesaemia ('+state.lo.triggers.join('; ')+'). Use IV MgSO₄; add oral once stable.</div>'; return; }
+  if(route==='oral'&&!state.lo.gut){ btn.classList.add('incorrect'); out.innerHTML='<div class="result high">❌ The gut was marked unusable in Step 2. Use IV MgSO₄.</div>'; return; }
+  if(route==='bolus'&&!state.lo.emergency){
+    btn.classList.add('picked');
+    out.innerHTML='<div class="result warn">A rapid bolus is reserved for torsades / VT or seizure. For other cases a slower planned infusion retains more magnesium (less is lost in urine). Plan instead:<br><br>'+mlIvPlan()+next+'</div>'; return;
+  }
+  btn.classList.add('correct');
+  if(route==='bolus') out.innerHTML='<div class="result good">✅ Appropriate for '+(state.lo.ecg==='arr'?'torsades / VT':'seizure / severe tetany')+'.<br><br><b>MgSO₄ 2 g IV over 5–15 min</b> (pulseless torsades: 1–2 g IV push in 10 mL). Then follow with a planned infusion:<br><br>'+mlIvPlan()+next+'</div>';
+  else if(route==='iv') out.innerHTML='<div class="result good">✅ Reasonable choice.<br><br>'+mlIvPlan()+next+'</div>';
+  else out.innerHTML='<div class="result good">✅ Reasonable for mild, stable hypomagnesaemia.<br><br>'+mlOralPlan()+next+'</div>';
+}
+
+/* ---- ML DASHBOARD ---- */
+let mlChart=null, mlRoute='iv', mlSig='', mlWired=false;
+const ML_PROD={
+  oral:[{name:'1 tablet Mg oxide 400 mg (≈240 mg elemental)',v:240},{name:'2 tablets (≈480 mg elemental)',v:480}],
+  iv:[{name:'4% MgSO₄ (2 g in 50 mL or 4 g in 100 mL)',v:0.04},{name:'2% MgSO₄ (2 g in 100 mL)',v:0.02},{name:'1% MgSO₄ (1 g in 100 mL)',v:0.01}]
+};
+function showMlDash(){
+  if(!mlWired){ wireMl(); mlWired=true; }
+  if(!mlChart) initMlChart();
+  const sig=[state.mg,state.lo.target,state.lo.renalImpaired,state.lo.route,state.lo.needIV].join('|');
+  if(sig!==mlSig){
+    mlSig=sig;
+    const m=clamp(state.mg,0.3,1.6);
+    $('mlMgNum').value=m; $('mlMgSlider').value=m;
+    $('mlTarget').value=state.lo.target||2.0;
+    $('mlRenal').value=state.lo.renalImpaired?'impaired':'normal';
+    const r=state.lo.route==='oral'?'oral':(state.lo.route?'iv':(state.lo.needIV?'iv':'oral'));
+    setMlRoute(r);
+  } else runMlCalc();
+}
+function wireMl(){
+  $('mlMgSlider').addEventListener('input',e=>{ $('mlMgNum').value=e.target.value; runMlCalc(); });
+  $('mlMgNum').addEventListener('input',e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) $('mlMgSlider').value=clamp(v,0.3,1.6); runMlCalc(); });
+  ['mlTarget','mlRenal','mlConc','mlFreq','mlRate','mlLoss'].forEach(id=>{ $(id).addEventListener('input',runMlCalc); $(id).addEventListener('change',runMlCalc); });
+}
+function setMlTarget(v){ $('mlTarget').value=v; runMlCalc(); }
+function setMlRoute(route){
+  mlRoute=route;
+  const base='py-2 px-1 text-[11px] font-bold rounded-lg transition-all ';
+  const on='bg-sky-600 text-white shadow-sm', off='bg-transparent text-slate-600 hover:text-slate-900';
+  $('mlBtnOral').className=base+(route==='oral'?on:off);
+  $('mlBtnIv').className=base+(route==='iv'?on:off);
+  $('mlIvWrap').classList.toggle('hidden',route==='oral');
+  $('mlOralWrap').classList.toggle('hidden',route!=='oral');
+  $('mlConcLabel').textContent=route==='oral'?'Oral product':'IV MgSO₄ concentration (carrier: 0.9% saline or D5W)';
+  $('mlConcNote').textContent=route==='oral'?'Absorption ~30%; diarrhoea limits the dose. For mild, stable cases only.':'Planned infusion ≤1 g/h. For torsades or seizure give 2 g over 5–15 min first.';
+  const sel=$('mlConc'); sel.innerHTML='';
+  ML_PROD[route].forEach((f,i)=>{ const o=document.createElement('option'); o.value=f.v; o.textContent=f.name; if(i===0) o.selected=true; sel.appendChild(o); });
+  $('mlRate').value=$('mlRenal').value==='impaired'?0.25:0.5;
+  runMlCalc();
+}
+function resetMlDefaults(){
+  $('mlMgNum').value=1.0; $('mlMgSlider').value=1.0; $('mlTarget').value=2.0; $('mlRenal').value='normal'; $('mlLoss').value=0; $('mlFreq').value=2;
+  setMlRoute('iv');
+}
+function initMlChart(){
+  mlChart=new Chart($('mlChart').getContext('2d'),{
+    type:'line',
+    data:{labels:Array.from({length:25},(_,i)=>i),datasets:[
+      {label:'Upper estimate',data:[],borderColor:'#0284c7',backgroundColor:'rgba(2,132,199,0.10)',borderWidth:3,pointRadius:0,tension:0.2,fill:false},
+      {label:'Lower estimate',data:[],borderColor:'#64748b',backgroundColor:'rgba(2,132,199,0.10)',borderWidth:2.5,pointRadius:0,tension:0.2,fill:'-1'},
+      {label:'Target',data:[],borderColor:'#16a34a',borderWidth:1.5,borderDash:[2,4],pointRadius:0,fill:false},
+      {label:'2.5 ceiling',data:[],borderColor:'#dc2626',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>i[0].label+' h',label:c=>' '+c.dataset.label+': '+c.parsed.y.toFixed(2)+' mg/dL'}}},
+      scales:{y:{title:{display:true,text:'Serum Mg²⁺ (mg/dL)',font:{size:11,weight:'bold'}},grid:{color:'#f1f5f9'}},
+              x:{grid:{display:false},ticks:{autoSkip:false,maxRotation:0,callback:(v,i)=>(i%4===0?i+'h':'')}}}}
+  });
+}
+function runMlCalc(){
+  const m0=clamp(parseFloat($('mlMgNum').value)||1.0,0.3,1.6);
+  const tgt=clamp(parseFloat($('mlTarget').value)||2.0,1.7,2.5);
+  const imp=$('mlRenal').value==='impaired', route=mlRoute;
+  const conc=parseFloat($('mlConc').value)||0;
+  const lossG=Math.max(0,parseFloat($('mlLoss').value)||0);
+  const reqLow=Math.max(0,(tgt-m0)/ML_UP), reqHigh=Math.max(0,(tgt-m0)/ML_LO);
+  $('outMlDef').textContent=reqLow.toFixed(1)+'–'+reqHigh.toFixed(1);
+  $('outMlPlan').textContent=Math.ceil(reqLow);
+
+  let cap,rate,rateEq,dose=0,freq=0,perDay=0;
+  if(route==='oral'){
+    dose=conc; freq=parseInt($('mlFreq').value)||2; perDay=dose*freq; rateEq=perDay/98.6*0.3/24; rate=rateEq;
+    cap=imp?480:960;
+    $('outMlCap').textContent=cap; $('outMlCapUnit').textContent='mg/day'; $('outMlCapSub').textContent='Oral elemental Mg';
+    $('outMlPresc').textContent=perDay; $('outMlPrescUnit').textContent='mg/day'; $('outMlPrescSub').textContent=dose+' mg × '+freq+' (q'+(24/freq).toFixed(0)+'h)';
+  } else {
+    rate=parseFloat($('mlRate').value)||0; $('mlRateDisp').textContent=rate; rateEq=rate;
+    cap=imp?0.5:1;
+    $('outMlCap').textContent=cap; $('outMlCapUnit').textContent='g/h'; $('outMlCapSub').textContent='Planned infusion';
+    $('outMlPresc').textContent=conc>0?Math.round(rate/conc):0; $('outMlPrescUnit').textContent='mL/hr'; $('outMlPrescSub').textContent=rate+' g/h';
+  }
+  const netAt=t=>Math.min(rateEq*t,reqLow)-lossG/24*t;
+  const estAt=t=>{ const d=netAt(t); const a=clamp(m0+d*ML_UP,0.3,3.5), b=clamp(m0+d*ML_LO,0.3,3.5); return {lo:Math.min(a,b),hi:Math.max(a,b),net:d}; };
+  const series=Array.from({length:25},(_,t)=>estAt(t));
+  mlChart.data.datasets[0].data=series.map(s=>s.hi);
+  mlChart.data.datasets[1].data=series.map(s=>s.lo);
+  mlChart.data.datasets[2].data=Array(25).fill(tgt);
+  mlChart.data.datasets[3].data=Array(25).fill(2.5);
+  mlChart.options.scales.y.suggestedMin=Math.floor((Math.min(m0,...series.map(s=>s.lo))-0.2)*5)/5;
+  mlChart.options.scales.y.suggestedMax=2.7;
+  mlChart.update();
+
+  let rows='';
+  [0,2,4,6,8,12,24].forEach(h=>{
+    const s=estAt(h); let label,tone;
+    if(s.hi>2.5){label='Over-correction Risk';tone='bad';}
+    else if(s.lo>=tgt-0.1){label='At Target';tone='ok';}
+    else if(s.hi>=tgt-0.1){label='Approaching Target';tone='info';}
+    else{label='Below Target';tone='warn';}
+    rows+='<tr class="hover:bg-slate-50"><td class="p-2.5 font-bold text-slate-900">'+h+'h</td>'+
+      '<td class="p-2.5 font-extrabold text-sky-700">'+s.lo.toFixed(2)+'–'+s.hi.toFixed(2)+'</td>'+
+      '<td class="p-2.5 font-semibold text-slate-600">'+s.net.toFixed(1)+' g-eq</td>'+
+      '<td class="p-2.5">'+statusBadge(label,tone)+'</td></tr>';
+  });
+  $('mlTbody').innerHTML=rows;
+
+  const al=[]; let serious=false;
+  if(route==='oral'){
+    if(dose>(imp?240:480)){ al.push(alertCard('rose','🛑','Single oral dose too high','Keep each dose ≤'+(imp?240:480)+' mg elemental Mg (diarrhoea).')); serious=true; }
+    if(perDay>cap){ al.push(alertCard('rose','🛑','Daily oral total above limit','Total '+perDay+' mg/day exceeds the '+cap+' mg/day ceiling used here.')); serious=true; }
+    if(state.lo.urgent||m0<1.0){ al.push(alertCard('rose','🛑','Oral alone is inadequate','Mg²⁺ &lt;1.0, arrhythmia or neuro features need IV MgSO₄; add oral once stable.')); serious=true; }
+  } else {
+    if(rate>cap){ al.push(alertCard('rose','🛑','Rate exceeds the planned-infusion limit','Max '+cap+' g/h'+(imp?' (halved for impaired renal function)':'')+'. Faster rates are only for torsades / seizure as a 2 g bolus over 5–15 min.')); serious=true; }
+    if(state.lo.emergency) al.push(alertCard('amber','⚠️','Emergency features present','Give MgSO₄ 2 g IV over 5–15 min first (torsades / seizure), then this planned infusion.'));
+    al.push(alertCard('sky','ℹ️','Check reflexes, RR and BP','Loss of patellar reflexes, RR &lt;12, hypotension or urine output &lt;30 mL/h means stop the infusion.'));
+  }
+  if(imp) al.push(alertCard('amber','⚠️','Impaired renal function','Doses halved. Recheck the level before every repeat dose — hypermagnesaemia risk.'));
+  if(reqLow<=0){ al.push(alertCard('amber','⚠️','Target at or below current Mg²⁺','No replacement is needed on this calculation.')); serious=true; }
+  if(lossG/24>=rateEq&&reqLow>0){ al.push(alertCard('amber','⚠️','Ongoing losses ≥ delivery','Serum Mg²⁺ will not rise. Increase delivery or reduce the loss source.')); serious=true; }
+  if(state.lo.hypoK) al.push(alertCard('sky','ℹ️','Hypokalaemia present','Potassium will not correct reliably until Mg²⁺ is replaced — replace both.'));
+  if(state.lo.hypoCa) al.push(alertCard('sky','ℹ️','Hypocalcaemia present','Likely Mg²⁺-driven — correct Mg²⁺ first, then recheck calcium.'));
+  if(!serious&&reqLow>0) al.unshift(alertCard('emerald','✅','Safe Replacement Trajectory','Rate and dose are within limits. Plan ≈'+Math.ceil(reqLow)+' g-equivalent, then recheck Mg²⁺ about 6 h after the infusion ends.'));
+  $('mlSafety').innerHTML=al.join('');
+
+  const prod=$('mlConc').options[$('mlConc').selectedIndex].text;
+  $('mlOrderTime').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  let o='MEDICAL ORDER: HYPOMAGNESEMIA Mg REPLACEMENT\n';
+  o+='--------------------------------------------------\n';
+  o+='Baseline Mg2+       : '+m0.toFixed(1)+' mg/dL\n';
+  o+='Target Mg2+         : '+tgt.toFixed(1)+' mg/dL\n';
+  o+='Estimated need      : '+reqLow.toFixed(1)+'–'+reqHigh.toFixed(1)+' g MgSO4 (plan ~'+Math.ceil(reqLow)+' g, then recheck)\n';
+  o+='--------------------------------------------------\n';
+  if(route==='oral'){
+    o+='ROUTE: Oral / enteral\nPRODUCT: '+prod+'\n';
+    o+='DOSE : '+dose+' mg elemental '+freq+' times daily (q'+(24/freq).toFixed(0)+'h) = '+perDay+' mg/day\n';
+  } else {
+    o+='ROUTE: Intravenous infusion\nPRODUCT: '+prod+'\n';
+    o+='RATE : '+Math.round(conc>0?rate/conc:0)+' mL/hr = '+rate+' g/h via infusion pump (max '+cap+' g/h).\n';
+    o+='Total ~'+Math.ceil(reqLow)+' g over ~'+(rate>0?(Math.ceil(reqLow)/rate).toFixed(1):'—')+' h, then recheck.\n';
+    if(state.lo.emergency) o+='PRE-STEP: MgSO4 2 g IV over 5–15 min for torsades / seizure.\n';
+  }
+  o+='--------------------------------------------------\n';
+  o+='MONITORING PROTOCOL:\n';
+  o+='1. Serum Mg2+ ~6 h after infusion ends (earlier levels overestimate), then daily.\n';
+  o+='2. Continuous ECG if arrhythmia / QT prolongation; keep K+ >=4.0.\n';
+  o+='3. Check patellar reflexes, RR and BP during infusion; STOP if reflexes lost, RR <12, urine output <30 mL/h.\n';
+  o+='4. Continue replacement 1–2 days after Mg2+ normalises.\n';
+  if(imp) o+='5. Renal impairment: dose halved; recheck level before each repeat.\n';
+  $('mlOrder').textContent=o;
+}
+
+/* ---- ML STEP 5 ---- */
+function renderMl5Intro(){
+  ensureBaseline();
+  const l=state.history[state.history.length-1];
+  $('ml5_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>Mg²⁺ '+l.v+' mg/dL</b> ('+l.label+').<br>Target Mg²⁺ '+(state.lo.target||2.0)+' mg/dL. Enter hours elapsed and the new level — check it ~6 h after an infusion ends.</div>';
+  renderHistoryLog('ml5_log');
+}
+function logMlReading(){
+  const hours=parseFloat($('ml5_hours').value), nv=parseFloat($('ml5_new').value), refl=$('ml5_reflex').value;
+  const out=$('ml5_result');
+  if(isNaN(hours)||hours<=0||isNaN(nv)){ out.innerHTML='<div class="result warn">Enter both hours elapsed and the new serum Mg²⁺.</div>'; return; }
+  ensureBaseline();
+  const last=state.history[state.history.length-1], delta=+(nv-last.v).toFixed(2), tgt=state.lo.target||2.0;
+  let h;
+  if(refl!=='normal'){
+    h='<div class="result high">🔴 Reflexes '+(refl==='absent'?'absent':'reduced')+' — early sign of magnesium toxicity.<span class="next-action">NEXT ACTION → Stop magnesium now, check the level and RR / ECG. If respiratory depression or conduction change: IV calcium gluconate 10–20 mL, and manage as hypermagnesaemia.</span></div>';
+  } else if(nv>2.5){
+    h='<div class="result high">🔴 Mg²⁺ '+last.v+' → <b>'+nv+' mg/dL</b> — above the 2.5 ceiling.<span class="next-action">NEXT ACTION → Stop magnesium, review renal function and total dose given, recheck in 2–4 h.</span></div>';
+  } else if(nv>=tgt){
+    h='<div class="result good">✅ Mg²⁺ '+last.v+' → '+nv+' mg/dL — <b>target ('+tgt+') reached</b>.<span class="next-action">NEXT ACTION → Stop the infusion. Continue replacement for 1–2 days (oral if tolerated), treat the cause, and recheck in 24 h — levels fall again as stores refill.</span></div>';
+  } else if(delta>0){
+    h='<div class="result good">✅ Mg²⁺ rose '+last.v+' → '+nv+' mg/dL ('+hours+' h) — responding.<span class="next-action">NEXT ACTION → Continue the plan; recheck 6 h after the next dose or at 24 h.</span></div>';
+  } else {
+    h='<div class="result warn">Mg²⁺ '+(delta<0?'fell '+last.v+' → '+nv:'unchanged at '+nv)+' mg/dL over '+hours+' h.<ul><li>Ongoing renal losses (diuretics, nephrotoxins) or GI losses.</li><li>Dose too small — about half of an IV dose is excreted; larger or longer courses are often needed.</li><li>Check K⁺ and Ca²⁺ and replace together.</li></ul><span class="next-action">NEXT ACTION → Address losses and give a further course (renally adjusted), then recheck.</span></div>';
+  }
+  out.innerHTML=h;
+  state.history.push({v:nv,hours:hours,label:hours+'h after previous check'});
+  $('ml5_hours').value=''; $('ml5_new').value=''; $('ml5_reflex').value='normal';
+  const l=state.history[state.history.length-1];
+  $('ml5_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>Mg²⁺ '+l.v+' mg/dL</b> ('+l.label+').<br>Target Mg²⁺ '+tgt+' mg/dL.</div>';
+  renderHistoryLog('ml5_log');
+}
+
+/* ================= HYPERMAGNESAEMIA ================= */
+function onMh2Input(){
+  const mg=state.mg; if(mg==null) return;
+  const refl=$('mh_reflex').value, resp=$('mh_resp').value, ecg=$('mh_ecg').value, renal=$('mh_renal').value, hypot=$('mh_hypot').checked;
+  const src=[]; if($('mh_s_inf').checked) src.push('inf'); if($('mh_s_ant').checked) src.push('ant'); if($('mh_s_tpn').checked) src.push('tpn');
+  const ecgAbn=(ecg==='mild'||ecg==='severe');
+  const emergency=mg>=9||refl==='absent'||resp!=='normal'||ecgAbn;
+  const urgent=!emergency&&(mg>=5||refl==='reduced'||hypot||(renal!=='normal'&&mg>=3.5));
+  Object.assign(state.hi,{emergency,urgent,renal,ecg,reflex:refl,resp,src});
+  let h='';
+  if(ecg==='unknown') h+='<div class="result warn">⚠ No ECG yet — record a 12-lead ECG now.</div>';
+  if(resp==='apnoea'||ecg==='severe') h+='<div class="result high">🔴 <b>Peri-arrest.</b> Secure the airway and ventilate, start CPR if no pulse, give calcium immediately (10% calcium gluconate 10–20 mL or calcium chloride 5–10 mL IV over 1–3 min), pace for heart block, and arrange urgent dialysis.</div>';
+  if(emergency) h+='<div class="result high">🔴 <b>Hypermagnesaemic emergency</b> (Mg²⁺ '+mg+' mg/dL'+(refl==='absent'?', areflexia':'')+(resp!=='normal'?', respiratory depression':'')+(ecgAbn?', ECG changes':'')+').<span class="next-action">NEXT ACTION → Stop all magnesium, IV calcium now with continuous ECG, support breathing, then clear Mg²⁺.</span></div>';
+  else if(urgent) h+='<div class="result warn">🟠 <b>Symptomatic / high-risk hypermagnesaemia</b> (Mg²⁺ '+mg+' mg/dL'+(refl==='reduced'?', reduced reflexes':'')+(hypot?', hypotension':'')+').<span class="next-action">NEXT ACTION → Stop sources, continuous ECG, start clearance; give calcium immediately if reflexes fade or breathing / ECG change.</span></div>';
+  else h+='<div class="result good">🟡 <b>Mild hypermagnesaemia</b> (Mg²⁺ '+mg+' mg/dL), no neuromuscular or ECG effects.<span class="next-action">NEXT ACTION → Stop the source, hydrate, check renal function, recheck in 6–12 h.</span></div>';
+  if(src.includes('inf')) h+='<div class="result info">Magnesium infusion: the pre-eclampsia range is about 4.8–8.4 mg/dL. Stop if reflexes are lost, RR &lt;12 or urine output &lt;30 mL/h; calcium gluconate 1 g IV over 3 min reverses toxicity.</div>';
+  if(src.includes('ant')) h+='<div class="result info">Stop Mg-containing antacids, laxatives, enemas and Epsom salts. Accumulation is much more likely with renal impairment.</div>';
+  if(renal!=='normal') h+='<div class="result info">Impaired renal function — clearance is slow (hours become days). Plan early dialysis if the level is high or symptomatic.</div>';
+  $('mh2_result').innerHTML=h;
+}
+function renderMh3(){
+  const x=state.hi;
+  $('mh3_status').innerHTML=x.emergency
+    ?'<div class="result high" style="margin-top:0">🔴 Calcium is indicated <b>now</b> (Mg²⁺ '+state.mg+' mg/dL'+(x.reflex==='absent'?', areflexia':'')+(x.resp!=='normal'?', respiratory depression':'')+').</div>'
+    :'<div class="result info" style="margin-top:0">No respiratory, ECG or reflex loss — calcium is not routinely needed. Give it at once if reflexes fade or breathing / ECG changes.</div>';
+}
+function chooseMhAgent(a,btn){
+  state.hi.agent=a;
+  document.querySelectorAll('#p-mh3 .btn.choice').forEach(b=>b.classList.remove('correct','incorrect'));
+  const out=$('mh3_agentResult');
+  if(a==='ca'){
+    btn.classList.add('correct');
+    out.innerHTML='<div class="result good">✅ Correct — calcium antagonises magnesium at the neuromuscular junction and heart within minutes.<ul>'+
+      '<li><b>10% calcium gluconate 10–20 mL (1–2 g)</b> IV over ~10 min — over 3 min in arrest or eclamptic toxicity — <i>or</i> <b>10% calcium chloride 5–10 mL</b> via a central line.</li>'+
+      '<li>Continuous ECG; repeat as symptoms or ECG changes recur.</li>'+
+      '<li>Lasts 30–60 min and does <b>not</b> lower Mg²⁺. Do not mix with bicarbonate or phosphate.</li></ul>'+
+      '<span class="next-action">NEXT STEP → Eliminate magnesium.</span></div>';
+    return;
+  }
+  btn.classList.add('incorrect');
+  const why={
+    lasix:'Clearance takes hours and needs urine output and volume. Calcium comes first, then saline + furosemide.',
+    hd:'Dialysis is definitive in renal failure, but arranging it takes time. Antagonise with calcium while it is organised.',
+    ins:'Insulin and dextrose shift potassium, not magnesium — they do nothing useful here.',
+    bic:'Bicarbonate neither removes nor antagonises magnesium.',
+    stop:'Essential — but magnesium already in the body keeps acting for hours. Antagonise with calcium now.'
+  }[a];
+  out.innerHTML='<div class="result high">❌ Not first. '+why+' Start with <b>IV calcium</b>.</div>';
+}
+function onMh4Input(){
+  const uo=$('mh_uo').value, vol=$('mh_vol').value, out=$('mh4_result');
+  state.hi.uo=uo; state.hi.vol=vol;
+  if(!uo||!vol){ out.innerHTML=''; return; }
+  const x=state.hi, mg=state.mg, anuric=uo==='none', oligo=uo==='low';
+  const dial=anuric||(oligo&&mg>=9)||(x.renal!=='normal'&&mg>=9)||mg>=12||x.ecg==='severe'||x.resp==='apnoea';
+  state.hi.dialysis=dial;
+  let h='';
+  if(dial) h+='<div class="result high">🔴 <b>Haemodialysis indicated — call nephrology now</b> ('+(anuric?'no renal route for clearance':mg>=12?'Mg²⁺ ≥12 mg/dL':x.ecg==='severe'||x.resp==='apnoea'?'life-threatening features':'renal impairment with Mg²⁺ ≥9')+'). Dialysis lowers Mg²⁺ fastest; use a low- or Mg-free dialysate. Expect a 10–25% rebound — recheck at 2–4 h.</div>';
+  if(!anuric){
+    h+= vol==='hyper'
+      ? '<div class="result info"><b>Furosemide</b> 40–80 mg IV (higher in CKD) without a saline load — the patient is volume overloaded. Consider early dialysis if the response is poor.</div>'
+      : '<div class="result info"><b>Saline + loop diuretic:</b> 0.9% saline 1–2 L over 1–2 h'+(vol==='hypo'?' (restore volume first)':'')+', then furosemide 20–40 mg IV (higher in CKD). Replace urine output with saline. Diuresis also wastes K⁺ and Ca²⁺ — monitor and replace.</div>';
+  } else h+='<div class="result warn">Diuretics are ineffective when anuric — dialysis is the removal route.</div>';
+  const c=[];
+  if(x.src.includes('inf')) c.push('Stop the MgSO₄ infusion; check reflexes and RR every 30–60 min.');
+  if(x.src.includes('ant')) c.push('Stop Mg-containing antacids, laxatives, enemas and Epsom salts.');
+  if(x.src.includes('tpn')) c.push('Review TPN and replacement orders for a dosing error; check lithium level and renal function.');
+  c.push('Avoid all Mg-containing drugs until the level normalises; treat hypotension and bradycardia supportively.');
+  h+='<div class="result warn"><b>Source control and support:</b><ul>'+c.map(t=>'<li>'+t+'</li>').join('')+'</ul></div>';
+  h+='<span class="next-action" style="margin-top:10px;color:inherit;font-size:13px">NEXT STEP → Open the dashboard to see the indicative Mg²⁺ timeline and build the orders.</span>';
+  out.innerHTML=h;
+}
+
+/* ---- MH DASHBOARD ---- */
+let mhChart=null, mhWired=false, mhSig='';
+function mhParams(){
+  return {m0:clamp(parseFloat($('mhMgNum').value)||9,2.6,20), renal:$('mhRenal').value, load:parseFloat($('mhLoad').value)||0,
+    sym:$('mhSym').checked, ca:$('mhCa').checked, loop:$('mhLoop').checked, hd:$('mhHd').checked, hdDelay:parseFloat($('mhHdDelay').value)||0};
+}
+function mhSeries(p){
+  const base={normal:0.15,impaired:0.03,anuric:0.005}[p.renal];
+  let k=base; if(p.loop&&p.renal!=='anuric') k*=2;
+  const dt=0.05, out=[]; let m=p.m0, mStart=null, mEnd=null, reb=0;
+  for(let i=0;i<=480;i++){
+    const t=i*dt;
+    if(i%10===0) out.push(m);
+    let kk=k;
+    const inHd=p.hd&&t>=p.hdDelay&&t<p.hdDelay+4;
+    if(inHd){ kk+=0.35; if(mStart===null) mStart=m; }
+    if(p.hd&&mStart!==null&&mEnd===null&&t>=p.hdDelay+4){ mEnd=m; reb=0.15*(mStart-mEnd)/6; }
+    const rebound=(p.hd&&mEnd!==null&&t<p.hdDelay+10)?reb:0;
+    m+=dt*(p.load-kk*(m-2.0)+rebound);
+    if(m<1.0) m=1.0;
+  }
+  return out; // index i = i*0.5 h
+}
+function showMhDash(){
+  if(!mhWired){ wireMh(); mhWired=true; }
+  if(!mhChart) initMhChart();
+  const x=state.hi, sig=[state.mg,x.renal,x.emergency,x.dialysis,x.uo].join('|');
+  if(sig!==mhSig){
+    mhSig=sig;
+    const m=clamp(state.mg,2.6,20);
+    $('mhMgNum').value=m; $('mhMgSlider').value=m;
+    $('mhRenal').value=x.renal||'normal';
+    $('mhSym').checked=!!x.emergency;
+    $('mhCa').checked=!!x.emergency;
+    $('mhHd').checked=!!x.dialysis;
+    $('mhLoop').checked=(x.uo==='good'||x.uo==='low');
+    $('mhLoad').value=(x.src&&x.src.includes('inf'))?'0.3':'0';
+  }
+  runMhCalc();
+}
+function wireMh(){
+  $('mhMgSlider').addEventListener('input',e=>{ $('mhMgNum').value=e.target.value; runMhCalc(); });
+  $('mhMgNum').addEventListener('input',e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) $('mhMgSlider').value=clamp(v,2.6,20); runMhCalc(); });
+  ['mhRenal','mhLoad','mhSym','mhCa','mhLoop','mhHd','mhHdDelay'].forEach(id=>{ $(id).addEventListener('input',runMhCalc); $(id).addEventListener('change',runMhCalc); });
+}
+function resetMhDefaults(){
+  $('mhMgNum').value=9; $('mhMgSlider').value=9; $('mhRenal').value='normal'; $('mhLoad').value='0'; $('mhSym').checked=false;
+  $('mhCa').checked=true; $('mhLoop').checked=true; $('mhHd').checked=false; $('mhHdDelay').value='2';
+  runMhCalc();
+}
+function initMhChart(){
+  mhChart=new Chart($('mhChart').getContext('2d'),{
+    type:'line',
+    data:{labels:Array.from({length:49},(_,i)=>i/2),datasets:[
+      {label:'Indicative Mg²⁺',data:[],borderColor:'#e11d48',backgroundColor:'rgba(225,29,72,0.08)',borderWidth:3,pointRadius:0,tension:0.25,fill:true},
+      {label:'9 areflexia / respiratory risk',data:[],borderColor:'#991b1b',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false},
+      {label:'5 symptom threshold',data:[],borderColor:'#f59e0b',borderWidth:1.5,borderDash:[4,4],pointRadius:0,fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>i[0].label+' h',label:c=>' '+c.dataset.label+': '+c.parsed.y.toFixed(1)+' mg/dL'}}},
+      scales:{y:{title:{display:true,text:'Serum Mg²⁺ (mg/dL)',font:{size:11,weight:'bold'}},grid:{color:'#f1f5f9'}},
+              x:{grid:{display:false},ticks:{autoSkip:false,maxRotation:0,callback:(v,i)=>(i%8===0?(i/2)+'h':'')}}}}
+  });
+}
+function runMhCalc(){
+  const p=mhParams(), ser=mhSeries(p);
+  const tag=$('mhSevTag');
+  if(p.m0>=9){ tag.textContent='Severe'; tag.className='text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200'; }
+  else if(p.m0>=5){ tag.textContent='Moderate'; tag.className='text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200'; }
+  else{ tag.textContent='Mild'; tag.className='text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200'; }
+  $('outMh2').textContent=ser[4].toFixed(1); $('outMh12').textContent=ser[24].toFixed(1);
+  $('outMh12Sub').textContent=ser[24]>=5?'⚠ Still in symptom range':'Clearance check';
+  $('outMhFur').textContent=p.renal==='anuric'?'Ineffective — anuric':'After 1–2 L saline';
+
+  mhChart.data.datasets[0].data=ser;
+  mhChart.data.datasets[1].data=Array(49).fill(9);
+  mhChart.data.datasets[2].data=Array(49).fill(5);
+  mhChart.options.scales.y.suggestedMin=Math.floor(Math.min(...ser,2)-0.5);
+  mhChart.options.scales.y.suggestedMax=Math.ceil(Math.max(...ser,6)+0.5);
+  mhChart.update();
+
+  let rows='';
+  [0,1,2,4,6,8,12,24].forEach(t=>{
+    const m=ser[t*2]; let label,tone;
+    if(m<1.7){label='Over-correction Risk';tone='bad';}
+    else if(m>=12){label='Life-threatening';tone='bad';}
+    else if(m>=9){label='Severe';tone='bad';}
+    else if(m>=5){label='Moderate';tone='warn';}
+    else if(m>2.5){label='Mildly Elevated';tone='info';}
+    else{label='Target Range';tone='ok';}
+    rows+='<tr class="hover:bg-slate-50"><td class="p-2.5 font-bold text-slate-900">'+t+'h</td><td class="p-2.5 font-extrabold text-rose-600">'+m.toFixed(1)+' mg/dL</td>'+
+      '<td class="p-2.5 font-semibold text-slate-600">'+(m-p.m0>=0?'+':'')+(m-p.m0).toFixed(1)+'</td><td class="p-2.5">'+statusBadge(label,tone)+'</td></tr>';
+  });
+  $('mhTbody').innerHTML=rows;
+
+  const emergency=p.m0>=9||p.sym;
+  const al=[]; let serious=false;
+  if(emergency&&!p.ca){ al.push(alertCard('rose','🛑','Calcium not selected','Mg²⁺ ≥9 or neuromuscular / ECG effects — give IV calcium first; it protects the heart and breathing within minutes.')); serious=true; }
+  if(p.renal==='anuric'&&!p.hd&&p.m0>=5){ al.push(alertCard('rose','🛑','No clearance route','Anuric — diuretics cannot work. Haemodialysis is the only way to remove magnesium.')); serious=true; }
+  if(p.loop&&p.renal==='anuric') al.push(alertCard('amber','⚠️','Loop diuretic ineffective when anuric','It was left out of the curve.'));
+  if(p.load>0) al.push(alertCard('amber','⚠️','Magnesium is still going in','Stop the source (infusion, antacid, laxative) — nothing else works while intake continues.')), serious=true;
+  if(!p.hd&&ser[24]>=5){ al.push(alertCard('amber','⚠️','Still symptomatic at 12 h','Indicative Mg²⁺ at 12 h is '+ser[24].toFixed(1)+' mg/dL. Consider dialysis or a stronger clearance strategy.')); serious=true; }
+  if(p.hd) al.push(alertCard('sky','ℹ️','Dialysis rebound','Expect Mg²⁺ to rebound 10–25% after the session. Recheck at 2–4 h.'));
+  if(p.loop) al.push(alertCard('sky','ℹ️','Forced diuresis wastes K⁺ and Ca²⁺','Monitor and replace; replace urine output with saline.'));
+  if(Math.min(...ser)<1.7){ al.push(alertCard('amber','⚠️','Over-correction possible','Indicative Mg²⁺ falls below 1.7 — recheck often.')); serious=true; }
+  if(!serious) al.unshift(alertCard('emerald','✅','Reasonable Treatment Trajectory','Indicative Mg²⁺ settles in the usual range. Confirm with serial levels — don\'t rely on the curve.'));
+  $('mhSafety').innerHTML=al.join('');
+
+  $('mhOrderTime').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  let o='MEDICAL ORDER: HYPERMAGNESEMIA — ANTAGONISE / CLEAR / DIALYSE\n';
+  o+='--------------------------------------------------\n';
+  o+='Presenting Mg2+ : '+p.m0.toFixed(1)+' mg/dL   Neuro/ECG effects: '+(p.sym?'YES':'no')+'\n';
+  o+='Renal: '+({normal:'normal',impaired:'AKI/eGFR<30',anuric:'anuric/dialysis'}[p.renal])+'\n';
+  o+='--------------------------------------------------\n';
+  let n=1;
+  o+=(n++)+'. SOURCE: STOP all magnesium (MgSO4 infusion, antacids, laxatives, enemas, Epsom salts, Mg in TPN).\n';
+  if(p.ca) o+=(n++)+'. ANTAGONISE: 10% calcium gluconate 10–20 mL (1–2 g) IV over ~10 min (3 min if arrest). Repeat if reflexes / ECG / breathing worsen.\n';
+  if(p.loop&&p.renal!=='anuric') o+=(n++)+'. CLEAR: 0.9% saline 1–2 L over 1–2 h (if not overloaded), then furosemide 20–40 mg IV. Replace urine output with saline.\n';
+  if(p.hd) o+=(n++)+'. DIALYSE: urgent haemodialysis, low/Mg-free dialysate (target start in '+p.hdDelay+' h). Nephrology informed.\n';
+  o+=(n++)+'. SUPPORT: continuous ECG and SpO2; ventilate if respiratory depression; pace for symptomatic bradycardia.\n';
+  o+='--------------------------------------------------\n';
+  o+='MONITORING PROTOCOL:\n';
+  o+='1. Reflexes and RR every 30–60 min until improving.\n';
+  o+='2. Mg2+ at 1–2 h, 4 h, 6 h, then every 6–12 h until normal and stable.\n';
+  o+='3. K+ and Ca2+ during diuresis; recheck Mg2+ 2–4 h after dialysis (rebound).\n';
+  $('mhOrder').textContent=o;
+}
+
+/* ---- MH STEP 5 ---- */
+function renderMh5Intro(){
+  ensureBaseline();
+  const l=state.history[state.history.length-1];
+  $('mh5_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>Mg²⁺ '+l.v+' mg/dL</b> ('+l.label+').<br>Enter hours elapsed, the new level and reflexes, then log it.</div>';
+  renderHistoryLog('mh5_log');
+}
+function logMhReading(){
+  const hours=parseFloat($('mh5_hours').value), nv=parseFloat($('mh5_new').value), refl=$('mh5_reflex').value, out=$('mh5_result');
+  if(isNaN(hours)||hours<=0||isNaN(nv)){ out.innerHTML='<div class="result warn">Enter both hours elapsed and the new serum Mg²⁺.</div>'; return; }
+  ensureBaseline();
+  const last=state.history[state.history.length-1], delta=+(nv-last.v).toFixed(2);
+  let h;
+  if(nv<1.7) h='<div class="result high">🔴 Mg²⁺ now <b>'+nv+' mg/dL</b> — over-correction.<span class="next-action">NEXT ACTION → Stop clearance measures (diuretic / dialysis), recheck, and replace cautiously with K⁺ and Ca²⁺ checked.</span></div>';
+  else if(nv>=9||(delta>0&&nv>=5)||refl==='absent') h='<div class="result high">🔴 Mg²⁺ '+last.v+' → <b>'+nv+' mg/dL</b>'+(refl==='absent'?', reflexes absent':'')+(delta>0?' and rising':'')+' — still dangerous.<ul><li>Repeat calcium if reflexes, breathing or ECG are affected.</li><li>Confirm all magnesium sources are stopped.</li><li>Escalate to dialysis now if not already under way.</li></ul></div>';
+  else if(nv>5) h='<div class="result warn">Mg²⁺ '+last.v+' → '+nv+' mg/dL — improving but still in the symptomatic range.<span class="next-action">NEXT ACTION → Continue clearance (saline + furosemide or dialysis). Recheck in 2–4 h.</span></div>';
+  else if(nv>2.5) h='<div class="result good">✅ Mg²⁺ '+last.v+' → '+nv+' mg/dL — mildly elevated and falling.<span class="next-action">NEXT ACTION → Keep the source stopped, hydrate, recheck in 6–12 h. Reflexes: '+refl+'.</span></div>';
+  else h='<div class="result good">✅ Mg²⁺ '+last.v+' → '+nv+' mg/dL — in the usual range.<span class="next-action">NEXT ACTION → Recheck at 6–12 h (dialysis rebound / ongoing absorption) and keep Mg-containing drugs off.</span></div>';
+  out.innerHTML=h;
+  state.history.push({v:nv,hours:hours,label:hours+'h after previous check'});
+  $('mh5_hours').value=''; $('mh5_new').value=''; $('mh5_reflex').value='normal';
+  const l=state.history[state.history.length-1];
+  $('mh5_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>Mg²⁺ '+l.v+' mg/dL</b> ('+l.label+').</div>';
+  renderHistoryLog('mh5_log');
+}
+
+/* ---------------- SUMMARY ---------------- */
+function renderSummary(){
+  const out=$('summaryOut'), mg=state.mg;
+  if(mg==null){ out.innerHTML='<p>No case entered.</p>'; return; }
+  const log=state.history.length>1?'<p><b>Mg²⁺ recheck history:</b></p><ul style="margin:4px 0 0;padding-left:18px">'+state.history.map(h=>'<li>'+h.label+': Mg²⁺ '+h.v+' mg/dL</li>').join('')+'</ul>':'';
+  let h='<p><b>Presenting Mg²⁺:</b> '+mg+' mg/dL</p>';
+  if(mg<1.7){
+    const l=state.lo;
+    h+='<p><b>Risk:</b> '+(l.urgent?'High-risk — '+l.triggers.join('; '):'No high-risk features')+'; ECG: '+l.ecg+'</p>'+
+      '<p><b>Concurrent:</b> hypokalaemia '+(l.hypoK?'Yes':'No')+', hypocalcaemia '+(l.hypoCa?'Yes':'No')+' — renal impairment: '+(l.renalImpaired?'Yes':'No')+'</p>'+
+      '<p><b>Mechanism:</b> '+(l.mech||'—')+'</p>'+
+      '<p><b>Estimated need:</b> '+(l.defLow!=null?l.defLow.toFixed(1)+'–'+l.defHigh.toFixed(1)+' g MgSO₄ to Mg²⁺ '+l.target:'—')+' — route: '+(l.route?{oral:'oral',iv:'IV infusion',bolus:'IV bolus + infusion'}[l.route]:'—')+'</p>';
+  } else if(mg>2.5){
+    const x=state.hi;
+    h+='<p><b>Classification:</b> '+(x.emergency?'Emergency':x.urgent?'Symptomatic / high-risk':'Mild')+' — reflexes '+x.reflex+', breathing '+x.resp+', ECG '+x.ecg+'</p>'+
+      '<p><b>Renal:</b> '+x.renal+' — urine output '+(x.uo||'—')+', volume '+(x.vol||'—')+'</p>'+
+      '<p><b>Dialysis indicated:</b> '+(x.dialysis?'Yes':'No')+'</p>';
+  } else h+='<p>Within the usual range — no correction indicated.</p>';
+  out.innerHTML=h+log;
+}
+
+(function(){
+  const q=new URLSearchParams(location.search);
+  if(q.get('embed')) document.body.classList.add('embed');
+  const v=parseFloat(q.get('mg'));
+  if(!isNaN(v)){
+    $('s1_mg').value=v; onStep1Input();
+    const o=getPageOrder(); showPageById(o[Math.min(2,o.length-1)]);
+  } else showPageById('p-intro');
+})();
+</script>
+</body>
+</html>
