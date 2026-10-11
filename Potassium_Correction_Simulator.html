@@ -1,0 +1,1892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Electrolyte Management — Potassium (DRAFT)</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  tailwind.config = { corePlugins: { preflight: false } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#eef4f7; --bg2:#e1ecf1; --line:#c3d5de; --ink:#2b4756; --ink-dim:#5d7986;
+    --title:#0b2230; --accent:#1f6d8a; --accent-dark:#1f6d8a; --nav-prev:#d3e2e9;
+    --card:#ffffff; --card-ink:#122733;
+    --high:#c0392b; --high-bg:#fdecea;
+    --low:#1f6d8a; --low-bg:#e9f4f8;
+    --warn:#a06f00; --warn-bg:#fdf6e3;
+    --good:#1e7d4f; --good-bg:#e8f6ee;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0b1a20; --bg2:#0f2530; --line:#2e4d5c; --ink:#bcd4dc; --ink-dim:#7fa0ac;
+      --title:#ffffff; --accent:#3fa9c9; --nav-prev:#1c3844;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b1a20; --bg2:#0f2530; --line:#2e4d5c; --ink:#bcd4dc; --ink-dim:#7fa0ac;
+    --title:#ffffff; --accent:#3fa9c9; --nav-prev:#1c3844;
+  }
+  *{box-sizing:border-box}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--ink);min-height:100%;
+  }
+  .draft-banner{
+    background:#5a1a1a;color:#ffd9d0;text-align:center;font-size:12px;font-weight:700;
+    letter-spacing:.3px;padding:7px 10px;
+  }
+  header{padding:18px 16px 14px;text-align:center;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--bg2),var(--bg))}
+  header h1{margin:0 0 3px;font-size:19px;color:var(--title)}
+  header p{margin:0;font-size:12.5px;color:var(--ink-dim)}
+  .wrap{max-width:640px;margin:0 auto;padding:16px 16px 110px}
+
+  .phase{display:none}
+  .phase.active{display:block}
+
+  .step-tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--accent);margin-bottom:4px}
+  .step-title{color:var(--title);font-size:20px;margin:0 0 14px}
+
+  .card{background:var(--card);color:var(--card-ink);border-radius:12px;padding:16px;margin-bottom:12px;border-left:4px solid var(--accent-dark);border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .card h3{margin:0 0 10px;font-size:14px;color:var(--accent-dark)}
+  .card p{margin:0 0 8px;font-size:14px;line-height:1.55}
+  .card p:last-child{margin-bottom:0}
+  .muted{color:#5a6d75;font-size:12.5px}
+
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:#5a6d75;margin-bottom:4px}
+  .field input,.field select{
+    width:100%;padding:10px;border:1px solid #cfd9dd;border-radius:8px;font-size:15px;
+    background:#fbfdfe;color:var(--card-ink);
+  }
+  .field-row{display:flex;gap:10px}
+  .field-row .field{flex:1;min-width:0}
+
+  .btn{
+    display:block;width:100%;background:var(--accent-dark);color:#fff;border:none;border-radius:9px;
+    padding:12px;font-size:14px;font-weight:600;margin-bottom:8px;cursor:pointer;text-align:center;
+  }
+  .btn:active{background:#164f65}
+  .btn.choice{background:#fbfdfe;color:var(--card-ink);border:1.5px solid #cfd9dd}
+  .btn.choice.correct{background:var(--good-bg);border-color:var(--good);color:var(--good)}
+  .btn.choice.incorrect{background:var(--high-bg);border-color:var(--high);color:var(--high)}
+  .btn.choice.picked{background:var(--low-bg);border-color:var(--low);color:var(--low)}
+  .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  .choice-grid.one{grid-template-columns:1fr}
+
+  .result{border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.55;margin-top:8px}
+  .result.high{background:var(--high-bg);color:var(--high)}
+  .result.warn{background:var(--warn-bg);color:var(--warn)}
+  .result.good{background:var(--good-bg);color:var(--good)}
+  .result.info{background:var(--low-bg);color:var(--low)}
+  .result b{font-weight:700}
+  .result ul{margin:6px 0 0;padding-left:18px}
+  .next-action{font-weight:700;margin-top:6px;display:block}
+
+  .checkbox-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13.5px;color:var(--card-ink)}
+  .checkbox-row input{width:auto}
+  .checkbox-row label{margin:0;font-size:13.5px;color:var(--card-ink)}
+
+  table.mini{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+  table.mini th{color:#5a6d75;text-align:left;font-weight:600;padding:3px 4px 3px 0}
+  table.mini td{padding:3px 4px 3px 0;border-top:1px solid rgba(0,0,0,.08)}
+
+  .nav-bar{
+    position:fixed;left:0;right:0;bottom:0;background:var(--bg2);border-top:1px solid var(--line);
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));
+    display:flex;gap:10px;max-width:640px;margin:0 auto;z-index:20;
+  }
+  .nav-bar button{
+    flex:1;padding:12px;border-radius:9px;border:none;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .nav-prev{background:var(--nav-prev);color:var(--ink)}
+  .nav-next{background:var(--accent-dark);color:#fff}
+  .nav-bar button:disabled{opacity:.4}
+
+  .hidden{display:none}
+  .tag-lo{color:#1f6d8a}
+  .tag-hi{color:#c0392b}
+  body.embed .draft-banner, body.embed header{display:none}
+  body.embed .wrap{padding-top:10px}
+</style>
+</head>
+<body>
+
+<div class="draft-banner">⚠ DRAFT — decision-support aid for review; verify doses against local protocol</div>
+
+<header>
+  <h1>Electrolyte Management — Potassium</h1>
+  <p>Step-by-step case-driven algorithm (draft)</p>
+</header>
+
+<div class="wrap">
+
+  <!-- INTRO -->
+  <div class="phase active" id="p-intro">
+    <div class="step-tag">ELECTROLYTE CASE SIMULATOR</div>
+    <h2 class="step-title">Serum Potassium</h2>
+    <div class="card">
+      <p>This is a dynamic, case-driven walkthrough. Enter the serum potassium on the next page — the simulator will determine whether this is hypokalaemia or hyperkalaemia and route the case accordingly.</p>
+      <p>Tap <b>NEXT</b> below to begin.</p>
+    </div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="phase" id="p-step1">
+    <div class="step-tag">STEP 1</div>
+    <h2 class="step-title">Enter Potassium Level</h2>
+    <div class="card">
+      <div class="field">
+        <label>Serum K⁺ (mmol/L) — normal 3.5–5.0</label>
+        <input type="number" id="s1_k" step="0.1" placeholder="e.g. 2.4 or 6.8" oninput="onStep1Input()">
+      </div>
+      <div id="s1_result"></div>
+    </div>
+  </div>
+
+  <!-- ================= HYPOKALAEMIA PATH ================= -->
+
+  <!-- LO STEP 2 -->
+  <div class="phase" id="p-lo2">
+    <div class="step-tag tag-lo">STEP 2 · HYPOKALAEMIA</div>
+    <h2 class="step-title">Urgency &amp; Risk Assessment</h2>
+    <div class="card">
+      <p class="muted">Decides whether replacement can be oral or needs monitored IV. Cardiac toxicity, not the number alone, drives urgency.</p>
+      <div class="field">
+        <label>12-lead ECG</label>
+        <select id="lo_ecg" onchange="onLo2Input()">
+          <option value="unknown">ECG not yet done — get one now</option>
+          <option value="normal">Normal ECG</option>
+          <option value="mild">U waves / flat T / ST depression</option>
+          <option value="qt">Prolonged QT or frequent ectopy</option>
+          <option value="arr">VT / torsades / VF / high-grade AV block</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Neuromuscular / other features</label>
+        <select id="lo_weak" onchange="onLo2Input()">
+          <option value="none">None</option>
+          <option value="mild">Mild weakness / cramps / constipation</option>
+          <option value="severe">Severe weakness, paralysis, ileus, respiratory compromise or rhabdomyolysis</option>
+        </select>
+      </div>
+      <div class="checkbox-row"><input type="checkbox" id="lo_dig" onchange="onLo2Input()"> <label for="lo_dig">On digoxin</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="lo_card" onchange="onLo2Input()"> <label for="lo_card">Acute MI, decompensated heart failure or structural heart disease</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="lo_gut" checked onchange="onLo2Input()"> <label for="lo_gut">Gut usable (tolerating oral / enteral intake)</label></div>
+      <div class="field-row" style="margin-top:6px">
+        <div class="field">
+          <label>Serum Mg²⁺ (mg/dL) — optional</label>
+          <input type="number" step="0.1" id="lo_mg" placeholder="e.g. 1.2" oninput="onLo2Input()">
+        </div>
+        <div class="field">
+          <label>Renal function</label>
+          <select id="lo_renal" onchange="onLo2Input()">
+            <option value="normal">Normal / mildly reduced</option>
+            <option value="impaired">eGFR &lt;30, AKI or oliguric</option>
+          </select>
+        </div>
+      </div>
+      <div id="lo2_result"></div>
+    </div>
+  </div>
+
+  <!-- LO STEP 3 -->
+  <div class="phase" id="p-lo3">
+    <div class="step-tag tag-lo">STEP 3 · HYPOKALAEMIA</div>
+    <h2 class="step-title">Determine the Mechanism</h2>
+    <div class="card">
+      <p class="muted">A spot urine K⁺ separates renal wasting from extrarenal loss / shift. Collect it <i>before</i> large K⁺ doses, and interpret cautiously if the patient is on diuretics or the urine is very dilute. Rarely, a very high WBC with delayed processing causes pseudohypokalaemia.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Spot urine K⁺ (mmol/L)</label>
+          <input type="number" step="0.1" id="lo_uk" placeholder="e.g. 12" oninput="onLo3Input()">
+        </div>
+        <div class="field">
+          <label>Urine creatinine (mg/dL) — optional</label>
+          <input type="number" step="0.1" id="lo_ucr" placeholder="e.g. 90" oninput="onLo3Input()">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Serum HCO₃⁻ (mmol/L)</label>
+          <input type="number" step="0.1" id="lo_hco3" placeholder="e.g. 31" oninput="onLo3Input()">
+        </div>
+        <div class="field">
+          <label>Urine Cl⁻ (mmol/L) — optional</label>
+          <input type="number" step="1" id="lo_ucl" placeholder="e.g. 8" oninput="onLo3Input()">
+        </div>
+      </div>
+      <div class="field">
+        <label>Blood pressure</label>
+        <select id="lo_htn" onchange="onLo3Input()">
+          <option value="">— select —</option>
+          <option value="high">Hypertensive</option>
+          <option value="normal">Normotensive / low</option>
+        </select>
+      </div>
+      <p class="muted" style="margin-bottom:6px">History (tick all that apply):</p>
+      <div class="checkbox-row"><input type="checkbox" id="lo_h_diur" onchange="onLo3Input()"> <label for="lo_h_diur">Loop / thiazide diuretic use</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="lo_h_vom" onchange="onLo3Input()"> <label for="lo_h_vom">Vomiting / NG aspirate</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="lo_h_diar" onchange="onLo3Input()"> <label for="lo_h_diar">Diarrhoea / laxatives / GI fistula</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="lo_h_shift" onchange="onLo3Input()"> <label for="lo_h_shift">Recent insulin, β-agonist, large carbohydrate load, refeeding or alkalosis</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="lo_h_thy" onchange="onLo3Input()"> <label for="lo_h_thy">Thyrotoxic features or abrupt-onset paralysis</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="lo_h_intake" onchange="onLo3Input()"> <label for="lo_h_intake">Poor intake / alcohol use</label></div>
+      <div id="lo3_result"></div>
+      <p class="muted" style="margin-top:10px;font-size:11.5px">
+        <b>A. Transcellular shift</b> — insulin, β-agonists, alkalosis, thyrotoxic periodic paralysis, refeeding, hypothermia<br>
+        <b>B. Extrarenal loss / low intake</b> — diarrhoea, laxatives, fistulae, sweat, poor intake<br>
+        <b>C. Renal loss</b> — diuretics, mineralocorticoid excess, RTA, hypomagnesaemia, osmotic diuresis, amphotericin B, aminoglycosides, cisplatin, Bartter / Gitelman
+      </p>
+    </div>
+  </div>
+
+  <!-- LO STEP 4 -->
+  <div class="phase" id="p-lo4">
+    <div class="step-tag tag-lo">STEP 4 · HYPOKALAEMIA</div>
+    <h2 class="step-title">Calculate Replacement</h2>
+    <div class="card">
+      <div class="field-row">
+        <div class="field">
+          <label>Current K⁺ (mmol/L)</label>
+          <input type="number" step="0.1" id="lo4_k" oninput="onLo4Input()">
+        </div>
+        <div class="field">
+          <label>Target K⁺ (mmol/L)</label>
+          <input type="number" step="0.1" id="lo4_target" value="4.0" oninput="onLo4Input()">
+        </div>
+      </div>
+      <p class="muted" style="margin-top:-4px">Aim for ≥4.0 if cardiac disease, digoxin or arrhythmia.</p>
+      <div id="lo4_result"></div>
+      <div id="lo4_routeWrap" class="hidden">
+        <p style="font-size:13px;color:#5a6d75;margin:10px 0 6px">Select route of replacement:</p>
+        <div class="choice-grid one">
+          <button class="btn choice" data-route="oral" onclick="chooseLoRoute('oral',this)">Oral / enteral KCl</button>
+          <button class="btn choice" data-route="per" onclick="chooseLoRoute('per',this)">IV KCl — peripheral line (monitored)</button>
+          <button class="btn choice" data-route="cen" onclick="chooseLoRoute('cen',this)">IV KCl — central line (monitored)</button>
+        </div>
+        <div id="lo4_routeResult"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LO DASHBOARD -->
+  <div class="phase" id="p-lodash">
+    <div class="step-tag tag-lo">QUICK DASHBOARD</div>
+    <h2 class="step-title">Hypokalemia Clinical Engine</h2>
+    <div id="loRoot" class="text-slate-800" style="background:#f8fafc;border-radius:14px;padding:14px;margin:0 -2px">
+
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <p class="text-xs text-slate-500 font-medium">K⁺ Deficit Planner • Oral / Peripheral / Central IV Replacement Simulator</p>
+        <div class="flex items-center gap-2">
+          <button onclick="openModal('loGuide')" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200">📖 Clinical Protocols</button>
+          <button onclick="resetLoDefaults()" class="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200">🔄 Reset</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+        <section class="lg:col-span-5 space-y-5">
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">1</span>
+                Serum K⁺ &amp; Target
+              </h2>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <div class="flex justify-between items-center mb-1.5">
+                  <label class="text-xs font-bold text-slate-700">Current Serum K⁺</label>
+                  <div class="flex items-center gap-1 bg-sky-50 border border-sky-200 rounded-lg px-2 py-0.5">
+                    <input type="number" step="0.1" id="loKNum" min="1" max="3.4" value="2.6" class="w-12 text-sm font-black text-sky-700 bg-transparent text-right focus:outline-none">
+                    <span class="text-xs font-bold text-sky-800">mmol/L</span>
+                  </div>
+                </div>
+                <input type="range" id="loKSlider" min="1" max="3.4" step="0.1" value="2.6" class="mt-1 w-full accent-sky-600 cursor-pointer">
+                <div class="flex justify-between text-[10px] text-slate-400 font-semibold mt-1">
+                  <span>1.0 (Critical)</span><span>2.5 (Severe)</span><span>3.4 (Mild)</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Target K⁺ (mmol/L)</label>
+                  <input type="number" step="0.1" id="loTarget" value="4.0" min="3.0" max="5.0" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Renal function</label>
+                  <select id="loRenal" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="normal">Normal / mild ↓</option>
+                    <option value="impaired">eGFR &lt;30 / AKI (rates ×0.5)</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Quick Target Presets:</span>
+                <div class="grid grid-cols-3 gap-1.5">
+                  <button onclick="setLoTarget(3.5)" class="py-1 px-2 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200">3.5</button>
+                  <button onclick="setLoTarget(4.0)" class="py-1 px-2 text-[11px] font-bold bg-sky-100 hover:bg-sky-200 text-sky-800 rounded border border-sky-200">4.0</button>
+                  <button onclick="setLoTarget(4.5)" class="py-1 px-2 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200">4.5</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">2</span>
+                Route, Product &amp; Ongoing Losses
+              </h2>
+            </div>
+            <div class="space-y-4">
+              <div class="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button id="loBtnOral" onclick="setLoRoute('oral')" class="py-2 px-1 text-[11px] font-bold rounded-lg">💊 Oral</button>
+                <button id="loBtnPer" onclick="setLoRoute('per')" class="py-2 px-1 text-[11px] font-bold rounded-lg">💉 IV Periph.</button>
+                <button id="loBtnCen" onclick="setLoRoute('cen')" class="py-2 px-1 text-[11px] font-bold rounded-lg">🩺 IV Central</button>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1" id="loFluidLabel">Product</label>
+                <select id="loFluid" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2.5"></select>
+                <p class="text-[10px] text-slate-400 mt-1" id="loFluidNote"></p>
+              </div>
+
+              <div id="loIvWrap">
+                <div class="flex justify-between mb-1">
+                  <label class="text-xs font-bold text-slate-700">Infusion rate (mmol/h)</label>
+                  <span id="loRateDisp" class="text-xs font-bold text-sky-700">10</span>
+                </div>
+                <input type="range" id="loRate" min="1" max="40" step="1" value="10" class="w-full accent-sky-600 cursor-pointer">
+                <div id="loEmergWrap" class="hidden mt-2 p-2.5 bg-rose-50 border border-rose-200 rounded-lg">
+                  <label class="flex items-start gap-2 text-[11px] font-semibold text-rose-900 cursor-pointer">
+                    <input type="checkbox" id="loEmerg" class="mt-0.5">
+                    <span>Life-threatening arrhythmia — allow up to 40 mmol/h (ICU, continuous ECG, K⁺ every 1 h)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div id="loOralWrap" class="hidden">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Doses per day</label>
+                <select id="loFreq" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                  <option value="2">2 (q12h)</option>
+                  <option value="3" selected>3 (q8h)</option>
+                  <option value="4">4 (q6h)</option>
+                  <option value="5">5 (q4–5h)</option>
+                </select>
+              </div>
+
+              <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Ongoing K⁺ losses (mmol/h) — optional</label>
+                <input type="number" step="0.5" min="0" id="loLoss" value="0" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                <p class="text-[10px] text-slate-500 mt-1 leading-tight">Urine K⁺ (mmol/L) × urine output (L/h) + GI losses. Subtracted from net delivery in the simulation.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lg:col-span-7 space-y-5">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">K⁺ Deficit to Target</span>
+              <div class="mt-2"><span id="outDefRange" class="text-lg font-black text-sky-700 tracking-tight">100–200</span><span class="text-xs font-bold text-sky-600 ml-0.5">mmol</span></div>
+              <p class="text-[10px] text-slate-400 mt-1">Estimated range</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Plan Replacement</span>
+              <div class="mt-2"><span id="outReq" class="text-xl font-black text-slate-900 tracking-tight">100</span><span class="text-xs font-bold text-slate-500 ml-0.5">mmol</span></div>
+              <p class="text-[10px] text-slate-400 mt-1">Low end, then recheck</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Max Safe Rate</span>
+              <div class="mt-2"><span id="outMaxRate" class="text-xl font-black text-slate-900 tracking-tight">10</span><span class="text-xs font-bold text-slate-500 ml-0.5" id="outMaxUnit">mmol/h</span></div>
+              <p class="text-[10px] text-slate-400 mt-1" id="outMaxSub">Peripheral line</p>
+            </div>
+            <div class="bg-white border-2 border-sky-300 bg-sky-50/40 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-sky-900 uppercase tracking-wider">Prescribed</span>
+              <div class="mt-1"><span id="outPresc" class="text-2xl font-black text-sky-700 tracking-tight">250</span><span id="outPrescUnit" class="text-xs font-bold text-sky-800 ml-0.5">mL/hr</span></div>
+              <p id="outPrescSub" class="text-[10px] font-bold text-sky-800 mt-0.5">10 mmol/h</p>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📈 24-Hour Estimated Serum K⁺ Band</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Upper vs lower estimate. Real response varies with shift, losses and Mg²⁺ — recheck K⁺, don't extrapolate.</p>
+              <div class="flex flex-wrap items-center gap-3 text-[10px] font-bold mt-1.5">
+                <span class="flex items-center gap-1 text-sky-700"><span class="w-2.5 h-2.5 rounded-full bg-sky-600 inline-block"></span> Upper estimate</span>
+                <span class="flex items-center gap-1 text-slate-600"><span class="w-2.5 h-2.5 rounded-full bg-slate-500 inline-block"></span> Lower estimate</span>
+                <span class="flex items-center gap-1 text-rose-600"><span class="w-2.5 h-0.5 bg-rose-600 inline-block"></span> 5.0 ceiling</span>
+              </div>
+            </div>
+            <div class="h-60 w-full relative"><canvas id="loChart"></canvas></div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider mb-3">🗂️ Predictive Timeline Breakdown</h2>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                    <th class="p-2.5">Time</th><th class="p-2.5">Est. K⁺ range</th><th class="p-2.5">Net K⁺ given</th><th class="p-2.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="loTbody" class="text-xs font-medium text-slate-700 divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📝 Clinical Prescription &amp; Action Plan</h2>
+              <button onclick="copyText('loOrder','loCopyTxt')" class="px-2.5 py-1 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md border border-slate-200">📋 <span id="loCopyTxt">Copy Order</span></button>
+            </div>
+            <div id="loSafety" class="mb-4"></div>
+            <div class="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-xs leading-relaxed border border-slate-800">
+              <div class="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-2 mb-2 text-[10px] uppercase font-bold tracking-wider">
+                <span>🩺 Medical Order draft</span><span id="loOrderTime">Updated Live</span>
+              </div>
+              <pre id="loOrder" class="whitespace-pre-wrap font-mono text-xs text-emerald-400"></pre>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="loGuide" class="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+        <div class="p-5 border-b border-slate-200 flex justify-between items-center sticky top-0 bg-white z-10">
+          <h3 class="text-base font-extrabold text-slate-900">📖 Hypokalemia Protocols &amp; References</h3>
+          <button onclick="closeModal('loGuide')" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600">✕</button>
+        </div>
+        <div class="p-6 space-y-5 text-xs text-slate-700 leading-relaxed">
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">1. Replacement Safety Limits</h4>
+            <ul class="list-disc list-inside space-y-1 font-semibold text-slate-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+              <li><strong>Peripheral IV:</strong> ≤10 mmol/h and ≤40 mmol/L (vein irritation, pain).</li>
+              <li><strong>Central IV:</strong> usually 10–20 mmol/h with continuous ECG; up to 40 mmol/h only for life-threatening arrhythmia, in ICU, with hourly K⁺.</li>
+              <li><strong>Never</strong> give IV KCl as a bolus or push. Concentrated KCl only via central line, via a pump.</li>
+              <li>Use <strong>0.9% saline</strong> as carrier — dextrose causes insulin release and shifts K⁺ into cells.</li>
+              <li>eGFR &lt;30 / AKI / oliguria: halve rates and recheck sooner (rebound hyperkalaemia risk).</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">2. Deficit Estimate Used Here</h4>
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1 font-mono text-[11px]">
+              <div>K⁺ 3.0–4.0: deficit ≈ 100–200 mmol per 1 mmol/L fall</div>
+              <div>K⁺ &lt;3.0: ≈ 200–400 mmol more per additional 1 mmol/L fall</div>
+              <div>Rule of thumb: 10 mmol KCl ≈ +0.1 mmol/L serum K⁺</div>
+            </div>
+            <p class="mt-2">These are bedside approximations. Replace in aliquots (e.g. 40 mmol) and recheck rather than giving the whole calculated deficit blindly. 15% KCl 10 mL ampoule ≈ 20 mmol K⁺.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">3. Magnesium</h4>
+            <p>Hypokalaemia is often refractory until Mg²⁺ is replaced. For Mg²⁺ &lt;1.7 mg/dL give MgSO₄ 2 g IV over 1–2 h (over 5–15 min if torsades / VT).</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">4. Salt Choice</h4>
+            <p>KCl is the default. Use K-bicarbonate / citrate with metabolic acidosis (RTA, diarrhoea) and K-phosphate when phosphate is also low (e.g. DKA recovery).</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">5. Monitoring</h4>
+            <ul class="list-disc list-inside space-y-1 text-slate-600">
+              <li>IV ≥10 mmol/h or K⁺ &lt;2.5: continuous ECG; K⁺ every 1–2 h.</li>
+              <li>Stable IV replacement: K⁺ 4–6 hourly. Oral: recheck within 12–24 h.</li>
+              <li>Transcellular shift (thyrotoxic paralysis, insulin, β-agonist): use smaller doses — rebound hyperkalaemia once the shift reverses.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+          <button onclick="closeModal('loGuide')" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold">Close Guide</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LO STEP 5 -->
+  <div class="phase" id="p-lo5">
+    <div class="step-tag tag-lo">STEP 5 · HYPOKALAEMIA</div>
+    <h2 class="step-title">Dynamic Reassessment</h2>
+    <div class="card">
+      <div id="lo5_intro"></div>
+      <div class="field-row">
+        <div class="field">
+          <label>Hours since last check</label>
+          <input type="number" step="0.5" id="lo5_hours" placeholder="e.g. 2 or 6">
+        </div>
+        <div class="field">
+          <label>New serum K⁺ (mmol/L)</label>
+          <input type="number" step="0.1" id="lo5_newK" placeholder="e.g. 3.1">
+        </div>
+      </div>
+      <button class="btn" onclick="logLoReading()">Log this reading</button>
+      <div id="lo5_result"></div>
+      <div id="lo5_log"></div>
+    </div>
+  </div>
+
+  <!-- ================= HYPERKALAEMIA PATH ================= -->
+
+  <!-- HI STEP 2 -->
+  <div class="phase" id="p-hi2">
+    <div class="step-tag tag-hi">STEP 2 · HYPERKALAEMIA</div>
+    <h2 class="step-title">Confirm &amp; Assess Cardiac Risk</h2>
+    <div class="card">
+      <p class="muted">Get a 12-lead ECG now. Do <b>not</b> delay treatment for a repeat sample if K⁺ ≥6.5 or the ECG is abnormal.</p>
+      <div class="field">
+        <label>12-lead ECG</label>
+        <select id="hi_ecg" onchange="onHi2Input()">
+          <option value="unknown">ECG not yet done — get one now</option>
+          <option value="normal">Normal ECG</option>
+          <option value="peaked">Peaked T waves only</option>
+          <option value="pr">Flat P / long PR / ST changes</option>
+          <option value="qrs">Wide QRS / sine-wave pattern / bradycardia</option>
+          <option value="arrest">VF / VT / asystole / PEA (peri-arrest)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Renal function</label>
+        <select id="hi_renal" onchange="onHi2Input()">
+          <option value="normal">Normal / mildly reduced</option>
+          <option value="impaired">AKI or eGFR &lt;30</option>
+          <option value="anuric">Oliguric / anuric / dialysis-dependent</option>
+        </select>
+      </div>
+      <div class="checkbox-row"><input type="checkbox" id="hi_release" onchange="onHi2Input()"> <label for="hi_release">Ongoing K⁺ release: rhabdomyolysis, tumour lysis, crush, haemolysis, GI bleed</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="hi_dig" onchange="onHi2Input()"> <label for="hi_dig">On digoxin</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="hi_pseudo" onchange="onHi2Input()"> <label for="hi_pseudo">Sample haemolysed / difficult draw, and no risk factors for hyperkalaemia</label></div>
+      <div id="hi2_result"></div>
+    </div>
+  </div>
+
+  <!-- HI STEP 3 -->
+  <div class="phase" id="p-hi3">
+    <div class="step-tag tag-hi">STEP 3 · HYPERKALAEMIA</div>
+    <h2 class="step-title">Membrane Stabilisation</h2>
+    <div class="card">
+      <div id="hi3_status"></div>
+      <p style="font-size:13px;color:#5a6d75;margin:12px 0 6px">Which agent comes <b>first</b> for hyperkalaemia with ECG changes?</p>
+      <div class="choice-grid">
+        <button class="btn choice" onclick="chooseHiAgent('ca',this)">IV calcium</button>
+        <button class="btn choice" onclick="chooseHiAgent('ins',this)">Insulin + dextrose</button>
+        <button class="btn choice" onclick="chooseHiAgent('salb',this)">Nebulised salbutamol</button>
+        <button class="btn choice" onclick="chooseHiAgent('bic',this)">Sodium bicarbonate</button>
+        <button class="btn choice" onclick="chooseHiAgent('lasix',this)">Furosemide</button>
+        <button class="btn choice" onclick="chooseHiAgent('resin',this)">K⁺ binder (resin)</button>
+      </div>
+      <div id="hi3_agentResult"></div>
+    </div>
+  </div>
+
+  <!-- HI STEP 4 -->
+  <div class="phase" id="p-hi4">
+    <div class="step-tag tag-hi">STEP 4 · HYPERKALAEMIA</div>
+    <h2 class="step-title">Shift K⁺ Into Cells</h2>
+    <div class="card">
+      <p class="muted">Shifting lowers serum K⁺ within 15–30 min but removes nothing from the body. Effects wear off in ~4–6 h, so Step 5 (removal) must follow.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Weight (kg)</label>
+          <input type="number" id="hi_wt" placeholder="e.g. 70" oninput="onHi4Input()">
+        </div>
+        <div class="field">
+          <label>Blood glucose (mg/dL)</label>
+          <input type="number" id="hi_glu" placeholder="e.g. 110" oninput="onHi4Input()">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Serum HCO₃⁻ (mmol/L)</label>
+          <input type="number" step="0.1" id="hi_hco3" placeholder="e.g. 14" oninput="onHi4Input()">
+        </div>
+        <div class="field">
+          <label>Arterial pH — optional</label>
+          <input type="number" step="0.01" id="hi_ph" placeholder="e.g. 7.18" oninput="onHi4Input()">
+        </div>
+      </div>
+      <div class="checkbox-row"><input type="checkbox" id="hi_tachy" onchange="onHi4Input()"> <label for="hi_tachy">Tachyarrhythmia or acute coronary syndrome (avoid salbutamol)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="hi_overload" onchange="onHi4Input()"> <label for="hi_overload">Volume overloaded / pulmonary oedema (avoid bicarbonate volume)</label></div>
+      <div id="hi4_result"></div>
+    </div>
+  </div>
+
+  <!-- HI STEP 5 -->
+  <div class="phase" id="p-hi5">
+    <div class="step-tag tag-hi">STEP 5 · HYPERKALAEMIA</div>
+    <h2 class="step-title">Remove K⁺ &amp; Treat the Cause</h2>
+    <div class="card">
+      <div class="field-row">
+        <div class="field">
+          <label>Urine output</label>
+          <select id="hi_uo" onchange="onHi5Input()">
+            <option value="">— select —</option>
+            <option value="good">Adequate (&gt;0.5 mL/kg/h)</option>
+            <option value="low">Reduced / oliguric</option>
+            <option value="none">Anuric</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Volume status</label>
+          <select id="hi_vol" onchange="onHi5Input()">
+            <option value="">— select —</option>
+            <option value="hypo">Hypovolaemic</option>
+            <option value="eu">Euvolaemic</option>
+            <option value="hyper">Hypervolaemic</option>
+          </select>
+        </div>
+      </div>
+      <p class="muted" style="margin-bottom:6px">Likely contributors (tick all that apply):</p>
+      <div class="checkbox-row"><input type="checkbox" id="hi_c_drug" onchange="onHi5Input()"> <label for="hi_c_drug">ACEi / ARB / MRA / K⁺-sparing diuretic</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="hi_c_drug2" onchange="onHi5Input()"> <label for="hi_c_drug2">NSAID, trimethoprim, heparin, calcineurin inhibitor, β-blocker</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="hi_c_supp" onchange="onHi5Input()"> <label for="hi_c_supp">K⁺ supplements / salt substitute / stored blood</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="hi_c_aki" onchange="onHi5Input()"> <label for="hi_c_aki">AKI / CKD progression, obstruction</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="hi_c_adr" onchange="onHi5Input()"> <label for="hi_c_adr">Possible adrenal insufficiency (hyponatraemia, hypotension, steroids stopped)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="hi_c_lysis" onchange="onHi5Input()"> <label for="hi_c_lysis">Rhabdomyolysis / tumour lysis / tissue necrosis / haemolysis</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="hi_c_dka" onchange="onHi5Input()"> <label for="hi_c_dka">Insulin deficiency / DKA / metabolic acidosis</label></div>
+      <div id="hi5_result"></div>
+    </div>
+  </div>
+
+  <!-- HI DASHBOARD -->
+  <div class="phase" id="p-hidash">
+    <div class="step-tag tag-hi">QUICK DASHBOARD</div>
+    <h2 class="step-title">Hyperkalemia Clinical Engine</h2>
+    <div id="hiRoot" class="text-slate-800" style="background:#f8fafc;border-radius:14px;padding:14px;margin:0 -2px">
+
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <p class="text-xs text-slate-500 font-medium">Stabilise • Shift • Remove — Indicative K⁺ Timeline &amp; Order Builder</p>
+        <div class="flex items-center gap-2">
+          <button onclick="openModal('hiGuide')" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200">📖 Clinical Protocols</button>
+          <button onclick="resetHiDefaults()" class="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200">🔄 Reset</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+        <section class="lg:col-span-5 space-y-5">
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">1</span>
+                Patient K⁺ &amp; Physiology
+              </h2>
+              <span id="hiSevTag" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">Severe</span>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <div class="flex justify-between items-center mb-1.5">
+                  <label class="text-xs font-bold text-slate-700">Current Serum K⁺</label>
+                  <div class="flex items-center gap-1 bg-rose-50 border border-rose-200 rounded-lg px-2 py-0.5">
+                    <input type="number" step="0.1" id="hiKNum" min="5.1" max="9.5" value="6.8" class="w-12 text-sm font-black text-rose-600 bg-transparent text-right focus:outline-none">
+                    <span class="text-xs font-bold text-rose-700">mmol/L</span>
+                  </div>
+                </div>
+                <input type="range" id="hiKSlider" min="5.1" max="9.5" step="0.1" value="6.8" class="mt-1 w-full accent-rose-600 cursor-pointer">
+                <div class="flex justify-between text-[10px] text-slate-400 font-semibold mt-1">
+                  <span>5.1 (Mild)</span><span>6.0 (Moderate)</span><span>6.5+ (Severe)</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Weight (kg)</label>
+                  <input type="number" id="hiWt" value="70" min="5" max="250" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Glucose (mg/dL)</label>
+                  <input type="number" id="hiGlu" value="120" min="20" max="900" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Renal function</label>
+                  <select id="hiRenal" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="normal">Normal / mild ↓</option>
+                    <option value="impaired">AKI / eGFR &lt;30</option>
+                    <option value="anuric">Anuric / dialysis</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Ongoing K⁺ release</label>
+                  <select id="hiLoad" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="0">None</option>
+                    <option value="0.1">Moderate (+0.1/h)</option>
+                    <option value="0.2">Brisk (+0.2/h)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="checkbox-row" style="margin-bottom:0">
+                <input type="checkbox" id="hiAcid" class="w-4 h-4"> <label for="hiAcid" class="text-xs font-bold text-slate-700">Metabolic acidosis (pH &lt;7.2 or HCO₃⁻ &lt;15)</label>
+              </div>
+              <div class="checkbox-row" style="margin-bottom:0">
+                <input type="checkbox" id="hiEcg" class="w-4 h-4"> <label for="hiEcg" class="text-xs font-bold text-slate-700">ECG changes present</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">2</span>
+                Therapies to Model
+              </h2>
+            </div>
+            <div class="space-y-2.5 text-xs">
+              <label class="flex items-start gap-2 p-2 bg-amber-50/60 border border-amber-200 rounded-lg cursor-pointer"><input type="checkbox" id="hiCa" class="mt-0.5" checked> <span><b>IV calcium</b> — protects the heart; does not lower K⁺ (not in curve)</span></label>
+              <label class="flex items-start gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer"><input type="checkbox" id="hiIns" class="mt-0.5" checked> <span><b>Insulin + dextrose</b> — ≈ −0.7 mmol/L, peak ~1 h, fades by ~6 h</span></label>
+              <label class="flex items-start gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer"><input type="checkbox" id="hiSalb" class="mt-0.5"> <span><b>Nebulised salbutamol</b> — ≈ −0.5 mmol/L, peak ~1 h, fades by ~4 h</span></label>
+              <label class="flex items-start gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer"><input type="checkbox" id="hiBic" class="mt-0.5"> <span><b>Sodium bicarbonate</b> — ≈ −0.3 mmol/L, only if acidotic</span></label>
+              <label class="flex items-start gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer"><input type="checkbox" id="hiLoop" class="mt-0.5"> <span><b>Loop diuretic</b> — ≈ −0.4 mmol/L over ~4 h; needs urine output</span></label>
+              <div class="p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                <label class="block text-xs font-bold text-slate-700 mb-1">K⁺ binder</label>
+                <select id="hiBinder" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                  <option value="none">None</option>
+                  <option value="szc">Sodium zirconium cyclosilicate 10 g (≈ −0.9 over ~6 h)</option>
+                  <option value="cps">Calcium polystyrene sulfonate 15 g (≈ −0.3, slow)</option>
+                </select>
+              </div>
+              <div class="p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="hiHd"> <span><b>Haemodialysis</b> — ≈ −2.0 mmol/L over ~3 h, partial rebound</span></label>
+                <div class="mt-2">
+                  <label class="block text-[10px] font-bold text-slate-600 mb-1">Time until dialysis starts</label>
+                  <select id="hiHdDelay" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="0">Immediately</option>
+                    <option value="1">In 1 h</option>
+                    <option value="2" selected>In 2 h</option>
+                    <option value="4">In 4 h</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lg:col-span-7 space-y-5">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-white border border-amber-200 bg-amber-50/40 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-amber-900 uppercase tracking-wider">IV Calcium</span>
+              <div class="mt-2"><span class="text-xl font-black text-amber-700 tracking-tight">30</span><span class="text-xs font-bold text-amber-800 ml-0.5">mL</span></div>
+              <p class="text-[10px] text-slate-500 mt-1">10% Ca gluconate</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Insulin + Glucose</span>
+              <div class="mt-2"><span id="outIns" class="text-xl font-black text-slate-900 tracking-tight">10 U</span></div>
+              <p id="outInsSub" class="text-[10px] text-slate-400 mt-1">+ 25 g dextrose</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Est. K⁺ at 1 h</span>
+              <div class="mt-2"><span id="outK1" class="text-xl font-black text-blue-600 tracking-tight">6.1</span><span class="text-xs font-bold text-blue-500 ml-0.5">mmol/L</span></div>
+              <p class="text-[10px] text-slate-400 mt-1">Shift effect at peak</p>
+            </div>
+            <div class="bg-white border-2 border-rose-300 bg-rose-50/40 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-rose-900 uppercase tracking-wider">Est. K⁺ at 6 h</span>
+              <div class="mt-1"><span id="outK6" class="text-2xl font-black text-rose-600 tracking-tight">6.4</span><span class="text-xs font-bold text-rose-800 ml-0.5">mmol/L</span></div>
+              <p id="outK6Sub" class="text-[10px] font-bold text-rose-800 mt-0.5">Rebound check</p>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📈 24-Hour Indicative Serum K⁺ Trajectory</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Illustrates timing of effect and rebound. Effects are approximate and not strictly additive — it is not a prediction. Recheck K⁺.</p>
+              <div class="flex flex-wrap items-center gap-3 text-[10px] font-bold mt-1.5">
+                <span class="flex items-center gap-1 text-rose-600"><span class="w-2.5 h-2.5 rounded-full bg-rose-600 inline-block"></span> Indicative K⁺</span>
+                <span class="flex items-center gap-1 text-red-800"><span class="w-2.5 h-0.5 bg-red-800 inline-block"></span> 6.5 critical</span>
+                <span class="flex items-center gap-1 text-amber-600"><span class="w-2.5 h-0.5 bg-amber-500 inline-block"></span> 5.5 upper target</span>
+              </div>
+            </div>
+            <div class="h-60 w-full relative"><canvas id="hiChart"></canvas></div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider mb-3">🗂️ Predictive Timeline Breakdown</h2>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                    <th class="p-2.5">Time</th><th class="p-2.5">Indicative K⁺</th><th class="p-2.5">Δ from start</th><th class="p-2.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="hiTbody" class="text-xs font-medium text-slate-700 divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📝 Clinical Prescription &amp; Action Plan</h2>
+              <button onclick="copyText('hiOrder','hiCopyTxt')" class="px-2.5 py-1 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md border border-slate-200">📋 <span id="hiCopyTxt">Copy Order</span></button>
+            </div>
+            <div id="hiSafety" class="mb-4"></div>
+            <div class="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-xs leading-relaxed border border-slate-800">
+              <div class="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-2 mb-2 text-[10px] uppercase font-bold tracking-wider">
+                <span>🩺 Medical Order draft</span><span id="hiOrderTime">Updated Live</span>
+              </div>
+              <pre id="hiOrder" class="whitespace-pre-wrap font-mono text-xs text-emerald-400"></pre>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="hiGuide" class="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+        <div class="p-5 border-b border-slate-200 flex justify-between items-center sticky top-0 bg-white z-10">
+          <h3 class="text-base font-extrabold text-slate-900">📖 Hyperkalemia Protocols &amp; References</h3>
+          <button onclick="closeModal('hiGuide')" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600">✕</button>
+        </div>
+        <div class="p-6 space-y-5 text-xs text-slate-700 leading-relaxed">
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">1. Severity &amp; Urgency</h4>
+            <ul class="list-disc list-inside space-y-1 font-semibold text-slate-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+              <li><strong>Mild</strong> 5.5–5.9 · <strong>Moderate</strong> 6.0–6.4 · <strong>Severe</strong> ≥6.5 mmol/L.</li>
+              <li>Any ECG change (peaked T, flat P, wide QRS, sine wave) = emergency, whatever the K⁺ value.</li>
+              <li>AKI, oliguria, ongoing K⁺ release, acidosis or digoxin raise the risk — treat at a lower threshold.</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">2. Three Prongs of Treatment</h4>
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2 text-[11px]">
+              <div><strong>Stabilise:</strong> 10% calcium gluconate 30 mL (or 10% calcium chloride 10 mL, central preferred) IV over 5–10 min; repeat after 5–10 min if ECG changes persist. Onset in minutes, lasts 30–60 min. Don't mix with bicarbonate.</div>
+              <div><strong>Shift:</strong> regular insulin 10 U IV (5 U if renal impairment or low weight) + 25 g glucose; omit glucose if baseline ≥250 mg/dL. Salbutamol 10–20 mg nebulised. Bicarbonate only if acidotic.</div>
+              <div><strong>Remove:</strong> loop diuretic if urine output; K⁺ binder (SZC 10 g up to TID); dialysis for severe, refractory, anuric or ongoing release.</div>
+            </div>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">3. Hypoglycaemia After Insulin</h4>
+            <p>Check glucose at 30 and 60 min, then hourly for at least 6 h — risk is highest with renal impairment, low baseline glucose and no dextrose infusion afterwards.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">4. Pseudohyperkalaemia</h4>
+            <p>Haemolysis, fist clenching, delayed processing, very high platelets or WBC. Confirm with a whole-blood gas K⁺ when the patient is well, has no ECG changes and no risk factors — but never delay treatment if the ECG is abnormal.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">5. Monitoring</h4>
+            <ul class="list-disc list-inside space-y-1 text-slate-600">
+              <li>Continuous ECG while K⁺ ≥6.0 or ECG abnormal.</li>
+              <li>Recheck K⁺ at 1 h, 2 h, 4 h and 6 h, then every 6 h for 24 h to catch rebound.</li>
+              <li>After dialysis or large shift therapy, watch for over-correction to hypokalaemia.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+          <button onclick="closeModal('hiGuide')" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold">Close Guide</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HI STEP 6 -->
+  <div class="phase" id="p-hi6">
+    <div class="step-tag tag-hi">STEP 6 · HYPERKALAEMIA</div>
+    <h2 class="step-title">Dynamic Reassessment</h2>
+    <div class="card">
+      <div id="hi6_intro"></div>
+      <div class="field-row">
+        <div class="field">
+          <label>Hours since last check</label>
+          <input type="number" step="0.5" id="hi6_hours" placeholder="e.g. 1 or 4">
+        </div>
+        <div class="field">
+          <label>New serum K⁺ (mmol/L)</label>
+          <input type="number" step="0.1" id="hi6_newK" placeholder="e.g. 5.9">
+        </div>
+      </div>
+      <div class="field">
+        <label>Glucose now (mg/dL) — if insulin was given</label>
+        <input type="number" id="hi6_glu" placeholder="e.g. 78">
+      </div>
+      <button class="btn" onclick="logHiReading()">Log this reading</button>
+      <div id="hi6_result"></div>
+      <div id="hi6_log"></div>
+    </div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="phase" id="p-summary">
+    <div class="step-tag">SUMMARY</div>
+    <h2 class="step-title">Case Recap</h2>
+    <div class="card" id="summaryOut"></div>
+  </div>
+
+</div>
+
+<div class="nav-bar">
+  <button class="nav-prev" id="navPrev" onclick="goPrev()">← PREVIOUS</button>
+  <button class="nav-next" id="navNext" onclick="goNext()">NEXT →</button>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+let currentPageId='p-intro';
+
+const state={
+  k:null,
+  lo:{urgent:false,needIV:false,gut:true,mgLow:false,renalImpaired:false,ecg:'unknown',triggers:[],
+      mech:null,target:4.0,route:null,defLow:null,defHigh:null},
+  hi:{ecg:'unknown',renal:'normal',release:false,dig:false,emergency:false,urgent:false,
+      wt:null,glu:null,acid:false,insU:null,dexG:null,uo:'',vol:'',dialysis:false,agent:null},
+  history:[]
+};
+
+/* Dynamic page order — recomputed every time so changing the entered K⁺
+   re-routes the flow to whichever algorithm applies. */
+function getPageOrder(){
+  const base=['p-intro','p-step1'];
+  if(state.k==null) return base;
+  if(state.k<3.5) return base.concat(['p-lo2','p-lo3','p-lo4','p-lodash','p-lo5','p-summary']);
+  if(state.k>5.0) return base.concat(['p-hi2','p-hi3','p-hi4','p-hi5','p-hidash','p-hi6','p-summary']);
+  return base.concat(['p-summary']);
+}
+
+function showPageById(id){
+  document.querySelectorAll('.phase').forEach(el=>el.classList.remove('active'));
+  const target=$(id);
+  if(target) target.classList.add('active');
+  currentPageId=id;
+  window.scrollTo({top:0,behavior:'smooth'});
+  const order=getPageOrder();
+  const idx=order.indexOf(id);
+  $('navPrev').disabled = idx<=0;
+  $('navNext').textContent = (idx>=0&&idx===order.length-1) ? 'RESTART' : 'NEXT →';
+
+  if(id==='p-lo2') onLo2Input();
+  if(id==='p-lo3') onLo3Input();
+  if(id==='p-lo4') initLo4();
+  if(id==='p-lodash') showLoDash();
+  if(id==='p-lo5') renderLo5Intro();
+  if(id==='p-hi2') onHi2Input();
+  if(id==='p-hi3') renderHi3();
+  if(id==='p-hi4') onHi4Input();
+  if(id==='p-hi5') onHi5Input();
+  if(id==='p-hidash') showHiDash();
+  if(id==='p-hi6') renderHi6Intro();
+  if(id==='p-summary') renderSummary();
+}
+function goPrev(){
+  const order=getPageOrder(); const idx=order.indexOf(currentPageId);
+  if(idx>0) showPageById(order[idx-1]);
+}
+function goNext(){
+  if(currentPageId==='p-step1'&&state.k==null){
+    $('s1_result').innerHTML='<div class="result warn">Enter a serum K⁺ value first.</div>';
+    return;
+  }
+  const order=getPageOrder(); const idx=order.indexOf(currentPageId);
+  if(idx===-1){ showPageById(order[order.length-1]); return; }
+  if(idx===order.length-1){ location.reload(); return; }
+  showPageById(order[idx+1]);
+}
+function openModal(id){ $(id).classList.remove('hidden'); }
+function closeModal(id){ $(id).classList.add('hidden'); }
+function copyText(preId,labelId){
+  const text=$(preId).textContent;
+  const done=()=>{ $(labelId).textContent='Copied!'; setTimeout(()=>{ $(labelId).textContent='Copy Order'; },2000); };
+  const fallback=()=>{
+    const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); done(); }catch(e){ $(labelId).textContent='Select & copy manually'; }
+    document.body.removeChild(ta);
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done,fallback); }
+  else fallback();
+}
+
+/* ---------------- STEP 1 ---------------- */
+function onStep1Input(){
+  const k=parseFloat($('s1_k').value);
+  const out=$('s1_result');
+  if(isNaN(k)){ state.k=null; out.innerHTML=''; return; }
+  state.k=k;
+  const odd=(k<1.5||k>8.5)?'<div class="result warn">Unusually extreme value — confirm it is not a unit, entry or sample error (haemolysis, contaminated sample) before acting, unless the ECG is also abnormal.</div>':'';
+  if(k<3.5){
+    let sev,cls,icon;
+    if(k<2.5){sev='Severe';cls='high';icon='🔴';}
+    else if(k<3.0){sev='Moderate';cls='warn';icon='🟠';}
+    else{sev='Mild';cls='good';icon='🟡';}
+    out.innerHTML='<div class="result '+cls+'">'+icon+' <b>'+sev+' hypokalaemia detected</b> (K⁺ '+k+' mmol/L, &lt;3.5).'+
+      (k<2.5?' Cardiac and neuromuscular risk — monitored IV replacement is likely needed.':'')+
+      '<span class="next-action">Next step → Assess urgency (ECG, weakness, Mg²⁺).</span></div>'+odd;
+    return;
+  }
+  if(k<=5.0){
+    out.innerHTML='<div class="result good">✅ K⁺ '+k+' mmol/L — within normal range (3.5–5.0). No potassium correction indicated.</div>'+odd;
+    return;
+  }
+  let sev,cls,icon;
+  if(k>=6.5){sev='Severe';cls='high';icon='🔴';}
+  else if(k>=6.0){sev='Moderate';cls='warn';icon='🟠';}
+  else{sev='Mild';cls='good';icon='🟡';}
+  out.innerHTML='<div class="result '+cls+'">'+icon+' <b>'+sev+' hyperkalaemia detected</b> (K⁺ '+k+' mmol/L, &gt;5.0).'+
+    (k>=6.5?' Arrhythmia risk — get a 12-lead ECG immediately; do not wait for a repeat sample.':'')+
+    '<span class="next-action">Next step → ECG and cardiac-risk assessment.</span></div>'+odd;
+}
+
+/* ================= HYPOKALAEMIA ================= */
+
+/* ---- LO STEP 2 ---- */
+function onLo2Input(){
+  const k=state.k; if(k==null) return;
+  const ecg=$('lo_ecg').value, weak=$('lo_weak').value;
+  const dig=$('lo_dig').checked, card=$('lo_card').checked, gut=$('lo_gut').checked;
+  const mg=parseFloat($('lo_mg').value);
+  const renal=$('lo_renal').value;
+
+  const ecgAbn=(ecg==='mild'||ecg==='qt'||ecg==='arr');
+  const triggers=[];
+  if(k<2.5) triggers.push('K⁺ &lt;2.5 mmol/L');
+  if(ecgAbn) triggers.push('ECG changes of hypokalaemia');
+  if(weak==='severe') triggers.push('severe neuromuscular involvement');
+  if(k<3.0&&(dig||card)) triggers.push('K⁺ &lt;3.0 with '+(dig&&card?'digoxin and cardiac disease':dig?'digoxin':'cardiac disease'));
+  const urgent=triggers.length>0;
+  const needIV=urgent||!gut;
+  const mgLow=(!isNaN(mg)&&mg<1.7);
+  Object.assign(state.lo,{urgent,needIV,gut,mgLow,renalImpaired:renal==='impaired',ecg,triggers});
+
+  let html='';
+  if(ecg==='unknown') html+='<div class="result warn">⚠ No ECG yet — record a 12-lead ECG now. Any hypokalaemic change would upgrade this to a high-risk case.</div>';
+  if(ecg==='arr') html+='<div class="result high">🔴 <b>Life-threatening arrhythmia.</b> Call for help; MgSO₄ 2 g IV over 5–15 min for torsades / VT, central-line KCl with continuous ECG, and review QT-prolonging drugs.</div>';
+  if(urgent){
+    html+='<div class="result high">🔴 <b>High-risk hypokalaemia</b> (K⁺ '+k+' mmol/L) — '+triggers.join('; ')+'.'+
+      '<span class="next-action">NEXT ACTION → Monitored IV replacement (continuous ECG, HDU/ICU level of care). Oral alone is not enough.</span></div>';
+  } else if(!gut){
+    html+='<div class="result warn">🟠 Gut not usable — oral replacement is unreliable.<span class="next-action">NEXT ACTION → IV replacement with ECG monitoring.</span></div>';
+  } else {
+    html+='<div class="result good">✅ No high-risk features — <b>oral replacement is appropriate</b> (K⁺ '+k+' mmol/L).'+
+      '<span class="next-action">NEXT ACTION → Find the cause, then oral KCl; recheck K⁺ in 12–24 h.</span></div>';
+  }
+  if(!isNaN(mg)){
+    html+= mgLow
+      ? '<div class="result warn">Hypomagnesaemia (Mg²⁺ '+mg+' mg/dL). Replace concurrently: MgSO₄ 2 g IV over 1–2 h. Hypokalaemia often will not correct until Mg²⁺ is replaced.</div>'
+      : '<div class="result info">Mg²⁺ '+mg+' mg/dL — adequate.</div>';
+  } else {
+    html+='<div class="result info">Mg²⁺ not entered — measure it now; low Mg²⁺ makes hypokalaemia refractory to replacement.</div>';
+  }
+  if(dig) html+='<div class="result info">Hypokalaemia potentiates digoxin toxicity — aim for K⁺ ≥4.0.</div>';
+  if(renal==='impaired') html+='<div class="result info">Impaired renal function — halve replacement rates and recheck K⁺ sooner (rebound hyperkalaemia risk).</div>';
+  $('lo2_result').innerHTML=html;
+}
+
+/* ---- LO STEP 3 ---- */
+function onLo3Input(){
+  const uk=parseFloat($('lo_uk').value), ucr=parseFloat($('lo_ucr').value);
+  const hco3=parseFloat($('lo_hco3').value), ucl=parseFloat($('lo_ucl').value);
+  const htn=$('lo_htn').value;
+  const diur=$('lo_h_diur').checked, vom=$('lo_h_vom').checked, diar=$('lo_h_diar').checked;
+  const shift=$('lo_h_shift').checked, thy=$('lo_h_thy').checked, intake=$('lo_h_intake').checked;
+  const out=$('lo3_result');
+  if(isNaN(uk)){
+    out.innerHTML=(shift||thy||diur||vom||diar||intake)
+      ?'<div class="result info">History noted. Enter the spot urine K⁺ to separate renal wasting from extrarenal loss / shift.</div>':'';
+    state.lo.mech=null; return;
+  }
+
+  let renal, basis;
+  if(!isNaN(ucr)&&ucr>0){
+    const ratio=uk/(ucr*0.0884); // mmol/mmol
+    renal=ratio>=1.5;
+    basis='Urine K⁺/creatinine ratio <b>'+ratio.toFixed(1)+' mmol/mmol</b> ('+(renal?'≥1.5 — renal K⁺ wasting':'&lt;1.5 — kidney is conserving K⁺')+')';
+  } else {
+    renal=uk>=20;
+    basis='Spot urine K⁺ <b>'+uk+' mmol/L</b> ('+(renal?'≥20 — inappropriately high':'&lt;20 — kidney is conserving K⁺')+'; add urine creatinine for a more reliable ratio)';
+  }
+
+  let title,cls,body,action,label;
+  if(!renal){
+    if(shift||thy){
+      cls='warn'; label='Transcellular shift';
+      title='<b>Transcellular shift</b> likely (low urinary K⁺ plus a shift trigger)';
+      body='Total-body K⁺ may be near normal — insulin, β-agonists, alkalosis, refeeding or thyrotoxic periodic paralysis move K⁺ into cells.';
+      action='NEXT ACTION → Use smaller aliquots and recheck often: K⁺ can rebound once the trigger resolves. In thyrotoxic paralysis a non-selective β-blocker (e.g. propranolol) addresses the shift; treat the thyroid.';
+    } else if(diar||(!isNaN(hco3)&&hco3<22)){
+      cls='warn'; label='Lower GI loss';
+      title='<b>Lower GI K⁺ loss</b> (diarrhoea / laxatives / fistula)';
+      body='Appropriate renal conservation of K⁺'+((!isNaN(hco3)&&hco3<22)?' with a low HCO₃⁻ (non-gap acidosis is typical).':'.');
+      action='NEXT ACTION → Replace K⁺ and treat the source. With acidosis, replace K⁺ before or alongside bicarbonate (bicarbonate shifts K⁺ into cells and can worsen hypokalaemia); consider K-bicarbonate / citrate orally.';
+    } else {
+      cls='warn'; label='Extrarenal loss / low intake';
+      title='<b>Extrarenal loss or low intake</b>'+(intake?' (poor intake / alcohol)':'');
+      body='The kidney is conserving K⁺. Think GI loss (including vomiting, where urinary K⁺ falls once alkalosis settles), sweat, poor intake, or diuretics stopped days ago.';
+      action='NEXT ACTION → Review history for GI losses and recent diuretic use; replace K⁺ and Mg²⁺.';
+    }
+  } else {
+    if(!isNaN(hco3)&&hco3<22){
+      cls='warn'; label='Renal wasting with metabolic acidosis';
+      title='<b>Renal K⁺ wasting with metabolic acidosis</b>';
+      body='Think distal (type 1) or proximal (type 2) RTA, ketoacidosis with osmotic diuresis, acetazolamide or toxins.';
+      action='NEXT ACTION → Check glucose / ketones, urine pH and urine anion gap. Replace with K-citrate / bicarbonate where appropriate.';
+    } else if(!isNaN(hco3)&&hco3>=28){
+      if(htn==='high'){
+        cls='warn'; label='Mineralocorticoid excess';
+        title='<b>Renal K⁺ wasting + alkalosis + hypertension</b> → mineralocorticoid excess pattern';
+        body='Primary hyperaldosteronism, Cushing syndrome, Liddle syndrome, liquorice, congenital adrenal hyperplasia.';
+        action='NEXT ACTION → Send renin and aldosterone (interpret against interfering drugs); do not delay replacement.';
+      } else if(!isNaN(ucl)){
+        if(ucl<20){
+          cls='info'; label='Vomiting / remote diuretic';
+          title='<b>Renal K⁺ wasting + alkalosis + low urine Cl⁻</b> (&lt;20 mmol/L)';
+          body='Pattern of vomiting or NG loss (or diuretics stopped some days ago) — volume contraction and bicarbonaturia drive renal K⁺ loss.';
+          action='NEXT ACTION → Correct volume with saline, replace K⁺, treat the source (PPI, antiemetics).';
+        } else {
+          cls='warn'; label='Active diuretic / Bartter-Gitelman';
+          title='<b>Renal K⁺ wasting + alkalosis + high urine Cl⁻</b> (≥20 mmol/L)';
+          body='Active loop / thiazide diuretic use, or Bartter / Gitelman syndrome. Also check for Mg²⁺ depletion.';
+          action='NEXT ACTION → Confirm diuretic use (urine diuretic screen if unclear); replace K⁺ and Mg²⁺; consider a K⁺-sparing agent long-term.';
+        }
+      } else {
+        cls='warn'; label='Renal wasting with alkalosis';
+        title='<b>Renal K⁺ wasting + metabolic alkalosis</b>';
+        body='Diuretics, vomiting or Bartter / Gitelman syndrome.';
+        action='NEXT ACTION → Measure urine Cl⁻ (low in vomiting, high with active diuretics) to separate these.';
+      }
+    } else if(htn==='high'){
+      cls='warn'; label='Renal wasting with hypertension';
+      title='<b>Renal K⁺ wasting + hypertension</b>';
+      body='Mineralocorticoid excess is possible even without frank alkalosis.';
+      action='NEXT ACTION → Send renin and aldosterone; review drugs (liquorice, steroids).';
+    } else {
+      cls='warn'; label='Renal K⁺ wasting';
+      title='<b>Renal K⁺ wasting</b>, acid–base normal'+(diur?' — diuretic use is the commonest cause':'');
+      body='Diuretics, hypomagnesaemia, osmotic diuresis (check glucose), or drugs — amphotericin B, aminoglycosides, cisplatin, high-dose penicillins.';
+      action='NEXT ACTION → Review drugs, check glucose and Mg²⁺; replace K⁺ and Mg²⁺.';
+    }
+  }
+  state.lo.mech=label;
+  out.innerHTML='<div class="result info">'+basis+'.</div>'+
+    '<div class="result '+cls+'">'+title+'.<br>'+body+'<span class="next-action">'+action+'</span></div>';
+}
+
+/* ---- LO STEP 4 ---- */
+/* Deficit model: ~100–200 mmol per 1 mmol/L fall from 4.0 to 3.0, then
+   ~200–400 mmol more per 1 mmol/L below 3.0. Linear extension above 4.0
+   (negative deficit) lets targets above 4.0 be costed. */
+function defLow(k){ return k>=3 ? 100*(4-k) : 100+200*(3-k); }
+function defHigh(k){ return k>=3 ? 200*(4-k) : 200+400*(3-k); }
+function invLow(d){ return d<=100 ? 4-d/100 : 3-(d-100)/200; }
+function invHigh(d){ return d<=200 ? 4-d/200 : 3-(d-200)/400; }
+
+function initLo4(){
+  if($('lo4_k').value==='') $('lo4_k').value=state.k;
+  onLo4Input();
+}
+function lo4Need(){
+  const k0=parseFloat($('lo4_k').value), tgt=parseFloat($('lo4_target').value);
+  if(isNaN(k0)||isNaN(tgt)) return null;
+  return {k0,tgt,low:Math.max(0,defLow(k0)-defLow(tgt)),high:Math.max(0,defHigh(k0)-defHigh(tgt))};
+}
+function onLo4Input(){
+  const n=lo4Need(); const out=$('lo4_result'); const wrap=$('lo4_routeWrap');
+  if(!n){ out.innerHTML=''; wrap.classList.add('hidden'); return; }
+  state.lo.target=n.tgt; state.lo.defLow=n.low; state.lo.defHigh=n.high;
+  if(n.low<=0){
+    out.innerHTML='<div class="result good">Current K⁺ is already at or above the target — no replacement needed on this calculation.</div>';
+    wrap.classList.add('hidden'); return;
+  }
+  out.innerHTML='<div class="result info">'+
+    '<b>Estimated deficit (K⁺ '+n.k0+' → '+n.tgt+'):</b> ≈'+Math.round(n.low)+'–'+Math.round(n.high)+' mmol<br>'+
+    '<b>Plan first:</b> ≈'+Math.round(n.low)+' mmol (low end), given in aliquots with rechecks — not all at once<br>'+
+    '<b>Rule of thumb:</b> 10 mmol KCl ≈ +0.1 mmol/L serum K⁺, less when K⁺ &lt;3.0 or with ongoing loss / shift'+
+    '<span class="next-action">NEXT STEP → Select your route of replacement.</span></div>';
+  wrap.classList.remove('hidden');
+  if(state.lo.route){
+    const btn=document.querySelector('#lo4_routeWrap .btn[data-route="'+state.lo.route+'"]');
+    if(btn) chooseLoRoute(state.lo.route,btn);
+  }
+}
+function loPlan(route){
+  const n=lo4Need(); const imp=state.lo.renalImpaired;
+  if(route==='oral'){
+    let perDay=clamp(Math.ceil(n.low/2/20)*20,40,120);
+    if(imp) perDay=Math.max(20,Math.round(perDay/2/10)*10);
+    const dose=perDay<=60?20:40;
+    const cnt=Math.max(1,Math.ceil(perDay/dose));
+    return '<b>Oral / enteral KCl:</b> ≈<b>'+(cnt*dose)+' mmol/day</b> — '+dose+' mmol per dose × '+cnt+' (about every '+(24/cnt).toFixed(0)+' h), spread over ~2 days.<br>'+
+      'Dilute liquid KCl well, give with food or feed, upright; avoid with ileus / obstruction. Max single dose 40 mmol. Recheck K⁺ in 12–24 h.'+(imp?'<br>Dose halved for impaired renal function.':'');
+  }
+  const cen=route==='cen';
+  const rate=cen?(state.lo.urgent?(imp?10:20):(imp?5:10)):(imp?5:10);
+  const block=clamp(Math.round(n.low/10)*10,10,40);
+  const hrs=block/rate;
+  const conc=cen?400:40;
+  const mlh=rate/conc*1000;
+  return '<b>IV KCl in 0.9% saline ('+(cen?'central line, e.g. 40 mmol in 100 mL':'peripheral, ≤40 mmol/L, e.g. 20 mmol in 500 mL')+'):</b><br>'+
+    'First block <b>'+block+' mmol</b> at <b>'+rate+' mmol/h</b> (≈'+mlh.toFixed(0)+' mL/h) over ~'+hrs.toFixed(1)+' h, then recheck K⁺'+(state.lo.urgent?' (hourly–2-hourly while K⁺ &lt;2.5 or ECG abnormal)':'')+'.<br>'+
+    'Continuous ECG at ≥10 mmol/h. Use a saline carrier — not dextrose. Never IV push.'+(imp?'<br>Rate halved for impaired renal function.':'');
+}
+function chooseLoRoute(route,btn){
+  state.lo.route=route;
+  document.querySelectorAll('#lo4_routeWrap .btn.choice').forEach(b=>b.classList.remove('correct','incorrect','picked'));
+  const out=$('lo4_routeResult');
+  const next='<span class="next-action">NEXT STEP → Open the dashboard to simulate and finalise the order.</span>';
+  if(route==='oral'&&state.lo.urgent){
+    btn.classList.add('incorrect');
+    out.innerHTML='<div class="result high">❌ Not the best choice. Oral replacement alone is too slow and unpredictable for high-risk hypokalaemia ('+state.lo.triggers.join('; ')+'). Use monitored IV replacement, then add oral once stable.</div>';
+    return;
+  }
+  if(route==='oral'&&!state.lo.gut){
+    btn.classList.add('incorrect');
+    out.innerHTML='<div class="result high">❌ The gut was marked unusable in Step 2 — oral replacement will not be reliably absorbed. Use IV replacement.</div>';
+    return;
+  }
+  if(route==='cen'&&!state.lo.urgent){
+    btn.classList.add('picked');
+    out.innerHTML='<div class="result warn">Central access is not needed here — oral or peripheral IV (≤10 mmol/h) is sufficient and avoids line risks. Plan if you still want it:<br><br>'+loPlan(route)+next+'</div>';
+    return;
+  }
+  btn.classList.add('correct');
+  out.innerHTML='<div class="result good">✅ Reasonable choice.<br><br>'+loPlan(route)+next+'</div>';
+}
+
+/* ---- shared helpers for dashboards / reassessment ---- */
+function alertCard(tone,icon,title,text){
+  const t={
+    rose:['bg-rose-50 border-rose-200','text-rose-900','text-rose-800'],
+    amber:['bg-amber-50 border-amber-200','text-amber-900','text-amber-800'],
+    emerald:['bg-emerald-50 border-emerald-200','text-emerald-900','text-emerald-800'],
+    sky:['bg-sky-50 border-sky-200','text-sky-900','text-sky-800']
+  }[tone];
+  return '<div class="p-3.5 '+t[0]+' border rounded-xl flex gap-3 items-start mb-2"><span>'+icon+'</span><div><h4 class="text-xs font-bold '+t[1]+'">'+title+'</h4><p class="text-xs '+t[2]+' mt-0.5">'+text+'</p></div></div>';
+}
+function statusBadge(label,tone){
+  const m={ok:'bg-emerald-50 text-emerald-700 border-emerald-200',warn:'bg-amber-50 text-amber-700 border-amber-200',bad:'bg-rose-50 text-rose-700 border-rose-200 font-bold',info:'bg-sky-50 text-sky-700 border-sky-200'};
+  return '<span class="px-2 py-0.5 rounded text-[10px] border '+m[tone]+'">'+label+'</span>';
+}
+function ensureBaseline(){
+  if(state.history.length>1&&state.history[0].k!==state.k) state.history=[];
+  if(!state.history.length) state.history.push({k:state.k,hours:0,label:'Baseline (Step 1)'});
+  else if(state.history.length===1) state.history[0].k=state.k;
+}
+function renderHistoryLog(elId){
+  const el=$(elId);
+  if(state.history.length<=1){ el.innerHTML=''; return; }
+  const rows=state.history.map((h,i)=>{
+    if(i===0) return '<tr><td>'+h.label+'</td><td>'+h.k+'</td><td>—</td></tr>';
+    const d=+(h.k-state.history[i-1].k).toFixed(1);
+    return '<tr><td>+'+h.hours+'h</td><td>'+h.k+'</td><td>'+(d>0?'+':'')+d+'</td></tr>';
+  }).join('');
+  el.innerHTML='<p style="font-size:12px;color:#5a6d75;margin:14px 0 4px"><b>Reading log</b></p>'+
+    '<table class="mini"><tr><th>Interval</th><th>K⁺</th><th>Δ</th></tr>'+rows+'</table>';
+}
+
+/* ---- LO DASHBOARD ---- */
+let loChart=null, loRoute='per', loSig='', loWired=false;
+const LO_FLUIDS={
+  oral:[
+    {name:'KCl 20 mmol per dose',v:20},
+    {name:'KCl 40 mmol per dose (maximum single dose)',v:40}],
+  per:[
+    {name:'KCl 40 mmol/L in 0.9% saline (e.g. 20 mmol in 500 mL)',v:40},
+    {name:'KCl 20 mmol/L in 0.9% saline (e.g. 20 mmol in 1 L) — gentler on veins',v:20}],
+  cen:[
+    {name:'KCl 400 mmol/L (40 mmol in 100 mL saline) — central line only',v:400},
+    {name:'KCl 200 mmol/L (20 mmol in 100 mL saline) — central line only',v:200},
+    {name:'KCl 40 mmol/L in 0.9% saline (e.g. 20 mmol in 500 mL)',v:40}]
+};
+
+function showLoDash(){
+  if(!loWired){ wireLo(); loWired=true; }
+  if(!loChart) initLoChart();
+  const sig=[state.k,state.lo.target,state.lo.renalImpaired,state.lo.route,state.lo.urgent].join('|');
+  if(sig!==loSig){
+    loSig=sig;
+    const k=clamp(state.k,1,3.4);
+    $('loKNum').value=k; $('loKSlider').value=k;
+    $('loTarget').value=state.lo.target||4.0;
+    $('loRenal').value=state.lo.renalImpaired?'impaired':'normal';
+    setLoRoute(state.lo.route||(state.lo.needIV?'per':'oral'));
+  } else runLoCalc();
+}
+function wireLo(){
+  $('loKSlider').addEventListener('input',e=>{ $('loKNum').value=e.target.value; runLoCalc(); });
+  $('loKNum').addEventListener('input',e=>{
+    const v=parseFloat(e.target.value);
+    if(!isNaN(v)) $('loKSlider').value=clamp(v,1,3.4);
+    runLoCalc();
+  });
+  ['loTarget','loRenal','loFluid','loFreq','loRate','loLoss','loEmerg'].forEach(id=>{
+    $(id).addEventListener('input',runLoCalc);
+    $(id).addEventListener('change',runLoCalc);
+  });
+}
+function setLoTarget(v){ $('loTarget').value=v; runLoCalc(); }
+function setLoRoute(route){
+  loRoute=route;
+  const base='py-2 px-1 text-[11px] font-bold rounded-lg transition-all ';
+  const on='bg-sky-600 text-white shadow-sm', off='bg-transparent text-slate-600 hover:text-slate-900';
+  $('loBtnOral').className=base+(route==='oral'?on:off);
+  $('loBtnPer').className=base+(route==='per'?on:off);
+  $('loBtnCen').className=base+(route==='cen'?on:off);
+  $('loIvWrap').classList.toggle('hidden',route==='oral');
+  $('loOralWrap').classList.toggle('hidden',route!=='oral');
+  $('loEmergWrap').classList.toggle('hidden',route!=='cen');
+  if(route!=='cen') $('loEmerg').checked=false;
+  $('loFluidLabel').textContent=route==='oral'?'Oral product':'IV product (carrier: 0.9% saline, not dextrose)';
+  $('loFluidNote').textContent=route==='oral'
+    ?'Give with food or feed, upright; dilute liquid KCl well. Maximum 40 mmol per dose.'
+    :(route==='per'?'Peripheral: ≤10 mmol/h and ≤40 mmol/L. Never bolus.':'Concentrated KCl via central line, on a pump, with continuous ECG. Never bolus.');
+  const sel=$('loFluid'); sel.innerHTML='';
+  LO_FLUIDS[route].forEach((f,i)=>{
+    const o=document.createElement('option'); o.value=f.v; o.textContent=f.name; if(i===0) o.selected=true; sel.appendChild(o);
+  });
+  const imp=$('loRenal').value==='impaired';
+  $('loRate').value=route==='cen'?(state.lo.urgent?(imp?10:20):(imp?5:10)):(imp?5:10);
+  runLoCalc();
+}
+function resetLoDefaults(){
+  $('loKNum').value=2.6; $('loKSlider').value=2.6; $('loTarget').value=4.0;
+  $('loRenal').value='normal'; $('loLoss').value=0; $('loFreq').value=3;
+  setLoRoute('per');
+}
+function initLoChart(){
+  loChart=new Chart($('loChart').getContext('2d'),{
+    type:'line',
+    data:{labels:Array.from({length:25},(_,i)=>i),datasets:[
+      {label:'Upper estimate',data:[],borderColor:'#0284c7',backgroundColor:'rgba(2,132,199,0.10)',borderWidth:3,pointRadius:0,tension:0.2,fill:false},
+      {label:'Lower estimate',data:[],borderColor:'#64748b',backgroundColor:'rgba(2,132,199,0.10)',borderWidth:2.5,pointRadius:0,tension:0.2,fill:'-1'},
+      {label:'Target',data:[],borderColor:'#16a34a',borderWidth:1.5,borderDash:[2,4],pointRadius:0,fill:false},
+      {label:'5.0 ceiling',data:[],borderColor:'#dc2626',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false}
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{
+        title:i=>i[0].label+' h',label:c=>' '+c.dataset.label+': '+c.parsed.y.toFixed(1)+' mmol/L'}}},
+      scales:{
+        y:{title:{display:true,text:'Serum K⁺ (mmol/L)',font:{size:11,weight:'bold'}},grid:{color:'#f1f5f9'}},
+        x:{grid:{display:false},ticks:{autoSkip:false,maxRotation:0,callback:(v,i)=>(i%4===0?i+'h':'')}}
+      }
+    }
+  });
+}
+function runLoCalc(){
+  const k0=clamp(parseFloat($('loKNum').value)||2.6,1,3.4);
+  const tgt=clamp(parseFloat($('loTarget').value)||4.0,3.0,5.0);
+  const imp=$('loRenal').value==='impaired';
+  const route=loRoute;
+  const conc=parseFloat($('loFluid').value)||0;
+  const loss=Math.max(0,parseFloat($('loLoss').value)||0);
+  const emerg=$('loEmerg').checked;
+  const reqLow=Math.max(0,defLow(k0)-defLow(tgt));
+  const reqHigh=Math.max(0,defHigh(k0)-defHigh(tgt));
+  $('outDefRange').textContent=Math.round(reqLow)+'–'+Math.round(reqHigh);
+  $('outReq').textContent=Math.round(reqLow);
+
+  let cap,rate,rateEq,dose=0,freq=0,perDay=0;
+  if(route==='oral'){
+    dose=conc; freq=parseInt($('loFreq').value)||3; perDay=dose*freq; rateEq=perDay/24; rate=rateEq;
+    cap=imp?60:120;
+    $('outMaxRate').textContent=cap; $('outMaxUnit').textContent='mmol/day';
+    $('outMaxSub').textContent='Oral, ≤'+(imp?20:40)+' mmol per dose';
+    $('outPresc').textContent=perDay; $('outPrescUnit').textContent='mmol/day';
+    $('outPrescSub').textContent=dose+' mmol × '+freq+' (q'+(24/freq).toFixed(0)+'h)';
+  } else {
+    rate=parseFloat($('loRate').value)||0; $('loRateDisp').textContent=rate; rateEq=rate;
+    cap=(route==='per'?10:(emerg?40:20))*(imp?0.5:1);
+    $('outMaxRate').textContent=cap; $('outMaxUnit').textContent='mmol/h';
+    $('outMaxSub').textContent=route==='per'?'Peripheral line':(emerg?'Central, life-threatening':'Central line');
+    $('outPresc').textContent=conc>0?Math.round(rate/conc*1000):0; $('outPrescUnit').textContent='mL/hr';
+    $('outPrescSub').textContent=rate+' mmol/h';
+  }
+
+  /* K⁺ band: delivered mmol (stops once the low-end deficit is covered;
+     ongoing losses continue) mapped back to serum K⁺ with the deficit model. */
+  const netAt=t=>Math.min(rateEq*t,reqLow)-loss*t;
+  const estAt=t=>{
+    const d=netAt(t);
+    const a=clamp(invLow(defLow(k0)-d),1,5.5), b=clamp(invHigh(defHigh(k0)-d),1,5.5);
+    return {lo:Math.min(a,b),hi:Math.max(a,b),net:d};
+  };
+  const series=Array.from({length:25},(_,t)=>estAt(t));
+  loChart.data.datasets[0].data=series.map(s=>s.hi);
+  loChart.data.datasets[1].data=series.map(s=>s.lo);
+  loChart.data.datasets[2].data=Array(25).fill(tgt);
+  loChart.data.datasets[3].data=Array(25).fill(5.0);
+  loChart.options.scales.y.suggestedMin=Math.floor(Math.min(k0,...series.map(s=>s.lo))-0.3);
+  loChart.options.scales.y.suggestedMax=5.5;
+  loChart.update();
+
+  let rows='';
+  [0,2,4,6,8,12,24].forEach(h=>{
+    const s=estAt(h); let label,tone;
+    if(s.hi>=5.0){label='Over-correction Risk';tone='bad';}
+    else if(s.lo>=tgt-0.1){label='At Target';tone='ok';}
+    else if(s.hi>=tgt-0.1){label='Approaching Target';tone='info';}
+    else{label='Below Target';tone='warn';}
+    rows+='<tr class="hover:bg-slate-50"><td class="p-2.5 font-bold text-slate-900">'+h+'h</td>'+
+      '<td class="p-2.5 font-extrabold text-sky-700">'+s.lo.toFixed(1)+'–'+s.hi.toFixed(1)+'</td>'+
+      '<td class="p-2.5 font-semibold text-slate-600">'+Math.round(s.net)+' mmol</td>'+
+      '<td class="p-2.5">'+statusBadge(label,tone)+'</td></tr>';
+  });
+  $('loTbody').innerHTML=rows;
+
+  /* ---- safety ---- */
+  const al=[]; let serious=false;
+  if(route==='oral'){
+    if(dose>(imp?20:40)){ al.push(alertCard('rose','🛑','Single oral dose too high','Keep each oral dose ≤'+(imp?20:40)+' mmol (GI irritation / ulceration).')); serious=true; }
+    if(perDay>cap){ al.push(alertCard('rose','🛑','Daily oral total above limit','Total '+perDay+' mmol/day exceeds the '+cap+' mmol/day ceiling used here. Reduce, or move to monitored IV replacement.')); serious=true; }
+    if(state.lo.urgent||k0<2.5){ al.push(alertCard('rose','🛑','Oral alone is inadequate for high-risk hypokalaemia','K⁺ &lt;2.5, ECG changes or severe weakness need monitored IV replacement; add oral once stable.')); serious=true; }
+  } else {
+    if(rate>cap){ al.push(alertCard('rose','🛑','Rate exceeds the safe limit for this route','Max '+cap+' mmol/h'+(imp?' (halved for impaired renal function)':'')+(route==='cen'&&!emerg?'. Tick the life-threatening option only for ICU-monitored arrhythmia.':'.')+' Reduce the rate.')); serious=true; }
+    if(route==='per'&&conc>40){ al.push(alertCard('rose','🛑','Concentration too high for a peripheral line','Peripheral KCl must be ≤40 mmol/L; stronger solutions go through a central line.')); serious=true; }
+    if(route==='cen'&&emerg){ al.push(alertCard('amber','⚠️','Life-threatening mode','Up to 40 mmol/h needs ICU, continuous ECG, hourly K⁺ and a dedicated central line.')); serious=true; }
+    if(route==='per'&&k0<2.5&&reqLow>40) al.push(alertCard('sky','ℹ️','Peripheral rate is slow for this deficit','At ≤10 mmol/h this takes many hours. Consider a central line (up to 20 mmol/h) if ECG changes are present.'));
+  }
+  if(imp) al.push(alertCard('amber','⚠️','Impaired renal function','Rate caps halved. Recheck K⁺ sooner — rebound hyperkalaemia is the main risk.'));
+  if(reqLow<=0){ al.push(alertCard('amber','⚠️','Target at or below current K⁺','No replacement is needed on this calculation — raise the target or current value.')); serious=true; }
+  if(loss>0&&rateEq<=loss&&reqLow>0){ al.push(alertCard('amber','⚠️','Ongoing losses ≥ delivery','Serum K⁺ will not rise at this rate. Increase delivery or reduce the loss source.')); serious=true; }
+  if(state.lo.mgLow) al.push(alertCard('sky','ℹ️','Hypomagnesaemia','Give MgSO₄ 2 g IV over 1–2 h alongside — K⁺ will not correct reliably until Mg²⁺ is replaced.'));
+  if(!serious&&reqLow>0) al.unshift(alertCard('emerald','✅','Safe Replacement Trajectory','Rate and concentration are within limits. Plan ≈'+Math.round(reqLow)+' mmol in aliquots (≈'+(rateEq>0?(reqLow/Math.max(rateEq-loss,0.01)).toFixed(0):'—')+' h at net delivery), then recheck K⁺ before continuing.'));
+  $('loSafety').innerHTML=al.join('');
+
+  /* ---- order ---- */
+  const fluidName=$('loFluid').options[$('loFluid').selectedIndex].text;
+  $('loOrderTime').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  let o='MEDICAL ORDER: HYPOKALEMIA K+ REPLACEMENT\n';
+  o+='--------------------------------------------------\n';
+  o+='Baseline K+          : '+k0.toFixed(1)+' mmol/L\n';
+  o+='Target K+            : '+tgt.toFixed(1)+' mmol/L\n';
+  o+='Estimated deficit    : '+Math.round(reqLow)+'–'+Math.round(reqHigh)+' mmol\n';
+  o+='Plan first          : ~'+Math.round(reqLow)+' mmol, then recheck K+\n';
+  o+='--------------------------------------------------\n';
+  if(route==='oral'){
+    o+='ROUTE: Oral / enteral\nPRODUCT: '+fluidName+'\n';
+    o+='DOSE : '+dose+' mmol '+freq+' times daily (q'+(24/freq).toFixed(0)+'h) = '+perDay+' mmol/day\n';
+    o+='Give with food or feed, sitting upright; dilute liquid KCl.\n';
+  } else {
+    o+='ROUTE: Intravenous — '+(route==='per'?'peripheral line':'central line')+'\nFLUID: '+fluidName+'\n';
+    o+='RATE : '+Math.round(conc>0?rate/conc*1000:0)+' mL/hr = '+rate+' mmol/h via infusion pump.\n';
+    o+='Carrier 0.9% saline — no dextrose. NO IV push or bolus.\n';
+    o+='Stop after ~'+Math.round(reqLow)+' mmol ('+(rate>0?(reqLow/rate).toFixed(1):'—')+' h) and recheck K+.\n';
+  }
+  o+='--------------------------------------------------\n';
+  o+='MONITORING PROTOCOL:\n';
+  if(route==='oral') o+='1. Recheck K+ in 12–24 h.\n';
+  else o+='1. Continuous ECG'+(rate>=10||k0<2.5?' (rate ≥10 mmol/h or K+ <2.5)':' if any ECG change')+'. Check K+ 2 h after start, then every '+(k0<2.5||emerg?'1–2':'4–6')+' h.\n';
+  o+='2. Mg2+: '+(state.lo.mgLow?'LOW — give MgSO4 2 g IV over 1–2 h.':'check; replace if <1.7 mg/dL.')+'\n';
+  o+='3. Stop K+ and notify physician if K+ ≥ 5.0 mmol/L or rise >0.5 mmol/L in 1 h.\n';
+  if(imp) o+='4. Renal impairment: rates halved; high rebound risk.\n';
+  if(loss>0) o+=(imp?'5':'4')+'. Ongoing losses ~'+loss+' mmol/h — re-estimate every 6 h.\n';
+  $('loOrder').textContent=o;
+}
+
+/* ---- LO STEP 5 (reassessment) ---- */
+function renderLo5Intro(){
+  ensureBaseline();
+  const last=state.history[state.history.length-1];
+  $('lo5_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>K⁺ '+last.k+' mmol/L</b> ('+last.label+').<br>Target K⁺ '+(state.lo.target||4.0)+' mmol/L. Enter the hours elapsed and the new serum K⁺, then log it.</div>';
+  renderHistoryLog('lo5_log');
+}
+function logLoReading(){
+  const hours=parseFloat($('lo5_hours').value), newK=parseFloat($('lo5_newK').value);
+  const out=$('lo5_result');
+  if(isNaN(hours)||hours<=0||isNaN(newK)){ out.innerHTML='<div class="result warn">Enter both hours elapsed and the new serum K⁺.</div>'; return; }
+  ensureBaseline();
+  const last=state.history[state.history.length-1];
+  const delta=+(newK-last.k).toFixed(2), rate=delta/hours, tgt=state.lo.target||4.0;
+  let html;
+  if(newK>=5.0){
+    html='<div class="result high">🔴 K⁺ is now <b>'+newK+' mmol/L</b> (from '+last.k+' over '+hours+' h) — above the 5.0 ceiling.'+
+      '<span class="next-action">NEXT ACTION → Stop all potassium now, 12-lead ECG, recheck K⁺ within 1 h. Look for shift reversal, renal impairment or over-delivery; manage as hyperkalaemia if ≥5.5.</span></div>';
+  } else if(newK>=tgt){
+    html='<div class="result good">✅ K⁺ '+last.k+' → '+newK+' mmol/L — <b>target ('+tgt+') reached</b>.'+
+      '<span class="next-action">NEXT ACTION → Stop IV replacement. Move to oral maintenance if losses continue, treat the cause, keep Mg²⁺ normal, and recheck K⁺ in 6–12 h to catch redistribution.</span></div>';
+  } else if(delta>0&&rate>0.5){
+    html='<div class="result warn">⚠ K⁺ rose '+last.k+' → '+newK+' mmol/L = <b>'+rate.toFixed(2)+' mmol/L/h</b> — faster than expected (&gt;0.5/h).'+
+      '<span class="next-action">NEXT ACTION → Slow or hold replacement and recheck in 1 h — especially with a shift trigger or impaired renal function (rebound risk).</span></div>';
+  } else if(delta>0){
+    html='<div class="result good">✅ K⁺ rose '+last.k+' → '+newK+' mmol/L ('+rate.toFixed(2)+' mmol/L/h) — responding.'+
+      '<span class="next-action">NEXT ACTION → Continue the plan. Recheck K⁺ in 1–2 h (IV) or 6–12 h (oral) until target is reached.</span></div>';
+  } else {
+    html='<div class="result warn">K⁺ '+(delta<0?'fell '+last.k+' → '+newK:'unchanged at '+newK)+' mmol/L over '+hours+' h despite replacement.'+
+      '<ul><li>Is Mg²⁺ low or unmeasured? Replace it'+(state.lo.mgLow?' (flagged low in Step 2)':'')+'.</li>'+
+      '<li>Ongoing losses (urine, GI) exceeding delivery — re-estimate them.</li>'+
+      '<li>Ongoing shift (insulin, β-agonist, alkalosis) or the dose is too small for the deficit.</li></ul>'+
+      '<span class="next-action">NEXT ACTION → Address these, increase delivery within route limits, and recheck in 1–2 h.</span></div>';
+  }
+  out.innerHTML=html;
+  state.history.push({k:newK,hours:hours,label:hours+'h after previous check'});
+  $('lo5_hours').value=''; $('lo5_newK').value='';
+  const l=state.history[state.history.length-1];
+  $('lo5_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>K⁺ '+l.k+' mmol/L</b> ('+l.label+').<br>Target K⁺ '+tgt+' mmol/L.</div>';
+  renderHistoryLog('lo5_log');
+}
+
+/* ================= HYPERKALAEMIA ================= */
+
+/* ---- HI STEP 2 ---- */
+function onHi2Input(){
+  const k=state.k; if(k==null) return;
+  const ecg=$('hi_ecg').value, renal=$('hi_renal').value;
+  const release=$('hi_release').checked, dig=$('hi_dig').checked, pseudo=$('hi_pseudo').checked;
+  const ecgAbn=['peaked','pr','qrs','arrest'].includes(ecg);
+  const risk=renal!=='normal'||release;
+  const emergency=k>=6.5||ecgAbn;
+  const urgent=!emergency&&(k>=6.0||(k>=5.5&&risk));
+  Object.assign(state.hi,{ecg,renal,release,dig,emergency,urgent});
+
+  let html='';
+  if(ecg==='unknown') html+='<div class="result warn">⚠ No ECG yet — record a 12-lead ECG now.</div>';
+  if(ecg==='arrest') html+='<div class="result high">🔴 <b>Peri-arrest.</b> Follow ALS: 10% calcium chloride 10 mL IV bolus immediately (repeat if needed), insulin–glucose, salbutamol, and early dialysis / senior help.</div>';
+  else if(ecg==='qrs') html+='<div class="result high">🔴 <b>Pre-arrest pattern.</b> Give IV calcium immediately — do not wait for a repeat K⁺ or other measures.</div>';
+  if(emergency){
+    html+='<div class="result high">🔴 <b>Hyperkalaemic emergency</b> (K⁺ '+k+' mmol/L'+(ecgAbn?', ECG changes':'')+').'+
+      '<span class="next-action">NEXT ACTION → IV calcium now with continuous ECG, then shift and remove K⁺.</span></div>';
+  } else if(urgent){
+    html+='<div class="result warn">🟠 <b>Urgent hyperkalaemia</b> (K⁺ '+k+' mmol/L'+(risk?', with renal impairment or ongoing release':'')+').'+
+      '<span class="next-action">NEXT ACTION → Continuous ECG, shift therapy and removal now; give calcium immediately if the ECG changes. Repeat K⁺ in 1–2 h.</span></div>';
+  } else {
+    html+='<div class="result good">🟡 <b>Mild hyperkalaemia</b> (K⁺ '+k+' mmol/L), normal ECG, no major risk factors.'+
+      '<span class="next-action">NEXT ACTION → Find and remove the cause, stop contributing drugs, repeat K⁺ within 24 h; consider a binder.</span></div>';
+  }
+  if(pseudo){
+    html+= (emergency||risk)
+      ? '<div class="result warn">Pseudohyperkalaemia is possible, but the ECG / risk profile means <b>treat now</b> — do not wait for a repeat.</div>'
+      : '<div class="result info">Possible pseudohyperkalaemia — if the patient is stable, repeat with a free-flowing, no-tourniquet whole-blood (gas analyser) sample before treating.</div>';
+  }
+  if(dig) html+='<div class="result info">Digoxin: consider digoxin toxicity (check level; digoxin-specific Fab if suspected). Calcium is still given — infuse over 20–30 min.</div>';
+  $('hi2_result').innerHTML=html;
+}
+
+/* ---- HI STEP 3 ---- */
+function renderHi3(){
+  const h=state.hi;
+  $('hi3_status').innerHTML=h.emergency
+    ? '<div class="result high" style="margin-top:0">🔴 Calcium is indicated <b>now</b> (K⁺ '+state.k+' mmol/L'+(['peaked','pr','qrs','arrest'].includes(h.ecg)?', ECG changes':'')+').</div>'
+    : '<div class="result info" style="margin-top:0">K⁺ &lt;6.5 with no ECG change — calcium is not routinely needed. Give it immediately if the ECG becomes abnormal or the patient deteriorates.</div>';
+}
+function chooseHiAgent(a,btn){
+  state.hi.agent=a;
+  document.querySelectorAll('#p-hi3 .btn.choice').forEach(b=>b.classList.remove('correct','incorrect'));
+  const out=$('hi3_agentResult');
+  if(a==='ca'){
+    btn.classList.add('correct');
+    out.innerHTML='<div class="result good">✅ Correct — calcium antagonises the membrane effect within minutes.'+
+      '<ul><li><b>10% calcium gluconate 30 mL</b> IV over 5–10 min, <i>or</i> <b>10% calcium chloride 10 mL</b> over 2–5 min (central line preferred; extravasation causes necrosis).</li>'+
+      '<li>Continuous ECG. Repeat after 5–10 min if ECG changes persist.</li>'+
+      '<li>Lasts only 30–60 min and does <b>not</b> lower K⁺. Do not mix with bicarbonate or phosphate.</li>'+
+      (state.hi.dig?'<li>On digoxin: infuse over 20–30 min.</li>':'')+'</ul>'+
+      '<span class="next-action">NEXT STEP → Shift K⁺ into cells.</span></div>';
+    return;
+  }
+  btn.classList.add('incorrect');
+  const why={
+    ins:'Insulin–dextrose works in 15–30 min and shifts K⁺, but does not protect the myocardium. Give calcium first, then insulin.',
+    salb:'Salbutamol takes ~30 min, is inconsistent (esp. ESRD) and can provoke tachyarrhythmia. It is an adjunct, not first-line.',
+    bic:'Bicarbonate has a weak, slow effect and helps mainly with acidosis. It does not stabilise the membrane.',
+    lasix:'Furosemide removes K⁺ over hours and only with urine output — too slow for an unstable ECG.',
+    resin:'Binders act over hours. They are for removal, not for acute cardiac protection.'
+  }[a];
+  out.innerHTML='<div class="result high">❌ Not first. '+why+' Start with <b>IV calcium</b>.</div>';
+}
+
+/* ---- HI STEP 4 ---- */
+function insulinPlan(wt,glu,renal){
+  const imp=renal!=='normal';
+  const U=(imp||(wt&&wt<50))?5:10;
+  let dex,dexG;
+  if(isNaN(glu)){ dexG=25; dex='25 g dextrose (check glucose first)'; }
+  else if(glu>=250){ dexG=0; dex='no dextrose (glucose ≥250 mg/dL) — insulin alone, glucose hourly'; }
+  else if(glu<140){ dexG=50; dex='50 g dextrose (glucose &lt;140 mg/dL) = 100 mL of 50%'; }
+  else{ dexG=25; dex='25 g dextrose = 50 mL of 50% (large vein) or 250 mL of 10%'; }
+  return {U,dexG,dex,imp};
+}
+function onHi4Input(){
+  const wt=parseFloat($('hi_wt').value), glu=parseFloat($('hi_glu').value);
+  const hco3=parseFloat($('hi_hco3').value), ph=parseFloat($('hi_ph').value);
+  const tachy=$('hi_tachy').checked, overload=$('hi_overload').checked;
+  const out=$('hi4_result');
+  const p=insulinPlan(isNaN(wt)?null:wt,glu,state.hi.renal);
+  const acid=(!isNaN(ph)&&ph<7.2)||(!isNaN(hco3)&&hco3<15);
+  Object.assign(state.hi,{wt:isNaN(wt)?null:wt,glu:isNaN(glu)?null:glu,acid,insU:p.U,dexG:p.dexG});
+
+  let html='<div class="result info" style="margin-top:0"><b>1. Insulin + glucose</b> (≈ −0.6 to −1.0 mmol/L, peak 30–60 min, lasts 4–6 h)<br>'+
+    'Regular insulin <b>'+p.U+' U IV</b>'+(p.imp||(wt&&wt<50)?' (reduced dose: renal impairment / low weight)':'')+(!isNaN(wt)?' — or 0.1 U/kg ≈ '+Math.min(10,Math.round(wt*0.1*2)/2)+' U':'')+'<br>'+
+    '<b>'+p.dex+'</b>'+
+    '<br>Check glucose at 30 and 60 min, then hourly for ≥6 h'+((p.imp||p.dexG<=25&&!isNaN(glu)&&glu<200)?'; consider a 10% dextrose infusion (e.g. 50 mL/h for 5–6 h) afterwards':'')+'.</div>';
+
+  html+= tachy
+    ? '<div class="result warn"><b>2. Salbutamol:</b> avoid — tachyarrhythmia / ACS.</div>'
+    : '<div class="result info"><b>2. Salbutamol</b> 10–20 mg nebulised over 10 min (≈ −0.5 mmol/L, peak ~1 h). Response is blunted in some patients, especially ESRD — use as an adjunct.</div>';
+
+  if(acid){
+    html+= overload
+      ? '<div class="result warn"><b>3. Bicarbonate:</b> acidotic, but volume overloaded — avoid the sodium/volume load; favour dialysis.</div>'
+      : '<div class="result info"><b>3. Bicarbonate</b> (acidosis present): isotonic 1.26% NaHCO₃ ≈500 mL over 1–2 h, or 50 mmol (50 mL of 8.4%) IV in severe acidosis. Modest effect; never mix with calcium.</div>';
+  } else if(!isNaN(hco3)||!isNaN(ph)){
+    html+='<div class="result good"><b>3. Bicarbonate:</b> not indicated — no significant acidosis, and it has little K⁺-lowering effect otherwise.</div>';
+  }
+  html+='<div class="result warn">⏱ All of these wear off in ~4–6 h — K⁺ will rebound unless removal (Step 5) is under way.<span class="next-action">NEXT STEP → Remove K⁺ and treat the cause.</span></div>';
+  out.innerHTML=html;
+}
+
+/* ---- HI STEP 5 ---- */
+function onHi5Input(){
+  const uo=$('hi_uo').value, vol=$('hi_vol').value;
+  const out=$('hi5_result');
+  state.hi.uo=uo; state.hi.vol=vol;
+  if(!uo||!vol){ out.innerHTML=''; return; }
+  const k=state.k, anuric=uo==='none', oligo=uo==='low';
+  const dial=anuric||(oligo&&k>=6.5)||k>=7.0||state.hi.release&&k>=6.5||state.hi.ecg==='qrs'||state.hi.ecg==='arrest';
+  state.hi.dialysis=dial;
+  let html='';
+  if(dial){
+    html+='<div class="result high">🔴 <b>Haemodialysis indicated / call nephrology now</b> — '+
+      (anuric?'no renal route for K⁺ removal':oligo&&k>=6.5?'oliguria with K⁺ ≥6.5':k>=7.0?'K⁺ ≥7.0':'refractory-risk features (ongoing release or unstable ECG)')+
+      '. Dialysis lowers K⁺ most reliably (~1 mmol/L in the first hour). Medical therapy bridges until it starts.</div>';
+  }
+  if(!anuric){
+    html+= vol==='hypo'
+      ? '<div class="result info"><b>Volume:</b> restore with isotonic crystalloid (balanced solution or 0.9% saline) — better perfusion increases renal K⁺ excretion; add a loop diuretic afterwards if still needed.</div>'
+      : '<div class="result info"><b>Loop diuretic:</b> furosemide 40–80 mg IV (80–160 mg in CKD). Works only with preserved urine output; match losses to avoid hypovolaemia.</div>';
+  }
+  html+='<div class="result info"><b>K⁺ binder:</b> sodium zirconium cyclosilicate 10 g orally up to TID for 48 h (onset ~1 h, where available), or calcium polystyrene sulfonate 15 g orally TDS (slow, modest). Avoid resins with ileus, bowel obstruction or recent bowel surgery.</div>';
+  const c=[];
+  if($('hi_c_drug').checked) c.push('Stop ACEi / ARB / MRA / K⁺-sparing diuretics now.');
+  if($('hi_c_drug2').checked) c.push('Hold NSAIDs, trimethoprim, heparin, calcineurin inhibitors and β-blockers where possible.');
+  if($('hi_c_supp').checked) c.push('Stop K⁺ supplements and salt substitutes; review feed / TPN K⁺ content.');
+  if($('hi_c_aki').checked) c.push('Treat the AKI: exclude obstruction (ultrasound), restore perfusion, stop nephrotoxins; early nephrology input.');
+  if($('hi_c_adr').checked) c.push('Possible adrenal crisis: send cortisol, give hydrocortisone 100 mg IV if unstable — do not wait for results.');
+  if($('hi_c_lysis').checked) c.push('Ongoing K⁺ load (rhabdomyolysis / tumour lysis / haemolysis): expect rebound, plan early dialysis, treat the source (fluids for rhabdomyolysis; rasburicase for TLS).');
+  if($('hi_c_dka').checked) c.push('DKA / insulin deficiency: insulin infusion and fluids will drop K⁺ fast — recheck within 1–2 h and watch for hypokalaemia.');
+  if(c.length) html+='<div class="result warn"><b>Treat the cause:</b><ul>'+c.map(x=>'<li>'+x+'</li>').join('')+'</ul></div>';
+  html+='<span class="next-action" style="margin-top:10px;color:inherit;font-size:13px">NEXT STEP → Open the dashboard to see the indicative K⁺ timeline and build the orders.</span>';
+  out.innerHTML=html;
+}
+
+/* ---- HI DASHBOARD ---- */
+let hiChart=null, hiWired=false, hiSig='';
+const tri=(t,t0,tp,te)=>{ const s=t-t0; if(s<=0) return 0; if(s<tp) return s/tp; if(s<te) return (te-s)/(te-tp); return 0; };
+const ramp=(t,t0,tr)=>{ const s=t-t0; return s<=0?0:(s<tr?s/tr:1); };
+const hdProfile=(t,t0)=>{ const s=t-t0; if(s<=0) return 0; if(s<3) return 1-Math.pow(1-s/3,2); if(s<9) return 1-0.2*(s-3)/6; return 0.8; };
+
+function hiParams(){
+  return {
+    k0:clamp(parseFloat($('hiKNum').value)||6.8,5.1,9.5),
+    wt:parseFloat($('hiWt').value)||70, glu:parseFloat($('hiGlu').value),
+    renal:$('hiRenal').value, load:parseFloat($('hiLoad').value)||0,
+    acid:$('hiAcid').checked, ecg:$('hiEcg').checked,
+    ca:$('hiCa').checked, ins:$('hiIns').checked, salb:$('hiSalb').checked, bic:$('hiBic').checked,
+    loop:$('hiLoop').checked, binder:$('hiBinder').value, hd:$('hiHd').checked, hdDelay:parseFloat($('hiHdDelay').value)||0
+  };
+}
+function hiKAt(p,t){
+  let k=p.k0+p.load*t;
+  if(p.ins) k-=0.7*tri(t,0,1,6);
+  if(p.salb) k-=0.5*tri(t,0,1,4);
+  if(p.bic&&p.acid) k-=0.3*tri(t,0,2,6);
+  if(p.loop&&p.renal!=='anuric') k-=0.4*ramp(t,0,4);
+  if(p.binder==='szc') k-=0.9*ramp(t,0,6);
+  if(p.binder==='cps') k-=0.3*ramp(t,0,8);
+  if(p.hd) k-=2.0*hdProfile(t,p.hdDelay);
+  return Math.max(2.0,k);
+}
+function showHiDash(){
+  if(!hiWired){ wireHi(); hiWired=true; }
+  if(!hiChart) initHiChart();
+  const sig=[state.k,state.hi.renal,state.hi.ecg,state.hi.wt,state.hi.glu,state.hi.acid,state.hi.dialysis].join('|');
+  if(sig!==hiSig){
+    hiSig=sig;
+    const k=clamp(state.k,5.1,9.5);
+    $('hiKNum').value=k; $('hiKSlider').value=k;
+    if(state.hi.wt) $('hiWt').value=state.hi.wt;
+    if(state.hi.glu!=null) $('hiGlu').value=state.hi.glu;
+    $('hiRenal').value=state.hi.renal||'normal';
+    $('hiAcid').checked=!!state.hi.acid;
+    $('hiEcg').checked=['peaked','pr','qrs','arrest'].includes(state.hi.ecg);
+    $('hiLoad').value=state.hi.release?'0.1':'0';
+    $('hiHd').checked=!!state.hi.dialysis;
+    $('hiLoop').checked=(state.hi.uo==='good');
+    $('hiCa').checked=!!state.hi.emergency;
+  }
+  runHiCalc();
+}
+function wireHi(){
+  $('hiKSlider').addEventListener('input',e=>{ $('hiKNum').value=e.target.value; runHiCalc(); });
+  $('hiKNum').addEventListener('input',e=>{
+    const v=parseFloat(e.target.value); if(!isNaN(v)) $('hiKSlider').value=clamp(v,5.1,9.5); runHiCalc();
+  });
+  ['hiWt','hiGlu','hiRenal','hiLoad','hiAcid','hiEcg','hiCa','hiIns','hiSalb','hiBic','hiLoop','hiBinder','hiHd','hiHdDelay'].forEach(id=>{
+    $(id).addEventListener('input',runHiCalc); $(id).addEventListener('change',runHiCalc);
+  });
+}
+function resetHiDefaults(){
+  $('hiKNum').value=6.8; $('hiKSlider').value=6.8; $('hiWt').value=70; $('hiGlu').value=120;
+  $('hiRenal').value='normal'; $('hiLoad').value='0'; $('hiAcid').checked=false; $('hiEcg').checked=false;
+  $('hiCa').checked=true; $('hiIns').checked=true; $('hiSalb').checked=false; $('hiBic').checked=false;
+  $('hiLoop').checked=false; $('hiBinder').value='none'; $('hiHd').checked=false; $('hiHdDelay').value='2';
+  runHiCalc();
+}
+function initHiChart(){
+  hiChart=new Chart($('hiChart').getContext('2d'),{
+    type:'line',
+    data:{labels:Array.from({length:49},(_,i)=>i/2),datasets:[
+      {label:'Indicative K⁺',data:[],borderColor:'#e11d48',backgroundColor:'rgba(225,29,72,0.08)',borderWidth:3,pointRadius:0,tension:0.25,fill:true},
+      {label:'6.5 critical',data:[],borderColor:'#991b1b',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false},
+      {label:'5.5 upper target',data:[],borderColor:'#f59e0b',borderWidth:1.5,borderDash:[4,4],pointRadius:0,fill:false}
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{
+        title:i=>i[0].label+' h',label:c=>' '+c.dataset.label+': '+c.parsed.y.toFixed(1)+' mmol/L'}}},
+      scales:{
+        y:{title:{display:true,text:'Serum K⁺ (mmol/L)',font:{size:11,weight:'bold'}},grid:{color:'#f1f5f9'}},
+        x:{grid:{display:false},ticks:{autoSkip:false,maxRotation:0,callback:(v,i)=>(i%8===0?(i/2)+'h':'')}}
+      }
+    }
+  });
+}
+function runHiCalc(){
+  const p=hiParams();
+  const sevTag=$('hiSevTag');
+  if(p.k0>=6.5){ sevTag.textContent='Severe'; sevTag.className='text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200'; }
+  else if(p.k0>=6.0){ sevTag.textContent='Moderate'; sevTag.className='text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200'; }
+  else{ sevTag.textContent='Mild'; sevTag.className='text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200'; }
+
+  const ip=insulinPlan(p.wt,p.glu,p.renal);
+  $('outIns').textContent=ip.U+' U';
+  $('outInsSub').textContent=ip.dexG>0?'+ '+ip.dexG+' g dextrose':'insulin alone';
+  const k1=hiKAt(p,1), k6=hiKAt(p,6);
+  $('outK1').textContent=k1.toFixed(1); $('outK6').textContent=k6.toFixed(1);
+  $('outK6Sub').textContent=(k6>k1+0.3)?'⚠ Rebound as shift fades':'Rebound check';
+
+  const hrs=Array.from({length:49},(_,i)=>i/2);
+  const ks=hrs.map(t=>hiKAt(p,t));
+  hiChart.data.datasets[0].data=ks;
+  hiChart.data.datasets[1].data=Array(49).fill(6.5);
+  hiChart.data.datasets[2].data=Array(49).fill(5.5);
+  hiChart.options.scales.y.suggestedMin=Math.floor(Math.min(...ks,4.5));
+  hiChart.options.scales.y.suggestedMax=Math.ceil(Math.max(...ks,7));
+  hiChart.update();
+
+  let rows='';
+  [0,0.5,1,2,4,6,8,12,24].forEach(t=>{
+    const k=hiKAt(p,t); let label,tone;
+    if(k<3.5){label='Over-correction Risk';tone='bad';}
+    else if(k>=6.5){label='Critical';tone='bad';}
+    else if(k>=6.0){label='High';tone='warn';}
+    else if(k>=5.5){label='Elevated';tone='info';}
+    else{label='Target Range';tone='ok';}
+    rows+='<tr class="hover:bg-slate-50"><td class="p-2.5 font-bold text-slate-900">'+(t===0.5?'30 min':t+'h')+'</td>'+
+      '<td class="p-2.5 font-extrabold text-rose-600">'+k.toFixed(1)+' mmol/L</td>'+
+      '<td class="p-2.5 font-semibold text-slate-600">'+(k-p.k0>=0?'+':'')+(k-p.k0).toFixed(1)+'</td>'+
+      '<td class="p-2.5">'+statusBadge(label,tone)+'</td></tr>';
+  });
+  $('hiTbody').innerHTML=rows;
+
+  const emergency=p.k0>=6.5||p.ecg;
+  const removal=p.loop||p.binder!=='none'||p.hd;
+  const al=[]; let serious=false;
+  if(emergency&&!p.ca){ al.push(alertCard('rose','🛑','Calcium not selected','K⁺ ≥6.5 or ECG changes — give IV calcium first; it is the only agent that protects the myocardium within minutes.')); serious=true; }
+  if(p.k0>=6.0&&!p.ins&&!p.salb&&!p.hd){ al.push(alertCard('amber','⚠️','No shift therapy selected','Add insulin + glucose (± salbutamol) to lower K⁺ within 30–60 min.')); serious=true; }
+  if(!removal&&(k6>p.k0-0.5||k6>5.5)){ al.push(alertCard('rose','🛑','No removal strategy active','Shift therapy fades by ~4–6 h. Indicative K⁺ at 6 h is '+k6.toFixed(1)+' mmol/L. Add a diuretic, binder or dialysis.')); serious=true; }
+  if(p.loop&&p.renal==='anuric') al.push(alertCard('amber','⚠️','Loop diuretic ineffective when anuric','It was left out of the curve. Dialysis is the removal route.'));
+  if(p.bic&&!p.acid) al.push(alertCard('amber','⚠️','Bicarbonate without acidosis','Little K⁺-lowering effect — left out of the curve.'));
+  if(p.ins) al.push(alertCard('sky','ℹ️','Hypoglycaemia watch','Glucose at 30 and 60 min, then hourly for ≥6 h'+((ip.imp||(!isNaN(p.glu)&&p.glu<140))?' — higher risk here (renal impairment / low baseline glucose); consider a 10% dextrose infusion':'')+'.'));
+  if(p.load>0&&!p.hd) al.push(alertCard('amber','⚠️','Ongoing K⁺ release','Brisk release outpaces medical therapy; early dialysis is usually needed.'));
+  if(Math.min(...ks)<3.5){ al.push(alertCard('amber','⚠️','Over-correction possible','Indicative K⁺ drops below 3.5. Recheck K⁺ often and avoid stacking therapies.')); serious=true; }
+  if(!serious) al.unshift(alertCard('emerald','✅','Reasonable Treatment Trajectory','Indicative K⁺ settles near target. Confirm with serial K⁺; do not rely on the curve.'));
+  $('hiSafety').innerHTML=al.join('');
+
+  $('hiOrderTime').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  let o='MEDICAL ORDER: HYPERKALEMIA — STABILISE / SHIFT / REMOVE\n';
+  o+='--------------------------------------------------\n';
+  o+='Presenting K+ : '+p.k0.toFixed(1)+' mmol/L   ECG changes: '+(p.ecg?'YES':'no')+'\n';
+  o+='Weight '+p.wt+' kg | Glucose '+(isNaN(p.glu)?'—':p.glu)+' mg/dL | Renal: '+({normal:'normal',impaired:'AKI/eGFR<30',anuric:'anuric/dialysis'}[p.renal])+'\n';
+  o+='--------------------------------------------------\n';
+  let n=1;
+  if(p.ca) o+=(n++)+'. STABILISE: 10% calcium gluconate 30 mL IV over 5–10 min (or 10% CaCl2 10 mL, central). Repeat in 5–10 min if ECG changes persist.\n';
+  if(p.ins) o+=(n++)+'. SHIFT: Regular insulin '+ip.U+' U IV + '+(ip.dexG>0?ip.dexG+' g dextrose':'no dextrose (glucose ≥250)')+'. Glucose at 30 and 60 min, then hourly x6 h.\n';
+  if(p.salb) o+=(n++)+'. SHIFT: Salbutamol 10–20 mg nebulised over 10 min (avoid if tachyarrhythmia/ACS).\n';
+  if(p.bic&&p.acid) o+=(n++)+'. SHIFT: Isotonic NaHCO3 1.26% ~500 mL over 1–2 h (acidosis; separate line from calcium).\n';
+  if(p.loop&&p.renal!=='anuric') o+=(n++)+'. REMOVE: Furosemide 40–80 mg IV (higher dose in CKD); replace urine losses as needed.\n';
+  if(p.binder==='szc') o+=(n++)+'. REMOVE: Sodium zirconium cyclosilicate 10 g PO up to TID for 48 h.\n';
+  if(p.binder==='cps') o+=(n++)+'. REMOVE: Calcium polystyrene sulfonate 15 g PO TDS (not with ileus/obstruction).\n';
+  if(p.hd) o+=(n++)+'. REMOVE: Urgent haemodialysis (target start in '+p.hdDelay+' h). Nephrology informed.\n';
+  o+=(n++)+'. CAUSE: stop ACEi/ARB/MRA/K-sparing diuretics, K+ supplements, NSAIDs, trimethoprim; treat AKI / source.\n';
+  o+='--------------------------------------------------\n';
+  o+='MONITORING PROTOCOL:\n';
+  o+='1. Continuous ECG while K+ >=6.0 or ECG abnormal.\n';
+  o+='2. K+ at 1 h, 2 h, 4 h, 6 h, then every 6 h for 24 h (rebound).\n';
+  o+='3. Re-dose calcium if ECG changes recur; escalate to dialysis if K+ rising or refractory.\n';
+  o+='4. Watch for over-correction (K+ <3.5) after dialysis or stacked therapy.\n';
+  $('hiOrder').textContent=o;
+}
+
+/* ---- HI STEP 6 ---- */
+function renderHi6Intro(){
+  ensureBaseline();
+  const last=state.history[state.history.length-1];
+  $('hi6_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>K⁺ '+last.k+' mmol/L</b> ('+last.label+').<br>Enter the hours elapsed and the new serum K⁺, then log it.</div>';
+  renderHistoryLog('hi6_log');
+}
+function logHiReading(){
+  const hours=parseFloat($('hi6_hours').value), newK=parseFloat($('hi6_newK').value), glu=parseFloat($('hi6_glu').value);
+  const out=$('hi6_result');
+  if(isNaN(hours)||hours<=0||isNaN(newK)){ out.innerHTML='<div class="result warn">Enter both hours elapsed and the new serum K⁺.</div>'; return; }
+  ensureBaseline();
+  const last=state.history[state.history.length-1];
+  const delta=+(newK-last.k).toFixed(2), rate=delta/hours;
+  let html;
+  if(newK>=6.5||(delta>0&&newK>=6.0)){
+    html='<div class="result high">🔴 K⁺ '+last.k+' → <b>'+newK+' mmol/L</b> ('+hours+' h) — still dangerous'+(delta>0?' and rising':'')+'.'+
+      '<ul><li>Repeat ECG; give calcium again if abnormal.</li><li>Repeat or add shift therapy.</li><li>Escalate to dialysis now.</li><li>Look for ongoing release (rhabdomyolysis, TLS, haemolysis, GI bleed) or hidden K⁺ intake.</li></ul></div>';
+  } else if(newK>=5.5){
+    html='<div class="result warn">K⁺ '+last.k+' → '+newK+' mmol/L — improving but still above 5.5.'+
+      '<span class="next-action">NEXT ACTION → Ensure a removal route is active (diuretic / binder / dialysis) — shift effects fade by 4–6 h. Recheck in 1–2 h.</span></div>';
+  } else if(newK>=3.5){
+    html='<div class="result good">✅ K⁺ '+last.k+' → '+newK+' mmol/L — in target range.'+
+      '<span class="next-action">NEXT ACTION → Keep removal going, hold K⁺-raising drugs, and recheck K⁺ every 6 h for 24 h to catch rebound.</span></div>';
+  } else {
+    html='<div class="result high">🔴 K⁺ now <b>'+newK+' mmol/L</b> — over-correction.'+
+      '<span class="next-action">NEXT ACTION → Stop K⁺-lowering therapy (insulin, diuretic, binder), ECG, check Mg²⁺, and replace cautiously.</span></div>';
+  }
+  if(delta<0&&Math.abs(rate)>1.0) html+='<div class="result warn">Fall of '+Math.abs(rate).toFixed(1)+' mmol/L/h is very rapid — repeat ECG and check Mg²⁺ (arrhythmia risk, esp. with digoxin or cardiac disease).</div>';
+  if(!isNaN(glu)){
+    if(glu<70) html+='<div class="result high">🔴 Glucose '+glu+' mg/dL — hypoglycaemia after insulin. Treat now (IV dextrose), start a dextrose infusion, recheck hourly.</div>';
+    else if(glu<100) html+='<div class="result warn">Glucose '+glu+' mg/dL — trending low; consider a dextrose infusion and keep hourly checks.</div>';
+  }
+  out.innerHTML=html;
+  state.history.push({k:newK,hours:hours,label:hours+'h after previous check'});
+  $('hi6_hours').value=''; $('hi6_newK').value=''; $('hi6_glu').value='';
+  const l=state.history[state.history.length-1];
+  $('hi6_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>K⁺ '+l.k+' mmol/L</b> ('+l.label+').</div>';
+  renderHistoryLog('hi6_log');
+}
+
+/* ---------------- SUMMARY ---------------- */
+function renderSummary(){
+  const out=$('summaryOut'); const k=state.k;
+  const log=state.history.length>1
+    ? '<p><b>K⁺ recheck history:</b></p><ul style="margin:4px 0 0;padding-left:18px">'+state.history.map(h=>'<li>'+h.label+': K⁺ '+h.k+' mmol/L</li>').join('')+'</ul>':'';
+  if(k==null){ out.innerHTML='<p>No case entered.</p>'; return; }
+  let html='<p><b>Presenting K⁺:</b> '+k+' mmol/L</p>';
+  if(k<3.5){
+    const l=state.lo;
+    html+='<p><b>Risk:</b> '+(l.urgent?'High-risk — '+l.triggers.join('; '):'No high-risk features')+'; ECG: '+l.ecg+'</p>'+
+      '<p><b>Mg²⁺ low:</b> '+(l.mgLow?'Yes':'Not flagged')+' — renal impairment: '+(l.renalImpaired?'Yes':'No')+'</p>'+
+      '<p><b>Mechanism:</b> '+(l.mech||'—')+'</p>'+
+      '<p><b>Estimated deficit:</b> '+(l.defLow!=null?Math.round(l.defLow)+'–'+Math.round(l.defHigh)+' mmol to K⁺ '+l.target:'—')+' — route: '+(l.route?{oral:'oral',per:'IV peripheral',cen:'IV central'}[l.route]:'—')+'</p>';
+  } else if(k>5.0){
+    const h=state.hi;
+    html+='<p><b>ECG:</b> '+h.ecg+' — classification: '+(h.emergency?'Emergency':h.urgent?'Urgent':'Mild')+'; renal: '+h.renal+'</p>'+
+      '<p><b>Shift plan:</b> insulin '+(h.insU??'—')+' U'+(h.dexG!=null?' + '+h.dexG+' g dextrose':'')+'; acidosis: '+(h.acid?'Yes':'No')+'</p>'+
+      '<p><b>Removal:</b> urine output '+(h.uo||'—')+', volume '+(h.vol||'—')+' — dialysis indicated: '+(h.dialysis?'Yes':'No')+'</p>';
+  } else {
+    html+='<p>Within the normal range — no correction indicated.</p>';
+  }
+  out.innerHTML=html+log;
+}
+
+(function(){
+  const q=new URLSearchParams(location.search);
+  if(q.get('embed')) document.body.classList.add('embed');
+  const k=parseFloat(q.get('k'));
+  if(!isNaN(k)){
+    $('s1_k').value=k; onStep1Input();
+    const o=getPageOrder(); showPageById(o[Math.min(2,o.length-1)]);
+  } else showPageById('p-intro');
+})();
+</script>
+</body>
+</html>
