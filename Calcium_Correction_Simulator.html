@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Electrolyte Management — Calcium (DRAFT)</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  tailwind.config = { corePlugins: { preflight: false } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#eef4f7; --bg2:#e1ecf1; --line:#c3d5de; --ink:#2b4756; --ink-dim:#5d7986;
+    --title:#0b2230; --accent:#1f6d8a; --accent-dark:#1f6d8a; --nav-prev:#d3e2e9;
+    --card:#ffffff; --card-ink:#122733;
+    --high:#c0392b; --high-bg:#fdecea;
+    --low:#1f6d8a; --low-bg:#e9f4f8;
+    --warn:#a06f00; --warn-bg:#fdf6e3;
+    --good:#1e7d4f; --good-bg:#e8f6ee;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0b1a20; --bg2:#0f2530; --line:#2e4d5c; --ink:#bcd4dc; --ink-dim:#7fa0ac;
+      --title:#ffffff; --accent:#3fa9c9; --nav-prev:#1c3844;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b1a20; --bg2:#0f2530; --line:#2e4d5c; --ink:#bcd4dc; --ink-dim:#7fa0ac;
+    --title:#ffffff; --accent:#3fa9c9; --nav-prev:#1c3844;
+  }
+  *{box-sizing:border-box}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--ink);min-height:100%;
+  }
+  .draft-banner{
+    background:#5a1a1a;color:#ffd9d0;text-align:center;font-size:12px;font-weight:700;
+    letter-spacing:.3px;padding:7px 10px;
+  }
+  header{padding:18px 16px 14px;text-align:center;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--bg2),var(--bg))}
+  header h1{margin:0 0 3px;font-size:19px;color:var(--title)}
+  header p{margin:0;font-size:12.5px;color:var(--ink-dim)}
+  .wrap{max-width:640px;margin:0 auto;padding:16px 16px 110px}
+
+  .phase{display:none}
+  .phase.active{display:block}
+
+  .step-tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--accent);margin-bottom:4px}
+  .step-title{color:var(--title);font-size:20px;margin:0 0 14px}
+
+  .card{background:var(--card);color:var(--card-ink);border-radius:12px;padding:16px;margin-bottom:12px;border-left:4px solid var(--accent-dark);border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .card h3{margin:0 0 10px;font-size:14px;color:var(--accent-dark)}
+  .card p{margin:0 0 8px;font-size:14px;line-height:1.55}
+  .card p:last-child{margin-bottom:0}
+  .muted{color:#5a6d75;font-size:12.5px}
+
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:#5a6d75;margin-bottom:4px}
+  .field input,.field select{
+    width:100%;padding:10px;border:1px solid #cfd9dd;border-radius:8px;font-size:15px;
+    background:#fbfdfe;color:var(--card-ink);
+  }
+  .field-row{display:flex;gap:10px}
+  .field-row .field{flex:1;min-width:0}
+
+  .btn{
+    display:block;width:100%;background:var(--accent-dark);color:#fff;border:none;border-radius:9px;
+    padding:12px;font-size:14px;font-weight:600;margin-bottom:8px;cursor:pointer;text-align:center;
+  }
+  .btn:active{background:#164f65}
+  .btn.choice{background:#fbfdfe;color:var(--card-ink);border:1.5px solid #cfd9dd}
+  .btn.choice.correct{background:var(--good-bg);border-color:var(--good);color:var(--good)}
+  .btn.choice.incorrect{background:var(--high-bg);border-color:var(--high);color:var(--high)}
+  .btn.choice.picked{background:var(--low-bg);border-color:var(--low);color:var(--low)}
+  .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  .choice-grid.one{grid-template-columns:1fr}
+
+  .result{border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.55;margin-top:8px}
+  .result.high{background:var(--high-bg);color:var(--high)}
+  .result.warn{background:var(--warn-bg);color:var(--warn)}
+  .result.good{background:var(--good-bg);color:var(--good)}
+  .result.info{background:var(--low-bg);color:var(--low)}
+  .result b{font-weight:700}
+  .result ul{margin:6px 0 0;padding-left:18px}
+  .next-action{font-weight:700;margin-top:6px;display:block}
+
+  .checkbox-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13.5px;color:var(--card-ink)}
+  .checkbox-row input{width:auto}
+  .checkbox-row label{margin:0;font-size:13.5px;color:var(--card-ink)}
+
+  table.mini{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+  table.mini th{color:#5a6d75;text-align:left;font-weight:600;padding:3px 4px 3px 0}
+  table.mini td{padding:3px 4px 3px 0;border-top:1px solid rgba(0,0,0,.08)}
+
+  .nav-bar{
+    position:fixed;left:0;right:0;bottom:0;background:var(--bg2);border-top:1px solid var(--line);
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));
+    display:flex;gap:10px;max-width:640px;margin:0 auto;z-index:20;
+  }
+  .nav-bar button{
+    flex:1;padding:12px;border-radius:9px;border:none;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .nav-prev{background:var(--nav-prev);color:var(--ink)}
+  .nav-next{background:var(--accent-dark);color:#fff}
+  .nav-bar button:disabled{opacity:.4}
+
+  .hidden{display:none}
+  .tag-lo{color:#1f6d8a}
+  .tag-hi{color:#c0392b}
+  body.embed .draft-banner, body.embed header{display:none}
+  body.embed .wrap{padding-top:10px}
+</style>
+</head>
+<body>
+
+<div class="draft-banner">⚠ DRAFT — decision-support aid for review; verify doses against local protocol</div>
+
+<header>
+  <h1>Electrolyte Management — Calcium</h1>
+  <p>Step-by-step case-driven algorithm (draft)</p>
+</header>
+
+<div class="wrap">
+
+  <!-- INTRO -->
+  <div class="phase active" id="p-intro">
+    <div class="step-tag">ELECTROLYTE CASE SIMULATOR</div>
+    <h2 class="step-title">Serum Calcium</h2>
+    <div class="card">
+      <p>This is a dynamic, case-driven walkthrough. Enter the serum calcium on the next page — the simulator will determine whether this is hypocalcaemia or hypercalcaemia and route the case accordingly.</p>
+      <p>Tap <b>NEXT</b> below to begin.</p>
+    </div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="phase" id="p-step1">
+    <div class="step-tag">STEP 1</div>
+    <h2 class="step-title">Enter Calcium Level</h2>
+    <div class="card">
+      <div class="field-row">
+        <div class="field">
+          <label>Serum Ca²⁺ (mg/dL) — normal 8.5–10.5</label>
+          <input type="number" id="s1_ca" step="0.1" placeholder="e.g. 6.8 or 13.5" oninput="onStep1Input()">
+        </div>
+        <div class="field">
+          <label>Albumin (g/dL) — optional</label>
+          <input type="number" id="s1_alb" step="0.1" placeholder="e.g. 2.4" oninput="onStep1Input()">
+        </div>
+      </div>
+      <p class="muted" style="margin-top:-2px">If albumin is entered, calcium is corrected: Ca + 0.8 × (4.0 − albumin). Ionised calcium is more reliable in critical illness. 1 mmol/L = 4.0 mg/dL.</p>
+      <div id="s1_result"></div>
+    </div>
+  </div>
+
+  <!-- ================= HYPOCALCAEMIA PATH ================= -->
+
+  <!-- CL STEP 2 -->
+  <div class="phase" id="p-cl2">
+    <div class="step-tag tag-lo">STEP 2 · HYPOCALCAEMIA</div>
+    <h2 class="step-title">Urgency &amp; Risk Assessment</h2>
+    <div class="card">
+      <p class="muted">Symptoms, QT interval and haemodynamics decide whether IV calcium is needed now, not the number alone.</p>
+      <div class="field">
+        <label>12-lead ECG / rhythm</label>
+        <select id="cl_ecg" onchange="onCl2Input()">
+          <option value="unknown">ECG not yet done — get one now</option>
+          <option value="normal">Normal ECG</option>
+          <option value="qt">Prolonged QT / heart block / ectopy</option>
+          <option value="arr">Torsades / VT / VF / arrest</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Neuromuscular / CNS features</label>
+        <select id="cl_neuro" onchange="onCl2Input()">
+          <option value="none">None</option>
+          <option value="mild">Perioral / digital paraesthesia, cramps, Chvostek / Trousseau sign</option>
+          <option value="severe">Seizure, tetany, laryngospasm or bronchospasm</option>
+        </select>
+      </div>
+      <div class="checkbox-row"><input type="checkbox" id="cl_hemo" onchange="onCl2Input()"> <label for="cl_hemo">Hypotension or decompensated heart failure</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="cl_dig" onchange="onCl2Input()"> <label for="cl_dig">On digoxin</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="cl_gut" checked onchange="onCl2Input()"> <label for="cl_gut">Gut usable (tolerating oral / enteral intake)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="cl_hypomg" onchange="onCl2Input()"> <label for="cl_hypomg">Hypomagnesaemia present (Mg²⁺ &lt;1.7 mg/dL)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="cl_hiphos" onchange="onCl2Input()"> <label for="cl_hiphos">Hyperphosphataemia present (&gt;5.5 mg/dL)</label></div>
+      <div class="field" style="margin-top:6px">
+        <label>Renal function</label>
+        <select id="cl_renal" onchange="onCl2Input()">
+          <option value="normal">Normal / mildly reduced</option>
+          <option value="impaired">eGFR &lt;30, AKI or oliguric</option>
+        </select>
+      </div>
+      <div id="cl2_result"></div>
+    </div>
+  </div>
+
+  <!-- CL STEP 3 -->
+  <div class="phase" id="p-cl3">
+    <div class="step-tag tag-lo">STEP 3 · HYPOCALCAEMIA</div>
+    <h2 class="step-title">Determine the Mechanism</h2>
+    <div class="card">
+      <p class="muted">PTH is the key test: in hypocalcaemia it should be high. Send PTH, 25-OH vitamin D and phosphate <i>before</i> large calcium doses where possible, and treat the symptomatic patient first.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Intact PTH (pg/mL; normal 15–65)</label>
+          <input type="number" step="1" id="cl_pth" placeholder="e.g. 8" oninput="onCl3Input()">
+        </div>
+        <div class="field">
+          <label>25-OH vitamin D (ng/mL)</label>
+          <input type="number" step="1" id="cl_vitd" placeholder="e.g. 14" oninput="onCl3Input()">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Phosphate (mg/dL)</label>
+          <input type="number" step="0.1" id="cl_phos" placeholder="e.g. 6.2" oninput="onCl3Input()">
+        </div>
+        <div class="field">
+          <label>Renal function</label>
+          <select id="cl_egfr" onchange="onCl3Input()">
+            <option value="normal">eGFR ≥60</option>
+            <option value="mid">eGFR 30–59</option>
+            <option value="low">eGFR &lt;30 / dialysis</option>
+          </select>
+        </div>
+      </div>
+      <p class="muted" style="margin-bottom:6px">History (tick all that apply):</p>
+      <div class="checkbox-row"><input type="checkbox" id="cl_h_neck" onchange="onCl3Input()"> <label for="cl_h_neck">Recent thyroid / parathyroid / neck surgery</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="cl_h_panc" onchange="onCl3Input()"> <label for="cl_h_panc">Pancreatitis, rhabdomyolysis or tumour lysis</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="cl_h_cit" onchange="onCl3Input()"> <label for="cl_h_cit">Massive transfusion, citrate CRRT or plasmapheresis</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="cl_h_drug" onchange="onCl3Input()"> <label for="cl_h_drug">Bisphosphonate / denosumab, foscarnet, cisplatin, loop diuretic, anticonvulsant</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="cl_h_mal" onchange="onCl3Input()"> <label for="cl_h_mal">Malabsorption, poor sun / diet, liver disease</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="cl_h_sep" onchange="onCl3Input()"> <label for="cl_h_sep">Sepsis, burns or other critical illness</label></div>
+      <div id="cl3_result"></div>
+      <p class="muted" style="margin-top:10px;font-size:11.5px">
+        <b>A. Low PTH</b> — post-surgical, autoimmune or hypomagnesaemia-related hypoparathyroidism<br>
+        <b>B. High PTH</b> — vitamin D deficiency, CKD, hungry bone, pseudohypoparathyroidism<br>
+        <b>C. Acute binding / precipitation</b> — citrate, pancreatitis, rhabdomyolysis, phosphate load, sepsis
+      </p>
+    </div>
+  </div>
+
+  <!-- CL STEP 4 -->
+  <div class="phase" id="p-cl4">
+    <div class="step-tag tag-lo">STEP 4 · HYPOCALCAEMIA</div>
+    <h2 class="step-title">Calculate Replacement</h2>
+    <div class="card">
+      <div class="field-row">
+        <div class="field">
+          <label>Corrected Ca²⁺ (mg/dL)</label>
+          <input type="number" step="0.1" id="cl4_ca" oninput="onCl4Input()">
+        </div>
+        <div class="field">
+          <label>Target Ca²⁺ (mg/dL)</label>
+          <input type="number" step="0.1" id="cl4_target" value="8.2" oninput="onCl4Input()">
+        </div>
+      </div>
+      <div class="field">
+        <label>Weight (kg)</label>
+        <input type="number" id="cl4_wt" value="70" oninput="onCl4Input()">
+      </div>
+      <p class="muted" style="margin-top:-4px">Aim for the low-normal range (about 8.0–8.5), especially in hypoparathyroidism — higher targets cause hypercalciuria and kidney injury.</p>
+      <div id="cl4_result"></div>
+      <div id="cl4_routeWrap" class="hidden">
+        <p style="font-size:13px;color:#5a6d75;margin:10px 0 6px">Select route of replacement:</p>
+        <div class="choice-grid one">
+          <button class="btn choice" data-route="oral" onclick="chooseClRoute('oral',this)">Oral calcium ± calcitriol</button>
+          <button class="btn choice" data-route="bolus" onclick="chooseClRoute('bolus',this)">IV calcium gluconate — bolus</button>
+          <button class="btn choice" data-route="iv" onclick="chooseClRoute('iv',this)">IV calcium gluconate — infusion</button>
+        </div>
+        <div id="cl4_routeResult"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CL DASHBOARD -->
+  <div class="phase" id="p-cldash">
+    <div class="step-tag tag-lo">QUICK DASHBOARD</div>
+    <h2 class="step-title">Hypocalcemia Clinical Engine</h2>
+    <div id="clRoot" class="text-slate-800" style="background:#f8fafc;border-radius:14px;padding:14px;margin:0 -2px">
+
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <p class="text-xs text-slate-500 font-medium">Elemental Ca²⁺ Planner • Oral / IV Calcium Gluconate Replacement Simulator</p>
+        <div class="flex items-center gap-2">
+          <button onclick="openModal('clGuide')" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200">📖 Clinical Protocols</button>
+          <button onclick="resetClDefaults()" class="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200">🔄 Reset</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+        <section class="lg:col-span-5 space-y-5">
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">1</span>
+                Corrected Ca²⁺ &amp; Target
+              </h2>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <div class="flex justify-between items-center mb-1.5">
+                  <label class="text-xs font-bold text-slate-700">Current Corrected Ca²⁺</label>
+                  <div class="flex items-center gap-1 bg-sky-50 border border-sky-200 rounded-lg px-2 py-0.5">
+                    <input type="number" step="0.1" id="clCaNum" min="5" max="8.4" value="6.8" class="w-12 text-sm font-black text-sky-700 bg-transparent text-right focus:outline-none">
+                    <span class="text-xs font-bold text-sky-800">mg/dL</span>
+                  </div>
+                </div>
+                <input type="range" id="clCaSlider" min="5" max="8.4" step="0.1" value="6.8" class="mt-1 w-full accent-sky-600 cursor-pointer">
+                <div class="flex justify-between text-[10px] text-slate-400 font-semibold mt-1">
+                  <span>5.0 (Critical)</span><span>7.0 (Severe)</span><span>8.4 (Mild)</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Target Ca²⁺ (mg/dL)</label>
+                  <input type="number" step="0.1" id="clTarget" value="8.2" min="7.5" max="9.5" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Weight (kg)</label>
+                  <input type="number" id="clWt" value="70" min="5" max="250" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                </div>
+              </div>
+              <div>
+                <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Quick Target Presets:</span>
+                <div class="grid grid-cols-3 gap-1.5">
+                  <button onclick="setClTarget(8.0)" class="py-1 px-2 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200">8.0</button>
+                  <button onclick="setClTarget(8.2)" class="py-1 px-2 text-[11px] font-bold bg-sky-100 hover:bg-sky-200 text-sky-800 rounded border border-sky-200">8.2</button>
+                  <button onclick="setClTarget(8.8)" class="py-1 px-2 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200">8.8</button>
+                </div>
+              </div>
+              <div class="checkbox-row" style="margin-bottom:0">
+                <input type="checkbox" id="clDig" class="w-4 h-4"> <label for="clDig" class="text-xs font-bold text-slate-700">On digoxin (give calcium slowly)</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">2</span>
+                Route, Product &amp; Ongoing Requirement
+              </h2>
+            </div>
+            <div class="space-y-4">
+              <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button id="clBtnOral" onclick="setClRoute('oral')" class="py-2 px-1 text-[11px] font-bold rounded-lg">💊 Oral</button>
+                <button id="clBtnIv" onclick="setClRoute('iv')" class="py-2 px-1 text-[11px] font-bold rounded-lg">💉 IV Ca gluconate</button>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1" id="clConcLabel">Product</label>
+                <select id="clConc" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2.5"></select>
+                <p class="text-[10px] text-slate-400 mt-1" id="clConcNote"></p>
+              </div>
+              <div id="clIvWrap">
+                <div class="flex justify-between mb-1">
+                  <label class="text-xs font-bold text-slate-700">Infusion rate (mg elemental Ca/kg/h)</label>
+                  <span id="clRateDisp" class="text-xs font-bold text-sky-700">1</span>
+                </div>
+                <input type="range" id="clRate" min="0.25" max="2" step="0.25" value="1" class="w-full accent-sky-600 cursor-pointer">
+              </div>
+              <div id="clOralWrap" class="hidden">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Doses per day</label>
+                <select id="clFreq" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                  <option value="2">2 (q12h)</option>
+                  <option value="3" selected>3 (q8h, with meals)</option>
+                  <option value="4">4 (q6h)</option>
+                </select>
+              </div>
+              <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Ongoing requirement (mg elemental Ca/kg/h) — optional</label>
+                <input type="number" step="0.1" min="0" id="clLoss" value="0" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                <p class="text-[10px] text-slate-500 mt-1 leading-tight">Hypoparathyroidism, hungry bone, citrate CRRT or pancreatitis keep pulling calcium out of the blood. Subtracted from net delivery.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lg:col-span-7 space-y-5">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Elemental Ca to Target</span>
+              <div class="mt-2"><span id="outClDef" class="text-lg font-black text-sky-700 tracking-tight">300–600</span><span class="text-xs font-bold text-sky-600 ml-0.5">mg</span></div>
+              <p class="text-[10px] text-slate-400 mt-1">Estimated range</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Plan Replacement</span>
+              <div class="mt-2"><span id="outClPlan" class="text-xl font-black text-slate-900 tracking-tight">300</span><span class="text-xs font-bold text-slate-500 ml-0.5">mg</span></div>
+              <p id="outClPlanSub" class="text-[10px] text-slate-400 mt-1">≈ 3 g Ca gluconate</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Max Safe Rate</span>
+              <div class="mt-2"><span id="outClCap" class="text-xl font-black text-slate-900 tracking-tight">1.5</span><span class="text-xs font-bold text-slate-500 ml-0.5" id="outClCapUnit">mg/kg/h</span></div>
+              <p class="text-[10px] text-slate-400 mt-1" id="outClCapSub">IV infusion</p>
+            </div>
+            <div class="bg-white border-2 border-sky-300 bg-sky-50/40 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-sky-900 uppercase tracking-wider">Prescribed</span>
+              <div class="mt-1"><span id="outClPresc" class="text-2xl font-black text-sky-700 tracking-tight">75</span><span id="outClPrescUnit" class="text-xs font-bold text-sky-800 ml-0.5">mL/hr</span></div>
+              <p id="outClPrescSub" class="text-[10px] font-bold text-sky-800 mt-0.5">70 mg/h elemental</p>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📈 24-Hour Estimated Serum Ca²⁺ Band</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Upper vs lower estimate. IV calcium wears off in 2–3 h unless the cause is treated — recheck, don't extrapolate.</p>
+              <div class="flex flex-wrap items-center gap-3 text-[10px] font-bold mt-1.5">
+                <span class="flex items-center gap-1 text-sky-700"><span class="w-2.5 h-2.5 rounded-full bg-sky-600 inline-block"></span> Upper estimate</span>
+                <span class="flex items-center gap-1 text-slate-600"><span class="w-2.5 h-2.5 rounded-full bg-slate-500 inline-block"></span> Lower estimate</span>
+                <span class="flex items-center gap-1 text-rose-600"><span class="w-2.5 h-0.5 bg-rose-600 inline-block"></span> 10.5 ceiling</span>
+              </div>
+            </div>
+            <div class="h-60 w-full relative"><canvas id="clChart"></canvas></div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider mb-3">🗂️ Predictive Timeline Breakdown</h2>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                    <th class="p-2.5">Time</th><th class="p-2.5">Est. Ca²⁺ range</th><th class="p-2.5">Net given</th><th class="p-2.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="clTbody" class="text-xs font-medium text-slate-700 divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📝 Clinical Prescription &amp; Action Plan</h2>
+              <button onclick="copyText('clOrder','clCopyTxt')" class="px-2.5 py-1 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md border border-slate-200">📋 <span id="clCopyTxt">Copy Order</span></button>
+            </div>
+            <div id="clSafety" class="mb-4"></div>
+            <div class="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-xs leading-relaxed border border-slate-800">
+              <div class="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-2 mb-2 text-[10px] uppercase font-bold tracking-wider">
+                <span>🩺 Medical Order draft</span><span id="clOrderTime">Updated Live</span>
+              </div>
+              <pre id="clOrder" class="whitespace-pre-wrap font-mono text-xs text-emerald-400"></pre>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="clGuide" class="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+        <div class="p-5 border-b border-slate-200 flex justify-between items-center sticky top-0 bg-white z-10">
+          <h3 class="text-base font-extrabold text-slate-900">📖 Hypocalcemia Protocols &amp; References</h3>
+          <button onclick="closeModal('clGuide')" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600">✕</button>
+        </div>
+        <div class="p-6 space-y-5 text-xs text-slate-700 leading-relaxed">
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">1. IV Calcium Safety Limits</h4>
+            <ul class="list-disc list-inside space-y-1 font-semibold text-slate-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+              <li><strong>Bolus:</strong> 10% calcium gluconate 10–20 mL (1–2 g = 93–186 mg elemental) in 50–100 mL over 10–20 min, with ECG monitoring. Gluconate is safe peripherally; calcium chloride (272 mg elemental per g) goes via a central line only.</li>
+              <li><strong>Infusion:</strong> 0.5–1.5 mg elemental Ca/kg/h (e.g. 100 mL of 10% gluconate in 900 mL NS or D5W ≈ 0.93 mg/mL), titrated to the level.</li>
+              <li>Do not mix with bicarbonate or phosphate (precipitates). Avoid ceftriaxone in the same line.</li>
+              <li>Digoxin: give slowly with monitoring; calcium potentiates toxicity.</li>
+              <li>Extravasation causes tissue necrosis — check the cannula.</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">2. Estimate Used Here</h4>
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1 font-mono text-[11px]">
+              <div>Corrected Ca = Ca + 0.8 × (4.0 − albumin g/dL)</div>
+              <div>Serum rise ≈ 0.12–0.25 mg/dL per mg/kg elemental Ca</div>
+              <div>10 mL 10% Ca gluconate = 93 mg elemental = 2.3 mmol</div>
+            </div>
+            <p class="mt-2">An IV bolus raises calcium for only 2–3 h, so follow it with an infusion and treat the cause. Approximations only — titrate to level.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">3. Fix the Cause</h4>
+            <p>Replace Mg²⁺ first (low Mg²⁺ causes PTH failure and resistance). Give calcitriol 0.25–0.5 mcg twice daily in hypoparathyroidism and CKD; cholecalciferol for deficiency. In hyperphosphataemia, treat the phosphate and avoid forcing calcium (Ca × P product &gt;55 risks calcification).</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">4. Oral Therapy</h4>
+            <p>Elemental calcium 1–3 g/day in divided doses with meals (carbonate = 40% elemental; use citrate with PPI or achlorhydria). Start oral therapy and vitamin D before stopping the infusion.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">5. Monitoring</h4>
+            <ul class="list-disc list-inside space-y-1 text-slate-600">
+              <li>Ca²⁺ (ideally ionised) every 4–6 h during infusion, every 1–2 h if symptomatic.</li>
+              <li>Continuous ECG while symptomatic or QT is prolonged. Check Mg²⁺, phosphate and K⁺.</li>
+              <li>Aim for low-normal calcium; avoid overshoot.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+          <button onclick="closeModal('clGuide')" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold">Close Guide</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CL STEP 5 -->
+  <div class="phase" id="p-cl5">
+    <div class="step-tag tag-lo">STEP 5 · HYPOCALCAEMIA</div>
+    <h2 class="step-title">Dynamic Reassessment</h2>
+    <div class="card">
+      <div id="cl5_intro"></div>
+      <div class="field-row">
+        <div class="field">
+          <label>Hours since last check</label>
+          <input type="number" step="0.5" id="cl5_hours" placeholder="e.g. 4 or 12">
+        </div>
+        <div class="field">
+          <label>New corrected Ca²⁺ (mg/dL)</label>
+          <input type="number" step="0.1" id="cl5_new" placeholder="e.g. 7.6">
+        </div>
+      </div>
+      <div class="field">
+        <label>Symptoms now</label>
+        <select id="cl5_sym">
+          <option value="none">None</option>
+          <option value="mild">Paraesthesia / cramps</option>
+          <option value="severe">Tetany, seizure or laryngospasm</option>
+        </select>
+      </div>
+      <button class="btn" onclick="logClReading()">Log this reading</button>
+      <div id="cl5_result"></div>
+      <div id="cl5_log"></div>
+    </div>
+  </div>
+
+  <!-- ================= HYPERCALCAEMIA PATH ================= -->
+
+  <!-- CH STEP 2 -->
+  <div class="phase" id="p-ch2">
+    <div class="step-tag tag-hi">STEP 2 · HYPERCALCAEMIA</div>
+    <h2 class="step-title">Severity &amp; Clinical Risk</h2>
+    <div class="card">
+      <p class="muted">Severity depends on the level, the speed of rise and the symptoms. Dehydration from calcium-induced diuresis worsens it.</p>
+      <div class="field">
+        <label>Symptoms</label>
+        <select id="ch_sym" onchange="onCh2Input()">
+          <option value="none">None / incidental</option>
+          <option value="mild">Fatigue, constipation, thirst, polyuria, nausea</option>
+          <option value="severe">Confusion, drowsiness, coma, vomiting or abdominal pain</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>12-lead ECG</label>
+        <select id="ch_ecg" onchange="onCh2Input()">
+          <option value="unknown">ECG not yet done — get one now</option>
+          <option value="normal">Normal ECG</option>
+          <option value="mild">Short QT / bradycardia / long PR</option>
+          <option value="severe">Heart block / VT / VF / arrest</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Renal function</label>
+        <select id="ch_renal" onchange="onCh2Input()">
+          <option value="normal">Normal / mildly reduced</option>
+          <option value="impaired">AKI or eGFR &lt;30</option>
+          <option value="anuric">Oliguric / anuric / dialysis-dependent</option>
+        </select>
+      </div>
+      <div class="checkbox-row"><input type="checkbox" id="ch_hf" onchange="onCh2Input()"> <label for="ch_hf">Heart failure or fluid overload (limits saline)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ch_dig" onchange="onCh2Input()"> <label for="ch_dig">On digoxin (hypercalcaemia potentiates toxicity)</label></div>
+      <div id="ch2_result"></div>
+    </div>
+  </div>
+
+  <!-- CH STEP 3 -->
+  <div class="phase" id="p-ch3">
+    <div class="step-tag tag-hi">STEP 3 · HYPERCALCAEMIA</div>
+    <h2 class="step-title">Determine the Mechanism</h2>
+    <div class="card">
+      <p class="muted">PTH splits the causes. A suppressed PTH means a PTH-independent cause (malignancy, vitamin D, granulomas). Send these before treatment — they change which drugs will work.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Intact PTH (pg/mL; normal 15–65)</label>
+          <input type="number" step="1" id="ch_pth" placeholder="e.g. 4" oninput="onCh3Input()">
+        </div>
+        <div class="field">
+          <label>PTHrP (pmol/L) — optional</label>
+          <input type="number" step="0.1" id="ch_pthrp" placeholder="e.g. 4.5" oninput="onCh3Input()">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>25-OH vitamin D (ng/mL) — optional</label>
+          <input type="number" step="1" id="ch_25" placeholder="e.g. 30" oninput="onCh3Input()">
+        </div>
+        <div class="field">
+          <label>1,25-(OH)₂ vitamin D (pg/mL) — optional</label>
+          <input type="number" step="1" id="ch_125" placeholder="e.g. 80" oninput="onCh3Input()">
+        </div>
+      </div>
+      <p class="muted" style="margin-bottom:6px">History (tick all that apply):</p>
+      <div class="checkbox-row"><input type="checkbox" id="ch_h_mal" onchange="onCh3Input()"> <label for="ch_h_mal">Known or suspected malignancy (solid tumour, myeloma, lymphoma)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ch_h_gran" onchange="onCh3Input()"> <label for="ch_h_gran">Sarcoidosis, TB or other granulomatous disease</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ch_h_drug" onchange="onCh3Input()"> <label for="ch_h_drug">Thiazide or lithium use</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ch_h_vit" onchange="onCh3Input()"> <label for="ch_h_vit">Calcium / vitamin D / vitamin A supplements, antacids (milk-alkali)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ch_h_imm" onchange="onCh3Input()"> <label for="ch_h_imm">Prolonged immobilisation or thyrotoxicosis</label></div>
+      <div id="ch3_result"></div>
+    </div>
+  </div>
+
+  <!-- CH STEP 4 -->
+  <div class="phase" id="p-ch4">
+    <div class="step-tag tag-hi">STEP 4 · HYPERCALCAEMIA</div>
+    <h2 class="step-title">Volume Resuscitation</h2>
+    <div class="card">
+      <div id="ch4_status"></div>
+      <p style="font-size:13px;color:#5a6d75;margin:12px 0 6px">Which treatment comes <b>first</b> for symptomatic hypercalcaemia?</p>
+      <div class="choice-grid">
+        <button class="btn choice" onclick="chooseChAgent('sal',this)">IV 0.9% saline</button>
+        <button class="btn choice" onclick="chooseChAgent('zol',this)">Zoledronic acid</button>
+        <button class="btn choice" onclick="chooseChAgent('lasix',this)">Furosemide</button>
+        <button class="btn choice" onclick="chooseChAgent('ct',this)">Calcitonin</button>
+        <button class="btn choice" onclick="chooseChAgent('ster',this)">Prednisolone</button>
+        <button class="btn choice" onclick="chooseChAgent('hd',this)">Haemodialysis</button>
+      </div>
+      <div id="ch4_agentResult"></div>
+      <div class="field" style="margin-top:12px">
+        <label>Volume status</label>
+        <select id="ch_vol" onchange="onCh4Input()">
+          <option value="">— select —</option>
+          <option value="hypo">Hypovolaemic (usual)</option>
+          <option value="eu">Euvolaemic</option>
+          <option value="hyper">Hypervolaemic</option>
+        </select>
+      </div>
+      <div id="ch4_fluid"></div>
+    </div>
+  </div>
+
+  <!-- CH STEP 5 -->
+  <div class="phase" id="p-ch5">
+    <div class="step-tag tag-hi">STEP 5 · HYPERCALCAEMIA</div>
+    <h2 class="step-title">Lower Calcium &amp; Treat the Cause</h2>
+    <div class="card">
+      <p class="muted">Saline starts working at once; bisphosphonates and denosumab take 2–4 days. Start them early when the level is ≥12 mg/dL.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Weight (kg)</label>
+          <input type="number" id="ch_wt" placeholder="e.g. 70" oninput="onCh5Input()">
+        </div>
+        <div class="field">
+          <label>Renal function (eGFR)</label>
+          <select id="ch_egfr" onchange="onCh5Input()">
+            <option value="normal">≥60</option>
+            <option value="mid">30–59</option>
+            <option value="low">&lt;30 / dialysis</option>
+          </select>
+        </div>
+      </div>
+      <div id="ch5_result"></div>
+    </div>
+  </div>
+
+  <!-- CH DASHBOARD -->
+  <div class="phase" id="p-chdash">
+    <div class="step-tag tag-hi">QUICK DASHBOARD</div>
+    <h2 class="step-title">Hypercalcemia Clinical Engine</h2>
+    <div id="chRoot" class="text-slate-800" style="background:#f8fafc;border-radius:14px;padding:14px;margin:0 -2px">
+
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <p class="text-xs text-slate-500 font-medium">Hydrate • Lower • Treat the Cause — Indicative Ca²⁺ Timeline &amp; Order Builder</p>
+        <div class="flex items-center gap-2">
+          <button onclick="openModal('chGuide')" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200">📖 Clinical Protocols</button>
+          <button onclick="resetChDefaults()" class="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200">🔄 Reset</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+        <section class="lg:col-span-5 space-y-5">
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">1</span>
+                Patient Ca²⁺ &amp; Physiology
+              </h2>
+              <span id="chSevTag" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">Severe</span>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <div class="flex justify-between items-center mb-1.5">
+                  <label class="text-xs font-bold text-slate-700">Current Corrected Ca²⁺</label>
+                  <div class="flex items-center gap-1 bg-rose-50 border border-rose-200 rounded-lg px-2 py-0.5">
+                    <input type="number" step="0.1" id="chCaNum" min="10.6" max="20" value="14.0" class="w-12 text-sm font-black text-rose-600 bg-transparent text-right focus:outline-none">
+                    <span class="text-xs font-bold text-rose-700">mg/dL</span>
+                  </div>
+                </div>
+                <input type="range" id="chCaSlider" min="10.6" max="20" step="0.1" value="14" class="mt-1 w-full accent-rose-600 cursor-pointer">
+                <div class="flex justify-between text-[10px] text-slate-400 font-semibold mt-1">
+                  <span>10.6 (Mild)</span><span>12 (Moderate)</span><span>14+ (Severe)</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Weight (kg)</label>
+                  <input type="number" id="chWt" value="70" min="5" max="250" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Renal function</label>
+                  <select id="chRenal" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="normal">Normal / mild ↓</option>
+                    <option value="impaired">AKI / eGFR &lt;30</option>
+                    <option value="anuric">Anuric / dialysis</option>
+                  </select>
+                </div>
+                <div class="col-span-2">
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Ongoing calcium release</label>
+                  <select id="chLoad" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="0">None / source removed</option>
+                    <option value="0.02">Moderate (+0.5 mg/dL/day)</option>
+                    <option value="0.05">Brisk (+1.2 mg/dL/day)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="checkbox-row" style="margin-bottom:0">
+                <input type="checkbox" id="chSym" class="w-4 h-4"> <label for="chSym" class="text-xs font-bold text-slate-700">Severe symptoms or ECG changes</label>
+              </div>
+              <div class="checkbox-row" style="margin-bottom:0">
+                <input type="checkbox" id="chVitD" class="w-4 h-4"> <label for="chVitD" class="text-xs font-bold text-slate-700">Vitamin D–mediated (sarcoid, lymphoma, vitamin D toxicity)</label>
+              </div>
+              <div class="checkbox-row" style="margin-bottom:0">
+                <input type="checkbox" id="chHf" class="w-4 h-4"> <label for="chHf" class="text-xs font-bold text-slate-700">Heart failure / fluid overload</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">2</span>
+                Therapies to Model
+              </h2>
+            </div>
+            <div class="space-y-2.5 text-xs">
+              <label class="flex items-start gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer"><input type="checkbox" id="chSaline" class="mt-0.5" checked> <span><b>IV 0.9% saline</b> — ≈ −1.5 mg/dL over ~24 h; needs urine output</span></label>
+              <label class="flex items-start gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer"><input type="checkbox" id="chCt" class="mt-0.5"> <span><b>Calcitonin</b> — ≈ −1.2 mg/dL, onset hours, fades by ~48 h (tachyphylaxis)</span></label>
+              <div class="p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Bisphosphonate</label>
+                <select id="chBis" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                  <option value="none">None</option>
+                  <option value="zol" selected>Zoledronic acid (≈ −3.0 over ~3 days)</option>
+                  <option value="pam">Pamidronate (≈ −2.5 over ~3 days)</option>
+                </select>
+              </div>
+              <label class="flex items-start gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer"><input type="checkbox" id="chDeno" class="mt-0.5"> <span><b>Denosumab</b> — ≈ −2.5 over ~3 days; option when eGFR &lt;30</span></label>
+              <label class="flex items-start gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer"><input type="checkbox" id="chSteroid" class="mt-0.5"> <span><b>Glucocorticoid</b> — works only for vitamin D–mediated causes (≈ −2.5 over ~3 days)</span></label>
+              <label class="flex items-start gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer"><input type="checkbox" id="chLoop" class="mt-0.5"> <span><b>Loop diuretic</b> — small effect; only once volume replete or if overloaded</span></label>
+              <div class="p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="chHd"> <span><b>Haemodialysis</b> (low-Ca dialysate) — ≈ −3.5 over ~3 h, partial rebound</span></label>
+                <div class="mt-2">
+                  <label class="block text-[10px] font-bold text-slate-600 mb-1">Time until dialysis starts</label>
+                  <select id="chHdDelay" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="0">Immediately</option>
+                    <option value="2" selected>In 2 h</option>
+                    <option value="6">In 6 h</option>
+                    <option value="12">In 12 h</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lg:col-span-7 space-y-5">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">0.9% Saline</span>
+              <div class="mt-2"><span id="outChFluid" class="text-lg font-black text-slate-900 tracking-tight">150–250</span><span class="text-xs font-bold text-slate-500 ml-0.5">mL/h</span></div>
+              <p id="outChFluidSub" class="text-[10px] text-slate-400 mt-1">After a 1–2 L bolus</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Calcitonin</span>
+              <div class="mt-2"><span id="outChCt" class="text-xl font-black text-slate-900 tracking-tight">280</span><span class="text-xs font-bold text-slate-500 ml-0.5">IU</span></div>
+              <p class="text-[10px] text-slate-400 mt-1">4 IU/kg SC/IM q12h</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Est. Ca²⁺ at 24 h</span>
+              <div class="mt-2"><span id="outCh24" class="text-xl font-black text-blue-600 tracking-tight">12.0</span><span class="text-xs font-bold text-blue-500 ml-0.5">mg/dL</span></div>
+              <p class="text-[10px] text-slate-400 mt-1">Early response</p>
+            </div>
+            <div class="bg-white border-2 border-rose-300 bg-rose-50/40 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-rose-900 uppercase tracking-wider">Est. Ca²⁺ at 72 h</span>
+              <div class="mt-1"><span id="outCh72" class="text-2xl font-black text-rose-600 tracking-tight">10.0</span><span class="text-xs font-bold text-rose-800 ml-0.5">mg/dL</span></div>
+              <p id="outCh72Sub" class="text-[10px] font-bold text-rose-800 mt-0.5">Full-effect check</p>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📈 72-Hour Indicative Serum Ca²⁺ Trajectory</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Shows timing of each therapy's effect. Effects are approximate and not strictly additive — not a prediction. Recheck Ca²⁺.</p>
+              <div class="flex flex-wrap items-center gap-3 text-[10px] font-bold mt-1.5">
+                <span class="flex items-center gap-1 text-rose-600"><span class="w-2.5 h-2.5 rounded-full bg-rose-600 inline-block"></span> Indicative Ca²⁺</span>
+                <span class="flex items-center gap-1 text-red-800"><span class="w-2.5 h-0.5 bg-red-800 inline-block"></span> 14 severe</span>
+                <span class="flex items-center gap-1 text-amber-600"><span class="w-2.5 h-0.5 bg-amber-500 inline-block"></span> 12 moderate</span>
+                <span class="flex items-center gap-1 text-emerald-600"><span class="w-2.5 h-0.5 bg-emerald-500 inline-block"></span> 10.5 target</span>
+              </div>
+            </div>
+            <div class="h-60 w-full relative"><canvas id="chChart"></canvas></div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider mb-3">🗂️ Predictive Timeline Breakdown</h2>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                    <th class="p-2.5">Time</th><th class="p-2.5">Indicative Ca²⁺</th><th class="p-2.5">Δ from start</th><th class="p-2.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="chTbody" class="text-xs font-medium text-slate-700 divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📝 Clinical Prescription &amp; Action Plan</h2>
+              <button onclick="copyText('chOrder','chCopyTxt')" class="px-2.5 py-1 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md border border-slate-200">📋 <span id="chCopyTxt">Copy Order</span></button>
+            </div>
+            <div id="chSafety" class="mb-4"></div>
+            <div class="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-xs leading-relaxed border border-slate-800">
+              <div class="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-2 mb-2 text-[10px] uppercase font-bold tracking-wider">
+                <span>🩺 Medical Order draft</span><span id="chOrderTime">Updated Live</span>
+              </div>
+              <pre id="chOrder" class="whitespace-pre-wrap font-mono text-xs text-emerald-400"></pre>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="chGuide" class="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+        <div class="p-5 border-b border-slate-200 flex justify-between items-center sticky top-0 bg-white z-10">
+          <h3 class="text-base font-extrabold text-slate-900">📖 Hypercalcemia Protocols &amp; References</h3>
+          <button onclick="closeModal('chGuide')" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600">✕</button>
+        </div>
+        <div class="p-6 space-y-5 text-xs text-slate-700 leading-relaxed">
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">1. Severity (corrected calcium)</h4>
+            <ul class="list-disc list-inside space-y-1 font-semibold text-slate-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+              <li><strong>Mild</strong> 10.6–11.9 · <strong>Moderate</strong> 12.0–13.9 · <strong>Severe</strong> ≥14.0 mg/dL.</li>
+              <li>Severe symptoms (confusion, coma), ECG changes (short QT, bradycardia, block) or AKI make it an emergency at any level ≥12.</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">2. Treatment Order</h4>
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2 text-[11px]">
+              <div><strong>Fluids:</strong> 0.9% saline 1–2 L bolus, then 100–250 mL/h aiming for urine output 100–150 mL/h. Be cautious in heart failure or CKD.</div>
+              <div><strong>Calcitonin:</strong> 4 IU/kg SC/IM every 12 h; onset 4–6 h; effect fades in ~48 h.</div>
+              <div><strong>Zoledronic acid</strong> 4 mg IV over ≥15 min (reduce for eGFR 30–59; avoid below 30) or <strong>pamidronate</strong> 60–90 mg over 2–4 h. Onset 2–4 days, lasts weeks.</div>
+              <div><strong>Denosumab</strong> 120 mg SC — option for eGFR &lt;30 or refractory disease; watch for hypocalcaemia.</div>
+              <div><strong>Glucocorticoid</strong> (prednisolone 20–40 mg/day) only for vitamin D–mediated causes.</div>
+              <div><strong>Dialysis</strong> with low-calcium dialysate for severe disease with renal failure or heart failure.</div>
+            </div>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">3. Loop Diuretics</h4>
+            <p>Not routine. Use furosemide only after volume repletion or if overloaded; used early they worsen dehydration and hypercalcaemia.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">4. Treat the Cause</h4>
+            <p>Stop thiazides, lithium, calcium and vitamin D. Primary hyperparathyroidism: parathyroidectomy (cinacalcet if unfit). Malignancy: treat the tumour and repeat bisphosphonate / denosumab. Sarcoid or vitamin D toxicity: glucocorticoid.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">5. Monitoring</h4>
+            <ul class="list-disc list-inside space-y-1 text-slate-600">
+              <li>Ca²⁺ (ideally ionised) at 6, 12, 24 h, then daily; check K⁺, Mg²⁺, phosphate and creatinine.</li>
+              <li>Fluid balance and signs of overload during saline. Continuous ECG if QT shortening or arrhythmia.</li>
+              <li>After denosumab or bisphosphonates watch for late hypocalcaemia and hypophosphataemia.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+          <button onclick="closeModal('chGuide')" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold">Close Guide</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CH STEP 6 -->
+  <div class="phase" id="p-ch6">
+    <div class="step-tag tag-hi">STEP 6 · HYPERCALCAEMIA</div>
+    <h2 class="step-title">Dynamic Reassessment</h2>
+    <div class="card">
+      <div id="ch6_intro"></div>
+      <div class="field-row">
+        <div class="field">
+          <label>Hours since last check</label>
+          <input type="number" step="0.5" id="ch6_hours" placeholder="e.g. 12 or 24">
+        </div>
+        <div class="field">
+          <label>New corrected Ca²⁺ (mg/dL)</label>
+          <input type="number" step="0.1" id="ch6_new" placeholder="e.g. 12.4">
+        </div>
+      </div>
+      <div class="field">
+        <label>Mental state / symptoms</label>
+        <select id="ch6_sym">
+          <option value="none">Improving / none</option>
+          <option value="mild">Unchanged mild symptoms</option>
+          <option value="severe">Worse — drowsy, confused or vomiting</option>
+        </select>
+      </div>
+      <button class="btn" onclick="logChReading()">Log this reading</button>
+      <div id="ch6_result"></div>
+      <div id="ch6_log"></div>
+    </div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="phase" id="p-summary">
+    <div class="step-tag">SUMMARY</div>
+    <h2 class="step-title">Case Recap</h2>
+    <div class="card" id="summaryOut"></div>
+  </div>
+
+</div>
+
+<div class="nav-bar">
+  <button class="nav-prev" id="navPrev" onclick="goPrev()">← PREVIOUS</button>
+  <button class="nav-next" id="navNext" onclick="goNext()">NEXT →</button>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+let currentPageId='p-intro';
+
+const state={
+  ca:null,
+  lo:{urgent:false,emergency:false,gut:true,renalImpaired:false,ecg:'unknown',triggers:[],hypoMg:false,hiPhos:false,dig:false,
+      mech:null,hypoPTH:false,target:8.2,route:null,defLow:null,defHigh:null,wt:70},
+  hi:{emergency:false,urgent:false,renal:'normal',ecg:'unknown',sym:'none',hf:false,dig:false,mech:null,mechLabel:null,
+      vol:'',dialysis:false,wt:null},
+  history:[]
+};
+
+function getPageOrder(){
+  const base=['p-intro','p-step1'];
+  if(state.ca==null) return base;
+  if(state.ca<8.5) return base.concat(['p-cl2','p-cl3','p-cl4','p-cldash','p-cl5','p-summary']);
+  if(state.ca>10.5) return base.concat(['p-ch2','p-ch3','p-ch4','p-ch5','p-chdash','p-ch6','p-summary']);
+  return base.concat(['p-summary']);
+}
+function showPageById(id){
+  document.querySelectorAll('.phase').forEach(el=>el.classList.remove('active'));
+  const t=$(id); if(t) t.classList.add('active');
+  currentPageId=id;
+  window.scrollTo({top:0,behavior:'smooth'});
+  const order=getPageOrder(), idx=order.indexOf(id);
+  $('navPrev').disabled=idx<=0;
+  $('navNext').textContent=(idx>=0&&idx===order.length-1)?'RESTART':'NEXT →';
+  const hook={'p-cl2':onCl2Input,'p-cl3':onCl3Input,'p-cl4':initCl4,'p-cldash':showClDash,'p-cl5':renderCl5Intro,
+    'p-ch2':onCh2Input,'p-ch3':onCh3Input,'p-ch4':renderCh4,'p-ch5':onCh5Input,'p-chdash':showChDash,'p-ch6':renderCh6Intro,'p-summary':renderSummary}[id];
+  if(hook) hook();
+}
+function goPrev(){ const o=getPageOrder(),i=o.indexOf(currentPageId); if(i>0) showPageById(o[i-1]); }
+function goNext(){
+  if(currentPageId==='p-step1'&&state.ca==null){ $('s1_result').innerHTML='<div class="result warn">Enter a serum calcium value first.</div>'; return; }
+  const o=getPageOrder(),i=o.indexOf(currentPageId);
+  if(i===-1){ showPageById(o[o.length-1]); return; }
+  if(i===o.length-1){ location.reload(); return; }
+  showPageById(o[i+1]);
+}
+function openModal(id){ $(id).classList.remove('hidden'); }
+function closeModal(id){ $(id).classList.add('hidden'); }
+function copyText(preId,labelId){
+  const text=$(preId).textContent;
+  const done=()=>{ $(labelId).textContent='Copied!'; setTimeout(()=>{ $(labelId).textContent='Copy Order'; },2000); };
+  const fb=()=>{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); done(); }catch(e){ $(labelId).textContent='Select & copy manually'; }
+    document.body.removeChild(ta); };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done,fb); else fb();
+}
+function alertCard(tone,icon,title,text){
+  const t={rose:['bg-rose-50 border-rose-200','text-rose-900','text-rose-800'],amber:['bg-amber-50 border-amber-200','text-amber-900','text-amber-800'],
+    emerald:['bg-emerald-50 border-emerald-200','text-emerald-900','text-emerald-800'],sky:['bg-sky-50 border-sky-200','text-sky-900','text-sky-800']}[tone];
+  return '<div class="p-3.5 '+t[0]+' border rounded-xl flex gap-3 items-start mb-2"><span>'+icon+'</span><div><h4 class="text-xs font-bold '+t[1]+'">'+title+'</h4><p class="text-xs '+t[2]+' mt-0.5">'+text+'</p></div></div>';
+}
+function statusBadge(label,tone){
+  const m={ok:'bg-emerald-50 text-emerald-700 border-emerald-200',warn:'bg-amber-50 text-amber-700 border-amber-200',bad:'bg-rose-50 text-rose-700 border-rose-200 font-bold',info:'bg-sky-50 text-sky-700 border-sky-200'};
+  return '<span class="px-2 py-0.5 rounded text-[10px] border '+m[tone]+'">'+label+'</span>';
+}
+function ensureBaseline(){
+  if(state.history.length>1&&state.history[0].v!==state.ca) state.history=[];
+  if(!state.history.length) state.history.push({v:state.ca,hours:0,label:'Baseline (Step 1)'});
+  else if(state.history.length===1) state.history[0].v=state.ca;
+}
+function renderHistoryLog(elId){
+  const el=$(elId);
+  if(state.history.length<=1){ el.innerHTML=''; return; }
+  const rows=state.history.map((h,i)=>{
+    if(i===0) return '<tr><td>'+h.label+'</td><td>'+h.v+'</td><td>—</td></tr>';
+    const d=+(h.v-state.history[i-1].v).toFixed(1);
+    return '<tr><td>+'+h.hours+'h</td><td>'+h.v+'</td><td>'+(d>0?'+':'')+d+'</td></tr>';
+  }).join('');
+  el.innerHTML='<p style="font-size:12px;color:#5a6d75;margin:14px 0 4px"><b>Reading log</b></p><table class="mini"><tr><th>Interval</th><th>Ca²⁺</th><th>Δ</th></tr>'+rows+'</table>';
+}
+
+
+/* ---------------- STEP 1 ---------------- */
+function onStep1Input(){
+  const raw=parseFloat($('s1_ca').value), alb=parseFloat($('s1_alb').value), out=$('s1_result');
+  if(isNaN(raw)){ state.ca=null; out.innerHTML=''; return; }
+  let v=raw, corr='';
+  if(!isNaN(alb)&&alb>0&&alb<12){ v=+(raw+0.8*(4.0-alb)).toFixed(1); corr='<div class="result info">Albumin-corrected Ca²⁺ = <b>'+v+' mg/dL</b> (measured '+raw+', albumin '+alb+' g/dL). Unreliable in critical illness — confirm with ionised calcium.</div>'; }
+  state.ca=v;
+  const odd=(v<4||v>20)?'<div class="result warn">Unusually extreme value — confirm it is not a unit or entry error (mg/dL here; 1 mmol/L = 4.0 mg/dL).</div>':'';
+  if(v<8.5){
+    let sev,cls,icon;
+    if(v<7.0){sev='Severe';cls='high';icon='🔴';} else if(v<7.5){sev='Moderate';cls='warn';icon='🟠';} else{sev='Mild';cls='good';icon='🟡';}
+    out.innerHTML=corr+'<div class="result '+cls+'">'+icon+' <b>'+sev+' hypocalcaemia detected</b> (Ca²⁺ '+v+' mg/dL, &lt;8.5).'+(v<7.5?' Seizure and arrhythmia risk — IV calcium is likely needed.':'')+
+      '<span class="next-action">Next step → Assess urgency (ECG, neuro features, Mg²⁺).</span></div>'+odd; return;
+  }
+  if(v<=10.5){ out.innerHTML=corr+'<div class="result good">✅ Ca²⁺ '+v+' mg/dL — within the usual range (8.5–10.5). No calcium correction indicated.</div>'+odd; return; }
+  let sev,cls,icon;
+  if(v>=14){sev='Severe';cls='high';icon='🔴';} else if(v>=12){sev='Moderate';cls='warn';icon='🟠';} else{sev='Mild';cls='good';icon='🟡';}
+  out.innerHTML=corr+'<div class="result '+cls+'">'+icon+' <b>'+sev+' hypercalcaemia detected</b> (Ca²⁺ '+v+' mg/dL, &gt;10.5).'+(v>=14?' Hypercalcaemic crisis — check mental state, ECG and renal function now.':'')+
+    '<span class="next-action">Next step → Severity and clinical-risk assessment.</span></div>'+odd;
+}
+
+/* ================= HYPOCALCAEMIA ================= */
+function onCl2Input(){
+  const ca=state.ca; if(ca==null) return;
+  const ecg=$('cl_ecg').value, neuro=$('cl_neuro').value, hemo=$('cl_hemo').checked, dig=$('cl_dig').checked, gut=$('cl_gut').checked;
+  const hm=$('cl_hypomg').checked, hp=$('cl_hiphos').checked, renal=$('cl_renal').value;
+  const ecgAbn=(ecg==='qt'||ecg==='arr');
+  const emergency=(neuro==='severe'||ecgAbn||hemo);
+  const tr=[];
+  if(ca<7.5) tr.push('corrected Ca²⁺ &lt;7.5 mg/dL');
+  if(neuro==='severe') tr.push('seizure, tetany or laryngo/bronchospasm');
+  if(ecgAbn) tr.push(ecg==='arr'?'torsades / VT / VF':'QT prolongation, block or ectopy');
+  if(hemo) tr.push('hypotension or heart failure');
+  const urgent=tr.length>0;
+  Object.assign(state.lo,{urgent,emergency,gut,renalImpaired:renal==='impaired',ecg,triggers:tr,hypoMg:hm,hiPhos:hp,dig});
+  let h='';
+  if(ecg==='unknown') h+='<div class="result warn">⚠ No ECG yet — record a 12-lead ECG now (QT interval).</div>';
+  if(neuro==='severe') h+='<div class="result high">🔴 <b>Tetany / seizure / laryngospasm.</b> Give 10% calcium gluconate 10–20 mL IV over ~10 min now — do not wait for a repeat level. Secure the airway if stridor.</div>';
+  if(ecg==='arr') h+='<div class="result high">🔴 <b>Torsades / VT / arrest.</b> Calcium gluconate 10–20 mL IV now, plus MgSO₄ 2 g IV; stop QT-prolonging drugs; keep K⁺ ≥4.0.</div>';
+  if(urgent) h+='<div class="result high">🔴 <b>High-risk hypocalcaemia</b> (Ca²⁺ '+ca+' mg/dL) — '+tr.join('; ')+'.<span class="next-action">NEXT ACTION → IV calcium with ECG monitoring (bolus then infusion). Oral alone is not enough.</span></div>';
+  else if(!gut) h+='<div class="result warn">🟠 Gut not usable — oral calcium is unreliable.<span class="next-action">NEXT ACTION → IV calcium gluconate.</span></div>';
+  else h+='<div class="result good">✅ No high-risk features. <b>Oral calcium ± vitamin D</b> is reasonable (Ca²⁺ '+ca+' mg/dL).<span class="next-action">NEXT ACTION → Find the cause (PTH, vitamin D, Mg²⁺), then replace and recheck.</span></div>';
+  if(hm) h+='<div class="result info">Hypomagnesaemia: PTH release and action fail when Mg²⁺ is low. Replace MgSO₄ 2 g IV — calcium will not hold otherwise.</div>';
+  if(hp) h+='<div class="result info">Hyperphosphataemia: forcing calcium risks precipitation (keep Ca × P &lt;55). Treat the phosphate source (AKI, rhabdomyolysis, TLS).</div>';
+  if(dig) h+='<div class="result info">Digoxin: calcium potentiates toxicity — give slowly (over ≥30 min) with ECG monitoring.</div>';
+  if(renal==='impaired') h+='<div class="result info">Impaired renal function — calcitriol will be needed (no 1α-hydroxylation); watch phosphate.</div>';
+  $('cl2_result').innerHTML=h;
+}
+function onCl3Input(){
+  const pth=parseFloat($('cl_pth').value), vd=parseFloat($('cl_vitd').value), ph=parseFloat($('cl_phos').value), egfr=$('cl_egfr').value;
+  const g=id=>$(id).checked;
+  const neck=g('cl_h_neck'),panc=g('cl_h_panc'),cit=g('cl_h_cit'),drug=g('cl_h_drug'),mal=g('cl_h_mal'),sep=g('cl_h_sep');
+  const out=$('cl3_result'), acute=panc||cit||sep;
+  state.lo.hypoPTH=false;
+  if(isNaN(pth)){
+    out.innerHTML=(neck||acute||drug||mal)?'<div class="result info">History noted. Enter the PTH (plus vitamin D and phosphate) to classify the mechanism.</div>':''; state.lo.mech=null; return;
+  }
+  let t,c='warn',b,a,label;
+  const hiP=!isNaN(ph)&&ph>5.5, loP=!isNaN(ph)&&ph<2.5, lowD=!isNaN(vd)&&vd<20;
+  if(pth<=65){
+    if(neck){ label='Post-surgical hypoparathyroidism'; t='<b>Hypoparathyroidism after neck surgery</b> (PTH '+pth+' pg/mL — inappropriately low)'; b='Transient (stunned glands) or permanent. Expect high phosphate.'; a='NEXT ACTION → IV calcium if symptomatic, then oral calcium + calcitriol; check Mg²⁺.'; state.lo.hypoPTH=true; }
+    else if(state.lo.hypoMg){ label='Hypomagnesaemia-related PTH failure'; t='<b>PTH failure from hypomagnesaemia</b> (PTH '+pth+' pg/mL)'; b='Low Mg²⁺ blocks PTH secretion and action; calcium will not correct until Mg²⁺ is replaced.'; a='NEXT ACTION → Replace MgSO₄ 2 g IV, then calcium; recheck PTH once Mg²⁺ is normal.'; }
+    else if(acute){ label='Acute illness / binding with blunted PTH'; t='<b>Acute calcium binding or critical-illness hypocalcaemia</b> (PTH '+pth+' pg/mL not raised)'; b=(cit?'Citrate chelates ionised calcium (massive transfusion, citrate CRRT). ':'')+(panc?'Pancreatitis and rhabdomyolysis/TLS bind or precipitate calcium. ':'')+'Total calcium may mislead — use ionised calcium.'; a='NEXT ACTION → Treat the cause; replace calcium to the ionised level; avoid over-correction in rhabdomyolysis (rebound hypercalcaemia).'; }
+    else { label='Primary hypoparathyroidism'; t='<b>Hypoparathyroidism</b> (PTH '+pth+' pg/mL — inappropriately low/normal for hypocalcaemia)'; b='Autoimmune, genetic or infiltrative; phosphate is usually high.'; a='NEXT ACTION → Oral calcium + calcitriol long term; keep calcium low-normal to limit hypercalciuria.'; state.lo.hypoPTH=true; }
+  } else {
+    if((egfr!=='normal')&&(hiP||egfr==='low')){ label='CKD mineral-bone disorder'; t='<b>CKD-related hypocalcaemia</b> (PTH '+pth+' pg/mL appropriately high)'; b='Reduced 1α-hydroxylation and phosphate retention.'; a='NEXT ACTION → Control phosphate, calcitriol, calcium; nephrology input.'; state.lo.hypoPTH=true; }
+    else if(lowD||mal){ label='Vitamin D deficiency / malabsorption'; t='<b>Vitamin D deficiency or malabsorption</b> (PTH '+pth+' pg/mL appropriately high'+(lowD?', 25-OH D '+vd+' ng/mL':'')+')'; b='Phosphate is typically low-normal.'; a='NEXT ACTION → Calcium plus cholecalciferol loading; treat malabsorption.'; }
+    else if(neck&&loP){ label='Hungry bone syndrome'; t='<b>Hungry bone syndrome</b> (high PTH, low phosphate after parathyroid surgery)'; b='Bone avidly takes up calcium, phosphate and magnesium.'; a='NEXT ACTION → High-dose calcium (often prolonged IV), calcitriol, replace Mg²⁺ and phosphate.'; }
+    else if(acute){ label='Acute binding / precipitation'; t='<b>Acute calcium loss with appropriate PTH response</b>'; b='Pancreatitis, rhabdomyolysis, TLS or citrate.'; a='NEXT ACTION → Treat the cause and replace to ionised calcium.'; }
+    else if(hiP&&egfr==='normal'){ label='PTH resistance'; t='<b>PTH resistance (pseudohypoparathyroidism)</b> — high PTH and phosphate with normal kidneys'; b='Rare; also consider severe hypomagnesaemia and drugs.'; a='NEXT ACTION → Calcium + calcitriol; genetics / endocrine referral.'; state.lo.hypoPTH=true; }
+    else { label='Secondary hyperparathyroidism'; t='<b>Appropriate PTH rise</b> (PTH '+pth+' pg/mL)'; b='Think vitamin D deficiency, CKD, drugs (bisphosphonate, denosumab, foscarnet, cisplatin) or low intake.'; a='NEXT ACTION → Check 25-OH D, renal function and drug list; replace calcium and vitamin D.'; }
+  }
+  if(drug) b+=' Drug contributor suspected (bisphosphonate / denosumab, foscarnet, cisplatin, loop diuretic, anticonvulsant) — review need.';
+  state.lo.mech=label;
+  out.innerHTML='<div class="result '+c+'">'+t+'.<br>'+b+'<span class="next-action">'+a+'</span></div>';
+}
+
+/* Estimate: serum rise ≈ 0.12–0.25 mg/dL per mg/kg elemental Ca delivered */
+const CL_UP=0.25, CL_LO=0.12, GLUC=93; // mg elemental per g Ca gluconate
+function initCl4(){
+  if($('cl4_ca').value==='') $('cl4_ca').value=state.ca;
+  $('cl4_wt').value=state.lo.wt||70;
+  onCl4Input();
+}
+function cl4Need(){
+  const c=parseFloat($('cl4_ca').value), t=parseFloat($('cl4_target').value), w=parseFloat($('cl4_wt').value);
+  if(isNaN(c)||isNaN(t)||isNaN(w)||w<=0) return null;
+  const lk=Math.max(0,(t-c)/CL_UP), hk=Math.max(0,(t-c)/CL_LO);
+  return {c,t,w,lowMg:lk*w,highMg:hk*w,lowKg:lk,highKg:hk};
+}
+function onCl4Input(){
+  const n=cl4Need(), out=$('cl4_result'), wrap=$('cl4_routeWrap');
+  if(!n){ out.innerHTML=''; wrap.classList.add('hidden'); return; }
+  Object.assign(state.lo,{target:n.t,defLow:n.lowMg,defHigh:n.highMg,wt:n.w});
+  if(n.lowMg<=0){ out.innerHTML='<div class="result good">Current Ca²⁺ is already at or above the target.</div>'; wrap.classList.add('hidden'); return; }
+  out.innerHTML='<div class="result info"><b>Estimated elemental calcium needed (Ca²⁺ '+n.c+' → '+n.t+'):</b> ≈'+Math.round(n.lowMg)+'–'+Math.round(n.highMg)+' mg (≈'+(n.lowMg/GLUC).toFixed(1)+'–'+(n.highMg/GLUC).toFixed(1)+' g calcium gluconate)<br>'+
+    '<b>Plan first:</b> ≈'+Math.round(n.lowMg)+' mg (low end), then recheck<br>'+
+    '<b>Remember:</b> a bolus lasts only 2–3 h — follow it with an infusion or oral therapy and treat the cause.'+
+    '<span class="next-action">NEXT STEP → Select your route of replacement.</span></div>';
+  wrap.classList.remove('hidden');
+  if(state.lo.route){ const b=document.querySelector('#cl4_routeWrap .btn[data-route="'+state.lo.route+'"]'); if(b) chooseClRoute(state.lo.route,b); }
+}
+function clBolusText(){
+  return '<b>10% calcium gluconate 10–20 mL (1–2 g = 93–186 mg elemental)</b> in 50–100 mL D5W or 0.9% saline IV over 10–20 min with ECG monitoring'+(state.lo.dig?' — over ≥30 min (digoxin)':'')+'. Repeat if symptoms persist. Effect lasts 2–3 h.';
+}
+function clInfusionText(){
+  const n=cl4Need(), rate=1, mgh=rate*n.w, hrs=n.lowMg/mgh;
+  return '<b>Infusion:</b> 100 mL of 10% calcium gluconate in 900 mL 0.9% saline or D5W (≈0.93 mg elemental/mL) at <b>'+rate+' mg/kg/h = '+(mgh/0.93).toFixed(0)+' mL/h</b> (range 0.5–1.5 mg/kg/h), for ≈'+hrs.toFixed(1)+' h to deliver ≈'+Math.round(n.lowMg)+' mg, then recheck Ca²⁺. Titrate to a low-normal level; start oral calcium ± calcitriol before stopping.';
+}
+function clOralText(){
+  const per=state.ca>=7.5?1500:2400;
+  return '<b>Oral calcium:</b> ≈<b>'+per+' mg elemental/day</b> in 3 divided doses with meals (calcium carbonate 1250 mg = 500 mg elemental; use citrate with a PPI).'+
+    (state.lo.hypoPTH?'<br><b>Add calcitriol</b> 0.25–0.5 mcg twice daily (hypoparathyroidism / CKD).':'<br>Add cholecalciferol if 25-OH D is low.')+'<br>Replace Mg²⁺ if low. Recheck Ca²⁺ in 24–48 h.';
+}
+function chooseClRoute(route,btn){
+  state.lo.route=route;
+  document.querySelectorAll('#cl4_routeWrap .btn.choice').forEach(b=>b.classList.remove('correct','incorrect','picked'));
+  const out=$('cl4_routeResult');
+  const next='<span class="next-action">NEXT STEP → Open the dashboard to simulate and finalise the order.</span>';
+  if(route==='oral'&&state.lo.urgent){ btn.classList.add('incorrect'); out.innerHTML='<div class="result high">❌ Not the best choice. Oral calcium is too slow for high-risk hypocalcaemia ('+state.lo.triggers.join('; ')+'). Use IV calcium gluconate; add oral therapy once stable.</div>'; return; }
+  if(route==='oral'&&!state.lo.gut){ btn.classList.add('incorrect'); out.innerHTML='<div class="result high">❌ The gut was marked unusable in Step 2. Use IV calcium.</div>'; return; }
+  if(route==='bolus'&&!state.lo.emergency){
+    btn.classList.add('picked');
+    out.innerHTML='<div class="result warn">A bolus is for symptomatic or unstable patients. Without those, an infusion avoids the 2–3 h peak-and-fall. Plan instead:<br><br>'+clInfusionText()+next+'</div>'; return;
+  }
+  btn.classList.add('correct');
+  if(route==='bolus') out.innerHTML='<div class="result good">✅ Appropriate for '+(state.lo.triggers.join('; ')||'symptomatic hypocalcaemia')+'.<br><br>'+clBolusText()+'<br><br>Then:<br>'+clInfusionText()+next+'</div>';
+  else if(route==='iv') out.innerHTML='<div class="result good">✅ Reasonable choice.<br><br>'+clInfusionText()+next+'</div>';
+  else out.innerHTML='<div class="result good">✅ Reasonable for mild, stable hypocalcaemia.<br><br>'+clOralText()+next+'</div>';
+}
+
+/* ---- CL DASHBOARD ---- */
+let clChart=null, clRoute='iv', clSig='', clWired=false;
+const CL_PROD={
+  oral:[{name:'Calcium carbonate 1250 mg (500 mg elemental)',v:500},{name:'2 tablets (1000 mg elemental)',v:1000}],
+  iv:[{name:'100 mL 10% Ca gluconate in 900 mL (≈0.93 mg/mL)',v:0.93},{name:'50 mL 10% Ca gluconate in 950 mL (≈0.47 mg/mL)',v:0.47},{name:'150 mL 10% Ca gluconate in 850 mL (≈1.4 mg/mL, fluid-restricted)',v:1.4}]
+};
+function showClDash(){
+  if(!clWired){ wireCl(); clWired=true; }
+  if(!clChart) initClChart();
+  const sig=[state.ca,state.lo.target,state.lo.wt,state.lo.route,state.lo.urgent,state.lo.dig].join('|');
+  if(sig!==clSig){
+    clSig=sig;
+    const c=clamp(state.ca,5,8.4);
+    $('clCaNum').value=c; $('clCaSlider').value=c;
+    $('clTarget').value=state.lo.target||8.2; $('clWt').value=state.lo.wt||70; $('clDig').checked=!!state.lo.dig;
+    setClRoute(state.lo.route==='oral'?'oral':(state.lo.route?'iv':(state.lo.urgent||!state.lo.gut?'iv':'oral')));
+  } else runClCalc();
+}
+function wireCl(){
+  $('clCaSlider').addEventListener('input',e=>{ $('clCaNum').value=e.target.value; runClCalc(); });
+  $('clCaNum').addEventListener('input',e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) $('clCaSlider').value=clamp(v,5,8.4); runClCalc(); });
+  ['clTarget','clWt','clDig','clConc','clFreq','clRate','clLoss'].forEach(id=>{ $(id).addEventListener('input',runClCalc); $(id).addEventListener('change',runClCalc); });
+}
+function setClTarget(v){ $('clTarget').value=v; runClCalc(); }
+function setClRoute(route){
+  clRoute=route;
+  const base='py-2 px-1 text-[11px] font-bold rounded-lg transition-all ';
+  const on='bg-sky-600 text-white shadow-sm', off='bg-transparent text-slate-600 hover:text-slate-900';
+  $('clBtnOral').className=base+(route==='oral'?on:off);
+  $('clBtnIv').className=base+(route==='iv'?on:off);
+  $('clIvWrap').classList.toggle('hidden',route==='oral');
+  $('clOralWrap').classList.toggle('hidden',route!=='oral');
+  $('clConcLabel').textContent=route==='oral'?'Oral product':'IV preparation (carrier: 0.9% saline or D5W)';
+  $('clConcNote').textContent=route==='oral'?'Absorption ~30%; take with meals. For mild, stable cases only.':'Gluconate is safe peripherally. Never mix with bicarbonate or phosphate. Calcium chloride is central-line only.';
+  const sel=$('clConc'); sel.innerHTML='';
+  CL_PROD[route].forEach((f,i)=>{ const o=document.createElement('option'); o.value=f.v; o.textContent=f.name; if(i===0) o.selected=true; sel.appendChild(o); });
+  $('clRate').value=1;
+  runClCalc();
+}
+function resetClDefaults(){
+  $('clCaNum').value=6.8; $('clCaSlider').value=6.8; $('clTarget').value=8.2; $('clWt').value=70; $('clLoss').value=0; $('clFreq').value=3; $('clDig').checked=false;
+  setClRoute('iv');
+}
+function initClChart(){
+  clChart=new Chart($('clChart').getContext('2d'),{
+    type:'line',
+    data:{labels:Array.from({length:25},(_,i)=>i),datasets:[
+      {label:'Upper estimate',data:[],borderColor:'#0284c7',backgroundColor:'rgba(2,132,199,0.10)',borderWidth:3,pointRadius:0,tension:0.2,fill:false},
+      {label:'Lower estimate',data:[],borderColor:'#64748b',backgroundColor:'rgba(2,132,199,0.10)',borderWidth:2.5,pointRadius:0,tension:0.2,fill:'-1'},
+      {label:'Target',data:[],borderColor:'#16a34a',borderWidth:1.5,borderDash:[2,4],pointRadius:0,fill:false},
+      {label:'10.5 ceiling',data:[],borderColor:'#dc2626',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>i[0].label+' h',label:c=>' '+c.dataset.label+': '+c.parsed.y.toFixed(1)+' mg/dL'}}},
+      scales:{y:{title:{display:true,text:'Serum Ca²⁺ (mg/dL)',font:{size:11,weight:'bold'}},grid:{color:'#f1f5f9'}},
+              x:{grid:{display:false},ticks:{autoSkip:false,maxRotation:0,callback:(v,i)=>(i%4===0?i+'h':'')}}}}
+  });
+}
+function runClCalc(){
+  const c0=clamp(parseFloat($('clCaNum').value)||6.8,5,8.4);
+  const tgt=clamp(parseFloat($('clTarget').value)||8.2,7.5,9.5);
+  const wt=clamp(parseFloat($('clWt').value)||70,5,250);
+  const dig=$('clDig').checked, route=clRoute;
+  const conc=parseFloat($('clConc').value)||0;
+  const loss=Math.max(0,parseFloat($('clLoss').value)||0);
+  const reqLowKg=Math.max(0,(tgt-c0)/CL_UP), reqHighKg=Math.max(0,(tgt-c0)/CL_LO);
+  const lowMg=reqLowKg*wt, highMg=reqHighKg*wt;
+  $('outClDef').textContent=Math.round(lowMg)+'–'+Math.round(highMg);
+  $('outClPlan').textContent=Math.round(lowMg);
+  $('outClPlanSub').textContent='≈ '+(lowMg/GLUC).toFixed(1)+' g Ca gluconate';
+
+  let cap,rate,rateEq,dose=0,freq=0,perDay=0;
+  if(route==='oral'){
+    dose=conc; freq=parseInt($('clFreq').value)||3; perDay=dose*freq; rateEq=perDay*0.3/24/wt; rate=rateEq;
+    cap=3000;
+    $('outClCap').textContent=cap; $('outClCapUnit').textContent='mg/day'; $('outClCapSub').textContent='Oral elemental Ca';
+    $('outClPresc').textContent=perDay; $('outClPrescUnit').textContent='mg/day'; $('outClPrescSub').textContent=dose+' mg × '+freq+' (q'+(24/freq).toFixed(0)+'h)';
+  } else {
+    rate=parseFloat($('clRate').value)||0; $('clRateDisp').textContent=rate; rateEq=rate;
+    cap=1.5;
+    $('outClCap').textContent=cap; $('outClCapUnit').textContent='mg/kg/h'; $('outClCapSub').textContent='= '+Math.round(cap*wt)+' mg/h';
+    $('outClPresc').textContent=conc>0?Math.round(rate*wt/conc):0; $('outClPrescUnit').textContent='mL/hr'; $('outClPrescSub').textContent=Math.round(rate*wt)+' mg/h elemental';
+  }
+  const netAt=t=>Math.min(rateEq*t,reqLowKg)-loss*t; // mg/kg
+  const estAt=t=>{ const d=netAt(t); const a=clamp(c0+d*CL_UP,4.5,11.5), b=clamp(c0+d*CL_LO,4.5,11.5); return {lo:Math.min(a,b),hi:Math.max(a,b),net:d*wt}; };
+  const series=Array.from({length:25},(_,t)=>estAt(t));
+  clChart.data.datasets[0].data=series.map(s=>s.hi);
+  clChart.data.datasets[1].data=series.map(s=>s.lo);
+  clChart.data.datasets[2].data=Array(25).fill(tgt);
+  clChart.data.datasets[3].data=Array(25).fill(10.5);
+  clChart.options.scales.y.suggestedMin=Math.floor(Math.min(c0,...series.map(s=>s.lo))-0.3);
+  clChart.options.scales.y.suggestedMax=10.8;
+  clChart.update();
+
+  let rows='';
+  [0,2,4,6,8,12,24].forEach(h=>{
+    const s=estAt(h); let label,tone;
+    if(s.hi>10.5){label='Over-correction Risk';tone='bad';}
+    else if(s.lo>=tgt-0.2){label='At Target';tone='ok';}
+    else if(s.hi>=tgt-0.2){label='Approaching Target';tone='info';}
+    else{label='Below Target';tone='warn';}
+    rows+='<tr class="hover:bg-slate-50"><td class="p-2.5 font-bold text-slate-900">'+h+'h</td><td class="p-2.5 font-extrabold text-sky-700">'+s.lo.toFixed(1)+'–'+s.hi.toFixed(1)+'</td>'+
+      '<td class="p-2.5 font-semibold text-slate-600">'+Math.round(s.net)+' mg</td><td class="p-2.5">'+statusBadge(label,tone)+'</td></tr>';
+  });
+  $('clTbody').innerHTML=rows;
+
+  const al=[]; let serious=false;
+  if(route==='oral'){
+    if(perDay>cap){ al.push(alertCard('rose','🛑','Daily oral total above limit','Total '+perDay+' mg/day exceeds '+cap+' mg/day elemental. Reduce, or move to IV.')); serious=true; }
+    if(state.lo.urgent||c0<7.5){ al.push(alertCard('rose','🛑','Oral alone is inadequate','Ca²⁺ &lt;7.5, symptoms or ECG changes need IV calcium; add oral once stable.')); serious=true; }
+  } else {
+    if(rate>cap){ al.push(alertCard('rose','🛑','Rate exceeds the safe limit','Max '+cap+' mg elemental Ca/kg/h. Reduce the rate.')); serious=true; }
+    if(state.lo.emergency) al.push(alertCard('amber','⚠️','Unstable features present','Give a 10–20 mL 10% calcium gluconate bolus over 10–20 min first, then this infusion.'));
+    al.push(alertCard('sky','ℹ️','Line and compatibility','Check the cannula for extravasation. No bicarbonate or phosphate in the same line.'));
+  }
+  if(dig) al.push(alertCard('amber','⚠️','Digoxin','Calcium potentiates digoxin toxicity: bolus over ≥30 min and keep ECG monitoring; avoid rapid correction.'));
+  if(state.lo.hypoMg) al.push(alertCard('sky','ℹ️','Hypomagnesaemia present','Give MgSO₄ 2 g IV — calcium will not hold until Mg²⁺ is replaced.'));
+  if(state.lo.hiPhos) al.push(alertCard('amber','⚠️','Hyperphosphataemia','Keep Ca × P &lt;55 mg²/dL² to avoid precipitation; treat the phosphate source.'));
+  if(reqLowKg<=0){ al.push(alertCard('amber','⚠️','Target at or below current Ca²⁺','No replacement is needed on this calculation.')); serious=true; }
+  if(loss>=rateEq&&reqLowKg>0){ al.push(alertCard('amber','⚠️','Ongoing requirement ≥ delivery','Serum Ca²⁺ will not rise. Increase delivery or treat the cause.')); serious=true; }
+  if(!serious&&reqLowKg>0) al.unshift(alertCard('emerald','✅','Safe Replacement Trajectory','Rate and dose are within limits. Plan ≈'+Math.round(lowMg)+' mg elemental, then recheck Ca²⁺; start oral calcium ± calcitriol before stopping IV.'));
+  $('clSafety').innerHTML=al.join('');
+
+  const prod=$('clConc').options[$('clConc').selectedIndex].text;
+  $('clOrderTime').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  let o='MEDICAL ORDER: HYPOCALCEMIA Ca REPLACEMENT\n';
+  o+='--------------------------------------------------\n';
+  o+='Baseline corrected Ca : '+c0.toFixed(1)+' mg/dL    Weight: '+wt+' kg\n';
+  o+='Target Ca             : '+tgt.toFixed(1)+' mg/dL\n';
+  o+='Estimated need        : '+Math.round(lowMg)+'–'+Math.round(highMg)+' mg elemental Ca (plan ~'+Math.round(lowMg)+' mg, then recheck)\n';
+  o+='--------------------------------------------------\n';
+  if(route==='oral'){
+    o+='ROUTE: Oral\nPRODUCT: '+prod+'\n';
+    o+='DOSE : '+dose+' mg elemental '+freq+' times daily with meals = '+perDay+' mg/day\n';
+    if(state.lo.hypoPTH) o+='ADD  : Calcitriol 0.25–0.5 mcg twice daily (hypoparathyroidism / CKD)\n';
+  } else {
+    if(state.lo.emergency) o+='BOLUS: 10% calcium gluconate 10–20 mL IV in 50–100 mL over 10–20 min'+(dig?' (>=30 min, digoxin)':'')+'.\n';
+    o+='ROUTE: Intravenous infusion\nPRODUCT: '+prod+'\n';
+    o+='RATE : '+Math.round(conc>0?rate*wt/conc:0)+' mL/hr = '+rate+' mg elemental Ca/kg/h ('+Math.round(rate*wt)+' mg/h).\n';
+    o+='Run ~'+(rate>0?(lowMg/(rate*wt)).toFixed(1):'—')+' h, then recheck and titrate. Start oral Ca +/- calcitriol before stopping.\n';
+  }
+  o+='--------------------------------------------------\n';
+  o+='MONITORING PROTOCOL:\n';
+  o+='1. Ca2+ (ideally ionised) every 4–6 h on infusion; every 1–2 h if symptomatic.\n';
+  o+='2. Continuous ECG while symptomatic or QT prolonged. Check Mg2+, phosphate, K+.\n';
+  o+='3. Stop and reassess if Ca2+ >10.0 mg/dL; aim for low-normal.\n';
+  o+='4. No bicarbonate / phosphate in the same line; check cannula for extravasation.\n';
+  $('clOrder').textContent=o;
+}
+
+/* ---- CL STEP 5 ---- */
+function renderCl5Intro(){
+  ensureBaseline();
+  const l=state.history[state.history.length-1];
+  $('cl5_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>Ca²⁺ '+l.v+' mg/dL</b> ('+l.label+').<br>Target Ca²⁺ '+(state.lo.target||8.2)+' mg/dL. Enter hours elapsed and the new level.</div>';
+  renderHistoryLog('cl5_log');
+}
+function logClReading(){
+  const hours=parseFloat($('cl5_hours').value), nv=parseFloat($('cl5_new').value), sym=$('cl5_sym').value, out=$('cl5_result');
+  if(isNaN(hours)||hours<=0||isNaN(nv)){ out.innerHTML='<div class="result warn">Enter both hours elapsed and the new corrected Ca²⁺.</div>'; return; }
+  ensureBaseline();
+  const last=state.history[state.history.length-1], delta=+(nv-last.v).toFixed(2), tgt=state.lo.target||8.2;
+  let h;
+  if(sym==='severe') h='<div class="result high">🔴 Still tetanic / seizing / bronchospastic (Ca²⁺ '+last.v+' → '+nv+').<span class="next-action">NEXT ACTION → Repeat 10% calcium gluconate 10–20 mL IV over 10 min, secure the airway if needed, check Mg²⁺ and ECG, and confirm the infusion is running.</span></div>';
+  else if(nv>10.5) h='<div class="result high">🔴 Ca²⁺ '+last.v+' → <b>'+nv+' mg/dL</b> — above 10.5.<span class="next-action">NEXT ACTION → Stop calcium and calcitriol, hydrate, recheck in 4–6 h (rebound hypercalcaemia is common in rhabdomyolysis recovery).</span></div>';
+  else if(nv>=tgt) h='<div class="result good">✅ Ca²⁺ '+last.v+' → '+nv+' mg/dL — <b>target ('+tgt+') reached</b>.<span class="next-action">NEXT ACTION → Make sure oral calcium ± calcitriol is on board before stopping the infusion; taper the rate, recheck Ca²⁺ every 6–12 h for 24 h, and treat the cause.</span></div>';
+  else if(delta>0) h='<div class="result good">✅ Ca²⁺ rose '+last.v+' → '+nv+' mg/dL ('+hours+' h) — responding.<span class="next-action">NEXT ACTION → Continue the plan; recheck in 4–6 h.</span></div>';
+  else h='<div class="result warn">Ca²⁺ '+(delta<0?'fell '+last.v+' → '+nv:'unchanged at '+nv)+' mg/dL over '+hours+' h despite replacement.<ul><li>Is Mg²⁺ low? Replace it.</li><li>Ongoing calcium loss (hypoparathyroidism, hungry bone, citrate, pancreatitis) — increase the rate within 1.5 mg/kg/h.</li><li>No vitamin D / calcitriol yet; phosphate precipitation; albumin correction error (check ionised Ca).</li></ul></div>';
+  out.innerHTML=h;
+  state.history.push({v:nv,hours:hours,label:hours+'h after previous check'});
+  $('cl5_hours').value=''; $('cl5_new').value=''; $('cl5_sym').value='none';
+  const l=state.history[state.history.length-1];
+  $('cl5_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>Ca²⁺ '+l.v+' mg/dL</b> ('+l.label+').<br>Target Ca²⁺ '+tgt+' mg/dL.</div>';
+  renderHistoryLog('cl5_log');
+}
+
+/* ================= HYPERCALCAEMIA ================= */
+function onCh2Input(){
+  const ca=state.ca; if(ca==null) return;
+  const sym=$('ch_sym').value, ecg=$('ch_ecg').value, renal=$('ch_renal').value, hf=$('ch_hf').checked, dig=$('ch_dig').checked;
+  const ecgAbn=(ecg==='mild'||ecg==='severe');
+  const emergency=ca>=14||sym==='severe'||ecgAbn||(renal!=='normal'&&ca>=12);
+  const urgent=!emergency&&(ca>=12||sym==='mild');
+  Object.assign(state.hi,{emergency,urgent,renal,ecg,sym,hf,dig});
+  let h='';
+  if(ecg==='unknown') h+='<div class="result warn">⚠ No ECG yet — record a 12-lead ECG now (short QT, bradycardia, block).</div>';
+  if(ecg==='severe') h+='<div class="result high">🔴 <b>Life-threatening rhythm.</b> Standard ALS, urgent haemodialysis with low-calcium dialysate, and start saline; treat arrhythmia per protocol.</div>';
+  if(emergency) h+='<div class="result high">🔴 <b>Hypercalcaemic emergency</b> (Ca²⁺ '+ca+' mg/dL'+(sym==='severe'?', severe neuro / GI symptoms':'')+(ecgAbn?', ECG changes':'')+(renal!=='normal'&&ca>=12?', renal impairment':'')+').<span class="next-action">NEXT ACTION → IV 0.9% saline now, ECG monitoring, then calcitonin and a bisphosphonate / denosumab; consider early dialysis.</span></div>';
+  else if(urgent) h+='<div class="result warn">🟠 <b>Moderate or symptomatic hypercalcaemia</b> (Ca²⁺ '+ca+' mg/dL).<span class="next-action">NEXT ACTION → IV saline, find the cause (PTH), and give a bisphosphonate early — it takes days to work.</span></div>';
+  else h+='<div class="result good">🟡 <b>Mild hypercalcaemia</b> (Ca²⁺ '+ca+' mg/dL), few or no symptoms.<span class="next-action">NEXT ACTION → Oral hydration, stop calcium / vitamin D / thiazides, send PTH, repeat in 24–72 h.</span></div>';
+  if(hf) h+='<div class="result info">Heart failure or overload — saline must be cautious; consider earlier dialysis or denosumab.</div>';
+  if(dig) h+='<div class="result info">Hypercalcaemia potentiates digoxin toxicity — check level and avoid rapid shifts.</div>';
+  if(renal!=='normal') h+='<div class="result info">Impaired renal function: saline is less effective, bisphosphonates need dose reduction (avoid at eGFR &lt;30), and denosumab or dialysis may be needed.</div>';
+  $('ch2_result').innerHTML=h;
+}
+function onCh3Input(){
+  const pth=parseFloat($('ch_pth').value), rp=parseFloat($('ch_pthrp').value), v25=parseFloat($('ch_25').value), v125=parseFloat($('ch_125').value);
+  const g=id=>$(id).checked;
+  const mal=g('ch_h_mal'),gran=g('ch_h_gran'),drug=g('ch_h_drug'),vit=g('ch_h_vit'),imm=g('ch_h_imm');
+  const out=$('ch3_result');
+  state.hi.mech=null; state.hi.mechLabel=null;
+  if(isNaN(pth)){ out.innerHTML=(mal||gran||drug||vit||imm)?'<div class="result info">History noted. Enter the PTH to split PTH-dependent from PTH-independent causes.</div>':''; return; }
+  let t,b,a,mech,label;
+  if(pth>=20){
+    mech='pth'; label='PTH-dependent hypercalcaemia';
+    t='<b>PTH-dependent hypercalcaemia</b> (PTH '+pth+' pg/mL — not suppressed)';
+    b='Primary hyperparathyroidism is the commonest cause. Also tertiary hyperparathyroidism (CKD / transplant), lithium, familial hypocalciuric hypercalcaemia (low urine Ca:Cr clearance ratio), or thiazide unmasking.'+(drug?' Thiazide / lithium noted — stop if possible.':'');
+    a='NEXT ACTION → Urine calcium / creatinine clearance ratio, neck imaging and surgical referral; saline and bisphosphonate for symptomatic cases; cinacalcet if unfit for surgery.';
+  } else if(rp>2||(mal&&isNaN(rp))){
+    mech='malig'; label='Malignancy-associated';
+    t='<b>Malignancy-associated hypercalcaemia</b> (PTH suppressed'+(!isNaN(rp)?', PTHrP '+rp+' pmol/L raised':'')+')';
+    b='Humoral (PTHrP), osteolytic metastases or myeloma. Usually severe and rapid; poor prognosis if untreated tumour.';
+    a='NEXT ACTION → Saline, calcitonin and a bisphosphonate or denosumab; SPEP / imaging; treat the tumour. Glucocorticoids help only in lymphoma / myeloma.';
+  } else if(v125>65||gran){
+    mech='vitd'; label='1,25-vitamin D–mediated (granulomatous)';
+    t='<b>1,25-vitamin D–mediated hypercalcaemia</b> (PTH suppressed'+(!isNaN(v125)?', 1,25-(OH)₂D '+v125+' pg/mL':'')+')';
+    b='Sarcoidosis, TB, lymphoma — extra-renal 1α-hydroxylation.';
+    a='NEXT ACTION → Saline and a glucocorticoid (prednisolone 20–40 mg/day); avoid sun and vitamin D; bisphosphonate if severe.';
+  } else if(v25>150||vit){
+    mech='vitd'; label='Vitamin D / calcium excess';
+    t='<b>Vitamin D or calcium excess</b> (PTH suppressed'+(!isNaN(v25)?', 25-OH D '+v25+' ng/mL':'')+')';
+    b='Vitamin D toxicity, vitamin A or milk-alkali syndrome.';
+    a='NEXT ACTION → Stop all supplements and antacids; saline; glucocorticoid for vitamin D toxicity if prolonged; levels fall over days to weeks.';
+  } else if(mal){
+    mech='malig'; label='Malignancy-associated'; t='<b>Suspect malignancy</b> (PTH suppressed, history of cancer)'; b='Send PTHrP, SPEP and imaging.'; a='NEXT ACTION → Saline, calcitonin and bisphosphonate / denosumab.';
+  } else if(imm){
+    mech='other'; label='Immobilisation / thyrotoxicosis'; t='<b>Immobilisation or thyrotoxicosis</b> (PTH suppressed)'; b='Increased bone turnover.'; a='NEXT ACTION → Hydrate, mobilise, treat the thyroid; bisphosphonate if severe.';
+  } else {
+    mech='other'; label='PTH-independent, unclassified';
+    t='<b>PTH-independent hypercalcaemia</b> (PTH '+pth+' pg/mL suppressed), cause unclear';
+    b='Send PTHrP, 1,25-(OH)₂D, SPEP / light chains, TSH and cortisol; review drugs and supplements.';
+    a='NEXT ACTION → Treat with saline and a bisphosphonate while the work-up is under way.';
+  }
+  state.hi.mech=mech; state.hi.mechLabel=label;
+  out.innerHTML='<div class="result warn">'+t+'.<br>'+b+'<span class="next-action">'+a+'</span></div>';
+}
+function renderCh4(){
+  const x=state.hi;
+  $('ch4_status').innerHTML=x.emergency
+    ?'<div class="result high" style="margin-top:0">🔴 Start IV saline <b>now</b> (Ca²⁺ '+state.ca+' mg/dL). Patients are almost always volume-depleted from calcium-induced diuresis.</div>'
+    :'<div class="result info" style="margin-top:0">Hydration is the first step at every level — start with IV saline if Ca²⁺ ≥12 or symptomatic; oral fluids for mild cases.</div>';
+  onCh4Input();
+}
+function chooseChAgent(a,btn){
+  document.querySelectorAll('#p-ch4 .btn.choice').forEach(b=>b.classList.remove('correct','incorrect'));
+  const out=$('ch4_agentResult');
+  if(a==='sal'){
+    btn.classList.add('correct');
+    out.innerHTML='<div class="result good">✅ Correct — saline restores volume, reverses the diuresis-driven dehydration and promotes calcium excretion (≈ −1 to −2 mg/dL in 24–48 h). Next: calcitonin and a bisphosphonate.</div>'; return;
+  }
+  btn.classList.add('incorrect');
+  const why={
+    zol:'Zoledronic acid is essential but takes 2–4 days to act. Start saline first, and give it early alongside.',
+    lasix:'Loop diuretics are not first-line: given to a dehydrated patient they worsen volume depletion and hypercalcaemia. Use only after volume repletion or if overloaded.',
+    ct:'Calcitonin acts within hours but is weak and loses effect in ~48 h. It is a bridge, not first-line.',
+    ster:'Glucocorticoids work only for vitamin D–mediated causes (sarcoid, lymphoma) and take days.',
+    hd:'Dialysis is rapid and definitive for severe disease with renal failure or heart failure, but is not first-line in most patients.'
+  }[a];
+  out.innerHTML='<div class="result high">❌ Not first. '+why+' Start with <b>IV 0.9% saline</b>.</div>';
+}
+function onCh4Input(){
+  const vol=$('ch_vol').value, out=$('ch4_fluid'), x=state.hi;
+  x.vol=vol;
+  if(!vol){ out.innerHTML=''; return; }
+  let h;
+  if(x.renal==='anuric') h='<div class="result warn">Anuric: saline cannot drive calciuresis and risks overload. <b>Haemodialysis with low-calcium dialysate</b> is the lowering route.</div>';
+  else if(vol==='hyper'||x.hf) h='<div class="result warn"><b>Cautious fluids:</b> 500 mL 0.9% saline then 75–100 mL/h, reassessing lungs and urine output every 2–4 h. Add furosemide 40–80 mg IV only for overload. Consider early denosumab or dialysis.</div>';
+  else h='<div class="result info"><b>0.9% saline 1–2 L over 1–2 h</b>'+(vol==='hypo'?' (clinically dry)':'')+', then <b>150–250 mL/h</b> aiming for urine output 100–150 mL/h. Reassess volume status every 4–6 h; replace K⁺ and Mg²⁺ as they are lost.</div>';
+  out.innerHTML=h+'<span class="next-action" style="margin-top:8px;color:inherit;font-size:13px">NEXT STEP → Calcium-lowering drugs and cause-specific treatment.</span>';
+}
+function onCh5Input(){
+  const wt=parseFloat($('ch_wt').value), egfr=$('ch_egfr').value, out=$('ch5_result'), x=state.hi, ca=state.ca;
+  x.wt=isNaN(wt)?null:wt;
+  const dial=x.renal==='anuric'||egfr==='low'&&ca>=14||(x.hf&&ca>=14)||x.ecg==='severe'||(x.sym==='severe'&&egfr==='low');
+  x.dialysis=dial;
+  let h='';
+  if(dial) h+='<div class="result high">🔴 <b>Haemodialysis with low-calcium dialysate indicated</b> — call nephrology. Lowers calcium within hours; expect partial rebound.</div>';
+  h+='<div class="result info"><b>Calcitonin:</b> '+(x.wt?'<b>'+Math.round(4*x.wt)+' IU</b> ('+4+' IU/kg) ':'4 IU/kg ')+'SC/IM every 12 h — onset 4–6 h, lowers ≈1–2 mg/dL, effect fades by ~48 h. Bridge only.</div>';
+  if(egfr==='normal') h+='<div class="result info"><b>Zoledronic acid 4 mg</b> IV over ≥15 min (or pamidronate 60–90 mg over 2–4 h). Onset 2–4 days, lasts weeks. Hydrate first; check dental status.</div>';
+  else if(egfr==='mid') h+='<div class="result warn"><b>Zoledronic acid</b> reduced dose (≈3.0–3.5 mg for eGFR 30–59) over ≥30 min, or <b>denosumab 120 mg SC</b>. Check creatinine before and after.</div>';
+  else h+='<div class="result warn">eGFR &lt;30: <b>avoid bisphosphonates</b> where possible. Use <b>denosumab 120 mg SC</b> (watch for severe hypocalcaemia) or dialysis.</div>';
+  if(x.mech==='vitd') h+='<div class="result info"><b>Glucocorticoid:</b> prednisolone 20–40 mg/day (or hydrocortisone 200–400 mg/day IV). Effective for vitamin D–mediated disease — onset 2–5 days.</div>';
+  else if(x.mech) h+='<div class="result warn">Glucocorticoids are <b>not</b> expected to help here ('+(x.mechLabel||'this mechanism')+') — skip unless lymphoma or myeloma is proven.</div>';
+  if(x.vol==='hyper'||x.hf) h+='<div class="result info"><b>Loop diuretic:</b> furosemide 40–80 mg IV for overload only — never as a calcium-lowering agent in a dry patient.</div>';
+  const c=[];
+  if(x.mech==='pth') c.push('Primary hyperparathyroidism: parathyroidectomy is definitive; cinacalcet if unfit or parathyroid carcinoma.');
+  if(x.mech==='malig') c.push('Malignancy: treat the tumour; repeat bisphosphonate / denosumab every 3–4 weeks.');
+  if(x.mech==='vitd') c.push('Stop vitamin D, calcium and antacids; treat granulomatous disease.');
+  c.push('Stop thiazides, lithium and calcium / vitamin D supplements; avoid immobility.');
+  h+='<div class="result warn"><b>Treat the cause:</b><ul>'+c.map(t=>'<li>'+t+'</li>').join('')+'</ul></div>';
+  h+='<span class="next-action" style="margin-top:10px;color:inherit;font-size:13px">NEXT STEP → Open the dashboard to see the indicative Ca²⁺ timeline and build the orders.</span>';
+  out.innerHTML=h;
+}
+
+/* ---- CH DASHBOARD ---- */
+let chChart=null, chWired=false, chSig='';
+const ramp=(t,t0,tr)=>{ const s=t-t0; return s<=0?0:(s<tr?s/tr:1); };
+const tri=(t,t0,tp,te)=>{ const s=t-t0; if(s<=0) return 0; if(s<tp) return s/tp; if(s<te) return (te-s)/(te-tp); return 0; };
+const hdProfile=(t,t0)=>{ const s=t-t0; if(s<=0) return 0; if(s<3) return 1-Math.pow(1-s/3,2); if(s<9) return 1-0.2*(s-3)/6; return 0.8; };
+function chParams(){
+  return {c0:clamp(parseFloat($('chCaNum').value)||14,10.6,20), wt:clamp(parseFloat($('chWt').value)||70,5,250), renal:$('chRenal').value,
+    load:parseFloat($('chLoad').value)||0, sym:$('chSym').checked, vitd:$('chVitD').checked, hf:$('chHf').checked,
+    sal:$('chSaline').checked, ct:$('chCt').checked, bis:$('chBis').value, deno:$('chDeno').checked, ster:$('chSteroid').checked,
+    loop:$('chLoop').checked, hd:$('chHd').checked, hdDelay:parseFloat($('chHdDelay').value)||0};
+}
+function chCaAt(p,t){
+  let c=p.c0+p.load*t;
+  const kid=p.renal!=='anuric';
+  if(p.sal&&kid) c-=1.5*ramp(t,0,24);
+  if(p.ct) c-=1.2*tri(t,0,6,48);
+  if(p.bis==='zol') c-=3.0*ramp(t,0,72);
+  if(p.bis==='pam') c-=2.5*ramp(t,0,72);
+  if(p.deno) c-=2.5*ramp(t,0,72);
+  if(p.ster) c-=(p.vitd?2.5:0.3)*ramp(t,0,72);
+  if(p.loop&&kid) c-=0.4*ramp(t,0,12);
+  if(p.hd) c-=3.5*hdProfile(t,p.hdDelay);
+  return Math.max(6.0,c);
+}
+function showChDash(){
+  if(!chWired){ wireCh(); chWired=true; }
+  if(!chChart) initChChart();
+  const x=state.hi, sig=[state.ca,x.renal,x.emergency,x.dialysis,x.mech,x.hf,x.wt].join('|');
+  if(sig!==chSig){
+    chSig=sig;
+    const c=clamp(state.ca,10.6,20);
+    $('chCaNum').value=c; $('chCaSlider').value=c;
+    if(x.wt) $('chWt').value=x.wt;
+    $('chRenal').value=x.renal||'normal';
+    $('chSym').checked=!!x.emergency; $('chHf').checked=!!x.hf; $('chVitD').checked=(x.mech==='vitd');
+    $('chHd').checked=!!x.dialysis;
+    $('chSteroid').checked=(x.mech==='vitd');
+    $('chSaline').checked=(x.renal!=='anuric');
+    $('chBis').value=(x.renal==='anuric')?'none':'zol';
+    $('chDeno').checked=(x.renal==='anuric');
+  }
+  runChCalc();
+}
+function wireCh(){
+  $('chCaSlider').addEventListener('input',e=>{ $('chCaNum').value=e.target.value; runChCalc(); });
+  $('chCaNum').addEventListener('input',e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) $('chCaSlider').value=clamp(v,10.6,20); runChCalc(); });
+  ['chWt','chRenal','chLoad','chSym','chVitD','chHf','chSaline','chCt','chBis','chDeno','chSteroid','chLoop','chHd','chHdDelay'].forEach(id=>{ $(id).addEventListener('input',runChCalc); $(id).addEventListener('change',runChCalc); });
+}
+function resetChDefaults(){
+  $('chCaNum').value=14; $('chCaSlider').value=14; $('chWt').value=70; $('chRenal').value='normal'; $('chLoad').value='0';
+  $('chSym').checked=false; $('chVitD').checked=false; $('chHf').checked=false;
+  $('chSaline').checked=true; $('chCt').checked=false; $('chBis').value='zol'; $('chDeno').checked=false; $('chSteroid').checked=false; $('chLoop').checked=false; $('chHd').checked=false; $('chHdDelay').value='2';
+  runChCalc();
+}
+function initChChart(){
+  chChart=new Chart($('chChart').getContext('2d'),{
+    type:'line',
+    data:{labels:Array.from({length:73},(_,i)=>i),datasets:[
+      {label:'Indicative Ca²⁺',data:[],borderColor:'#e11d48',backgroundColor:'rgba(225,29,72,0.08)',borderWidth:3,pointRadius:0,tension:0.25,fill:true},
+      {label:'14 severe',data:[],borderColor:'#991b1b',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false},
+      {label:'12 moderate',data:[],borderColor:'#f59e0b',borderWidth:1.5,borderDash:[4,4],pointRadius:0,fill:false},
+      {label:'10.5 target',data:[],borderColor:'#10b981',borderWidth:1.5,borderDash:[2,4],pointRadius:0,fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>i[0].label+' h',label:c=>' '+c.dataset.label+': '+c.parsed.y.toFixed(1)+' mg/dL'}}},
+      scales:{y:{title:{display:true,text:'Serum Ca²⁺ (mg/dL)',font:{size:11,weight:'bold'}},grid:{color:'#f1f5f9'}},
+              x:{grid:{display:false},ticks:{autoSkip:false,maxRotation:0,callback:(v,i)=>(i%12===0?i+'h':'')}}}}
+  });
+}
+function runChCalc(){
+  const p=chParams();
+  const ser=Array.from({length:73},(_,t)=>chCaAt(p,t));
+  const tag=$('chSevTag');
+  if(p.c0>=14){ tag.textContent='Severe'; tag.className='text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200'; }
+  else if(p.c0>=12){ tag.textContent='Moderate'; tag.className='text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200'; }
+  else{ tag.textContent='Mild'; tag.className='text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200'; }
+  $('outChFluid').textContent=p.hf?'75–100':'150–250';
+  $('outChFluidSub').textContent=p.renal==='anuric'?'Ineffective — anuric':(p.hf?'Cautious, after 500 mL':'After a 1–2 L bolus');
+  $('outChCt').textContent=Math.round(4*p.wt);
+  $('outCh24').textContent=ser[24].toFixed(1); $('outCh72').textContent=ser[72].toFixed(1);
+  $('outCh72Sub').textContent=ser[72]<8.5?'⚠ Hypocalcaemia risk':(ser[72]>12?'Still above 12':'Full-effect check');
+
+  chChart.data.datasets[0].data=ser;
+  chChart.data.datasets[1].data=Array(73).fill(14);
+  chChart.data.datasets[2].data=Array(73).fill(12);
+  chChart.data.datasets[3].data=Array(73).fill(10.5);
+  chChart.options.scales.y.suggestedMin=Math.floor(Math.min(...ser,9)-0.5);
+  chChart.options.scales.y.suggestedMax=Math.ceil(Math.max(...ser,15)+0.5);
+  chChart.update();
+
+  let rows='';
+  [0,6,12,24,48,72].forEach(t=>{
+    const c=ser[t]; let label,tone;
+    if(c<8.5){label='Over-correction Risk';tone='bad';}
+    else if(c>=14){label='Severe';tone='bad';}
+    else if(c>=12){label='Moderate';tone='warn';}
+    else if(c>10.5){label='Mildly Elevated';tone='info';}
+    else{label='Target Range';tone='ok';}
+    rows+='<tr class="hover:bg-slate-50"><td class="p-2.5 font-bold text-slate-900">'+t+'h</td><td class="p-2.5 font-extrabold text-rose-600">'+c.toFixed(1)+' mg/dL</td>'+
+      '<td class="p-2.5 font-semibold text-slate-600">'+(c-p.c0>=0?'+':'')+(c-p.c0).toFixed(1)+'</td><td class="p-2.5">'+statusBadge(label,tone)+'</td></tr>';
+  });
+  $('chTbody').innerHTML=rows;
+
+  const emergency=p.c0>=14||p.sym, lowering=p.sal||p.ct||p.bis!=='none'||p.deno||p.hd;
+  const al=[]; let serious=false;
+  if(emergency&&!p.sal&&p.renal!=='anuric'){ al.push(alertCard('rose','🛑','Saline not selected','Ca²⁺ ≥14 or severe symptoms — start IV 0.9% saline first; the patient is almost always volume-depleted.')); serious=true; }
+  if(p.c0>=12&&!lowering){ al.push(alertCard('amber','⚠️','No lowering therapy selected','Add saline, calcitonin and a bisphosphonate / denosumab.')); serious=true; }
+  if((p.renal==='impaired'||p.renal==='anuric')&&p.bis!=='none'){ al.push(alertCard('rose','🛑','Bisphosphonate with renal impairment','Avoid at eGFR &lt;30 (nephrotoxic). Use denosumab 120 mg SC or dialysis; reduce the dose if eGFR 30–59.')); serious=true; }
+  if(p.renal==='anuric'&&p.sal) al.push(alertCard('amber','⚠️','Saline ineffective when anuric','It was left out of the curve; dialysis is the lowering route.'));
+  if(p.ster&&!p.vitd) al.push(alertCard('amber','⚠️','Glucocorticoid unlikely to help','Only effective for vitamin D–mediated causes (sarcoid, lymphoma). Minimal effect modelled.'));
+  if(p.loop&&!p.hf&&p.sal===false) al.push(alertCard('amber','⚠️','Loop diuretic without volume repletion','Worsens dehydration and hypercalcaemia. Use only after saline or if overloaded.'));
+  if(p.hf&&p.sal) al.push(alertCard('amber','⚠️','Heart failure','Use cautious saline (75–100 mL/h) and reassess lungs; consider denosumab or dialysis.'));
+  if(p.ct) al.push(alertCard('sky','ℹ️','Calcitonin tachyphylaxis','Effect fades in ~48 h — it only bridges until bisphosphonate / denosumab acts.'));
+  if(p.deno||p.bis!=='none') al.push(alertCard('sky','ℹ️','Late hypocalcaemia','Check Ca²⁺, phosphate and Mg²⁺ at 3–5 days; vitamin D deficiency raises the risk (especially with denosumab).'));
+  if(p.hd) al.push(alertCard('sky','ℹ️','Dialysis rebound','Use low-calcium dialysate; expect partial rebound — recheck at 2–4 h and 12 h.'));
+  if(p.load>0) al.push(alertCard('amber','⚠️','Calcium is still being released','Treat the source (tumour, supplements) — the curve rises again as the effect fades.'));
+  if(Math.min(...ser)<8.5){ al.push(alertCard('amber','⚠️','Over-correction possible','Indicative Ca²⁺ falls below 8.5. Avoid stacking therapies; recheck often.')); serious=true; }
+  if(!serious) al.unshift(alertCard('emerald','✅','Reasonable Treatment Trajectory','Indicative Ca²⁺ settles near the target range. Confirm with serial levels — don\'t rely on the curve.'));
+  $('chSafety').innerHTML=al.join('');
+
+  $('chOrderTime').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  let o='MEDICAL ORDER: HYPERCALCEMIA — HYDRATE / LOWER / TREAT CAUSE\n';
+  o+='--------------------------------------------------\n';
+  o+='Presenting Ca2+ : '+p.c0.toFixed(1)+' mg/dL (corrected)   Weight: '+p.wt+' kg\n';
+  o+='Renal: '+({normal:'normal',impaired:'AKI/eGFR<30',anuric:'anuric/dialysis'}[p.renal])+'   Severe symptoms/ECG: '+(p.sym?'YES':'no')+'\n';
+  o+='--------------------------------------------------\n';
+  let n=1;
+  if(p.sal&&p.renal!=='anuric') o+=(n++)+'. HYDRATE: 0.9% saline '+(p.hf?'500 mL then 75–100 mL/h; reassess lungs q2–4h.':'1–2 L over 1–2 h, then 150–250 mL/h to urine output 100–150 mL/h.')+' Replace K+ and Mg2+.\n';
+  if(p.ct) o+=(n++)+'. CALCITONIN: '+Math.round(4*p.wt)+' IU (4 IU/kg) SC/IM q12h for up to 48 h.\n';
+  if(p.bis==='zol') o+=(n++)+'. ZOLEDRONIC ACID: '+(p.renal==='normal'?'4 mg':'REDUCED dose per eGFR (avoid if <30)')+' IV over >=15 min after hydration.\n';
+  if(p.bis==='pam') o+=(n++)+'. PAMIDRONATE: 60–90 mg IV over 2–4 h after hydration (not if eGFR <30).\n';
+  if(p.deno) o+=(n++)+'. DENOSUMAB: 120 mg SC; check Ca2+/phosphate/Mg2+ at 3–5 days.\n';
+  if(p.ster) o+=(n++)+'. GLUCOCORTICOID: prednisolone 20–40 mg/day (vitamin D–mediated causes only).\n';
+  if(p.loop&&p.renal!=='anuric') o+=(n++)+'. FUROSEMIDE: 40–80 mg IV for overload only, after volume repletion.\n';
+  if(p.hd) o+=(n++)+'. DIALYSE: haemodialysis, low-Ca dialysate (target start in '+p.hdDelay+' h). Nephrology informed.\n';
+  o+=(n++)+'. CAUSE: stop calcium, vitamin D, thiazides, lithium; send PTH, PTHrP, 1,25-(OH)2D; treat the source.\n';
+  o+='--------------------------------------------------\n';
+  o+='MONITORING PROTOCOL:\n';
+  o+='1. Ca2+ (ionised if possible) at 6 h, 12 h, 24 h, then daily; K+, Mg2+, phosphate, creatinine.\n';
+  o+='2. Fluid balance and lung exam during saline; continuous ECG if QT short / arrhythmia.\n';
+  o+='3. Reassess for hypocalcaemia at day 3–5 after bisphosphonate / denosumab.\n';
+  $('chOrder').textContent=o;
+}
+
+/* ---- CH STEP 6 ---- */
+function renderCh6Intro(){
+  ensureBaseline();
+  const l=state.history[state.history.length-1];
+  $('ch6_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>Ca²⁺ '+l.v+' mg/dL</b> ('+l.label+').<br>Enter hours elapsed, the new level and symptoms. Bisphosphonates take 2–4 days — judge early response by saline and calcitonin.</div>';
+  renderHistoryLog('ch6_log');
+}
+function logChReading(){
+  const hours=parseFloat($('ch6_hours').value), nv=parseFloat($('ch6_new').value), sym=$('ch6_sym').value, out=$('ch6_result');
+  if(isNaN(hours)||hours<=0||isNaN(nv)){ out.innerHTML='<div class="result warn">Enter both hours elapsed and the new corrected Ca²⁺.</div>'; return; }
+  ensureBaseline();
+  const last=state.history[state.history.length-1], delta=+(nv-last.v).toFixed(2);
+  let h;
+  if(nv<8.5) h='<div class="result high">🔴 Ca²⁺ now <b>'+nv+' mg/dL</b> — over-correction / hypocalcaemia.<span class="next-action">NEXT ACTION → Stop calcium-lowering therapy, check ionised Ca²⁺, Mg²⁺ and phosphate; give calcium if symptomatic (esp. after denosumab or dialysis).</span></div>';
+  else if(sym==='severe'||nv>=14||(delta>0&&nv>=12)) h='<div class="result high">🔴 Ca²⁺ '+last.v+' → <b>'+nv+' mg/dL</b>'+(sym==='severe'?', symptoms worse':'')+(delta>0?' and rising':'')+'.<ul><li>Confirm saline is running and urine output is adequate.</li><li>Add or repeat calcitonin; ensure a bisphosphonate / denosumab has been given.</li><li>Escalate to dialysis with low-calcium dialysate if refractory or renal failure.</li><li>Look for an untreated source (tumour, supplements, vitamin D).</li></ul></div>';
+  else if(nv>12) h='<div class="result warn">Ca²⁺ '+last.v+' → '+nv+' mg/dL — improving but still moderate.<span class="next-action">NEXT ACTION → Continue saline; bisphosphonate effect builds over days. Recheck in 12–24 h.</span></div>';
+  else if(nv>10.5) h='<div class="result good">✅ Ca²⁺ '+last.v+' → '+nv+' mg/dL — mildly elevated and falling.<span class="next-action">NEXT ACTION → Continue treating the cause; recheck daily and watch for rebound as calcitonin fades.</span></div>';
+  else h='<div class="result good">✅ Ca²⁺ '+last.v+' → '+nv+' mg/dL — in the usual range.<span class="next-action">NEXT ACTION → Recheck at 24–48 h, keep supplements and thiazides off, and plan definitive treatment (surgery / tumour therapy / repeat bisphosphonate).</span></div>';
+  out.innerHTML=h;
+  state.history.push({v:nv,hours:hours,label:hours+'h after previous check'});
+  $('ch6_hours').value=''; $('ch6_new').value=''; $('ch6_sym').value='none';
+  const l=state.history[state.history.length-1];
+  $('ch6_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>Ca²⁺ '+l.v+' mg/dL</b> ('+l.label+').</div>';
+  renderHistoryLog('ch6_log');
+}
+
+/* ---------------- SUMMARY ---------------- */
+function renderSummary(){
+  const out=$('summaryOut'), ca=state.ca;
+  if(ca==null){ out.innerHTML='<p>No case entered.</p>'; return; }
+  const log=state.history.length>1?'<p><b>Ca²⁺ recheck history:</b></p><ul style="margin:4px 0 0;padding-left:18px">'+state.history.map(h=>'<li>'+h.label+': Ca²⁺ '+h.v+' mg/dL</li>').join('')+'</ul>':'';
+  let h='<p><b>Presenting corrected Ca²⁺:</b> '+ca+' mg/dL</p>';
+  if(ca<8.5){
+    const l=state.lo;
+    h+='<p><b>Risk:</b> '+(l.urgent?'High-risk — '+l.triggers.join('; '):'No high-risk features')+'; ECG: '+l.ecg+'</p>'+
+      '<p><b>Concurrent:</b> hypomagnesaemia '+(l.hypoMg?'Yes':'No')+', hyperphosphataemia '+(l.hiPhos?'Yes':'No')+', renal impairment '+(l.renalImpaired?'Yes':'No')+'</p>'+
+      '<p><b>Mechanism:</b> '+(l.mech||'—')+'</p>'+
+      '<p><b>Estimated need:</b> '+(l.defLow!=null?Math.round(l.defLow)+'–'+Math.round(l.defHigh)+' mg elemental Ca to '+l.target+' mg/dL':'—')+' — route: '+(l.route?{oral:'oral',bolus:'IV bolus + infusion',iv:'IV infusion'}[l.route]:'—')+'</p>';
+  } else if(ca>10.5){
+    const x=state.hi;
+    h+='<p><b>Classification:</b> '+(x.emergency?'Emergency':x.urgent?'Moderate / symptomatic':'Mild')+' — symptoms '+x.sym+', ECG '+x.ecg+', renal '+x.renal+'</p>'+
+      '<p><b>Mechanism:</b> '+(x.mechLabel||'—')+'</p>'+
+      '<p><b>Volume:</b> '+(x.vol||'—')+' — dialysis indicated: '+(x.dialysis?'Yes':'No')+'</p>';
+  } else h+='<p>Within the usual range — no correction indicated.</p>';
+  out.innerHTML=h+log;
+}
+
+(function(){
+  const q=new URLSearchParams(location.search);
+  if(q.get('embed')) document.body.classList.add('embed');
+  const v=parseFloat(q.get('ca'));
+  if(!isNaN(v)){
+    $('s1_ca').value=v; onStep1Input();
+    const o=getPageOrder(); showPageById(o[Math.min(2,o.length-1)]);
+  } else showPageById('p-intro');
+})();
+</script>
+</body>
+</html>
