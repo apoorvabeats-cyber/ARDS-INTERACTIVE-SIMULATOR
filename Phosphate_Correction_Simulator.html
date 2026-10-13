@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Electrolyte Management — Phosphate (DRAFT)</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  tailwind.config = { corePlugins: { preflight: false } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#eef4f7; --bg2:#e1ecf1; --line:#c3d5de; --ink:#2b4756; --ink-dim:#5d7986;
+    --title:#0b2230; --accent:#1f6d8a; --accent-dark:#1f6d8a; --nav-prev:#d3e2e9;
+    --card:#ffffff; --card-ink:#122733;
+    --high:#c0392b; --high-bg:#fdecea;
+    --low:#1f6d8a; --low-bg:#e9f4f8;
+    --warn:#a06f00; --warn-bg:#fdf6e3;
+    --good:#1e7d4f; --good-bg:#e8f6ee;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0b1a20; --bg2:#0f2530; --line:#2e4d5c; --ink:#bcd4dc; --ink-dim:#7fa0ac;
+      --title:#ffffff; --accent:#3fa9c9; --nav-prev:#1c3844;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b1a20; --bg2:#0f2530; --line:#2e4d5c; --ink:#bcd4dc; --ink-dim:#7fa0ac;
+    --title:#ffffff; --accent:#3fa9c9; --nav-prev:#1c3844;
+  }
+  *{box-sizing:border-box}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--ink);min-height:100%;
+  }
+  .draft-banner{
+    background:#5a1a1a;color:#ffd9d0;text-align:center;font-size:12px;font-weight:700;
+    letter-spacing:.3px;padding:7px 10px;
+  }
+  header{padding:18px 16px 14px;text-align:center;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--bg2),var(--bg))}
+  header h1{margin:0 0 3px;font-size:19px;color:var(--title)}
+  header p{margin:0;font-size:12.5px;color:var(--ink-dim)}
+  .wrap{max-width:640px;margin:0 auto;padding:16px 16px 110px}
+
+  .phase{display:none}
+  .phase.active{display:block}
+
+  .step-tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--accent);margin-bottom:4px}
+  .step-title{color:var(--title);font-size:20px;margin:0 0 14px}
+
+  .card{background:var(--card);color:var(--card-ink);border-radius:12px;padding:16px;margin-bottom:12px;border-left:4px solid var(--accent-dark);border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .card h3{margin:0 0 10px;font-size:14px;color:var(--accent-dark)}
+  .card p{margin:0 0 8px;font-size:14px;line-height:1.55}
+  .card p:last-child{margin-bottom:0}
+  .muted{color:#5a6d75;font-size:12.5px}
+
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:#5a6d75;margin-bottom:4px}
+  .field input,.field select{
+    width:100%;padding:10px;border:1px solid #cfd9dd;border-radius:8px;font-size:15px;
+    background:#fbfdfe;color:var(--card-ink);
+  }
+  .field-row{display:flex;gap:10px}
+  .field-row .field{flex:1;min-width:0}
+
+  .btn{
+    display:block;width:100%;background:var(--accent-dark);color:#fff;border:none;border-radius:9px;
+    padding:12px;font-size:14px;font-weight:600;margin-bottom:8px;cursor:pointer;text-align:center;
+  }
+  .btn:active{background:#164f65}
+  .btn.choice{background:#fbfdfe;color:var(--card-ink);border:1.5px solid #cfd9dd}
+  .btn.choice.correct{background:var(--good-bg);border-color:var(--good);color:var(--good)}
+  .btn.choice.incorrect{background:var(--high-bg);border-color:var(--high);color:var(--high)}
+  .btn.choice.picked{background:var(--low-bg);border-color:var(--low);color:var(--low)}
+  .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  .choice-grid.one{grid-template-columns:1fr}
+
+  .result{border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.55;margin-top:8px}
+  .result.high{background:var(--high-bg);color:var(--high)}
+  .result.warn{background:var(--warn-bg);color:var(--warn)}
+  .result.good{background:var(--good-bg);color:var(--good)}
+  .result.info{background:var(--low-bg);color:var(--low)}
+  .result b{font-weight:700}
+  .result ul{margin:6px 0 0;padding-left:18px}
+  .next-action{font-weight:700;margin-top:6px;display:block}
+
+  .checkbox-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13.5px;color:var(--card-ink)}
+  .checkbox-row input{width:auto}
+  .checkbox-row label{margin:0;font-size:13.5px;color:var(--card-ink)}
+
+  table.mini{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+  table.mini th{color:#5a6d75;text-align:left;font-weight:600;padding:3px 4px 3px 0}
+  table.mini td{padding:3px 4px 3px 0;border-top:1px solid rgba(0,0,0,.08)}
+
+  .nav-bar{
+    position:fixed;left:0;right:0;bottom:0;background:var(--bg2);border-top:1px solid var(--line);
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));
+    display:flex;gap:10px;max-width:640px;margin:0 auto;z-index:20;
+  }
+  .nav-bar button{
+    flex:1;padding:12px;border-radius:9px;border:none;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .nav-prev{background:var(--nav-prev);color:var(--ink)}
+  .nav-next{background:var(--accent-dark);color:#fff}
+  .nav-bar button:disabled{opacity:.4}
+
+  .hidden{display:none}
+  .tag-lo{color:#1f6d8a}
+  .tag-hi{color:#c0392b}
+  body.embed .draft-banner, body.embed header{display:none}
+  body.embed .wrap{padding-top:10px}
+</style>
+</head>
+<body>
+
+<div class="draft-banner">⚠ DRAFT — decision-support aid for review; verify doses against local protocol</div>
+
+<header>
+  <h1>Electrolyte Management — Phosphate</h1>
+  <p>Step-by-step case-driven algorithm (draft)</p>
+</header>
+
+<div class="wrap">
+
+  <!-- INTRO -->
+  <div class="phase active" id="p-intro">
+    <div class="step-tag">ELECTROLYTE CASE SIMULATOR</div>
+    <h2 class="step-title">Serum Phosphate</h2>
+    <div class="card">
+      <p>This is a dynamic, case-driven walkthrough. Enter the serum phosphate on the next page — the simulator will determine whether this is hypophosphataemia or hyperphosphataemia and route the case accordingly.</p>
+      <p>Tap <b>NEXT</b> below to begin.</p>
+    </div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="phase" id="p-step1">
+    <div class="step-tag">STEP 1</div>
+    <h2 class="step-title">Enter Phosphate Level</h2>
+    <div class="card">
+      <div class="field">
+        <label>Serum phosphate (mg/dL) — normal 2.5–4.5 (1 mg/dL = 0.32 mmol/L)</label>
+        <input type="number" id="s1_ph" step="0.1" placeholder="e.g. 0.8 or 9.5" oninput="onStep1Input()">
+      </div>
+      <div id="s1_result"></div>
+    </div>
+  </div>
+
+  <!-- ================= HYPOPHOSPHATAEMIA PATH ================= -->
+
+  <!-- PL STEP 2 -->
+  <div class="phase" id="p-pl2">
+    <div class="step-tag tag-lo">STEP 2 · HYPOPHOSPHATAEMIA</div>
+    <h2 class="step-title">Urgency &amp; Risk Assessment</h2>
+    <div class="card">
+      <p class="muted">Phosphate runs ATP, so severe deficiency weakens the diaphragm and heart. Decide between oral and IV replacement, and which phosphate salt is safe for this patient's potassium.</p>
+      <div class="field">
+        <label>Muscle / CNS / blood features</label>
+        <select id="pl_sev" onchange="onPl2Input()">
+          <option value="none">None</option>
+          <option value="mild">Weakness, malaise, paraesthesia</option>
+          <option value="severe">Respiratory weakness / failure to wean, rhabdomyolysis, haemolysis, encephalopathy or seizure</option>
+        </select>
+      </div>
+      <div class="checkbox-row"><input type="checkbox" id="pl_card" onchange="onPl2Input()"> <label for="pl_card">Arrhythmia, heart failure or hypotension</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="pl_refeed" onchange="onPl2Input()"> <label for="pl_refeed">Refeeding risk: malnutrition, alcohol use, prolonged NPO or nutrition just started</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="pl_gut" checked onchange="onPl2Input()"> <label for="pl_gut">Gut usable (tolerating oral / enteral intake)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="pl_hypoca" onchange="onPl2Input()"> <label for="pl_hypoca">Hypocalcaemia present</label></div>
+      <div class="field-row" style="margin-top:6px">
+        <div class="field">
+          <label>Potassium status</label>
+          <select id="pl_k" onchange="onPl2Input()">
+            <option value="normal">Normal</option>
+            <option value="low">Low (&lt;3.5)</option>
+            <option value="high">High (&gt;5.0) or oliguric AKI</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Renal function</label>
+          <select id="pl_renal" onchange="onPl2Input()">
+            <option value="normal">Normal / mild ↓</option>
+            <option value="impaired">eGFR &lt;30 / AKI</option>
+          </select>
+        </div>
+      </div>
+      <div id="pl2_result"></div>
+    </div>
+  </div>
+
+  <!-- PL STEP 3 -->
+  <div class="phase" id="p-pl3">
+    <div class="step-tag tag-lo">STEP 3 · HYPOPHOSPHATAEMIA</div>
+    <h2 class="step-title">Determine the Mechanism</h2>
+    <div class="card">
+      <p class="muted">Fractional excretion of phosphate (FEPO₄) separates renal wasting from shift or low intake. A kidney responding to deficiency conserves phosphate (FEPO₄ &lt;5%). Take the sample before large phosphate doses.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Urine phosphate (mg/dL)</label>
+          <input type="number" step="0.1" id="pl_uph" placeholder="e.g. 5" oninput="onPl3Input()">
+        </div>
+        <div class="field">
+          <label>Urine creatinine (mg/dL)</label>
+          <input type="number" step="1" id="pl_ucr" placeholder="e.g. 90" oninput="onPl3Input()">
+        </div>
+      </div>
+      <div class="field">
+        <label>Serum creatinine (mg/dL)</label>
+        <input type="number" step="0.1" id="pl_scr" placeholder="e.g. 0.9" oninput="onPl3Input()">
+      </div>
+      <p class="muted" style="margin-bottom:6px">History (tick all that apply):</p>
+      <div class="checkbox-row"><input type="checkbox" id="pl_h_shift" onchange="onPl3Input()"> <label for="pl_h_shift">Refeeding, insulin / DKA treatment, respiratory alkalosis or rapid cell growth (leukaemia)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="pl_h_intake" onchange="onPl3Input()"> <label for="pl_h_intake">Alcohol use, malnutrition or prolonged NPO</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="pl_h_bind" onchange="onPl3Input()"> <label for="pl_h_bind">Aluminium / magnesium antacids or phosphate binders</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="pl_h_mal" onchange="onPl3Input()"> <label for="pl_h_mal">Malabsorption or vitamin D deficiency</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="pl_h_diur" onchange="onPl3Input()"> <label for="pl_h_diur">Acetazolamide, loop diuretic or osmotic diuresis</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="pl_h_renal" onchange="onPl3Input()"> <label for="pl_h_renal">Hyperparathyroidism, post-transplant, tenofovir, ifosfamide or IV iron</label></div>
+      <div id="pl3_result"></div>
+      <p class="muted" style="margin-top:10px;font-size:11.5px">
+        <b>A. Shift into cells</b> — refeeding (the key ICU cause), insulin, respiratory alkalosis, hungry bone<br>
+        <b>B. Low intake / absorption</b> — alcohol, malnutrition, binders, vitamin D deficiency, malabsorption<br>
+        <b>C. Renal loss</b> — hyperparathyroidism, proximal tubulopathy, osmotic diuresis, drugs
+      </p>
+    </div>
+  </div>
+
+  <!-- PL STEP 4 -->
+  <div class="phase" id="p-pl4">
+    <div class="step-tag tag-lo">STEP 4 · HYPOPHOSPHATAEMIA</div>
+    <h2 class="step-title">Calculate Replacement</h2>
+    <div class="card">
+      <div class="field-row">
+        <div class="field">
+          <label>Current phosphate (mg/dL)</label>
+          <input type="number" step="0.1" id="pl4_p" oninput="onPl4Input()">
+        </div>
+        <div class="field">
+          <label>Target phosphate (mg/dL)</label>
+          <input type="number" step="0.1" id="pl4_target" value="2.5" oninput="onPl4Input()">
+        </div>
+      </div>
+      <div class="field">
+        <label>Weight (kg)</label>
+        <input type="number" id="pl4_wt" value="70" oninput="onPl4Input()">
+      </div>
+      <p class="muted" style="margin-top:-4px">Aim for the low-normal range (2.5–3.0). Overshooting risks hyperphosphataemia and calcium–phosphate precipitation.</p>
+      <div id="pl4_result"></div>
+      <div id="pl4_routeWrap" class="hidden">
+        <p style="font-size:13px;color:#5a6d75;margin:10px 0 6px">Select route of replacement:</p>
+        <div class="choice-grid one">
+          <button class="btn choice" data-route="oral" onclick="choosePlRoute('oral',this)">Oral / enteral phosphate</button>
+          <button class="btn choice" data-route="iv" onclick="choosePlRoute('iv',this)">IV sodium / potassium phosphate</button>
+        </div>
+        <div id="pl4_routeResult"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PL DASHBOARD -->
+  <div class="phase" id="p-pldash">
+    <div class="step-tag tag-lo">QUICK DASHBOARD</div>
+    <h2 class="step-title">Hypophosphatemia Clinical Engine</h2>
+    <div id="plRoot" class="text-slate-800" style="background:#f8fafc;border-radius:14px;padding:14px;margin:0 -2px">
+
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <p class="text-xs text-slate-500 font-medium">Phosphate Deficit Planner • Oral / IV Phosphate Replacement Simulator</p>
+        <div class="flex items-center gap-2">
+          <button onclick="openModal('plGuide')" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200">📖 Clinical Protocols</button>
+          <button onclick="resetPlDefaults()" class="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200">🔄 Reset</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+        <section class="lg:col-span-5 space-y-5">
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">1</span>
+                Serum Phosphate &amp; Target
+              </h2>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <div class="flex justify-between items-center mb-1.5">
+                  <label class="text-xs font-bold text-slate-700">Current Serum Phosphate</label>
+                  <div class="flex items-center gap-1 bg-sky-50 border border-sky-200 rounded-lg px-2 py-0.5">
+                    <input type="number" step="0.1" id="plPNum" min="0.3" max="2.4" value="0.8" class="w-12 text-sm font-black text-sky-700 bg-transparent text-right focus:outline-none">
+                    <span class="text-xs font-bold text-sky-800">mg/dL</span>
+                  </div>
+                </div>
+                <input type="range" id="plPSlider" min="0.3" max="2.4" step="0.1" value="0.8" class="mt-1 w-full accent-sky-600 cursor-pointer">
+                <div class="flex justify-between text-[10px] text-slate-400 font-semibold mt-1">
+                  <span>0.3 (Critical)</span><span>1.0 (Severe)</span><span>2.4 (Mild)</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Target (mg/dL)</label>
+                  <input type="number" step="0.1" id="plTarget" value="2.5" min="2.0" max="4.0" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Weight (kg)</label>
+                  <input type="number" id="plWt" value="70" min="5" max="250" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                </div>
+                <div class="col-span-2">
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Renal function</label>
+                  <select id="plRenal" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="normal">Normal / mild ↓</option>
+                    <option value="impaired">eGFR &lt;30 / AKI (doses ×0.5)</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Quick Target Presets:</span>
+                <div class="grid grid-cols-3 gap-1.5">
+                  <button onclick="setPlTarget(2.0)" class="py-1 px-2 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200">2.0</button>
+                  <button onclick="setPlTarget(2.5)" class="py-1 px-2 text-[11px] font-bold bg-sky-100 hover:bg-sky-200 text-sky-800 rounded border border-sky-200">2.5</button>
+                  <button onclick="setPlTarget(3.0)" class="py-1 px-2 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200">3.0</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">2</span>
+                Route, Salt &amp; Ongoing Shift
+              </h2>
+            </div>
+            <div class="space-y-4">
+              <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button id="plBtnOral" onclick="setPlRoute('oral')" class="py-2 px-1 text-[11px] font-bold rounded-lg">💊 Oral</button>
+                <button id="plBtnIv" onclick="setPlRoute('iv')" class="py-2 px-1 text-[11px] font-bold rounded-lg">💉 IV Phosphate</button>
+              </div>
+              <div id="plSaltWrap">
+                <label class="block text-xs font-bold text-slate-700 mb-1">IV phosphate salt</label>
+                <select id="plSalt" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                  <option value="na">Sodium phosphate (3 mmol P + 4 mEq Na per mL)</option>
+                  <option value="k">Potassium phosphate (3 mmol P + 4.4 mEq K per mL)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1" id="plConcLabel">Product</label>
+                <select id="plConc" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2.5"></select>
+                <p class="text-[10px] text-slate-400 mt-1" id="plConcNote"></p>
+              </div>
+              <div id="plIvWrap">
+                <div class="flex justify-between mb-1">
+                  <label class="text-xs font-bold text-slate-700">Infusion rate (mmol phosphate/h)</label>
+                  <span id="plRateDisp" class="text-xs font-bold text-sky-700">5</span>
+                </div>
+                <input type="range" id="plRate" min="1" max="10" step="0.5" value="5" class="w-full accent-sky-600 cursor-pointer">
+              </div>
+              <div id="plOralWrap" class="hidden">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Doses per day</label>
+                <select id="plFreq" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                  <option value="2">2 (q12h)</option>
+                  <option value="3" selected>3 (q8h)</option>
+                  <option value="4">4 (q6h)</option>
+                </select>
+              </div>
+              <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Ongoing uptake / loss (mmol phosphate/h) — optional</label>
+                <input type="number" step="0.5" min="0" id="plLoss" value="0" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                <p class="text-[10px] text-slate-500 mt-1 leading-tight">Refeeding shift, CRRT effluent, urinary wasting. Subtracted from net delivery.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lg:col-span-7 space-y-5">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Phosphate to Target</span>
+              <div class="mt-2"><span id="outPlDef" class="text-lg font-black text-sky-700 tracking-tight">30–60</span><span class="text-xs font-bold text-sky-600 ml-0.5">mmol</span></div>
+              <p class="text-[10px] text-slate-400 mt-1">Estimated range</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Plan Replacement</span>
+              <div class="mt-2"><span id="outPlPlan" class="text-xl font-black text-slate-900 tracking-tight">30</span><span class="text-xs font-bold text-slate-500 ml-0.5">mmol</span></div>
+              <p id="outPlPlanSub" class="text-[10px] text-slate-400 mt-1">Low end, then recheck</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Max Safe Rate</span>
+              <div class="mt-2"><span id="outPlCap" class="text-xl font-black text-slate-900 tracking-tight">7.5</span><span class="text-xs font-bold text-slate-500 ml-0.5" id="outPlCapUnit">mmol/h</span></div>
+              <p class="text-[10px] text-slate-400 mt-1" id="outPlCapSub">IV infusion</p>
+            </div>
+            <div class="bg-white border-2 border-sky-300 bg-sky-50/40 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-sky-900 uppercase tracking-wider">Prescribed</span>
+              <div class="mt-1"><span id="outPlPresc" class="text-2xl font-black text-sky-700 tracking-tight">83</span><span id="outPlPrescUnit" class="text-xs font-bold text-sky-800 ml-0.5">mL/hr</span></div>
+              <p id="outPlPrescSub" class="text-[10px] font-bold text-sky-800 mt-0.5">5 mmol/h</p>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📈 24-Hour Estimated Serum Phosphate Band</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Upper vs lower estimate. Real response varies with refeeding shift and renal loss — recheck phosphate, don't extrapolate.</p>
+              <div class="flex flex-wrap items-center gap-3 text-[10px] font-bold mt-1.5">
+                <span class="flex items-center gap-1 text-sky-700"><span class="w-2.5 h-2.5 rounded-full bg-sky-600 inline-block"></span> Upper estimate</span>
+                <span class="flex items-center gap-1 text-slate-600"><span class="w-2.5 h-2.5 rounded-full bg-slate-500 inline-block"></span> Lower estimate</span>
+                <span class="flex items-center gap-1 text-rose-600"><span class="w-2.5 h-0.5 bg-rose-600 inline-block"></span> 4.5 ceiling</span>
+              </div>
+            </div>
+            <div class="h-60 w-full relative"><canvas id="plChart"></canvas></div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider mb-3">🗂️ Predictive Timeline Breakdown</h2>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                    <th class="p-2.5">Time</th><th class="p-2.5">Est. phosphate range</th><th class="p-2.5">Net given</th><th class="p-2.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="plTbody" class="text-xs font-medium text-slate-700 divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📝 Clinical Prescription &amp; Action Plan</h2>
+              <button onclick="copyText('plOrder','plCopyTxt')" class="px-2.5 py-1 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md border border-slate-200">📋 <span id="plCopyTxt">Copy Order</span></button>
+            </div>
+            <div id="plSafety" class="mb-4"></div>
+            <div class="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-xs leading-relaxed border border-slate-800">
+              <div class="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-2 mb-2 text-[10px] uppercase font-bold tracking-wider">
+                <span>🩺 Medical Order draft</span><span id="plOrderTime">Updated Live</span>
+              </div>
+              <pre id="plOrder" class="whitespace-pre-wrap font-mono text-xs text-emerald-400"></pre>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="plGuide" class="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+        <div class="p-5 border-b border-slate-200 flex justify-between items-center sticky top-0 bg-white z-10">
+          <h3 class="text-base font-extrabold text-slate-900">📖 Hypophosphatemia Protocols &amp; References</h3>
+          <button onclick="closeModal('plGuide')" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600">✕</button>
+        </div>
+        <div class="p-6 space-y-5 text-xs text-slate-700 leading-relaxed">
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">1. Replacement Safety Limits</h4>
+            <ul class="list-disc list-inside space-y-1 font-semibold text-slate-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+              <li><strong>IV phosphate:</strong> 0.25–0.5 mmol/kg over 6–12 h for severe (&lt;1.0 mg/dL) or symptomatic cases; lower doses (≈0.16–0.25 mmol/kg) for moderate IV replacement.</li>
+              <li><strong>Rate:</strong> ≤7.5 mmol phosphate/h (≈1 mmol P = 31 mg elemental P). Dilute in 250–500 mL 0.9% saline or D5W; never give undiluted or as a bolus.</li>
+              <li><strong>Salt choice:</strong> potassium phosphate if K⁺ is low (1.5 mmol K⁺ per mmol P; keep K⁺ ≤10 mmol/h); sodium phosphate if K⁺ is normal-high or in AKI.</li>
+              <li><strong>eGFR &lt;30 / AKI:</strong> halve the dose and recheck sooner — hyperphosphataemia risk.</li>
+              <li>Risks of overshoot: hypocalcaemia, calcium–phosphate precipitation, hypotension, hyperkalaemia (K salt).</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">2. Estimate Used Here</h4>
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1 font-mono text-[11px]">
+              <div>1 mmol phosphate = 31 mg elemental P; 1 mg/dL = 0.32 mmol/L</div>
+              <div>Serum rise ≈ 2–4 mg/dL per mmol/kg delivered</div>
+              <div>FEPO₄ = (UPO₄ × SCr) / (PPO₄ × UCr) × 100</div>
+            </div>
+            <p class="mt-2">Approximations only. Replace in aliquots and recheck rather than giving the whole estimate blindly.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">3. Oral Replacement</h4>
+            <p>Elemental phosphate about 1–2 g/day in divided doses (e.g. tablets of 250 mg ≈ 8 mmol). Diarrhoea is dose-limiting. Suited to mild or moderate cases with a working gut.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">4. Refeeding Syndrome</h4>
+            <p>In at-risk patients check phosphate, K⁺ and Mg²⁺ before feeding, give thiamine 100–300 mg IV first, start nutrition slowly, supplement electrolytes, and recheck every 12–24 h for the first 3 days.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">5. Monitoring</h4>
+            <ul class="list-disc list-inside space-y-1 text-slate-600">
+              <li>Phosphate every 6 h during IV replacement; calcium, K⁺ and Mg²⁺ every 6–12 h.</li>
+              <li>ECG monitoring with potassium phosphate or any arrhythmia.</li>
+              <li>Phosphate commonly falls again as feeding continues — keep monitoring after correction.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+          <button onclick="closeModal('plGuide')" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold">Close Guide</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PL STEP 5 -->
+  <div class="phase" id="p-pl5">
+    <div class="step-tag tag-lo">STEP 5 · HYPOPHOSPHATAEMIA</div>
+    <h2 class="step-title">Dynamic Reassessment</h2>
+    <div class="card">
+      <div id="pl5_intro"></div>
+      <div class="field-row">
+        <div class="field">
+          <label>Hours since last check</label>
+          <input type="number" step="0.5" id="pl5_hours" placeholder="e.g. 6 or 12">
+        </div>
+        <div class="field">
+          <label>New phosphate (mg/dL)</label>
+          <input type="number" step="0.1" id="pl5_new" placeholder="e.g. 1.6">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Calcium now (mg/dL) — optional</label>
+          <input type="number" step="0.1" id="pl5_ca" placeholder="e.g. 8.6">
+        </div>
+        <div class="field">
+          <label>Symptoms</label>
+          <select id="pl5_sym">
+            <option value="none">None / improving</option>
+            <option value="mild">Weakness persists</option>
+            <option value="severe">Worse — respiratory or cardiac</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn" onclick="logPlReading()">Log this reading</button>
+      <div id="pl5_result"></div>
+      <div id="pl5_log"></div>
+    </div>
+  </div>
+
+  <!-- ================= HYPERPHOSPHATAEMIA PATH ================= -->
+
+  <!-- PH STEP 2 -->
+  <div class="phase" id="p-ph2">
+    <div class="step-tag tag-hi">STEP 2 · HYPERPHOSPHATAEMIA</div>
+    <h2 class="step-title">Severity &amp; Clinical Risk</h2>
+    <div class="card">
+      <p class="muted">High phosphate harms through low calcium (tetany, seizures, arrhythmia), calcium–phosphate precipitation and kidney injury. Calcium and renal function decide urgency more than the number.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Calcium (mg/dL) — optional</label>
+          <input type="number" step="0.1" id="ph_ca" placeholder="e.g. 7.4" oninput="onPh2Input()">
+        </div>
+        <div class="field">
+          <label>Hypocalcaemia symptoms</label>
+          <select id="ph_sym" onchange="onPh2Input()">
+            <option value="none">None</option>
+            <option value="mild">Paraesthesia, cramps, Chvostek sign</option>
+            <option value="severe">Tetany, seizure, prolonged QT or arrhythmia</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Renal function</label>
+        <select id="ph_renal" onchange="onPh2Input()">
+          <option value="normal">Normal / mildly reduced</option>
+          <option value="ckd">CKD (stable)</option>
+          <option value="aki">AKI or eGFR &lt;30, still passing urine</option>
+          <option value="anuric">Oliguric / anuric / dialysis-dependent</option>
+        </select>
+      </div>
+      <div class="checkbox-row"><input type="checkbox" id="ph_acute" onchange="onPh2Input()"> <label for="ph_acute">Acute phosphate load: tumour lysis, rhabdomyolysis, haemolysis, phosphate enema / bowel prep</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ph_hyperk" onchange="onPh2Input()"> <label for="ph_hyperk">Hyperkalaemia present (K⁺ &gt;5.5)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ph_pseudo" onchange="onPh2Input()"> <label for="ph_pseudo">Possible pseudohyperphosphataemia (paraprotein, lipaemia, haemolysed or high-bilirubin sample)</label></div>
+      <div id="ph2_result"></div>
+    </div>
+  </div>
+
+  <!-- PH STEP 3 -->
+  <div class="phase" id="p-ph3">
+    <div class="step-tag tag-hi">STEP 3 · HYPERPHOSPHATAEMIA</div>
+    <h2 class="step-title">Determine the Mechanism</h2>
+    <div class="card">
+      <p class="muted">Reduced kidney excretion is the commonest cause. Acute loads and hypoparathyroidism are the others. Send PTH before treating.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>eGFR (mL/min/1.73 m²)</label>
+          <select id="ph_egfr" onchange="onPh3Input()">
+            <option value="">— select —</option>
+            <option value="normal">≥60</option>
+            <option value="mid">30–59</option>
+            <option value="low">&lt;30 / dialysis</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Intact PTH (pg/mL) — optional</label>
+          <input type="number" step="1" id="ph_pth" placeholder="e.g. 8" oninput="onPh3Input()">
+        </div>
+      </div>
+      <p class="muted" style="margin-bottom:6px">History (tick all that apply):</p>
+      <div class="checkbox-row"><input type="checkbox" id="ph_h_tls" onchange="onPh3Input()"> <label for="ph_h_tls">Tumour lysis syndrome or recent chemotherapy</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ph_h_rhab" onchange="onPh3Input()"> <label for="ph_h_rhab">Rhabdomyolysis or haemolysis</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ph_h_enema" onchange="onPh3Input()"> <label for="ph_h_enema">Phosphate enema, phosphate bowel prep or phosphate supplements</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ph_h_acid" onchange="onPh3Input()"> <label for="ph_h_acid">Lactic acidosis or ketoacidosis</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="ph_h_vit" onchange="onPh3Input()"> <label for="ph_h_vit">Vitamin D excess or neck surgery (hypoparathyroidism)</label></div>
+      <div id="ph3_result"></div>
+    </div>
+  </div>
+
+  <!-- PH STEP 4 -->
+  <div class="phase" id="p-ph4">
+    <div class="step-tag tag-hi">STEP 4 · HYPERPHOSPHATAEMIA</div>
+    <h2 class="step-title">Volume Expansion &amp; First Step</h2>
+    <div class="card">
+      <div id="ph4_status"></div>
+      <p style="font-size:13px;color:#5a6d75;margin:12px 0 6px">In acute severe hyperphosphataemia (e.g. tumour lysis) with urine still flowing, which comes <b>first</b>?</p>
+      <div class="choice-grid">
+        <button class="btn choice" onclick="choosePhAgent('sal',this)">IV 0.9% saline</button>
+        <button class="btn choice" onclick="choosePhAgent('ca',this)">IV calcium</button>
+        <button class="btn choice" onclick="choosePhAgent('bind',this)">Phosphate binder</button>
+        <button class="btn choice" onclick="choosePhAgent('hd',this)">Haemodialysis</button>
+        <button class="btn choice" onclick="choosePhAgent('ins',this)">Insulin + dextrose</button>
+        <button class="btn choice" onclick="choosePhAgent('lasix',this)">Furosemide alone</button>
+      </div>
+      <div id="ph4_agentResult"></div>
+      <div class="field" style="margin-top:12px">
+        <label>Volume status</label>
+        <select id="ph_vol" onchange="onPh4Input()">
+          <option value="">— select —</option>
+          <option value="hypo">Hypovolaemic</option>
+          <option value="eu">Euvolaemic</option>
+          <option value="hyper">Hypervolaemic / heart failure</option>
+        </select>
+      </div>
+      <div id="ph4_fluid"></div>
+    </div>
+  </div>
+
+  <!-- PH STEP 5 -->
+  <div class="phase" id="p-ph5">
+    <div class="step-tag tag-hi">STEP 5 · HYPERPHOSPHATAEMIA</div>
+    <h2 class="step-title">Lower Phosphate &amp; Treat the Cause</h2>
+    <div class="card">
+      <p class="muted">Binders and diet act on intake and work over days. Rapid lowering needs the kidney (saline) or dialysis. Never chase low calcium with large IV doses while phosphate is high.</p>
+      <div class="field">
+        <label>Setting</label>
+        <select id="ph_set" onchange="onPh5Input()">
+          <option value="">— select —</option>
+          <option value="acute">Acute (TLS, rhabdomyolysis, AKI)</option>
+          <option value="chronic">Chronic (CKD / dialysis)</option>
+        </select>
+      </div>
+      <div id="ph5_result"></div>
+    </div>
+  </div>
+
+  <!-- PH DASHBOARD -->
+  <div class="phase" id="p-phdash">
+    <div class="step-tag tag-hi">QUICK DASHBOARD</div>
+    <h2 class="step-title">Hyperphosphatemia Clinical Engine</h2>
+    <div id="phRoot" class="text-slate-800" style="background:#f8fafc;border-radius:14px;padding:14px;margin:0 -2px">
+
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <p class="text-xs text-slate-500 font-medium">Expand • Bind • Dialyse — Indicative Phosphate Timeline &amp; Order Builder</p>
+        <div class="flex items-center gap-2">
+          <button onclick="openModal('phGuide')" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200">📖 Clinical Protocols</button>
+          <button onclick="resetPhDefaults()" class="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200">🔄 Reset</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+        <section class="lg:col-span-5 space-y-5">
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">1</span>
+                Patient Phosphate &amp; Physiology
+              </h2>
+              <span id="phSevTag" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">Severe</span>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <div class="flex justify-between items-center mb-1.5">
+                  <label class="text-xs font-bold text-slate-700">Current Serum Phosphate</label>
+                  <div class="flex items-center gap-1 bg-rose-50 border border-rose-200 rounded-lg px-2 py-0.5">
+                    <input type="number" step="0.1" id="phPNum" min="4.6" max="20" value="10.0" class="w-12 text-sm font-black text-rose-600 bg-transparent text-right focus:outline-none">
+                    <span class="text-xs font-bold text-rose-700">mg/dL</span>
+                  </div>
+                </div>
+                <input type="range" id="phPSlider" min="4.6" max="20" step="0.1" value="10" class="mt-1 w-full accent-rose-600 cursor-pointer">
+                <div class="flex justify-between text-[10px] text-slate-400 font-semibold mt-1">
+                  <span>4.6 (Mild)</span><span>6 (Moderate)</span><span>10+ (Severe)</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Calcium (mg/dL)</label>
+                  <input type="number" step="0.1" id="phCa" value="8.0" min="4" max="14" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Renal function</label>
+                  <select id="phRenal" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="normal">Normal / CKD, urine OK</option>
+                    <option value="impaired">AKI / eGFR &lt;30</option>
+                    <option value="anuric">Anuric / dialysis</option>
+                  </select>
+                </div>
+                <div class="col-span-2">
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Ongoing phosphate release</label>
+                  <select id="phLoad" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="0">None / source removed</option>
+                    <option value="0.1">Moderate (+0.1 mg/dL/h)</option>
+                    <option value="0.3">Brisk, tumour lysis (+0.3/h)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="checkbox-row" style="margin-bottom:0">
+                <input type="checkbox" id="phSym" class="w-4 h-4"> <label for="phSym" class="text-xs font-bold text-slate-700">Symptomatic hypocalcaemia (tetany, seizure, QT)</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <div class="border-b border-slate-100 pb-3 mb-4">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] flex items-center justify-center font-bold">2</span>
+                Therapies to Model
+              </h2>
+            </div>
+            <div class="space-y-2.5 text-xs">
+              <label class="flex items-start gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer"><input type="checkbox" id="phSaline" class="mt-0.5" checked> <span><b>IV 0.9% saline</b> — roughly doubles renal phosphate clearance; needs urine output</span></label>
+              <label class="flex items-start gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer"><input type="checkbox" id="phBinder" class="mt-0.5"> <span><b>Phosphate binder + diet</b> — cuts gut absorption; modest effect over 1–2 days</span></label>
+              <div class="p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Dialysis</label>
+                <select id="phDial" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                  <option value="none">None</option>
+                  <option value="hd">Haemodialysis (≈ 4 h, fast, partial rebound)</option>
+                  <option value="crrt">CRRT (continuous, steady)</option>
+                </select>
+                <div class="mt-2">
+                  <label class="block text-[10px] font-bold text-slate-600 mb-1">Time until dialysis starts</label>
+                  <select id="phDelay" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2">
+                    <option value="0">Immediately</option>
+                    <option value="2" selected>In 2 h</option>
+                    <option value="6">In 6 h</option>
+                    <option value="12">In 12 h</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lg:col-span-7 space-y-5">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">0.9% Saline</span>
+              <div class="mt-2"><span id="outPhFluid" class="text-lg font-black text-slate-900 tracking-tight">150–250</span><span class="text-xs font-bold text-slate-500 ml-0.5">mL/h</span></div>
+              <p id="outPhFluidSub" class="text-[10px] text-slate-400 mt-1">After a 1–2 L bolus</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Ca × P Product</span>
+              <div class="mt-2"><span id="outPhProd" class="text-xl font-black text-slate-900 tracking-tight">80</span></div>
+              <p id="outPhProdSub" class="text-[10px] text-slate-400 mt-1">Keep below 55</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Est. Phosphate at 12 h</span>
+              <div class="mt-2"><span id="outPh12" class="text-xl font-black text-blue-600 tracking-tight">6.0</span><span class="text-xs font-bold text-blue-500 ml-0.5">mg/dL</span></div>
+              <p class="text-[10px] text-slate-400 mt-1">Early response</p>
+            </div>
+            <div class="bg-white border-2 border-rose-300 bg-rose-50/40 rounded-xl p-3 flex flex-col justify-between">
+              <span class="text-[10px] font-extrabold text-rose-900 uppercase tracking-wider">Est. Phosphate at 48 h</span>
+              <div class="mt-1"><span id="outPh48" class="text-2xl font-black text-rose-600 tracking-tight">4.0</span><span class="text-xs font-bold text-rose-800 ml-0.5">mg/dL</span></div>
+              <p id="outPh48Sub" class="text-[10px] font-bold text-rose-800 mt-0.5">Full-effect check</p>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📈 48-Hour Indicative Serum Phosphate Trajectory</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Shows how fast clearance acts for the renal state and therapies chosen. Not a prediction — recheck phosphate.</p>
+              <div class="flex flex-wrap items-center gap-3 text-[10px] font-bold mt-1.5">
+                <span class="flex items-center gap-1 text-rose-600"><span class="w-2.5 h-2.5 rounded-full bg-rose-600 inline-block"></span> Indicative phosphate</span>
+                <span class="flex items-center gap-1 text-red-800"><span class="w-2.5 h-0.5 bg-red-800 inline-block"></span> 10 severe</span>
+                <span class="flex items-center gap-1 text-emerald-600"><span class="w-2.5 h-0.5 bg-emerald-500 inline-block"></span> 4.5 target</span>
+              </div>
+            </div>
+            <div class="h-60 w-full relative"><canvas id="phChart"></canvas></div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider mb-3">🗂️ Predictive Timeline Breakdown</h2>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                    <th class="p-2.5">Time</th><th class="p-2.5">Indicative PO₄</th><th class="p-2.5">Ca × P</th><th class="p-2.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="phTbody" class="text-xs font-medium text-slate-700 divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+              <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">📝 Clinical Prescription &amp; Action Plan</h2>
+              <button onclick="copyText('phOrder','phCopyTxt')" class="px-2.5 py-1 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md border border-slate-200">📋 <span id="phCopyTxt">Copy Order</span></button>
+            </div>
+            <div id="phSafety" class="mb-4"></div>
+            <div class="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-xs leading-relaxed border border-slate-800">
+              <div class="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-2 mb-2 text-[10px] uppercase font-bold tracking-wider">
+                <span>🩺 Medical Order draft</span><span id="phOrderTime">Updated Live</span>
+              </div>
+              <pre id="phOrder" class="whitespace-pre-wrap font-mono text-xs text-emerald-400"></pre>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="phGuide" class="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+        <div class="p-5 border-b border-slate-200 flex justify-between items-center sticky top-0 bg-white z-10">
+          <h3 class="text-base font-extrabold text-slate-900">📖 Hyperphosphatemia Protocols &amp; References</h3>
+          <button onclick="closeModal('phGuide')" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600">✕</button>
+        </div>
+        <div class="p-6 space-y-5 text-xs text-slate-700 leading-relaxed">
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">1. Severity &amp; Urgency</h4>
+            <ul class="list-disc list-inside space-y-1 font-semibold text-slate-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+              <li><strong>Mild</strong> 4.6–5.9 · <strong>Moderate</strong> 6.0–9.9 · <strong>Severe</strong> ≥10 mg/dL.</li>
+              <li>Acute severe elevation (tumour lysis, rhabdomyolysis) can cause AKI through calcium–phosphate deposition in the kidney.</li>
+              <li>A Ca × P product above about 55 mg²/dL² risks soft-tissue calcification.</li>
+              <li>Low calcium with high phosphate: treat only if symptomatic, and with small doses.</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">2. Treatment</h4>
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2 text-[11px]">
+              <div><strong>Acute, urine flowing:</strong> 0.9% saline 1–2 L, then 150–250 mL/h to urine output ≥100 mL/h; careful in heart failure. Treat the source (e.g. rasburicase and hydration in tumour lysis).</div>
+              <div><strong>Binders with meals:</strong> sevelamer 800–1600 mg TDS or lanthanum 500–1000 mg TDS (chewed) are generally preferred; calcium acetate if calcium is low and not in tumour lysis. Short-term aluminium hydroxide only in severe acute cases (avoid long-term).</div>
+              <div><strong>Dialysis:</strong> AKI or anuria with severe hyperphosphataemia, symptomatic hypocalcaemia, or tumour lysis refractory to fluids. CRRT removes phosphate steadily; intermittent HD is fast but rebounds 25–50%.</div>
+              <div><strong>Diet:</strong> restrict to about 800–1000 mg phosphate/day (chronic).</div>
+            </div>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">3. Calcium Cautions</h4>
+            <p>Avoid routine IV calcium while phosphate is high — it precipitates and worsens kidney injury. Give 1–2 g calcium gluconate over 10–20 min only for tetany, seizure, arrhythmia or marked QT prolongation, with ECG monitoring.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">4. After Dialysis</h4>
+            <p>Phosphate often rebounds after HD and can fall too low on prolonged CRRT — recheck at 2–6 h and replace phosphate if &lt;2.5 mg/dL.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm mb-1">5. Monitoring</h4>
+            <ul class="list-disc list-inside space-y-1 text-slate-600">
+              <li>Phosphate, calcium, K⁺, creatinine and uric acid every 4–6 h in tumour lysis.</li>
+              <li>Urine output and fluid balance hourly during saline.</li>
+              <li>ECG if hyperkalaemia or hypocalcaemia is present.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+          <button onclick="closeModal('phGuide')" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold">Close Guide</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PH STEP 6 -->
+  <div class="phase" id="p-ph6">
+    <div class="step-tag tag-hi">STEP 6 · HYPERPHOSPHATAEMIA</div>
+    <h2 class="step-title">Dynamic Reassessment</h2>
+    <div class="card">
+      <div id="ph6_intro"></div>
+      <div class="field-row">
+        <div class="field">
+          <label>Hours since last check</label>
+          <input type="number" step="0.5" id="ph6_hours" placeholder="e.g. 6 or 12">
+        </div>
+        <div class="field">
+          <label>New phosphate (mg/dL)</label>
+          <input type="number" step="0.1" id="ph6_new" placeholder="e.g. 7.4">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Calcium now (mg/dL) — optional</label>
+          <input type="number" step="0.1" id="ph6_ca" placeholder="e.g. 7.8">
+        </div>
+        <div class="field">
+          <label>Urine output</label>
+          <select id="ph6_uo">
+            <option value="good">Good (&gt;100 mL/h)</option>
+            <option value="low">Falling</option>
+            <option value="none">Oliguric / none</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn" onclick="logPhReading()">Log this reading</button>
+      <div id="ph6_result"></div>
+      <div id="ph6_log"></div>
+    </div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="phase" id="p-summary">
+    <div class="step-tag">SUMMARY</div>
+    <h2 class="step-title">Case Recap</h2>
+    <div class="card" id="summaryOut"></div>
+  </div>
+
+</div>
+
+<div class="nav-bar">
+  <button class="nav-prev" id="navPrev" onclick="goPrev()">← PREVIOUS</button>
+  <button class="nav-next" id="navNext" onclick="goNext()">NEXT →</button>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+let currentPageId='p-intro';
+
+const state={
+  p:null,
+  lo:{urgent:false,needIV:false,gut:true,refeed:false,kStatus:'normal',salt:'na',hypoCa:false,renalImpaired:false,
+      triggers:[],mech:null,target:2.5,route:null,defLow:null,defHigh:null,wt:70},
+  hi:{emergency:false,urgent:false,renal:'normal',sym:'none',acute:false,hyperk:false,pseudo:false,ca:null,
+      mech:null,mechLabel:null,vol:'',dialysis:false,setting:''},
+  history:[]
+};
+
+function getPageOrder(){
+  const base=['p-intro','p-step1'];
+  if(state.p==null) return base;
+  if(state.p<2.5) return base.concat(['p-pl2','p-pl3','p-pl4','p-pldash','p-pl5','p-summary']);
+  if(state.p>4.5) return base.concat(['p-ph2','p-ph3','p-ph4','p-ph5','p-phdash','p-ph6','p-summary']);
+  return base.concat(['p-summary']);
+}
+function showPageById(id){
+  document.querySelectorAll('.phase').forEach(el=>el.classList.remove('active'));
+  const t=$(id); if(t) t.classList.add('active');
+  currentPageId=id;
+  window.scrollTo({top:0,behavior:'smooth'});
+  const order=getPageOrder(), idx=order.indexOf(id);
+  $('navPrev').disabled=idx<=0;
+  $('navNext').textContent=(id==='p-summary')?'RESTART':'NEXT →';
+  const hook={'p-pl2':onPl2Input,'p-pl3':onPl3Input,'p-pl4':initPl4,'p-pldash':showPlDash,'p-pl5':renderPl5Intro,
+    'p-ph2':onPh2Input,'p-ph3':onPh3Input,'p-ph4':renderPh4,'p-ph5':onPh5Input,'p-phdash':showPhDash,'p-ph6':renderPh6Intro,'p-summary':renderSummary}[id];
+  if(hook) hook();
+}
+function goPrev(){ const o=getPageOrder(),i=o.indexOf(currentPageId); if(i>0) showPageById(o[i-1]); }
+function goNext(){
+  if(currentPageId==='p-step1'&&state.p==null){ $('s1_result').innerHTML='<div class="result warn">Enter a serum phosphate value first.</div>'; return; }
+  const o=getPageOrder(),i=o.indexOf(currentPageId);
+  if(i===-1){ showPageById(o[o.length-1]); return; }
+  if(i===o.length-1){ location.reload(); return; }
+  showPageById(o[i+1]);
+}
+function openModal(id){ $(id).classList.remove('hidden'); }
+function closeModal(id){ $(id).classList.add('hidden'); }
+function copyText(preId,labelId){
+  const text=$(preId).textContent;
+  const done=()=>{ $(labelId).textContent='Copied!'; setTimeout(()=>{ $(labelId).textContent='Copy Order'; },2000); };
+  const fb=()=>{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); done(); }catch(e){ $(labelId).textContent='Select & copy manually'; }
+    document.body.removeChild(ta); };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done,fb); else fb();
+}
+function alertCard(tone,icon,title,text){
+  const t={rose:['bg-rose-50 border-rose-200','text-rose-900','text-rose-800'],amber:['bg-amber-50 border-amber-200','text-amber-900','text-amber-800'],
+    emerald:['bg-emerald-50 border-emerald-200','text-emerald-900','text-emerald-800'],sky:['bg-sky-50 border-sky-200','text-sky-900','text-sky-800']}[tone];
+  return '<div class="p-3.5 '+t[0]+' border rounded-xl flex gap-3 items-start mb-2"><span>'+icon+'</span><div><h4 class="text-xs font-bold '+t[1]+'">'+title+'</h4><p class="text-xs '+t[2]+' mt-0.5">'+text+'</p></div></div>';
+}
+function statusBadge(label,tone){
+  const m={ok:'bg-emerald-50 text-emerald-700 border-emerald-200',warn:'bg-amber-50 text-amber-700 border-amber-200',bad:'bg-rose-50 text-rose-700 border-rose-200 font-bold',info:'bg-sky-50 text-sky-700 border-sky-200'};
+  return '<span class="px-2 py-0.5 rounded text-[10px] border '+m[tone]+'">'+label+'</span>';
+}
+function ensureBaseline(){
+  if(state.history.length>1&&state.history[0].v!==state.p) state.history=[];
+  if(!state.history.length) state.history.push({v:state.p,hours:0,label:'Baseline (Step 1)'});
+  else if(state.history.length===1) state.history[0].v=state.p;
+}
+function renderHistoryLog(elId){
+  const el=$(elId);
+  if(state.history.length<=1){ el.innerHTML=''; return; }
+  const rows=state.history.map((h,i)=>{
+    if(i===0) return '<tr><td>'+h.label+'</td><td>'+h.v+'</td><td>—</td></tr>';
+    const d=+(h.v-state.history[i-1].v).toFixed(1);
+    return '<tr><td>+'+h.hours+'h</td><td>'+h.v+'</td><td>'+(d>0?'+':'')+d+'</td></tr>';
+  }).join('');
+  el.innerHTML='<p style="font-size:12px;color:#5a6d75;margin:14px 0 4px"><b>Reading log</b></p><table class="mini"><tr><th>Interval</th><th>PO₄</th><th>Δ</th></tr>'+rows+'</table>';
+}
+
+
+/* ---------------- STEP 1 ---------------- */
+function onStep1Input(){
+  const v=parseFloat($('s1_ph').value), out=$('s1_result');
+  if(isNaN(v)){ state.p=null; out.innerHTML=''; return; }
+  state.p=v;
+  const odd=(v<0.2||v>25)?'<div class="result warn">Unusually extreme value — confirm it is not a unit or entry error (mg/dL here; 1 mmol/L = 3.1 mg/dL).</div>':'';
+  if(v<2.5){
+    let sev,cls,icon;
+    if(v<1.0){sev='Severe';cls='high';icon='🔴';} else if(v<2.0){sev='Moderate';cls='warn';icon='🟠';} else{sev='Mild';cls='good';icon='🟡';}
+    out.innerHTML='<div class="result '+cls+'">'+icon+' <b>'+sev+' hypophosphataemia detected</b> (phosphate '+v+' mg/dL, &lt;2.5).'+(v<1.0?' Respiratory and cardiac muscle risk — IV replacement is likely needed.':'')+
+      '<span class="next-action">Next step → Assess urgency (symptoms, refeeding risk, K⁺).</span></div>'+odd; return;
+  }
+  if(v<=4.5){ out.innerHTML='<div class="result good">✅ Phosphate '+v+' mg/dL — within the usual range (2.5–4.5). No phosphate correction indicated.</div>'+odd; return; }
+  let sev,cls,icon;
+  if(v>=10){sev='Severe';cls='high';icon='🔴';} else if(v>=6){sev='Moderate';cls='warn';icon='🟠';} else{sev='Mild';cls='good';icon='🟡';}
+  out.innerHTML='<div class="result '+cls+'">'+icon+' <b>'+sev+' hyperphosphataemia detected</b> (phosphate '+v+' mg/dL, &gt;4.5).'+(v>=10?' Check calcium, renal function and urine output now.':'')+
+    '<span class="next-action">Next step → Severity and clinical-risk assessment.</span></div>'+odd;
+}
+
+/* ================= HYPOPHOSPHATAEMIA ================= */
+function onPl2Input(){
+  const p=state.p; if(p==null) return;
+  const sev=$('pl_sev').value, card=$('pl_card').checked, refeed=$('pl_refeed').checked, gut=$('pl_gut').checked, hca=$('pl_hypoca').checked;
+  const ks=$('pl_k').value, renal=$('pl_renal').value;
+  const tr=[];
+  if(p<1.0) tr.push('phosphate &lt;1.0 mg/dL');
+  if(sev==='severe') tr.push('respiratory failure, rhabdomyolysis, haemolysis or encephalopathy');
+  if(card) tr.push('arrhythmia, heart failure or hypotension');
+  const urgent=tr.length>0, needIV=urgent||!gut;
+  const salt=(ks==='low')?'k':'na';
+  Object.assign(state.lo,{urgent,needIV,gut,refeed,kStatus:ks,salt,hypoCa:hca,renalImpaired:renal==='impaired',triggers:tr});
+  let h='';
+  if(urgent) h+='<div class="result high">🔴 <b>High-risk hypophosphataemia</b> (phosphate '+p+' mg/dL) — '+tr.join('; ')+'.<span class="next-action">NEXT ACTION → IV phosphate with monitoring. Oral alone is not enough.</span></div>';
+  else if(!gut) h+='<div class="result warn">🟠 Gut not usable — oral phosphate is unreliable.<span class="next-action">NEXT ACTION → IV phosphate replacement.</span></div>';
+  else h+='<div class="result good">✅ No high-risk features. <b>Oral replacement</b> is reasonable (phosphate '+p+' mg/dL).<span class="next-action">NEXT ACTION → Find the cause, then replace and recheck.</span></div>';
+  if(ks==='low') h+='<div class="result info">K⁺ is low — <b>potassium phosphate</b> corrects both (1.5 mmol K⁺ per mmol phosphate; keep K⁺ ≤10 mmol/h).</div>';
+  else if(ks==='high') h+='<div class="result warn">K⁺ high or oliguric AKI — use <b>sodium phosphate only</b>. Potassium phosphate could cause dangerous hyperkalaemia.</div>';
+  else h+='<div class="result info">K⁺ normal — sodium phosphate is the default; potassium phosphate only if K⁺ is at the low end.</div>';
+  if(refeed) h+='<div class="result info">Refeeding risk: give thiamine 100–300 mg IV before feeding, start nutrition slowly, and replace K⁺ and Mg²⁺ together. Expect phosphate to keep falling for 2–3 days.</div>';
+  if(hca) h+='<div class="result info">Hypocalcaemia: IV phosphate lowers ionised calcium — check calcium before and during, and replace slowly.</div>';
+  if(renal==='impaired') h+='<div class="result info">Impaired renal function — halve the dose and recheck sooner (hyperphosphataemia risk).</div>';
+  $('pl2_result').innerHTML=h;
+}
+function onPl3Input(){
+  const uph=parseFloat($('pl_uph').value), ucr=parseFloat($('pl_ucr').value), scr=parseFloat($('pl_scr').value);
+  const g=id=>$(id).checked;
+  const shift=g('pl_h_shift'),intake=g('pl_h_intake'),bind=g('pl_h_bind'),mal=g('pl_h_mal'),diur=g('pl_h_diur'),rn=g('pl_h_renal');
+  const out=$('pl3_result');
+  const ren=[]; if(diur) ren.push('acetazolamide / diuretic / osmotic diuresis'); if(rn) ren.push('hyperparathyroidism, transplant or drug-induced tubulopathy');
+  const ext=[]; if(intake) ext.push('alcohol, malnutrition or NPO'); if(bind) ext.push('Al/Mg antacids or binders'); if(mal) ext.push('malabsorption / vitamin D deficiency');
+  state.lo.mech=null;
+  if(isNaN(uph)||isNaN(ucr)||isNaN(scr)||ucr<=0){
+    out.innerHTML=(shift||ren.length||ext.length)?'<div class="result info">History noted'+(shift?' — shift trigger present':'')+(ren.length?' — renal suspects: '+ren.join(', '):'')+(ext.length?' — intake suspects: '+ext.join(', '):'')+'. Enter urine phosphate and creatinine plus serum creatinine to calculate FEPO₄.</div>':'';
+    return;
+  }
+  const fe=(uph*scr)/(state.p*ucr)*100, renal=fe>=5;
+  let t,b,a,label;
+  if(!renal){
+    if(shift){ label='Transcellular shift / refeeding'; t='<b>Shift into cells</b> (FEPO₄ '+fe.toFixed(1)+'%, kidney conserving)'; b='Refeeding, insulin or DKA treatment, respiratory alkalosis, rapid cell growth or hungry bone. Total-body phosphate may be only mildly low, but it falls further as feeding continues.'; a='NEXT ACTION → Replace in aliquots, slow the feed, give thiamine, and recheck every 6–12 h for 2–3 days.'; }
+    else { label='Low intake / absorption'; t='<b>Low intake or absorption</b> (FEPO₄ '+fe.toFixed(1)+'%, kidney conserving)'; b=ext.length?'Likely contributors: '+ext.join('; ')+'.':'Think alcohol, malnutrition, phosphate-binding antacids, vitamin D deficiency or malabsorption.'; a='NEXT ACTION → Replace phosphate, stop binding antacids, treat the underlying deficiency.'; }
+  } else {
+    label='Renal phosphate wasting'; t='<b>Renal phosphate wasting</b> (FEPO₄ '+fe.toFixed(1)+'%, ≥5%)'; b=ren.length?'Likely contributors: '+ren.join('; ')+'.':'Think hyperparathyroidism, proximal tubulopathy (Fanconi), osmotic diuresis, volume expansion, or drugs (tenofovir, ifosfamide, IV iron).'; a='NEXT ACTION → Stop the offending drug if possible; check PTH, vitamin D and glucose; replace and expect higher or ongoing needs.';
+  }
+  state.lo.mech=label;
+  out.innerHTML='<div class="result info">FEPO₄ = (UPO₄ × SCr) / (PPO₄ × UCr) × 100 = <b>'+fe.toFixed(1)+'%</b>.</div><div class="result warn">'+t+'.<br>'+b+'<span class="next-action">'+a+'</span></div>';
+}
+
+/* Estimate: serum rise ≈ 2–4 mg/dL per mmol/kg phosphate delivered */
+const PL_UP=4.0, PL_LO=2.0, MGP=31;
+function initPl4(){
+  if($('pl4_p').value==='') $('pl4_p').value=state.p;
+  $('pl4_wt').value=state.lo.wt||70;
+  onPl4Input();
+}
+function pl4Need(){
+  const p=parseFloat($('pl4_p').value), t=parseFloat($('pl4_target').value), w=parseFloat($('pl4_wt').value);
+  if(isNaN(p)||isNaN(t)||isNaN(w)||w<=0) return null;
+  const lk=Math.max(0,(t-p)/PL_UP), hk=Math.max(0,(t-p)/PL_LO);
+  return {p,t,w,lowKg:lk,highKg:hk,low:lk*w,high:hk*w};
+}
+function onPl4Input(){
+  const n=pl4Need(), out=$('pl4_result'), wrap=$('pl4_routeWrap');
+  if(!n){ out.innerHTML=''; wrap.classList.add('hidden'); return; }
+  Object.assign(state.lo,{target:n.t,defLow:n.low,defHigh:n.high,wt:n.w});
+  if(n.low<=0){ out.innerHTML='<div class="result good">Current phosphate is already at or above the target.</div>'; wrap.classList.add('hidden'); return; }
+  out.innerHTML='<div class="result info"><b>Estimated phosphate needed (phosphate '+n.p+' → '+n.t+'):</b> ≈'+Math.round(n.low)+'–'+Math.round(n.high)+' mmol (≈'+Math.round(n.low*MGP)+'–'+Math.round(n.high*MGP)+' mg elemental P)<br>'+
+    '<b>Plan first:</b> ≈'+Math.round(n.low)+' mmol (low end), then recheck<br>'+
+    '<b>Remember:</b> phosphate keeps falling during refeeding — continue to monitor after correction.'+
+    '<span class="next-action">NEXT STEP → Select your route of replacement.</span></div>';
+  wrap.classList.remove('hidden');
+  if(state.lo.route){ const b=document.querySelector('#pl4_routeWrap .btn[data-route="'+state.lo.route+'"]'); if(b) choosePlRoute(state.lo.route,b); }
+}
+function plIvPlan(){
+  const n=pl4Need(), imp=state.lo.renalImpaired, salt=state.lo.salt;
+  let total=clamp(Math.round(n.low/5)*5,5,Math.max(5,Math.round(0.5*n.w/5)*5)); if(imp) total=Math.max(5,Math.round(total/2/5)*5);
+  const hours=clamp(Math.ceil(total/7.5),6,12), rate=total/hours;
+  return '<b>'+(salt==='k'?'Potassium':'Sodium')+' phosphate '+total+' mmol</b> in 250–500 mL 0.9% saline or D5W over <b>'+hours+' h</b> = '+rate.toFixed(1)+' mmol/h (≈'+(rate/0.06).toFixed(0)+' mL/h at 15 mmol/250 mL).'+
+    (salt==='k'?'<br>Potassium load ≈'+(total*1.47).toFixed(0)+' mmol ('+(rate*1.47).toFixed(1)+' mmol/h) — keep ≤10 mmol/h and monitor ECG.':'')+
+    '<br>Check phosphate, calcium, K⁺ and Mg²⁺ 6 h after the infusion starts, then every 6–12 h. Never undiluted or as a bolus.'+(imp?'<br>Dose halved for impaired renal function.':'');
+}
+function plOralPlan(){
+  const n=pl4Need(), imp=state.lo.renalImpaired;
+  let per=n.p>=2.0?1000:1500; if(imp) per=Math.round(per/2);
+  return '<b>Oral / enteral phosphate:</b> ≈<b>'+per+' mg elemental P/day</b> (≈'+Math.round(per/MGP)+' mmol) — e.g. 250 mg (≈8 mmol) tablets × '+Math.round(per/250)+' per day in 3–4 divided doses.<br>'+
+    'Diarrhoea is dose-limiting; reduce if loose stools. Recheck in 24 h.'+(imp?'<br>Dose halved for impaired renal function.':'');
+}
+function choosePlRoute(route,btn){
+  state.lo.route=route;
+  document.querySelectorAll('#pl4_routeWrap .btn.choice').forEach(b=>b.classList.remove('correct','incorrect','picked'));
+  const out=$('pl4_routeResult');
+  const next='<span class="next-action">NEXT STEP → Open the dashboard to simulate and finalise the order.</span>';
+  if(route==='oral'&&state.lo.urgent){ btn.classList.add('incorrect'); out.innerHTML='<div class="result high">❌ Not the best choice. Oral phosphate is too slow and diarrhoea-limited for high-risk hypophosphataemia ('+state.lo.triggers.join('; ')+'). Use IV phosphate; add oral once stable.</div>'; return; }
+  if(route==='oral'&&!state.lo.gut){ btn.classList.add('incorrect'); out.innerHTML='<div class="result high">❌ The gut was marked unusable in Step 2. Use IV phosphate.</div>'; return; }
+  if(route==='iv'&&!state.lo.needIV&&state.p>=1.5){
+    btn.classList.add('picked');
+    out.innerHTML='<div class="result warn">IV is not needed here — oral replacement avoids hyperphosphataemia and calcium precipitation. Oral plan:<br><br>'+plOralPlan()+next+'</div>'; return;
+  }
+  btn.classList.add('correct');
+  out.innerHTML='<div class="result good">✅ '+(route==='iv'?'Appropriate.':'Reasonable for mild, stable hypophosphataemia.')+'<br><br>'+(route==='iv'?plIvPlan():plOralPlan())+next+'</div>';
+}
+
+/* ---- PL DASHBOARD ---- */
+let plChart=null, plRoute='iv', plSig='', plWired=false;
+const PL_PROD={
+  oral:[{name:'1 tablet (250 mg elemental P ≈ 8 mmol)',v:250},{name:'2 tablets (500 mg elemental P ≈ 16 mmol)',v:500}],
+  iv:[{name:'15 mmol in 250 mL (0.06 mmol/mL)',v:0.06},{name:'15 mmol in 500 mL (0.03 mmol/mL, gentler)',v:0.03}]
+};
+function showPlDash(){
+  if(!plWired){ wirePl(); plWired=true; }
+  if(!plChart) initPlChart();
+  const sig=[state.p,state.lo.target,state.lo.wt,state.lo.route,state.lo.salt,state.lo.renalImpaired,state.lo.needIV].join('|');
+  if(sig!==plSig){
+    plSig=sig;
+    const v=clamp(state.p,0.3,2.4);
+    $('plPNum').value=v; $('plPSlider').value=v;
+    $('plTarget').value=state.lo.target||2.5; $('plWt').value=state.lo.wt||70;
+    $('plRenal').value=state.lo.renalImpaired?'impaired':'normal';
+    $('plSalt').value=state.lo.salt||'na';
+    setPlRoute(state.lo.route==='oral'?'oral':(state.lo.route?'iv':(state.lo.needIV?'iv':'oral')));
+  } else runPlCalc();
+}
+function wirePl(){
+  $('plPSlider').addEventListener('input',e=>{ $('plPNum').value=e.target.value; runPlCalc(); });
+  $('plPNum').addEventListener('input',e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) $('plPSlider').value=clamp(v,0.3,2.4); runPlCalc(); });
+  ['plTarget','plWt','plRenal','plSalt','plConc','plFreq','plRate','plLoss'].forEach(id=>{ $(id).addEventListener('input',runPlCalc); $(id).addEventListener('change',runPlCalc); });
+}
+function setPlTarget(v){ $('plTarget').value=v; runPlCalc(); }
+function setPlRoute(route){
+  plRoute=route;
+  const base='py-2 px-1 text-[11px] font-bold rounded-lg transition-all ';
+  const on='bg-sky-600 text-white shadow-sm', off='bg-transparent text-slate-600 hover:text-slate-900';
+  $('plBtnOral').className=base+(route==='oral'?on:off);
+  $('plBtnIv').className=base+(route==='iv'?on:off);
+  $('plIvWrap').classList.toggle('hidden',route==='oral');
+  $('plSaltWrap').classList.toggle('hidden',route==='oral');
+  $('plOralWrap').classList.toggle('hidden',route!=='oral');
+  $('plConcLabel').textContent=route==='oral'?'Oral product':'IV dilution (carrier: 0.9% saline or D5W)';
+  $('plConcNote').textContent=route==='oral'?'Take with food. Diarrhoea limits the dose. For mild, stable cases only.':'Always diluted; never a bolus. Potassium phosphate adds 1.5 mmol K⁺ per mmol phosphate.';
+  const sel=$('plConc'); sel.innerHTML='';
+  PL_PROD[route].forEach((f,i)=>{ const o=document.createElement('option'); o.value=f.v; o.textContent=f.name; if(i===0) o.selected=true; sel.appendChild(o); });
+  $('plRate').value=$('plRenal').value==='impaired'?2.5:5;
+  runPlCalc();
+}
+function resetPlDefaults(){
+  $('plPNum').value=0.8; $('plPSlider').value=0.8; $('plTarget').value=2.5; $('plWt').value=70; $('plRenal').value='normal'; $('plSalt').value='na'; $('plLoss').value=0; $('plFreq').value=3;
+  setPlRoute('iv');
+}
+function initPlChart(){
+  plChart=new Chart($('plChart').getContext('2d'),{
+    type:'line',
+    data:{labels:Array.from({length:25},(_,i)=>i),datasets:[
+      {label:'Upper estimate',data:[],borderColor:'#0284c7',backgroundColor:'rgba(2,132,199,0.10)',borderWidth:3,pointRadius:0,tension:0.2,fill:false},
+      {label:'Lower estimate',data:[],borderColor:'#64748b',backgroundColor:'rgba(2,132,199,0.10)',borderWidth:2.5,pointRadius:0,tension:0.2,fill:'-1'},
+      {label:'Target',data:[],borderColor:'#16a34a',borderWidth:1.5,borderDash:[2,4],pointRadius:0,fill:false},
+      {label:'4.5 ceiling',data:[],borderColor:'#dc2626',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>i[0].label+' h',label:c=>' '+c.dataset.label+': '+c.parsed.y.toFixed(1)+' mg/dL'}}},
+      scales:{y:{title:{display:true,text:'Serum phosphate (mg/dL)',font:{size:11,weight:'bold'}},grid:{color:'#f1f5f9'}},
+              x:{grid:{display:false},ticks:{autoSkip:false,maxRotation:0,callback:(v,i)=>(i%4===0?i+'h':'')}}}}
+  });
+}
+function runPlCalc(){
+  const p0=clamp(parseFloat($('plPNum').value)||0.8,0.3,2.4);
+  const tgt=clamp(parseFloat($('plTarget').value)||2.5,2.0,4.0);
+  const wt=clamp(parseFloat($('plWt').value)||70,5,250);
+  const imp=$('plRenal').value==='impaired', salt=$('plSalt').value, route=plRoute;
+  const conc=parseFloat($('plConc').value)||0;
+  const loss=Math.max(0,parseFloat($('plLoss').value)||0);
+  const reqLowKg=Math.max(0,(tgt-p0)/PL_UP), reqHighKg=Math.max(0,(tgt-p0)/PL_LO);
+  const lowM=reqLowKg*wt, highM=reqHighKg*wt;
+  $('outPlDef').textContent=Math.round(lowM)+'–'+Math.round(highM);
+  $('outPlPlan').textContent=Math.round(lowM);
+  $('outPlPlanSub').textContent='≈ '+Math.round(lowM*MGP)+' mg elemental P';
+
+  let cap,rate,rateEq,dose=0,freq=0,perDay=0;
+  if(route==='oral'){
+    dose=conc; freq=parseInt($('plFreq').value)||3; perDay=dose*freq; rateEq=(perDay/MGP)*0.5/24/wt; rate=rateEq;
+    cap=imp?1000:2000;
+    $('outPlCap').textContent=cap; $('outPlCapUnit').textContent='mg/day'; $('outPlCapSub').textContent='Oral elemental P';
+    $('outPlPresc').textContent=perDay; $('outPlPrescUnit').textContent='mg/day'; $('outPlPrescSub').textContent=dose+' mg × '+freq+' (q'+(24/freq).toFixed(0)+'h)';
+  } else {
+    rate=parseFloat($('plRate').value)||0; $('plRateDisp').textContent=rate; rateEq=rate/wt;
+    cap=imp?3.75:7.5;
+    $('outPlCap').textContent=cap; $('outPlCapUnit').textContent='mmol/h'; $('outPlCapSub').textContent='IV infusion';
+    $('outPlPresc').textContent=conc>0?Math.round(rate/conc):0; $('outPlPrescUnit').textContent='mL/hr'; $('outPlPrescSub').textContent=rate+' mmol/h';
+  }
+  const lossKg=loss/wt;
+  const netAt=t=>Math.min(rateEq*t,reqLowKg)-lossKg*t; // mmol/kg
+  const estAt=t=>{ const d=netAt(t); const a=clamp(p0+d*PL_UP,0.3,5.5), b=clamp(p0+d*PL_LO,0.3,5.5); return {lo:Math.min(a,b),hi:Math.max(a,b),net:d*wt}; };
+  const series=Array.from({length:25},(_,t)=>estAt(t));
+  plChart.data.datasets[0].data=series.map(s=>s.hi);
+  plChart.data.datasets[1].data=series.map(s=>s.lo);
+  plChart.data.datasets[2].data=Array(25).fill(tgt);
+  plChart.data.datasets[3].data=Array(25).fill(4.5);
+  plChart.options.scales.y.suggestedMin=Math.floor(Math.min(p0,...series.map(s=>s.lo))-0.2);
+  plChart.options.scales.y.suggestedMax=4.8;
+  plChart.update();
+
+  let rows='';
+  [0,2,4,6,8,12,24].forEach(h=>{
+    const s=estAt(h); let label,tone;
+    if(s.hi>4.5){label='Over-correction Risk';tone='bad';}
+    else if(s.lo>=tgt-0.2){label='At Target';tone='ok';}
+    else if(s.hi>=tgt-0.2){label='Approaching Target';tone='info';}
+    else{label='Below Target';tone='warn';}
+    rows+='<tr class="hover:bg-slate-50"><td class="p-2.5 font-bold text-slate-900">'+h+'h</td><td class="p-2.5 font-extrabold text-sky-700">'+s.lo.toFixed(1)+'–'+s.hi.toFixed(1)+'</td>'+
+      '<td class="p-2.5 font-semibold text-slate-600">'+Math.round(s.net)+' mmol</td><td class="p-2.5">'+statusBadge(label,tone)+'</td></tr>';
+  });
+  $('plTbody').innerHTML=rows;
+
+  const al=[]; let serious=false;
+  if(route==='oral'){
+    if(perDay>cap){ al.push(alertCard('rose','🛑','Daily oral total above limit','Total '+perDay+' mg/day exceeds '+cap+' mg/day elemental P (diarrhoea, hyperphosphataemia risk).')); serious=true; }
+    if(state.lo.urgent||p0<1.0){ al.push(alertCard('rose','🛑','Oral alone is inadequate','Phosphate &lt;1.0, symptoms or cardiac features need IV phosphate; add oral once stable.')); serious=true; }
+  } else {
+    if(rate>cap){ al.push(alertCard('rose','🛑','Rate exceeds the safe limit','Max '+cap+' mmol phosphate/h'+(imp?' (halved for impaired renal function)':'')+'. Reduce the rate.')); serious=true; }
+    if(salt==='k'){
+      const kl=rate*1.47;
+      if(state.lo.kStatus==='high'||imp){ al.push(alertCard('rose','🛑','Potassium phosphate with high K⁺ / renal impairment','Risk of dangerous hyperkalaemia. Use sodium phosphate.')); serious=true; }
+      else if(kl>10){ al.push(alertCard('rose','🛑','Potassium load too high','Rate gives ≈'+kl.toFixed(1)+' mmol K⁺/h; keep ≤10 mmol/h and monitor ECG.')); serious=true; }
+      else al.push(alertCard('sky','ℹ️','Potassium load','≈'+kl.toFixed(1)+' mmol K⁺/h delivered. Monitor K⁺ and ECG.'));
+    } else if(state.lo.kStatus==='low') al.push(alertCard('sky','ℹ️','Low K⁺','Consider potassium phosphate to correct both deficits.'));
+  }
+  if(imp) al.push(alertCard('amber','⚠️','Impaired renal function','Doses halved. Recheck phosphate in 4–6 h — hyperphosphataemia risk.'));
+  if(state.lo.hypoCa) al.push(alertCard('amber','⚠️','Hypocalcaemia present','IV phosphate lowers ionised calcium — check calcium before and every 6 h; replace slowly if symptomatic.'));
+  if(state.lo.refeed) al.push(alertCard('sky','ℹ️','Refeeding risk','Thiamine 100–300 mg IV before feeding; replace K⁺ and Mg²⁺ too; phosphate may keep falling for 2–3 days.'));
+  if(reqLowKg<=0){ al.push(alertCard('amber','⚠️','Target at or below current phosphate','No replacement is needed on this calculation.')); serious=true; }
+  if(lossKg>=rateEq&&reqLowKg>0){ al.push(alertCard('amber','⚠️','Ongoing shift or loss ≥ delivery','Serum phosphate will not rise. Increase delivery within limits or reduce the loss source.')); serious=true; }
+  if(!serious&&reqLowKg>0) al.unshift(alertCard('emerald','✅','Safe Replacement Trajectory','Rate and dose are within limits. Plan ≈'+Math.round(lowM)+' mmol, then recheck phosphate, calcium and K⁺ at 6 h.'));
+  $('plSafety').innerHTML=al.join('');
+
+  const prod=$('plConc').options[$('plConc').selectedIndex].text;
+  $('plOrderTime').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  let o='MEDICAL ORDER: HYPOPHOSPHATEMIA PO4 REPLACEMENT\n';
+  o+='--------------------------------------------------\n';
+  o+='Baseline phosphate  : '+p0.toFixed(1)+' mg/dL    Weight: '+wt+' kg\n';
+  o+='Target phosphate    : '+tgt.toFixed(1)+' mg/dL\n';
+  o+='Estimated need      : '+Math.round(lowM)+'–'+Math.round(highM)+' mmol (plan ~'+Math.round(lowM)+' mmol, then recheck)\n';
+  o+='--------------------------------------------------\n';
+  if(route==='oral'){
+    o+='ROUTE: Oral / enteral\nPRODUCT: '+prod+'\n';
+    o+='DOSE : '+dose+' mg elemental P '+freq+' times daily (q'+(24/freq).toFixed(0)+'h) = '+perDay+' mg/day, with food\n';
+  } else {
+    o+='ROUTE: Intravenous infusion\nPRODUCT: '+(salt==='k'?'Potassium':'Sodium')+' phosphate '+prod+' in 0.9% saline or D5W\n';
+    o+='RATE : '+Math.round(conc>0?rate/conc:0)+' mL/hr = '+rate+' mmol phosphate/h via infusion pump (max '+cap+').\n';
+    o+='Total ~'+Math.round(lowM)+' mmol over ~'+(rate>0?(lowM/rate).toFixed(1):'—')+' h, then recheck. NEVER undiluted / bolus.\n';
+    if(salt==='k') o+='K+ load ~'+(rate*1.47).toFixed(1)+' mmol/h — ECG monitoring; keep <=10 mmol/h.\n';
+  }
+  o+='--------------------------------------------------\n';
+  o+='MONITORING PROTOCOL:\n';
+  o+='1. Phosphate, calcium, K+, Mg2+ at 6 h after start, then every 6–12 h.\n';
+  o+='2. Stop and reassess if phosphate >4.5 mg/dL or calcium falls / symptoms develop.\n';
+  o+='3. Refeeding risk: thiamine 100–300 mg IV before feeding; recheck daily for 3 days.\n';
+  if(imp) o+='4. Renal impairment: doses halved; recheck in 4–6 h.\n';
+  $('plOrder').textContent=o;
+}
+
+/* ---- PL STEP 5 ---- */
+function renderPl5Intro(){
+  ensureBaseline();
+  const l=state.history[state.history.length-1];
+  $('pl5_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>phosphate '+l.v+' mg/dL</b> ('+l.label+').<br>Target '+(state.lo.target||2.5)+' mg/dL. Enter hours elapsed and the new level — check about 6 h after an infusion starts.</div>';
+  renderHistoryLog('pl5_log');
+}
+function logPlReading(){
+  const hours=parseFloat($('pl5_hours').value), nv=parseFloat($('pl5_new').value), ca=parseFloat($('pl5_ca').value), sym=$('pl5_sym').value, out=$('pl5_result');
+  if(isNaN(hours)||hours<=0||isNaN(nv)){ out.innerHTML='<div class="result warn">Enter both hours elapsed and the new phosphate.</div>'; return; }
+  ensureBaseline();
+  const last=state.history[state.history.length-1], delta=+(nv-last.v).toFixed(2), tgt=state.lo.target||2.5;
+  let h;
+  if(nv>4.5) h='<div class="result high">🔴 Phosphate '+last.v+' → <b>'+nv+' mg/dL</b> — above 4.5.<span class="next-action">NEXT ACTION → Stop phosphate, check renal function and total dose given, and recheck calcium and K⁺ (hypocalcaemia and hyperkalaemia risk).</span></div>';
+  else if(nv>=tgt) h='<div class="result good">✅ Phosphate '+last.v+' → '+nv+' mg/dL — <b>target ('+tgt+') reached</b>.<span class="next-action">NEXT ACTION → Stop IV, move to oral maintenance if needed, and keep checking every 12–24 h for 3 days — levels often fall again as refeeding continues.</span></div>';
+  else if(delta>0) h='<div class="result good">✅ Phosphate rose '+last.v+' → '+nv+' mg/dL ('+hours+' h) — responding.<span class="next-action">NEXT ACTION → Continue the plan; recheck in 6–12 h.</span></div>';
+  else h='<div class="result warn">Phosphate '+(delta<0?'fell '+last.v+' → '+nv:'unchanged at '+nv)+' mg/dL over '+hours+' h despite replacement.<ul><li>Ongoing refeeding shift or renal wasting — re-check the mechanism.</li><li>Dose too small for the deficit — increase within 7.5 mmol/h.</li><li>CRRT or dialysis losses — add phosphate to the circuit fluid.</li></ul></div>';
+  if(!isNaN(ca)&&ca<7.5) h+='<div class="result warn">Calcium '+ca+' mg/dL — IV phosphate can lower ionised calcium. Check ionised Ca²⁺ and ECG; replace calcium if symptomatic.</div>';
+  if(sym==='severe') h+='<div class="result high">🔴 Symptoms are worse — check respiratory effort, rhythm and calcium; consider a faster planned dose (≤7.5 mmol/h) with monitoring.</div>';
+  out.innerHTML=h;
+  state.history.push({v:nv,hours:hours,label:hours+'h after previous check'});
+  $('pl5_hours').value=''; $('pl5_new').value=''; $('pl5_ca').value=''; $('pl5_sym').value='none';
+  const l=state.history[state.history.length-1];
+  $('pl5_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>phosphate '+l.v+' mg/dL</b> ('+l.label+').<br>Target '+tgt+' mg/dL.</div>';
+  renderHistoryLog('pl5_log');
+}
+
+/* ================= HYPERPHOSPHATAEMIA ================= */
+function onPh2Input(){
+  const p=state.p; if(p==null) return;
+  const ca=parseFloat($('ph_ca').value), sym=$('ph_sym').value, renal=$('ph_renal').value;
+  const acute=$('ph_acute').checked, hk=$('ph_hyperk').checked, pseudo=$('ph_pseudo').checked;
+  const prod=isNaN(ca)?null:p*ca;
+  const lowCa=!isNaN(ca)&&ca<8.0;
+  const kidneyBad=(renal==='aki'||renal==='anuric');
+  const emergency=sym==='severe'||(p>=10&&(kidneyBad||acute));
+  const urgent=!emergency&&(p>=10||(p>=6&&(kidneyBad||acute||sym==='mild'||lowCa)));
+  Object.assign(state.hi,{emergency,urgent,renal,sym,acute,hyperk:hk,pseudo,ca:isNaN(ca)?null:ca});
+  let h='';
+  if(sym==='severe') h+='<div class="result high">🔴 <b>Symptomatic hypocalcaemia with high phosphate.</b> Give calcium gluconate 1–2 g IV over 10–20 min with ECG monitoring (small dose only — precipitation risk), and start definitive phosphate lowering.</div>';
+  if(emergency) h+='<div class="result high">🔴 <b>Hyperphosphataemic emergency</b> (phosphate '+p+' mg/dL'+(kidneyBad?', kidney failing':'')+(acute?', acute load':'')+').<span class="next-action">NEXT ACTION → IV saline if urine flows, stop the source, ECG and calcium / K⁺ checks, and arrange dialysis early if oliguric.</span></div>';
+  else if(urgent) h+='<div class="result warn">🟠 <b>Moderate or high-risk hyperphosphataemia</b> (phosphate '+p+' mg/dL).<span class="next-action">NEXT ACTION → Find the cause, hydrate if appropriate, start binders and recheck calcium, renal function and phosphate within 6–12 h.</span></div>';
+  else h+='<div class="result good">🟡 <b>Mild or chronic hyperphosphataemia</b> (phosphate '+p+' mg/dL).<span class="next-action">NEXT ACTION → Dietary restriction and phosphate binders with meals; manage CKD-mineral disorder; recheck in days.</span></div>';
+  if(prod!=null){
+    if(prod>70) h+='<div class="result high">Ca × P = <b>'+prod.toFixed(0)+'</b> mg²/dL² — high precipitation risk (soft-tissue and renal calcification). Avoid giving calcium unless essential.</div>';
+    else if(prod>55) h+='<div class="result warn">Ca × P = <b>'+prod.toFixed(0)+'</b> mg²/dL² — above 55; avoid routine calcium.</div>';
+    else h+='<div class="result info">Ca × P = '+prod.toFixed(0)+' mg²/dL² — below 55.</div>';
+  }
+  if(pseudo) h+=(emergency||urgent)?'<div class="result warn">Pseudohyperphosphataemia is possible, but the clinical picture means <b>treat as real</b> until a repeat result says otherwise.</div>':'<div class="result info">If the patient is well, repeat with a fresh, non-haemolysed sample before treating (paraprotein, lipaemia, bilirubin or haemolysis can falsely raise phosphate).</div>';
+  if(hk) h+='<div class="result info">Hyperkalaemia as well — typical of tumour lysis or rhabdomyolysis. Get an ECG and treat it in parallel.</div>';
+  if(renal==='anuric') h+='<div class="result info">No urine output — saline cannot drive excretion; plan dialysis.</div>';
+  $('ph2_result').innerHTML=h;
+}
+function onPh3Input(){
+  const egfr=$('ph_egfr').value, pth=parseFloat($('ph_pth').value);
+  const g=id=>$(id).checked;
+  const tls=g('ph_h_tls'),rhab=g('ph_h_rhab'),enema=g('ph_h_enema'),acid=g('ph_h_acid'),vit=g('ph_h_vit');
+  const out=$('ph3_result'), load=tls||rhab||enema;
+  state.hi.mech=null; state.hi.mechLabel=null;
+  if(!egfr&&!load&&!acid&&!vit&&isNaN(pth)){ out.innerHTML=''; return; }
+  if(!egfr){ out.innerHTML='<div class="result info">Select the eGFR to classify the mechanism.</div>'; return; }
+  let t,b,a,mech,label;
+  if(load){
+    mech='acute'; label='Acute phosphate load'+(egfr!=='normal'?' with reduced clearance':'');
+    t='<b>Acute phosphate load</b>'+(egfr!=='normal'?' on top of reduced kidney clearance':'');
+    b=(tls?'Tumour lysis releases intracellular phosphate, K⁺ and uric acid, with secondary hypocalcaemia. ':'')+(rhab?'Rhabdomyolysis or haemolysis releases cell contents. ':'')+(enema?'Phosphate enemas / bowel prep can overload, especially with renal impairment. ':'')+'Calcium–phosphate deposition can itself injure the kidney.';
+    a='NEXT ACTION → Hydrate to keep urine flowing, remove the source, and plan early dialysis if oliguric or refractory.';
+  } else if(egfr==='low'||egfr==='mid'){
+    mech='renal'; label='Reduced renal excretion (CKD / AKI)';
+    t='<b>Reduced renal phosphate excretion</b> (eGFR '+(egfr==='low'?'&lt;30':'30–59')+')';
+    b='Commonest cause. Phosphate rises as GFR falls, with secondary hyperparathyroidism in chronic CKD.';
+    a='NEXT ACTION → Diet and binders for chronic disease; treat AKI causes; dialysis if severe or symptomatic.';
+  } else if(vit||(!isNaN(pth)&&pth<15)){
+    mech='hypopth'; label='Hypoparathyroidism / vitamin D excess';
+    t='<b>Hypoparathyroidism or vitamin D excess</b>'+(!isNaN(pth)?' (PTH '+pth+' pg/mL, low)':'');
+    b='Low PTH reduces phosphate excretion; vitamin D increases gut absorption. Expect low calcium in hypoparathyroidism.';
+    a='NEXT ACTION → Stop vitamin D if excess; manage hypoparathyroidism with calcium and calcitriol while limiting phosphate.';
+  } else if(acid){
+    mech='shift'; label='Shift out of cells (acidosis)';
+    t='<b>Transcellular shift from lactic or ketoacidosis</b>';
+    b='Acidosis moves phosphate out of cells; total-body phosphate is often depleted and the level falls as acidosis is treated.';
+    a='NEXT ACTION → Treat the acidosis; watch for hypophosphataemia as it resolves.';
+  } else {
+    mech='other'; label='Unclassified';
+    t='<b>Cause unclear</b>';
+    b='Normal kidney function and no acute load. Check for pseudohyperphosphataemia, PTH, vitamin D, and phosphate-containing medicines or supplements.';
+    a='NEXT ACTION → Repeat the sample, send PTH, review drugs and supplements.';
+  }
+  state.hi.mech=mech; state.hi.mechLabel=label;
+  out.innerHTML='<div class="result warn">'+t+'.<br>'+b+'<span class="next-action">'+a+'</span></div>';
+}
+function renderPh4(){
+  const x=state.hi;
+  $('ph4_status').innerHTML=x.emergency
+    ?'<div class="result high" style="margin-top:0">🔴 Start volume expansion <b>now</b> if urine is flowing (phosphate '+state.p+' mg/dL).</div>'
+    :'<div class="result info" style="margin-top:0">Saline helps when there is an acute load and urine output; for stable CKD the first step is diet and binders.</div>';
+  onPh4Input();
+}
+function choosePhAgent(a,btn){
+  document.querySelectorAll('#p-ph4 .btn.choice').forEach(b=>b.classList.remove('correct','incorrect'));
+  const out=$('ph4_agentResult');
+  if(a==='sal'){ btn.classList.add('correct'); out.innerHTML='<div class="result good">✅ Correct — volume expansion restores GFR and promotes renal phosphate excretion (and dilutes potassium and uric acid in tumour lysis). Keep urine output ≥100 mL/h.</div>'; return; }
+  btn.classList.add('incorrect');
+  const why={
+    ca:'Calcium with a high phosphate level precipitates and can injure the kidney. Reserve it for tetany, seizure or arrhythmia, in small doses.',
+    bind:'Binders only block gut absorption — they act over days. Helpful long term, not as the first move in an acute load.',
+    hd:'Dialysis is definitive for AKI with oliguria or refractory disease, but is not first when urine is still flowing.',
+    ins:'Insulin and dextrose shift potassium; the effect on phosphate is small and unreliable.',
+    lasix:'Furosemide alone dries out a patient who needs volume. Use it only after expansion or for overload.'
+  }[a];
+  out.innerHTML='<div class="result high">❌ Not first. '+why+' Start with <b>IV 0.9% saline</b>.</div>';
+}
+function onPh4Input(){
+  const vol=$('ph_vol').value, out=$('ph4_fluid'), x=state.hi; x.vol=vol;
+  if(!vol){ out.innerHTML=''; return; }
+  let h;
+  if(x.renal==='anuric') h='<div class="result warn">Anuric: saline cannot drive excretion and risks overload. <b>Dialysis (CRRT preferred for continuous removal)</b> is the lowering route.</div>';
+  else if(vol==='hyper') h='<div class="result warn"><b>Cautious fluids:</b> 500 mL 0.9% saline then 75–100 mL/h, reassessing lungs and output every 2–4 h. Furosemide 40–80 mg IV for overload only; consider early dialysis.</div>';
+  else h='<div class="result info"><b>0.9% saline 1–2 L over 1–2 h</b>'+(vol==='hypo'?' (dry)':'')+', then <b>150–250 mL/h</b> aiming for urine output ≥100 mL/h (about 3 L/m²/day in tumour lysis). Reassess volume every 4–6 h.</div>';
+  out.innerHTML=h+'<span class="next-action" style="margin-top:8px;color:inherit;font-size:13px">NEXT STEP → Binders, dialysis decision and cause-specific treatment.</span>';
+}
+function onPh5Input(){
+  const set=$('ph_set').value, out=$('ph5_result'), x=state.hi, p=state.p;
+  x.setting=set;
+  if(!set){ out.innerHTML=''; return; }
+  const kidneyBad=(x.renal==='aki'||x.renal==='anuric');
+  const dial=x.renal==='anuric'||(set==='acute'&&kidneyBad&&p>=10)||x.sym==='severe'||(x.acute&&x.hyperk&&x.renal!=='normal');
+  x.dialysis=dial;
+  let h='';
+  if(dial) h+='<div class="result high">🔴 <b>Dialysis indicated — call nephrology.</b> CRRT removes phosphate steadily; intermittent HD is faster but rebounds 25–50% within hours. Add phosphate to the circuit if levels fall below 2.5.</div>';
+  if(set==='acute'){
+    h+='<div class="result info"><b>Saline</b> as in Step 4. Treat the source: rasburicase and hydration in tumour lysis, fluids for rhabdomyolysis, stop phosphate enemas and supplements.</div>';
+    h+='<div class="result info"><b>Binder (short term):</b> sevelamer 800–1600 mg or lanthanum 500–1000 mg with feeds / meals; aluminium hydroxide 300–600 mg TDS only for a few days in severe cases (avoid long term).</div>';
+  } else {
+    h+='<div class="result info"><b>Diet:</b> limit phosphate to about 800–1000 mg/day; avoid processed foods and cola; dietitian input.</div>';
+    h+='<div class="result info"><b>Binders with meals:</b> sevelamer carbonate 800–1600 mg TDS or lanthanum 500–1000 mg TDS (chewed). Calcium acetate 667–1334 mg TDS if calcium is low and not hypercalcaemic.</div>';
+    h+='<div class="result info"><b>Dialysis adequacy:</b> longer or more frequent sessions lower phosphate; review CKD-mineral bone disease (PTH, vitamin D, calcium).</div>';
+  }
+  if(x.sym==='severe') h+='<div class="result high"><b>Symptomatic hypocalcaemia:</b> calcium gluconate 1–2 g IV over 10–20 min with ECG monitoring — small dose, then lower phosphate; high doses precipitate.</div>';
+  else h+='<div class="result warn"><b>Calcium:</b> do not give routinely while phosphate is high. Treat low calcium only if symptomatic.</div>';
+  const c=[];
+  if(x.mech==='acute') c.push('Acute load: remove the source and protect the kidney; recheck every 4–6 h.');
+  if(x.mech==='renal') c.push('CKD / AKI: treat the cause of kidney injury and manage mineral-bone disease.');
+  if(x.mech==='hypopth') c.push('Hypoparathyroidism / vitamin D excess: stop vitamin D; endocrine input.');
+  if(x.mech==='shift') c.push('Acidosis: treat it; expect phosphate to drop and replace if it falls below 2.5.');
+  c.push('Stop phosphate-containing laxatives, enemas and supplements.');
+  h+='<div class="result warn"><b>Treat the cause:</b><ul>'+c.map(t=>'<li>'+t+'</li>').join('')+'</ul></div>';
+  h+='<span class="next-action" style="margin-top:10px;color:inherit;font-size:13px">NEXT STEP → Open the dashboard to see the indicative phosphate timeline and build the orders.</span>';
+  out.innerHTML=h;
+}
+
+/* ---- PH DASHBOARD ---- */
+let phChart=null, phWired=false, phSig='';
+function phParams(){
+  return {p0:clamp(parseFloat($('phPNum').value)||10,4.6,20), ca:parseFloat($('phCa').value)||8, renal:$('phRenal').value,
+    load:parseFloat($('phLoad').value)||0, sym:$('phSym').checked, sal:$('phSaline').checked, binder:$('phBinder').checked,
+    dial:$('phDial').value, delay:parseFloat($('phDelay').value)||0};
+}
+function phSeries(p){
+  const base={normal:0.10,impaired:0.02,anuric:0.003}[p.renal];
+  let k=base; if(p.sal&&p.renal!=='anuric') k*=1.8; if(p.binder) k+=0.01;
+  const loadEff=p.load*(p.binder?0.6:1), dt=0.05, out=[]; let m=p.p0, mS=null, mE=null, reb=0;
+  for(let i=0;i<=960;i++){
+    const t=i*dt;
+    if(i%20===0) out.push(m);
+    let kk=k;
+    if(p.dial==='hd'){
+      const inHd=t>=p.delay&&t<p.delay+4;
+      if(inHd){ kk+=0.30; if(mS===null) mS=m; }
+      if(mS!==null&&mE===null&&t>=p.delay+4){ mE=m; reb=0.25*(mS-mE)/6; }
+    }
+    if(p.dial==='crrt'&&t>=p.delay) kk+=0.06;
+    const rebound=(p.dial==='hd'&&mE!==null&&t<p.delay+10)?reb:0;
+    m+=dt*(loadEff-kk*(m-4.0)+rebound);
+    if(m<1.0) m=1.0;
+  }
+  return out; // hourly 0..48
+}
+function showPhDash(){
+  if(!phWired){ wirePh(); phWired=true; }
+  if(!phChart) initPhChart();
+  const x=state.hi, sig=[state.p,x.renal,x.emergency,x.dialysis,x.acute,x.ca,x.sym].join('|');
+  if(sig!==phSig){
+    phSig=sig;
+    $('phPNum').value=clamp(state.p,4.6,20); $('phPSlider').value=clamp(state.p,4.6,20);
+    if(x.ca!=null) $('phCa').value=x.ca;
+    $('phRenal').value=(x.renal==='anuric')?'anuric':((x.renal==='aki')?'impaired':'normal');
+    $('phSym').checked=(x.sym==='severe');
+    $('phLoad').value=x.acute?'0.1':'0';
+    $('phSaline').checked=(x.renal!=='anuric');
+    $('phBinder').checked=(x.setting==='chronic');
+    $('phDial').value=x.dialysis?(x.acute?'crrt':'hd'):'none';
+  }
+  runPhCalc();
+}
+function wirePh(){
+  $('phPSlider').addEventListener('input',e=>{ $('phPNum').value=e.target.value; runPhCalc(); });
+  $('phPNum').addEventListener('input',e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) $('phPSlider').value=clamp(v,4.6,20); runPhCalc(); });
+  ['phCa','phRenal','phLoad','phSym','phSaline','phBinder','phDial','phDelay'].forEach(id=>{ $(id).addEventListener('input',runPhCalc); $(id).addEventListener('change',runPhCalc); });
+}
+function resetPhDefaults(){
+  $('phPNum').value=10; $('phPSlider').value=10; $('phCa').value=8; $('phRenal').value='normal'; $('phLoad').value='0'; $('phSym').checked=false;
+  $('phSaline').checked=true; $('phBinder').checked=false; $('phDial').value='none'; $('phDelay').value='2';
+  runPhCalc();
+}
+function initPhChart(){
+  phChart=new Chart($('phChart').getContext('2d'),{
+    type:'line',
+    data:{labels:Array.from({length:49},(_,i)=>i),datasets:[
+      {label:'Indicative phosphate',data:[],borderColor:'#e11d48',backgroundColor:'rgba(225,29,72,0.08)',borderWidth:3,pointRadius:0,tension:0.25,fill:true},
+      {label:'10 severe',data:[],borderColor:'#991b1b',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false},
+      {label:'4.5 target',data:[],borderColor:'#10b981',borderWidth:1.5,borderDash:[2,4],pointRadius:0,fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>i[0].label+' h',label:c=>' '+c.dataset.label+': '+c.parsed.y.toFixed(1)+' mg/dL'}}},
+      scales:{y:{title:{display:true,text:'Serum phosphate (mg/dL)',font:{size:11,weight:'bold'}},grid:{color:'#f1f5f9'}},
+              x:{grid:{display:false},ticks:{autoSkip:false,maxRotation:0,callback:(v,i)=>(i%6===0?i+'h':'')}}}}
+  });
+}
+function runPhCalc(){
+  const p=phParams(), ser=phSeries(p);
+  const tag=$('phSevTag');
+  if(p.p0>=10){ tag.textContent='Severe'; tag.className='text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200'; }
+  else if(p.p0>=6){ tag.textContent='Moderate'; tag.className='text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200'; }
+  else{ tag.textContent='Mild'; tag.className='text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200'; }
+  const prod0=p.p0*p.ca;
+  $('outPhFluid').textContent=p.renal==='anuric'?'—':'150–250';
+  $('outPhFluidSub').textContent=p.renal==='anuric'?'Ineffective — anuric':'After a 1–2 L bolus';
+  $('outPhProd').textContent=prod0.toFixed(0);
+  $('outPhProdSub').textContent=prod0>55?'⚠ Above 55 — precipitation risk':'Below 55';
+  $('outPh12').textContent=ser[12].toFixed(1); $('outPh48').textContent=ser[48].toFixed(1);
+  $('outPh48Sub').textContent=ser[48]<2.5?'⚠ Over-correction risk':(ser[48]>4.5?'Still above 4.5':'Full-effect check');
+
+  phChart.data.datasets[0].data=ser;
+  phChart.data.datasets[1].data=Array(49).fill(10);
+  phChart.data.datasets[2].data=Array(49).fill(4.5);
+  phChart.options.scales.y.suggestedMin=Math.floor(Math.min(...ser,3)-0.5);
+  phChart.options.scales.y.suggestedMax=Math.ceil(Math.max(...ser,11)+0.5);
+  phChart.update();
+
+  let rows='';
+  [0,2,4,8,12,24,48].forEach(t=>{
+    const v=ser[t], pr=v*p.ca; let label,tone;
+    if(v<2.5){label='Over-correction Risk';tone='bad';}
+    else if(v>=10){label='Severe';tone='bad';}
+    else if(v>=6){label='Moderate';tone='warn';}
+    else if(v>4.5){label='Mildly Elevated';tone='info';}
+    else{label='Target Range';tone='ok';}
+    rows+='<tr class="hover:bg-slate-50"><td class="p-2.5 font-bold text-slate-900">'+t+'h</td><td class="p-2.5 font-extrabold text-rose-600">'+v.toFixed(1)+' mg/dL</td>'+
+      '<td class="p-2.5 font-semibold '+(pr>55?'text-amber-700':'text-slate-600')+'">'+pr.toFixed(0)+'</td><td class="p-2.5">'+statusBadge(label,tone)+'</td></tr>';
+  });
+  $('phTbody').innerHTML=rows;
+
+  const emergency=p.p0>=10||p.sym, lowering=p.sal||p.binder||p.dial!=='none';
+  const al=[]; let serious=false;
+  if(p.renal==='anuric'&&p.dial==='none'&&p.p0>=6){ al.push(alertCard('rose','🛑','No removal route','Anuric — saline cannot work. Dialysis is the only way to remove phosphate.')); serious=true; }
+  if(emergency&&p.renal!=='anuric'&&!p.sal){ al.push(alertCard('rose','🛑','Saline not selected','Severe level or symptoms with urine flowing — start IV 0.9% saline first.')); serious=true; }
+  if(p.p0>=6&&!lowering){ al.push(alertCard('amber','⚠️','No lowering therapy selected','Add saline, a binder, or dialysis.')); serious=true; }
+  if(p.sym) al.push(alertCard('rose','🛑','Symptomatic hypocalcaemia','Calcium gluconate 1–2 g IV over 10–20 min with ECG monitoring, then lower phosphate. Larger doses precipitate.')), serious=true;
+  if(prod0>55&&!p.sym) al.push(alertCard('amber','⚠️','Ca × P above 55','Avoid routine IV calcium; precipitation can injure the kidney.'));
+  if(p.renal==='anuric'&&p.sal) al.push(alertCard('amber','⚠️','Saline ineffective when anuric','Left out of the curve; dialysis is the lowering route.'));
+  if(p.binder) al.push(alertCard('sky','ℹ️','Binders act over days','Take with meals or feeds. Modest effect on an acute high level.'));
+  if(p.dial==='hd') al.push(alertCard('sky','ℹ️','Dialysis rebound','Expect phosphate to rebound 25–50% within hours of intermittent HD — recheck at 2–6 h.'));
+  if(p.dial==='crrt') al.push(alertCard('sky','ℹ️','CRRT','Steady removal; phosphate can fall too low on long runs — add phosphate to the fluid if &lt;2.5 mg/dL.'));
+  if(p.load>0) al.push(alertCard('amber','⚠️','Phosphate is still being released','Treat the source (tumour lysis, rhabdomyolysis); the level rises again as clearance wanes.'));
+  if(Math.min(...ser)<2.5){ al.push(alertCard('amber','⚠️','Over-correction possible','Indicative phosphate falls below 2.5. Recheck often; replace if low.')); serious=true; }
+  if(!serious) al.unshift(alertCard('emerald','✅','Reasonable Treatment Trajectory','Indicative phosphate settles near the target range. Confirm with serial levels — don\'t rely on the curve.'));
+  $('phSafety').innerHTML=al.join('');
+
+  $('phOrderTime').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  let o='MEDICAL ORDER: HYPERPHOSPHATEMIA — EXPAND / BIND / DIALYSE\n';
+  o+='--------------------------------------------------\n';
+  o+='Presenting phosphate : '+p.p0.toFixed(1)+' mg/dL   Calcium: '+p.ca.toFixed(1)+' mg/dL   Ca x P: '+prod0.toFixed(0)+'\n';
+  o+='Renal: '+({normal:'normal / CKD with urine',impaired:'AKI/eGFR<30',anuric:'anuric/dialysis'}[p.renal])+'   Symptomatic hypoCa: '+(p.sym?'YES':'no')+'\n';
+  o+='--------------------------------------------------\n';
+  let n=1;
+  if(p.sal&&p.renal!=='anuric') o+=(n++)+'. EXPAND: 0.9% saline 1–2 L over 1–2 h, then 150–250 mL/h to urine output >=100 mL/h (cautious in heart failure).\n';
+  if(p.binder) o+=(n++)+'. BINDER: sevelamer 800–1600 mg or lanthanum 500–1000 mg with meals/feeds TDS; diet 800–1000 mg phosphate/day.\n';
+  if(p.dial==='hd') o+=(n++)+'. DIALYSE: intermittent haemodialysis (target start in '+p.delay+' h). Nephrology informed.\n';
+  if(p.dial==='crrt') o+=(n++)+'. DIALYSE: CRRT (target start in '+p.delay+' h); add phosphate to circuit if <2.5 mg/dL.\n';
+  if(p.sym) o+=(n++)+'. CALCIUM: calcium gluconate 1–2 g IV over 10–20 min with ECG (symptomatic only).\n';
+  o+=(n++)+'. CAUSE: stop phosphate enemas/supplements; treat TLS/rhabdomyolysis/AKI source; send PTH.\n';
+  o+='--------------------------------------------------\n';
+  o+='MONITORING PROTOCOL:\n';
+  o+='1. Phosphate, calcium, K+, creatinine every 4–6 h in acute load.\n';
+  o+='2. Urine output and fluid balance hourly during saline; ECG if hypocalcaemia or hyperkalaemia.\n';
+  o+='3. Recheck phosphate 2–6 h after dialysis (rebound) and for over-correction.\n';
+  $('phOrder').textContent=o;
+}
+
+/* ---- PH STEP 6 ---- */
+function renderPh6Intro(){
+  ensureBaseline();
+  const l=state.history[state.history.length-1];
+  $('ph6_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>phosphate '+l.v+' mg/dL</b> ('+l.label+').<br>Enter hours elapsed, the new level, calcium and urine output, then log it.</div>';
+  renderHistoryLog('ph6_log');
+}
+function logPhReading(){
+  const hours=parseFloat($('ph6_hours').value), nv=parseFloat($('ph6_new').value), ca=parseFloat($('ph6_ca').value), uo=$('ph6_uo').value, out=$('ph6_result');
+  if(isNaN(hours)||hours<=0||isNaN(nv)){ out.innerHTML='<div class="result warn">Enter both hours elapsed and the new phosphate.</div>'; return; }
+  ensureBaseline();
+  const last=state.history[state.history.length-1], delta=+(nv-last.v).toFixed(2);
+  let h;
+  if(nv<2.5) h='<div class="result high">🔴 Phosphate now <b>'+nv+' mg/dL</b> — over-correction (common after dialysis / CRRT).<span class="next-action">NEXT ACTION → Stop binders, replace phosphate cautiously, and recheck calcium and K⁺.</span></div>';
+  else if(nv>=10||(delta>0&&nv>=6)||uo==='none') h='<div class="result high">🔴 Phosphate '+last.v+' → <b>'+nv+' mg/dL</b>'+(delta>0?' and rising':'')+(uo==='none'?', no urine':'')+' — not controlled.<ul><li>Escalate to dialysis (CRRT if unstable).</li><li>Confirm saline is running and urine output is adequate.</li><li>Look for ongoing release (tumour lysis, rhabdomyolysis) or phosphate intake.</li></ul></div>';
+  else if(nv>6) h='<div class="result warn">Phosphate '+last.v+' → '+nv+' mg/dL — improving but still moderate.<span class="next-action">NEXT ACTION → Continue saline and binders; recheck in 6–12 h.</span></div>';
+  else if(nv>4.5) h='<div class="result good">✅ Phosphate '+last.v+' → '+nv+' mg/dL — mildly elevated and falling.<span class="next-action">NEXT ACTION → Continue binders with meals and treat the cause; recheck daily.</span></div>';
+  else h='<div class="result good">✅ Phosphate '+last.v+' → '+nv+' mg/dL — in the usual range.<span class="next-action">NEXT ACTION → Recheck at 6–12 h for rebound, keep phosphate sources off, and continue long-term control if CKD.</span></div>';
+  if(!isNaN(ca)){
+    const pr=nv*ca;
+    if(ca<7.5) h+='<div class="result warn">Calcium '+ca+' mg/dL — check ECG and symptoms; give calcium only if symptomatic.</div>';
+    if(pr>55) h+='<div class="result warn">Ca × P = '+pr.toFixed(0)+' — above 55; avoid routine calcium.</div>';
+  }
+  out.innerHTML=h;
+  state.history.push({v:nv,hours:hours,label:hours+'h after previous check'});
+  $('ph6_hours').value=''; $('ph6_new').value=''; $('ph6_ca').value=''; $('ph6_uo').value='good';
+  const l=state.history[state.history.length-1];
+  $('ph6_intro').innerHTML='<div class="result info" style="margin-top:0">Current baseline: <b>phosphate '+l.v+' mg/dL</b> ('+l.label+').</div>';
+  renderHistoryLog('ph6_log');
+}
+
+/* ---------------- SUMMARY ---------------- */
+function renderSummary(){
+  const out=$('summaryOut'), p=state.p;
+  if(p==null){ out.innerHTML='<p>No case entered.</p>'; return; }
+  const log=state.history.length>1?'<p><b>Phosphate recheck history:</b></p><ul style="margin:4px 0 0;padding-left:18px">'+state.history.map(h=>'<li>'+h.label+': '+h.v+' mg/dL</li>').join('')+'</ul>':'';
+  let h='<p><b>Presenting phosphate:</b> '+p+' mg/dL</p>';
+  if(p<2.5){
+    const l=state.lo;
+    h+='<p><b>Risk:</b> '+(l.urgent?'High-risk — '+l.triggers.join('; '):'No high-risk features')+'; refeeding risk: '+(l.refeed?'Yes':'No')+'</p>'+
+      '<p><b>K⁺ status:</b> '+l.kStatus+' — salt: '+(l.salt==='k'?'potassium phosphate':'sodium phosphate')+'; renal impairment '+(l.renalImpaired?'Yes':'No')+'</p>'+
+      '<p><b>Mechanism:</b> '+(l.mech||'—')+'</p>'+
+      '<p><b>Estimated need:</b> '+(l.defLow!=null?Math.round(l.defLow)+'–'+Math.round(l.defHigh)+' mmol phosphate to '+l.target+' mg/dL':'—')+' — route: '+(l.route?{oral:'oral',iv:'IV'}[l.route]:'—')+'</p>';
+  } else if(p>4.5){
+    const x=state.hi;
+    h+='<p><b>Classification:</b> '+(x.emergency?'Emergency':x.urgent?'Moderate / high-risk':'Mild / chronic')+' — renal '+x.renal+', hypocalcaemia symptoms '+x.sym+(x.ca!=null?', Ca '+x.ca+' mg/dL':'')+'</p>'+
+      '<p><b>Mechanism:</b> '+(x.mechLabel||'—')+'</p>'+
+      '<p><b>Volume:</b> '+(x.vol||'—')+' — dialysis indicated: '+(x.dialysis?'Yes':'No')+'</p>';
+  } else h+='<p>Within the usual range — no correction indicated.</p>';
+  out.innerHTML=h+log;
+}
+
+(function(){
+  const q=new URLSearchParams(location.search);
+  if(q.get('embed')) document.body.classList.add('embed');
+  const v=parseFloat(q.get('ph'));
+  if(!isNaN(v)){
+    $('s1_ph').value=v; onStep1Input();
+    const o=getPageOrder(); showPageById(o[Math.min(2,o.length-1)]);
+  } else showPageById('p-intro');
+})();
+</script>
+</body>
+</html>
