@@ -133,18 +133,16 @@ body.inside .shelf{display:block}
 .card span{display:block;margin-top:4px;color:var(--muted);line-height:1.4}
 .empty{color:var(--muted);line-height:1.45}
 .results{display:none;padding:8px 16px 24px}
-.veil{position:fixed;z-index:8;overflow:hidden;border-radius:18px;padding:18px;color:var(--fg);transition:left 1.25s cubic-bezier(.22,.61,.2,1),top 1.25s cubic-bezier(.22,.61,.2,1),width 1.25s cubic-bezier(.22,.61,.2,1),height 1.25s cubic-bezier(.22,.61,.2,1),border-radius 1.25s ease,opacity .8s ease}
-.veil.full{left:0;top:0;width:100%;height:100%;border-radius:0}
+.veil{position:fixed;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;text-align:center;padding:28px;color:var(--fg);transform-origin:var(--ox,50%) var(--oy,50%);transform:scale(var(--from,.42));transition:transform .9s cubic-bezier(.22,.61,.2,1),opacity .5s ease}
+.veil.full{transform:scale(1)}
 .veil.away{opacity:0}
 .veil.lab{background:radial-gradient(120% 90% at 50% 0%,#12343f,#071018 72%)}
 .veil.arena{background:radial-gradient(120% 90% at 50% 0%,#3a2a1c,#140e0b 72%)}
-.veil.title{background:#071018;display:flex;align-items:flex-end}
-.veil strong{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:34px;letter-spacing:-.03em}
-.veil.title strong{font-size:42px}
+.veil.title{background:#071018}
+.veil strong{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:40px;letter-spacing:-.03em;line-height:1}
 body.inside .shelf .card{animation:titleIn 1.15s ease both}
 @keyframes titleIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
-.credit{position:fixed;left:12px;right:12px;bottom:8px;z-index:4;margin:0;font-size:10px;line-height:1.3;color:var(--faint)}
-.credit a{color:inherit}
+.credit{display:none}
 .approach{position:fixed;inset:0;z-index:7;display:flex;align-items:center;justify-content:center;background:transparent;pointer-events:none}
 .approach img{width:100vw;height:100dvh;object-fit:cover;border-radius:0;box-shadow:none;transform:translate(var(--sx,0),var(--sy,-18vh)) scale(.2);opacity:0}
 .approach.rise img{opacity:1;transform:translate(0,0) scale(1);transition:transform 1.7s cubic-bezier(.22,.61,.2,1),opacity .7s ease}
@@ -169,13 +167,12 @@ body.searching .results{display:block}
 </head>
 <body>
 <canvas class="dust" id="dust" aria-hidden="true"></canvas>
-<audio id="bed" src="cylinder.mp3" loop preload="auto" playsinline></audio>
+<audio id="bed" src="interface.wav" loop preload="auto" playsinline></audio>
 <audio id="line" preload="auto"></audio>
 <div class="glow" aria-hidden="true"></div>
 <button type="button" class="skip" id="skip">Skip</button>
 <p class="touch" id="touch">Touch to begin</p>
 <button type="button" class="sound" id="sound" aria-pressed="true">Sound: On</button>
-<p class="credit">“Cylinder Seven” by <a href="https://chriszabriskie.com/cylinders/">Chris Zabriskie</a>, from Cylinders. <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</p>
 <div class="invite" id="invite">
   <p>Critical care • Human atlas</p>
   <h2>Explore the human body</h2>
@@ -183,7 +180,7 @@ body.searching .results{display:block}
   <p class="quiet">Select an organ to begin</p>
 </div>
 <div class="approach" id="approach">
-  <img src="brain-close.jpg" alt="Close view of the cerebral cortex and its surface vessels">
+  <img id="plate" src="brain-close.jpg" alt="">
   <p>Cortex and cerebral vessels</p>
 </div>
 <header>
@@ -210,6 +207,7 @@ const ORGANS = [
     id:"brain", name:"Brain", room:"Neurology",
     line:"The room for consciousness, vessels and seizure. The scan is part of the case, not a slide.",
     spots:[{x:50,y:11.2}],
+    plate:"brain-close.jpg",
     parts:[
       {id:"hemi", name:"Hemispheres"},
       {id:"circ", name:"Cerebral circulation"},
@@ -232,6 +230,7 @@ const ORGANS = [
     id:"thyroid", name:"Thyroid", room:"Endocrine",
     line:"Neck and endocrine crises. Glucose, potassium and the insulin that must not stop too early.",
     spots:[{x:50,y:28.9}],
+    plate:"plates/thyroid.jpg",
     learn:[
       ["DKA","Fluids, potassium, insulin and dextrose across four bedside cases.","DKA_Interactive_Simulator.html?v=20260925s"],
       ["DKA and HHS","Holds insulin when potassium is under 3.3, and does not stop it when the glucose falls.","DKA_HHS_Resuscitation_Engine.html?v=20260925n"]
@@ -243,6 +242,7 @@ const ORGANS = [
     id:"lungs", name:"Lungs", room:"Respiratory",
     line:"Gas exchange, the ventilator and the film. Failure has a pattern before it has a machine.",
     spots:[{x:39,y:42},{x:63,y:42}],
+    plate:"plates/lungs.jpg",
     learn:[
       ["Hypoxic patient","Oxygen, HFNC, NIV and the reason for the failure.","Hypoxic_Patient_Respiratory_Critical_Care_Simulator_v22.html?v=20260925s"],
       ["ARDS ventilator","PEEP, prone position, driving pressure and rescue.","ARDS_Active_Simulator.html?v=20260925s"],
@@ -260,6 +260,7 @@ const ORGANS = [
     id:"heart", name:"Heart", room:"Cardiac",
     line:"Rhythm, pressure and the failing pump. The trace moves before you commit.",
     spots:[{x:55,y:44.5}],
+    plate:"plates/heart.jpg",
     learn:[
       ["ACLS, 2025 AHA","Arrest, tachycardia and bradycardia, with the current doses.","ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20260925s"],
       ["Shock identification","MAP, cardiac index and the phenotype.","Shock_Identification_Management_Simulator.html?v=20260925s"],
@@ -276,24 +277,25 @@ const ORGANS = [
     id:"liver", name:"Liver", room:"Hepatic",
     line:"Acute liver failure and encephalopathy belong in this room. The cases are not on the floor yet.",
     spots:[{x:40,y:55}],
+    plate:"plates/liver.jpg",
     learn:[],
     practice:[],
     soon:"The Liver Failure Simulator is not built yet."
   },
   {
     id:"stomach", name:"Stomach", room:"Gastrointestinal",
-    line:"The upper abdomen. Pancreatitis is the case that is ready.",
+    line:"The upper abdomen. The working case sits with the gastrointestinal section.",
     spots:[{x:54,y:59.5}],
-    learn:[
-      ["Acute pancreatitis","Diagnosis, fluids, cause, and the step-up approach.","Acute_Pancreatitis_Simulator.html?v=20260926s"]
-    ],
+    plate:"plates/gi.jpg",
+    learn:[],
     practice:[],
-    soon:"The Acute GI Practice Simulator is the next bay."
+    soon:"Pancreatitis is in the gastrointestinal section."
   },
   {
-    id:"bowel", name:"Intestines", room:"Gastrointestinal",
-    line:"Bowel and bleeding. Pancreatitis is the working case; a bleeding bay is not built yet.",
+    id:"bowel", name:"Gastrointestinal", room:"Gastrointestinal",
+    line:"Stomach, pancreas and bowel. Pancreatitis is the case that is ready. The liver stays in its own room.",
     spots:[{x:50,y:70}],
+    plate:"plates/gi.jpg",
     learn:[
       ["Acute pancreatitis","Diagnosis, fluids, cause, and the step-up approach.","Acute_Pancreatitis_Simulator.html?v=20260926s"]
     ],
@@ -304,6 +306,7 @@ const ORGANS = [
     id:"multi", name:"Whole patient", room:"Multiorgan",
     line:"Sepsis, shock and more than one failing organ. Infection sits with the spleen; the integrated cases sit in the arena.",
     spots:[{x:66,y:54,name:"Spleen"},{x:50,y:78,name:"Whole patient"}],
+    plate:"plates/spleen.jpg",
     learn:[
       ["Shock bay","Phenotypes of shock, and a ventilator you control.","Shock_Bay.html?v=20260925s"],
       ["Antibiotics","The culture, the resistance, and the toxicity that changes the choice.","Antibiotic_Simulator.html?v=20260928e"],
@@ -319,6 +322,7 @@ const ORGANS = [
     id:"kidneys", name:"Kidneys", room:"Nephrology",
     line:"Sodium, potassium, calcium, magnesium and phosphate. Calcium is calculated from the serum value and the albumin.",
     spots:[{x:40,y:64},{x:60,y:64}],
+    plate:"plates/kidneys.jpg",
     learn:[
       ["Electrolytes","The number chooses the algorithm. Calcium starts from serum calcium and albumin.","Electrolyte_Disorders_Interactive_Simulator.html?v=20261014d"]
     ],
@@ -430,36 +434,35 @@ function openPath(which){
   renderRoom();
 }
 let traveling = false;
-function grow(el, kind, mid, end){
+function grow(el, kind, end){
   if(traveling) return;
-  if(reduced){ if(mid) mid(); if(end) end(); return; }
+  if(reduced){ if(end) end(); return; }
   traveling = true;
   const rect = el.getBoundingClientRect();
   const veil = document.createElement("div");
+  const label = el.querySelector("strong, b");
   veil.className = "veil "+kind;
-  veil.innerHTML = el.innerHTML;
-  veil.style.left = rect.left+"px";
-  veil.style.top = rect.top+"px";
-  veil.style.width = rect.width+"px";
-  veil.style.height = rect.height+"px";
+  veil.innerHTML = "<strong>"+esc(label ? label.textContent : "")+"</strong>";
+  veil.style.setProperty("--ox", (rect.left+rect.width/2)+"px");
+  veil.style.setProperty("--oy", (rect.top+rect.height/2)+"px");
+  veil.style.setProperty("--from", String(Math.max(0.34, rect.width/window.innerWidth)));
   document.body.appendChild(veil);
   requestAnimationFrame(function(){ requestAnimationFrame(function(){ veil.classList.add("full"); }); });
   setTimeout(function(){
-    if(mid) mid();
     veil.classList.add("away");
     setTimeout(function(){
       veil.remove();
       traveling = false;
       if(end) end();
-    }, 860);
-  }, kind==="title" ? 1500 : 1150);
+    }, 520);
+  }, kind==="title" ? 980 : 860);
 }
 function fillPortal(which, el){
   speak(which==="lab" ? "Welcome to Learning Hub." : "Welcome to Practice Arena.");
   grow(el, which==="lab" ? "lab" : "arena", function(){ openPath(which); });
 }
 function openTitle(card){
-  grow(card, "title", null, function(){
+  grow(card, "title", function(){
     hush();
     location.href = card.getAttribute("href");
   });
@@ -500,8 +503,11 @@ function enter(id, spot){
     figure.style.transform = "scale(4.2)";
     figure.style.opacity = "0";
   });
-  if(id==="brain" && !reduced){
+  if(organ.plate && !reduced){
     const layer = placeBrain(spot);
+    const plate = document.getElementById("plate");
+    plate.src = organ.plate;
+    plate.alt = organ.name+" cross-section";
     layer.classList.remove("leave");
     requestAnimationFrame(function(){ layer.classList.add("rise"); });
     arm = setTimeout(function(){ layer.classList.add("leave"); }, 1750);
@@ -641,7 +647,7 @@ function speak(text){
     "Heart":"voice/heart.mp3",
     "Liver":"voice/liver.mp3",
     "Stomach":"voice/stomach.mp3",
-    "Intestines":"voice/intestines.mp3",
+    "Gastrointestinal":"voice/gastrointestinal.mp3",
     "Spleen":"voice/spleen.mp3",
     "Whole patient":"voice/whole.mp3",
     "Kidneys":"voice/kidneys.mp3",
