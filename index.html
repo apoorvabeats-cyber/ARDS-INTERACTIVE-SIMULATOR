@@ -1,243 +1,283 @@
 <!doctype html>
-<!-- hub-front -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<meta name="theme-color" content="#071b3a">
+<meta name="theme-color" content="#0c0d10">
 <title>Critical Care Interactive Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520;9..144,620&family=Figtree:wght@460;600&display=swap" rel="stylesheet">
 <style>
+:root{
+  --bg:#0c0d10; --fg:#f4f0e6; --muted:#b7b2a6; --faint:#8d887e;
+  --line:rgba(244,240,230,.16); --learn:#12181c; --practice:#1b1511;
+}
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#f4f7fb;color:#14213d}
-.wrap{max-width:900px;margin:auto;padding:18px}
-.hero{background:linear-gradient(135deg,#071b3a,#1457a6);color:#fff;border-radius:24px;padding:28px 22px;margin-bottom:18px}
-h1{font-size:clamp(30px,8vw,48px);line-height:1.05;margin:0 0 10px}
-.hero p{font-size:18px;line-height:1.5;margin:0;color:#dbe9ff}
-.section{background:#fff;border:1px solid #d7e0ec;border-radius:20px;padding:20px;margin:14px 0}
-h2{margin:0 0 14px;font-size:25px}
-.card{display:block;text-decoration:none;color:inherit;border:1px solid #d7e0ec;border-radius:16px;padding:17px;margin:12px 0;background:#fff}
-.card:active{transform:scale(.99)}
-.title{font-weight:800;font-size:19px;color:#1457a6}
-.meta{margin-top:5px;color:#5f6f86;line-height:1.4}
-.badge{display:inline-block;margin-top:10px;padding:6px 10px;border-radius:999px;background:#e9f2ff;color:#1457a6;font-weight:700;font-size:13px}
-.footer{text-align:center;color:#718096;font-size:13px;padding:20px 0}
-.searchbar{position:sticky;top:8px;z-index:5;margin:0 0 14px}
-.searchbar input{width:100%;font:700 18px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;padding:14px 16px;border-radius:16px;border:2px solid #1457a6;background:#fff;color:#14213d;box-shadow:0 8px 24px #071b3a22}
-.searchbar input:focus{outline:3px solid #93c5fd}
-#none{display:none;background:#fff;border:1px solid #d7e0ec;border-radius:16px;padding:16px;color:#5f6f86;font-weight:700}
-.card[hidden],.section[hidden]{display:none !important}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg)}
+body{font-family:Figtree,ui-sans-serif,sans-serif;display:flex;flex-direction:column;min-height:100dvh}
+button,a,input{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+header{display:block;padding:14px 16px 2px}
+.brand{font-family:Fraunces,Georgia,serif;font-size:32px;font-weight:520;letter-spacing:-.03em;margin:0;line-height:1}
+header input{
+  width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);
+  padding:10px 0 8px;font-size:16px;
+}
+header input::placeholder{color:var(--faint)}
+.stage{flex:1;min-height:0;display:grid;grid-template-columns:4.6rem minmax(0,1fr);gap:4px;padding:8px 8px 0}
+.rail{display:flex;flex-direction:column;justify-content:space-between;padding:8px 0 12px}
+.rail button{
+  background:none;border:0;text-align:left;color:var(--faint);font-size:13px;padding:0;min-height:44px;
+}
+.rail button.on{color:var(--fg)}
+.well{perspective:1100px;display:flex;align-items:center;justify-content:center;min-height:0}
+.figure{
+  position:relative;height:100%;max-height:100%;aspect-ratio:1008/1792;width:auto;max-width:100%;
+  transform-style:preserve-3d;
+}
+.figure.sway{animation:sway 10s ease-in-out infinite}
+@keyframes sway{0%,100%{transform:rotateY(-8deg)}50%{transform:rotateY(8deg)}}
+.figure img{width:100%;height:100%;display:block;object-fit:fill;border-radius:28px;pointer-events:none;user-select:none}
+.hot{
+  position:absolute;transform:translate(-50%,-50%);width:48px;height:48px;border:0;border-radius:999px;background:transparent;padding:0;
+}
+.hot i{
+  position:absolute;inset:12px;border-radius:inherit;border:1.5px solid rgba(244,240,230,.72);
+  box-shadow:0 0 0 6px rgba(12,13,16,.25);
+}
+.hot.on i{inset:6px;background:rgba(244,240,230,.16);box-shadow:0 0 22px rgba(244,240,230,.45)}
+.chambers{display:none;min-height:0;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}
+body.picked .chambers{display:grid;height:46dvh}
+body.picked .stage{flex:1}
+.half{min-width:0;overflow:auto;padding:12px 12px 18px}
+.half.learn{background:linear-gradient(180deg,var(--learn),var(--bg))}
+.half.practice{background:linear-gradient(180deg,var(--practice),var(--bg));border-left:1px solid var(--line)}
+.kicker{margin:0;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+.organ-name{font-family:Fraunces,Georgia,serif;font-size:28px;font-weight:520;letter-spacing:-.03em;margin:2px 0 8px;line-height:1}
+.half.practice .organ-name{font-size:0;margin:0}
+.card{
+  display:block;text-decoration:none;padding:11px 0;border-top:1px solid var(--line);min-height:44px;
+}
+.card b{display:block;font-weight:600;font-size:15px;line-height:1.25}
+.card span{display:block;margin-top:3px;color:var(--muted);font-size:13px;line-height:1.35}
+.empty{color:var(--muted);font-size:14px;line-height:1.45;margin:8px 0 0}
+.results{display:none;padding:8px 14px 20px}
+.invite{display:none;max-width:16rem;color:var(--muted);font-family:Fraunces,Georgia,serif;font-size:28px;font-weight:520;letter-spacing:-.03em;line-height:1.15}
+body.searching .stage,body.searching .chambers{display:none}
+body.searching .results{display:block}
+.group{margin:14px 0}
+.group h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:0 0 4px}
+@media(min-width:900px){
+  body{display:grid;grid-template-columns:minmax(320px,46vw) minmax(0,1fr);grid-template-rows:auto 1fr}
+  header{grid-column:1/-1;display:flex;align-items:flex-end;gap:24px}
+  .brand{white-space:nowrap}
+  header input{flex:1}
+  body:not(.picked) .chambers{display:grid;place-items:center;padding:32px}
+  body:not(.picked) .invite{display:block}
+  body.picked .chambers{display:grid;height:auto;border-top:0;border-left:1px solid var(--line)}
+  .stage{padding-bottom:16px}
+}
+@media(prefers-reduced-motion:reduce){
+  .figure.sway{animation:none}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="hero">
-    <h1>Critical Care<br>Interactive Hub</h1>
-    <p>Interactive bedside learning tools and clinical simulators.</p>
-  </header>
-
-  <div class="searchbar">
-    <input id="find" type="search" enterkeyhint="search" placeholder="Find a simulator — stroke, ARDS, sodium, ACLS" autocomplete="off" aria-label="Find a simulator">
+<header>
+  <h1 class="brand">Critical Care</h1>
+  <input id="find" type="search" enterkeyhint="search" placeholder="Find a simulator" aria-label="Find a simulator">
+</header>
+<div class="stage">
+  <nav class="rail" id="rail" aria-label="Organs"></nav>
+  <div class="well">
+    <div class="figure sway" id="figure">
+      <img src="anatomy-body.jpg" alt="Translucent anatomical model. Brain, thyroid, lungs, heart, liver, stomach, spleen and kidneys are visible.">
+    </div>
   </div>
-  <p id="none">No simulator matches that.</p>
-
-
-  <section class="section">
-    <h2>Practice Simulators</h2>
-    <a class="card" data-find="practice simulator stroke sah subarachnoid ards septic shock hotspot image click finding learn exam" href="Practice_Simulator.html?v=20261014b" style="border-color:#1457a6;background:#f3f8ff">
-      <div class="title">Practice Simulator</div>
-      <div class="meta">Image-based cases for acute ischemic stroke, subarachnoid hemorrhage, ARDS, and septic shock. Click the finding on the study, then choose the next move. Learn mode stops a miss. Exam mode saves the teaching for the debrief.</div>
-      <span class="badge">OPEN PRACTICE SIMULATOR →</span>
-    </a>
-  </section>
-
-  <section class="section">
-    <h2>Neurocritical Care</h2>
-
-    <a class="card" href="Acute_Ischemic_Stroke_Simulator_V6_FINAL.html?v=20260925s">
-      <div class="title">Acute Ischemic Stroke Simulator</div>
-      <div class="meta">Interactive clinical assessment, NIHSS, imaging, IV thrombolysis, EVT and final treatment pathway.</div>
-      <span class="badge">OPEN SIMULATOR →</span>
-    </a>
-    <a class="card" href="TBI_Interactive_Simulator_v5_ICP_Anisocoria.html?v=20260925s">
-      <div class="title">Traumatic Brain Injury (TBI) Interactive Simulator</div>
-      <div class="meta">Interactive TBI ABCDE assessment, automatic GCS calculation, CT and laboratory correction, anticoagulant reversal, raised-ICP assessment, tiered ICP management and surgical decision pathway.</div>
-      <span class="badge">OPEN TBI SIMULATOR →</span>
-    </a>
-    <a class="card" href="Intracerebral_Hemorrhage_Interactive_Simulator_v1.html?v=20260925s">
-      <div class="title">Intracerebral Hemorrhage (ICH) Interactive Simulator</div>
-      <div class="meta">Interactive ICH assessment, BP management, reversal, imaging, ICP considerations and treatment pathway.</div>
-      <span class="badge">OPEN SIMULATOR →</span>
-    </a>
-    <a class="card" href="Subarachnoid_Hemorrhage_Interactive_Simulator_v1.html?v=20260925s">
-      <div class="title">Subarachnoid Hemorrhage (SAH) Interactive Simulator</div>
-      <div class="meta">Interactive SAH assessment, grading, aneurysm pathway and neurocritical-care management.</div>
-      <span class="badge">OPEN SIMULATOR →</span>
-    </a>
-    <a class="card" href="Status_Epilepticus_Interactive_Simulator_v2_EDITABLE.html?v=20260925s">
-      <div class="title">Status Epilepticus Interactive Simulator</div>
-      <div class="meta">Interactive status epilepticus assessment, seizure classification, benzodiazepine dosing, second-line therapy, refractory status and escalation pathway.</div>
-      <span class="badge">OPEN SIMULATOR →</span>
-    </a>
-    <a class="card" href="CNS_Infection_Interactive_Algorithm_v7.html?v=20260925s">
-      <div class="title">CNS Infection Interactive Algorithm</div>
-      <div class="meta">Interactive meningitis, encephalitis, meningoencephalitis, brain abscess, ventriculitis, TB, cryptococcal and opportunistic CNS infection pathways with ICU complication management.</div>
-      <span class="badge">OPEN ALGORITHM →</span>
-    </a>
-  </section>
-
-  <section class="section">
-    <h2>Respiratory Critical Care</h2>
-    <a class="card" href="Ventilator_Waveform_Troubleshooting.html?v=20260925s" style="border-color:#1457a6;background:#f3f8ff">
-      <div class="title">Ventilator Waveform Troubleshooting</div>
-      <div class="meta">Three scrolling scalars: pressure in cmH2O, flow in L/min, and volume in mL. High resistance, low compliance, auto-PEEP, leak, overdistension, flow starvation, secretions, missed triggers, and double trigger. Then name the pattern.</div>
-      <span class="badge">OPEN WAVEFORM SIMULATOR →</span>
-    </a>
-    <a class="card" href="Shock_Bay.html?v=20260925s" style="border-color:#1457a6;background:#f3f8ff">
-      <div class="title">Shock Bay — ICU shock and ARDS</div>
-      <div class="meta">Live bedside simulator. Shock phenotypes and severe ARDS with a ventilator you control: tidal volume, PEEP, FiO2, plateau pressure, and P/F ratio.</div>
-      <span class="badge">OPEN SHOCK BAY →</span>
-    </a>
-    <a class="card" href="Hypoxic_Patient_Respiratory_Critical_Care_Simulator_v22.html?v=20260925s">
-      <div class="title">Hypoxic Patient — Respiratory Critical Care Simulator</div>
-      <div class="meta">Interactive ABC stabilization, ABG and A–a gradient interpretation, Type 1/Type 2/Mixed respiratory failure pathways, oxygen, HFNC, NIV and intubation with etiology-based management.</div>
-      <span class="badge">OPEN HYPOXIC PATIENT SIMULATOR →</span>
-    </a>
-    <a class="card" href="ARDS_Active_Simulator.html?v=20260925s">
-      <div class="title">ARDS Active Simulator</div>
-      <div class="meta">Interactive ARDS ventilator management with live ABG, P/F ratio, hemodynamics, prone positioning, rescue therapies and clinical decision pathway. Now includes 4 selectable cases (pneumonia, COVID-19, aspiration, sepsis), driving pressure estimate, one-time recruitment maneuver with hemodynamic penalty, and session debrief screen.</div>
-      <span class="badge">OPEN ARDS ACTIVE SIMULATOR →</span>
-    </a>
-    <a class="card" href="COPD_Asthma_V11_CASE_DRIVEN_CHECKED.html?v=20260925s">
-      <div class="title">COPD &amp; Asthma Active Simulator</div>
-      <div class="meta">Interactive COPD and asthma case-driven management with live ventilator settings, bronchodilator therapy, escalation and ICU pathway.</div>
-      <span class="badge">OPEN COPD/ASTHMA SIMULATOR →</span>
-    </a>
-    <a class="card" href="COPD_vs_ARDS_Interactive_Atlas_NATIVE.html?v=20260925s">
-      <div class="title">COPD vs ARDS Interactive Atlas</div>
-      <div class="meta">Interactive respiratory critical-care learning tool comparing COPD and ARDS pathophysiology, diagnosis and management.</div>
-      <span class="badge">OPEN ATLAS →</span>
-    </a>
-  </section>
-
-  <section class="section">
-    <h2>ABG Interpretation</h2>
-    <a class="card" href="ABG_Photo_Interpreter_Simulator.html?v=20260925s">
-      <div class="title">ABG Photo Interpreter</div>
-      <div class="meta">Photograph an ABG report with your device camera — OCR extracts the values automatically. Full 6-step interpretation: pH, primary disorder, compensation (Winter's formula), mixed disorders, P/F ratio, A-a gradient, anion gap and delta-delta. Includes management guidance per abnormality, serial ABG trend tracking and one-tap export summary.</div>
-      <span class="badge">OPEN ABG INTERPRETER →</span>
-    </a>
-  </section>
-
-  <section class="section">
-    <h2>Infection in Critical Care</h2>
-    <a class="card" href="Antibiotic_Simulator.html?v=20260928e" style="border-color:#1457a6;background:#f3f8ff">
-      <div class="title">Antibiotic Simulator</div>
-      <div class="meta">Culture in hand. Community and hospital organisms, Pseudomonas, ESBL, AmpC, MRSA, VRE, Stenotrophomonas, and the carbapenemases NDM, KPC, and OXA-48. Dose, PK/PD, and the toxicity that changes the choice.</div>
-      <span class="badge">OPEN ANTIBIOTIC SIMULATOR →</span>
-    </a>
-    <a class="card" data-find="idsa carbapenemase kpc oxa ndm mbl crab dtr pseudomonas cefiderocol resistance matrix pk pd" href="IDSA_Antibiotic_Selection_Simulator.html?v=20260928g" style="border-color:#1457a6;background:#f3f8ff">
-      <div class="title">IDSA Antibiotic Selection and Resistance</div>
-      <div class="meta">Empiric regimen by source, shock, and MRSA, Pseudomonas, or ESBL risk. Directed therapy for KPC, OXA-48, NDM, AmpC, difficult Pseudomonas, and CRAB. Doses follow clearance, dialysis, and CRRT. Cefiderocol stays off unless it is in stock.</div>
-      <span class="badge">OPEN IDSA SIMULATOR →</span>
-    </a>
-    <a class="card" href="Antifungal_Resistance_Simulator.html?v=20260925s" style="border-color:#1457a6;background:#f3f8ff">
-      <div class="title">Antifungal Resistance</div>
-      <div class="meta">Culture in hand. C. auris, echinocandin FKS mutations, azole-resistant Aspergillus, Mucorales, and cryptococcal induction. Doses, PK/PD, and the site the drug does not reach.</div>
-      <span class="badge">OPEN ANTIFUNGAL SIMULATOR →</span>
-    </a>
-
-  </section>
-
-  <section class="section">
-    <h2>Endocrine Critical Care</h2>
-    <a class="card" href="DKA_Interactive_Simulator.html?v=20260925s" style="border-color:#1457a6;background:#f3f8ff">
-      <div class="title">DKA Simulator</div>
-      <div class="meta">Four bedside cases: classic DKA, hypokalemia before insulin, euglycemic DKA on an SGLT2 inhibitor, and hyperosmolar state. Fluids, potassium, insulin, and dextrose move the pH, the anion gap, and the ketones.</div>
-      <span class="badge">OPEN DKA SIMULATOR →</span>
-    </a>
-    <a class="card" href="DKA_HHS_Resuscitation_Engine.html?v=20260925n">
-      <div class="title">DKA and HHS Resuscitation</div>
-      <div class="meta">Adult glucose, pH, ketone, and electrolytes. Separates DKA, euglycaemic DKA, HHS, and the mixed picture. Holds insulin when potassium is under 3.3, and does not stop insulin when the glucose falls.</div>
-      <span class="badge">OPEN DKA AND HHS →</span>
-    </a>
-  </section>
-
-  <section class="section">
-    <h2>Electrolyte &amp; Metabolic</h2>
-    <a class="card" data-find="electrolyte sodium hyponatremia hypernatremia potassium hypokalemia hyperkalemia calcium magnesium phosphate" href="Electrolyte_Disorders_Interactive_Simulator.html?v=20261014d">
-      <div class="title">Electrolyte Simulator</div>
-      <div class="meta">Diagnosis and guideline-based management for hyponatremia, hypernatremia, hypo/hyperkalemia, hypo/hypercalcemia, hypo/hypermagnesemia and hypo/hyperphosphatemia. Enter the number. Sodium, potassium, calcium, magnesium, and phosphate each open a correction chart on this page.</div>
-      <span class="badge">OPEN ELECTROLYTE SIMULATOR →</span>
-    </a>
-  </section>
-
-  <section class="section">
-    <h2>GI Critical Care</h2>
-    <a class="card" data-find="gi pancreatitis necrosis step up walled off infected gallstone ercp cholangitis triglyceride" href="Acute_Pancreatitis_Simulator.html?v=20260926s">
-      <div class="title">Acute Pancreatitis</div>
-      <div class="meta">One page per step: diagnosis, severity, fluids, cause, complication, and the step-up approach.</div>
-      <span class="badge">OPEN ACUTE PANCREATITIS →</span>
-    </a>
-  </section>
-
-  <section class="section">
-    <h2>Cardiac Critical Care</h2>
-    <a class="card" href="ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20260925s" style="border-color:#1457a6;background:#f3f8ff">
-      <div class="title">ACLS Simulator — 2025 AHA</div>
-      <div class="meta">Adult cardiac arrest, tachycardia, and bradycardia. VF, asystole, PEA with a reversible cause, unstable VT, stable SVT, symptomatic bradycardia, and polymorphic VT. Doses and sequence follow the 2025 AHA algorithms.</div>
-      <span class="badge">OPEN ACLS SIMULATOR →</span>
-    </a>
-    <a class="card" href="Cardiac_Rhythm_Decision_Simulator_V29_FINAL_AUDITED.html?v=20260925t">
-      <div class="title">Cardiac Rhythm Decision Simulator</div>
-      <div class="meta">Interactive ECG rhythm diagnosis and treatment simulation with moving ECG, pulse and voice feedback, AV blocks, VT/VF, cardiac arrest, ROSC and dynamic 5 Hs & 5 Ts decision pathway.</div>
-      <span class="badge">OPEN CARDIAC RHYTHM SIMULATOR →</span>
-    </a>
-    <a class="card" href="Shock_POCUS_RUSH_Simulator.html?v=20260925l">
-      <div class="title">Shock and POCUS Simulator</div>
-      <div class="meta">Bedside pressures, ScvO₂, lactate, and a RUSH exam. Separates hypovolemia, cardiogenic shock, massive PE, tamponade, tension pneumothorax, vasodilated sepsis, septic cardiomyopathy, ARDS, and neurogenic shock.</div>
-      <span class="badge">OPEN SHOCK AND POCUS →</span>
-    </a>
-    <a class="card" href="Shock_Identification_Management_Simulator.html?v=20260925s">
-      <div class="title">Shock Identification &amp; Management Simulator</div>
-      <div class="meta">Six-page interactive simulator covering user hemodynamic inputs, automatic MAP/CO/CI/SVRI calculations, dynamic echo, shock phenotype diagnosis, shock-specific management pathways, educational TPTD simulation, and final mixed-shock treatment integration.</div>
-      <span class="badge">OPEN SHOCK SIMULATOR →</span>
-    </a>
-    <a class="card" data-find="shock telemetry arterial ivc pocus ppv svv eadyn scai lactate norepinephrine dobutamine tamponade" href="Shock_Telemetry_POCUS_Simulator.html?v=20261001a" style="border-color:#1457a6;background:#f3f8ff">
-      <div class="title">Multi-Modal Shock Telemetry</div>
-      <div class="meta">Live arterial line and IVC ultrasound. PPV and Ea,dyn only when they are valid. Fluids, norepi, dobutamine, and a procedure change the waveform and the 6-hour sketch.</div>
-      <span class="badge">OPEN TELEMETRY SIMULATOR →</span>
-    </a>
-  </section>
-
-  <div class="footer">Educational decision-support tools • Verify against current guidelines and local protocols.</div>
 </div>
+<section class="chambers" id="chambers" aria-live="polite"><p class="invite">Tap an organ. Learn and practice open on either side of the same cut.</p></section>
+<section class="results" id="results"></section>
 <script>
-(function(){
-  var box=document.getElementById('find');
-  var cards=[].slice.call(document.querySelectorAll('.card'));
-  var sections=[].slice.call(document.querySelectorAll('.section'));
-  var none=document.getElementById('none');
-  function hay(el){
-    return ((el.getAttribute('data-find')||'')+' '+(el.textContent||'')+' '+(el.getAttribute('href')||'')).toLowerCase();
+const ORGANS = [
+  {
+    id:"brain", name:"Brain", kicker:"Neurocritical care",
+    spots:[{x:50,y:11.2}],
+    learn:[
+      ["Acute ischemic stroke","Assessment, NIHSS, imaging, thrombolysis and EVT.","Acute_Ischemic_Stroke_Simulator_V6_FINAL.html?v=20260925s"],
+      ["Traumatic brain injury","GCS, CT, reversal, ICP tiers and surgery.","TBI_Interactive_Simulator_v5_ICP_Anisocoria.html?v=20260925s"],
+      ["Intracerebral hemorrhage","Blood pressure, reversal and the ICP pathway.","Intracerebral_Hemorrhage_Interactive_Simulator_v1.html?v=20260925s"],
+      ["Subarachnoid hemorrhage","Grading, the aneurysm and the day-one bundle.","Subarachnoid_Hemorrhage_Interactive_Simulator_v1.html?v=20260925s"],
+      ["Status epilepticus","Benzodiazepine, second-line drug, then refractory care.","Status_Epilepticus_Interactive_Simulator_v2_EDITABLE.html?v=20260925s"],
+      ["CNS infection","Meningitis, encephalitis, abscess and the ICU complications.","CNS_Infection_Interactive_Algorithm_v7.html?v=20260925s"]
+    ],
+    practice:[
+      ["Neurology Practice Simulator","Stroke and subarachnoid hemorrhage. Click the finding on the study, then choose the next move.","Practice_Simulator.html?focus=neuro&v=20261014e"]
+    ]
+  },
+  {
+    id:"thyroid", name:"Thyroid", kicker:"Endocrine critical care",
+    spots:[{x:50,y:28.9}],
+    learn:[
+      ["DKA","Fluids, potassium, insulin and dextrose across four bedside cases.","DKA_Interactive_Simulator.html?v=20260925s"],
+      ["DKA and HHS","Holds insulin when potassium is under 3.3, and does not stop it when the glucose falls.","DKA_HHS_Resuscitation_Engine.html?v=20260925n"]
+    ],
+    practice:[]
+  },
+  {
+    id:"lungs", name:"Lungs", kicker:"Respiratory critical care",
+    spots:[{x:39,y:42},{x:63,y:42}],
+    learn:[
+      ["Ventilator waveforms","Pressure, flow and volume. Name the pattern.","Ventilator_Waveform_Troubleshooting.html?v=20260925s"],
+      ["Hypoxic patient","Oxygen, HFNC, NIV and the reason for the failure.","Hypoxic_Patient_Respiratory_Critical_Care_Simulator_v22.html?v=20260925s"],
+      ["ARDS ventilator","PEEP, prone position, driving pressure and rescue.","ARDS_Active_Simulator.html?v=20260925s"],
+      ["COPD and asthma","Bronchodilator, the ventilator and the ICU pathway.","COPD_Asthma_V11_CASE_DRIVEN_CHECKED.html?v=20260925s"],
+      ["COPD versus ARDS","An atlas of the two patterns.","COPD_vs_ARDS_Interactive_Atlas_NATIVE.html?v=20260925s"],
+      ["ABG photo","Photograph a report. The six-step reading is done for you.","ABG_Photo_Interpreter_Simulator.html?v=20260925s"]
+    ],
+    practice:[
+      ["Respiratory Practice Simulator","ARDS. Click the opacity, name the severity, then set the tidal volume.","Practice_Simulator.html?focus=lungs&v=20261014e"]
+    ]
+  },
+  {
+    id:"heart", name:"Heart", kicker:"Cardiac and shock",
+    spots:[{x:55,y:44.5}],
+    learn:[
+      ["ACLS, 2025 AHA","Arrest, tachycardia and bradycardia, with the current doses.","ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20260925s"],
+      ["Cardiac rhythm","A moving ECG, the arrest and the reversible causes.","Cardiac_Rhythm_Decision_Simulator_V29_FINAL_AUDITED.html?v=20260925t"],
+      ["Shock bay","Phenotypes of shock, and a ventilator you control.","Shock_Bay.html?v=20260925s"],
+      ["Shock and POCUS","RUSH exam, ScvO2 and lactate.","Shock_POCUS_RUSH_Simulator.html?v=20260925l"],
+      ["Shock identification","MAP, cardiac index and the phenotype.","Shock_Identification_Management_Simulator.html?v=20260925s"],
+      ["Shock telemetry","Arterial line, IVC, PPV and the vasopressor.","Shock_Telemetry_POCUS_Simulator.html?v=20261001a"]
+    ],
+    practice:[
+      ["Shock Practice Simulator","Septic shock. The small ventricle, the full IVC, then norepinephrine.","Practice_Simulator.html?focus=circulation&v=20261014e"]
+    ]
+  },
+  {
+    id:"liver", name:"Liver", kicker:"Hepatic critical care",
+    spots:[{x:40,y:55}],
+    learn:[],
+    practice:[]
+  },
+  {
+    id:"stomach", name:"Stomach", kicker:"GI critical care",
+    spots:[{x:54,y:59.5}],
+    learn:[
+      ["Acute pancreatitis","Diagnosis, fluids, cause, and the step-up approach.","Acute_Pancreatitis_Simulator.html?v=20260926s"]
+    ],
+    practice:[]
+  },
+  {
+    id:"spleen", name:"Spleen", kicker:"Infection",
+    spots:[{x:66,y:54}],
+    learn:[
+      ["Antibiotics","The culture, the resistance, and the toxicity that changes the choice.","Antibiotic_Simulator.html?v=20260928e"],
+      ["IDSA selection","KPC, OXA-48, NDM, and the dose that follows the clearance.","IDSA_Antibiotic_Selection_Simulator.html?v=20260928g"],
+      ["Antifungal resistance","C. auris, Mucorales, and the site the drug does not reach.","Antifungal_Resistance_Simulator.html?v=20260925s"]
+    ],
+    practice:[]
+  },
+  {
+    id:"kidneys", name:"Kidneys", kicker:"Electrolytes",
+    spots:[{x:40,y:64},{x:60,y:64}],
+    learn:[
+      ["Electrolytes","Sodium, potassium, calcium, magnesium and phosphate. Calcium starts from the serum value and the albumin.","Electrolyte_Disorders_Interactive_Simulator.html?v=20261014d"]
+    ],
+    practice:[]
   }
-  function go(){
-    var words=box.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    var n=0;
-    cards.forEach(function(c){
-      var show=!words.length || words.every(function(w){ return hay(c).indexOf(w)!==-1; });
-      c.hidden=!show;
-      if(show) n++;
-    });
-    sections.forEach(function(s){
-      s.hidden=![].slice.call(s.querySelectorAll('.card')).some(function(c){ return !c.hidden; });
-    });
-    none.style.display=n?'none':'block';
+];
+
+const figure = document.getElementById("figure");
+const rail = document.getElementById("rail");
+const chambers = document.getElementById("chambers");
+const results = document.getElementById("results");
+const find = document.getElementById("find");
+let current = null;
+let dragging = null;
+
+function esc(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {"&":"&"+"amp;","<":"&"+"lt;",">":"&"+"gt;",'"':"&"+"quot;","'":"&"+"#39;"}[c];
+  });
+}
+function cards(list){
+  if(!list.length) return '<p class="empty">Nothing on this shelf yet.</p>';
+  return list.map(function(row){
+    return '<a class="card" href="'+esc(row[2])+'"><b>'+esc(row[0])+'</b><span>'+esc(row[1])+'</span></a>';
+  }).join("");
+}
+function selectOrgan(id){
+  const organ = ORGANS.find(function(item){ return item.id===id; });
+  if(!organ) return;
+  current = id;
+  document.body.classList.add("picked");
+  figure.classList.remove("sway");
+  figure.querySelectorAll(".hot").forEach(function(btn){
+    btn.classList.toggle("on", btn.getAttribute("data-id")===id);
+  });
+  rail.querySelectorAll("button").forEach(function(btn){
+    btn.classList.toggle("on", btn.getAttribute("data-id")===id);
+    if(btn.getAttribute("data-id")===id) btn.setAttribute("aria-current","true");
+    else btn.removeAttribute("aria-current");
+  });
+  chambers.innerHTML =
+    '<div class="half learn"><p class="kicker">Learn</p><h2 class="organ-name">'+esc(organ.name)+'</h2><p class="kicker">'+esc(organ.kicker)+'</p>'+cards(organ.learn)+'</div>'+
+    '<div class="half practice"><p class="kicker">Practice</p><h2 class="organ-name">'+esc(organ.name)+'</h2><p class="kicker">'+esc(organ.kicker)+'</p>'+cards(organ.practice)+'</div>';
+  if(window.matchMedia("(max-width:899px)").matches){
+    chambers.scrollIntoView({block:"nearest", behavior:"smooth"});
   }
-  box.addEventListener('input', go);
-})();
+}
+function paint(){
+  rail.innerHTML = ORGANS.map(function(organ){
+    return '<button type="button" data-id="'+organ.id+'">'+esc(organ.name)+'</button>';
+  }).join("");
+  const spots = [];
+  ORGANS.forEach(function(organ){
+    organ.spots.forEach(function(spot){
+      spots.push('<button type="button" class="hot" data-id="'+organ.id+'" style="left:'+spot.x+'%;top:'+spot.y+'%" aria-label="'+esc(organ.name)+'"><i></i></button>');
+    });
+  });
+  figure.insertAdjacentHTML("beforeend", spots.join(""));
+  document.querySelectorAll("[data-id]").forEach(function(btn){
+    btn.addEventListener("click", function(){ selectOrgan(btn.getAttribute("data-id")); });
+  });
+}
+function search(){
+  const words = find.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  document.body.classList.toggle("searching", words.length>0);
+  if(!words.length){ results.innerHTML=""; return; }
+  const html = ORGANS.map(function(organ){
+    const rows = organ.learn.concat(organ.practice).filter(function(row){
+      const hay = (organ.name+" "+organ.kicker+" "+row[0]+" "+row[1]+" "+row[2]).toLowerCase();
+      return words.every(function(word){ return hay.indexOf(word)!==-1; });
+    });
+    if(!rows.length) return "";
+    return '<div class="group"><h2>'+esc(organ.name)+'</h2>'+cards(rows)+'</div>';
+  }).join("");
+  results.innerHTML = html || '<p class="empty">No simulator matches that.</p>';
+}
+figure.addEventListener("pointerdown", function(event){
+  if(event.target.closest(".hot")) return;
+  dragging = {x:event.clientX, r:0};
+  figure.classList.remove("sway");
+  figure.setPointerCapture(event.pointerId);
+});
+figure.addEventListener("pointermove", function(event){
+  if(!dragging) return;
+  const next = Math.max(-16, Math.min(16, (event.clientX-dragging.x)/8));
+  figure.style.transform = "rotateY("+next+"deg)";
+});
+figure.addEventListener("pointerup", function(){
+  dragging = null;
+  if(!current){
+    figure.style.transform = "";
+    figure.classList.add("sway");
+  }
+});
+find.addEventListener("input", search);
+paint();
 </script>
 </body>
 </html>

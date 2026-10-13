@@ -590,16 +590,32 @@ function setBar(buttons){
     if (el) el.onclick = button.on;
   });
 }
+const FOCUS = {
+  neuro: { title: "Neurology Practice Simulator", ids: ["stroke", "sah"], line: "Stroke and subarachnoid hemorrhage. The scan comes first, then the next decision." },
+  lungs: { title: "Respiratory Practice Simulator", ids: ["ards"], line: "ARDS. The film, the gas, and the next breath." },
+  circulation: { title: "Shock Practice Simulator", ids: ["shock"], line: "Septic shock. The echo, the pressure, and the first vasopressor." }
+};
+function focusSpec(){
+  const key = new URLSearchParams(location.search).get("focus");
+  return FOCUS[key] || null;
+}
+function visibleCases(){
+  const spec = focusSpec();
+  if (!spec) return CASES;
+  return CASES.filter(function(c){ return spec.ids.indexOf(c.id) !== -1; });
+}
 function render(){
   renderVitals();
   if (phase === "catalog"){
-    crumb.textContent = "Practice Simulator";
+    const spec = focusSpec();
+    crumb.textContent = spec ? spec.title : "Practice Simulator";
     progress.textContent = "";
     nav.textContent = "Hub";
     nav.onclick = null;
     setBar([]);
-    app.innerHTML = '<section class="hero"><h1>Practice Simulator</h1><p>The chart and the image come first. Choose the study, click the finding, and live with the next set of numbers. Learn mode stops a miss. Exam mode waits until the debrief.</p><div class="steps"><div><b>01</b>Select the study</div><div><b>02</b>Click the finding</div><div><b>03</b>Decide the next move</div><div><b>04</b>Reassess</div></div></section>' +
-      CASES.map(function(c){
+    const shown = visibleCases();
+    app.innerHTML = '<section class="hero"><h1>' + esc(spec ? spec.title : "Practice Simulator") + "</h1><p>" + esc(spec ? spec.line : "The chart and the image come first. Choose the study, click the finding, and live with the next set of numbers. Learn mode stops a miss. Exam mode waits until the debrief.") + '</p><div class="steps"><div><b>01</b>Select the study</div><div><b>02</b>Click the finding</div><div><b>03</b>Decide the next move</div><div><b>04</b>Reassess</div></div></section>' +
+      shown.map(function(c){
         const best = loadBest(c.id);
         return '<button class="card" type="button" data-open="' + esc(c.id) + '"><img alt="" src="' + esc(c.thumb || "") + '"><span class="body"><span class="kicker">' + esc(c.syndrome) + " · " + esc(c.difficulty) + "</span><h2>" + esc(c.title) + "</h2><p class='meta'>" + esc(c.summary) + "</p><span class='badge'>" + c.stages.length + " decisions" + (best ? " · Best " + best + "%" : "") + " · Open</span></span></button>";
       }).join("") +
