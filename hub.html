@@ -37,13 +37,14 @@ body.opening .glow{animation:glow 2s ease forwards}
 @keyframes glow{0%{opacity:0}40%{opacity:1}100%{opacity:.35}}
 .sound,.skip{position:fixed;z-index:6;background:rgba(7,16,24,.72);border:1px solid var(--line);color:var(--fg);border-radius:999px;min-height:44px;padding:0 14px}
 .sound{top:12px;right:12px}
+.replay{top:64px;right:12px}
 .skip{top:12px;left:12px;display:none}
 body.opening .skip{display:block}
 body.blocked .figure{opacity:0}
 body.blocked header{visibility:hidden}
 body.blocked .invite{opacity:1}
-.touch{display:none;position:fixed;top:22px;left:0;right:0;z-index:6;text-align:center;color:var(--faint);font-size:13px;letter-spacing:.08em}
-body.blocked .touch{display:block}
+.touch{display:block;position:fixed;top:22px;left:0;right:0;z-index:6;text-align:center;color:var(--faint);font-size:13px;letter-spacing:.08em}
+body.begun .touch{display:none}
 .invite{position:fixed;left:0;right:0;bottom:28px;z-index:5;text-align:center;padding:0 24px;opacity:0;pointer-events:none}
 body.titled .invite,body.ready .invite{opacity:1;transition:opacity .8s ease}
 body.settled .invite,body.in .invite{opacity:0}
@@ -170,12 +171,12 @@ body.searching .results{display:block}
 </head>
 <body>
 <canvas class="dust" id="dust" aria-hidden="true"></canvas>
-<audio id="bed" src="pulse.wav" loop preload="auto" playsinline></audio>
 <audio id="line" preload="auto"></audio>
 <div class="glow" aria-hidden="true"></div>
 <button type="button" class="skip" id="skip">Skip</button>
 <p class="touch" id="touch">Touch to begin</p>
 <button type="button" class="sound" id="sound" aria-pressed="true">Sound: On</button>
+<button type="button" class="sound replay" id="replay">Replay</button>
 <div class="invite" id="invite">
   <p>Critical care • Human atlas</p>
   <h2>Explore the human body</h2>
@@ -488,9 +489,11 @@ function grow(el, kind, end){
 }
 function fillPortal(which, el){
   speak(which==="lab" ? "Welcome to Learning Lab." : "Welcome to Practice Arena.");
+  surge(0.35);
   grow(el, which==="lab" ? "lab" : "arena", function(){ openPath(which); });
 }
 function openTitle(card){
+  surge(0.7);
   grow(card, "title", function(){
     hush();
     location.href = card.getAttribute("href");
@@ -524,6 +527,7 @@ function enter(id, spot){
   finishIntro();
   setSpin(false);
   figure.classList.remove("sway");
+  blip((spot.x||50)/100*2-1);
   figure.classList.add("filming");
   document.body.classList.add("filming");
   figure.style.transformOrigin = spot.x+"% "+spot.y+"%";
@@ -603,7 +607,10 @@ document.querySelector(".atlas").addEventListener("pointerdown", function(event)
 window.addEventListener("pointermove", function(event){
   if(drag==null || current) return;
   const delta = event.clientX - drag;
-  if(Math.abs(delta) > 8) dragged = true;
+  if(Math.abs(delta) > 8){
+    dragged = true;
+    whoosh(delta);
+  }
   angle = grip + delta * 0.65;
   applyTurn();
 });
@@ -623,12 +630,117 @@ function ensureAudio(){
   if(audioCtx.state==="suspended") audioCtx.resume();
   return audioCtx;
 }
+let scoreNodes = [];
+let pulseTimer = 0;
+let lastWhoosh = 0;
+function bus(ctx){
+  const master = ctx.createGain();
+  master.gain.value = 0.55;
+  master.connect(ctx.destination);
+  return master;
+}
+function tone(ctx, dest, opts){
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = opts.type || "sine";
+  osc.frequency.setValueAtTime(Math.max(1, opts.f0), opts.t);
+  if(opts.f1) osc.frequency.exponentialRampToValueAtTime(Math.max(1, opts.f1), opts.t+opts.dur);
+  gain.gain.setValueAtTime(0.0001, opts.t);
+  gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, opts.vol), opts.t+(opts.atk||0.02));
+  gain.gain.exponentialRampToValueAtTime(0.0001, opts.t+opts.dur);
+  osc.connect(gain);
+  gain.connect(dest);
+  osc.start(opts.t);
+  osc.stop(opts.t+opts.dur+0.05);
+  scoreNodes.push(osc);
+}
+function noiseHit(ctx, dest, t, dur, vol, cut){
+  const len = Math.floor(ctx.sampleRate * dur);
+  const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for(let i=0;i<len;i++) data[i] = (Math.random()*2-1) * (1-i/len);
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = cut;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(vol, t);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  src.connect(filter);
+  filter.connect(gain);
+  gain.connect(dest);
+  src.start(t);
+  src.stop(t+dur+0.02);
+  scoreNodes.push(src);
+}
+function playScore(){
+  if(!soundOn || document.hidden) return;
+  stopAmbient();
+  const ctx = ensureAudio();
+  if(!ctx) return;
+  const dest = bus(ctx);
+  const t = ctx.currentTime + 0.03;
+  noiseHit(ctx, dest, t, 0.45, 0.7, 180);
+  tone(ctx, dest, {t:t, dur:0.7, f0:58, f1:34, vol:0.55, type:"sine", atk:0.012});
+  tone(ctx, dest, {t:t+0.35, dur:9.2, f0:46, f1:92, vol:0.28, type:"sine", atk:0.45});
+  tone(ctx, dest, {t:t+0.45, dur:8.6, f0:110, f1:640, vol:0.1, type:"sawtooth", atk:0.6});
+  tone(ctx, dest, {t:t+1.6, dur:7, f0:660, f1:1480, vol:0.035, type:"sine", atk:1.2});
+  for(let i=0;i<16;i++){
+    tone(ctx, dest, {t:t+0.8+i*0.55, dur:0.14, f0:52, vol:0.07, type:"sine", atk:0.008});
+  }
+  clearTimeout(pulseTimer);
+  pulseTimer = setTimeout(startPulse, 10400);
+}
+function startPulse(){
+  if(!soundOn || document.hidden || ambient.length) return;
+  startAmbient();
+}
+function whoosh(delta){
+  if(!soundOn || document.hidden) return;
+  const now = performance.now();
+  if(now-lastWhoosh < 110) return;
+  lastWhoosh = now;
+  const ctx = ensureAudio();
+  if(!ctx) return;
+  const dest = bus(ctx);
+  const t = ctx.currentTime;
+  const pan = Math.max(-1, Math.min(1, delta/180));
+  const node = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  const target = node || dest;
+  if(node){ node.pan.value = pan; node.connect(dest); }
+  noiseHit(ctx, target, t, 0.09, Math.min(0.18, Math.abs(delta)/900), 1400);
+}
+function blip(pan){
+  if(!soundOn || document.hidden) return;
+  const ctx = ensureAudio();
+  if(!ctx) return;
+  const dest = bus(ctx);
+  const node = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  const target = node || dest;
+  if(node){ node.pan.value = Math.max(-1, Math.min(1, pan||0)); node.connect(dest); }
+  tone(ctx, target, {t:ctx.currentTime, dur:0.18, f0:520, f1:760, vol:0.12, type:"sine", atk:0.01});
+}
+function surge(power){
+  if(!soundOn || document.hidden) return;
+  const ctx = ensureAudio();
+  if(!ctx) return;
+  const dest = bus(ctx);
+  const t = ctx.currentTime;
+  noiseHit(ctx, dest, t, 0.28, 0.35*power, 240);
+  tone(ctx, dest, {t:t, dur:0.42, f0:70, f1:180, vol:0.22*power, type:"sine", atk:0.01});
+}
+function stopScore(){
+  scoreNodes.forEach(function(node){ try{ node.stop(); }catch(err){} });
+  scoreNodes = [];
+  clearTimeout(pulseTimer);
+}
 function startAmbient(){
   if(!soundOn || ambient.length) return;
   const ctx = ensureAudio();
   if(!ctx) return;
   const master = ctx.createGain();
-  master.gain.value = 1;
+  master.gain.value = 0.45;
   master.connect(ctx.destination);
   [98,146,196].forEach(function(freq, index){
     const osc = ctx.createOscillator();
@@ -699,21 +811,13 @@ function speak(text){
   if(!file) return;
   playLine(file);
 }
-function startBed(){
-  if(!soundOn || document.hidden) return;
-  const bed = document.getElementById("bed");
-  bed.muted = false;
-  bed.volume = 0.18;
-  const pending = bed.play();
-  if(pending) pending.catch(function(){});
-}
+function startBed(){}
 function hush(){
-  const bed = document.getElementById("bed");
   const line = document.getElementById("line");
-  bed.pause();
   line.pause();
-  bed.muted = true;
   line.muted = true;
+  stopScore();
+  stopAmbient();
 }
 function playLine(src){
   if(!soundOn || document.hidden) return;
@@ -729,22 +833,22 @@ function playWelcome(){
   welcomed = true;
   playLine("welcome.mp3");
 }
-function bootSound(){
-  if(!soundOn) return;
-  startBed();
-}
+function bootSound(){}
 function setSound(on){
   soundOn = on;
   const button = document.getElementById("sound");
   button.setAttribute("aria-pressed", on ? "true" : "false");
   button.textContent = on ? "Sound: On" : "Sound: Off";
-  const bed = document.getElementById("bed");
   const line = document.getElementById("line");
-  if(on) startBed();
-  else { bed.pause(); line.pause(); }
+  if(!on){ line.pause(); stopScore(); stopAmbient(); }
+  else if(document.body.classList.contains("ready")) startPulse();
 }
 document.getElementById("sound").onclick = function(){
   setSound(!soundOn);
+};
+document.getElementById("replay").onclick = function(){
+  if(!soundOn) setSound(true);
+  playScore();
 };
 let begun = false;
 function beginShow(){
@@ -755,15 +859,15 @@ function beginShow(){
   playIntro();
 }
 document.addEventListener("pointerdown", function(event){
-  startBed();
-  if(begun && spinning && !current && !(event.target.closest && event.target.closest(".sound, .skip, input"))){
-    setSpin(false);
-    catchTap = true;
-  }
   if(!begun){
     beginShow();
+    playScore();
     if(!(event.target.closest && event.target.closest(".hot"))) playWelcome();
     return;
+  }
+  if(spinning && !current && !(event.target.closest && event.target.closest(".sound, .skip, .replay, input"))){
+    setSpin(false);
+    catchTap = true;
   }
   if(welcomed) return;
   if(event.target.closest && event.target.closest(".hot")) return;
@@ -780,9 +884,9 @@ function finishIntro(){
 }
 function later(ms, fn){ introTimers.push(setTimeout(fn, ms)); }
 function playIntro(){
-  if(reduced){ startBed(); playWelcome(); finishIntro(); return; }
+  if(reduced){ playScore(); playWelcome(); finishIntro(); return; }
   document.body.classList.add("opening");
-  later(180, function(){ figure.classList.add("materialise"); setSpin(true); startBed(); });
+  later(180, function(){ figure.classList.add("materialise"); setSpin(true); });
   later(2000, function(){ document.body.classList.add("scanning"); });
   later(2200, function(){ if(!current) light("brain"); });
   later(2800, function(){ if(!current) light("heart"); });
@@ -799,7 +903,7 @@ function playIntro(){
 document.getElementById("skip").onclick = function(){ playWelcome(); finishIntro(); };
 document.addEventListener("visibilitychange", function(){
   if(document.hidden) hush();
-  else if(soundOn) startBed();
+  else if(soundOn && document.body.classList.contains("ready")) startPulse();
 });
 window.addEventListener("pagehide", hush);
 document.addEventListener("freeze", hush);
@@ -838,14 +942,7 @@ figure.addEventListener("pointerover", function(event){
   fine = true;
   light(btn.getAttribute("data-id"), {x:+btn.getAttribute("data-x"), y:+btn.getAttribute("data-y")});
 });
-function startShow(){
-  const bed = document.getElementById("bed");
-  bed.volume = 0.18;
-  const pending = bed.play();
-  if(pending && pending.then){
-    pending.then(function(){ beginShow(); }).catch(function(){ document.body.classList.add("blocked"); });
-  } else beginShow();
-}
+function startShow(){}
 startShow();
 if(!reduced) requestAnimationFrame(drawDust);
 </script>
