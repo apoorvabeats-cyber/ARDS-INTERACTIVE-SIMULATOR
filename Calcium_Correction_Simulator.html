@@ -140,19 +140,19 @@
   <!-- STEP 1 -->
   <div class="phase" id="p-step1">
     <div class="step-tag">STEP 1</div>
-    <h2 class="step-title">Enter Calcium Level</h2>
+    <h2 class="step-title">Enter Calcium &amp; Albumin</h2>
     <div class="card">
       <div class="field-row">
         <div class="field">
-          <label>Serum Ca²⁺ (mg/dL) — normal 8.5–10.5</label>
-          <input type="number" id="s1_ca" step="0.1" placeholder="e.g. 6.8 or 13.5" oninput="onStep1Input()">
+          <label>Serum total Ca²⁺ (mg/dL) — normal 8.5–10.5</label>
+          <input type="number" id="s1_ca" step="0.1" placeholder="e.g. 6.8" oninput="onStep1Input()">
         </div>
         <div class="field">
-          <label>Albumin (g/dL) — optional</label>
+          <label>Serum albumin (g/dL)</label>
           <input type="number" id="s1_alb" step="0.1" placeholder="e.g. 2.4" oninput="onStep1Input()">
         </div>
       </div>
-      <p class="muted" style="margin-top:-2px">If albumin is entered, calcium is corrected: Ca + 0.8 × (4.0 − albumin). Ionised calcium is more reliable in critical illness. 1 mmol/L = 4.0 mg/dL.</p>
+      <p class="muted" style="margin-top:-2px">The simulator corrects calcium automatically: Corrected Ca = measured Ca + 0.8 × (4.0 − albumin), then routes to the hypocalcaemia or hypercalcaemia path. Ionised calcium is more reliable in critical illness. 1 mmol/L = 4.0 mg/dL.</p>
       <div id="s1_result"></div>
     </div>
   </div>
@@ -963,7 +963,7 @@ function showPageById(id){
 }
 function goPrev(){ const o=getPageOrder(),i=o.indexOf(currentPageId); if(i>0) showPageById(o[i-1]); }
 function goNext(){
-  if(currentPageId==='p-step1'&&state.ca==null){ $('s1_result').innerHTML='<div class="result warn">Enter a serum calcium value first.</div>'; return; }
+  if(currentPageId==='p-step1'&&state.ca==null){ $('s1_result').innerHTML='<div class="result warn">Enter the serum calcium and albumin first.</div>'; return; }
   const o=getPageOrder(),i=o.indexOf(currentPageId);
   if(i===-1){ showPageById(o[o.length-1]); return; }
   if(i===o.length-1){ location.reload(); return; }
@@ -1007,23 +1007,34 @@ function renderHistoryLog(elId){
 
 
 /* ---------------- STEP 1 ---------------- */
+let caDirect=false; // true when opened from the Electrolyte page with an already-corrected value
 function onStep1Input(){
   const raw=parseFloat($('s1_ca').value), alb=parseFloat($('s1_alb').value), out=$('s1_result');
+  state.raw=null; state.alb=null;
   if(isNaN(raw)){ state.ca=null; out.innerHTML=''; return; }
-  let v=raw, corr='';
-  if(!isNaN(alb)&&alb>0&&alb<12){ v=+(raw+0.8*(4.0-alb)).toFixed(1); corr='<div class="result info">Albumin-corrected Ca²⁺ = <b>'+v+' mg/dL</b> (measured '+raw+', albumin '+alb+' g/dL). Unreliable in critical illness — confirm with ionised calcium.</div>'; }
+  let v, corr='';
+  if(!isNaN(alb)&&alb>=0.5&&alb<=8){
+    v=+(raw+0.8*(4.0-alb)).toFixed(1);
+    state.raw=raw; state.alb=alb;
+    corr='<div class="result info">Corrected Ca²⁺ = '+raw+' + 0.8 × (4.0 − '+alb+') = <b>'+v+' mg/dL</b>.'+(Math.abs(v-raw)>=0.3?' Albumin changes the interpretation — the corrected value is used below.':'')+' Unreliable in critical illness — confirm with ionised calcium.</div>';
+  } else if(caDirect){
+    v=raw; corr='<div class="result info">Value used as the corrected calcium (opened from the Electrolyte page).</div>';
+  } else {
+    state.ca=null;
+    out.innerHTML='<div class="result warn">Enter the serum albumin (0.5–8 g/dL) so the corrected calcium can be calculated.</div>'; return;
+  }
   state.ca=v;
   const odd=(v<4||v>20)?'<div class="result warn">Unusually extreme value — confirm it is not a unit or entry error (mg/dL here; 1 mmol/L = 4.0 mg/dL).</div>':'';
   if(v<8.5){
     let sev,cls,icon;
     if(v<7.0){sev='Severe';cls='high';icon='🔴';} else if(v<7.5){sev='Moderate';cls='warn';icon='🟠';} else{sev='Mild';cls='good';icon='🟡';}
-    out.innerHTML=corr+'<div class="result '+cls+'">'+icon+' <b>'+sev+' hypocalcaemia detected</b> (Ca²⁺ '+v+' mg/dL, &lt;8.5).'+(v<7.5?' Seizure and arrhythmia risk — IV calcium is likely needed.':'')+
+    out.innerHTML=corr+'<div class="result '+cls+'">'+icon+' <b>'+sev+' hypocalcaemia detected</b> (corrected Ca²⁺ '+v+' mg/dL, &lt;8.5).'+(v<7.5?' Seizure and arrhythmia risk — IV calcium is likely needed.':'')+
       '<span class="next-action">Next step → Assess urgency (ECG, neuro features, Mg²⁺).</span></div>'+odd; return;
   }
-  if(v<=10.5){ out.innerHTML=corr+'<div class="result good">✅ Ca²⁺ '+v+' mg/dL — within the usual range (8.5–10.5). No calcium correction indicated.</div>'+odd; return; }
+  if(v<=10.5){ out.innerHTML=corr+'<div class="result good">✅ Corrected Ca²⁺ '+v+' mg/dL — within the usual range (8.5–10.5). No calcium correction indicated.</div>'+odd; return; }
   let sev,cls,icon;
   if(v>=14){sev='Severe';cls='high';icon='🔴';} else if(v>=12){sev='Moderate';cls='warn';icon='🟠';} else{sev='Mild';cls='good';icon='🟡';}
-  out.innerHTML=corr+'<div class="result '+cls+'">'+icon+' <b>'+sev+' hypercalcaemia detected</b> (Ca²⁺ '+v+' mg/dL, &gt;10.5).'+(v>=14?' Hypercalcaemic crisis — check mental state, ECG and renal function now.':'')+
+  out.innerHTML=corr+'<div class="result '+cls+'">'+icon+' <b>'+sev+' hypercalcaemia detected</b> (corrected Ca²⁺ '+v+' mg/dL, &gt;10.5).'+(v>=14?' Hypercalcaemic crisis — check mental state, ECG and renal function now.':'')+
     '<span class="next-action">Next step → Severity and clinical-risk assessment.</span></div>'+odd;
 }
 
@@ -1606,7 +1617,7 @@ function renderSummary(){
   const out=$('summaryOut'), ca=state.ca;
   if(ca==null){ out.innerHTML='<p>No case entered.</p>'; return; }
   const log=state.history.length>1?'<p><b>Ca²⁺ recheck history:</b></p><ul style="margin:4px 0 0;padding-left:18px">'+state.history.map(h=>'<li>'+h.label+': Ca²⁺ '+h.v+' mg/dL</li>').join('')+'</ul>':'';
-  let h='<p><b>Presenting corrected Ca²⁺:</b> '+ca+' mg/dL</p>';
+  let h='<p><b>Presenting corrected Ca²⁺:</b> '+ca+' mg/dL'+(state.raw!=null?' (measured '+state.raw+', albumin '+state.alb+' g/dL)':'')+'</p>';
   if(ca<8.5){
     const l=state.lo;
     h+='<p><b>Risk:</b> '+(l.urgent?'High-risk — '+l.triggers.join('; '):'No high-risk features')+'; ECG: '+l.ecg+'</p>'+
@@ -1627,7 +1638,7 @@ function renderSummary(){
   if(q.get('embed')) document.body.classList.add('embed');
   const v=parseFloat(q.get('ca'));
   if(!isNaN(v)){
-    $('s1_ca').value=v; onStep1Input();
+    caDirect=true; $('s1_ca').value=v; onStep1Input();
     const o=getPageOrder(); showPageById(o[Math.min(2,o.length-1)]);
   } else showPageById('p-intro');
 })();
