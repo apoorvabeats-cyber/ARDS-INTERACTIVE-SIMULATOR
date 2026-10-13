@@ -83,8 +83,8 @@ body.opening .figure.materialise{animation:materialise 2s ease forwards}
 .figure img{width:100%;height:100%;display:block;object-fit:fill;pointer-events:none;user-select:none;backface-visibility:hidden}
 .figure img.back{position:absolute;inset:0;transform:rotateY(180deg)}
 body.spinning .hot{pointer-events:none}
-.hot{position:absolute;transform:translate(-50%,-50%);width:64px;height:64px;border:0;border-radius:999px;background:transparent;padding:0;backface-visibility:hidden}
-.hot[data-id="brain"]{width:96px;height:78px}
+.hot{position:absolute;transform:translate(-50%,-50%);width:92px;height:92px;border:0;border-radius:999px;background:transparent;padding:0;backface-visibility:hidden}
+.hot[data-id="brain"]{width:120px;height:100px}
 .hot i{position:absolute;inset:16px;border:0;border-radius:inherit;background:transparent;box-shadow:none}
 .hot.lit i{inset:0;background:radial-gradient(circle,rgba(127,212,230,.62),rgba(127,212,230,0) 72%);box-shadow:0 0 26px rgba(127,212,230,.35)}
 .hot[data-id="brain"].lit i{animation:breathe 2.8s ease-in-out infinite}
@@ -349,6 +349,8 @@ let fine = false;
 let arm = 0;
 let timer = 0;
 let drag = null;
+let downY = 0;
+let pick = null;
 let angle = 0;
 let spinning = false;
 let catchTap = false;
@@ -587,36 +589,50 @@ function search(){
     return '<div class="group"><h2>'+esc(organ.name)+'</h2>'+cards(rows)+'</div>';
   }).join("") || '<p class="empty">No simulator matches that.</p>';
 }
-figure.addEventListener("click", function(event){
-  if(spinning || current) return;
-  if(catchTap){ catchTap = false; return; }
-  if(dragged){ dragged = false; return; }
-  const btn = event.target.closest(".hot");
+function chooseOrgan(target){
+  if(current || spinning || !target || !target.closest) return;
+  const btn = target.closest(".hot");
   if(!btn) return;
   const id = btn.getAttribute("data-id");
   const spot = {x:+btn.getAttribute("data-x"), y:+btn.getAttribute("data-y"), name: btn.querySelector("b").textContent};
   light(id, spot);
   enter(id, spot);
-});
+}
+function faceFront(){
+  setSpin(false);
+  figure.style.transition = "transform .55s cubic-bezier(.22,.7,.2,1), opacity .45s ease";
+  angle = 0;
+  applyTurn();
+  setTimeout(function(){ figure.style.transition = "opacity .45s ease"; }, 600);
+}
+figure.addEventListener("click", function(event){ event.preventDefault(); });
 document.querySelector(".atlas").addEventListener("pointerdown", function(event){
-  if(spinning || current || event.target.closest("input, a, .sound, .skip")) return;
+  if(current || event.target.closest("input, a, .sound, .skip, .replay")) return;
+  if(spinning){ faceFront(); return; }
   drag = event.clientX;
+  downY = event.clientY;
+  pick = event.target;
   grip = angle;
   dragged = false;
 });
 window.addEventListener("pointermove", function(event){
   if(drag==null || current) return;
   const delta = event.clientX - drag;
-  if(Math.abs(delta) > 8){
-    dragged = true;
-    whoosh(delta);
-  }
-  angle = grip + delta * 0.65;
+  const rise = event.clientY - downY;
+  if(Math.abs(delta) < 26 && Math.abs(rise) < 26) return;
+  dragged = true;
+  whoosh(delta);
+  angle = grip + delta * 0.55;
   applyTurn();
 });
 window.addEventListener("pointerup", function(){
+  const target = pick;
+  const moved = dragged;
   drag = null;
-  setTimeout(function(){ catchTap = false; dragged = false; }, 320);
+  pick = null;
+  dragged = false;
+  catchTap = false;
+  if(!moved) chooseOrgan(target);
 });
 find.addEventListener("input", search);
 let audioCtx = null;
@@ -652,9 +668,10 @@ function tone(ctx, dest, opts){
   gain.connect(dest);
   osc.start(opts.t);
   osc.stop(opts.t+opts.dur+0.05);
-  scoreNodes.push(osc);
+  if(opts.keep===false) waveNodes.push(osc);
+  else scoreNodes.push(osc);
 }
-function noiseHit(ctx, dest, t, dur, vol, cut){
+function noiseHit(ctx, dest, t, dur, vol, cut, keep){
   const len = Math.floor(ctx.sampleRate * dur);
   const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
   const data = buffer.getChannelData(0);
@@ -672,7 +689,8 @@ function noiseHit(ctx, dest, t, dur, vol, cut){
   gain.connect(dest);
   src.start(t);
   src.stop(t+dur+0.02);
-  scoreNodes.push(src);
+  if(keep===false) waveNodes.push(src);
+  else scoreNodes.push(src);
 }
 function playScore(){
   if(!soundOn || document.hidden) return;
@@ -681,20 +699,66 @@ function playScore(){
   if(!ctx) return;
   const dest = bus(ctx);
   const t = ctx.currentTime + 0.03;
-  noiseHit(ctx, dest, t, 0.45, 0.7, 180);
-  tone(ctx, dest, {t:t, dur:0.7, f0:58, f1:34, vol:0.55, type:"sine", atk:0.012});
-  tone(ctx, dest, {t:t+0.35, dur:9.2, f0:46, f1:92, vol:0.28, type:"sine", atk:0.45});
-  tone(ctx, dest, {t:t+0.45, dur:8.6, f0:110, f1:640, vol:0.1, type:"sawtooth", atk:0.6});
-  tone(ctx, dest, {t:t+1.6, dur:7, f0:660, f1:1480, vol:0.035, type:"sine", atk:1.2});
-  for(let i=0;i<16;i++){
-    tone(ctx, dest, {t:t+0.8+i*0.55, dur:0.14, f0:52, vol:0.07, type:"sine", atk:0.008});
-  }
+  noiseHit(ctx, dest, t, 0.45, 0.55, 180);
+  tone(ctx, dest, {t:t, dur:0.8, f0:58, f1:40, vol:0.4, type:"sine", atk:0.012});
+  tone(ctx, dest, {t:t+0.2, dur:1.4, f0:110, f1:440, vol:0.08, type:"sawtooth", atk:0.08});
   clearTimeout(pulseTimer);
-  pulseTimer = setTimeout(startPulse, 10400);
+  startWave();
 }
 function startPulse(){
-  if(!soundOn || document.hidden || ambient.length) return;
-  startAmbient();
+  startWave();
+}
+let waveOn = false;
+let waveTimer = 0;
+let waveStep = 0;
+let waveAt = 0;
+let waveNodes = [];
+function startWave(){
+  if(!soundOn || document.hidden || waveOn) return;
+  const ctx = ensureAudio();
+  if(!ctx) return;
+  waveOn = true;
+  waveAt = ctx.currentTime + 0.08;
+  const dest = ctx.createGain();
+  dest.gain.value = 0.42;
+  dest.connect(ctx.destination);
+  const eighth = 60/98/2;
+  const chords = [
+    [220, 261.63, 329.63],
+    [174.61, 220, 261.63],
+    [261.63, 329.63, 392],
+    [196, 246.94, 293.66]
+  ];
+  const bass = [55, 43.65, 65.41, 49];
+  function tickWave(){
+    if(!waveOn || !audioCtx) return;
+    while(waveAt < audioCtx.currentTime + 0.25){
+      const step = waveStep % 32;
+      const bar = Math.floor(step / 8) % 4;
+      if(step % 2 === 0){
+        tone(audioCtx, dest, {t:waveAt, dur:eighth*1.4, f0:bass[bar], vol:0.2, type:"triangle", atk:0.01, keep:false});
+      }
+      if(step % 8 === 0){
+        chords[bar].forEach(function(freq){
+          tone(audioCtx, dest, {t:waveAt, dur:eighth*7.2, f0:freq/2, vol:0.045, type:"sine", atk:0.25, keep:false});
+        });
+      }
+      const lead = chords[bar][step % 3] * 2;
+      tone(audioCtx, dest, {t:waveAt, dur:eighth*0.7, f0:lead, vol:0.028, type:"square", atk:0.005, keep:false});
+      if(step % 4 === 0) noiseHit(audioCtx, dest, waveAt, 0.09, 0.12, 140, false);
+      else if(step % 4 === 2) noiseHit(audioCtx, dest, waveAt, 0.08, 0.05, 1800, false);
+      waveStep += 1;
+      waveAt += eighth;
+    }
+    waveTimer = setTimeout(tickWave, 60);
+  }
+  tickWave();
+}
+function stopWave(){
+  waveOn = false;
+  clearTimeout(waveTimer);
+  waveNodes.forEach(function(node){ try{ node.stop(); }catch(err){} });
+  waveNodes = [];
 }
 function whoosh(delta){
   if(!soundOn || document.hidden) return;
@@ -734,6 +798,7 @@ function stopScore(){
   scoreNodes.forEach(function(node){ try{ node.stop(); }catch(err){} });
   scoreNodes = [];
   clearTimeout(pulseTimer);
+  stopWave();
 }
 function startAmbient(){
   if(!soundOn || ambient.length) return;
@@ -841,7 +906,7 @@ function setSound(on){
   button.textContent = on ? "Sound: On" : "Sound: Off";
   const line = document.getElementById("line");
   if(!on){ line.pause(); stopScore(); stopAmbient(); }
-  else if(document.body.classList.contains("ready")) startPulse();
+  else startWave();
 }
 document.getElementById("sound").onclick = function(){
   setSound(!soundOn);
@@ -862,15 +927,12 @@ document.addEventListener("pointerdown", function(event){
   if(!begun){
     beginShow();
     playScore();
+    startWave();
     if(!(event.target.closest && event.target.closest(".hot"))) playWelcome();
     return;
   }
-  if(spinning && !current && !(event.target.closest && event.target.closest(".sound, .skip, .replay, input"))){
-    setSpin(false);
-    catchTap = true;
-  }
   if(welcomed) return;
-  if(event.target.closest && event.target.closest(".hot")) return;
+  if(event.target.closest && event.target.closest(".hot, .sound, .skip, .replay, input")) return;
   playWelcome();
 }, true);
 let introTimers = [];
@@ -903,7 +965,7 @@ function playIntro(){
 document.getElementById("skip").onclick = function(){ playWelcome(); finishIntro(); };
 document.addEventListener("visibilitychange", function(){
   if(document.hidden) hush();
-  else if(soundOn && document.body.classList.contains("ready")) startPulse();
+  else if(soundOn) startWave();
 });
 window.addEventListener("pagehide", hush);
 document.addEventListener("freeze", hush);
