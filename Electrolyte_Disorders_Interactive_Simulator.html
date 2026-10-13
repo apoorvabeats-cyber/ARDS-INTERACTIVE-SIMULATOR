@@ -518,7 +518,7 @@ phosphate_high: {
 const IONS=[
   {id:'sodium', name:'Sodium', unit:'mmol/L', prompt:'Enter the sodium', low:135, high:145, lowKey:'sodium_low', highKey:'sodium_high', hint:'Usual range 135–145 mmol/L'},
   {id:'potassium', name:'Potassium', unit:'mmol/L', prompt:'Enter the potassium', low:3.5, high:5.0, lowKey:'potassium_low', highKey:'potassium_high', hint:'Usual range 3.5–5.0 mmol/L'},
-  {id:'calcium', name:'Calcium', unit:'mg/dL', prompt:'Enter the corrected calcium', low:8.5, high:10.5, lowKey:'calcium_low', highKey:'calcium_high', hint:'Corrected calcium. Usual range 8.5–10.5 mg/dL'},
+  {id:'calcium', name:'Calcium', unit:'mg/dL', prompt:'Serum calcium and albumin', low:8.5, high:10.5, lowKey:'calcium_low', highKey:'calcium_high', hint:'Enter measured calcium and albumin. Corrected calcium is calculated, then the low or high pathway opens.'},
   {id:'magnesium', name:'Magnesium', unit:'mg/dL', prompt:'Enter the magnesium', low:1.7, high:2.5, lowKey:'magnesium_low', highKey:'magnesium_high', hint:'Usual range 1.7–2.5 mg/dL'},
   {id:'phosphate', name:'Phosphate', unit:'mg/dL', prompt:'Enter the phosphate', low:2.5, high:4.5, lowKey:'phosphate_low', highKey:'phosphate_high', hint:'Usual range 2.5–4.5 mg/dL'}
 ];
@@ -545,12 +545,13 @@ function showEntry(id){
     <div class="disorder-head"><h2>${currentIon.name}</h2><div class="subtitle">${currentIon.prompt}</div></div>
     <div class="card">
       <h3>${currentIon.prompt}</h3>
-      <p>${currentIon.hint}. The value chooses the algorithm. A number inside the usual range does not open one.</p>
-      <div class="calc-field"><label>${currentIon.name} (${currentIon.unit})</label>
-        <input type="number" id="ionValue" step="0.1" inputmode="decimal">
+      <p>${currentIon.id==='calcium'?'Enter the measured serum calcium and the albumin. Corrected calcium is calculated as measured calcium + 0.8 × (4.0 − albumin). That number chooses hypocalcaemia or hypercalcaemia. Use mg/dL for calcium and g/dL for albumin.':currentIon.hint+'. The value chooses the algorithm. A number inside the usual range does not open one.'}</p>
+      <div class="calc-field"><label>${currentIon.id==='calcium'?'Serum calcium (mg/dL)':currentIon.name+' ('+currentIon.unit+')'}</label>
+        <input type="number" id="ionValue" step="0.1" inputmode="decimal" ${currentIon.id==='calcium'?'placeholder="e.g. 7.6"':''}>
       </div>
       ${currentIon.id==='sodium'?'<div class="calc-field"><label>Glucose (mg/dL), optional</label><input type="number" id="ionGlucose" inputmode="decimal" placeholder="Only if you already have it"></div>':''}
-      <button class="calc-btn" onclick="useValue()">Use this value</button>
+      ${currentIon.id==='calcium'?'<div class="calc-field"><label>Serum albumin (g/dL)</label><input type="number" id="ionAlbumin" step="0.1" inputmode="decimal" placeholder="e.g. 2.4 — a g/L value such as 24 is converted"></div><p class="calc-hint">Corrected Ca = serum Ca + 0.8 × (4.0 − albumin). Usual corrected range 8.5–10.5 mg/dL.</p>':''}
+      <button class="calc-btn" onclick="useValue()">${currentIon.id==='calcium'?'Calculate corrected calcium':'Use this value'}</button>
       <div id="ionMsg" class="calc-out"></div>
     </div>`;
   window.scrollTo({top:0,behavior:'smooth'});
@@ -587,8 +588,32 @@ function useValue(){
     showChart('Potassium_Correction_Simulator.html?embed=1&v=20261011a&k='+encodeURIComponent(v));
     return;
   }
+  if(ion.id==='calcium'){
+    const aRaw=document.getElementById('ionAlbumin').value;
+    const albIn=parseFloat(aRaw);
+    if(aRaw===''||Number.isNaN(albIn)){ msg.textContent='Enter the serum albumin.'; return; }
+    let alb=albIn;
+    let converted='';
+    if(albIn>15){
+      alb=albIn/10;
+      converted=' Albumin '+albIn+' was read as g/L and converted to '+alb.toFixed(1)+' g/dL.';
+    }
+    if(alb<0.5||alb>8){
+      msg.textContent='Albumin should be in g/dL, usually 3.5–5.0. If the report is in g/L, enter that number (for example 35) and it will be converted.';
+      return;
+    }
+    const corrected=Math.round((v+0.8*(4-alb))*10)/10;
+    const line='Corrected calcium = '+v+' + 0.8 × (4.0 − '+alb.toFixed(1)+') = <b>'+corrected+' mg/dL</b>.'+converted;
+    if(corrected>=ion.low && corrected<=ion.high){
+      msg.innerHTML=line+' That is inside 8.5–10.5 mg/dL, so neither the low nor the high pathway opens.';
+      return;
+    }
+    const side=corrected<ion.low?'hypocalcaemia':'hypercalcaemia';
+    msg.innerHTML=line+' Opening the '+side+' pathway.';
+    showChart('Calcium_Correction_Simulator.html?embed=1&v=20261014d&ca='+encodeURIComponent(corrected)+'&raw='+encodeURIComponent(v)+'&alb='+encodeURIComponent(alb.toFixed(1)));
+    return;
+  }
   const chartFor={
-    calcium:['Calcium_Correction_Simulator.html','Calcium_Correction_Simulator.html','ca'],
     magnesium:['Magnesium_Correction_Simulator.html','Magnesium_Correction_Simulator.html','mg'],
     phosphate:['Phosphate_Correction_Simulator.html','Phosphate_Correction_Simulator.html','ph']
   };

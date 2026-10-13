@@ -126,6 +126,7 @@
 </header>
 
 <div class="wrap">
+  <div id="caBanner" class="card" style="display:none"></div>
 
   <!-- INTRO -->
   <div class="phase active" id="p-intro">
@@ -1636,8 +1637,22 @@ function renderSummary(){
 (function(){
   const q=new URLSearchParams(location.search);
   if(q.get('embed')) document.body.classList.add('embed');
+  const rawQ=parseFloat(q.get('raw'));
+  const albQ=parseFloat(q.get('alb'));
   const v=parseFloat(q.get('ca'));
-  if(!isNaN(v)){
+  if(!isNaN(rawQ) && !isNaN(albQ)){
+    $('s1_ca').value=rawQ;
+    $('s1_alb').value=albQ;
+    onStep1Input();
+    const banner=$('caBanner');
+    if(banner && state.ca!=null){
+      const path=state.ca<8.5?'hypocalcaemia':state.ca>10.5?'hypercalcaemia':'the usual range';
+      banner.style.display='block';
+      banner.innerHTML='<h3 style="margin:0 0 6px">Corrected calcium '+state.ca+' mg/dL</h3><p style="margin:0">Serum calcium '+state.raw+' mg/dL and albumin '+state.alb+' g/dL. Corrected Ca = '+state.raw+' + 0.8 × (4.0 − '+state.alb+') = <b>'+state.ca+' mg/dL</b>. This is the '+path+' pathway.</p>';
+    }
+    const o=getPageOrder();
+    showPageById(o[Math.min(2,o.length-1)]);
+  } else if(!isNaN(v)){
     caDirect=true; $('s1_ca').value=v; onStep1Input();
     const o=getPageOrder(); showPageById(o[Math.min(2,o.length-1)]);
   } else showPageById('p-intro');
