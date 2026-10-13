@@ -133,6 +133,18 @@ body.inside .shelf{display:block}
 .card span{display:block;margin-top:4px;color:var(--muted);line-height:1.4}
 .empty{color:var(--muted);line-height:1.45}
 .results{display:none;padding:8px 16px 24px}
+.veil{position:fixed;z-index:8;overflow:hidden;border-radius:18px;padding:18px;color:var(--fg);transition:left 1.25s cubic-bezier(.22,.61,.2,1),top 1.25s cubic-bezier(.22,.61,.2,1),width 1.25s cubic-bezier(.22,.61,.2,1),height 1.25s cubic-bezier(.22,.61,.2,1),border-radius 1.25s ease,opacity .8s ease}
+.veil.full{left:0;top:0;width:100%;height:100%;border-radius:0}
+.veil.away{opacity:0}
+.veil.lab{background:radial-gradient(120% 90% at 50% 0%,#12343f,#071018 72%)}
+.veil.arena{background:radial-gradient(120% 90% at 50% 0%,#3a2a1c,#140e0b 72%)}
+.veil.title{background:#071018;display:flex;align-items:flex-end}
+.veil strong{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:34px;letter-spacing:-.03em}
+.veil.title strong{font-size:42px}
+body.inside .shelf .card{animation:titleIn 1.15s ease both}
+@keyframes titleIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.credit{position:fixed;left:12px;right:12px;bottom:8px;z-index:4;margin:0;font-size:10px;line-height:1.3;color:var(--faint)}
+.credit a{color:inherit}
 .approach{position:fixed;inset:0;z-index:7;display:flex;align-items:center;justify-content:center;background:transparent;pointer-events:none}
 .approach img{width:100vw;height:100dvh;object-fit:cover;border-radius:0;box-shadow:none;transform:translate(var(--sx,0),var(--sy,-18vh)) scale(.2);opacity:0}
 .approach.rise img{opacity:1;transform:translate(0,0) scale(1);transition:transform 1.7s cubic-bezier(.22,.61,.2,1),opacity .7s ease}
@@ -157,12 +169,13 @@ body.searching .results{display:block}
 </head>
 <body>
 <canvas class="dust" id="dust" aria-hidden="true"></canvas>
-<audio id="bed" src="ambient.wav" loop preload="auto"></audio>
+<audio id="bed" src="cylinder.mp3" loop preload="auto" playsinline></audio>
 <audio id="line" preload="auto"></audio>
 <div class="glow" aria-hidden="true"></div>
 <button type="button" class="skip" id="skip">Skip</button>
 <p class="touch" id="touch">Touch to begin</p>
 <button type="button" class="sound" id="sound" aria-pressed="true">Sound: On</button>
+<p class="credit">“Cylinder Seven” by <a href="https://chriszabriskie.com/cylinders/">Chris Zabriskie</a>, from Cylinders. <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</p>
 <div class="invite" id="invite">
   <p>Critical care • Human atlas</p>
   <h2>Explore the human body</h2>
@@ -184,7 +197,6 @@ body.searching .results{display:block}
       <div class="scan" aria-hidden="true"></div>
     </div>
     <div class="halo" aria-hidden="true"></div>
-    <div class="trace ct" aria-hidden="true"><img src="sim/stroke-ncct.jpg" alt=""></div>
     <div class="trace ecg" aria-hidden="true"><svg viewBox="0 0 160 46" fill="none"><path d="M0 28 H28 L36 28 L42 8 L50 40 L58 18 L66 28 H160" stroke="#7fd4e6" stroke-width="1.6"/></svg></div>
     <div class="trace vent" aria-hidden="true"><svg viewBox="0 0 160 46" fill="none"><path d="M0 30 H20 L28 12 H70 L78 30 H100 L108 16 H140 L148 30 H160" stroke="#7fd4e6" stroke-width="1.6"/></svg></div>
     <div class="trace line" aria-hidden="true"><svg viewBox="0 0 160 46" fill="none"><path d="M0 32 H18 L26 8 L34 24 L42 32 H70 L78 8 L86 24 L94 32 H160" stroke="#e2b48a" stroke-width="1.6"/></svg></div>
@@ -382,7 +394,7 @@ function renderRoom(){
   const parts = organ.parts ? '<div class="parts"><button type="button" data-part="all"'+(part==="all"?' class="on"':"")+'>Whole organ</button>'+organ.parts.map(function(item){
     return '<button type="button" data-part="'+item.id+'"'+(part===item.id?' class="on"':"")+'>'+esc(item.name)+'</button>';
   }).join("")+"</div>" : "";
-  const shelfTitle = inside==="lab" ? "Learning Lab" : "Practice Arena";
+  const shelfTitle = inside==="lab" ? "Learning Hub" : "Practice Arena";
   const shelfRows = inside==="lab" ? learn : practice;
   const shelfEmpty = inside==="lab"
     ? (organ.soon || "Nothing in the learning lab yet.")
@@ -404,8 +416,8 @@ function renderRoom(){
     if(inside){ inside=null; document.body.classList.remove("inside","lab","arena"); renderRoom(); }
     else leave();
   };
-  document.getElementById("openLab").onclick = function(){ openPath("lab"); };
-  document.getElementById("openArena").onclick = function(){ openPath("arena"); };
+  document.getElementById("openLab").onclick = function(){ fillPortal("lab", this); };
+  document.getElementById("openArena").onclick = function(){ fillPortal("arena", this); };
   room.querySelectorAll("[data-part]").forEach(function(btn){
     btn.onclick = function(){ part=btn.getAttribute("data-part"); renderRoom(); };
   });
@@ -415,8 +427,42 @@ function openPath(which){
   document.body.classList.add("inside");
   document.body.classList.toggle("lab", which==="lab");
   document.body.classList.toggle("arena", which==="arena");
-  speak(which==="lab" ? "Welcome to Learning Hub." : "Welcome to Practice Arena.");
   renderRoom();
+}
+let traveling = false;
+function grow(el, kind, mid, end){
+  if(traveling) return;
+  if(reduced){ if(mid) mid(); if(end) end(); return; }
+  traveling = true;
+  const rect = el.getBoundingClientRect();
+  const veil = document.createElement("div");
+  veil.className = "veil "+kind;
+  veil.innerHTML = el.innerHTML;
+  veil.style.left = rect.left+"px";
+  veil.style.top = rect.top+"px";
+  veil.style.width = rect.width+"px";
+  veil.style.height = rect.height+"px";
+  document.body.appendChild(veil);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ veil.classList.add("full"); }); });
+  setTimeout(function(){
+    if(mid) mid();
+    veil.classList.add("away");
+    setTimeout(function(){
+      veil.remove();
+      traveling = false;
+      if(end) end();
+    }, 860);
+  }, kind==="title" ? 1500 : 1150);
+}
+function fillPortal(which, el){
+  speak(which==="lab" ? "Welcome to Learning Hub." : "Welcome to Practice Arena.");
+  grow(el, which==="lab" ? "lab" : "arena", function(){ openPath(which); });
+}
+function openTitle(card){
+  grow(card, "title", null, function(){
+    hush();
+    location.href = card.getAttribute("href");
+  });
 }
 function placeBrain(spot){
   const layer = document.getElementById("approach");
@@ -606,15 +652,25 @@ function speak(text){
   playLine(file);
 }
 function startBed(){
-  if(!soundOn) return;
+  if(!soundOn || document.hidden) return;
   const bed = document.getElementById("bed");
-  bed.volume = 0.62;
+  bed.muted = false;
+  bed.volume = 0.13;
   const pending = bed.play();
   if(pending) pending.catch(function(){});
 }
-function playLine(src){
-  if(!soundOn) return;
+function hush(){
+  const bed = document.getElementById("bed");
   const line = document.getElementById("line");
+  bed.pause();
+  line.pause();
+  bed.muted = true;
+  line.muted = true;
+}
+function playLine(src){
+  if(!soundOn || document.hidden) return;
+  const line = document.getElementById("line");
+  line.muted = false;
   line.volume = 0.95;
   line.src = src;
   const pending = line.play();
@@ -684,6 +740,18 @@ function playIntro(){
   later(14000, function(){ document.body.classList.add("settled"); });
 }
 document.getElementById("skip").onclick = function(){ playWelcome(); finishIntro(); };
+document.addEventListener("visibilitychange", function(){
+  if(document.hidden) hush();
+  else if(soundOn) startBed();
+});
+window.addEventListener("pagehide", hush);
+document.addEventListener("freeze", hush);
+room.addEventListener("click", function(event){
+  const card = event.target.closest("a.card");
+  if(!card) return;
+  event.preventDefault();
+  openTitle(card);
+});
 const dust = document.getElementById("dust");
 const pen = dust.getContext("2d");
 const specks = [];
@@ -721,7 +789,7 @@ figure.addEventListener("pointerover", function(event){
 });
 function startShow(){
   const bed = document.getElementById("bed");
-  bed.volume = 0.62;
+  bed.volume = 0.13;
   const pending = bed.play();
   if(pending && pending.then){
     pending.then(function(){ beginShow(); }).catch(function(){ document.body.classList.add("blocked"); });
