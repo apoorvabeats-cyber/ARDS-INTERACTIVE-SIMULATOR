@@ -77,12 +77,12 @@ body.opening .figure.materialise{animation:materialise 2s ease forwards}
   background:radial-gradient(circle at var(--hx,50%) var(--hy,40%),transparent 0 22%,rgba(7,16,24,.4) 60%);
 }
 .figure.focus::after{opacity:1;transition:opacity .25s ease}
-.figure{position:relative;z-index:1;aspect-ratio:1008/1792;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.2,.7,.2,1),opacity .55s ease}
-.figure.sway{animation:sway 11s ease-in-out infinite}
-@keyframes sway{0%,100%{transform:rotateY(-7deg)}50%{transform:rotateY(7deg)}}
-.figure.zoom{opacity:.2}
-.figure img{width:100%;height:100%;display:block;object-fit:fill;pointer-events:none;user-select:none}
-.hot{position:absolute;transform:translate(-50%,-50%);width:64px;height:64px;border:0;border-radius:999px;background:transparent;padding:0}
+.well{perspective:1400px;transform-style:preserve-3d}
+.figure{position:relative;z-index:1;aspect-ratio:1008/1792;transform-style:preserve-3d;transition:opacity .45s ease}
+.figure img{width:100%;height:100%;display:block;object-fit:fill;pointer-events:none;user-select:none;backface-visibility:hidden}
+.figure img.back{position:absolute;inset:0;transform:rotateY(180deg)}
+body.spinning .hot{pointer-events:none}
+.hot{position:absolute;transform:translate(-50%,-50%);width:64px;height:64px;border:0;border-radius:999px;background:transparent;padding:0;backface-visibility:hidden}
 .hot[data-id="brain"]{width:96px;height:78px}
 .hot i{position:absolute;inset:16px;border:0;border-radius:inherit;background:transparent;box-shadow:none}
 .hot.lit i{inset:0;background:radial-gradient(circle,rgba(127,212,230,.62),rgba(127,212,230,0) 72%);box-shadow:0 0 26px rgba(127,212,230,.35)}
@@ -180,7 +180,7 @@ body.searching .results{display:block}
   <p>Critical care • Human atlas</p>
   <h2>Explore the human body</h2>
   <p class="quiet">Every organ. Every decision. Every critical moment.</p>
-  <p class="quiet">Select an organ to begin</p>
+  <p class="quiet">Tap anywhere to stop. Then turn the body and choose an organ.</p>
 </div>
 <div class="approach" id="approach">
   <img id="plate" src="brain-close.jpg" alt="">
@@ -193,7 +193,8 @@ body.searching .results{display:block}
 <main class="atlas">
   <div class="well">
     <div class="figure" id="figure">
-      <img src="anatomy-body.jpg" alt="Translucent anatomical model. Select an organ to enter that critical-care room.">
+      <img class="face" src="anatomy-body.jpg" alt="Translucent anatomical model. Turn it, then select an organ.">
+      <img class="back" src="anatomy-body.jpg" alt="" aria-hidden="true">
       <div class="scan" aria-hidden="true"></div>
     </div>
     <div class="halo" aria-hidden="true"></div>
@@ -347,6 +348,31 @@ let fine = false;
 let arm = 0;
 let timer = 0;
 let drag = null;
+let angle = 0;
+let spinning = false;
+let catchTap = false;
+let dragged = false;
+let grip = 0;
+let lastTick = 0;
+function applyTurn(){
+  if(current) return;
+  figure.style.transform = "rotateY("+angle+"deg)";
+}
+function setSpin(on){
+  spinning = !!on && !reduced && !current;
+  document.body.classList.toggle("spinning", spinning);
+}
+function tick(now){
+  if(!lastTick) lastTick = now;
+  const dt = Math.min(0.05, (now-lastTick)/1000);
+  lastTick = now;
+  if(spinning && !current){
+    angle = (angle + dt * 28) % 360;
+    applyTurn();
+  }
+  requestAnimationFrame(tick);
+}
+if(!reduced) requestAnimationFrame(tick);
 
 function esc(s){
   return String(s).replace(/[&<>"']/g, function(c){
@@ -496,6 +522,7 @@ function enter(id, spot){
   bootSound();
   speak(spot.name || organ.name);
   finishIntro();
+  setSpin(false);
   figure.classList.remove("sway");
   figure.classList.add("filming");
   document.body.classList.add("filming");
@@ -537,9 +564,9 @@ function leave(){
   document.body.classList.remove("in","enter","inside","lab","arena","filming");
   document.getElementById("approach").classList.remove("show","rise","leave");
   figure.classList.remove("zoom","filming");
-  figure.style.transform = "";
   figure.style.opacity = "";
-  figure.classList.add("sway");
+  angle = 0;
+  setSpin(!reduced);
   light("");
   if(!reduced) requestAnimationFrame(drawDust);
 }
@@ -557,28 +584,31 @@ function search(){
   }).join("") || '<p class="empty">No simulator matches that.</p>';
 }
 figure.addEventListener("click", function(event){
+  if(catchTap || dragged || spinning || current) return;
+  const facing = ((angle % 360) + 360) % 360;
+  if(facing > 75 && facing < 285) return;
   const btn = event.target.closest(".hot");
-  if(!btn || current) return;
+  if(!btn) return;
   const id = btn.getAttribute("data-id");
   const spot = {x:+btn.getAttribute("data-x"), y:+btn.getAttribute("data-y"), name: btn.querySelector("b").textContent};
   light(id, spot);
   enter(id, spot);
 });
-figure.addEventListener("pointerdown", function(event){
-  if(event.target.closest(".hot")) return;
+document.querySelector(".atlas").addEventListener("pointerdown", function(event){
+  if(spinning || current || event.target.closest("input, a, .sound, .skip")) return;
   drag = event.clientX;
-  figure.classList.remove("sway");
+  grip = angle;
+  dragged = false;
 });
-figure.addEventListener("pointermove", function(event){
-  if(drag==null) return;
-  const turn = Math.max(-18, Math.min(18, (event.clientX-drag)/10));
-  figure.style.transform = "rotateY("+turn+"deg)";
-});
-figure.addEventListener("pointerup", function(){
+window.addEventListener("pointermove", function(event){
   if(drag==null || current) return;
+  const delta = event.clientX - drag;
+  if(Math.abs(delta) > 8) dragged = true;
+  angle = grip + delta * 0.65;
+  applyTurn();
+});
+window.addEventListener("pointerup", function(){
   drag = null;
-  figure.style.transform = "";
-  figure.classList.add("sway");
 });
 find.addEventListener("input", search);
 let audioCtx = null;
@@ -725,6 +755,10 @@ function beginShow(){
 }
 document.addEventListener("pointerdown", function(event){
   startBed();
+  if(begun && spinning && !current && !(event.target.closest && event.target.closest(".sound, .skip, input"))){
+    setSpin(false);
+    catchTap = true;
+  }
   if(!begun){
     beginShow();
     if(!(event.target.closest && event.target.closest(".hot"))) playWelcome();
@@ -740,14 +774,14 @@ function finishIntro(){
   introTimers = [];
   document.body.classList.remove("opening","scanning","titled");
   document.body.classList.add("ready");
-  figure.classList.add("materialise","sway");
+  figure.classList.add("materialise");
   if(!current){ figure.style.opacity = "1"; light(""); }
 }
 function later(ms, fn){ introTimers.push(setTimeout(fn, ms)); }
 function playIntro(){
   if(reduced){ startBed(); playWelcome(); finishIntro(); return; }
   document.body.classList.add("opening");
-  later(180, function(){ figure.classList.add("materialise"); startBed(); });
+  later(180, function(){ figure.classList.add("materialise"); setSpin(true); startBed(); });
   later(2000, function(){ document.body.classList.add("scanning"); });
   later(2200, function(){ if(!current) light("brain"); });
   later(2800, function(){ if(!current) light("heart"); });
@@ -755,7 +789,6 @@ function playIntro(){
   later(3900, function(){ if(!current) light("kidneys"); });
   later(5000, function(){
     document.body.classList.add("titled");
-    figure.classList.add("sway");
     if(!current) light("");
     if(!current) playWelcome();
   });
