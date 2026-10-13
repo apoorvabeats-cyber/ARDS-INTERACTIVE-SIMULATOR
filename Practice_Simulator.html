@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="theme-color" content="#071b3a">
 <title>Practice Simulator</title>
 <style>
@@ -123,9 +126,84 @@ let zoom = 1;
 let pan = {x:0, y:0};
 let contrast = 1.05;
 let drag = null;
+let orderKey = "";
+let choiceOrder = [];
+let audioCtx = null;
 
 if (location.hostname.endsWith("github.io")) nav.href = "hub.html";
 else nav.href = "/";
+
+function clearOrder(){ orderKey = ""; choiceOrder = []; }
+function toTop(){
+  requestAnimationFrame(function(){
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  });
+}
+function soundCtx(){
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+function tone(ac, freq, start, dur, type, peak){
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, start);
+  g.gain.setValueAtTime(0.0001, start);
+  g.gain.exponentialRampToValueAtTime(peak, start + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  o.connect(g);
+  g.connect(ac.destination);
+  o.start(start);
+  o.stop(start + dur + 0.02);
+}
+function playVerdict(verdict){
+  if (mode === "exam") return;
+  const ac = soundCtx();
+  if (verdict === "wrong"){
+    if (!ac) return;
+    const t = ac.currentTime;
+    tone(ac, 880, t, 0.16, "square", 0.08);
+    tone(ac, 620, t + 0.18, 0.16, "square", 0.08);
+    tone(ac, 880, t + 0.36, 0.18, "square", 0.08);
+    return;
+  }
+  if (verdict !== "correct") return;
+  if (ac){
+    const t = ac.currentTime;
+    tone(ac, 523, t, 0.12, "sine", 0.07);
+    tone(ac, 784, t + 0.1, 0.18, "sine", 0.07);
+  }
+  try {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const said = new SpeechSynthesisUtterance("Correct");
+    said.lang = "en-US";
+    said.rate = 1;
+    window.speechSynthesis.speak(said);
+  } catch (e) {}
+}
+function orderedChoices(stage){
+  const key = item.id + ":" + index + ":" + stage.id;
+  if (orderKey !== key){
+    const ids = (stage.choices || []).map(function(choice){ return choice.id; });
+    for (let i = ids.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      const swap = ids[i];
+      ids[i] = ids[j];
+      ids[j] = swap;
+    }
+    orderKey = key;
+    choiceOrder = ids;
+  }
+  const byId = {};
+  (stage.choices || []).forEach(function(choice){ byId[choice.id] = choice; });
+  return choiceOrder.map(function(id){ return byId[id]; }).filter(Boolean);
+}
 
 function esc(s){
   return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
@@ -211,14 +289,18 @@ function openCase(id){
   feedback = null;
   log = [];
   zoom = 1; pan = {x:0,y:0}; contrast = 1.05;
+  clearOrder();
   history.replaceState(null, "", "#" + id);
   render();
+  toTop();
 }
 function begin(){
   phase = "ask";
   index = 0;
+  clearOrder();
   live = applyStart(Object.assign({}, item.opening, {extraMin:0, findings:[]}));
   render();
+  toTop();
 }
 function teachFor(fallback){
   const stage = item.stages[index];
@@ -256,6 +338,7 @@ function onChoice(){
     if (choice.delayMin) live = Object.assign({}, live, {extraMin: live.extraMin + choice.delayMin});
     feedback = {title:"Not that", body: resolved.feedback, verdict:"wrong", canAdvance:false};
     phase = "feedback";
+    playVerdict("wrong");
     render();
     return;
   }
@@ -285,6 +368,7 @@ function onChoice(){
     teach: mode === "exam" ? teachFor(resolved.feedback) : resolved.feedback,
     guideline: stage.guideline
   }, nextLive);
+  playVerdict(resolved.verdict);
 }
 function brightnessAt(img, x, y){
   if (!img || !img.naturalWidth) return 0;
@@ -323,6 +407,7 @@ function onPick(x, y, brightness){
     strikes = {tries: strikes.tries + 1, hint: strikes.hint, critical: strikes.critical};
     feedback = {title: titleHint === "close" ? "Close" : "Not that", body: body, verdict:"wrong", canAdvance:false};
     phase = "feedback";
+    playVerdict("wrong");
     render();
     return;
   }
@@ -345,12 +430,14 @@ function onPick(x, y, brightness){
     teach: mode === "exam" ? teachFor(body) : body,
     guideline: stage.guideline
   }, nextLive);
+  playVerdict(verdict);
 }
 function continueOn(){
   if (!feedback || !feedback.canAdvance){
     phase = "ask";
     selected = null;
     render();
+    toTop();
     return;
   }
   if (index + 1 >= item.stages.length){
@@ -358,6 +445,7 @@ function continueOn(){
     saveBest(item.id, finalScore);
     phase = "debrief";
     render();
+    toTop();
     return;
   }
   index += 1;
@@ -368,6 +456,7 @@ function continueOn(){
   zoom = 1; pan = {x:0,y:0};
   phase = "ask";
   render();
+  toTop();
 }
 function showHint(){
   if (strikes.tries < 1 || strikes.hint) return;
@@ -384,13 +473,17 @@ function resetCase(){
   feedback = null;
   log = [];
   zoom = 1; pan = {x:0,y:0}; contrast = 1.05;
+  clearOrder();
   render();
+  toTop();
 }
 function goCatalog(){
   item = null;
   phase = "catalog";
   history.replaceState(null, "", location.pathname + location.search);
+  clearOrder();
   render();
+  toTop();
 }
 
 function renderVitals(){
@@ -410,7 +503,7 @@ function renderVitals(){
   }).join("") + "</dl>";
 }
 function choiceList(stage){
-  return (stage.choices || []).map(function(choice, i){
+  return orderedChoices(stage).map(function(choice, i){
     const resolved = resolveChoice(choice, lkw());
     const hinted = mode === "learn" && strikes.hint && resolved.verdict === "correct";
     const on = selected === choice.id;
