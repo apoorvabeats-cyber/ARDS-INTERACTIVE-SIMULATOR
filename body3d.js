@@ -13,24 +13,29 @@ try{
   if(load) load.textContent = "3D is unavailable. The picture view stays on.";
   throw err;
 }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
 renderer.setClearColor(0x000000, 0);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 30);
 const target = new THREE.Vector3(0, 0.92, 0);
-scene.add(new THREE.HemisphereLight(0xd7eef5, 0x0b1218, 0.85));
-const key = new THREE.DirectionalLight(0xfff4e8, 1.35);
-key.position.set(1.4, 2.4, 2.2);
+scene.add(new THREE.HemisphereLight(0xfff1e6, 0x2a2420, 0.72));
+const key = new THREE.DirectionalLight(0xfff6ee, 2.1);
+key.position.set(0.8, 2.6, 2.4);
 scene.add(key);
-const rim = new THREE.DirectionalLight(0x7fd4e6, 1.1);
-rim.position.set(-2.2, 1.6, -1.6);
+const fill = new THREE.DirectionalLight(0xf0d2c4, 0.55);
+fill.position.set(-1.8, 1.2, 1.4);
+scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffe7d6, 0.35);
+rim.position.set(0.2, 1.8, -2.4);
 scene.add(rim);
 
 const ring = new THREE.Mesh(
-  new THREE.TorusGeometry(0.42, 0.008, 12, 64),
-  new THREE.MeshBasicMaterial({ color: 0x7fd4e6, transparent: true, opacity: 0.85 })
+  new THREE.TorusGeometry(0.38, 0.004, 8, 64),
+  new THREE.MeshBasicMaterial({ color: 0x8aa0a6, transparent: true, opacity: 0.35 })
 );
 ring.rotation.x = Math.PI / 2;
 ring.position.y = 0.02;
@@ -40,7 +45,7 @@ const specks = new THREE.BufferGeometry();
 const dots = new Float32Array(180);
 for(let i = 0; i < dots.length; i++) dots[i] = (Math.random() - 0.5) * 3;
 specks.setAttribute("position", new THREE.BufferAttribute(dots, 3));
-scene.add(new THREE.Points(specks, new THREE.PointsMaterial({ color: 0x7fd4e6, size: 0.015, transparent: true, opacity: 0.45 })));
+scene.add(new THREE.Points(specks, new THREE.PointsMaterial({ color: 0xc8d0d2, size: 0.008, transparent: true, opacity: 0.18 })));
 
 const root = new THREE.Group();
 scene.add(root);
@@ -52,8 +57,8 @@ const names = {
 
 function organ(id, x, y, z, sx, sy, sz, color){
   const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 28, 20),
-    new THREE.MeshStandardMaterial({ color, roughness: 0.42, metalness: 0.04, emissive: color, emissiveIntensity: 0.18 })
+    new THREE.SphereGeometry(1, 20, 14),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false })
   );
   mesh.position.set(x, y, z);
   mesh.scale.set(sx, sy, sz);
@@ -120,9 +125,6 @@ function zFront(point){ return point.z > 0; }
 function choose(id){
   if(!id || !window.enterOrgan) return;
   if(nameplate) nameplate.textContent = names[id] || id;
-  organMeshes.forEach(function(mesh){
-    mesh.material.emissiveIntensity = mesh.userData.id === id ? 0.85 : 0.18;
-  });
   window.enterOrgan(id);
 }
 function pick(clientX, clientY){
@@ -155,16 +157,24 @@ loader.load("models/body.glb", function(gltf){
   model.traverse(function(obj){
     if(!obj.isMesh) return;
     obj.material = new THREE.MeshPhysicalMaterial({
-      color: 0xd5e4ea,
-      roughness: 0.38,
-      metalness: 0.02,
-      transparent: true,
-      opacity: 0.34,
-      depthWrite: false,
-      emissive: 0x123844,
-      emissiveIntensity: 0.35,
+      color: 0xc4927c,
+      roughness: 0.58,
+      metalness: 0,
+      sheen: 0.6,
+      sheenColor: new THREE.Color(0xffc2ad),
+      sheenRoughness: 0.48,
+      clearcoat: 0.06,
+      clearcoatRoughness: 0.62,
+      specularIntensity: 0.28,
+      specularColor: new THREE.Color(0xffd0c0),
       side: THREE.FrontSide
     });
+    obj.material.onBeforeCompile = function(shader){
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <color_fragment>",
+        "#include <color_fragment>\nfloat pores = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);\ndiffuseColor.rgb *= 0.93 + pores * 0.07;"
+      );
+    };
     obj.renderOrder = 2;
     skin.push(obj);
   });
