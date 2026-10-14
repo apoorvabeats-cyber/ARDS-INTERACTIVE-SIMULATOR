@@ -8,6 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520;9..144,640&family=Figtree:wght@460;600&display=swap" rel="stylesheet">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
 <style>
 :root{
   --bg:#071018; --fg:#f3efe6; --muted:#b7b1a4; --faint:#8a8478;
@@ -20,7 +23,15 @@ button,a,input{font:inherit;color:inherit}
 button{cursor:pointer}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
 header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:14px 118px 0 16px}
-.brand{margin:0;font-family:Fraunces,Georgia,serif;font-weight:520;font-size:28px;letter-spacing:-.03em;line-height:.95}
+.brand{margin:0;font-family:Fraunces,Georgia,serif;font-weight:520;font-size:26px;letter-spacing:-.03em;line-height:.95}
+.figure{position:relative;z-index:1;width:min(100%,520px);height:min(72dvh,760px);transform-style:preserve-3d;transition:opacity .45s ease}
+.figure canvas{width:100%;height:100%;display:block;touch-action:none}
+body.live3d .figure img,body.live3d .hot{display:none}
+.dock{position:absolute;left:8px;right:8px;bottom:112px;z-index:4;display:flex;gap:6px;overflow:auto;padding-bottom:4px}
+.dock button{flex:0 0 auto;min-height:40px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:rgba(7,16,24,.72);color:var(--fg)}
+.dock button.on{border-color:var(--cool);color:var(--cool)}
+.pickname{position:absolute;left:0;right:0;top:8px;z-index:4;text-align:center;margin:0;font-family:Fraunces,Georgia,serif;font-size:22px;letter-spacing:-.03em;pointer-events:none}
+.load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);pointer-events:none}
 .brand small{display:block;margin-top:4px;font-family:Figtree,sans-serif;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:600}
 header input,.seek input{width:100%;max-width:none;background:transparent;border:0;border-bottom:1px solid var(--line);padding:8px 0;font-size:16px}
 header input::placeholder{color:var(--faint)}
@@ -80,7 +91,6 @@ body.opening .figure.materialise{animation:materialise 2s ease forwards}
 }
 .figure.focus::after{opacity:1;transition:opacity .25s ease}
 .well{perspective:1400px;transform-style:preserve-3d}
-.figure{position:relative;z-index:1;aspect-ratio:1008/1792;transform-style:preserve-3d;transition:opacity .45s ease}
 .figure img{width:100%;height:100%;display:block;object-fit:fill;pointer-events:none;user-select:none;backface-visibility:hidden}
 .figure img.back{position:absolute;inset:0;transform:rotateY(180deg)}
 body.spinning .hot{pointer-events:none}
@@ -176,7 +186,7 @@ body.searching .results{display:block}
 <div class="glow" aria-hidden="true"></div>
 <button type="button" class="skip" id="skip">Skip</button>
 <header>
-  <h1 class="brand">Human Atlas<small>Critical care</small></h1>
+  <h1 class="brand">Critical Care Hub<small>Explore the human body. Understand critical illness.</small></h1>
   <div class="seek">
     <input id="find" type="search" enterkeyhint="search" placeholder="Search" aria-label="Search simulators">
     <p class="touch" id="touch">Touch to begin</p>
@@ -197,9 +207,22 @@ body.searching .results{display:block}
 <main class="atlas">
   <div class="well">
     <div class="figure" id="figure">
+      <canvas id="view"></canvas>
+      <p class="load" id="load">Preparing the body…</p>
       <img class="face" src="anatomy-body.png" alt="Translucent anatomical model. Turn it, then select an organ.">
       <img class="back" src="anatomy-body.png" alt="" aria-hidden="true">
       <div class="scan" aria-hidden="true"></div>
+    </div>
+    <p class="pickname" id="pickname"></p>
+    <div class="dock" id="dock">
+      <button type="button" data-yaw="0">Front</button>
+      <button type="button" data-yaw="3.1416">Back</button>
+      <button type="button" data-yaw="1.5708">Left</button>
+      <button type="button" data-yaw="-1.5708">Right</button>
+      <button type="button" id="resetview">Reset</button>
+      <button type="button" id="autorot" class="on">Auto-rotate</button>
+      <button type="button" id="zin" aria-label="Zoom in">Zoom in</button>
+      <button type="button" id="zout" aria-label="Zoom out">Zoom out</button>
     </div>
     <div class="halo" aria-hidden="true"></div>
     <div class="trace ecg" aria-hidden="true"><svg viewBox="0 0 160 46" fill="none"><path d="M0 28 H28 L36 28 L42 8 L50 40 L58 18 L66 28 H160" stroke="#7fd4e6" stroke-width="1.6"/></svg></div>
@@ -372,6 +395,7 @@ function tick(now){
   if(!lastTick) lastTick = now;
   const dt = Math.min(0.05, (now-lastTick)/1000);
   lastTick = now;
+  if(window.body3d) return;
   if(spinning && !current){
     angle = (angle + dt * 28) % 360;
     applyTurn();
@@ -610,6 +634,7 @@ function faceFront(){
 }
 figure.addEventListener("click", function(event){ event.preventDefault(); });
 document.querySelector(".atlas").addEventListener("pointerdown", function(event){
+  if(window.body3d) return;
   if(current || event.target.closest("input, a, .sound, .skip, .replay")) return;
   if(spinning){ faceFront(); return; }
   drag = event.clientX;
@@ -1008,8 +1033,10 @@ figure.addEventListener("pointerover", function(event){
   light(btn.getAttribute("data-id"), {x:+btn.getAttribute("data-x"), y:+btn.getAttribute("data-y")});
 });
 function startShow(){}
+window.enterOrgan = enter;
 startShow();
 if(!reduced) requestAnimationFrame(drawDust);
 </script>
+<script type="module" src="body3d.js"></script>
 </body>
 </html>
