@@ -57,26 +57,33 @@ const names = {
 
 function organ(id, x, y, z, sx, sy, sz, color){
   const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 20, 14),
-    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false })
+    new THREE.SphereGeometry(1, 28, 20),
+    new THREE.MeshStandardMaterial({
+      color: color,
+      roughness: 0.55,
+      metalness: 0,
+      emissive: color,
+      emissiveIntensity: 0.12
+    })
   );
   mesh.position.set(x, y, z);
   mesh.scale.set(sx, sy, sz);
   mesh.userData.id = id;
+  mesh.renderOrder = 1;
   root.add(mesh);
   organMeshes.push(mesh);
   return mesh;
 }
-organ("brain", 0, 1.58, 0.03, 0.09, 0.075, 0.1, 0xc9bdd6);
-organ("thyroid", 0, 1.405, 0.07, 0.055, 0.02, 0.028, 0xc4896a);
-organ("lungs", -0.09, 1.28, 0.02, 0.09, 0.12, 0.07, 0x6fbfb8);
-organ("lungs", 0.09, 1.27, 0.015, 0.08, 0.115, 0.065, 0x6fbfb8);
-organ("heart", 0.035, 1.24, 0.07, 0.055, 0.065, 0.05, 0xc45454);
-organ("liver", -0.07, 1.12, 0.05, 0.1, 0.06, 0.07, 0x8a4638);
-organ("stomach", 0.055, 1.1, 0.065, 0.06, 0.07, 0.05, 0xc4a15a);
-organ("bowel", 0, 1.0, 0.04, 0.1, 0.06, 0.07, 0xd08a78);
-organ("kidneys", -0.07, 1.02, -0.04, 0.04, 0.055, 0.03, 0x9a3d45);
-organ("kidneys", 0.07, 1.015, -0.04, 0.04, 0.055, 0.03, 0x9a3d45);
+organ("brain", 0, 1.58, 0.03, 0.085, 0.07, 0.095, 0xd4c4d0);
+organ("thyroid", 0, 1.405, 0.075, 0.05, 0.018, 0.026, 0xb56a58);
+organ("lungs", -0.085, 1.27, 0.02, 0.085, 0.115, 0.065, 0xc48b8c);
+organ("lungs", 0.09, 1.26, 0.015, 0.075, 0.11, 0.06, 0xc48b8c);
+organ("heart", 0.03, 1.23, 0.075, 0.05, 0.06, 0.045, 0x8d3535);
+organ("liver", -0.065, 1.115, 0.05, 0.095, 0.055, 0.065, 0x6d3a30);
+organ("stomach", 0.05, 1.095, 0.065, 0.055, 0.065, 0.045, 0xc4a06a);
+organ("bowel", 0, 0.995, 0.045, 0.09, 0.05, 0.06, 0xc48472);
+organ("kidneys", -0.065, 1.02, -0.035, 0.038, 0.052, 0.028, 0x7a3036);
+organ("kidneys", 0.065, 1.015, -0.035, 0.038, 0.052, 0.028, 0x7a3036);
 
 let yaw = 0;
 let yawTo = 0;
@@ -157,16 +164,12 @@ loader.load("models/body.glb", function(gltf){
   model.traverse(function(obj){
     if(!obj.isMesh) return;
     obj.material = new THREE.MeshPhysicalMaterial({
-      color: 0xc4927c,
-      roughness: 0.58,
+      color: 0xe4c2b0,
+      roughness: 0.48,
       metalness: 0,
-      sheen: 0.6,
-      sheenColor: new THREE.Color(0xffc2ad),
-      sheenRoughness: 0.48,
-      clearcoat: 0.06,
-      clearcoatRoughness: 0.62,
-      specularIntensity: 0.28,
-      specularColor: new THREE.Color(0xffd0c0),
+      transparent: true,
+      opacity: 0.28,
+      depthWrite: false,
       side: THREE.FrontSide
     });
     obj.material.onBeforeCompile = function(shader){
@@ -190,32 +193,6 @@ loader.load("models/body.glb", function(gltf){
   document.body.classList.add("flat");
 });
 
-document.getElementById("dock").addEventListener("click", function(event){
-  const button = event.target.closest("button");
-  if(!button) return;
-  if(button.dataset.yaw != null){
-    auto = false;
-    yawTo = yaw + wrap(parseFloat(button.dataset.yaw) - wrap(yaw));
-    markAuto();
-  }
-  if(button.id === "resetview"){
-    auto = true;
-    yawTo = yaw + wrap(0 - wrap(yaw));
-    distTo = 3.05;
-    markAuto();
-  }
-  if(button.id === "autorot"){
-    auto = !auto;
-    markAuto();
-  }
-  if(button.id === "zin") distTo = Math.max(1.35, distTo - 0.28);
-  if(button.id === "zout") distTo = Math.min(5.2, distTo + 0.28);
-});
-function markAuto(){
-  const button = document.getElementById("autorot");
-  button.classList.toggle("on", auto);
-  button.textContent = auto ? "Auto-rotate" : "Auto-rotate off";
-}
 canvas.addEventListener("wheel", function(event){
   event.preventDefault();
   distTo = Math.min(5.2, Math.max(1.35, distTo + Math.sign(event.deltaY) * 0.18));
@@ -224,7 +201,6 @@ canvas.addEventListener("pointerdown", function(event){
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   dragging = true;
   auto = false;
-  markAuto();
   moved = 0;
   down = { x: event.clientX, y: event.clientY };
   lastSpan = span();
