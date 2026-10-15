@@ -55,35 +55,128 @@ const names = {
   liver: "Liver", stomach: "Stomach", bowel: "Gastrointestinal", kidneys: "Kidneys", multi: "Whole patient"
 };
 
-function organ(id, x, y, z, sx, sy, sz, color){
-  const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 28, 20),
-    new THREE.MeshStandardMaterial({
-      color: color,
-      roughness: 0.55,
-      metalness: 0,
-      emissive: color,
-      emissiveIntensity: 0.12
-    })
-  );
+function tissue(color){
+  return new THREE.MeshStandardMaterial({
+    color: color,
+    roughness: 0.62,
+    metalness: 0.02,
+    emissive: color,
+    emissiveIntensity: 0.08
+  });
+}
+function place(id, geometry, x, y, z, rx, ry, rz){
+  const mesh = new THREE.Mesh(geometry, tissue(place.color));
   mesh.position.set(x, y, z);
-  mesh.scale.set(sx, sy, sz);
+  mesh.rotation.set(rx || 0, ry || 0, rz || 0);
   mesh.userData.id = id;
   mesh.renderOrder = 1;
   root.add(mesh);
   organMeshes.push(mesh);
   return mesh;
 }
-organ("brain", 0, 1.58, 0.03, 0.085, 0.07, 0.095, 0xd4c4d0);
-organ("thyroid", 0, 1.405, 0.075, 0.05, 0.018, 0.026, 0xb56a58);
-organ("lungs", -0.085, 1.27, 0.02, 0.085, 0.115, 0.065, 0xc48b8c);
-organ("lungs", 0.09, 1.26, 0.015, 0.075, 0.11, 0.06, 0xc48b8c);
-organ("heart", 0.03, 1.23, 0.075, 0.05, 0.06, 0.045, 0x8d3535);
-organ("liver", -0.065, 1.115, 0.05, 0.095, 0.055, 0.065, 0x6d3a30);
-organ("stomach", 0.05, 1.095, 0.065, 0.055, 0.065, 0.045, 0xc4a06a);
-organ("bowel", 0, 0.995, 0.045, 0.09, 0.05, 0.06, 0xc48472);
-organ("kidneys", -0.065, 1.02, -0.035, 0.038, 0.052, 0.028, 0x7a3036);
-organ("kidneys", 0.065, 1.015, -0.035, 0.038, 0.052, 0.028, 0x7a3036);
+function heartGeo(){
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0.32);
+  shape.bezierCurveTo(0, 0.58, -0.48, 0.58, -0.48, 0.18);
+  shape.bezierCurveTo(-0.48, -0.08, -0.16, -0.16, 0, -0.5);
+  shape.bezierCurveTo(0.16, -0.16, 0.48, -0.08, 0.48, 0.18);
+  shape.bezierCurveTo(0.48, 0.58, 0, 0.58, 0, 0.32);
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.32, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.06, bevelSegments: 3, curveSegments: 20 });
+  geo.center();
+  geo.scale(0.13, 0.15, 0.11);
+  return geo;
+}
+function lungGeo(){
+  const pts = [
+    [0.012, 0.12], [0.04, 0.08], [0.068, 0.03], [0.074, -0.03], [0.06, -0.08], [0.028, -0.11]
+  ].map(function(p){ return new THREE.Vector2(p[0], p[1]); });
+  const geo = new THREE.LatheGeometry(pts, 28);
+  geo.scale(1, 1, 0.62);
+  return geo;
+}
+function liverGeo(){
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.62, 0.12);
+  shape.bezierCurveTo(-0.58, 0.48, -0.05, 0.52, 0.32, 0.28);
+  shape.bezierCurveTo(0.5, 0.12, 0.42, -0.16, 0.12, -0.28);
+  shape.bezierCurveTo(-0.12, -0.4, -0.55, -0.12, -0.62, 0.12);
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.32, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.04, bevelSegments: 2, curveSegments: 16 });
+  geo.center();
+  geo.scale(0.26, 0.18, 0.16);
+  return geo;
+}
+function kidneyGeo(){
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0.36);
+  shape.bezierCurveTo(0.28, 0.34, 0.3, 0.08, 0.16, 0);
+  shape.bezierCurveTo(0.3, -0.08, 0.28, -0.34, 0, -0.36);
+  shape.bezierCurveTo(-0.22, -0.34, -0.2, -0.05, -0.08, 0);
+  shape.bezierCurveTo(-0.2, 0.05, -0.22, 0.34, 0, 0.36);
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.03, bevelSegments: 2, curveSegments: 14 });
+  geo.center();
+  geo.scale(0.09, 0.11, 0.08);
+  return geo;
+}
+function stomachGeo(){
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-0.01, 0.07, 0.01),
+    new THREE.Vector3(0.035, 0.05, 0.02),
+    new THREE.Vector3(0.05, 0.0, 0.025),
+    new THREE.Vector3(0.03, -0.05, 0.015),
+    new THREE.Vector3(0.0, -0.07, 0.0),
+    new THREE.Vector3(-0.03, -0.045, -0.005)
+  ]);
+  return new THREE.TubeGeometry(curve, 32, 0.022, 12, false);
+}
+function bowelGeo(){
+  const pts = [];
+  for(let i = 0; i < 48; i++){
+    const t = i / 47;
+    const a = t * Math.PI * 6.2;
+    pts.push(new THREE.Vector3(Math.cos(a) * (0.045 + (i % 7) * 0.004), (t - 0.5) * 0.07, Math.sin(a) * 0.035));
+  }
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 90, 0.011, 8, false);
+}
+function brainGeo(){
+  const geo = new THREE.SphereGeometry(0.082, 42, 28);
+  const pos = geo.attributes.position;
+  for(let i = 0; i < pos.count; i++){
+    let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const fold = Math.sin(x * 95) * Math.sin(y * 80) * Math.sin(z * 90);
+    const groove = Math.exp(-Math.pow(x / 0.01, 2)) * 0.014;
+    const s = 1 + fold * 0.07;
+    pos.setXYZ(i, x * s * 1.08, (y * s - groove) * 0.82, z * s * 1.18);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+place.color = 0xd7c8d4;
+place("brain", brainGeo(), 0, 1.575, 0.02, 0, 0, 0);
+place.color = 0xc9a0b0;
+place("brain", new THREE.SphereGeometry(0.038, 20, 14), 0, 1.52, -0.03, 0.4, 0, 0);
+place.color = 0xb56a58;
+place("thyroid", new THREE.SphereGeometry(1, 16, 12), -0.018, 1.4, 0.078, 0, 0, 0);
+organMeshes[organMeshes.length - 1].scale.set(0.016, 0.026, 0.012);
+place("thyroid", new THREE.SphereGeometry(1, 16, 12), 0.018, 1.4, 0.078, 0, 0, 0);
+organMeshes[organMeshes.length - 1].scale.set(0.016, 0.026, 0.012);
+place.color = 0xc9b2b4;
+place("thyroid", new THREE.SphereGeometry(1, 10, 8), 0, 1.392, 0.082, 0, 0, 0);
+organMeshes[organMeshes.length - 1].scale.set(0.02, 0.006, 0.008);
+place.color = 0xd7a8aa;
+place("lungs", lungGeo(), -0.09, 1.25, 0.02, 0, 0.15, 0);
+place("lungs", lungGeo(), 0.095, 1.255, 0.015, 0, -0.2, 0);
+organMeshes[organMeshes.length - 1].scale.set(0.86, 0.92, 0.86);
+place.color = 0x8c3030;
+place("heart", heartGeo(), 0.028, 1.23, 0.055, 0.15, 0.2, -0.45);
+place.color = 0x6b342c;
+place("liver", liverGeo(), -0.06, 1.1, 0.04, -Math.PI / 2.4, 0.2, 0);
+place.color = 0xc4a06a;
+place("stomach", stomachGeo(), 0.04, 1.09, 0.05, 0, -0.4, 0);
+place.color = 0xc48472;
+place("bowel", bowelGeo(), 0.0, 0.99, 0.035, 0, 0.3, 0);
+place.color = 0x7a3036;
+place("kidneys", kidneyGeo(), -0.07, 1.03, -0.04, 0, 0.6, 0.1);
+place("kidneys", kidneyGeo(), 0.07, 1.025, -0.04, 0, -0.6, -0.1);
 
 let yaw = 0;
 let yawTo = 0;
@@ -168,7 +261,7 @@ loader.load("models/body.glb", function(gltf){
       roughness: 0.48,
       metalness: 0,
       transparent: true,
-      opacity: 0.28,
+      opacity: 0.2,
       depthWrite: false,
       side: THREE.FrontSide
     });

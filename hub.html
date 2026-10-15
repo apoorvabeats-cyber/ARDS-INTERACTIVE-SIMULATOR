@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0c0d10">
 <title>Critical Care Human Atlas</title>
-<!-- pages-build 2026-10-15 -->
+<!-- pages-build 2026-10-15b -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520;9..144,640&family=Figtree:wght@460;600&display=swap" rel="stylesheet">
@@ -183,6 +183,7 @@ body.searching .results{display:block}
 </head>
 <body>
 <canvas class="dust" id="dust" aria-hidden="true"></canvas>
+<audio id="bed" src="scan-bed.mp3" loop preload="auto" playsinline></audio>
 <audio id="line" preload="auto"></audio>
 <div class="glow" aria-hidden="true"></div>
 <button type="button" class="skip" id="skip">Skip</button>
@@ -730,51 +731,23 @@ let waveStep = 0;
 let waveAt = 0;
 let waveNodes = [];
 function startWave(){
-  if(!soundOn || document.hidden || waveOn) return;
-  const ctx = ensureAudio();
-  if(!ctx) return;
+  if(!soundOn || document.hidden) return;
+  const bed = document.getElementById("bed");
+  if(!bed) return;
+  bed.muted = false;
+  bed.volume = 0.42;
+  if(!bed.paused) return;
+  const pending = bed.play();
+  if(pending) pending.catch(function(){});
   waveOn = true;
-  waveAt = ctx.currentTime + 0.08;
-  const dest = ctx.createGain();
-  dest.gain.value = 0.42;
-  dest.connect(ctx.destination);
-  const eighth = 60/98/2;
-  const chords = [
-    [220, 261.63, 329.63],
-    [174.61, 220, 261.63],
-    [261.63, 329.63, 392],
-    [196, 246.94, 293.66]
-  ];
-  const bass = [55, 43.65, 65.41, 49];
-  function tickWave(){
-    if(!waveOn || !audioCtx) return;
-    while(waveAt < audioCtx.currentTime + 0.25){
-      const step = waveStep % 32;
-      const bar = Math.floor(step / 8) % 4;
-      if(step % 2 === 0){
-        tone(audioCtx, dest, {t:waveAt, dur:eighth*1.4, f0:bass[bar], vol:0.2, type:"triangle", atk:0.01, keep:false});
-      }
-      if(step % 8 === 0){
-        chords[bar].forEach(function(freq){
-          tone(audioCtx, dest, {t:waveAt, dur:eighth*7.2, f0:freq/2, vol:0.045, type:"sine", atk:0.25, keep:false});
-        });
-      }
-      const lead = chords[bar][step % 3] * 2;
-      tone(audioCtx, dest, {t:waveAt, dur:eighth*0.7, f0:lead, vol:0.028, type:"square", atk:0.005, keep:false});
-      if(step % 4 === 0) noiseHit(audioCtx, dest, waveAt, 0.09, 0.12, 140, false);
-      else if(step % 4 === 2) noiseHit(audioCtx, dest, waveAt, 0.08, 0.05, 1800, false);
-      waveStep += 1;
-      waveAt += eighth;
-    }
-    waveTimer = setTimeout(tickWave, 60);
-  }
-  tickWave();
 }
 function stopWave(){
   waveOn = false;
   clearTimeout(waveTimer);
-  waveNodes.forEach(function(node){ try{ node.stop(); }catch(err){} });
-  waveNodes = [];
+  const bed = document.getElementById("bed");
+  if(!bed) return;
+  bed.pause();
+  bed.muted = true;
 }
 function whoosh(delta){
   if(!soundOn || document.hidden) return;
@@ -1025,6 +998,6 @@ window.enterOrgan = enter;
 startShow();
 if(!reduced) requestAnimationFrame(drawDust);
 </script>
-<script type="module" src="body3d.js"></script>
+<script type="module" src="body3d.js?v=20261015b"></script>
 </body>
 </html>
