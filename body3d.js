@@ -22,24 +22,30 @@ renderer.toneMappingExposure = 1.08;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 30);
 const target = new THREE.Vector3(0, 0.92, 0);
-scene.add(new THREE.HemisphereLight(0xfff1e6, 0x2a2420, 0.72));
-const key = new THREE.DirectionalLight(0xfff6ee, 2.1);
-key.position.set(0.8, 2.6, 2.4);
+scene.add(new THREE.HemisphereLight(0xd9ffe8, 0x042018, 0.85));
+const key = new THREE.DirectionalLight(0xf4fff8, 1.35);
+key.position.set(0.6, 2.4, 2.2);
 scene.add(key);
-const fill = new THREE.DirectionalLight(0xf0d2c4, 0.55);
-fill.position.set(-1.8, 1.2, 1.4);
+const fill = new THREE.DirectionalLight(0x39f3a0, 0.45);
+fill.position.set(-1.6, 1.4, 1.2);
 scene.add(fill);
-const rim = new THREE.DirectionalLight(0xffe7d6, 0.35);
-rim.position.set(0.2, 1.8, -2.4);
+const rim = new THREE.DirectionalLight(0x39f3a0, 1.5);
+rim.position.set(0.2, 1.6, -2.2);
 scene.add(rim);
 
 const ring = new THREE.Mesh(
-  new THREE.TorusGeometry(0.38, 0.004, 8, 64),
-  new THREE.MeshBasicMaterial({ color: 0x8aa0a6, transparent: true, opacity: 0.35 })
+  new THREE.TorusGeometry(0.55, 0.006, 10, 80),
+  new THREE.MeshBasicMaterial({ color: 0x39f3a0, transparent: true, opacity: 0.7 })
 );
 ring.rotation.x = Math.PI / 2;
 ring.position.y = 0.02;
 scene.add(ring);
+const hoop = new THREE.Mesh(
+  new THREE.TorusGeometry(0.78, 0.004, 8, 90),
+  new THREE.MeshBasicMaterial({ color: 0x7dffc0, transparent: true, opacity: 0.45 })
+);
+hoop.position.y = 0.98;
+scene.add(hoop);
 
 const specks = new THREE.BufferGeometry();
 const dots = new Float32Array(180);
@@ -243,6 +249,8 @@ function frame(){
   requestAnimationFrame(frame);
   if(auto && !dragging) yawTo += 0.0045;
   ring.rotation.z += 0.004;
+  hoop.rotation.y += 0.003;
+  hoop.rotation.z += 0.002;
   placeCamera();
   resize();
   renderer.render(scene, camera);
@@ -257,11 +265,13 @@ loader.load("models/body.glb", function(gltf){
   model.traverse(function(obj){
     if(!obj.isMesh) return;
     obj.material = new THREE.MeshPhysicalMaterial({
-      color: 0xe4c2b0,
-      roughness: 0.48,
-      metalness: 0,
+      color: 0xc8ffe2,
+      emissive: 0x0d5a38,
+      emissiveIntensity: 0.7,
+      roughness: 0.32,
+      metalness: 0.04,
       transparent: true,
-      opacity: 0.2,
+      opacity: 0.16,
       depthWrite: false,
       side: THREE.FrontSide
     });

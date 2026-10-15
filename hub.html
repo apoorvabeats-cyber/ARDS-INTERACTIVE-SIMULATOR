@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0c0d10">
+<meta name="theme-color" content="#04140f">
 <title>Critical Care Human Atlas</title>
-<!-- pages-build 2026-10-15b -->
+<!-- pages-build 2026-10-15c -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520;9..144,640&family=Figtree:wght@460;600&display=swap" rel="stylesheet">
@@ -18,14 +18,14 @@
   --line:rgba(243,239,230,.18); --cool:#7fd4e6; --warm:#e2b48a;
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--fg)}
+html,body{margin:0;height:100%;background:#04140f;color:var(--fg)}
 body{font-family:Figtree,ui-sans-serif,sans-serif;min-height:100dvh}
 button,a,input{font:inherit;color:inherit}
 button{cursor:pointer}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
 header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:14px 118px 0 16px}
-.brand{margin:0;font-family:Fraunces,Georgia,serif;font-weight:520;font-size:26px;letter-spacing:-.03em;line-height:.95}
-.figure{position:relative;z-index:1;width:min(100%,520px);height:min(72dvh,760px);transform-style:preserve-3d;transition:opacity .45s ease}
+.brand{margin:0;font-family:Figtree,sans-serif;font-weight:600;font-size:13px;letter-spacing:.18em;text-transform:uppercase;line-height:1.15;color:#d9ffe8}
+.figure{position:relative;z-index:1;width:100%;height:min(78dvh,820px);transform-style:preserve-3d;transition:opacity .45s ease}
 .figure canvas{width:100%;height:100%;display:block;touch-action:none}
 body.live3d .figure img,body.live3d .hot{display:none}
 .dock{position:absolute;left:8px;right:8px;bottom:112px;z-index:4;display:flex;gap:6px;overflow:auto;padding-bottom:4px}
@@ -38,7 +38,23 @@ header input,.seek input{width:100%;max-width:none;background:transparent;border
 header input::placeholder{color:var(--faint)}
 .seek{display:flex;flex-direction:column;align-items:stretch;width:46%;max-width:220px}
 .touch{display:block;margin:10px 0 0;color:#f7fbff;font-size:16px;font-weight:650;letter-spacing:.01em;line-height:1.2;text-align:right;text-shadow:0 1px 6px #000}
-.atlas{position:relative;min-height:calc(100dvh - 72px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 12px 12px}
+.atlas{position:relative;min-height:calc(100dvh - 72px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0}
+.hud{position:absolute;inset:0;pointer-events:none;z-index:4}
+.reticle{position:absolute;left:50%;top:46%;width:min(70vw,380px);aspect-ratio:1;transform:translate(-50%,-50%);border:1px solid rgba(80,255,170,.4);border-radius:50%;box-shadow:0 0 0 14px rgba(80,255,170,.05), inset 0 0 30px rgba(80,255,170,.08)}
+.reticle::before,.reticle::after{content:"";position:absolute;inset:11%;border-radius:50%;border:1px dashed rgba(120,255,190,.4)}
+.reticle::after{inset:24%;border-style:solid;border-color:rgba(80,255,170,.28);animation:spin 36s linear infinite}
+.cross{position:absolute;left:50%;top:46%;width:18px;height:18px;transform:translate(-50%,-50%)}
+.cross::before,.cross::after{content:"";position:absolute;background:#7dffc0}
+.cross::before{left:8px;top:0;bottom:0;width:1px}
+.cross::after{top:8px;left:0;right:0;height:1px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.rail{position:absolute;top:6%;bottom:14%;width:78px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;pointer-events:auto}
+.rail.left{left:8px}
+.rail.right{right:8px}
+.rail button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 4px;min-height:64px;background:rgba(4,20,15,.72);border:1px solid rgba(80,255,170,.35);color:#d7ffe8;font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.rail img{width:46px;height:36px;object-fit:cover;border:1px solid rgba(80,255,170,.25)}
+.scanlines{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(transparent 0 3px, rgba(0,0,0,.12) 3px 4px);mix-blend-mode:multiply}
+body.filming .hud{opacity:0}
 .atlas::before{
   content:"";position:absolute;inset:0;pointer-events:none;
   background-image:linear-gradient(rgba(127,212,230,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(127,212,230,.06) 1px,transparent 1px);
@@ -61,10 +77,10 @@ body.begun .touch{display:none}
 .invite{position:fixed;left:0;right:0;bottom:28px;z-index:5;text-align:center;padding:0 24px;opacity:0;pointer-events:none}
 body.titled .invite,body.ready .invite{opacity:1;transition:opacity .8s ease}
 body.settled .invite,body.in .invite{opacity:0}
-.invite p{margin:0;letter-spacing:.16em;text-transform:uppercase;font-size:11px;color:var(--cool)}
-.invite h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:34px;letter-spacing:-.03em;margin:8px 0;line-height:1}
-.invite .quiet{letter-spacing:0;text-transform:none;font-size:15px;color:var(--muted);margin-top:6px}
-.well{perspective:1200px;width:min(100%,420px);position:relative;z-index:1}
+.invite p{margin:0;letter-spacing:.16em;text-transform:uppercase;font-size:11px;color:#8dceb0}
+.invite h2{font-family:Figtree,sans-serif;font-weight:600;font-size:13px;letter-spacing:.14em;text-transform:uppercase;margin:6px 0;line-height:1.3;color:#d9ffe8}
+.invite .quiet{letter-spacing:.04em;text-transform:uppercase;font-size:11px;color:#8dceb0;margin-top:4px}
+.well{perspective:1200px;width:min(100% - 168px, 520px);position:relative;z-index:1}
 .halo{position:absolute;left:22%;right:22%;bottom:16%;height:18px;border-radius:50%;border:1px solid rgba(127,212,230,.55);box-shadow:0 0 22px rgba(127,212,230,.35);opacity:0;pointer-events:none}
 body.titled .halo,body.ready .halo{opacity:1;transition:opacity .6s ease}
 .glimpses{display:none}
@@ -197,16 +213,31 @@ body.searching .results{display:block}
 <button type="button" class="sound" id="sound" aria-pressed="true">Sound: On</button>
 <button type="button" class="sound replay" id="replay">Replay</button>
 <div class="invite" id="invite">
-  <p>Critical care • Human atlas</p>
-  <h2>Explore the human body</h2>
-  <p class="quiet">Every organ. Every decision. Every critical moment.</p>
-  <p class="quiet">Tap anywhere to stop. Then turn the body and choose an organ.</p>
+  <p>Critical care • body scan</p>
+  <h2>Turn the body. Tap an organ.</h2>
 </div>
 <div class="approach" id="approach">
   <img id="plate" src="brain-close.jpg" alt="">
   <p>Cortex and cerebral vessels</p>
 </div>
 <main class="atlas">
+  <div class="hud">
+    <div class="reticle" aria-hidden="true"></div>
+    <div class="cross" aria-hidden="true"></div>
+    <div class="scanlines" aria-hidden="true"></div>
+    <nav class="rail left" aria-label="Organs">
+      <button type="button" data-organ="heart"><img src="heart.jpg" alt="">Heart</button>
+      <button type="button" data-organ="lungs"><img src="lungs.jpg" alt="">Lungs</button>
+      <button type="button" data-organ="liver"><img src="liver.jpg" alt="">Liver</button>
+      <button type="button" data-organ="kidneys"><img src="kidneys.jpg" alt="">Kidneys</button>
+    </nav>
+    <nav class="rail right" aria-label="Organs">
+      <button type="button" data-organ="brain"><img src="brain-close.jpg" alt="">Brain</button>
+      <button type="button" data-organ="thyroid"><img src="thyroid.jpg" alt="">Thyroid</button>
+      <button type="button" data-organ="stomach"><img src="stomach.jpg" alt="">Stomach</button>
+      <button type="button" data-organ="bowel"><img src="gi.jpg" alt="">Bowel</button>
+    </nav>
+  </div>
   <div class="well">
     <div class="figure" id="figure">
       <canvas id="view"></canvas>
@@ -995,9 +1026,14 @@ figure.addEventListener("pointerover", function(event){
 });
 function startShow(){}
 window.enterOrgan = enter;
+document.querySelectorAll(".rail button").forEach(function(button){
+  button.addEventListener("click", function(){
+    enter(button.getAttribute("data-organ"));
+  });
+});
 startShow();
 if(!reduced) requestAnimationFrame(drawDust);
 </script>
-<script type="module" src="body3d.js?v=20261015b"></script>
+<script type="module" src="body3d.js?v=20261015c"></script>
 </body>
 </html>
