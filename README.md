@@ -1,6 +1,6 @@
 # Critical Care Human Atlas
 
-The opening screen is an interactive Three.js anatomy viewer with a locally bundled **anatomical GLB**. It includes an external body, translucent internal anatomy, and isolated organ examination. The human and organs use source anatomical geometry, not primitive shapes or image projections.
+The opening screen starts with the **external body** in an interactive Three.js anatomy viewer with a locally bundled **anatomical GLB**. It includes an external body, translucent internal anatomy, and isolated organ examination. The human and organs use source anatomical geometry, not primitive shapes or image projections.
 
 ## Run locally or on GitHub Pages
 
@@ -22,7 +22,7 @@ Open `http://localhost:3000/`. Serve the complete repository over HTTP(S); ES mo
 - Camera controls reset the view, show the front/back, and toggle automatic rotation. With the canvas focused, arrow keys rotate, +/− zoom, Home resets, and Space toggles rotation.
 - **Learning Lab** and **Practice Arena** open the existing clinical rooms. Rooms without a simulator show their availability message. Original audio recordings and sound functions are retained; browser playback starts after interaction.
 
-The HUD contains decorative scan lines and circular instruments. Its readouts describe viewer state, not patient measurements. No bottom tabs are used.
+The HUD contains decorative scan lines and circular instruments. Its readouts describe viewer state, not patient measurements. No bottom tabs or bottom-right camera buttons are used.
 
 ## Anatomical assets and scope
 
