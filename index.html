@@ -221,7 +221,57 @@ body.searching .results{display:block}
   .portal.lab,.portal.arena{transform:none}
   body.opening .figure{opacity:1;animation:none}
 }
+
+/* Opening atlas: keep the body and its controls visible at every screen size. */
+body{height:auto;min-height:100dvh}
+.atlas{flex:none;height:100dvh;min-height:620px;overflow:hidden}
+.atlas-heading{position:absolute;left:32px;top:28px;z-index:5;pointer-events:none}
+.atlas-heading p{margin:0 0 8px;color:var(--cool);font-size:11px;letter-spacing:.18em;text-transform:uppercase}
+.atlas-heading h1{font:520 32px/1.1 Fraunces,Georgia,serif;margin:0 0 10px;letter-spacing:-.03em}
+.atlas-heading span{color:var(--muted);font-size:13px}
+.hud-header{position:absolute;z-index:8;top:24px;right:28px;gap:8px}
+.sound{width:auto;padding:0 13px;color:var(--fg);font-size:12px;background:#0c1823;min-height:38px;border-color:var(--line);border-radius:20px}
+#sound::before{content:"Sound on"}#sound[aria-pressed="false"]::before{content:"Sound off"}
+#replay::before{content:"Replay sound"}
+.skip{color:var(--fg);font-size:12px;width:auto;padding:0 12px;z-index:9;position:absolute;top:130px;left:32px}
+.skip::before{content:"Skip intro"}
+.atlas .hud-center{left:0;right:230px;top:94px;bottom:100px}
+.atlas .well,.atlas .figure{height:100%;min-height:0}
+.figure img{position:absolute;inset:0;object-fit:contain}
+.figure canvas{position:relative;z-index:1}
+body.flat .figure canvas{display:none}
+body.flat .figure .back{display:none}
+.load{font-size:12px;color:var(--muted);inset:auto 20px 8px;z-index:3;text-align:center}
+.pickname{top:auto;bottom:0;font:12px Figtree,sans-serif;color:var(--muted);transform:translateY(26px)}
+.organ-nav{position:absolute;z-index:5;right:32px;top:120px;bottom:100px;width:190px;display:flex;flex-direction:column;justify-content:center;gap:6px}
+.organ-nav h2{font:600 10px Figtree,sans-serif;text-transform:uppercase;letter-spacing:.16em;color:var(--faint);margin:0 0 12px}
+.organ-nav button{display:flex;align-items:center;gap:10px;text-align:left;min-height:36px;padding:8px 12px;background:rgba(9,21,31,.8);border:1px solid var(--line);border-radius:8px;font-size:13px;color:var(--muted)}
+.organ-nav button::before{content:"";width:6px;height:6px;flex:none;border-radius:50%;background:var(--dot,var(--cool))}
+.organ-nav button:hover,.organ-nav button.on,.organ-nav button:focus-visible{color:var(--fg);border-color:var(--cool);background:#112b37}
+.viewer-controls{position:absolute;left:24px;right:254px;bottom:26px;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;z-index:5}
+.viewer-controls button{min-height:40px;padding:8px 16px;border:1px solid var(--line);border-radius:22px;background:#0c1823;font-size:12px}
+.viewer-controls button[aria-pressed="true"]{border-color:#7fd4e680;color:var(--cool)}
+.viewer-controls button:disabled{opacity:.4;cursor:default}
+.atlas .ringset,.atlas .beam,.atlas .diag{display:none}
+.atlas .bracket{opacity:.2}
+body.in .organ-nav,body.in .viewer-controls{display:none}
+@media(max-width:720px){
+ .atlas{height:100dvh;min-height:700px}
+ .atlas-heading{top:22px;left:20px}.atlas-heading h1{font-size:25px}.atlas-heading span{font-size:12px}
+ .hud-header{top:20px;right:16px;gap:5px}.sound{padding:0 9px;min-height:32px;font-size:10px}
+ .atlas-heading{right:150px}.atlas-heading p{font-size:9px}.atlas-heading span{display:none}
+ .atlas .hud-center{top:94px;left:0;right:0;bottom:230px}
+ .organ-nav{top:auto;bottom:78px;left:16px;right:16px;width:auto;display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;justify-content:center}
+ .organ-nav h2{width:100%;text-align:center;margin:0 0 3px}
+ .organ-nav button{min-height:32px;padding:6px 9px;font-size:11px;gap:6px}
+ .viewer-controls{left:12px;right:12px;bottom:16px;gap:6px}.viewer-controls button{padding:7px 12px;min-height:36px;font-size:11px}
+ .pickname{font-size:11px;transform:translateY(20px)}
+ .skip{top:104px;left:20px}
+}
+@media(prefers-reduced-motion:reduce){.pane i,.bars b,.ringset::before,.ringset::after,.beam{animation:none}}
+
 </style>
+<link rel="stylesheet" href="anatomy/scan-room.css">
 </head>
 <body>
 <canvas class="dust" id="dust" aria-hidden="true"></canvas>
@@ -244,6 +294,8 @@ body.searching .results{display:block}
   <p>Cortex and cerebral vessels</p>
 </div>
 <main class="atlas">
+  <div class="atlas-heading"><h1>Critical care · anatomical scan</h1></div>
+  <div class="scan-light" aria-hidden="true"></div><div class="scan-light second" aria-hidden="true"></div><div class="scan-flare" aria-hidden="true"></div>
   <div class="veil" aria-hidden="true">
     <i class="bracket tl"></i><i class="bracket tr"></i><i class="bracket bl"></i><i class="bracket br"></i>
     <div class="ringset"></div>
@@ -262,15 +314,46 @@ body.searching .results{display:block}
   <div class="hud-center">
     <div class="well">
       <div class="figure" id="figure">
-        <canvas id="view"></canvas>
-        <p class="load" id="load"></p>
+        <canvas id="view" tabindex="0" aria-label="3D anatomy. Drag to rotate 360 degrees, pinch or scroll to zoom. Arrow keys rotate; plus and minus zoom; Home resets."></canvas>
+        <p class="load" id="load" role="status">Preparing the anatomy model…</p>
         <img class="face" src="anatomy-body.png" alt="">
         <img class="back" src="anatomy-body.png" alt="" aria-hidden="true">
         <div class="scan" aria-hidden="true"></div>
       </div>
-      <p class="pickname" id="pickname"></p>
+      <p class="pickname" id="pickname">Select an organ to explore its modules</p>
     </div>
   </div>
+  <aside class="scan-panel scan-left" aria-label="Anatomical reference scans">
+    <section><img class="scan-art cranial" src="assets/cranial-scan.webp" alt="Cranial scan illustration from the supplied reference"></section>
+    <section><h2>Lower body skeletal diagnostic</h2><img class="scan-art skeletal" src="assets/skeletal-scan.webp" alt="Skeletal anatomy reference illustration"></section>
+    <section><h2>Renal function &nbsp; · &nbsp; Lymphatic system</h2><img class="scan-art system-art" src="assets/system-scans.webp" alt="Renal and lymphatic system reference illustrations"></section>
+  </aside>
+  <aside class="scan-panel scan-right" aria-label="Anatomy scan controls">
+    <section><h2>Anatomical scan</h2><small>Complete anatomy · structural overview</small><div class="scan-histogram" aria-hidden="true"><i style="--bar:9%"></i><i style="--bar:15%"></i><i style="--bar:23%"></i><i style="--bar:17%"></i><i style="--bar:38%"></i><i style="--bar:26%"></i><i style="--bar:53%"></i><i style="--bar:87%"></i><i style="--bar:43%"></i><i style="--bar:35%"></i><i style="--bar:26%"></i><i style="--bar:49%"></i><i style="--bar:34%"></i><i style="--bar:57%"></i><i style="--bar:42%"></i><i style="--bar:66%"></i><i style="--bar:49%"></i><i style="--bar:71%"></i><i style="--bar:58%"></i><i style="--bar:91%"></i><i style="--bar:74%"></i><i style="--bar:61%"></i><i style="--bar:79%"></i><i style="--bar:49%"></i><i style="--bar:35%"></i><i style="--bar:57%"></i><i style="--bar:42%"></i><i style="--bar:24%"></i><i style="--bar:33%"></i><i style="--bar:19%"></i><i style="--bar:12%"></i></div><div class="scan-scale" aria-hidden="true"><span>01 · 02 · 03 · 04</span><span>SYSTEM ANALYSIS</span></div></section>
+    <section class="system-panel"><nav class="organ-nav" aria-label="Select an organ">
+    <h2>System view</h2>
+    <button type="button" data-organ="brain" style="--dot:#d8b2b2">Brain</button>
+    <button type="button" data-organ="thyroid" style="--dot:#d69357">Thyroid</button>
+    <button type="button" data-organ="lungs" style="--dot:#d38b9a">Lungs</button>
+    <button type="button" data-organ="heart" style="--dot:#ac3544">Heart</button>
+    <button type="button" data-organ="liver" style="--dot:#8c4243">Liver</button>
+    <button type="button" data-organ="stomach" style="--dot:#d8a286">Stomach</button>
+    <button type="button" data-organ="spleen" style="--dot:#905982">Spleen</button>
+    <button type="button" data-organ="bowel" style="--dot:#d39a87">Intestines</button>
+    <button type="button" data-organ="kidneys" style="--dot:#9c4d45">Kidneys</button>
+    <button type="button" data-organ="multi">Whole patient</button>
+  </nav></section>
+    <section><h2 id="rotation-status">360° rotation in progress</h2><div class="rotation-readout"><span>ANATOMICAL POSITION<br>DRAG TO EXPLORE</span><b>360°</b></div></section>
+    <section><h2>Physiology data</h2><div class="physiology" aria-hidden="true"><span class="scan-gauge">3D</span><span class="scan-gauge">SCAN</span><svg class="scan-wave" viewBox="0 0 160 42"><path d="M0 31 8 30 13 19 18 24 23 17 30 26 36 25 39 30 45 17 50 20 55 12 60 22 64 17 70 23 76 21 81 8 85 6 90 21 95 19 100 29 106 24 111 27 116 21 122 23 127 14 132 5 138 17 143 14 148 25 160 26"/></svg></div></section>
+    <section><h2>Foot vascularity map</h2><img class="foot-art" src="assets/foot-scan.webp" alt="Foot vascular anatomy reference illustration"></section>
+  </aside>
+  <div class="scan-bottom" aria-hidden="true"><span>Human atlas / interactive anatomy</span><span>Structural visualization · select an organ to enter</span></div>
+  <nav class="viewer-controls" aria-label="Rotate the anatomy model">
+    <button type="button" data-view="front">Front</button>
+    <button type="button" data-view="back">Back</button>
+    <button type="button" data-view="auto" aria-pressed="true">Pause rotation</button>
+    <button type="button" data-view="reset">Reset view</button>
+  </nav>
 </main>
 <section class="room" id="room"></section>
 <section class="results" id="results"></section>
@@ -378,7 +461,7 @@ const ORGANS = [
   {
     id:"multi", name:"Whole patient", room:"Multiorgan",
     line:"Sepsis, shock and more than one failing organ. Infection sits with the spleen; the integrated cases sit in the arena.",
-    spots:[{x:63,y:36,name:"Spleen"},{x:50,y:54,name:"Whole patient"}],
+    spots:[{x:50,y:54,name:"Whole patient"}],
     plate:"plates/spleen.jpg",
     learn:[
       ["Shock bay","Phenotypes of shock, and a ventilator you control.","Shock_Bay.html?v=20260925s"],
@@ -403,6 +486,13 @@ const ORGANS = [
     soon:"The Nephrology Practice Simulator is not built yet. The learning lab is open."
   }
 ];
+// The spleen shares the existing infection and integrated ICU modules.
+ORGANS.push({
+  ...ORGANS.find(function(organ){ return organ.id === "multi"; }),
+  id:"spleen", name:"Spleen", room:"Infection and immunity",
+  line:"The spleen filters blood and supports immune defense. Explore the infection, sepsis and shock modules here.",
+  spots:[{x:63,y:36,name:"Spleen"}]
+});
 
 const figure = document.getElementById("figure");
 const room = document.getElementById("room");
@@ -430,7 +520,7 @@ function applyTurn(){
   figure.style.transform = "rotateY("+angle+"deg)";
 }
 function setSpin(on){
-  spinning = !!on && !reduced && !current;
+  spinning = false; // The 3D viewer owns rotation; a flat image must stay readable.
   document.body.classList.toggle("spinning", spinning);
 }
 function tick(now){
@@ -584,6 +674,7 @@ function showRooms(){
   document.body.classList.remove("filming");
   document.body.classList.add("in","enter");
   renderRoom();
+  document.getElementById("back").focus({preventScroll:true});
 }
 function enter(id, spot){
   const organ = organById(id);
@@ -619,6 +710,7 @@ function enter(id, spot){
     };
     plate.alt = organ.name;
     plate.onload = null;
+    plate.onerror = function(){ plate.onload = null; plate.onerror = null; showRooms(); };
     if(plate.getAttribute("src")===organ.plate && plate.complete && plate.naturalWidth){
       go();
     } else {
@@ -643,6 +735,8 @@ function leave(){
   angle = 0;
   setSpin(!reduced);
   light("");
+  if(window.resetAtlas) window.resetAtlas();
+  document.getElementById("view").focus({preventScroll:true});
   if(!reduced) requestAnimationFrame(drawDust);
 }
 function search(){
@@ -674,10 +768,13 @@ function faceFront(){
   applyTurn();
   setTimeout(function(){ figure.style.transition = "opacity .45s ease"; }, 600);
 }
-figure.addEventListener("click", function(event){ event.preventDefault(); });
+figure.addEventListener("click", function(event){
+  event.preventDefault();
+  if(!window.body3d) chooseOrgan(event.target);
+});
 document.querySelector(".atlas").addEventListener("pointerdown", function(event){
   if(window.body3d) return;
-  if(current || event.target.closest("input, a, .sound, .skip, .replay")) return;
+  if(current || event.target.closest("input, a, button")) return;
   if(spinning){ faceFront(); return; }
   drag = event.clientX;
   downY = event.clientY;
@@ -1054,12 +1151,21 @@ document.querySelectorAll("[data-organ]").forEach(function(button){
     if(window.hoverOrgan) window.hoverOrgan(button.getAttribute("data-organ"));
   });
   button.addEventListener("click", function(){
-    enter(button.getAttribute("data-organ"));
+    const id = button.getAttribute("data-organ");
+    if(window.selectAtlasOrgan) window.selectAtlasOrgan(id);
+    else enter(id);
   });
 });
 startShow();
+setTimeout(function(){
+  if(!window.body3d && !document.body.classList.contains("flat")){
+    document.body.classList.add("flat");
+    document.getElementById("load").textContent = "3D could not load. Choose an organ below to open its modules.";
+    document.querySelectorAll("[data-view]").forEach(function(b){ b.disabled = true; });
+  }
+}, 10000);
 if(!reduced) requestAnimationFrame(drawDust);
 </script>
-<script type="module" src="body3d.js?v=20261016c"></script>
+<script type="module" src="body3d.js?v=20261016e"></script>
 </body>
 </html>

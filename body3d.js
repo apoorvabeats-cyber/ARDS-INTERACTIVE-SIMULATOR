@@ -1,393 +1,268 @@
-import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { buildAtlasOrgans } from './anatomy/atlas-organs.js';
+import { buildScanStructure, buildScanPlatform } from './anatomy/scan-structure.js';
+import { buildBody, createUniforms } from './anatomy/body-model.js';
 
-const canvas = document.getElementById("view");
-const load = document.getElementById("load");
-const nameplate = document.getElementById("pickname");
-if(!canvas) throw new Error("missing canvas");
+const canvas = document.getElementById('view');
+const load = document.getElementById('load');
+const nameplate = document.getElementById('pickname');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const autoButton = document.querySelector('[data-view="auto"]');
+const names = { brain: 'Brain', thyroid: 'Thyroid', lungs: 'Lungs', heart: 'Heart', liver: 'Liver',
+  stomach: 'Stomach', spleen: 'Spleen', bowel: 'Intestines', kidneys: 'Kidneys', multi: 'Whole patient' };
 
-let renderer;
-try{
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
-}catch(err){
-  if(load) load.textContent = "3D is unavailable. The picture view stays on.";
-  throw err;
-}
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
-renderer.setClearColor(0x000000, 0);
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
-
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 30);
-const target = new THREE.Vector3(0, 0.92, 0);
-scene.add(new THREE.HemisphereLight(0xd7e8ff, 0x0b121c, 0.9));
-const key = new THREE.DirectionalLight(0xf7fbff, 1.7);
-key.position.set(0.7, 2.8, 2.4);
-scene.add(key);
-const fill = new THREE.DirectionalLight(0x8eb7e8, 0.55);
-fill.position.set(-1.8, 1.3, 1.1);
-scene.add(fill);
-const rim = new THREE.DirectionalLight(0x7ecbff, 0.85);
-rim.position.set(0.1, 1.5, -2.3);
-scene.add(rim);
-
-const ring = new THREE.Mesh(
-  new THREE.TorusGeometry(0.78, 0.012, 12, 96),
-  new THREE.MeshBasicMaterial({ color: 0x8fd4ff, transparent: true, opacity: 0.9 })
-);
-ring.rotation.x = Math.PI / 2;
-ring.position.y = 0.02;
-scene.add(ring);
-const hoop = new THREE.Mesh(
-  new THREE.TorusGeometry(1.15, 0.004, 8, 80),
-  new THREE.MeshBasicMaterial({ color: 0x6eb6e6, transparent: true, opacity: 0.28 })
-);
-hoop.rotation.x = Math.PI / 2;
-hoop.position.y = 0.02;
-scene.add(hoop);
-const orbit = new THREE.Mesh(
-  new THREE.TorusGeometry(0.92, 0.0035, 8, 140),
-  new THREE.MeshBasicMaterial({ color: 0x9fe7ff, transparent: true, opacity: 0.55 })
-);
-scene.add(orbit);
-const orbit2 = new THREE.Mesh(
-  new THREE.TorusGeometry(1.05, 0.002, 8, 120),
-  new THREE.MeshBasicMaterial({ color: 0x3d8eb8, transparent: true, opacity: 0.35 })
-);
-orbit2.rotation.x = 1.15;
-scene.add(orbit2);
-const scan = new THREE.Mesh(
-  new THREE.RingGeometry(0.22, 0.3, 64),
-  new THREE.MeshBasicMaterial({ color: 0xd7f6ff, transparent: true, opacity: 0.45, side: THREE.DoubleSide })
-);
-scan.rotation.x = Math.PI / 2;
-scene.add(scan);
-
-const specks = new THREE.BufferGeometry();
-const dots = new Float32Array(180);
-for(let i = 0; i < dots.length; i++) dots[i] = (Math.random() - 0.5) * 3;
-specks.setAttribute("position", new THREE.BufferAttribute(dots, 3));
-scene.add(new THREE.Points(specks, new THREE.PointsMaterial({ color: 0xc8d0d2, size: 0.008, transparent: true, opacity: 0.18 })));
-
-const root = new THREE.Group();
-scene.add(root);
-const organMeshes = [];
-const names = {
-  brain: "Brain", thyroid: "Thyroid", lungs: "Lungs", heart: "Heart",
-  liver: "Liver", stomach: "Stomach", bowel: "Intestines", kidneys: "Kidneys", multi: "Whole patient"
-};
-
-function tissue(color){
-  return new THREE.MeshStandardMaterial({
-    color: color,
-    roughness: 0.62,
-    metalness: 0.02,
-    emissive: color,
-    emissiveIntensity: 0.08
+function init() {
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.75));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 30);
+  const controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true; controls.dampingFactor = 0.09;
+  controls.enablePan = false; controls.autoRotate = !reduce; controls.autoRotateSpeed = 0.6;
+  controls.minDistance = 1.1; controls.maxDistance = 6;
+  controls.minPolarAngle = Math.PI * 0.3; controls.maxPolarAngle = Math.PI * 0.7;
+  scene.add(new THREE.HemisphereLight(0xc5e6f1, 0x242431, 1.35));
+  for (const [color, intensity, position] of [[0xffe6d8, 2.3, [-1, 3, 3]], [0x8ecde6, 1.0, [2, 1, 1]], [0xa5e9ff, 3.2, [0, 2, -2]]]) {
+    const light = new THREE.DirectionalLight(color, intensity); light.position.set(...position); scene.add(light);
+  }
+  const atlas = buildAtlasOrgans(THREE); scene.add(atlas.group);
+  const structure = buildScanStructure(THREE); scene.add(structure.group);
+  scene.add(buildScanPlatform(THREE));
+  let needsRender = true;
+  controls.addEventListener('change', () => { needsRender = true; });
+  // Fresnel transparency preserves the body's contour without hiding the organs.
+  const skinMaterial = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, side: THREE.FrontSide,
+    uniforms: { opacity: { value: 1 }, surface: { value: null }, surfaceReady: { value: 0 } },
+    vertexShader: `
+      #include <common>
+      #include <skinning_pars_vertex>
+      varying vec3 n; varying vec3 viewDir; varying vec3 worldPoint; varying vec3 worldNormal;
+      void main(){
+        #include <beginnormal_vertex>
+        #include <skinbase_vertex>
+        #include <skinnormal_vertex>
+        #include <begin_vertex>
+        #include <skinning_vertex>
+        vec4 mv=modelViewMatrix*vec4(transformed,1.0);
+        n=normalize(normalMatrix*objectNormal); viewDir=-mv.xyz; worldPoint=(modelMatrix*vec4(transformed,1.0)).xyz; worldNormal=normalize(mat3(modelMatrix)*objectNormal); gl_Position=projectionMatrix*mv;
+      }`,
+    fragmentShader: `varying vec3 n; varying vec3 viewDir; varying vec3 worldPoint; varying vec3 worldNormal; uniform float opacity; uniform sampler2D surface; uniform float surfaceReady;
+      void main(){ float rim=pow(1.0-abs(dot(normalize(n),normalize(viewDir))),2.1);
+        float light=0.5+0.5*max(0.0,dot(normalize(n),normalize(vec3(-0.5,0.7,1.0))));
+        float torso=step(abs(worldPoint.x),0.16)*step(0.91,worldPoint.y)*step(worldPoint.y,1.4);
+        vec3 skin=mix(vec3(0.48,0.34,0.30)*light,vec3(0.70,0.87,0.91),pow(rim,0.6));
+        vec2 uv=vec2(0.5046+worldPoint.x*1.274,0.007+worldPoint.y*0.583);
+        vec3 detail=texture2D(surface,clamp(uv,0.0,1.0)).rgb;
+        float front=pow(max(0.0,worldNormal.z),0.5)*surfaceReady;
+        float hasDetail=smoothstep(0.025,0.10,dot(detail,vec3(0.333)));
+        skin=mix(skin,detail*1.45+vec3(0.07,0.09,0.10),front*0.74*hasDetail);
+        float alpha=(0.38+rim*0.50)*mix(1.0,0.30,torso);
+        gl_FragColor=vec4(skin,alpha*opacity);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`
   });
-}
-function place(id, geometry, x, y, z, rx, ry, rz){
-  const mesh = new THREE.Mesh(geometry, tissue(place.color));
-  mesh.position.set(x, y, z);
-  mesh.rotation.set(rx || 0, ry || 0, rz || 0);
-  mesh.userData.id = id;
-  mesh.renderOrder = 1;
-  root.add(mesh);
-  organMeshes.push(mesh);
-  return mesh;
-}
-function heartGeo(){
-  const shape = new THREE.Shape();
-  shape.moveTo(0, 0.32);
-  shape.bezierCurveTo(0, 0.58, -0.48, 0.58, -0.48, 0.18);
-  shape.bezierCurveTo(-0.48, -0.08, -0.16, -0.16, 0, -0.5);
-  shape.bezierCurveTo(0.16, -0.16, 0.48, -0.08, 0.48, 0.18);
-  shape.bezierCurveTo(0.48, 0.58, 0, 0.58, 0, 0.32);
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.32, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.06, bevelSegments: 3, curveSegments: 20 });
-  geo.center();
-  geo.scale(0.13, 0.15, 0.11);
-  return geo;
-}
-function lungGeo(){
-  const pts = [
-    [0.012, 0.12], [0.04, 0.08], [0.068, 0.03], [0.074, -0.03], [0.06, -0.08], [0.028, -0.11]
-  ].map(function(p){ return new THREE.Vector2(p[0], p[1]); });
-  const geo = new THREE.LatheGeometry(pts, 28);
-  geo.scale(1, 1, 0.62);
-  return geo;
-}
-function liverGeo(){
-  const shape = new THREE.Shape();
-  shape.moveTo(-0.62, 0.12);
-  shape.bezierCurveTo(-0.58, 0.48, -0.05, 0.52, 0.32, 0.28);
-  shape.bezierCurveTo(0.5, 0.12, 0.42, -0.16, 0.12, -0.28);
-  shape.bezierCurveTo(-0.12, -0.4, -0.55, -0.12, -0.62, 0.12);
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.32, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.04, bevelSegments: 2, curveSegments: 16 });
-  geo.center();
-  geo.scale(0.26, 0.18, 0.16);
-  return geo;
-}
-function kidneyGeo(){
-  const shape = new THREE.Shape();
-  shape.moveTo(0, 0.36);
-  shape.bezierCurveTo(0.28, 0.34, 0.3, 0.08, 0.16, 0);
-  shape.bezierCurveTo(0.3, -0.08, 0.28, -0.34, 0, -0.36);
-  shape.bezierCurveTo(-0.22, -0.34, -0.2, -0.05, -0.08, 0);
-  shape.bezierCurveTo(-0.2, 0.05, -0.22, 0.34, 0, 0.36);
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.03, bevelSegments: 2, curveSegments: 14 });
-  geo.center();
-  geo.scale(0.09, 0.11, 0.08);
-  return geo;
-}
-function stomachGeo(){
-  const curve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-0.01, 0.07, 0.01),
-    new THREE.Vector3(0.035, 0.05, 0.02),
-    new THREE.Vector3(0.05, 0.0, 0.025),
-    new THREE.Vector3(0.03, -0.05, 0.015),
-    new THREE.Vector3(0.0, -0.07, 0.0),
-    new THREE.Vector3(-0.03, -0.045, -0.005)
-  ]);
-  return new THREE.TubeGeometry(curve, 32, 0.022, 12, false);
-}
-function bowelGeo(){
-  const pts = [];
-  for(let i = 0; i < 48; i++){
-    const t = i / 47;
-    const a = t * Math.PI * 6.2;
-    pts.push(new THREE.Vector3(Math.cos(a) * (0.045 + (i % 7) * 0.004), (t - 0.5) * 0.07, Math.sin(a) * 0.035));
-  }
-  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 90, 0.011, 8, false);
-}
-function brainGeo(){
-  const geo = new THREE.SphereGeometry(0.082, 42, 28);
-  const pos = geo.attributes.position;
-  for(let i = 0; i < pos.count; i++){
-    let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
-    const fold = Math.sin(x * 95) * Math.sin(y * 80) * Math.sin(z * 90);
-    const groove = Math.exp(-Math.pow(x / 0.01, 2)) * 0.014;
-    const s = 1 + fold * 0.07;
-    pos.setXYZ(i, x * s * 1.08, (y * s - groove) * 0.82, z * s * 1.18);
-  }
-  geo.computeVertexNormals();
-  return geo;
-}
-place.color = 0xe4c8be;
-place("brain", brainGeo(), 0, 1.575, 0.02, 0, 0, 0);
-place.color = 0xd7aea4;
-place("brain", new THREE.SphereGeometry(0.038, 20, 14), 0, 1.52, -0.03, 0.4, 0, 0);
-place.color = 0xc46e62;
-place("thyroid", new THREE.SphereGeometry(1, 16, 12), -0.018, 1.4, 0.078, 0, 0, 0);
-organMeshes[organMeshes.length - 1].scale.set(0.016, 0.026, 0.012);
-place("thyroid", new THREE.SphereGeometry(1, 16, 12), 0.018, 1.4, 0.078, 0, 0, 0);
-organMeshes[organMeshes.length - 1].scale.set(0.016, 0.026, 0.012);
-place.color = 0xc9b2b4;
-place("thyroid", new THREE.SphereGeometry(1, 10, 8), 0, 1.392, 0.082, 0, 0, 0);
-organMeshes[organMeshes.length - 1].scale.set(0.02, 0.006, 0.008);
-place.color = 0xefb4b6;
-place("lungs", lungGeo(), -0.09, 1.25, 0.02, 0, 0.15, 0);
-place("lungs", lungGeo(), 0.095, 1.255, 0.015, 0, -0.2, 0);
-organMeshes[organMeshes.length - 1].scale.set(0.86, 0.92, 0.86);
-place.color = 0xb12e32;
-place("heart", heartGeo(), 0.028, 1.23, 0.055, 0.15, 0.2, -0.45);
-place.color = 0x7a2e28;
-place("liver", liverGeo(), -0.06, 1.1, 0.04, -Math.PI / 2.4, 0.2, 0);
-place.color = 0xd7a56a;
-place("stomach", stomachGeo(), 0.04, 1.09, 0.05, 0, -0.4, 0);
-place.color = 0xe08a84;
-place("bowel", bowelGeo(), 0.0, 0.99, 0.035, 0, 0.3, 0);
-place.color = 0x8a353c;
-place("kidneys", kidneyGeo(), -0.07, 1.03, -0.04, 0, 0.6, 0.1);
-place("kidneys", kidneyGeo(), 0.07, 1.025, -0.04, 0, -0.6, -0.1);
-organMeshes.forEach(function(mesh){ mesh.userData.base = mesh.scale.clone(); });
-let hotId = null;
-
-let yaw = 0;
-let yawTo = 0;
-let dist = 3.05;
-let distTo = 3.05;
-let auto = true;
-let dragging = false;
-let moved = 0;
-let down = null;
-const pointers = new Map();
-let lastSpan = 0;
-const ray = new THREE.Raycaster();
-const skin = [];
-
-function wrap(a){
-  while(a > Math.PI) a -= Math.PI * 2;
-  while(a < -Math.PI) a += Math.PI * 2;
-  return a;
-}
-function resize(){
-  const w = canvas.clientWidth || 300;
-  const h = canvas.clientHeight || 500;
-  if(canvas.width !== Math.floor(w * renderer.getPixelRatio()) || canvas.height !== Math.floor(h * renderer.getPixelRatio())){
-    renderer.setSize(w, h, false);
-  }
-  camera.aspect = w / Math.max(1, h);
-  camera.updateProjectionMatrix();
-}
-function placeCamera(){
-  yaw += wrap(yawTo - yaw) * 0.12;
-  dist += (distTo - dist) * 0.12;
-  camera.position.set(Math.sin(yaw) * dist, target.y + 0.08, Math.cos(yaw) * dist);
-  camera.lookAt(target);
-}
-function region(point){
-  const y = point.y;
-  const x = point.x;
-  if(y > 1.5) return "brain";
-  if(y > 1.37) return "thyroid";
-  if(y > 1.18) return Math.abs(x) < 0.05 ? "heart" : "lungs";
-  if(y > 1.05) return x < -0.01 ? "liver" : "stomach";
-  if(y > 0.94) return zFront(point) ? "bowel" : "kidneys";
-  return "multi";
-}
-function zFront(point){ return point.z > 0; }
-function choose(id){
-  if(!id || !window.enterOrgan) return;
-  mark(id);
-  window.enterOrgan(id);
-}
-function mark(id){
-  hotId = id || null;
-  if(nameplate) nameplate.textContent = "";
-  document.querySelectorAll("[data-organ]").forEach(function(button){
-    button.classList.toggle("on", button.getAttribute("data-organ") === hotId);
+  new THREE.TextureLoader().load('assets/anatomy-surface.webp', (texture) => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    skinMaterial.uniforms.surface.value = texture;
+    atlas.setSurface(texture);
+    skinMaterial.uniforms.surfaceReady.value = 1; needsRender = true;
   });
-}
-function idAt(clientX, clientY){
-  const rect = canvas.getBoundingClientRect();
-  const ndc = new THREE.Vector2(
-    ((clientX - rect.left) / rect.width) * 2 - 1,
-    -((clientY - rect.top) / rect.height) * 2 + 1
-  );
-  ray.setFromCamera(ndc, camera);
-  const hitOrgan = ray.intersectObjects(organMeshes, false)[0];
-  if(hitOrgan) return hitOrgan.object.userData.id;
-  const hitSkin = ray.intersectObjects(skin, false)[0];
-  if(hitSkin) return region(hitSkin.point);
-  return null;
-}
-function pick(clientX, clientY){
-  const id = idAt(clientX, clientY);
-  if(id) choose(id);
-}
-window.hoverOrgan = mark;
-function frame(){
-  requestAnimationFrame(frame);
-  if(auto && !dragging) yawTo += 0.0045;
-  ring.rotation.z += 0.004;
-  hoop.rotation.z -= 0.002;
-  orbit.rotation.y += 0.006;
-  orbit.rotation.z = 0.35 + Math.sin(performance.now() / 1400) * 0.08;
-  orbit2.rotation.y -= 0.004;
-  const sweep = (Math.sin(performance.now() / 900) + 1) / 2;
-  scan.position.y = 0.12 + sweep * 1.58;
-  scan.material.opacity = 0.22 + (1 - Math.abs(sweep - 0.5) * 2) * 0.35;
-  const beat = 1 + Math.sin(performance.now() / 160) * 0.07;
-  organMeshes.forEach(function(mesh){
-    const base = mesh.userData.base;
-    if(!base) return;
-    if(mesh.userData.id === hotId){
-      mesh.scale.set(base.x * beat, base.y * beat, base.z * beat);
-      mesh.material.emissiveIntensity = 0.45 + (beat - 1) * 4;
-    }else{
-      mesh.scale.copy(base);
-      mesh.material.emissiveIntensity = 0.08;
+  // A complete procedural shell remains available if the bundled GLB fails to load.
+  const fallback = buildBody(THREE, createUniforms(THREE, true), { reduce: true });
+  const shell = fallback.skinGroup; shell.scale.setScalar(1.68 / 1.915);
+  shell.traverse((o) => { if (o.isMesh) { o.material = skinMaterial; o.renderOrder = 2; } });
+  scene.add(shell);
+  // Dispose of the unused procedural organs/layers; only its skin is needed here.
+  const unusedMaterials = new Set(), unusedGeometries = new Set();
+  for (const layer of [fallback.organsG, fallback.boneG, fallback.vesselG]) {
+    layer.traverse((o) => { if (o.geometry) unusedGeometries.add(o.geometry); if (o.material) unusedMaterials.add(o.material); });
+  }
+  unusedGeometries.forEach((g) => g.dispose());
+  unusedMaterials.forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); });
+  fallback.skinMat.dispose();
+  new GLTFLoader().load('models/body.glb', ({ scene: model }) => {
+    // The bundled body's bind geometry already shares the organ landmarks and metre scale.
+    model.updateMatrixWorld(true);
+    // Relax the arms into the neutral standing pose in the reference.
+    for (const [suffix, side] of [['l', 1], ['r', -1]]) {
+      const upper = model.getObjectByName('upperarm_' + suffix);
+      const lower = model.getObjectByName('lowerarm_' + suffix);
+      const hand = model.getObjectByName('hand_' + suffix);
+      if (!upper || !lower || !hand) continue;
+      const rotateWorld = (bone, delta) => {
+        const world = bone.getWorldQuaternion(new THREE.Quaternion());
+        const parent = bone.parent.getWorldQuaternion(new THREE.Quaternion());
+        bone.quaternion.copy(parent.invert().multiply(delta.multiply(world)));
+        model.updateMatrixWorld(true);
+      };
+      rotateWorld(upper, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -side * 0.55));
+      const direction = hand.getWorldPosition(new THREE.Vector3()).sub(lower.getWorldPosition(new THREE.Vector3())).normalize();
+      rotateWorld(lower, new THREE.Quaternion().setFromUnitVectors(direction, new THREE.Vector3(side * 0.025, -0.25, 0.015).normalize()));
     }
-  });
-  placeCamera();
-  resize();
-  renderer.render(scene, camera);
-}
-requestAnimationFrame(frame);
-
-new ResizeObserver(resize).observe(canvas);
-
-const loader = new GLTFLoader();
-loader.load("models/body.glb", function(gltf){
-  const model = gltf.scene;
-  model.traverse(function(obj){
-    if(!obj.isMesh) return;
-    obj.material = new THREE.MeshPhysicalMaterial({
-      color: 0xd5e4f2,
-      emissive: 0x163044,
-      emissiveIntensity: 0.28,
-      roughness: 0.38,
-      metalness: 0.02,
-      transparent: true,
-      opacity: 0.2,
-      depthWrite: false,
-      side: THREE.FrontSide
+    // Bring the feet into the narrower anatomical stance in the reference.
+    for (const [suffix, side] of [['l', 1], ['r', -1]]) {
+      const thigh = model.getObjectByName('thigh_' + suffix);
+      if (!thigh) continue;
+      const world = thigh.getWorldQuaternion(new THREE.Quaternion());
+      const parent = thigh.parent.getWorldQuaternion(new THREE.Quaternion());
+      const delta = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -side * 0.075);
+      thigh.quaternion.copy(parent.invert().multiply(delta.multiply(world)));
+      model.updateMatrixWorld(true);
+    }
+    const armPoints = {};
+    for (const [suffix, side] of [['l', 1], ['r', -1]]) {
+      const joints = ['upperarm_', 'lowerarm_', 'hand_'].map((prefix) => model.getObjectByName(prefix + suffix));
+      if (joints.every(Boolean)) armPoints[side] = joints.map((joint) => joint.getWorldPosition(new THREE.Vector3()).toArray());
+    }
+    structure.setArms(armPoints);
+    const legPoints = {};
+    for (const [suffix, side] of [['l', 1], ['r', -1]]) {
+      const joints = ['thigh_', 'calf_', 'foot_', 'ball_'].map((prefix) => model.getObjectByName(prefix + suffix));
+      if (joints.every(Boolean)) legPoints[side] = joints.map((joint) => joint.getWorldPosition(new THREE.Vector3()).toArray());
+    }
+    structure.setLegs(legPoints);
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      const materials = Array.isArray(o.material) ? o.material : [o.material];
+      materials.forEach((m) => m.dispose()); o.material = skinMaterial; o.renderOrder = 2;
     });
-    obj.material.onBeforeCompile = function(shader){
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "#include <color_fragment>",
-        "#include <color_fragment>\nfloat pores = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);\ndiffuseColor.rgb *= 0.93 + pores * 0.07;"
-      );
-    };
-    obj.renderOrder = 2;
-    skin.push(obj);
-  });
-  root.add(model);
-  window.body3d = true;
-  document.body.classList.add("live3d");
-  if(load) load.textContent = "";
-}, function(event){
-  if(!load || !event.total) return;
-  load.textContent = "";
-}, function(){
-  if(load) load.textContent = "The 3D body could not load. The picture view stays on.";
-  document.body.classList.add("flat");
-});
+    scene.remove(shell);
+    const geometries = new Set(); shell.traverse((o) => { if (o.geometry) geometries.add(o.geometry); });
+    geometries.forEach((g) => g.dispose());
+    scene.add(model); needsRender = true;
+  }, undefined, () => { structure.setArms(); structure.setLegs(); load.textContent = 'Simplified body view · select any organ to continue'; });
 
-canvas.addEventListener("wheel", function(event){
-  event.preventDefault();
-  distTo = Math.min(5.2, Math.max(1.35, distTo + Math.sign(event.deltaY) * 0.18));
-}, { passive: false });
-canvas.addEventListener("pointerdown", function(event){
-  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  dragging = true;
-  auto = false;
-  moved = 0;
-  down = { x: event.clientX, y: event.clientY };
-  lastSpan = span();
-  canvas.setPointerCapture(event.pointerId);
-});
-canvas.addEventListener("pointermove", function(event){
-  if(!pointers.has(event.pointerId)){
-    mark(idAt(event.clientX, event.clientY));
-    return;
+  let fullDistance = 3.5, selected = null, hovered = null, down = null, travel = null, entering = false;
+  let contextLost = false, lastRender = 0;
+  let lastTime = performance.now(), activePointers = new Set(), gestureMoved = false;
+  const ray = new THREE.Raycaster(), pointer = new THREE.Vector2();
+  function auto(on) {
+    controls.autoRotate = !!on;
+    autoButton.setAttribute('aria-pressed', String(controls.autoRotate));
+    autoButton.textContent = controls.autoRotate ? 'Pause rotation' : 'Auto-rotate';
+    document.getElementById('rotation-status').textContent = controls.autoRotate ? '360° rotation in progress' : '360° interactive anatomy';
   }
-  const prev = pointers.get(event.pointerId);
-  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  if(pointers.size === 1){
-    yawTo -= (event.clientX - prev.x) * 0.01;
-    moved += Math.abs(event.clientX - prev.x) + Math.abs(event.clientY - prev.y);
-  } else if(pointers.size >= 2){
-    const next = span();
-    if(lastSpan) distTo = Math.min(5.2, Math.max(1.35, distTo * (lastSpan / next)));
-    lastSpan = next;
-    moved += 30;
+  function reset(back = false) {
+    travel = null; selected = null; hovered = null; needsRender = true;
+    controls.target.set(0, 0.84, 0);
+    camera.position.set(0, 1.07, (back ? -1 : 1) * fullDistance);
+    controls.update();
   }
-});
-function endPointer(event){
-  pointers.delete(event.pointerId);
-  if(pointers.size === 0){
-    dragging = false;
-    if(down && moved < 14) pick(down.x, down.y);
-    down = null;
+  function resize() {
+    const { width, height } = canvas.getBoundingClientRect();
+    if (!width || !height) return;
+    renderer.setSize(width, height, false); camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    // Fit both the standing body and its outstretched hands on narrow screens.
+    fullDistance = Math.max(0.94 / Math.tan(THREE.MathUtils.degToRad(16)), 0.55 / (Math.tan(THREE.MathUtils.degToRad(16)) * camera.aspect));
+    controls.maxDistance = Math.max(6, fullDistance * 1.6);
+    if (!entering) reset();
   }
+  function mark(id) {
+    if (hovered !== (id || null)) needsRender = true;
+    hovered = id || null;
+    nameplate.textContent = id ? `${names[id]} · select to explore` : 'Drag to rotate · scroll or pinch to zoom';
+    canvas.style.cursor = id ? 'pointer' : 'grab';
+    document.querySelectorAll('[data-organ]').forEach((button) => {
+      button.classList.toggle('on', button.dataset.organ === id);
+    });
+  }
+  function idAt(x, y) {
+    const rect = canvas.getBoundingClientRect();
+    pointer.set((x - rect.left) / rect.width * 2 - 1, -(y - rect.top) / rect.height * 2 + 1);
+    camera.updateMatrixWorld();
+    ray.setFromCamera(pointer, camera);
+    // Only intersect actual organ meshes. The transparent skin cannot steal a tap.
+    return ray.intersectObjects(atlas.pickMeshes, false)[0]?.object.userData.organ;
+  }
+  function choose(id) {
+    if (entering || !window.enterOrgan) return;
+    if (!atlas.organs[id]) { window.enterOrgan(id); return; }
+    entering = true; selected = id; mark(id); auto(false);
+    const p = atlas.organs[id].focus;
+    const from = controls.target.clone(), offset = camera.position.clone().sub(from).normalize();
+    const start = camera.position.clone(), end = p.clone().addScaledVector(offset, 0.7);
+    travel = { from, start, end, target: p.clone(), at: performance.now() };
+    setTimeout(() => {
+      travel = null;
+      window.enterOrgan(id);
+    }, reduce ? 0 : 520);
+  }
+  window.hoverOrgan = mark;
+  window.selectAtlasOrgan = choose;
+  window.resetAtlas = () => { entering = false; reset(); mark(null); auto(!reduce); };
+  document.querySelectorAll('[data-view]').forEach((button) => button.addEventListener('click', () => {
+    const action = button.dataset.view;
+    if (action === 'auto') auto(!controls.autoRotate);
+    else if (action === 'front' || action === 'back') { auto(false); reset(action === 'back'); }
+    else if (action === 'reset') { reset(); auto(!reduce); }
+  }));
+  controls.addEventListener('start', () => { auto(false); });
+  canvas.addEventListener('pointerdown', (e) => {
+    activePointers.add(e.pointerId);
+    if (activePointers.size === 1) { down = { x: e.clientX, y: e.clientY }; gestureMoved = false; }
+    else gestureMoved = true;
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (activePointers.size) {
+      if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) gestureMoved = true;
+    } else mark(idAt(e.clientX, e.clientY));
+  });
+  canvas.addEventListener('pointerup', (e) => {
+    const tap = activePointers.size === 1 && !gestureMoved && down && Math.hypot(e.clientX - down.x, e.clientY - down.y) <= 8;
+    activePointers.delete(e.pointerId);
+    if (!activePointers.size) down = null;
+    if (tap) { const id = idAt(e.clientX, e.clientY); if (id) choose(id); }
+  });
+  canvas.addEventListener('pointercancel', (e) => { activePointers.delete(e.pointerId); down = null; gestureMoved = true; });
+  canvas.addEventListener('pointerleave', () => { if (!activePointers.size) mark(null); });
+  canvas.addEventListener('keydown', (e) => {
+    const keys = ['ArrowLeft', 'ArrowRight', '+', '=', '-', 'Home'];
+    if (!keys.includes(e.key)) return;
+    e.preventDefault(); auto(false);
+    if (e.key === 'Home') { reset(); return; }
+    const offset = camera.position.clone().sub(controls.target);
+    if (e.key.startsWith('Arrow')) offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), e.key === 'ArrowLeft' ? -Math.PI / 8 : Math.PI / 8);
+    else offset.setLength(THREE.MathUtils.clamp(offset.length() * (e.key === '-' ? 1.15 : 0.85), controls.minDistance, controls.maxDistance));
+    camera.position.copy(controls.target).add(offset); controls.update();
+  });
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault(); contextLost = true; load.textContent = '3D view interrupted. Reload, or use the organ buttons below.';
+  });
+  new ResizeObserver(resize).observe(canvas); resize(); auto(!reduce); mark(null);
+  window.body3d = true; document.body.classList.remove('flat'); document.body.classList.add('live3d');
+  document.querySelectorAll('[data-view]').forEach((b) => { b.disabled = false; });
+  load.textContent = '';
+  // Clear a transform applied by the picture intro while the module was loading.
+  document.getElementById('figure').style.transform = 'none';
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (contextLost || document.hidden || document.body.classList.contains('in') || now - lastRender < 1000 / 24) return;
+    const dt = Math.min((now - lastTime) / 1000, 0.05); lastTime = now;
+    lastRender = now;
+    controls.enabled = !entering;
+    if (travel && !reduce) {
+      const t = Math.min(1, (now - travel.at) / 500), ease = t * t * (3 - 2 * t);
+      controls.target.lerpVectors(travel.from, travel.target, ease);
+      camera.position.lerpVectors(travel.start, travel.end, ease); needsRender = true;
+    }
+    controls.update(dt);
+    Object.entries(atlas.organs).forEach(([id, o]) => {
+      o.material.emissiveIntensity = id === (selected || hovered) ? 0.38 : 0.06;
+    });
+    if (needsRender) { renderer.render(scene, camera); needsRender = false; }
+  }
+  requestAnimationFrame(frame);
 }
-canvas.addEventListener("pointerup", endPointer);
-canvas.addEventListener("pointercancel", endPointer);
-function span(){
-  const pts = Array.from(pointers.values());
-  if(pts.length < 2) return 0;
-  return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+try { init(); } catch (error) {
+  document.body.classList.add('flat');
+  load.textContent = '3D is unavailable. Choose an organ below to open its modules.';
+  document.querySelectorAll('[data-view]').forEach((b) => { b.disabled = true; });
+  console.warn('Anatomy viewer unavailable:', error.message);
 }
