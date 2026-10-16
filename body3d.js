@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {MODEL, ORGANS} from './anatomy/explorer-data.js?v=hra1';
+import {MODEL, ORGANS} from './anatomy/explorer-data.js?v=hra4';
 
 window.__anatomyBoot = true;
 const $ = id => document.getElementById(id);
@@ -18,16 +18,6 @@ let entryTimer = null, entryFinish = null, entering = false;
 let highlight = null, allMaterials = [], bodyMaterials = [], eyeMeshes = [];
 const ray = new THREE.Raycaster(), pointer = new THREE.Vector2();
 const up = new THREE.Vector3(0,1,0), fullTarget = new THREE.Vector3(0,0.92,0);
-
-function panel(open) {
-  root.classList.toggle('panel-open', open);
-  $('panel-toggle').setAttribute('aria-expanded', String(open));
-  if(open && innerWidth <= 900) $('panel-close').focus({preventScroll:true});
-  if(!open && innerWidth <= 900) $('panel-toggle').focus({preventScroll:true});
-}
-$('panel-toggle').onclick = () => panel(!root.classList.contains('panel-open'));
-$('panel-close').onclick = () => panel(false);
-root.addEventListener('keydown', event => { if(event.key === 'Escape') panel(false); });
 
 // The catalogue and clinical links remain usable when the GPU or model cannot load.
 for(const organ of ORGANS) {
@@ -68,7 +58,6 @@ function updateInformation() {
   $('organ-system').textContent = organ ? organ.system.toUpperCase() : 'ANATOMICAL REFERENCE';
   $('organ-description').textContent = organ?.description || 'Select an organ on the model or in the list. Isolate it for a closer examination from every direction.';
   $('organ-location').textContent = organ?.location || 'Full-body reference';
-  $('organ-source').textContent = organ?.source || 'Human Reference Atlas · CC BY 4.0';
   $('isolate-selected').disabled = !organ || !state.loaded;
   document.querySelector('[data-mode="isolated"]').disabled = !organ || !state.loaded;
   $('selected-lab').disabled = $('selected-arena').disabled = !organ;
@@ -84,14 +73,14 @@ function selectOrgan(id) {
 }
 function visitOrgan(id) {
   if(entering || document.body.classList.contains('in') || !definitions.has(id)) return;
-  selectOrgan(id); panel(false);
+  selectOrgan(id);
   window.enterOrgan?.(definitions.get(id).clinical);
 }
 // Reuse the original full-screen portal room after zooming the actual GLB.
 window.zoomIntoAnatomy = (clinicalId, complete) => {
   const organ = ORGANS.find(item => item.clinical === clinicalId);
   if(!organ || !state.loaded) { complete(); return; }
-  selectOrgan(organ.id); panel(false); setMode('isolated');
+  selectOrgan(organ.id); setMode('isolated');
   entering = true; controls.enabled = false;
   root.classList.add('entering-organ'); root.setAttribute('aria-busy','true');
   const finish = () => {
@@ -108,7 +97,7 @@ $('selected-lab').onclick = () => openClinical('lab');
 $('selected-arena').onclick = () => openClinical('arena');
 function openClinical(which) {
   if(!state.selected) return;
-  setAuto(false); panel(false);
+  setAuto(false);
   window.openAnatomyPortal?.(definitions.get(state.selected).clinical,which);
 }
 
@@ -134,7 +123,7 @@ function applyMode() {
   document.querySelectorAll('[data-mode]').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.mode === state.mode)));
   $('mode-readout').textContent = {external:'External',internal:'Internal',isolated:'Isolated'}[state.mode];
   if(!state.loaded) return;
-  const bodyOpacity = {external:1,internal:0.28,isolated:0}[state.mode];
+  const bodyOpacity = {external:1,internal:0.16,isolated:0}[state.mode];
   for(const material of bodyMaterials) material.userData.targetOpacity = bodyOpacity;
   for(const [id,group] of groups) {
     const visible = state.organLayer && state.visible.has(id) && state.mode !== 'external' && (state.mode !== 'isolated' || state.selected === id);
@@ -187,7 +176,8 @@ function showError(title,message) {
   $('model-state').hidden = false; $('model-state').classList.add('error');
   $('load-title').textContent = title; $('load').textContent = message;
   $('model-progress').hidden = true; $('retry-model').hidden = false;
-  $('asset-status').textContent = 'MODEL UNAVAILABLE'; $('model-credit').textContent = 'No anatomical model loaded.';
+  $('asset-status').textContent = 'MODEL UNAVAILABLE';
+  root.classList.add('model-unavailable'); $('organ-panel').hidden = false;
   document.querySelectorAll('[data-view],[data-mode]').forEach(button => button.disabled = true);
   updateInformation(); $('isolate-selected').disabled = true; document.querySelector('[data-mode="isolated"]').disabled = true;
   if(entering) entryFinish?.();
@@ -250,6 +240,10 @@ async function loadModel() {
       if(Array.isArray(mesh.material)) throw Error('Configure separate meshes for multi-material anatomy');
       sourceMaterials.add(mesh.material);
       mesh.material = mesh.material.clone(); mesh.material.transparent = true; mesh.material.opacity = 0;
+      // Neutral tissue colors; vessel meshes retain their red/blue source distinction.
+      if(id === 'body') mesh.material.color.set('#b98264');
+      else if(id !== 'vessels' && definitions.has(id)) mesh.material.color.set(definitions.get(id).color);
+      mesh.material.roughness = id === 'body' ? 0.72 : 0.54;
       mesh.material.userData.targetOpacity = 0; incomingMaterials.push(mesh.material);
       triangles += (mesh.geometry.index?.count || mesh.geometry.attributes.position.count)/3;
       if(mesh.name === 'body' && id === 'body') { foundSkin = mesh; incomingBody.push(mesh.material); mesh.renderOrder = 3; }
@@ -278,7 +272,7 @@ async function loadModel() {
     document.body.classList.remove('flat'); document.body.classList.add('live3d');
     $('model-state').hidden = true; $('asset-status').textContent = 'ANATOMICAL GLB LOADED';
     $('structure-count').textContent = `${ORGANS.length} groups`;
-    $('model-credit').textContent = 'HRA United Male v1.5 + BodyParts3D stomach · CC BY 4.0';
+    root.classList.remove('model-unavailable'); $('organ-panel').hidden = true;
     document.querySelectorAll('[data-view],[data-mode]').forEach(button => button.disabled = false);
     updateInformation(); resize(); resetCamera(); applyMode(); setAuto(!reduced); dirty = true;
   } catch(error) {
@@ -369,8 +363,8 @@ function initialize() {
   controls = new OrbitControls(camera,canvas); controls.target.copy(fullTarget); controls.enablePan = false; controls.enableDamping = true;
   controls.dampingFactor = .1; controls.autoRotateSpeed = .55; controls.minPolarAngle = Math.PI*.15; controls.maxPolarAngle = Math.PI*.85;
   controls.addEventListener('change',() => { dirty = true; }); controls.addEventListener('start',() => { cameraTween = null; setAuto(false); });
-  scene.add(new THREE.HemisphereLight(0xe4f7ee,0x192c21,1.7));
-  for(const [color,intensity,position] of [[0xffe5d0,3.2,[-2,3,3]],[0x91dcca,1.8,[2,1,1]],[0x64dacb,2.4,[0,2,-3]]]) {
+  scene.add(new THREE.HemisphereLight(0xfff5eb,0x30302b,1.4));
+  for(const [color,intensity,position] of [[0xfff2e6,2.6,[-2,3,3]],[0xe6f0ff,1.7,[2,1,1]],[0x9bded8,2,[0,2,-3]]]) {
     const light = new THREE.DirectionalLight(color,intensity); light.position.set(...position); scene.add(light);
   }
   environment(); new ResizeObserver(resize).observe(stage); resize();
@@ -393,6 +387,16 @@ function initialize() {
   canvas.addEventListener('pointerleave',() => { if(!pointers.size) { highlight=null; dirty=true; } });
   canvas.addEventListener('keydown',event => {
     if(entering) return;
+    if(event.key === '[' || event.key === ']') {
+      event.preventDefault(); setAuto(false);
+      const index = ORGANS.findIndex(organ => organ.id === state.selected);
+      const next = index < 0 ? (event.key === ']' ? 0 : ORGANS.length - 1)
+        : (index + (event.key === ']' ? 1 : -1) + ORGANS.length) % ORGANS.length;
+      selectOrgan(ORGANS[next].id);
+      $('pickname').textContent = `${ORGANS[next].name} · press Enter to open`;
+      return;
+    }
+    if(event.key === 'Enter' && state.selected) { event.preventDefault(); visitOrgan(state.selected); return; }
     if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-','Home',' '].includes(event.key)) return;
     event.preventDefault(); cameraTween=null;
     if(event.key===' ') { setAuto(!state.auto); return; }

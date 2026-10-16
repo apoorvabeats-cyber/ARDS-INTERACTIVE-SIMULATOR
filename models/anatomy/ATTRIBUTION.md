@@ -10,7 +10,7 @@ Kristen Browne and Heidi Schlehlein, **3D Reference Organ Set for United, Male, 
 - Authoritative credits/license: https://cdn.humanatlas.io/digital-objects/ref-organ/united-male/v1.5/README.md
 - License: [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/)
 
-Adaptations: selected skin, eye surfaces, brain, spinal-cord segments, lung lobes, cardiac structures, liver, pancreas, spleen, kidneys, intestines, bladder and major vessels; baked source transforms; moved the feet onto y=0; welded duplicate vertices; simplified with meshoptimizer (0.3% relative error bound); grouped surfaces by selectable organ; applied display colors. No primitive geometry substitutes for these structures. Source node names and conversion statistics are retained in `model-manifest.json` and GLB node extras.
+Adaptations: selected skin, eye surfaces, brain, spinal-cord segments, lung lobes, cardiac structures, liver, pancreas, spleen, kidneys, intestines, bladder and major vessels; baked source transforms; moved the feet onto y=0; welded duplicate vertices; simplified with meshoptimizer (0.3% relative error bound); grouped surfaces by selectable organ; applied display colors. The viewer uses warm skin and tissue colours with neutral lighting; red/blue vessel colours remain conventional display colours. No primitive geometry substitutes for these structures. Source node names and conversion statistics are retained in `model-manifest.json` and GLB node extras.
 
 The HRA is a reference assembly, not a scan of one person's complete anatomy. Its brain and other components incorporate reference sources curated by HRA. Some structures overlap (for example capsule and organ segments), and this subset does not include every anatomical structure.
 
@@ -24,7 +24,7 @@ The HRA is a reference assembly, not a scan of one person's complete anatomy. It
 - Publication: https://doi.org/10.1093/nar/gkn613
 - Browser geometry intermediary: https://github.com/ashemag/human-atlas (`public/models/atlas.json` and `body-9.bin`). The intermediary's packed anatomy data is CC BY 4.0; its application code was not incorporated.
 
-HRA United Male v1.5 does not include a stomach surface. The actual BodyParts3D stomach mesh fills this gap. It was scaled by the reference-body height ratio and translated upward 35 mm to register with this assembly. This is an educational composite registration, not a patient-specific alignment or a validated surgical model. It is identified separately in the viewer's organ information and model manifest.
+HRA United Male v1.5 does not include a stomach surface. The actual BodyParts3D stomach mesh fills this gap. It was scaled by the reference-body height ratio and translated upward 35 mm to register with this assembly. This is an educational composite registration, not a patient-specific alignment or a validated surgical model. It is identified separately in the credits page and model manifest.
 
 ## Library dependencies
 
