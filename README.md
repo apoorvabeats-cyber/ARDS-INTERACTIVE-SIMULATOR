@@ -15,10 +15,10 @@ Open `http://localhost:3000/`. Serve the complete repository over HTTP(S); ES mo
 ## Explore
 
 - Drag with a mouse or one finger to rotate through 360°. Scroll or pinch with two fingers to zoom. Gestures pause automatic rotation.
-- Choose **External body**, **Internal anatomy**, or select an organ and use **Examine organ** to inspect the selected organ in isolation. Changes fade smoothly.
-- Tap a visible organ or choose it in **Structures** to zoom into the actual 3D organ, then open its full-screen portal room. Choose **Learning Lab** or **Practice Arena** there; Back returns to the portals, then the full body. The information panel retains the selected organ’s details.
+- Choose **External body** or **Internal anatomy**. With the canvas focused, use **[ / ]** to select an organ and **Isolate organ** to inspect it without entering a room. Changes fade smoothly.
+- Tap a visible organ to zoom into the actual 3D organ, then open its full-screen portal room. Choose **Learning Lab** or **Practice Arena** there; Back returns to the portals, then the full body. Keyboard users can select with **[ / ]** and open with **Enter**.
 - The 12 groups are brain, spinal cord, lungs, heart, liver, stomach, spleen, pancreas, kidneys, intestines, bladder, and major blood vessels.
-- Use the visibility checkboxes, **Organ layer**, search, and **Show all** to adjust the view. On phones, these appear in the **Organs** panel.
+- The viewer has no right-side organ panel or **Organs +** tab. If the model cannot load, an organ catalogue appears so clinical rooms remain reachable. Desktop **Organ layer** controls remain available.
 - Camera controls reset the view, show the front/back, and toggle automatic rotation. With the canvas focused, arrow keys rotate, +/− zoom, Home resets, and Space toggles rotation.
 - **Learning Lab** and **Practice Arena** open the existing clinical rooms. Rooms without a simulator show their availability message. Original audio recordings and sound functions are retained; browser playback starts after interaction.
 
@@ -26,9 +26,9 @@ The HUD contains decorative scan lines and circular instruments. Its readouts de
 
 ## Anatomical assets and scope
 
-`models/anatomy/human-reference.glb` is a 4.79 MB, 264,860-triangle assembly derived from **Human Reference Atlas United Male v1.5** (Kristen Browne and Heidi Schlehlein / HuBMAP, Visible Human Male data from NLM), plus the actual **BodyParts3D FJ2564 stomach** (© DBCLS). Both sources are CC BY 4.0. The stomach is registered into the HRA assembly and identified separately in the information panel.
+`models/anatomy/human-reference.glb` is a 4.79 MB, 264,860-triangle assembly derived from **Human Reference Atlas United Male v1.5** (Kristen Browne and Heidi Schlehlein / HuBMAP, Visible Human Male data from NLM), plus the actual **BodyParts3D FJ2564 stomach** (© DBCLS). Both sources are CC BY 4.0. The small **Credits** link opens [a separate page](credits.html) containing required attribution and library details. The stomach is registered into the HRA assembly and identified separately in the model manifest and credits.
 
-This is simplified anatomical reference geometry with display colors. It is not photorealistically textured, patient-specific, or clinically validated. Some source component surfaces overlap. See [full attribution, sources, licenses and adaptations](models/anatomy/ATTRIBUTION.md) and the [conversion manifest](models/anatomy/model-manifest.json).
+This is simplified anatomical reference geometry with warm skin and tissue display colours under neutral lighting. It is not photorealistically textured, patient-specific, or clinically validated. Some source component surfaces overlap. See [full attribution, sources, licenses and adaptations](models/anatomy/ATTRIBUTION.md) and the [conversion manifest](models/anatomy/model-manifest.json).
 
 ## Files and dependencies
 
