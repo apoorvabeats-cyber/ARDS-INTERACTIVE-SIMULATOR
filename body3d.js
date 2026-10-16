@@ -14,6 +14,7 @@ const groups = new Map(), rows = new Map(), pickMeshes = [];
 let renderer, scene, camera, controls, model, skin, targetRing, retryController;
 let dirty = true, cameraTween = null, modelTween = false, lost = false, loadGeneration = 0;
 let fullDistance = 4, lastFrame = 0, lastTime = 0;
+let entryTimer = null, entryFinish = null, entering = false;
 let highlight = null, allMaterials = [], bodyMaterials = [], eyeMeshes = [];
 const ray = new THREE.Raycaster(), pointer = new THREE.Vector2();
 const up = new THREE.Vector3(0,1,0), fullTarget = new THREE.Vector3(0,0.92,0);
@@ -32,7 +33,7 @@ root.addEventListener('keydown', event => { if(event.key === 'Escape') panel(fal
 for(const organ of ORGANS) {
   const row = document.createElement('div'); row.className = 'structure-row'; row.style.setProperty('--organ-color', organ.color);
   const select = document.createElement('button'); select.type = 'button'; select.textContent = organ.name;
-  select.setAttribute('aria-pressed','false'); select.onclick = () => selectOrgan(organ.id);
+  select.setAttribute('aria-pressed','false'); select.onclick = () => visitOrgan(organ.id);
   const visibility = document.createElement('input'); visibility.type = 'checkbox'; visibility.checked = true;
   visibility.setAttribute('aria-label',`Show ${organ.name}`); visibility.onchange = () => setOrganVisible(organ.id, visibility.checked);
   row.append(select,visibility); $('structure-list').append(row); rows.set(organ.id,{row,select,visibility});
@@ -81,6 +82,27 @@ function selectOrgan(id) {
   if(state.mode === 'isolated' && groups.has(id)) focusGroup(id);
   dirty = true;
 }
+function visitOrgan(id) {
+  if(entering || document.body.classList.contains('in') || !definitions.has(id)) return;
+  selectOrgan(id); panel(false);
+  window.enterOrgan?.(definitions.get(id).clinical);
+}
+// Reuse the original full-screen portal room after zooming the actual GLB.
+window.zoomIntoAnatomy = (clinicalId, complete) => {
+  const organ = ORGANS.find(item => item.clinical === clinicalId);
+  if(!organ || !state.loaded) { complete(); return; }
+  selectOrgan(organ.id); panel(false); setMode('isolated');
+  entering = true; controls.enabled = false;
+  root.classList.add('entering-organ'); root.setAttribute('aria-busy','true');
+  const finish = () => {
+    clearTimeout(entryTimer);
+    entryTimer = null; entryFinish = null; entering = false;
+    root.classList.remove('entering-organ'); root.removeAttribute('aria-busy');
+    complete();
+  };
+  clearTimeout(entryTimer); entryTimer = null; entryFinish = finish;
+  if(reduced) finish();
+};
 $('isolate-selected').onclick = () => setMode('isolated');
 $('selected-lab').onclick = () => openClinical('lab');
 $('selected-arena').onclick = () => openClinical('arena');
@@ -168,6 +190,7 @@ function showError(title,message) {
   $('asset-status').textContent = 'MODEL UNAVAILABLE'; $('model-credit').textContent = 'No anatomical model loaded.';
   document.querySelectorAll('[data-view],[data-mode]').forEach(button => button.disabled = true);
   updateInformation(); $('isolate-selected').disabled = true; document.querySelector('[data-mode="isolated"]').disabled = true;
+  if(entering) entryFinish?.();
 }
 $('retry-model').onclick = () => { if(!renderer || lost) location.reload(); else loadModel(); };
 
@@ -331,6 +354,8 @@ function animate(now) {
   }
   if(dirty) {
     renderer.render(scene,camera);
+    // Hold the organ close-up only after its completed zoom is rendered.
+    if(entering && !cameraTween && !modelTween && entryTimer === null) entryTimer = setTimeout(entryFinish,650);
     const offset = camera.position.clone().sub(controls.target), angle = (THREE.MathUtils.radToDeg(Math.atan2(offset.x,offset.z))+360)%360;
     $('rotation-angle').textContent = `${String(Math.round(angle)%360).padStart(3,'0')}°`; dirty = false;
   }
@@ -361,12 +386,13 @@ function initialize() {
   });
   canvas.addEventListener('pointerup',event => {
     const first = pointers.get(event.pointerId), tap = pointers.size===1 && !moved && first && Math.hypot(event.clientX-first.x,event.clientY-first.y)<=8;
-    pointers.delete(event.pointerId); if(tap) { const id=pickAt(event.clientX,event.clientY); if(id) { selectOrgan(id); if(innerWidth<=900) panel(true); } }
+    pointers.delete(event.pointerId); if(tap && !entering) { const id=pickAt(event.clientX,event.clientY); if(id) visitOrgan(id); }
   });
   canvas.addEventListener('pointercancel',event => { pointers.delete(event.pointerId); moved=true; });
   canvas.addEventListener('lostpointercapture',event => { pointers.delete(event.pointerId); });
   canvas.addEventListener('pointerleave',() => { if(!pointers.size) { highlight=null; dirty=true; } });
   canvas.addEventListener('keydown',event => {
+    if(entering) return;
     if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-','Home',' '].includes(event.key)) return;
     event.preventDefault(); cameraTween=null;
     if(event.key===' ') { setAuto(!state.auto); return; }
@@ -379,7 +405,12 @@ function initialize() {
   });
   canvas.addEventListener('webglcontextlost',event => { event.preventDefault(); lost=true; showError('The 3D view was interrupted','Reload to restore the graphical context. The organ information and clinical links remain available.'); });
   canvas.addEventListener('webglcontextrestored',() => { lost=false; loadModel(); });
-  window.resetAtlas = () => { $('figure').style.opacity='1'; cameraTween=null; resetCamera(); dirty=true; };
+  window.resetAtlas = () => {
+    clearTimeout(entryTimer); entryTimer = null; entryFinish = null; entering = false;
+    root.classList.remove('entering-organ'); root.removeAttribute('aria-busy');
+    controls.enabled = true; $('figure').style.opacity='1'; cameraTween=null;
+    state.mode = 'internal'; applyMode(); resetCamera(); dirty=true;
+  };
   requestAnimationFrame(animate); loadModel();
 }
 window.anatomyViewer = {
