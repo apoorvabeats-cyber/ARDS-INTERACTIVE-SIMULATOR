@@ -58,7 +58,7 @@ scene.add(root);
 const organMeshes = [];
 const names = {
   brain: "Brain", thyroid: "Thyroid", lungs: "Lungs", heart: "Heart",
-  liver: "Liver", stomach: "Stomach", bowel: "Gastrointestinal", kidneys: "Kidneys", multi: "Whole patient"
+  liver: "Liver", stomach: "Stomach", bowel: "Intestines", kidneys: "Kidneys", multi: "Whole patient"
 };
 
 function tissue(color){
@@ -183,6 +183,8 @@ place("bowel", bowelGeo(), 0.0, 0.99, 0.035, 0, 0.3, 0);
 place.color = 0x7a3036;
 place("kidneys", kidneyGeo(), -0.07, 1.03, -0.04, 0, 0.6, 0.1);
 place("kidneys", kidneyGeo(), 0.07, 1.025, -0.04, 0, -0.6, -0.1);
+organMeshes.forEach(function(mesh){ mesh.userData.base = mesh.scale.clone(); });
+let hotId = null;
 
 let yaw = 0;
 let yawTo = 0;
@@ -230,10 +232,17 @@ function region(point){
 function zFront(point){ return point.z > 0; }
 function choose(id){
   if(!id || !window.enterOrgan) return;
-  if(nameplate) nameplate.textContent = names[id] || id;
+  mark(id);
   window.enterOrgan(id);
 }
-function pick(clientX, clientY){
+function mark(id){
+  hotId = id || null;
+  if(nameplate) nameplate.textContent = hotId ? (names[hotId] || hotId) : "SELECT AN ORGAN";
+  document.querySelectorAll("[data-organ]").forEach(function(button){
+    button.classList.toggle("on", button.getAttribute("data-organ") === hotId);
+  });
+}
+function idAt(clientX, clientY){
   const rect = canvas.getBoundingClientRect();
   const ndc = new THREE.Vector2(
     ((clientX - rect.left) / rect.width) * 2 - 1,
@@ -241,16 +250,34 @@ function pick(clientX, clientY){
   );
   ray.setFromCamera(ndc, camera);
   const hitOrgan = ray.intersectObjects(organMeshes, false)[0];
-  if(hitOrgan){ choose(hitOrgan.object.userData.id); return; }
+  if(hitOrgan) return hitOrgan.object.userData.id;
   const hitSkin = ray.intersectObjects(skin, false)[0];
-  if(hitSkin) choose(region(hitSkin.point));
+  if(hitSkin) return region(hitSkin.point);
+  return null;
 }
+function pick(clientX, clientY){
+  const id = idAt(clientX, clientY);
+  if(id) choose(id);
+}
+window.hoverOrgan = mark;
 function frame(){
   requestAnimationFrame(frame);
   if(auto && !dragging) yawTo += 0.0045;
   ring.rotation.z += 0.004;
   hoop.rotation.y += 0.003;
   hoop.rotation.z += 0.002;
+  const beat = 1 + Math.sin(performance.now() / 160) * 0.07;
+  organMeshes.forEach(function(mesh){
+    const base = mesh.userData.base;
+    if(!base) return;
+    if(mesh.userData.id === hotId){
+      mesh.scale.set(base.x * beat, base.y * beat, base.z * beat);
+      mesh.material.emissiveIntensity = 0.45 + (beat - 1) * 4;
+    }else{
+      mesh.scale.copy(base);
+      mesh.material.emissiveIntensity = 0.08;
+    }
+  });
   placeCamera();
   resize();
   renderer.render(scene, camera);
@@ -310,7 +337,10 @@ canvas.addEventListener("pointerdown", function(event){
   canvas.setPointerCapture(event.pointerId);
 });
 canvas.addEventListener("pointermove", function(event){
-  if(!pointers.has(event.pointerId)) return;
+  if(!pointers.has(event.pointerId)){
+    mark(idAt(event.clientX, event.clientY));
+    return;
+  }
   const prev = pointers.get(event.pointerId);
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   if(pointers.size === 1){
