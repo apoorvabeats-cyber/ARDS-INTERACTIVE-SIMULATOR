@@ -22,29 +22,30 @@ renderer.toneMappingExposure = 1.08;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 30);
 const target = new THREE.Vector3(0, 0.92, 0);
-scene.add(new THREE.HemisphereLight(0xd9ffe8, 0x042018, 0.85));
-const key = new THREE.DirectionalLight(0xf4fff8, 1.35);
-key.position.set(0.6, 2.4, 2.2);
+scene.add(new THREE.HemisphereLight(0xd7e8ff, 0x0b121c, 0.9));
+const key = new THREE.DirectionalLight(0xf7fbff, 1.7);
+key.position.set(0.7, 2.8, 2.4);
 scene.add(key);
-const fill = new THREE.DirectionalLight(0x39f3a0, 0.45);
-fill.position.set(-1.6, 1.4, 1.2);
+const fill = new THREE.DirectionalLight(0x8eb7e8, 0.55);
+fill.position.set(-1.8, 1.3, 1.1);
 scene.add(fill);
-const rim = new THREE.DirectionalLight(0x39f3a0, 1.5);
-rim.position.set(0.2, 1.6, -2.2);
+const rim = new THREE.DirectionalLight(0x7ecbff, 0.85);
+rim.position.set(0.1, 1.5, -2.3);
 scene.add(rim);
 
 const ring = new THREE.Mesh(
-  new THREE.TorusGeometry(0.55, 0.006, 10, 80),
-  new THREE.MeshBasicMaterial({ color: 0x39f3a0, transparent: true, opacity: 0.7 })
+  new THREE.TorusGeometry(0.78, 0.012, 12, 96),
+  new THREE.MeshBasicMaterial({ color: 0x8fd4ff, transparent: true, opacity: 0.9 })
 );
 ring.rotation.x = Math.PI / 2;
 ring.position.y = 0.02;
 scene.add(ring);
 const hoop = new THREE.Mesh(
-  new THREE.TorusGeometry(0.78, 0.004, 8, 90),
-  new THREE.MeshBasicMaterial({ color: 0x7dffc0, transparent: true, opacity: 0.45 })
+  new THREE.TorusGeometry(1.15, 0.004, 8, 80),
+  new THREE.MeshBasicMaterial({ color: 0x6eb6e6, transparent: true, opacity: 0.28 })
 );
-hoop.position.y = 0.98;
+hoop.rotation.x = Math.PI / 2;
+hoop.position.y = 0.02;
 scene.add(hoop);
 
 const specks = new THREE.BufferGeometry();
@@ -156,11 +157,11 @@ function brainGeo(){
   geo.computeVertexNormals();
   return geo;
 }
-place.color = 0xd7c8d4;
+place.color = 0xe4c8be;
 place("brain", brainGeo(), 0, 1.575, 0.02, 0, 0, 0);
-place.color = 0xc9a0b0;
+place.color = 0xd7aea4;
 place("brain", new THREE.SphereGeometry(0.038, 20, 14), 0, 1.52, -0.03, 0.4, 0, 0);
-place.color = 0xb56a58;
+place.color = 0xc46e62;
 place("thyroid", new THREE.SphereGeometry(1, 16, 12), -0.018, 1.4, 0.078, 0, 0, 0);
 organMeshes[organMeshes.length - 1].scale.set(0.016, 0.026, 0.012);
 place("thyroid", new THREE.SphereGeometry(1, 16, 12), 0.018, 1.4, 0.078, 0, 0, 0);
@@ -168,19 +169,19 @@ organMeshes[organMeshes.length - 1].scale.set(0.016, 0.026, 0.012);
 place.color = 0xc9b2b4;
 place("thyroid", new THREE.SphereGeometry(1, 10, 8), 0, 1.392, 0.082, 0, 0, 0);
 organMeshes[organMeshes.length - 1].scale.set(0.02, 0.006, 0.008);
-place.color = 0xd7a8aa;
+place.color = 0xefb4b6;
 place("lungs", lungGeo(), -0.09, 1.25, 0.02, 0, 0.15, 0);
 place("lungs", lungGeo(), 0.095, 1.255, 0.015, 0, -0.2, 0);
 organMeshes[organMeshes.length - 1].scale.set(0.86, 0.92, 0.86);
-place.color = 0x8c3030;
+place.color = 0xb12e32;
 place("heart", heartGeo(), 0.028, 1.23, 0.055, 0.15, 0.2, -0.45);
-place.color = 0x6b342c;
+place.color = 0x7a2e28;
 place("liver", liverGeo(), -0.06, 1.1, 0.04, -Math.PI / 2.4, 0.2, 0);
-place.color = 0xc4a06a;
+place.color = 0xd7a56a;
 place("stomach", stomachGeo(), 0.04, 1.09, 0.05, 0, -0.4, 0);
-place.color = 0xc48472;
+place.color = 0xe08a84;
 place("bowel", bowelGeo(), 0.0, 0.99, 0.035, 0, 0.3, 0);
-place.color = 0x7a3036;
+place.color = 0x8a353c;
 place("kidneys", kidneyGeo(), -0.07, 1.03, -0.04, 0, 0.6, 0.1);
 place("kidneys", kidneyGeo(), 0.07, 1.025, -0.04, 0, -0.6, -0.1);
 organMeshes.forEach(function(mesh){ mesh.userData.base = mesh.scale.clone(); });
@@ -264,8 +265,7 @@ function frame(){
   requestAnimationFrame(frame);
   if(auto && !dragging) yawTo += 0.0045;
   ring.rotation.z += 0.004;
-  hoop.rotation.y += 0.003;
-  hoop.rotation.z += 0.002;
+  hoop.rotation.z -= 0.002;
   const beat = 1 + Math.sin(performance.now() / 160) * 0.07;
   organMeshes.forEach(function(mesh){
     const base = mesh.userData.base;
@@ -292,13 +292,13 @@ loader.load("models/body.glb", function(gltf){
   model.traverse(function(obj){
     if(!obj.isMesh) return;
     obj.material = new THREE.MeshPhysicalMaterial({
-      color: 0xc8ffe2,
-      emissive: 0x0d5a38,
-      emissiveIntensity: 0.7,
-      roughness: 0.32,
-      metalness: 0.04,
+      color: 0xd5e4f2,
+      emissive: 0x163044,
+      emissiveIntensity: 0.28,
+      roughness: 0.38,
+      metalness: 0.02,
       transparent: true,
-      opacity: 0.16,
+      opacity: 0.2,
       depthWrite: false,
       side: THREE.FrontSide
     });
