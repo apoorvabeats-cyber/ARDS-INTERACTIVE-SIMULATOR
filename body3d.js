@@ -8,7 +8,7 @@ const $ = id => document.getElementById(id);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const root = $('anatomy-workspace'), stage = $('anatomy-stage'), canvas = $('view');
 const definitions = new Map(ORGANS.map(organ => [organ.id, organ]));
-const state = {mode:'internal', selected:null, auto:!reduced, organLayer:true, loaded:false,
+const state = {mode:'external', selected:null, auto:!reduced, organLayer:true, loaded:false,
   visible:new Set(ORGANS.map(organ => organ.id))};
 const groups = new Map(), rows = new Map(), pickMeshes = [];
 let renderer, scene, camera, controls, model, skin, targetRing, retryController;
@@ -106,8 +106,7 @@ function setAuto(on) {
   if(controls) controls.autoRotate = state.auto;
   document.querySelectorAll('[data-view="auto"]').forEach(button => {
     button.setAttribute('aria-pressed',String(state.auto));
-    if(button.closest('.mobile-camera')) button.textContent = state.auto ? 'Ⅱ' : '▷';
-    else button.textContent = state.auto ? 'Pause rotation' : 'Auto-rotate';
+    button.textContent = state.auto ? 'Pause rotation' : 'Auto-rotate';
   });
   dirty = true;
 }
