@@ -47,6 +47,23 @@ const hoop = new THREE.Mesh(
 hoop.rotation.x = Math.PI / 2;
 hoop.position.y = 0.02;
 scene.add(hoop);
+const orbit = new THREE.Mesh(
+  new THREE.TorusGeometry(0.92, 0.0035, 8, 140),
+  new THREE.MeshBasicMaterial({ color: 0x9fe7ff, transparent: true, opacity: 0.55 })
+);
+scene.add(orbit);
+const orbit2 = new THREE.Mesh(
+  new THREE.TorusGeometry(1.05, 0.002, 8, 120),
+  new THREE.MeshBasicMaterial({ color: 0x3d8eb8, transparent: true, opacity: 0.35 })
+);
+orbit2.rotation.x = 1.15;
+scene.add(orbit2);
+const scan = new THREE.Mesh(
+  new THREE.RingGeometry(0.22, 0.3, 64),
+  new THREE.MeshBasicMaterial({ color: 0xd7f6ff, transparent: true, opacity: 0.45, side: THREE.DoubleSide })
+);
+scan.rotation.x = Math.PI / 2;
+scene.add(scan);
 
 const specks = new THREE.BufferGeometry();
 const dots = new Float32Array(180);
@@ -238,7 +255,7 @@ function choose(id){
 }
 function mark(id){
   hotId = id || null;
-  if(nameplate) nameplate.textContent = hotId ? (names[hotId] || hotId) : "SELECT AN ORGAN";
+  if(nameplate) nameplate.textContent = "";
   document.querySelectorAll("[data-organ]").forEach(function(button){
     button.classList.toggle("on", button.getAttribute("data-organ") === hotId);
   });
@@ -266,6 +283,12 @@ function frame(){
   if(auto && !dragging) yawTo += 0.0045;
   ring.rotation.z += 0.004;
   hoop.rotation.z -= 0.002;
+  orbit.rotation.y += 0.006;
+  orbit.rotation.z = 0.35 + Math.sin(performance.now() / 1400) * 0.08;
+  orbit2.rotation.y -= 0.004;
+  const sweep = (Math.sin(performance.now() / 900) + 1) / 2;
+  scan.position.y = 0.12 + sweep * 1.58;
+  scan.material.opacity = 0.22 + (1 - Math.abs(sweep - 0.5) * 2) * 0.35;
   const beat = 1 + Math.sin(performance.now() / 160) * 0.07;
   organMeshes.forEach(function(mesh){
     const base = mesh.userData.base;
@@ -317,7 +340,7 @@ loader.load("models/body.glb", function(gltf){
   if(load) load.textContent = "";
 }, function(event){
   if(!load || !event.total) return;
-  load.textContent = "Preparing the body… " + Math.round(event.loaded / event.total * 100) + "%";
+  load.textContent = "";
 }, function(){
   if(load) load.textContent = "The 3D body could not load. The picture view stays on.";
   document.body.classList.add("flat");
