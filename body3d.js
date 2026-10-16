@@ -8,18 +8,14 @@ const $ = id => document.getElementById(id);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const root = $('anatomy-workspace'), stage = $('anatomy-stage'), canvas = $('view');
 const definitions = new Map(ORGANS.map(organ => [organ.id, organ]));
-const state = {mode:'internal', selected:null, auto:!reduced, labels:true, organLayer:true, loaded:false,
+const state = {mode:'internal', selected:null, auto:!reduced, organLayer:true, loaded:false,
   visible:new Set(ORGANS.map(organ => organ.id))};
-const groups = new Map(), markers = new Map(), rows = new Map(), pickMeshes = [];
+const groups = new Map(), rows = new Map(), pickMeshes = [];
 let renderer, scene, camera, controls, model, skin, targetRing, retryController;
 let dirty = true, cameraTween = null, modelTween = false, lost = false, loadGeneration = 0;
-let fullDistance = 4, lastFrame = 0, lastTime = 0, viewportWidth = 1, viewportHeight = 1;
+let fullDistance = 4, lastFrame = 0, lastTime = 0;
 let highlight = null, allMaterials = [], bodyMaterials = [], eyeMeshes = [];
-const ray = new THREE.Raycaster(), pointer = new THREE.Vector2(), projected = new THREE.Vector3();
-const svgNS = 'http://www.w3.org/2000/svg';
-const markerLinks = document.createElementNS(svgNS,'svg');
-markerLinks.classList.add('marker-links'); markerLinks.setAttribute('aria-hidden','true');
-$('organ-markers').append(markerLinks);
+const ray = new THREE.Raycaster(), pointer = new THREE.Vector2();
 const up = new THREE.Vector3(0,1,0), fullTarget = new THREE.Vector3(0,0.92,0);
 
 function panel(open) {
@@ -40,15 +36,6 @@ for(const organ of ORGANS) {
   const visibility = document.createElement('input'); visibility.type = 'checkbox'; visibility.checked = true;
   visibility.setAttribute('aria-label',`Show ${organ.name}`); visibility.onchange = () => setOrganVisible(organ.id, visibility.checked);
   row.append(select,visibility); $('structure-list').append(row); rows.set(organ.id,{row,select,visibility});
-  const marker = document.createElement('button'); marker.type = 'button'; marker.className = 'organ-marker';
-  marker.textContent = organ.name; marker.dataset.side = organ.side; marker.dataset.organ = organ.id;
-  marker.style.setProperty('--marker-color', organ.color); marker.setAttribute('aria-label',`Examine ${organ.name}`);
-  marker.setAttribute('aria-pressed','false'); marker.hidden = true;
-  marker.onclick = () => { selectOrgan(organ.id); if(innerWidth <= 900) panel(true); };
-  const link = document.createElementNS(svgNS,'g');
-  const line = document.createElementNS(svgNS,'line'), dot = document.createElementNS(svgNS,'circle');
-  dot.setAttribute('r','2'); link.append(line,dot); markerLinks.append(link);
-  $('organ-markers').append(marker); markers.set(organ.id,{element:marker,link,line,dot,width:Math.max(55,organ.name.length*5+22),anchor:null});
 }
 $('organ-search').addEventListener('input', event => {
   const query = event.target.value.trim().toLowerCase(); let matches = 0;
@@ -60,16 +47,15 @@ $('show-all-organs').onclick = () => {
 };
 function syncLayers() {
   for(const organ of ORGANS) rows.get(organ.id).visibility.checked = state.visible.has(organ.id);
-  $('show-organs').checked = state.organLayer; $('show-labels').checked = state.labels;
-  document.querySelectorAll('[data-setting]').forEach(input => { input.checked = input.dataset.setting === 'labels' ? state.labels : state.organLayer; });
+  $('show-organs').checked = state.organLayer;
+  document.querySelectorAll('[data-setting]').forEach(input => { input.checked = state.organLayer; });
 }
-function layerChange(kind,checked) {
-  if(kind === 'labels') state.labels = checked; else state.organLayer = checked;
+function layerChange(checked) {
+  state.organLayer = checked;
   syncLayers(); applyMode(); dirty = true;
 }
-$('show-labels').onchange = event => layerChange('labels',event.target.checked);
-$('show-organs').onchange = event => layerChange('organs',event.target.checked);
-document.querySelectorAll('[data-setting]').forEach(input => input.onchange = () => layerChange(input.dataset.setting,input.checked));
+$('show-organs').onchange = event => layerChange(event.target.checked);
+document.querySelectorAll('[data-setting]').forEach(input => input.onchange = () => layerChange(input.checked));
 function setOrganVisible(id,visible) {
   if(!definitions.has(id)) return;
   if(visible) state.visible.add(id); else state.visible.delete(id);
@@ -79,14 +65,13 @@ function updateInformation() {
   const organ = definitions.get(state.selected);
   $('organ-name').textContent = organ?.name || 'Inside the human body';
   $('organ-system').textContent = organ ? organ.system.toUpperCase() : 'ANATOMICAL REFERENCE';
-  $('organ-description').textContent = organ?.description || 'Select an organ on the model, its marker, or the list. Isolate it for a closer examination from every direction.';
+  $('organ-description').textContent = organ?.description || 'Select an organ on the model or in the list. Isolate it for a closer examination from every direction.';
   $('organ-location').textContent = organ?.location || 'Full-body reference';
   $('organ-source').textContent = organ?.source || 'Human Reference Atlas · CC BY 4.0';
   $('isolate-selected').disabled = !organ || !state.loaded;
   document.querySelector('[data-mode="isolated"]').disabled = !organ || !state.loaded;
   $('selected-lab').disabled = $('selected-arena').disabled = !organ;
   for(const [id,row] of rows) row.select.setAttribute('aria-pressed',String(id === state.selected));
-  for(const [id,marker] of markers) marker.element.setAttribute('aria-pressed',String(id === state.selected));
 }
 function selectOrgan(id) {
   if(!definitions.has(id)) return;
@@ -181,7 +166,6 @@ function showError(title,message) {
   $('load-title').textContent = title; $('load').textContent = message;
   $('model-progress').hidden = true; $('retry-model').hidden = false;
   $('asset-status').textContent = 'MODEL UNAVAILABLE'; $('model-credit').textContent = 'No anatomical model loaded.';
-  for(const marker of markers.values()) { marker.element.hidden = true; marker.link.style.display = 'none'; }
   document.querySelectorAll('[data-view],[data-mode]').forEach(button => button.disabled = true);
   updateInformation(); $('isolate-selected').disabled = true; document.querySelector('[data-mode="isolated"]').disabled = true;
 }
@@ -259,7 +243,7 @@ async function loadModel() {
     if(bodyBounds.getSize(new THREE.Vector3()).y < 1 || bodyBounds.getSize(new THREE.Vector3()).y > 2.5) throw Error('The model must use documented metre-scale coordinates');
     for(const [id,group] of incomingGroups) {
       for(const mesh of group.meshes) group.box.union(new THREE.Box3().setFromObject(mesh));
-      group.box.getCenter(group.center); markers.get(id).anchor = group.center.clone();
+      group.box.getCenter(group.center);
     }
     if(generation !== loadGeneration) { disposeModel(incoming); return; }
     if(model) { scene.remove(model); disposeModel(model); }
@@ -298,7 +282,6 @@ function environment() {
 function resize() {
   if(!renderer) return;
   const rect = canvas.getBoundingClientRect(); if(!rect.width || !rect.height) return;
-  viewportWidth = rect.width; viewportHeight = rect.height;
   renderer.setSize(rect.width,rect.height,false); camera.aspect = rect.width/rect.height; camera.updateProjectionMatrix();
   const tangent = Math.tan(THREE.MathUtils.degToRad(camera.fov/2));
   fullDistance = Math.max(1.04/tangent,.58/(tangent*camera.aspect));
@@ -311,35 +294,6 @@ function pickAt(x,y) {
   camera.updateMatrixWorld(); ray.setFromCamera(pointer,camera);
   const visible = pickMeshes.filter(mesh => state.visible.has(mesh.userData.anatomyId) && (state.mode !== 'isolated' || mesh.userData.anatomyId === state.selected));
   return ray.intersectObjects(visible,false)[0]?.object.userData.anatomyId || null;
-}
-function updateMarkers() {
-  const sides = {[-1]:[],[1]:[]};
-  camera.updateMatrixWorld();
-  for(const organ of ORGANS) {
-    const marker = markers.get(organ.id); marker.link.style.display = 'none';
-    const eligible = state.loaded && state.labels && state.organLayer && state.visible.has(organ.id) && (state.mode !== 'isolated' || organ.id === state.selected);
-    if(!eligible || !marker.anchor) { marker.element.hidden = true; continue; }
-    projected.copy(marker.anchor).project(camera);
-    if(projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1.15 || Math.abs(projected.y) > 1.1) { marker.element.hidden = true; continue; }
-    const x = (projected.x*.5+.5)*viewportWidth, y = (-projected.y*.5+.5)*viewportHeight;
-    sides[organ.side].push({marker,x,y,anchorY:y});
-  }
-  for(const side of [-1,1]) {
-    const items = sides[side].sort((a,b) => a.y-b.y); let bottom = 42;
-    for(const item of items) { item.y = Math.max(item.y,bottom); bottom = item.y+33; }
-    let top = viewportHeight-50;
-    for(const item of [...items].reverse()) { item.y = Math.min(item.y,top); top = item.y-33; }
-    for(const {marker,x,y,anchorY} of items) {
-      marker.element.hidden = false;
-      const labelX = THREE.MathUtils.clamp(x+side*(viewportWidth<500?44:77),marker.width/2+9,viewportWidth-marker.width/2-9);
-      const labelY = THREE.MathUtils.clamp(y,40,viewportHeight-48);
-      marker.element.style.left = `${labelX}px`; marker.element.style.top = `${labelY}px`;
-      marker.link.style.display = '';
-      marker.line.setAttribute('x1',x); marker.line.setAttribute('y1',anchorY);
-      marker.line.setAttribute('x2',labelX); marker.line.setAttribute('y2',labelY);
-      marker.dot.setAttribute('cx',x); marker.dot.setAttribute('cy',anchorY);
-    }
-  }
 }
 function animate(now) {
   requestAnimationFrame(animate);
@@ -376,7 +330,7 @@ function animate(now) {
     if(targetRing.visible) { targetRing.position.copy(group.center); targetRing.quaternion.copy(camera.quaternion); targetRing.scale.setScalar(Math.max(.04,group.box.getSize(new THREE.Vector3()).length()*.57)); }
   }
   if(dirty) {
-    renderer.render(scene,camera); updateMarkers();
+    renderer.render(scene,camera);
     const offset = camera.position.clone().sub(controls.target), angle = (THREE.MathUtils.radToDeg(Math.atan2(offset.x,offset.z))+360)%360;
     $('rotation-angle').textContent = `${String(Math.round(angle)%360).padStart(3,'0')}°`; dirty = false;
   }
@@ -430,7 +384,7 @@ function initialize() {
 }
 window.anatomyViewer = {
   setMode,selectOrgan,setOrganVisible,resetCamera,setAutoRotate:setAuto,
-  getState:() => ({mode:state.mode,selected:state.selected,loaded:state.loaded,auto:state.auto,labels:state.labels,organLayer:state.organLayer,visible:[...state.visible],groups:[...groups.keys()],triangles:model?.userData.triangles || 0,modelUrl:MODEL.url})
+  getState:() => ({mode:state.mode,selected:state.selected,loaded:state.loaded,auto:state.auto,organLayer:state.organLayer,visible:[...state.visible],groups:[...groups.keys()],triangles:model?.userData.triangles || 0,modelUrl:MODEL.url})
 };
 try { initialize(); } catch(error) { showError('3D graphics are unavailable',`WebGL could not initialize: ${error.message}. Use a browser with WebGL enabled. No substitute image or primitive body is displayed.`); }
 updateInformation(); syncLayers();
