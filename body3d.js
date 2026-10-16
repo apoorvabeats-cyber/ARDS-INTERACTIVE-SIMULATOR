@@ -1,291 +1,436 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildAtlasOrgans } from './anatomy/atlas-organs.js';
-import { buildScanStructure, buildScanPlatform } from './anatomy/scan-structure.js?v=20261016f';
-import { buildBody, createUniforms } from './anatomy/body-model.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {MODEL, ORGANS} from './anatomy/explorer-data.js?v=hra1';
 
-const canvas = document.getElementById('view');
-const load = document.getElementById('load');
-const nameplate = document.getElementById('pickname');
-const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const autoButton = document.querySelector('[data-view="auto"]');
-const names = { brain: 'Brain', thyroid: 'Thyroid', lungs: 'Lungs', heart: 'Heart', liver: 'Liver',
-  stomach: 'Stomach', spleen: 'Spleen', bowel: 'Intestines', kidneys: 'Kidneys', multi: 'Whole patient' };
+window.__anatomyBoot = true;
+const $ = id => document.getElementById(id);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const root = $('anatomy-workspace'), stage = $('anatomy-stage'), canvas = $('view');
+const definitions = new Map(ORGANS.map(organ => [organ.id, organ]));
+const state = {mode:'internal', selected:null, auto:!reduced, labels:true, organLayer:true, loaded:false,
+  visible:new Set(ORGANS.map(organ => organ.id))};
+const groups = new Map(), markers = new Map(), rows = new Map(), pickMeshes = [];
+let renderer, scene, camera, controls, model, skin, targetRing, retryController;
+let dirty = true, cameraTween = null, modelTween = false, lost = false, loadGeneration = 0;
+let fullDistance = 4, lastFrame = 0, lastTime = 0, viewportWidth = 1, viewportHeight = 1;
+let highlight = null, allMaterials = [], bodyMaterials = [], eyeMeshes = [];
+const ray = new THREE.Raycaster(), pointer = new THREE.Vector2(), projected = new THREE.Vector3();
+const svgNS = 'http://www.w3.org/2000/svg';
+const markerLinks = document.createElementNS(svgNS,'svg');
+markerLinks.classList.add('marker-links'); markerLinks.setAttribute('aria-hidden','true');
+$('organ-markers').append(markerLinks);
+const up = new THREE.Vector3(0,1,0), fullTarget = new THREE.Vector3(0,0.92,0);
 
-function init() {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.75));
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 30);
-  const controls = new OrbitControls(camera, canvas);
-  controls.enableDamping = true; controls.dampingFactor = 0.09;
-  controls.enablePan = false; controls.autoRotate = !reduce; controls.autoRotateSpeed = 0.6;
-  controls.minDistance = 1.1; controls.maxDistance = 6;
-  controls.minPolarAngle = Math.PI * 0.3; controls.maxPolarAngle = Math.PI * 0.7;
-  scene.add(new THREE.HemisphereLight(0xc5e6f1, 0x242431, 1.35));
-  for (const [color, intensity, position] of [[0xffe6d8, 2.3, [-1, 3, 3]], [0x8ecde6, 1.0, [2, 1, 1]], [0xa5e9ff, 3.2, [0, 2, -2]]]) {
-    const light = new THREE.DirectionalLight(color, intensity); light.position.set(...position); scene.add(light);
-  }
-  const atlas = buildAtlasOrgans(THREE); scene.add(atlas.group);
-  const structure = buildScanStructure(THREE); scene.add(structure.group);
-  scene.add(buildScanPlatform(THREE));
-  let needsRender = true;
-  controls.addEventListener('change', () => { needsRender = true; });
-  // Warm shaded skin preserves the human face and limbs around a transparent torso.
-  const skinMaterial = new THREE.ShaderMaterial({
-    transparent: true, depthWrite: true, side: THREE.FrontSide,
-    uniforms: { opacity: { value: 1 }, surface: { value: null }, surfaceReady: { value: 0 } },
-    vertexShader: `
-      #include <common>
-      #include <skinning_pars_vertex>
-      varying vec3 n; varying vec3 viewDir; varying vec3 worldPoint; varying vec3 worldNormal;
-      void main(){
-        #include <beginnormal_vertex>
-        #include <skinbase_vertex>
-        #include <skinnormal_vertex>
-        #include <begin_vertex>
-        #include <skinning_vertex>
-        vec4 mv=modelViewMatrix*vec4(transformed,1.0);
-        n=normalize(normalMatrix*objectNormal); viewDir=-mv.xyz; worldPoint=(modelMatrix*vec4(transformed,1.0)).xyz; worldNormal=normalize(mat3(modelMatrix)*objectNormal); gl_Position=projectionMatrix*mv;
-      }`,
-    fragmentShader: `varying vec3 n; varying vec3 viewDir; varying vec3 worldPoint; varying vec3 worldNormal; uniform float opacity; uniform sampler2D surface; uniform float surfaceReady;
-      void main(){
-        vec3 normal=normalize(n), view=normalize(viewDir);
-        float rim=pow(1.0-abs(dot(normal,view)),3.0);
-        float key=max(0.0,dot(normal,normalize(vec3(-0.65,0.8,1.0))));
-        float fill=max(0.0,dot(normal,normalize(vec3(0.8,0.2,0.5))));
-        float light=0.28+key*0.72+fill*0.15;
-        float torso=(1.0-smoothstep(0.135,0.17,abs(worldPoint.x)))
-          *smoothstep(0.88,0.94,worldPoint.y)*(1.0-smoothstep(1.36,1.43,worldPoint.y));
-        float grain=fract(sin(dot(worldPoint,vec3(1271.1,3117.7,748.2)))*43758.5453);
-        vec3 skin=vec3(0.55,0.31,0.22)*light*(0.98+grain*0.04);
-        skin+=vec3(0.36,0.60,0.68)*rim*0.24;
-        vec2 uv=vec2(0.5046+worldPoint.x*1.274,0.007+worldPoint.y*0.583);
-        vec3 detail=texture2D(surface,clamp(uv,0.0,1.0)).rgb;
-        float front=pow(max(0.0,worldNormal.z),0.5)*surfaceReady;
-        float hasDetail=smoothstep(0.025,0.10,dot(detail,vec3(0.333)));
-        // Preserve the human face; the reference's skull overlay belongs inside the scan.
-        float belowFace=1.0-smoothstep(1.46,1.50,worldPoint.y);
-        skin=mix(skin,detail*1.25,front*0.38*hasDetail*belowFace);
-        // Color the existing facial geometry rather than drawing a skull over it.
-        vec2 eye=vec2(abs(worldPoint.x)-0.025,worldPoint.y-1.566);
-        float eyeFront=smoothstep(0.131,0.140,worldPoint.z);
-        float sclera=(1.0-smoothstep(0.78,1.0,length(eye/vec2(0.010,0.004))))*eyeFront;
-        float iris=(1.0-smoothstep(0.0026,0.0035,length(eye)))*sclera;
-        float pupil=(1.0-smoothstep(0.0011,0.0017,length(eye)))*sclera;
-        skin=mix(skin,vec3(0.66,0.62,0.55)*light,sclera);
-        skin=mix(skin,vec3(0.055,0.034,0.022),iris);
-        skin=mix(skin,vec3(0.006),pupil);
-        vec2 brow=vec2((abs(worldPoint.x)-0.025)/0.016,(worldPoint.y-1.582)/0.0028);
-        float eyebrow=(1.0-smoothstep(0.7,1.0,length(brow)))*smoothstep(0.13,0.145,worldPoint.z);
-        skin=mix(skin,vec3(0.13,0.075,0.045)*light,eyebrow*0.65);
-        float cranialWindow=smoothstep(1.585,1.62,worldPoint.y);
-        float alpha=mix(1.0,0.09,torso);
-        alpha=mix(alpha,0.20,cranialWindow);
-        gl_FragColor=vec4(skin,alpha*opacity);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
-      }`
-  });
-  new THREE.TextureLoader().load('assets/anatomy-surface.webp', (texture) => {
-    texture.colorSpace = THREE.SRGBColorSpace;
-    skinMaterial.uniforms.surface.value = texture;
-    atlas.setSurface(texture);
-    skinMaterial.uniforms.surfaceReady.value = 1; needsRender = true;
-  });
-  // A complete procedural shell remains available if the bundled GLB fails to load.
-  const fallback = buildBody(THREE, createUniforms(THREE, true), { reduce: true });
-  const shell = fallback.skinGroup; shell.scale.setScalar(1.68 / 1.915);
-  shell.traverse((o) => { if (o.isMesh) { o.material = skinMaterial; o.renderOrder = 2; } });
-  scene.add(shell);
-  // Dispose of the unused procedural organs/layers; only its skin is needed here.
-  const unusedMaterials = new Set(), unusedGeometries = new Set();
-  for (const layer of [fallback.organsG, fallback.boneG, fallback.vesselG]) {
-    layer.traverse((o) => { if (o.geometry) unusedGeometries.add(o.geometry); if (o.material) unusedMaterials.add(o.material); });
-  }
-  unusedGeometries.forEach((g) => g.dispose());
-  unusedMaterials.forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); });
-  fallback.skinMat.dispose();
-  new GLTFLoader().load('models/body.glb', ({ scene: model }) => {
-    // The bundled body's bind geometry already shares the organ landmarks and metre scale.
-    model.updateMatrixWorld(true);
-    // Relax the arms into the neutral standing pose in the reference.
-    for (const [suffix, side] of [['l', 1], ['r', -1]]) {
-      const upper = model.getObjectByName('upperarm_' + suffix);
-      const lower = model.getObjectByName('lowerarm_' + suffix);
-      const hand = model.getObjectByName('hand_' + suffix);
-      if (!upper || !lower || !hand) continue;
-      const rotateWorld = (bone, delta) => {
-        const world = bone.getWorldQuaternion(new THREE.Quaternion());
-        const parent = bone.parent.getWorldQuaternion(new THREE.Quaternion());
-        bone.quaternion.copy(parent.invert().multiply(delta.multiply(world)));
-        model.updateMatrixWorld(true);
-      };
-      rotateWorld(upper, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -side * 0.55));
-      const direction = hand.getWorldPosition(new THREE.Vector3()).sub(lower.getWorldPosition(new THREE.Vector3())).normalize();
-      rotateWorld(lower, new THREE.Quaternion().setFromUnitVectors(direction, new THREE.Vector3(side * 0.025, -0.25, 0.015).normalize()));
-    }
-    // Bring the feet into the narrower anatomical stance in the reference.
-    for (const [suffix, side] of [['l', 1], ['r', -1]]) {
-      const thigh = model.getObjectByName('thigh_' + suffix);
-      if (!thigh) continue;
-      const world = thigh.getWorldQuaternion(new THREE.Quaternion());
-      const parent = thigh.parent.getWorldQuaternion(new THREE.Quaternion());
-      const delta = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -side * 0.075);
-      thigh.quaternion.copy(parent.invert().multiply(delta.multiply(world)));
-      model.updateMatrixWorld(true);
-    }
-    const armPoints = {};
-    for (const [suffix, side] of [['l', 1], ['r', -1]]) {
-      const joints = ['upperarm_', 'lowerarm_', 'hand_'].map((prefix) => model.getObjectByName(prefix + suffix));
-      if (joints.every(Boolean)) armPoints[side] = joints.map((joint) => joint.getWorldPosition(new THREE.Vector3()).toArray());
-    }
-    structure.setArms(armPoints);
-    const legPoints = {};
-    for (const [suffix, side] of [['l', 1], ['r', -1]]) {
-      const joints = ['thigh_', 'calf_', 'foot_', 'ball_'].map((prefix) => model.getObjectByName(prefix + suffix));
-      if (joints.every(Boolean)) legPoints[side] = joints.map((joint) => joint.getWorldPosition(new THREE.Vector3()).toArray());
-    }
-    structure.setLegs(legPoints);
-    model.traverse((o) => {
-      if (!o.isMesh) return;
-      const materials = Array.isArray(o.material) ? o.material : [o.material];
-      materials.forEach((m) => m.dispose()); o.material = skinMaterial; o.renderOrder = 2;
-    });
-    scene.remove(shell);
-    const geometries = new Set(); shell.traverse((o) => { if (o.geometry) geometries.add(o.geometry); });
-    geometries.forEach((g) => g.dispose());
-    scene.add(model); needsRender = true;
-  }, undefined, () => { structure.setArms(); structure.setLegs(); load.textContent = 'Simplified body view · select any organ to continue'; });
-
-  let fullDistance = 3.5, selected = null, hovered = null, down = null, travel = null, entering = false;
-  let contextLost = false, lastRender = 0;
-  let lastTime = performance.now(), activePointers = new Set(), gestureMoved = false;
-  const ray = new THREE.Raycaster(), pointer = new THREE.Vector2();
-  function auto(on) {
-    controls.autoRotate = !!on;
-    autoButton.setAttribute('aria-pressed', String(controls.autoRotate));
-    autoButton.textContent = controls.autoRotate ? 'Pause rotation' : 'Auto-rotate';
-    document.getElementById('rotation-status').textContent = controls.autoRotate ? '360° rotation in progress' : '360° interactive anatomy';
-  }
-  function reset(back = false) {
-    travel = null; selected = null; hovered = null; needsRender = true;
-    controls.target.set(0, 0.84, 0);
-    camera.position.set(0, 1.07, (back ? -1 : 1) * fullDistance);
-    controls.update();
-  }
-  function resize() {
-    const { width, height } = canvas.getBoundingClientRect();
-    if (!width || !height) return;
-    renderer.setSize(width, height, false); camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    // Fit both the standing body and its outstretched hands on narrow screens.
-    fullDistance = Math.max(0.94 / Math.tan(THREE.MathUtils.degToRad(16)), 0.55 / (Math.tan(THREE.MathUtils.degToRad(16)) * camera.aspect));
-    controls.maxDistance = Math.max(6, fullDistance * 1.6);
-    if (!entering) reset();
-  }
-  function mark(id) {
-    if (hovered !== (id || null)) needsRender = true;
-    hovered = id || null;
-    nameplate.textContent = id ? `${names[id]} · select to explore` : 'Drag to rotate · scroll or pinch to zoom';
-    canvas.style.cursor = id ? 'pointer' : 'grab';
-    document.querySelectorAll('[data-organ]').forEach((button) => {
-      button.classList.toggle('on', button.dataset.organ === id);
-    });
-  }
-  function idAt(x, y) {
-    const rect = canvas.getBoundingClientRect();
-    pointer.set((x - rect.left) / rect.width * 2 - 1, -(y - rect.top) / rect.height * 2 + 1);
-    camera.updateMatrixWorld();
-    ray.setFromCamera(pointer, camera);
-    // Only intersect actual organ meshes. The transparent skin cannot steal a tap.
-    return ray.intersectObjects(atlas.pickMeshes, false)[0]?.object.userData.organ;
-  }
-  function choose(id) {
-    if (entering || !window.enterOrgan) return;
-    if (!atlas.organs[id]) { window.enterOrgan(id); return; }
-    entering = true; selected = id; mark(id); auto(false);
-    const p = atlas.organs[id].focus;
-    const from = controls.target.clone(), offset = camera.position.clone().sub(from).normalize();
-    const start = camera.position.clone(), end = p.clone().addScaledVector(offset, 0.7);
-    travel = { from, start, end, target: p.clone(), at: performance.now() };
-    setTimeout(() => {
-      travel = null;
-      window.enterOrgan(id);
-    }, reduce ? 0 : 520);
-  }
-  window.hoverOrgan = mark;
-  window.selectAtlasOrgan = choose;
-  window.resetAtlas = () => { entering = false; reset(); mark(null); auto(!reduce); };
-  document.querySelectorAll('[data-view]').forEach((button) => button.addEventListener('click', () => {
-    const action = button.dataset.view;
-    if (action === 'auto') auto(!controls.autoRotate);
-    else if (action === 'front' || action === 'back') { auto(false); reset(action === 'back'); }
-    else if (action === 'reset') { reset(); auto(!reduce); }
-  }));
-  controls.addEventListener('start', () => { auto(false); });
-  canvas.addEventListener('pointerdown', (e) => {
-    activePointers.add(e.pointerId);
-    if (activePointers.size === 1) { down = { x: e.clientX, y: e.clientY }; gestureMoved = false; }
-    else gestureMoved = true;
-  });
-  canvas.addEventListener('pointermove', (e) => {
-    if (activePointers.size) {
-      if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) gestureMoved = true;
-    } else mark(idAt(e.clientX, e.clientY));
-  });
-  canvas.addEventListener('pointerup', (e) => {
-    const tap = activePointers.size === 1 && !gestureMoved && down && Math.hypot(e.clientX - down.x, e.clientY - down.y) <= 8;
-    activePointers.delete(e.pointerId);
-    if (!activePointers.size) down = null;
-    if (tap) { const id = idAt(e.clientX, e.clientY); if (id) choose(id); }
-  });
-  canvas.addEventListener('pointercancel', (e) => { activePointers.delete(e.pointerId); down = null; gestureMoved = true; });
-  canvas.addEventListener('pointerleave', () => { if (!activePointers.size) mark(null); });
-  canvas.addEventListener('keydown', (e) => {
-    const keys = ['ArrowLeft', 'ArrowRight', '+', '=', '-', 'Home'];
-    if (!keys.includes(e.key)) return;
-    e.preventDefault(); auto(false);
-    if (e.key === 'Home') { reset(); return; }
-    const offset = camera.position.clone().sub(controls.target);
-    if (e.key.startsWith('Arrow')) offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), e.key === 'ArrowLeft' ? -Math.PI / 8 : Math.PI / 8);
-    else offset.setLength(THREE.MathUtils.clamp(offset.length() * (e.key === '-' ? 1.15 : 0.85), controls.minDistance, controls.maxDistance));
-    camera.position.copy(controls.target).add(offset); controls.update();
-  });
-  canvas.addEventListener('webglcontextlost', (e) => {
-    e.preventDefault(); contextLost = true; load.textContent = '3D view interrupted. Reload, or use the organ buttons below.';
-  });
-  new ResizeObserver(resize).observe(canvas); resize(); auto(!reduce); mark(null);
-  window.body3d = true; document.body.classList.remove('flat'); document.body.classList.add('live3d');
-  document.querySelectorAll('[data-view]').forEach((b) => { b.disabled = false; });
-  load.textContent = '';
-  // Clear a transform applied by the picture intro while the module was loading.
-  document.getElementById('figure').style.transform = 'none';
-  function frame(now) {
-    requestAnimationFrame(frame);
-    if (contextLost || document.hidden || document.body.classList.contains('in') || now - lastRender < 1000 / 24) return;
-    const dt = Math.min((now - lastTime) / 1000, 0.05); lastTime = now;
-    lastRender = now;
-    controls.enabled = !entering;
-    if (travel && !reduce) {
-      const t = Math.min(1, (now - travel.at) / 500), ease = t * t * (3 - 2 * t);
-      controls.target.lerpVectors(travel.from, travel.target, ease);
-      camera.position.lerpVectors(travel.start, travel.end, ease); needsRender = true;
-    }
-    controls.update(dt);
-    Object.entries(atlas.organs).forEach(([id, o]) => {
-      o.material.emissiveIntensity = id === (selected || hovered) ? 0.38 : 0.06;
-    });
-    if (needsRender) { renderer.render(scene, camera); needsRender = false; }
-  }
-  requestAnimationFrame(frame);
+function panel(open) {
+  root.classList.toggle('panel-open', open);
+  $('panel-toggle').setAttribute('aria-expanded', String(open));
+  if(open && innerWidth <= 900) $('panel-close').focus({preventScroll:true});
+  if(!open && innerWidth <= 900) $('panel-toggle').focus({preventScroll:true});
 }
-try { init(); } catch (error) {
-  document.body.classList.add('flat');
-  load.textContent = '3D is unavailable. Choose an organ below to open its modules.';
-  document.querySelectorAll('[data-view]').forEach((b) => { b.disabled = true; });
-  console.warn('Anatomy viewer unavailable:', error.message);
+$('panel-toggle').onclick = () => panel(!root.classList.contains('panel-open'));
+$('panel-close').onclick = () => panel(false);
+root.addEventListener('keydown', event => { if(event.key === 'Escape') panel(false); });
+
+// The catalogue and clinical links remain usable when the GPU or model cannot load.
+for(const organ of ORGANS) {
+  const row = document.createElement('div'); row.className = 'structure-row'; row.style.setProperty('--organ-color', organ.color);
+  const select = document.createElement('button'); select.type = 'button'; select.textContent = organ.name;
+  select.setAttribute('aria-pressed','false'); select.onclick = () => selectOrgan(organ.id);
+  const visibility = document.createElement('input'); visibility.type = 'checkbox'; visibility.checked = true;
+  visibility.setAttribute('aria-label',`Show ${organ.name}`); visibility.onchange = () => setOrganVisible(organ.id, visibility.checked);
+  row.append(select,visibility); $('structure-list').append(row); rows.set(organ.id,{row,select,visibility});
+  const marker = document.createElement('button'); marker.type = 'button'; marker.className = 'organ-marker';
+  marker.textContent = organ.name; marker.dataset.side = organ.side; marker.dataset.organ = organ.id;
+  marker.style.setProperty('--marker-color', organ.color); marker.setAttribute('aria-label',`Examine ${organ.name}`);
+  marker.setAttribute('aria-pressed','false'); marker.hidden = true;
+  marker.onclick = () => { selectOrgan(organ.id); if(innerWidth <= 900) panel(true); };
+  const link = document.createElementNS(svgNS,'g');
+  const line = document.createElementNS(svgNS,'line'), dot = document.createElementNS(svgNS,'circle');
+  dot.setAttribute('r','2'); link.append(line,dot); markerLinks.append(link);
+  $('organ-markers').append(marker); markers.set(organ.id,{element:marker,link,line,dot,width:Math.max(55,organ.name.length*5+22),anchor:null});
 }
+$('organ-search').addEventListener('input', event => {
+  const query = event.target.value.trim().toLowerCase(); let matches = 0;
+  for(const organ of ORGANS) { const show = `${organ.name} ${organ.system}`.toLowerCase().includes(query); rows.get(organ.id).row.hidden = !show; matches += Number(show); }
+  $('empty-filter').hidden = matches > 0;
+});
+$('show-all-organs').onclick = () => {
+  state.organLayer = true; state.visible = new Set(ORGANS.map(organ => organ.id)); syncLayers(); applyMode();
+};
+function syncLayers() {
+  for(const organ of ORGANS) rows.get(organ.id).visibility.checked = state.visible.has(organ.id);
+  $('show-organs').checked = state.organLayer; $('show-labels').checked = state.labels;
+  document.querySelectorAll('[data-setting]').forEach(input => { input.checked = input.dataset.setting === 'labels' ? state.labels : state.organLayer; });
+}
+function layerChange(kind,checked) {
+  if(kind === 'labels') state.labels = checked; else state.organLayer = checked;
+  syncLayers(); applyMode(); dirty = true;
+}
+$('show-labels').onchange = event => layerChange('labels',event.target.checked);
+$('show-organs').onchange = event => layerChange('organs',event.target.checked);
+document.querySelectorAll('[data-setting]').forEach(input => input.onchange = () => layerChange(input.dataset.setting,input.checked));
+function setOrganVisible(id,visible) {
+  if(!definitions.has(id)) return;
+  if(visible) state.visible.add(id); else state.visible.delete(id);
+  syncLayers(); applyMode(); dirty = true;
+}
+function updateInformation() {
+  const organ = definitions.get(state.selected);
+  $('organ-name').textContent = organ?.name || 'Inside the human body';
+  $('organ-system').textContent = organ ? organ.system.toUpperCase() : 'ANATOMICAL REFERENCE';
+  $('organ-description').textContent = organ?.description || 'Select an organ on the model, its marker, or the list. Isolate it for a closer examination from every direction.';
+  $('organ-location').textContent = organ?.location || 'Full-body reference';
+  $('organ-source').textContent = organ?.source || 'Human Reference Atlas · CC BY 4.0';
+  $('isolate-selected').disabled = !organ || !state.loaded;
+  document.querySelector('[data-mode="isolated"]').disabled = !organ || !state.loaded;
+  $('selected-lab').disabled = $('selected-arena').disabled = !organ;
+  for(const [id,row] of rows) row.select.setAttribute('aria-pressed',String(id === state.selected));
+  for(const [id,marker] of markers) marker.element.setAttribute('aria-pressed',String(id === state.selected));
+}
+function selectOrgan(id) {
+  if(!definitions.has(id)) return;
+  state.selected = id; setAuto(false); state.visible.add(id); state.organLayer = true;
+  if(state.mode === 'external') state.mode = 'internal';
+  syncLayers(); updateInformation(); applyMode();
+  if(state.mode === 'isolated' && groups.has(id)) focusGroup(id);
+  dirty = true;
+}
+$('isolate-selected').onclick = () => setMode('isolated');
+$('selected-lab').onclick = () => openClinical('lab');
+$('selected-arena').onclick = () => openClinical('arena');
+function openClinical(which) {
+  if(!state.selected) return;
+  setAuto(false); panel(false);
+  window.openAnatomyPortal?.(definitions.get(state.selected).clinical,which);
+}
+
+function setAuto(on) {
+  state.auto = Boolean(on) && state.loaded;
+  if(controls) controls.autoRotate = state.auto;
+  document.querySelectorAll('[data-view="auto"]').forEach(button => {
+    button.setAttribute('aria-pressed',String(state.auto));
+    if(button.closest('.mobile-camera')) button.textContent = state.auto ? 'Ⅱ' : '▷';
+    else button.textContent = state.auto ? 'Pause rotation' : 'Auto-rotate';
+  });
+  dirty = true;
+}
+function setMode(mode) {
+  if(!['external','internal','isolated'].includes(mode) || (mode === 'isolated' && !state.selected)) return;
+  const previous = state.mode; state.mode = mode;
+  if(mode === 'isolated') {
+    state.visible.add(state.selected); state.organLayer = true; syncLayers(); setAuto(false); focusGroup(state.selected);
+  } else if(previous === 'isolated') resetCamera();
+  applyMode();
+}
+function applyMode() {
+  document.querySelectorAll('[data-mode]').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.mode === state.mode)));
+  $('mode-readout').textContent = {external:'External',internal:'Internal',isolated:'Isolated'}[state.mode];
+  if(!state.loaded) return;
+  const bodyOpacity = {external:1,internal:0.28,isolated:0}[state.mode];
+  for(const material of bodyMaterials) material.userData.targetOpacity = bodyOpacity;
+  for(const [id,group] of groups) {
+    const visible = state.organLayer && state.visible.has(id) && state.mode !== 'external' && (state.mode !== 'isolated' || state.selected === id);
+    for(const mesh of group.meshes) mesh.material.userData.targetOpacity = visible ? 1 : 0;
+  }
+  for(const mesh of eyeMeshes) mesh.material.userData.targetOpacity = state.mode === 'external' ? 1 : state.mode === 'internal' ? 0.35 : 0;
+  const started = performance.now();
+  for(const material of allMaterials) {
+    material.userData.startOpacity = material.opacity;
+    material.userData.opacityStarted = started;
+  }
+  modelTween = true; dirty = true;
+}
+
+function moveCamera(position,target) {
+  if(!controls) return;
+  // Clear accumulated orbit damping before a programmatic camera move.
+  const damping = controls.enableDamping, auto = controls.autoRotate;
+  controls.enableDamping = false; controls.autoRotate = false; controls.update(0);
+  controls.enableDamping = damping; controls.autoRotate = auto;
+  if(reduced) { camera.position.copy(position); controls.target.copy(target); controls.update(); }
+  else cameraTween = {at:performance.now(),from:camera.position.clone(),to:position.clone(),oldTarget:controls.target.clone(),target:target.clone()};
+  dirty = true;
+}
+function resetCamera(back=false) {
+  if(!state.loaded) return;
+  if(state.mode === 'isolated' && state.selected) { focusGroup(state.selected,back); return; }
+  controls.minDistance = 1.3; controls.maxDistance = Math.max(7,fullDistance*1.7);
+  moveCamera(new THREE.Vector3(0,1.04,(back?-1:1)*fullDistance),fullTarget);
+}
+function focusGroup(id,back=false) {
+  const group = groups.get(id); if(!group) return;
+  const size = group.box.getSize(new THREE.Vector3());
+  const half = Math.max(size.length()/2,0.025), distance = half/Math.sin(THREE.MathUtils.degToRad(camera.fov/2))*1.23/Math.min(1,camera.aspect);
+  const direction = camera.position.clone().sub(controls.target).normalize();
+  if(back) direction.set(0,0,-1);
+  controls.minDistance = Math.max(0.06,half*1.25); controls.maxDistance = Math.max(3,distance*4);
+  moveCamera(group.center.clone().addScaledVector(direction,distance),group.center);
+}
+document.querySelectorAll('[data-mode]').forEach(button => button.onclick = () => setMode(button.dataset.mode));
+document.querySelectorAll('[data-view]').forEach(button => button.onclick = () => {
+  if(button.dataset.view === 'auto') setAuto(!state.auto);
+  else { setAuto(false); cameraTween = null; resetCamera(button.dataset.view === 'back'); }
+});
+
+function showError(title,message) {
+  state.loaded = false; window.body3d = false; setAuto(false);
+  if(model) model.visible = false;
+  dirty = true;
+  $('model-state').hidden = false; $('model-state').classList.add('error');
+  $('load-title').textContent = title; $('load').textContent = message;
+  $('model-progress').hidden = true; $('retry-model').hidden = false;
+  $('asset-status').textContent = 'MODEL UNAVAILABLE'; $('model-credit').textContent = 'No anatomical model loaded.';
+  for(const marker of markers.values()) { marker.element.hidden = true; marker.link.style.display = 'none'; }
+  document.querySelectorAll('[data-view],[data-mode]').forEach(button => button.disabled = true);
+  updateInformation(); $('isolate-selected').disabled = true; document.querySelector('[data-mode="isolated"]').disabled = true;
+}
+$('retry-model').onclick = () => { if(!renderer || lost) location.reload(); else loadModel(); };
+
+async function modelBytes(url,signal) {
+  const response = await fetch(url,{signal});
+  if(!response.ok) throw Error(`HTTP ${response.status}`);
+  const total = Number(response.headers.get('content-length')) || 0;
+  if(total > MODEL.maxBytes) throw Error('Model exceeds the configured download budget');
+  $('model-progress').hidden = false;
+  if(!response.body?.getReader) {
+    const bytes = await response.arrayBuffer();
+    if(bytes.byteLength > MODEL.maxBytes) throw Error('Model exceeds the configured download budget');
+    return bytes;
+  }
+  const reader = response.body.getReader(), chunks = []; let loaded = 0;
+  try {
+    while(true) {
+      const {done,value} = await reader.read(); if(done) break;
+      loaded += value.byteLength;
+      if(loaded > MODEL.maxBytes) { await reader.cancel(); throw Error('Model exceeds the configured download budget'); }
+      chunks.push(value);
+      if(total) { $('model-progress').value = loaded/total*100; $('load').textContent = `Loading reference geometry · ${Math.round(loaded/total*100)}%`; }
+    }
+  } finally { reader.releaseLock(); }
+  const result = new Uint8Array(loaded); let offset = 0;
+  for(const chunk of chunks) { result.set(chunk,offset); offset += chunk.length; }
+  return result.buffer;
+}
+function disposeModel(object) {
+  if(!object) return;
+  const geometries = new Set(), materials = new Set();
+  object.traverse(mesh => { if(mesh.isMesh) { geometries.add(mesh.geometry); for(const mat of Array.isArray(mesh.material)?mesh.material:[mesh.material]) materials.add(mat); } });
+  geometries.forEach(item => item.dispose()); materials.forEach(item => item.dispose());
+}
+async function loadModel() {
+  const generation = ++loadGeneration;
+  retryController?.abort();
+  const controller = new AbortController(); retryController = controller;
+  const timeout = setTimeout(() => controller.abort(),45000);
+  $('model-state').hidden = false; $('model-state').classList.remove('error');
+  $('load-title').textContent = 'Loading anatomical model'; $('load').textContent = 'Loading locally bundled GLB geometry…';
+  $('retry-model').hidden = true; $('model-progress').removeAttribute('value');
+  let incoming;
+  try {
+    const url = new URL(MODEL.url,document.baseURI), bytes = await modelBytes(url,controller.signal);
+    if(generation !== loadGeneration) return;
+    $('load').textContent = 'Preparing anatomical surfaces…';
+    const gltf = await new GLTFLoader().parseAsync(bytes,new URL('.',url).href);
+    incoming = gltf.scene;
+    const incomingGroups = new Map(), incomingBody = [], incomingEyes = [], incomingMaterials = [], incomingPick = [];
+    let foundSkin = null, triangles = 0;
+    const sourceMaterials = new Set();
+    try { incoming.traverse(mesh => {
+      if(!mesh.isMesh) return;
+      const id = mesh.userData.anatomyId;
+      mesh.frustumCulled = true;
+      if(Array.isArray(mesh.material)) throw Error('Configure separate meshes for multi-material anatomy');
+      sourceMaterials.add(mesh.material);
+      mesh.material = mesh.material.clone(); mesh.material.transparent = true; mesh.material.opacity = 0;
+      mesh.material.userData.targetOpacity = 0; incomingMaterials.push(mesh.material);
+      triangles += (mesh.geometry.index?.count || mesh.geometry.attributes.position.count)/3;
+      if(mesh.name === 'body' && id === 'body') { foundSkin = mesh; incomingBody.push(mesh.material); mesh.renderOrder = 3; }
+      else if(['eyes','irises','pupils'].includes(id)) { incomingEyes.push(mesh); mesh.renderOrder = 4; }
+      else if(definitions.has(id)) {
+        if(!incomingGroups.has(id)) incomingGroups.set(id,{meshes:[],box:new THREE.Box3(),center:new THREE.Vector3()});
+        incomingGroups.get(id).meshes.push(mesh); mesh.renderOrder = 1; incomingPick.push(mesh);
+      } else throw Error(`Unmapped anatomical mesh: ${mesh.name}`);
+    });
+    } finally { sourceMaterials.forEach(material => material.dispose()); }
+    if(!foundSkin || ORGANS.some(organ => !incomingGroups.has(organ.id))) throw Error('The GLB is missing its body or required anatomical organ groups');
+    incoming.updateMatrixWorld(true);
+    const bodyBounds = new THREE.Box3().setFromObject(foundSkin);
+    if(bodyBounds.getSize(new THREE.Vector3()).y < 1 || bodyBounds.getSize(new THREE.Vector3()).y > 2.5) throw Error('The model must use documented metre-scale coordinates');
+    for(const [id,group] of incomingGroups) {
+      for(const mesh of group.meshes) group.box.union(new THREE.Box3().setFromObject(mesh));
+      group.box.getCenter(group.center); markers.get(id).anchor = group.center.clone();
+    }
+    if(generation !== loadGeneration) { disposeModel(incoming); return; }
+    if(model) { scene.remove(model); disposeModel(model); }
+    model = incoming; scene.add(model); skin = foundSkin;
+    allMaterials = incomingMaterials; bodyMaterials = incomingBody; eyeMeshes = incomingEyes;
+    groups.clear(); for(const [id,group] of incomingGroups) groups.set(id,group);
+    pickMeshes.splice(0,pickMeshes.length,...incomingPick);
+    model.userData.triangles = triangles; state.loaded = true; window.body3d = true;
+    document.body.classList.remove('flat'); document.body.classList.add('live3d');
+    $('model-state').hidden = true; $('asset-status').textContent = 'ANATOMICAL GLB LOADED';
+    $('structure-count').textContent = `${ORGANS.length} groups`;
+    $('model-credit').textContent = 'HRA United Male v1.5 + BodyParts3D stomach · CC BY 4.0';
+    document.querySelectorAll('[data-view],[data-mode]').forEach(button => button.disabled = false);
+    updateInformation(); resize(); resetCamera(); applyMode(); setAuto(!reduced); dirty = true;
+  } catch(error) {
+    if(incoming && incoming !== model) disposeModel(incoming);
+    if(generation === loadGeneration) showError('Anatomical model could not load',`Expected ${MODEL.url}. ${error.name === 'AbortError' ? 'The request timed out.' : error.message}. Keep the model and vendor folders beside index.html and serve over HTTP(S). No substitute body is shown.`);
+  } finally { clearTimeout(timeout); }
+}
+
+function environment() {
+  // Scanner graphics are geometry; the human and every organ come only from the GLB.
+  const floor = new THREE.Group(); scene.add(floor);
+  const material = new THREE.LineBasicMaterial({color:0x5ccfac,transparent:true,opacity:0.17});
+  for(const radius of [0.57,0.65,0.69]) {
+    const points = Array.from({length:97},(_,i) => new THREE.Vector3(Math.cos(i/96*Math.PI*2)*radius,0.002,Math.sin(i/96*Math.PI*2)*radius));
+    floor.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(points),material));
+  }
+  for(let i=-5;i<=5;i++) {
+    const points = [new THREE.Vector3(i*.17,-.006,-.9),new THREE.Vector3(i*.17,-.006,.9),new THREE.Vector3(-.9,-.006,i*.17),new THREE.Vector3(.9,-.006,i*.17)];
+    floor.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(points),new THREE.LineBasicMaterial({color:0x59bc99,transparent:true,opacity:.055})));
+  }
+  targetRing = new THREE.Mesh(new THREE.TorusGeometry(1,.005,6,96),new THREE.MeshBasicMaterial({color:0x8fffd2,transparent:true,opacity:.55,depthTest:false,depthWrite:false}));
+  targetRing.visible = false; targetRing.renderOrder = 5; scene.add(targetRing);
+}
+function resize() {
+  if(!renderer) return;
+  const rect = canvas.getBoundingClientRect(); if(!rect.width || !rect.height) return;
+  viewportWidth = rect.width; viewportHeight = rect.height;
+  renderer.setSize(rect.width,rect.height,false); camera.aspect = rect.width/rect.height; camera.updateProjectionMatrix();
+  const tangent = Math.tan(THREE.MathUtils.degToRad(camera.fov/2));
+  fullDistance = Math.max(1.04/tangent,.58/(tangent*camera.aspect));
+  if(state.loaded) { cameraTween = null; resetCamera(); } dirty = true;
+}
+function pickAt(x,y) {
+  if(!state.loaded || state.mode === 'external' || !state.organLayer) return null;
+  const rect = canvas.getBoundingClientRect();
+  pointer.set((x-rect.left)/rect.width*2-1,-(y-rect.top)/rect.height*2+1);
+  camera.updateMatrixWorld(); ray.setFromCamera(pointer,camera);
+  const visible = pickMeshes.filter(mesh => state.visible.has(mesh.userData.anatomyId) && (state.mode !== 'isolated' || mesh.userData.anatomyId === state.selected));
+  return ray.intersectObjects(visible,false)[0]?.object.userData.anatomyId || null;
+}
+function updateMarkers() {
+  const sides = {[-1]:[],[1]:[]};
+  camera.updateMatrixWorld();
+  for(const organ of ORGANS) {
+    const marker = markers.get(organ.id); marker.link.style.display = 'none';
+    const eligible = state.loaded && state.labels && state.organLayer && state.visible.has(organ.id) && (state.mode !== 'isolated' || organ.id === state.selected);
+    if(!eligible || !marker.anchor) { marker.element.hidden = true; continue; }
+    projected.copy(marker.anchor).project(camera);
+    if(projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1.15 || Math.abs(projected.y) > 1.1) { marker.element.hidden = true; continue; }
+    const x = (projected.x*.5+.5)*viewportWidth, y = (-projected.y*.5+.5)*viewportHeight;
+    sides[organ.side].push({marker,x,y,anchorY:y});
+  }
+  for(const side of [-1,1]) {
+    const items = sides[side].sort((a,b) => a.y-b.y); let bottom = 42;
+    for(const item of items) { item.y = Math.max(item.y,bottom); bottom = item.y+33; }
+    let top = viewportHeight-50;
+    for(const item of [...items].reverse()) { item.y = Math.min(item.y,top); top = item.y-33; }
+    for(const {marker,x,y,anchorY} of items) {
+      marker.element.hidden = false;
+      const labelX = THREE.MathUtils.clamp(x+side*(viewportWidth<500?44:77),marker.width/2+9,viewportWidth-marker.width/2-9);
+      const labelY = THREE.MathUtils.clamp(y,40,viewportHeight-48);
+      marker.element.style.left = `${labelX}px`; marker.element.style.top = `${labelY}px`;
+      marker.link.style.display = '';
+      marker.line.setAttribute('x1',x); marker.line.setAttribute('y1',anchorY);
+      marker.line.setAttribute('x2',labelX); marker.line.setAttribute('y2',labelY);
+      marker.dot.setAttribute('cx',x); marker.dot.setAttribute('cy',anchorY);
+    }
+  }
+}
+function animate(now) {
+  requestAnimationFrame(animate);
+  if(lost || document.hidden || document.body.classList.contains('in') || now-lastFrame < 1000/30) return;
+  const dt = Math.min((now-lastTime)/1000 || .033,.08); lastTime = now; lastFrame = now;
+  if(cameraTween) {
+    const t = Math.min(1,(now-cameraTween.at)/650), eased = t*t*(3-2*t);
+    camera.position.lerpVectors(cameraTween.from,cameraTween.to,eased);
+    controls.target.lerpVectors(cameraTween.oldTarget,cameraTween.target,eased);
+    if(t === 1) cameraTween = null;
+    dirty = true;
+  }
+  controls.update(dt);
+  if(modelTween) {
+    modelTween = false;
+    for(const material of allMaterials) {
+      const target = material.userData.targetOpacity;
+      const t = reduced ? 1 : THREE.MathUtils.clamp((now-material.userData.opacityStarted)/650,0,1);
+      const eased = t*t*(3-2*t);
+      material.opacity = THREE.MathUtils.lerp(material.userData.startOpacity,target,eased);
+      material.depthWrite = material.opacity>.98;
+      if(material.opacity !== target) modelTween = true;
+    }
+    model?.traverse(mesh => { if(mesh.isMesh) mesh.visible = mesh.material.opacity>.002; }); dirty = true;
+  }
+  const active = state.selected || highlight;
+  for(const [id,group] of groups) for(const mesh of group.meshes) {
+    const intensity = id === active ? .15 : 0;
+    if(mesh.material.emissiveIntensity !== intensity) { mesh.material.emissive.set(0x36deb0); mesh.material.emissiveIntensity = intensity; dirty = true; }
+  }
+  if(targetRing) {
+    const group = groups.get(state.selected);
+    targetRing.visible = Boolean(group && state.loaded && state.mode !== 'external' && state.organLayer && state.visible.has(state.selected));
+    if(targetRing.visible) { targetRing.position.copy(group.center); targetRing.quaternion.copy(camera.quaternion); targetRing.scale.setScalar(Math.max(.04,group.box.getSize(new THREE.Vector3()).length()*.57)); }
+  }
+  if(dirty) {
+    renderer.render(scene,camera); updateMarkers();
+    const offset = camera.position.clone().sub(controls.target), angle = (THREE.MathUtils.radToDeg(Math.atan2(offset.x,offset.z))+360)%360;
+    $('rotation-angle').textContent = `${String(Math.round(angle)%360).padStart(3,'0')}°`; dirty = false;
+  }
+}
+
+function initialize() {
+  renderer = new THREE.WebGLRenderer({canvas,alpha:true,antialias:true,powerPreference:'low-power'});
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1,1.5));
+  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+  scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(32,1,.01,25); camera.position.set(0,1.04,4);
+  controls = new OrbitControls(camera,canvas); controls.target.copy(fullTarget); controls.enablePan = false; controls.enableDamping = true;
+  controls.dampingFactor = .1; controls.autoRotateSpeed = .55; controls.minPolarAngle = Math.PI*.15; controls.maxPolarAngle = Math.PI*.85;
+  controls.addEventListener('change',() => { dirty = true; }); controls.addEventListener('start',() => { cameraTween = null; setAuto(false); });
+  scene.add(new THREE.HemisphereLight(0xe4f7ee,0x192c21,1.7));
+  for(const [color,intensity,position] of [[0xffe5d0,3.2,[-2,3,3]],[0x91dcca,1.8,[2,1,1]],[0x64dacb,2.4,[0,2,-3]]]) {
+    const light = new THREE.DirectionalLight(color,intensity); light.position.set(...position); scene.add(light);
+  }
+  environment(); new ResizeObserver(resize).observe(stage); resize();
+  const pointers = new Map(); let moved = false;
+  canvas.addEventListener('pointerdown',event => { pointers.set(event.pointerId,{x:event.clientX,y:event.clientY}); if(pointers.size===1) moved=false; else moved=true; });
+  canvas.addEventListener('pointermove',event => {
+    if(pointers.size) { const first = pointers.get(event.pointerId); if(first && Math.hypot(event.clientX-first.x,event.clientY-first.y)>8) moved=true; }
+    else {
+      const id = pickAt(event.clientX,event.clientY); if(highlight!==id) { highlight=id; dirty=true; }
+      canvas.style.cursor = id ? 'pointer' : 'grab';
+      $('pickname').textContent = id ? `${definitions.get(id).name} · select to examine` : 'Drag to rotate · pinch or scroll to zoom · select an organ';
+    }
+  });
+  canvas.addEventListener('pointerup',event => {
+    const first = pointers.get(event.pointerId), tap = pointers.size===1 && !moved && first && Math.hypot(event.clientX-first.x,event.clientY-first.y)<=8;
+    pointers.delete(event.pointerId); if(tap) { const id=pickAt(event.clientX,event.clientY); if(id) { selectOrgan(id); if(innerWidth<=900) panel(true); } }
+  });
+  canvas.addEventListener('pointercancel',event => { pointers.delete(event.pointerId); moved=true; });
+  canvas.addEventListener('lostpointercapture',event => { pointers.delete(event.pointerId); });
+  canvas.addEventListener('pointerleave',() => { if(!pointers.size) { highlight=null; dirty=true; } });
+  canvas.addEventListener('keydown',event => {
+    if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-','Home',' '].includes(event.key)) return;
+    event.preventDefault(); cameraTween=null;
+    if(event.key===' ') { setAuto(!state.auto); return; }
+    setAuto(false); if(event.key==='Home') { resetCamera(); return; }
+    const offset=camera.position.clone().sub(controls.target);
+    if(event.key==='ArrowLeft'||event.key==='ArrowRight') offset.applyAxisAngle(up,event.key==='ArrowLeft'?-.15:.15);
+    else if(event.key==='ArrowUp'||event.key==='ArrowDown') { const spherical=new THREE.Spherical().setFromVector3(offset);spherical.phi=THREE.MathUtils.clamp(spherical.phi+(event.key==='ArrowUp'?-.1:.1),controls.minPolarAngle,controls.maxPolarAngle);offset.setFromSpherical(spherical); }
+    else offset.setLength(THREE.MathUtils.clamp(offset.length()*(event.key==='-'?1.12:.88),controls.minDistance,controls.maxDistance));
+    camera.position.copy(controls.target).add(offset); controls.update(); dirty=true;
+  });
+  canvas.addEventListener('webglcontextlost',event => { event.preventDefault(); lost=true; showError('The 3D view was interrupted','Reload to restore the graphical context. The organ information and clinical links remain available.'); });
+  canvas.addEventListener('webglcontextrestored',() => { lost=false; loadModel(); });
+  window.resetAtlas = () => { $('figure').style.opacity='1'; cameraTween=null; resetCamera(); dirty=true; };
+  requestAnimationFrame(animate); loadModel();
+}
+window.anatomyViewer = {
+  setMode,selectOrgan,setOrganVisible,resetCamera,setAutoRotate:setAuto,
+  getState:() => ({mode:state.mode,selected:state.selected,loaded:state.loaded,auto:state.auto,labels:state.labels,organLayer:state.organLayer,visible:[...state.visible],groups:[...groups.keys()],triangles:model?.userData.triangles || 0,modelUrl:MODEL.url})
+};
+try { initialize(); } catch(error) { showError('3D graphics are unavailable',`WebGL could not initialize: ${error.message}. Use a browser with WebGL enabled. No substitute image or primitive body is displayed.`); }
+updateInformation(); syncLayers();

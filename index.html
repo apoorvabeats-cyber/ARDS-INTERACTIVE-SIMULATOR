@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520;9..144,640&family=Figtree:wght@460;600&display=swap" rel="stylesheet">
 <script type="importmap">
-{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+{"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}
 </script>
 <style>
 :root{
@@ -271,16 +271,17 @@ body.in .organ-nav,body.in .viewer-controls{display:none}
 @media(prefers-reduced-motion:reduce){.pane i,.bars b,.ringset::before,.ringset::after,.beam{animation:none}}
 
 </style>
-<link rel="stylesheet" href="anatomy/scan-room.css?v=20261016f">
+<link rel="stylesheet" href="anatomy/explorer.css?v=hra1">
 </head>
 <body>
+<script>window.anatomyManaged = true;</script>
 <canvas class="dust" id="dust" aria-hidden="true"></canvas>
 <audio id="bed" src="scan-bed.mp3" loop preload="auto" playsinline></audio>
 <audio id="line" preload="auto"></audio>
 <div class="glow" aria-hidden="true"></div>
-<button type="button" class="skip" id="skip" aria-label="Skip"></button>
+<button type="button" class="skip" id="skip" aria-label="Skip" hidden></button>
 <header class="hud-header">
-  <input id="find" type="search" enterkeyhint="search" placeholder="" aria-label="Search simulators">
+  <input id="find" type="search" hidden tabindex="-1" enterkeyhint="search" placeholder="" aria-label="Search simulators">
   <button type="button" class="sound" id="sound" aria-pressed="true" aria-label="Sound"></button>
   <button type="button" class="sound replay" id="replay" aria-label="Replay"></button>
 </header>
@@ -293,68 +294,46 @@ body.in .organ-nav,body.in .viewer-controls{display:none}
   <img id="plate" src="brain-close.jpg" alt="">
   <p>Cortex and cerebral vessels</p>
 </div>
-<main class="atlas">
-  <div class="atlas-heading"><h1>Critical care · anatomical scan</h1></div>
-  <div class="scan-light" aria-hidden="true"></div><div class="scan-light second" aria-hidden="true"></div><div class="scan-flare" aria-hidden="true"></div>
-  <div class="veil" aria-hidden="true">
-    <i class="bracket tl"></i><i class="bracket tr"></i><i class="bracket bl"></i><i class="bracket br"></i>
-    <div class="ringset"></div>
-    <div class="beam"></div>
-    <aside class="diag left">
-      <div class="pane"><i></i></div>
-      <div class="bars"><b></b><b></b><b></b><b></b><b></b></div>
-      <div class="pane alt"><i></i></div>
+<main class="atlas explorer" id="anatomy-workspace">
+  <div class="explorer-head">
+    <div class="explorer-brand"><span class="status-dot" aria-hidden="true"></span><div><p>CRITICAL CARE / HUMAN ATLAS</p><h1>Explore the anatomy.</h1></div></div>
+    <nav class="mode-switch" aria-label="Visualization mode">
+      <button type="button" data-mode="external" aria-pressed="false">External body</button>
+      <button type="button" data-mode="internal" aria-pressed="true">Internal anatomy</button>
+      <button type="button" data-mode="isolated" aria-pressed="false" disabled>Isolate organ</button>
+    </nav>
+    <button type="button" id="panel-toggle" class="hud-button panel-toggle" aria-expanded="false" aria-controls="organ-panel">Organs <span aria-hidden="true">＋</span></button>
+  </div>
+  <div class="explorer-grid">
+    <aside class="diagnostic-rail" aria-label="Reference and camera controls">
+      <section class="hud-card"><p class="eyebrow">01 / REFERENCE SCAN</p><div class="diagnostic-orbit" aria-hidden="true"><i></i><i></i><b>360<span>DEGREE VIEW</span></b></div><h2>Human anatomy</h2><p class="muted">A real anatomical mesh.<br>A view from every angle.</p><dl class="scan-readouts"><div><dt>REFERENCE</dt><dd>Adult male</dd></div><div><dt>STRUCTURES</dt><dd id="structure-count">Loading…</dd></div><div><dt>AZIMUTH</dt><dd id="rotation-angle">000°</dd></div><div><dt>VIEW</dt><dd id="mode-readout">Internal</dd></div></dl></section>
+      <section class="hud-card camera-panel"><p class="eyebrow">02 / CAMERA</p><div class="camera-buttons"><button type="button" data-view="front">Front</button><button type="button" data-view="back">Back</button><button type="button" data-view="reset">Reset camera</button><button type="button" data-view="auto" aria-pressed="true">Pause rotation</button></div><label class="layer-control"><input type="checkbox" id="show-labels" checked> Anatomical labels</label><label class="layer-control"><input type="checkbox" id="show-organs" checked> Organ layer</label></section>
+      <p class="reference-caption">Anatomical reference assembly.<br>Display colors identify structures.</p>
     </aside>
-    <aside class="diag right">
-      <div class="pane alt"><i></i></div>
-      <div class="bars"><b></b><b></b><b></b><b></b><b></b></div>
-      <div class="pane"><i></i></div>
+    <section class="anatomy-stage" id="anatomy-stage" aria-label="Interactive anatomical model">
+      <div class="stage-corner top-left" aria-hidden="true"></div><div class="stage-corner top-right" aria-hidden="true"></div><div class="stage-corner bottom-left" aria-hidden="true"></div><div class="stage-corner bottom-right" aria-hidden="true"></div>
+      <div class="stage-heading"><span>LIVE 3D / ANATOMICAL REFERENCE</span><span id="asset-status">LOADING GLB</span></div>
+      <div class="figure" id="figure"><canvas id="view" tabindex="0" aria-label="3D anatomical human. Drag to rotate, pinch or scroll to zoom. Arrow keys rotate, plus and minus zoom, Home resets. Use the Organs panel for keyboard organ selection."></canvas></div>
+      <div id="organ-markers" class="organ-markers" aria-label="Anatomical hotspots"></div>
+      <div class="scan-sweep" aria-hidden="true"></div>
+      <div class="stage-target" aria-hidden="true"><i></i><i></i></div>
+      <div class="model-state" id="model-state" role="status" aria-live="polite"><span class="loading-glyph" aria-hidden="true"></span><h2 id="load-title">Loading anatomical model</h2><p id="load">Preparing the local GLB…</p><progress id="model-progress" max="100" aria-label="Model download progress"></progress><button type="button" id="retry-model" class="hud-button" hidden>Retry model load</button></div>
+      <p class="stage-hint" id="pickname">Drag to rotate · pinch or scroll to zoom · select an organ</p>
+      <div class="mobile-camera" aria-label="Camera shortcuts"><button type="button" data-view="reset" aria-label="Reset camera" title="Reset camera">↺</button><button type="button" data-view="auto" aria-pressed="true" aria-label="Toggle automatic rotation" title="Automatic rotation">Ⅱ</button></div>
+    </section>
+    <aside class="organ-panel hud-card" id="organ-panel" aria-label="Organ information and visibility">
+      <div class="panel-heading"><p class="eyebrow">03 / STRUCTURE EXPLORER</p><button type="button" id="panel-close" aria-label="Close organ panel">×</button></div>
+      <section class="organ-information" aria-live="polite"><p class="system-label" id="organ-system">ANATOMICAL REFERENCE</p><h2 id="organ-name">Inside the human body</h2><p id="organ-description">Select an organ on the model, its marker, or the list below. Isolate it for a closer examination from every direction.</p><dl><dt>LOCATION</dt><dd id="organ-location">Full-body reference</dd><dt>SOURCE</dt><dd id="organ-source">Human Reference Atlas · CC BY 4.0</dd></dl></section>
+      <div class="organ-actions"><button type="button" id="isolate-selected" class="hud-button" disabled>Examine organ <span aria-hidden="true">↗</span></button><div><button type="button" id="selected-lab" disabled>Learning Lab</button><button type="button" id="selected-arena" disabled>Practice Arena</button></div></div>
+      <div class="mobile-layer-controls"><label class="layer-control"><input type="checkbox" data-setting="labels" checked> Labels</label><label class="layer-control"><input type="checkbox" data-setting="organs" checked> Organ layer</label></div>
+      <div class="structure-list-heading"><h3>Structures</h3><button type="button" id="show-all-organs">Show all</button></div>
+      <label class="organ-search-label"><span class="sr-only">Search organs</span><input id="organ-search" type="search" placeholder="Find a structure…" autocomplete="off"></label>
+      <div class="structure-list" id="structure-list"></div><p class="empty-filter" id="empty-filter" hidden>No structures match.</p>
     </aside>
   </div>
-  <div class="hud-center">
-    <div class="well">
-      <div class="figure" id="figure">
-        <canvas id="view" tabindex="0" aria-label="3D anatomy. Drag to rotate 360 degrees, pinch or scroll to zoom. Arrow keys rotate; plus and minus zoom; Home resets."></canvas>
-        <p class="load" id="load" role="status">Preparing the anatomy model…</p>
-        <img class="face" src="anatomy-body.png" alt="">
-        <img class="back" src="anatomy-body.png" alt="" aria-hidden="true">
-        <div class="scan" aria-hidden="true"></div>
-      </div>
-      <p class="pickname" id="pickname">Select an organ to explore its modules</p>
-    </div>
-  </div>
-  <aside class="scan-panel scan-left" aria-label="Anatomical reference scans">
-    <section><img class="scan-art cranial" src="assets/cranial-scan.webp" alt="Cranial scan illustration from the supplied reference"></section>
-    <section><h2>Lower body skeletal diagnostic</h2><img class="scan-art skeletal" src="assets/skeletal-scan.webp" alt="Skeletal anatomy reference illustration"></section>
-    <section><h2>Renal function &nbsp; · &nbsp; Lymphatic system</h2><img class="scan-art system-art" src="assets/system-scans.webp" alt="Renal and lymphatic system reference illustrations"></section>
-  </aside>
-  <aside class="scan-panel scan-right" aria-label="Anatomy scan controls">
-    <section><h2>Anatomical scan</h2><small>Complete anatomy · structural overview</small><div class="scan-histogram" aria-hidden="true"><i style="--bar:9%"></i><i style="--bar:15%"></i><i style="--bar:23%"></i><i style="--bar:17%"></i><i style="--bar:38%"></i><i style="--bar:26%"></i><i style="--bar:53%"></i><i style="--bar:87%"></i><i style="--bar:43%"></i><i style="--bar:35%"></i><i style="--bar:26%"></i><i style="--bar:49%"></i><i style="--bar:34%"></i><i style="--bar:57%"></i><i style="--bar:42%"></i><i style="--bar:66%"></i><i style="--bar:49%"></i><i style="--bar:71%"></i><i style="--bar:58%"></i><i style="--bar:91%"></i><i style="--bar:74%"></i><i style="--bar:61%"></i><i style="--bar:79%"></i><i style="--bar:49%"></i><i style="--bar:35%"></i><i style="--bar:57%"></i><i style="--bar:42%"></i><i style="--bar:24%"></i><i style="--bar:33%"></i><i style="--bar:19%"></i><i style="--bar:12%"></i></div><div class="scan-scale" aria-hidden="true"><span>01 · 02 · 03 · 04</span><span>SYSTEM ANALYSIS</span></div></section>
-    <section class="system-panel"><nav class="organ-nav" aria-label="Select an organ">
-    <h2>System view</h2>
-    <button type="button" data-organ="brain" style="--dot:#d8b2b2">Brain</button>
-    <button type="button" data-organ="thyroid" style="--dot:#d69357">Thyroid</button>
-    <button type="button" data-organ="lungs" style="--dot:#d38b9a">Lungs</button>
-    <button type="button" data-organ="heart" style="--dot:#ac3544">Heart</button>
-    <button type="button" data-organ="liver" style="--dot:#8c4243">Liver</button>
-    <button type="button" data-organ="stomach" style="--dot:#d8a286">Stomach</button>
-    <button type="button" data-organ="spleen" style="--dot:#905982">Spleen</button>
-    <button type="button" data-organ="bowel" style="--dot:#d39a87">Intestines</button>
-    <button type="button" data-organ="kidneys" style="--dot:#9c4d45">Kidneys</button>
-    <button type="button" data-organ="multi">Whole patient</button>
-  </nav></section>
-    <section><h2 id="rotation-status">360° rotation in progress</h2><div class="rotation-readout"><span>ANATOMICAL POSITION<br>DRAG TO EXPLORE</span><b>360°</b></div></section>
-    <section><h2>Physiology data</h2><div class="physiology" aria-hidden="true"><span class="scan-gauge">3D</span><span class="scan-gauge">SCAN</span><svg class="scan-wave" viewBox="0 0 160 42"><path d="M0 31 8 30 13 19 18 24 23 17 30 26 36 25 39 30 45 17 50 20 55 12 60 22 64 17 70 23 76 21 81 8 85 6 90 21 95 19 100 29 106 24 111 27 116 21 122 23 127 14 132 5 138 17 143 14 148 25 160 26"/></svg></div></section>
-    <section><h2>Foot vascularity map</h2><img class="foot-art" src="assets/foot-scan.webp" alt="Foot vascular anatomy reference illustration"></section>
-  </aside>
-  <div class="scan-bottom" aria-hidden="true"><span>Human atlas / interactive anatomy</span><span>Structural visualization · select an organ to enter</span></div>
-  <nav class="viewer-controls" aria-label="Rotate the anatomy model">
-    <button type="button" data-view="front">Front</button>
-    <button type="button" data-view="back">Back</button>
-    <button type="button" data-view="auto" aria-pressed="true">Pause rotation</button>
-    <button type="button" data-view="reset">Reset view</button>
-  </nav>
+  <footer class="explorer-footer"><span id="model-credit">Loading the locally bundled anatomical reference…</span><details class="model-credits"><summary>Model credits &amp; dependencies</summary><div><strong>Real anatomical GLB assets</strong><p>Human Reference Atlas, United Male v1.5 — Kristen Browne &amp; Heidi Schlehlein / HuBMAP, CC BY 4.0. Stomach: BodyParts3D © DBCLS, CC BY 4.0, registered into this reference assembly.</p><p>Geometry is simplified and display colors are applied. This is an educational reference assembly, not a patient-specific scan.</p><p>Three.js r170, GLTFLoader and OrbitControls (MIT) are bundled locally. Optional Google Fonts is the only visual CDN dependency.</p><a href="models/anatomy/ATTRIBUTION.md" target="_blank" rel="noopener">Full sources, licenses &amp; adaptation notes ↗</a></div></details></footer>
 </main>
+
 <section class="room" id="room"></section>
 <section class="results" id="results"></section>
 <script>
@@ -527,7 +506,7 @@ function tick(now){
   if(!lastTick) lastTick = now;
   const dt = Math.min(0.05, (now-lastTick)/1000);
   lastTick = now;
-  if(window.body3d) return;
+  if(window.anatomyManaged) return;
   if(spinning && !current){
     angle = (angle + dt * 28) % 360;
     applyTurn();
@@ -541,6 +520,12 @@ function esc(s){
     return {"&":"&"+"amp;","<":"&"+"lt;",">":"&"+"gt;",'"':"&"+"quot;","'":"&"+"#39;"}[c];
   });
 }
+for (const extra of [
+  {id:"spinal",name:"Spinal cord",room:"Neurology",line:"Examine spinal-cord anatomy. Dedicated spinal-cord cases are not available yet.",learn:[],practice:[],soon:"A dedicated spinal-cord simulator is not available yet."},
+  {id:"pancreas",name:"Pancreas",room:"Gastrointestinal",line:"Pancreatic anatomy and acute pancreatitis.",learn:ORGANS.find(o=>o.id==="bowel").learn,practice:[],soon:"A dedicated pancreatic practice arena is not available yet."},
+  {id:"bladder",name:"Bladder",room:"Urinary",line:"Urinary bladder anatomy.",learn:[],practice:[],soon:"A dedicated bladder simulator is not available yet."},
+  {id:"vessels",name:"Major blood vessels",room:"Cardiovascular",line:"Systemic circulation and hemodynamic assessment.",learn:ORGANS.find(o=>o.id==="heart").learn,practice:ORGANS.find(o=>o.id==="heart").practice}
+]) ORGANS.push({...extra,spots:[{x:50,y:50}]});
 function organById(id){ return ORGANS.find(function(item){ return item.id===id; }); }
 function rowsOf(list){
   return list.map(function(row){
@@ -770,10 +755,10 @@ function faceFront(){
 }
 figure.addEventListener("click", function(event){
   event.preventDefault();
-  if(!window.body3d) chooseOrgan(event.target);
+  if(!window.anatomyManaged) chooseOrgan(event.target);
 });
 document.querySelector(".atlas").addEventListener("pointerdown", function(event){
-  if(window.body3d) return;
+  if(window.anatomyManaged) return;
   if(current || event.target.closest("input, a, button")) return;
   if(spinning){ faceFront(); return; }
   drag = event.clientX;
@@ -1120,7 +1105,7 @@ const pen = dust.getContext("2d");
 const specks = [];
 for(let n=0;n<36;n++) specks.push({x:Math.random(), y:Math.random(), v:0.15+Math.random()*0.35, s:0.6+Math.random()*1.4});
 function drawDust(){
-  if(reduced || document.body.classList.contains("in")) return;
+  if(window.anatomyManaged || reduced || document.body.classList.contains("in")) return;
   const w = window.innerWidth;
   const h = window.innerHeight;
   if(dust.width!==w || dust.height!==h){ dust.width = w; dust.height = h; }
@@ -1136,7 +1121,7 @@ function drawDust(){
   requestAnimationFrame(drawDust);
 }
 document.querySelector(".atlas").addEventListener("pointermove", function(){});
-paint();
+if(!window.anatomyManaged) paint();
 figure.addEventListener("pointerover", function(event){
   if(event.pointerType==="touch" || current) return;
   const btn = event.target.closest(".hot");
@@ -1146,6 +1131,16 @@ figure.addEventListener("pointerover", function(event){
 });
 function startShow(){}
 window.enterOrgan = enter;
+window.openAnatomyPortal = function(id, which){
+  if(current || !organById(id) || !["lab","arena"].includes(which)) return;
+  current = id; part = "all"; inside = which;
+  finishIntro(); setSpin(false); bootSound();
+  speak(which==="lab" ? "Welcome to Learning Lab." : "Welcome to Practice Arena.");
+  surge(0.35);
+  document.body.classList.add("in","enter","inside",which);
+  renderRoom();
+  document.getElementById("back").focus({preventScroll:true});
+};
 document.querySelectorAll("[data-organ]").forEach(function(button){
   button.addEventListener("pointerenter", function(){
     if(window.hoverOrgan) window.hoverOrgan(button.getAttribute("data-organ"));
@@ -1158,14 +1153,15 @@ document.querySelectorAll("[data-organ]").forEach(function(button){
 });
 startShow();
 setTimeout(function(){
-  if(!window.body3d && !document.body.classList.contains("flat")){
-    document.body.classList.add("flat");
-    document.getElementById("load").textContent = "3D could not load. Choose an organ below to open its modules.";
-    document.querySelectorAll("[data-view]").forEach(function(b){ b.disabled = true; });
+  if(!window.__anatomyBoot){
+    document.getElementById("load-title").textContent = "The 3D library could not load";
+    document.getElementById("load").textContent = "Serve the complete site over HTTP(S), including vendor/three/. Reload to retry. No substitute body is shown.";
+    document.getElementById("model-progress").hidden = true;
+    document.getElementById("asset-status").textContent = "LIBRARY UNAVAILABLE";
   }
-}, 10000);
+}, 12000);
 if(!reduced) requestAnimationFrame(drawDust);
 </script>
-<script type="module" src="body3d.js?v=20261016f"></script>
+<script type="module" src="body3d.js?v=hra1"></script>
 </body>
 </html>
