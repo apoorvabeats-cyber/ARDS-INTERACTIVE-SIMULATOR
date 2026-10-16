@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111a">
+<title>Neuroanatomy Learning Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520&family=Figtree:wght@460;600&display=swap" rel="stylesheet">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+<style>
+:root{--bg:#07111a;--fg:#e7f1f4;--muted:#93a8b3;--line:rgba(127,212,230,.28);--cyan:#7fd4e6;--green:#3ee0a0;--warm:#e2b48a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:Figtree,sans-serif}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+#view{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+a.back{position:fixed;top:10px;left:10px;z-index:5;color:var(--muted);text-decoration:none;min-height:40px;display:flex;align-items:center}
+.bar{position:fixed;z-index:4;left:0;right:0;display:flex;gap:6px;overflow:auto;padding:0 10px 6px;-webkit-overflow-scrolling:touch}
+.bar.mods{top:48px}
+.bar.layers{top:92px}
+.bar button,.dock button{flex:0 0 auto;border:1px solid var(--line);background:rgba(7,17,26,.72);color:var(--fg);border-radius:999px;min-height:36px;padding:0 12px}
+.bar button.on,.dock button.on{border-color:var(--green);color:var(--green)}
+.dock{position:fixed;z-index:4;left:0;right:0;bottom:0;display:flex;gap:6px;overflow:auto;padding:8px 10px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(transparent,rgba(7,17,26,.92) 30%)}
+.sheet{position:fixed;z-index:6;left:0;right:0;bottom:0;max-height:min(52dvh,520px);overflow:auto;background:rgba(8,16,24,.94);border-top:1px solid var(--line);padding:14px 16px calc(16px + env(safe-area-inset-bottom));transform:translateY(110%);transition:transform .35s ease}
+.sheet.open{transform:none}
+.sheet h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:28px;margin:0 0 4px;letter-spacing:-.03em}
+.kicker{margin:0;color:var(--cyan);letter-spacing:.14em;text-transform:uppercase;font-size:11px}
+.sheet p{margin:8px 0;line-height:1.45;color:#d5e3ea}
+.sheet h3{margin:14px 0 4px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm)}
+.close{position:absolute;top:8px;right:8px;border:0;background:transparent;color:var(--muted);min-width:44px;min-height:44px}
+.choices{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.choices button{text-align:left;border:1px solid var(--line);background:transparent;border-radius:12px;padding:10px 12px;min-height:44px}
+.choices button.good{border-color:var(--green);color:var(--green)}
+.choices button.bad{border-color:#e07a7a;color:#e07a7a}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.row button,button.go{border:1px solid var(--line);background:transparent;border-radius:999px;min-height:40px;padding:0 14px}
+.load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:7;background:var(--bg);text-align:center;padding:24px}
+.load.gone{display:none}
+.note{color:var(--muted);font-size:13px}
+.list button{display:block;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid rgba(127,212,230,.12);padding:10px 0;min-height:44px}
+input.find{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);padding:8px 0;margin:8px 0}
+.score{font-variant-numeric:tabular-nums;color:var(--green)}
+@media(min-width:900px){
+  .sheet{left:auto;top:0;width:min(420px,38vw);max-height:none;height:100%;border-top:0;border-left:1px solid var(--line)}
+  .dock{right:min(420px,38vw)}
+}
+@media(prefers-reduced-motion:reduce){.sheet{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="Three dimensional brain. Drag to turn, pinch to zoom, tap a structure."></canvas>
+<a class="back" href="hub.html">Brain</a>
+<div class="bar mods" id="mods" role="tablist" aria-label="Anatomy modules"></div>
+<div class="bar layers" id="layers" aria-label="Layer visibility"></div>
+<div class="dock" id="dock"></div>
+<section class="sheet" id="sheet" aria-live="polite"></section>
+<div class="load" id="load"><div><p>Opening the brain atlas…</p><p class="note" id="loadmsg"></p></div></div>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const MODULES = [
+  {id:"cortex", title:"Hemispheres", cats:["cortex"], text:"Gyri and sulci from the atlas. Functional names such as Broca or Wernicke are used only where a card says which mesh they correspond to."},
+  {id:"deep", title:"Deep nuclei", cats:["deep_grey","white_matter","diencephalon"], text:"Basal ganglia, diencephalon and commissures that exist as meshes. The internal capsule is not a separate mesh."},
+  {id:"stem", title:"Brainstem", cats:["brainstem","cranial_nerves","cerebellum"], text:"Midbrain, pons, medulla, the cranial nerves present in the model, and the cerebellum."},
+  {id:"csf", title:"Ventricles", cats:["ventricles","meninges_dura"], text:"Ventricles, choroid plexus, aqueduct, falx and tentorium. Arachnoid granulations are not a mesh."},
+  {id:"tracts", title:"Tracts", cats:["tracts"], text:"This atlas has no spinal cord mesh. The pathways below are the ones that were built. The spinothalamic tract is not among them."},
+  {id:"vessels", title:"Vessels", cats:["arteries","veins_sinuses"], text:"Arterial segments of the circle of Willis and the dural sinuses included in the model."},
+  {id:"paths", title:"Pathways", cats:["cortex","tracts","white_matter","diencephalon","cranial_nerves","ventricles","veins_sinuses"], text:"Step through a pathway. Each step isolates meshes that are actually in the atlas."},
+  {id:"sections", title:"Sections", cats:["cortex","ventricles","white_matter","brainstem","deep_grey","arteries"], text:"Axial, coronal and sagittal planes cut the 3D atlas. They are not CT or MRI slices. No DICOM volume is bundled, so there is no window or level control."},
+  {id:"pressure", title:"Pressure", cats:["meninges_dura","cerebellum","cranial_nerves","brainstem"], text:"Herniation is taught on the tentorium, the falx, the cerebellar tonsil and the oculomotor nerve. The uncus is not a named mesh."},
+  {id:"cases", title:"Localize", cats:["cortex","arteries","tracts","brainstem","cerebellum","meninges_dura","cranial_nerves"], text:"Choose the site before the answer is shown. Hints lower the score."}
+];
+
+const CARDS = {
+  "Precentral gyrus": {
+    functions:"Primary motor cortex. The leg is medial, over the paracentral lobule. Face and arm are on the lateral convexity.",
+    afferent:"Ventrolateral thalamus, primary somatosensory cortex and premotor cortex.",
+    efferent:"Corticospinal and corticobulbar fibres leave this cortex.",
+    supply:"Middle cerebral artery on the lateral surface. Anterior cerebral artery for the paracentral leg area.",
+    clinical:"Face and arm weakness with a spared leg points to the lateral motor cortex, not the paracentral leg area.",
+    deficits:"Contralateral upper-motor-neuron weakness, largest in the face and arm when the lateral gyrus is injured.",
+    imaging:"On MRI it is the gyrus immediately in front of the central sulcus. This lab has no scan stack.",
+    case:"mca",
+    quiz:{q:"Right face and arm are weak, the leg is strong. Which territory supplies that cortex?", choices:["Left middle cerebral artery","Left anterior cerebral artery","Left posterior cerebral artery"], answer:0, why:"Lateral motor cortex is middle-cerebral territory. The leg cortex is anterior-cerebral."}
+  },
+  "Paracentral gyrus and sulcus": {
+    functions:"Medial continuation of motor and sensory cortex for the distal lower limb.",
+    afferent:"Thalamic sensory relays and the lateral sensorimotor cortex.",
+    efferent:"Corticospinal fibres for the leg.",
+    supply:"Anterior cerebral artery, including callosomarginal branches.",
+    clinical:"Anterior cerebral infarction weakens the contralateral leg more than the arm.",
+    deficits:"Contralateral leg weakness and sensory loss. Urinary urgency can occur with bilateral medial injury.",
+    imaging:"The paracentral lobule sits on the medial face, beside the falx. No scan is loaded here.",
+    case:"aca"
+  },
+  "Opercular part of inferior frontal gyrus": {
+    functions:"In the dominant hemisphere this opercular cortex is part of Broca's area, with the triangular part.",
+    afferent:"Posterior language cortex via the arcuate fasciculus, and premotor cortex.",
+    efferent:"Premotor and motor cortex for speech articulation.",
+    supply:"Superior division of the middle cerebral artery.",
+    clinical:"Non-fluent speech with preserved comprehension is the bedside picture.",
+    deficits:"Non-fluent aphasia when the dominant operculum is injured. The opposite face may be weak.",
+    imaging:"The operculum covers the insula. On CT an early MCA infarct can efface it. No scan is loaded.",
+    case:"mca"
+  },
+  "Triangular part of inferior frontal gyrus": {
+    functions:"Anterior part of Broca's area in the dominant hemisphere.",
+    afferent:"Prefrontal cortex and the arcuate fasciculus.",
+    efferent:"Opercular cortex and premotor cortex.",
+    supply:"Superior division of the middle cerebral artery.",
+    clinical:"Injured together with the opercular part in superior-division infarcts.",
+    deficits:"Non-fluent aphasia. A pure triangular lesion is less complete than an opercular one.",
+    imaging:"Inferior frontal gyrus, anterior to the operculum, on axial CT and MRI.",
+    case:"mca"
+  },
+  "Postcentral gyrus": {
+    functions:"Primary somatosensory cortex. The sensory homunculus matches the motor one.",
+    afferent:"Thalamic ventral posterior relay for discriminative touch and proprioception.",
+    efferent:"Motor cortex, posterior parietal cortex and descending sensory modulation.",
+    supply:"Middle cerebral artery laterally. Anterior cerebral artery medially.",
+    clinical:"Cortical sensory loss is not a length-dependent neuropathy. Stereognosis fails before crude touch.",
+    deficits:"Contralateral loss of discriminative touch, proprioception and stereognosis.",
+    imaging:"The gyrus immediately behind the central sulcus.",
+    case:"mca"
+  },
+  "Calcarine sulcus": {
+    functions:"Primary visual cortex lies in the banks of this sulcus. This mesh is the sulcus, not a separate macular-cortex object.",
+    afferent:"Optic radiations from the lateral geniculate nucleus.",
+    efferent:"Extrastriate occipital cortex.",
+    supply:"Posterior cerebral artery. The occipital pole can be middle-cerebral, which is why central vision is sometimes spared.",
+    clinical:"A posterior cerebral infarct causes a contralateral homonymous field defect with little weakness.",
+    deficits:"Contralateral homonymous hemianopia.",
+    imaging:"On axial MRI the sulcus is the deep medial occipital crease. No scan stack is bundled.",
+    case:"pca"
+  },
+  "Hippocampus": {
+    functions:"Episodic memory formation and a relay in the Papez circuit.",
+    afferent:"Entorhinal cortex, septum and contralateral hippocampus through the commissure.",
+    efferent:"Fornix to the mammillary bodies, and entorhinal cortex.",
+    supply:"Posterior cerebral artery and anterior choroidal artery.",
+    clinical:"Both hippocampi must be injured to cause a lasting amnestic state. One side is often compensated.",
+    deficits:"Bilateral injury: anterograde amnesia. Unilateral injury: a milder, material-specific memory change.",
+    imaging:"The hippocampus is in the medial temporal lobe, beside the temporal horn. Bright on T2 when it is seizing or swollen.",
+    case:"pca"
+  },
+  "Caudate nucleus": {
+    functions:"Dorsal striatum. It participates in the selection of movement and in cognitive loops.",
+    afferent:"Cortex, substantia nigra pars compacta and thalamus.",
+    efferent:"Globus pallidus and substantia nigra pars reticulata.",
+    supply:"Lateral lenticulostriate branches of the middle cerebral artery, and recurrent artery of Heubner from the anterior cerebral artery for the anterior head.",
+    clinical:"A small deep infarct here is a lacunar syndrome, not a cortical one. Aphasia and hemianopia are absent.",
+    deficits:"Contralateral weakness or behavioural change, depending on the part of the head or body involved.",
+    imaging:"The caudate indents the lateral wall of the frontal horn. It is grey on CT, beside dark CSF.",
+    case:"capsule"
+  },
+  "Putamen": {
+    functions:"Dorsal striatum with the caudate, mainly the motor loop.",
+    afferent:"Motor and somatosensory cortex, and nigral dopamine.",
+    efferent:"Globus pallidus external and internal, and substantia nigra.",
+    supply:"Lenticulostriate arteries from the M1 segment.",
+    clinical:"Hypertensive haemorrhage often starts here. The patient is weak on the opposite side and drowsy if the clot is large.",
+    deficits:"Contralateral hemiparesis. Cortical signs are absent unless the haemorrhage breaks out.",
+    imaging:"Lateral to the internal capsule on axial CT. Acute blood is bright on non-contrast CT. No scan is loaded.",
+    case:"capsule"
+  },
+  "Globus pallidus internal": {
+    functions:"Output nucleus of the dorsal basal ganglia. It inhibits the thalamus.",
+    afferent:"Striatum and subthalamic nucleus.",
+    efferent:"Thalamus and brainstem.",
+    supply:"Anterior choroidal artery and lenticulostriate perforators.",
+    clinical:"The teaching point is the direct pathway leaving the basal ganglia, not a single clinical stroke syndrome.",
+    deficits:"Injury can cause contralateral dystonia or a hemiballistic picture when the neighbouring subthalamic nucleus is involved.",
+    imaging:"Medial to the external pallidum, lateral to the internal capsule, on axial MRI."
+  },
+  "Subthalamic nucleus": {
+    functions:"Drives the internal pallidum. It is the excitatory station of the indirect pathway.",
+    afferent:"Cortical and external pallidal fibres.",
+    efferent:"Internal pallidum and substantia nigra.",
+    supply:"Posterior cerebral and posterior communicating perforators.",
+    clinical:"A small stroke here causes violent flinging of the opposite limbs.",
+    deficits:"Contralateral hemiballismus.",
+    imaging:"A small lens under the thalamus on axial MRI. The atlas mesh is an imaging registration, about 7 mm, not a surgical target."
+  },
+  "Substantia nigra": {
+    functions:"Pars compacta supplies dopamine to the striatum. Pars reticulata is an output nucleus.",
+    afferent:"Striatum and subthalamic nucleus.",
+    efferent:"Striatum, thalamus and superior colliculus.",
+    supply:"Paramedian perforators of the basilar and posterior cerebral arteries.",
+    clinical:"This is the pigmented nucleus lost in Parkinson disease. An acute midbrain stroke is a different illness.",
+    deficits:"Parkinsonism is bilateral and chronic. An acute unilateral midbrain infarct causes a crossed motor syndrome, not isolated tremor.",
+    imaging:"On axial MRI the nigra sits in front of the red nucleus, in the cerebral peduncle."
+  },
+  "Corticospinal tract": {
+    functions:"Voluntary skilled movement from cortex to spinal motor neurons.",
+    afferent:"Precentral gyrus and premotor cortex.",
+    efferent:"Most fibres cross in the pyramidal decussation and enter the lateral cord.",
+    supply:"The supplying arteries change along the tract: lenticulostriates in the capsule, basilar paramedian branches in the pons, anterior spinal artery at the pyramid.",
+    clinical:"The posterior limb of the internal capsule is the classic site of a pure motor stroke. That capsule is not a separate mesh. This tract is the fibre bundle the capsule carries.",
+    deficits:"Contralateral upper-motor-neuron weakness of face, arm and leg when the capsule or the tract above the decussation is hit.",
+    imaging:"The tract is not seen as a line on routine CT. On MRI diffusion restriction in the capsule is the usual correlate. No scan is loaded.",
+    case:"capsule"
+  },
+  "Medial lemniscus": {
+    functions:"Discriminative touch, vibration and proprioception from the opposite side of the body, after the sensory decussation.",
+    afferent:"Nucleus gracilis and nucleus cuneatus.",
+    efferent:"Ventral posterolateral thalamus, then postcentral gyrus.",
+    supply:"Paramedian perforators of the vertebral and basilar arteries.",
+    clinical:"The posterior columns themselves are in the spinal cord, which is not in this atlas. The lemniscus is their brainstem continuation.",
+    deficits:"Loss of vibration and position sense on the opposite side of the body.",
+    imaging:"A thin ribbon in the medial medulla and pons. It is not resolved on clinical CT."
+  },
+  "Optic radiation": {
+    functions:"Geniculocalcarine fibres. The lower loop swings into the temporal lobe. The upper fibres pass through the parietal lobe.",
+    afferent:"Lateral geniculate nucleus.",
+    efferent:"Calcarine cortex.",
+    supply:"Middle cerebral artery for the parietal and temporal portions. Posterior cerebral artery at the occipital end.",
+    clinical:"A temporal lesion cuts the lower loop and raises the opposite upper field.",
+    deficits:"Contralateral homonymous quadrantanopia, or hemianopia if both loops are cut.",
+    imaging:"The radiation is white matter of the occipital and temporal lobes on MRI. No volume is bundled."
+  },
+  "Arcuate fasciculus": {
+    functions:"Association fibres between frontal and posterior temporal language cortex.",
+    afferent:"Posterior superior temporal and parietal cortex.",
+    efferent:"Inferior frontal gyrus.",
+    supply:"Middle cerebral artery territory.",
+    clinical:"Conduction aphasia repeats poorly, while comprehension and fluency are relatively spared.",
+    deficits:"Impaired repetition.",
+    imaging:"A white-matter bundle above the insula on diffusion tractography. This mesh is a population template, not this patient's tract."
+  },
+  "Corpus callosum": {
+    functions:"The largest commissure. It connects homologous cortex of the two hemispheres.",
+    afferent:"Cortical neurons of both hemispheres.",
+    efferent:"The opposite hemisphere.",
+    supply:"Anterior cerebral artery, through the pericallosal artery.",
+    clinical:"An anterior cerebral infarct can involve the genu. A butterfly glioma crosses it. Neither is modelled as a lesion here.",
+    deficits:"Disconnection signs, such as inability of one hand to name an object felt by the other, after surgical section.",
+    imaging:"The bright arch above the lateral ventricles on sagittal T1. No scan is loaded."
+  },
+  "Fornix": {
+    functions:"The output of the hippocampus toward the mammillary bodies.",
+    afferent:"Hippocampus.",
+    efferent:"Mammillary body, then anterior thalamus.",
+    supply:"Anterior cerebral and anterior choroidal branches.",
+    clinical:"Part of the memory circuit, together with the hippocampus.",
+    deficits:"Memory impairment when both fornices are injured.",
+    imaging:"Thin arches under the corpus callosum on sagittal MRI."
+  },
+  "Midbrain": {
+    functions:"Vertical gaze, the oculomotor and trochlear nuclei, the cerebral peduncles and the reticular activating system at this level.",
+    afferent:"Corticospinal fibres in the peduncle, and cerebellar output through the superior cerebellar peduncle.",
+    efferent:"Oculomotor nerve and descending motor fibres.",
+    supply:"Basilar tip and posterior cerebral perforators. The posterior cerebral artery itself continues to the occiput.",
+    clinical:"A medial midbrain infarct hits the oculomotor nerve and the cerebral peduncle together.",
+    deficits:"Ipsilateral eye down and out, with contralateral arm and leg weakness. This is Weber syndrome.",
+    imaging:"The midbrain is the small round slice with a Mickey-mouse shape on axial MRI, cerebral peduncles forward. No scan is loaded.",
+    case:"weber"
+  },
+  "Pons": {
+    functions:"Horizontal gaze, facial movement, and a large crossing of cerebellar fibres.",
+    afferent:"Corticospinal fibres still uncrossed, and middle cerebellar peduncle.",
+    efferent:"Trigeminal, abducens, facial and vestibulocochlear nerves leave near this level.",
+    supply:"Basilar paramedian and circumferential branches, including AICA laterally.",
+    clinical:"A medial pontine stroke is a crossed syndrome. A locked-in state needs the basis pontis on both sides.",
+    deficits:"Ipsilateral face or gaze palsy with contralateral body weakness.",
+    imaging:"The pons is the bulky anterior brainstem on sagittal MRI, with the belly of the basilar artery in front."
+  },
+  "Medulla oblongata": {
+    functions:"Respiration, swallowing, and the caudal nuclei of the lower cranial nerves.",
+    afferent:"Pyramids in front, olives lateral, sensory nuclei behind.",
+    efferent:"Hypoglossal, vagus, glossopharyngeal and accessory roots.",
+    supply:"Anterior spinal and vertebral paramedian branches medially. Posterior inferior cerebellar artery laterally.",
+    clinical:"Lateral medullary infarction is a vessel syndrome, not a hemispheric one. Weakness of the limbs is usually absent.",
+    deficits:"Lateral: vertigo, ipsilateral facial sensory loss, contralateral body pain loss, hoarseness and Horner syndrome.",
+    imaging:"The medulla is the tail of the brainstem at the foramen magnum on sagittal MRI.",
+    case:"pica"
+  },
+  "Pyramid of medulla oblongata": {
+    functions:"Corticospinal fibres on the ventral medulla, before most of them cross.",
+    afferent:"Corticospinal tract.",
+    efferent:"Lateral corticospinal tract of the opposite cord after the decussation. The cord is not in this atlas.",
+    supply:"Anterior spinal artery.",
+    clinical:"A medial medullary infarct includes the pyramid and the medial lemniscus.",
+    deficits:"Contralateral arm and leg weakness, often with loss of vibration on the same side, and ipsilateral tongue weakness.",
+    imaging:"The ventral medulla, beside the midline, on axial MRI."
+  },
+  "Oculomotor nerve (III)": {
+    functions:"Most extraocular muscles, the pupil and the lid.",
+    afferent:"Oculomotor nucleus and Edinger-Westphal nucleus in the midbrain.",
+    efferent:"Medial, superior and inferior recti, inferior oblique and levator. Parasympathetic fibres constrict the pupil.",
+    supply:"The nerve fascicle is in posterior-cerebral perforator territory. The peripheral nerve runs beside the posterior communicating artery.",
+    clinical:"A new dilated pupil with a down-and-out eye is a compressive emergency until proved otherwise.",
+    deficits:"Ptosis, eye down and out, pupil dilated if the superficial pupillary fibres are compressed.",
+    imaging:"The nerve leaves the interpeduncular fossa. A posterior communicating aneurysm is the vessel to look for. No angiogram is loaded.",
+    case:"uncal"
+  },
+  "Posterior inferior cerebellar artery": {
+    functions:"Not a brain function. This artery supplies the lateral medulla and the inferior cerebellum.",
+    afferent:"Vertebral artery.",
+    efferent:"Lateral medulla, inferior cerebellar hemisphere and choroid of the fourth ventricle.",
+    supply:"Itself a branch of the vertebral artery.",
+    clinical:"Occlusion is the usual arterial cause of lateral medullary syndrome.",
+    deficits:"Vertigo, ipsilateral face and contralateral body pain loss, dysphagia, hoarseness, Horner syndrome, ipsilateral ataxia.",
+    imaging:"The infarct is lateral in the medulla on diffusion MRI, and may include the inferior cerebellum. No scan is loaded.",
+    case:"pica"
+  },
+  "Middle cerebral artery (M1-segment)": {
+    functions:"The stem artery of the lateral hemisphere, before the bifurcation.",
+    afferent:"Internal carotid artery.",
+    efferent:"Superior and inferior divisions, and lenticulostriate perforators.",
+    supply:"Lateral frontal, parietal and temporal cortex, and the basal ganglia through perforators.",
+    clinical:"Stem occlusion threatens arm, face, language and the deep nuclei together.",
+    deficits:"Contralateral hemiparesis, hemianesthesia, hemianopia and aphasia or neglect, depending on the hemisphere and how much is saved.",
+    imaging:"The hyperdense MCA sign on non-contrast CT is the clot in this segment. No scan is loaded.",
+    case:"mca"
+  },
+  "Anterior cerebral artery": {
+    functions:"The artery of the medial frontal lobe and the paracentral lobule.",
+    afferent:"Internal carotid artery, joined to its twin by the anterior communicating artery.",
+    efferent:"Callosomarginal and pericallosal branches.",
+    supply:"Medial hemisphere, corpus callosum and a strip of hemisphere over the top.",
+    clinical:"Leg weakness greater than arm weakness is the bedside clue.",
+    deficits:"Contralateral leg-predominant weakness. Bilateral infarction causes an akinetic, mute picture.",
+    imaging:"The artery runs in the interhemispheric fissure. No angiogram is loaded.",
+    case:"aca"
+  },
+  "Posterior cerebral artery": {
+    functions:"The artery of the occiput, medial temporal lobe and much of the thalamus.",
+    afferent:"Basilar tip. A fetal origin from the carotid is a known variant and is not a separate mesh.",
+    efferent:"Calcarine and temporal branches, and thalamic perforators.",
+    supply:"Occipital lobe, medial temporal lobe, thalamus and midbrain.",
+    clinical:"Field loss without much weakness is the usual cortical picture.",
+    deficits:"Contralateral homonymous hemianopia. Thalamic pain or memory loss if the perforators are included.",
+    imaging:"The P1 segment crosses the tentorial edge. No scan is loaded.",
+    case:"pca"
+  },
+  "Tentorium cerebelli": {
+    functions:"A dural fold, not neural tissue. It is the roof of the posterior fossa.",
+    afferent:"Attached to the petrous ridges and the falx.",
+    efferent:"None. It forms the opening the midbrain passes through.",
+    supply:"Dural branches of the carotid and vertebral arteries. Not a clinically useful stroke territory.",
+    clinical:"The medial temporal lobe is forced across this edge in uncal herniation. The oculomotor nerve is compressed there.",
+    deficits:"An enlarging ipsilateral pupil, then a down-and-out eye, then contralateral weakness as the peduncle is crushed.",
+    imaging:"The tentorium is the bright sheet on coronal post-contrast MRI. No scan is loaded.",
+    case:"uncal"
+  },
+  "Falx cerebri": {
+    functions:"The dural sheet between the cerebral hemispheres. The superior and inferior sagittal sinuses run in its edges.",
+    afferent:"Crista galli to the tentorium.",
+    efferent:"None.",
+    supply:"Dural arteries.",
+    clinical:"Subfalcine shift carries the cingulate gyrus under this sheet and can trap the anterior cerebral artery.",
+    deficits:"Leg weakness from anterior cerebral compression, added to the original hemispheric signs.",
+    imaging:"The midline sheet on coronal CT. Shift is measured from it."
+  },
+  "Tonsil of cerebellum": {
+    functions:"A cerebellar lobule on the inferior surface, beside the medulla.",
+    afferent:"Inferior cerebellar peduncle.",
+    efferent:"Cerebellar nuclei, not a separate mesh for each nucleus.",
+    supply:"Posterior inferior cerebellar artery.",
+    clinical:"Raised pressure in the posterior fossa drives the tonsil through the foramen magnum.",
+    deficits:"Neck stiffness, hypertension, bradycardia and apnea. This is tonsillar herniation.",
+    imaging:"Low cerebellar tissue behind the medulla on sagittal MRI. Descent through the foramen is the sign. No scan is loaded.",
+    case:"tonsil"
+  },
+  "Lateral ventricle": {
+    functions:"A CSF space, not grey matter. It has frontal, temporal and occipital horns.",
+    afferent:"Choroid plexus secretes CSF into it.",
+    efferent:"Foramen of Monro into the third ventricle. That foramen is not a separate mesh.",
+    supply:"Anterior and posterior choroidal arteries supply the plexus, not the ventricle as tissue.",
+    clinical:"Hydrocephalus enlarges it. A trapped temporal horn is a local mass effect.",
+    deficits:"The deficit is from the cause, or from raised pressure, not from the ventricle itself.",
+    imaging:"Dark on CT, bright on T2 MRI. This lab does not load those slices.",
+    case:"pressure"
+  },
+  "Fourth ventricle": {
+    functions:"The CSF space between the brainstem and the cerebellum.",
+    afferent:"Aqueduct of the midbrain.",
+    efferent:"Foramina of Luschka and Magendie into the subarachnoid space. Those foramina are not separate meshes.",
+    supply:"Choroidal branches of the posterior inferior cerebellar artery.",
+    clinical:"Blood or a swollen cerebellum can block it and cause acute hydrocephalus.",
+    deficits:"Headache, vomiting, falling consciousness, and the signs of the underlying posterior fossa lesion.",
+    imaging:"A diamond of CSF in front of the cerebellum on axial MRI."
+  },
+  "Aqueduct of midbrain": {
+    functions:"The narrow CSF channel through the midbrain, from the third ventricle to the fourth.",
+    afferent:"Third ventricle.",
+    efferent:"Fourth ventricle.",
+    supply:"Not an arterial territory.",
+    clinical:"Stenosis here causes enlargement of the lateral and third ventricles with a normal fourth.",
+    deficits:"Headache and the signs of raised pressure. Upgaze can fail from pressure on the tectum.",
+    imaging:"A thin dark line through the midbrain on sagittal T2. No scan is loaded."
+  }
+};
+
+const CASES = [
+  {id:"mca", level:"Core", title:"Face and arm", stem:"Sudden weakness of the right face and arm. The leg is almost strong. Speech is effortful, comprehension is preserved.", choices:[{id:"op", label:"Left opercular and triangular inferior frontal cortex, middle cerebral superior division"},{id:"para", label:"Left paracentral lobule, anterior cerebral artery"},{id:"calc", label:"Left calcarine cortex, posterior cerebral artery"},{id:"tons", label:"Left cerebellar tonsil"}], answer:"op", meshes:["Opercular part of inferior frontal gyrus","Triangular part of inferior frontal gyrus","Precentral gyrus","Middle cerebral artery (M1-segment)"], hints:["The weak parts are the face and the arm, not the leg.","Comprehension is intact and the speech is non-fluent."], why:"Dominant inferior frontal cortex and the lateral motor cortex are superior-division middle cerebral territory. The leg cortex is anterior cerebral."},
+  {id:"aca", level:"Core", title:"The leg", stem:"Collapse with a weak right leg. The arm is only slightly clumsy. There is no field cut and no aphasia.", choices:[{id:"para", label:"Left paracentral cortex, anterior cerebral artery"},{id:"mca", label:"Left middle cerebral stem"},{id:"pca", label:"Left posterior cerebral artery"},{id:"pica", label:"Left posterior inferior cerebellar artery"}], answer:"para", meshes:["Paracentral gyrus and sulcus","Anterior cerebral artery"], hints:["One limb is much weaker than the others.","The weak limb is the leg."], why:"The paracentral lobule is anterior cerebral territory. Middle cerebral infarction prefers the face and arm."},
+  {id:"pca", level:"Core", title:"The field", stem:"Sudden inability to see the right half of space. Strength is nearly normal. The patient bumps into things on the right.", choices:[{id:"calc", label:"Left calcarine cortex, posterior cerebral artery"},{id:"mca", label:"Left middle cerebral stem"},{id:"aca", label:"Left anterior cerebral artery"},{id:"mid", label:"Right cerebellar hemisphere"}], answer:"calc", meshes:["Calcarine sulcus","Posterior cerebral artery","Optic radiation"], hints:["Power is not the problem.","The deficit is a homonymous field."], why:"Primary visual cortex in the calcarine banks is posterior cerebral territory. A dense hemiparesis would argue for the middle cerebral artery or the capsule."},
+  {id:"capsule", level:"Core", title:"Face, arm and leg", stem:"Sudden weakness of the right face, arm and leg, all to a similar degree. Language, fields and sensory stereognosis are intact.", choices:[{id:"cst", label:"Corticospinal fibres, classically in the posterior limb of the internal capsule"},{id:"opt", label:"Optic radiation"},{id:"arc", label:"Arcuate fasciculus"},{id:"fx", label:"Fornix"}], answer:"cst", meshes:["Corticospinal tract","Putamen"], hints:["There is no aphasia and no field cut.","Face, arm and leg are equal, which is not the cortical pattern."], why:"Equal face, arm and leg weakness without cortical signs is a subcortical motor stroke. The capsule itself is not a mesh in this atlas. The corticospinal tract is the bundle that the capsule carries. The putamen is the neighbour supplied by the same perforators."},
+  {id:"weber", level:"Advanced", title:"Crossed eye and limbs", stem:"The left eye is down and out, with a dilated pupil. The right arm and leg are weak. The patient is awake.", choices:[{id:"mid", label:"Left medial midbrain"},{id:"pons", label:"Left lateral pons"},{id:"med", label:"Left lateral medulla"},{id:"ton", label:"Left cerebellar tonsil"}], answer:"mid", meshes:["Midbrain","Oculomotor nerve (III)","Corticospinal tract"], hints:["The bad eye and the weak limbs are on opposite sides.","The eye findings are an oculomotor palsy, not a facial droop."], why:"Weber syndrome is a medial midbrain lesion: oculomotor fascicle plus the cerebral peduncle. A lateral medullary lesion does not dilate the pupil or paralyse the limbs."},
+  {id:"pica", level:"Advanced", title:"Lateral medulla", stem:"Sudden vertigo, hoarseness, a small left pupil, loss of pain on the left face and on the right body. The limbs are strong.", choices:[{id:"pica", label:"Left posterior inferior cerebellar artery"},{id:"aica", label:"Anterior inferior cerebellar artery"},{id:"aca", label:"Anterior cerebral artery"},{id:"ssa", label:"Superior sagittal sinus"}], answer:"pica", meshes:["Posterior inferior cerebellar artery","Medulla oblongata"], hints:["The limbs are strong, so this is not the corticospinal pathway.","The face and the body disagree about the side of the sensory loss."], why:"Lateral medullary infarction is usually posterior inferior cerebellar artery, or the vertebral artery that gives it off. Crossed pain loss with Horner syndrome and no limb weakness is the pattern."},
+  {id:"tonsil", level:"Advanced", title:"Posterior fossa pressure", stem:"After a cerebellar haemorrhage the patient becomes apneic. The blood pressure rises and the pulse slows. There is no new dilated pupil.", choices:[{id:"ton", label:"Cerebellar tonsil through the foramen magnum"},{id:"unc", label:"Medial temporal lobe across the tentorium"},{id:"falx", label:"Cingulate gyrus under the falx"},{id:"sss", label:"Thrombosis of the superior sagittal sinus"}], answer:"ton", meshes:["Tonsil of cerebellum"], hints:["The pupil has not blown, so this is not the oculomotor nerve at the tentorial edge.","Breathing has stopped. The structure sits at the foramen magnum."], why:"Tonsillar herniation compresses the medulla. Uncal herniation would enlarge the pupil first. The tonsil is the mesh. The medulla is next to it."},
+  {id:"uncal", level:"Advanced", title:"The new pupil", stem:"A swollen left hemisphere. The left pupil enlarges, then the left eye fails to adduct. The right side becomes weak.", choices:[{id:"tent", label:"Across the tentorial edge, compressing the left oculomotor nerve"},{id:"ton", label:"Cerebellar tonsil in the foramen magnum"},{id:"falx", label:"Only under the falx, with no oculomotor compression"},{id:"vent", label:"An isolated enlarged lateral ventricle"}], answer:"tent", meshes:["Tentorium cerebelli","Oculomotor nerve (III)"], hints:["The first new sign is the pupil on the side of the mass.","The oculomotor nerve runs along a dural edge."], why:"This is uncal herniation. The uncus is not a named mesh. The tentorium is the edge, and the oculomotor nerve is the compressed structure. The opposite weakness is the peduncle."},
+  {id:"cord", level:"Advanced", title:"Half of the cord", stem:"A hemisection of the spinal cord. Ipsilateral weakness and loss of vibration. Pain and temperature are lost on the opposite side, a level or two lower. Which present atlas tract carries the weakness?", choices:[{id:"cst", label:"Corticospinal tract"},{id:"lem", label:"Medial lemniscus"},{id:"opt", label:"Optic radiation"},{id:"mcp", label:"Middle cerebellar peduncle"}], answer:"cst", meshes:["Corticospinal tract","Medial lemniscus"], hints:["The question asks for the motor tract, not the sensory one.","The spinal cord itself is not in this atlas."], why:"Limb weakness in cord hemisection is the lateral corticospinal tract. Vibration ascends in the posterior columns, which continue as the medial lemniscus. Pain crosses and travels in the spinothalamic tract, which is not a mesh here. There is no spinal cord model."}
+];
+
+const PATHS = [
+  {id:"motor", title:"Corticospinal", steps:[
+    {meshes:["Precentral gyrus"], text:"The cell bodies sit in the precentral gyrus. The leg cells are medial, in the paracentral region."},
+    {meshes:["Corticospinal tract"], text:"The fibres descend through the corona radiata and the internal capsule. The capsule is not its own mesh, so the tract stands in for that segment."},
+    {meshes:["Pyramid of medulla oblongata"], text:"They reach the pyramid. Most cross at the caudal medulla. The spinal cord that receives them is not in this atlas."}
+  ]},
+  {id:"visual", title:"Visual", steps:[
+    {meshes:["Optic nerve (II)"], text:"Retinal axons in the optic nerve."},
+    {meshes:["Optic chiasm"], text:"Nasal fibres cross. A chiasm lesion cuts the outer field of both eyes."},
+    {meshes:["Optic tract"], text:"Each tract now carries the opposite half of the visual field."},
+    {meshes:["Lateral geniculate body"], text:"The thalamic relay. This nucleus is an imaging-registered mesh, approximate to about 7 mm."},
+    {meshes:["Optic radiation"], text:"The lower fibres loop through the temporal lobe. The upper fibres pass through the parietal lobe."},
+    {meshes:["Calcarine sulcus"], text:"They end in the cortex of the calcarine banks. The mesh is the sulcus."}
+  ]},
+  {id:"csf", title:"CSF", steps:[
+    {meshes:["Choroid plexus"], text:"Choroid plexus secretes cerebrospinal fluid."},
+    {meshes:["Lateral ventricle"], text:"Fluid fills the lateral ventricle."},
+    {meshes:["Third ventricle"], text:"It passes through the foramen of Monro, which is not a separate mesh, into the third ventricle."},
+    {meshes:["Aqueduct of midbrain"], text:"The aqueduct is the narrow point. Stenosis spares the fourth ventricle."},
+    {meshes:["Fourth ventricle"], text:"The fourth ventricle lies between brainstem and cerebellum."},
+    {meshes:["Superior sagittal sinus"], text:"Fluid reaches the subarachnoid space and is absorbed into the superior sagittal sinus. Arachnoid granulations are not a mesh."}
+  ]},
+  {id:"speech", title:"Language", steps:[
+    {meshes:["Temporal plane","Transverse temporal gyri"], text:"The planum temporale sits beside posterior language cortex. A mesh named Wernicke is not in the atlas. Heschl's gyri, next to it, are primary auditory cortex."},
+    {meshes:["Arcuate fasciculus"], text:"The arcuate fasciculus runs forward above the insula. This mesh is a population tract template."},
+    {meshes:["Opercular part of inferior frontal gyrus","Triangular part of inferior frontal gyrus"], text:"The dominant opercular and triangular parts are Broca's area in this atlas."}
+  ]}
+];
+
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const canvas = document.getElementById("view");
+const sheet = document.getElementById("sheet");
+const loadEl = document.getElementById("load");
+const loadMsg = document.getElementById("loadmsg");
+let renderer, camera, controls, model, home;
+const meshes = [];
+const byLabel = new Map();
+let manifest = {nodes:[], categories:{}};
+let selected = null;
+let moduleId = "cortex";
+let pathStep = 0;
+let pathId = "motor";
+let caseId = "mca";
+let caseHints = 0;
+let casePicked = null;
+let caseOpen = false;
+const revealed = {};
+const points = JSON.parse(sessionStorage.getItem("neuro-score") || "{}");
+Object.keys(points).forEach(function(key){ revealed[key] = true; });
+const hidden = new Set();
+const clipOn = {axial:false, coronal:false, sagittal:false};
+const clipK = {axial:0, coronal:0, sagittal:0};
+let flip = 1;
+const planes = {
+  axial: new THREE.Plane(new THREE.Vector3(0, -1, 0), 0),
+  coronal: new THREE.Plane(new THREE.Vector3(0, 0, -1), 0),
+  sagittal: new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0)
+};
+let extent = 1;
+
+function mats(mesh){ return Array.isArray(mesh.material) ? mesh.material : [mesh.material]; }
+function boot(){
+  try{
+    renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:"high-performance"});
+  }catch(err){
+    fail("WebGL did not start. The structure list is still available.");
+    return;
+  }
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+  renderer.setSize(innerWidth, innerHeight, false);
+  renderer.setClearColor(0x07111a, 1);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.localClippingEnabled = true;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  sceneAdd();
+}
+const scene = new THREE.Scene();
+function sceneAdd(){
+  scene.add(new THREE.HemisphereLight(0xd7e8f2, 0x0b1218, 0.85));
+  const key = new THREE.DirectionalLight(0xffffff, 1.35);
+  key.position.set(2, 3, 4);
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x7fd4e6, 0.7);
+  rim.position.set(-3, 1, -2);
+  scene.add(rim);
+  camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 50);
+  controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.autoRotate = !reduced;
+  controls.autoRotateSpeed = 0.7;
+  const loader = new GLTFLoader();
+  const draco = new DRACOLoader();
+  draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
+  loader.setDRACOLoader(draco);
+  loader.load("neuro/brain.glb", function(gltf){
+    model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    model.position.sub(center);
+    const size = box.getSize(new THREE.Vector3());
+    extent = Math.max(size.x, size.y, size.z) * 0.55;
+    model.traverse(function(obj){
+      if(!obj.isMesh) return;
+      const ex = obj.userData || {};
+      obj.material = obj.material.clone();
+      mats(obj).forEach(function(mat){
+        mat.clippingPlanes = [];
+        mat.transparent = false;
+        mat.depthWrite = true;
+      });
+      meshes.push(obj);
+      const label = ex.bx_label || obj.name;
+      if(!byLabel.has(label)) byLabel.set(label, []);
+      byLabel.get(label).push(obj);
+    });
+    scene.add(model);
+    home = {pos: new THREE.Vector3(0, extent * 0.05, extent * 2.3), target: new THREE.Vector3()};
+    camera.position.copy(home.pos);
+    controls.target.copy(home.target);
+    loadEl.classList.add("gone");
+    applyModule();
+    if(sheet.classList.contains("open") && moduleId==="cortex") renderModule();
+  }, function(ev){
+    if(ev.total) loadMsg.textContent = Math.round(ev.loaded / ev.total * 100) + "%";
+  }, function(){
+    fail("The brain model did not load. The names from the atlas list are still available.");
+  });
+  fetch("neuro/manifest.json").then(function(r){ return r.json(); }).then(function(data){
+    manifest = data;
+    applyModule();
+    paintLayers();
+  }).catch(function(){ loadMsg.textContent = "The label file did not load."; });
+  addEventListener("resize", resize);
+  canvas.addEventListener("pointerdown", down);
+  canvas.addEventListener("pointerup", up);
+  requestAnimationFrame(frame);
+}
+let downPt = null;
+function down(e){ downPt = {x:e.clientX, y:e.clientY}; controls.autoRotate = false; paintDock(); }
+function up(e){
+  if(!downPt || !meshes.length) return;
+  const moved = Math.hypot(e.clientX - downPt.x, e.clientY - downPt.y);
+  downPt = null;
+  if(moved > 8) return;
+  const rect = canvas.getBoundingClientRect();
+  const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(ndc, camera);
+  const hits = ray.intersectObjects(meshes.filter(function(m){ return m.visible; }), false);
+  if(hits[0]) openMesh(hits[0].object);
+}
+function frame(){
+  requestAnimationFrame(frame);
+  if(controls) controls.update();
+  if(renderer) renderer.render(scene, camera);
+}
+function resize(){
+  if(!renderer) return;
+  renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth / Math.max(1, innerHeight);
+  camera.updateProjectionMatrix();
+}
+function fail(msg){
+  loadEl.classList.add("gone");
+  moduleId = "list";
+  openSheet(msg);
+}
+function nodeOf(mesh){
+  const id = mesh.userData.bx_id;
+  return manifest.nodes.find(function(n){ return n.id === id; }) || null;
+}
+function showLabels(labels){
+  const wanted = new Set(labels);
+  meshes.forEach(function(mesh){
+    const on = wanted.has(mesh.userData.bx_label);
+    mesh.visible = on;
+    mats(mesh).forEach(function(mat){
+      mat.emissive = mat.emissive || new THREE.Color();
+      mat.emissive.set(on ? 0x143028 : 0x000000);
+      mat.emissiveIntensity = on ? 0.35 : 0;
+    });
+  });
+}
+function applyVisibility(){
+  meshes.forEach(function(mesh){
+    const cat = mesh.userData.bx_cat;
+    mesh.visible = !hidden.has(cat);
+    mats(mesh).forEach(function(mat){
+      const hot = selected && mesh === selected;
+      mat.emissive = mat.emissive || new THREE.Color();
+      mat.emissive.set(hot ? 0x0d3b32 : 0x000000);
+      mat.emissiveIntensity = hot ? 0.55 : 0;
+    });
+  });
+}
+function applyClip(){
+  const list = [];
+  ["axial","coronal","sagittal"].forEach(function(key){
+    if(!clipOn[key]) return;
+    planes[key].constant = clipK[key];
+    if(key === "axial") planes[key].normal.set(0, -flip, 0);
+    if(key === "coronal") planes[key].normal.set(0, 0, -flip);
+    if(key === "sagittal") planes[key].normal.set(-flip, 0, 0);
+    list.push(planes[key]);
+  });
+  meshes.forEach(function(mesh){
+    mats(mesh).forEach(function(mat){ mat.clippingPlanes = list; mat.clipShadows = true; });
+  });
+}
+function view(which){
+  if(!home) return;
+  const d = extent * 2.3;
+  const map = {
+    front:[0, extent*0.05, d],
+    side:[d, extent*0.05, 0],
+    top:[0, d, 0.01],
+    back:[0, extent*0.05, -d]
+  };
+  const p = map[which] || map.front;
+  camera.position.set(p[0], p[1], p[2]);
+  controls.target.set(0, 0, 0);
+}
+function openMesh(mesh){
+  selected = mesh;
+  applyVisibility();
+  const label = mesh.userData.bx_label || mesh.name;
+  const node = nodeOf(mesh);
+  const card = CARDS[label];
+  const side = mesh.userData.bx_side || "";
+  const cat = (manifest.categories[mesh.userData.bx_cat] || {}).label || mesh.userData.bx_cat || "";
+  let html = '<button type="button" class="close" id="shut">Close</button>';
+  html += '<p class="kicker">'+esc(cat)+(side?' · '+esc(side):'')+'</p>';
+  html += '<h2>'+esc(label)+'</h2>';
+  if(node && node.region) html += '<p class="note">'+esc(node.region)+'</p>';
+  if(card){
+    html += block("Function", card.functions);
+    html += block("Afferent", card.afferent);
+    html += block("Efferent", card.efferent);
+    html += block("Blood supply", card.supply);
+    html += block("At the bedside", card.clinical);
+    html += block("If it is injured", card.deficits);
+    html += block("On a scan", card.imaging);
+    if(card.case) html += '<div class="row"><button type="button" id="jump">Open the related case</button></div>';
+    if(card.quiz) html += quizHtml(label, card.quiz);
+  }else{
+    html += '<p>No separate clinical card is written for this mesh. The name is the atlas label, not a guess.</p>';
+  }
+  html += '<p class="note">Source: Z-Anatomy / BodyParts3D, CC BY-SA 4.0. Registered deep nuclei and tracts are approximate.</p>';
+  sheet.innerHTML = html;
+  sheet.classList.add("open");
+  document.getElementById("shut").onclick = function(){ sheet.classList.remove("open"); };
+  const jump = document.getElementById("jump");
+  if(jump) jump.onclick = function(){ moduleId = "cases"; caseId = card.case; casePicked = null; caseHints = 0; caseOpen = true; paint(); renderCase(); };
+  const ask = document.getElementById("ask");
+  if(ask){
+    ask.onclick = function(){
+      const picked = sheet.querySelector("input[name=q]:checked");
+      const out = document.getElementById("qout");
+      if(!picked){ out.textContent = "Choose one first."; return; }
+      const right = String(card.quiz.answer) === picked.value;
+      out.textContent = (right ? "Correct. " : "Not that one. ") + card.quiz.why;
+    };
+  }
+}
+function block(title, text){ return text ? '<h3>'+esc(title)+'</h3><p>'+esc(text)+'</p>' : ""; }
+function quizHtml(label, quiz){
+  return '<h3>Check</h3><p>'+esc(quiz.q)+'</p><div class="choices">'+quiz.choices.map(function(choice, i){
+    return '<label><input type="radio" name="q" value="'+i+'"> '+esc(choice)+'</label>';
+  }).join("<br>")+'</div><div class="row"><button type="button" id="ask">Check the answer</button></div><p id="qout"></p>';
+}
+function esc(s){
+  return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+    if(c==="&") return "\u0026amp;";
+    if(c==="<") return "\u0026lt;";
+    if(c===">") return "\u0026gt;";
+    return "\u0026quot;";
+  });
+}
+function paint(){
+  document.getElementById("mods").innerHTML = MODULES.map(function(mod){
+    return '<button type="button"'+(mod.id===moduleId?' class="on"':'')+' data-mod="'+mod.id+'">'+esc(mod.title)+'</button>';
+  }).join("");
+  document.getElementById("mods").querySelectorAll("[data-mod]").forEach(function(btn){
+    btn.onclick = function(){ moduleId = btn.getAttribute("data-mod"); caseOpen = moduleId==="cases"; applyModule(); paint(); if(moduleId!=="cases") renderModule(); else renderCase(); };
+  });
+  paintDock();
+  paintLayers();
+}
+function paintLayers(){
+  const cats = manifest.categories || {};
+  const keys = Object.keys(cats);
+  document.getElementById("layers").innerHTML = keys.map(function(key){
+    const on = !hidden.has(key);
+    return '<button type="button"'+(on?' class="on"':'')+' data-cat="'+key+'">'+esc(cats[key].label)+'</button>';
+  }).join("");
+  document.getElementById("layers").querySelectorAll("[data-cat]").forEach(function(btn){
+    btn.onclick = function(){
+      const key = btn.getAttribute("data-cat");
+      if(hidden.has(key)) hidden.delete(key); else hidden.add(key);
+      applyVisibility();
+      paintLayers();
+    };
+  });
+}
+function paintDock(){
+  const auto = controls && controls.autoRotate;
+  document.getElementById("dock").innerHTML =
+    '<button type="button"'+(auto?' class="on"':'')+' id="spin">Turn</button>'+
+    '<button type="button" id="reset">Reset</button>'+
+    '<button type="button" id="front">Front</button>'+
+    '<button type="button" id="side">Side</button>'+
+    '<button type="button" id="top">Top</button>'+
+    '<button type="button" id="solo">Isolate</button>'+
+    '<button type="button" id="about">About</button>'+
+    '<span class="score">'+scoreText()+'</span>';
+  document.getElementById("spin").onclick = function(){ controls.autoRotate = !controls.autoRotate; paintDock(); };
+  document.getElementById("reset").onclick = function(){
+    hidden.clear(); selected = null; clipOn.axial = clipOn.coronal = clipOn.sagittal = false;
+    applyClip(); applyModule(); view("front"); sheet.classList.remove("open");
+  };
+  document.getElementById("front").onclick = function(){ view("front"); };
+  document.getElementById("side").onclick = function(){ view("side"); };
+  document.getElementById("top").onclick = function(){ view("top"); };
+  document.getElementById("solo").onclick = function(){
+    if(!selected) return;
+    meshes.forEach(function(mesh){ mesh.visible = mesh === selected; });
+  };
+  document.getElementById("about").onclick = renderAbout;
+}
+function scoreText(){
+  const vals = Object.values(points);
+  if(!vals.length) return "";
+  const sum = vals.reduce(function(a,b){ return a+b; }, 0);
+  return sum.toFixed(1)+" / "+CASES.length*2;
+}
+function applyModule(){
+  const mod = MODULES.find(function(item){ return item.id === moduleId; }) || MODULES[0];
+  hidden.clear();
+  if(manifest.categories){
+    Object.keys(manifest.categories).forEach(function(key){
+      if(mod.cats.indexOf(key) === -1) hidden.add(key);
+    });
+  }
+  applyVisibility();
+  paintLayers();
+}
+function renderModule(){
+  const mod = MODULES.find(function(item){ return item.id === moduleId; });
+  if(!mod) return;
+  if(moduleId === "paths"){ renderPath(); return; }
+  if(moduleId === "sections"){ renderSections(); return; }
+  if(moduleId === "list"){ renderList(); return; }
+  sheet.innerHTML = '<button type="button" class="close" id="shut">Close</button><p class="kicker">Module</p><h2>'+esc(mod.title)+'</h2><p>'+esc(mod.text)+'</p>'+searchBox();
+  sheet.classList.add("open");
+  bindList();
+}
+function searchBox(){
+  const labels = [];
+  byLabel.forEach(function(group, label){
+    const cat = group[0].userData.bx_cat;
+    if(hidden.has(cat)) return;
+    labels.push(label);
+  });
+  labels.sort();
+  return '<input class="find" id="find" placeholder="Find a structure" aria-label="Find a structure"><div class="list" id="list">'+labels.map(function(label){
+    return '<button type="button" data-label="'+esc(label)+'">'+esc(label)+'</button>';
+  }).join("")+'</div>';
+}
+function bindList(){
+  document.getElementById("shut").onclick = function(){ sheet.classList.remove("open"); };
+  const find = document.getElementById("find");
+  const list = document.getElementById("list");
+  if(find) find.oninput = function(){
+    const q = find.value.toLowerCase();
+    list.querySelectorAll("button").forEach(function(btn){
+      btn.hidden = btn.textContent.toLowerCase().indexOf(q) === -1;
+    });
+  };
+  if(list) list.onclick = function(event){
+    const btn = event.target.closest("[data-label]");
+    if(!btn) return;
+    const group = byLabel.get(btn.getAttribute("data-label"));
+    if(group && group[0]){ showLabels([btn.getAttribute("data-label")]); openMesh(group[0]); }
+  };
+}
+function renderPath(){
+  const path = PATHS.find(function(item){ return item.id === pathId; }) || PATHS[0];
+  const step = path.steps[pathStep];
+  showLabels(step.meshes);
+  sheet.innerHTML = '<button type="button" class="close" id="shut">Close</button><p class="kicker">Pathway '+(pathStep+1)+' / '+path.steps.length+'</p><h2>'+esc(path.title)+'</h2><div class="row">'+PATHS.map(function(item){
+    return '<button type="button" data-path="'+item.id+'">'+esc(item.title)+'</button>';
+  }).join("")+'</div><p>'+esc(step.text)+'</p><p class="note">'+esc(step.meshes.join(", "))+'</p><div class="row"><button type="button" id="prev">Previous</button><button type="button" id="next">Next</button></div>';
+  sheet.classList.add("open");
+  document.getElementById("shut").onclick = function(){ sheet.classList.remove("open"); applyModule(); };
+  sheet.querySelectorAll("[data-path]").forEach(function(btn){
+    btn.onclick = function(){ pathId = btn.getAttribute("data-path"); pathStep = 0; renderPath(); };
+  });
+  document.getElementById("prev").onclick = function(){ pathStep = Math.max(0, pathStep-1); renderPath(); };
+  document.getElementById("next").onclick = function(){ pathStep = Math.min(path.steps.length-1, pathStep+1); renderPath(); };
+}
+function renderSections(){
+  applyModule();
+  sheet.innerHTML = '<button type="button" class="close" id="shut">Close</button><p class="kicker">Atlas sections</p><h2>Cutting planes</h2><p>These planes cut the 3D model. They are not computed tomography or magnetic resonance slices. A DICOM viewer is not included, because no licensed scan volume ships with this lab.</p>'+
+    planeRow("axial","Axial")+planeRow("coronal","Coronal")+planeRow("sagittal","Sagittal")+
+    '<div class="row"><button type="button" id="flip">Flip the cut</button></div>'+
+    '<h3>Landmarks</h3><div class="list"><button type="button" data-label="Lateral ventricle">Lateral ventricle</button><button type="button" data-label="Corpus callosum">Corpus callosum</button><button type="button" data-label="Midbrain">Midbrain</button><button type="button" data-label="Middle cerebral artery (M1-segment)">Middle cerebral artery, M1</button></div>';
+  sheet.classList.add("open");
+  document.getElementById("shut").onclick = function(){ sheet.classList.remove("open"); };
+  ["axial","coronal","sagittal"].forEach(function(key){
+    document.getElementById("on-"+key).onchange = function(event){ clipOn[key] = event.target.checked; applyClip(); };
+    document.getElementById("k-"+key).oninput = function(event){ clipK[key] = Number(event.target.value) * extent; applyClip(); };
+  });
+  document.getElementById("flip").onclick = function(){ flip = -flip; applyClip(); };
+  sheet.querySelectorAll("[data-label]").forEach(function(btn){
+    btn.onclick = function(){
+      const group = byLabel.get(btn.getAttribute("data-label"));
+      if(group){ hidden.delete(group[0].userData.bx_cat); applyVisibility(); openMesh(group[0]); }
+    };
+  });
+}
+function planeRow(key, label){
+  return '<h3>'+label+'</h3><label><input type="checkbox" id="on-'+key+'"> Show '+label.toLowerCase()+' plane</label><br><input id="k-'+key+'" type="range" min="-1" max="1" step="0.02" value="0" aria-label="'+label+' position">';
+}
+function renderCase(){
+  const item = CASES.find(function(c){ return c.id === caseId; }) || CASES[0];
+  const open = !!revealed[item.id];
+  const order = item.choices.slice();
+  sheet.innerHTML = '<button type="button" class="close" id="shut">Close</button><p class="kicker">'+esc(item.level)+' · '+scoreText()+'</p><h2>'+esc(item.title)+'</h2><p>'+esc(item.stem)+'</p><div class="choices" id="choices">'+order.map(function(choice){
+    return '<button type="button" data-choice="'+choice.id+'">'+esc(choice.label)+'</button>';
+  }).join("")+'</div><div class="row"><button type="button" id="hint">Hint ('+caseHints+'/2)</button><button type="button" id="lock">Submit</button><button type="button" id="debrief">Debrief</button></div><p id="hinttext"></p><div class="row">'+CASES.map(function(c){
+    return '<button type="button" data-case="'+c.id+'">'+esc(c.title)+(points[c.id]!=null?" ·":"")+'</button>';
+  }).join("")+'</div>';
+  sheet.classList.add("open");
+  document.getElementById("shut").onclick = function(){ sheet.classList.remove("open"); };
+  if(open) markChoices(item);
+  sheet.querySelectorAll("[data-choice]").forEach(function(btn){
+    btn.onclick = function(){
+      if(revealed[item.id]) return;
+      casePicked = btn.getAttribute("data-choice");
+      sheet.querySelectorAll("[data-choice]").forEach(function(other){ other.classList.toggle("on", other===btn); });
+    };
+  });
+  document.getElementById("hint").onclick = function(){
+    if(revealed[item.id] || caseHints >= item.hints.length) return;
+    caseHints += 1;
+    document.getElementById("hinttext").textContent = item.hints[caseHints-1];
+    document.getElementById("hint").textContent = "Hint ("+caseHints+"/2)";
+  };
+  document.getElementById("lock").onclick = function(){
+    if(revealed[item.id]) return;
+    if(!casePicked){ document.getElementById("hinttext").textContent = "Select a site first."; return; }
+    revealed[item.id] = true;
+    const right = casePicked === item.answer;
+    points[item.id] = right ? Math.max(0, 2 - caseHints) : 0;
+    sessionStorage.setItem("neuro-score", JSON.stringify(points));
+    markChoices(item);
+    showLabels(item.meshes);
+    paintDock();
+  };
+  document.getElementById("debrief").onclick = renderDebrief;
+  sheet.querySelectorAll("[data-case]").forEach(function(btn){
+    btn.onclick = function(){ caseId = btn.getAttribute("data-case"); casePicked = null; caseHints = 0; renderCase(); };
+  });
+}
+function markChoices(item){
+  sheet.querySelectorAll("[data-choice]").forEach(function(btn){
+    const id = btn.getAttribute("data-choice");
+    btn.classList.toggle("good", id === item.answer);
+    btn.classList.toggle("bad", id === casePicked && id !== item.answer);
+  });
+  const note = document.getElementById("hinttext");
+  if(note) note.textContent = item.why;
+}
+function renderDebrief(){
+  const sum = CASES.reduce(function(total, item){ return total + (points[item.id] || 0); }, 0);
+  sheet.innerHTML = '<button type="button" class="close" id="shut">Close</button><p class="kicker">Debrief</p><h2>'+sum.toFixed(1)+' of '+(CASES.length*2)+'</h2><p>A correct answer with no hint is 2. Each hint costs 1. A wrong site is 0. The explanation stays hidden until you submit.</p>'+CASES.map(function(item){
+    const got = points[item.id];
+    return '<h3>'+esc(item.title)+'</h3><p>'+(got==null?'Not submitted yet.':((got>0?'Scored '+got+'. ':'Missed. ')+esc(item.why)))+'</p>';
+  }).join("")+'<div class="row"><button type="button" id="again">Clear the score</button></div>';
+  sheet.classList.add("open");
+  document.getElementById("shut").onclick = function(){ renderCase(); };
+  document.getElementById("again").onclick = function(){
+    Object.keys(points).forEach(function(key){ delete points[key]; });
+    Object.keys(revealed).forEach(function(key){ delete revealed[key]; });
+    sessionStorage.removeItem("neuro-score");
+    renderCase();
+    paintDock();
+  };
+}
+function renderAbout(){
+  sheet.innerHTML = '<button type="button" class="close" id="shut">Close</button><p class="kicker">About this lab</p><h2>What is real</h2><p>The brain is a Draco-compressed glTF, 437 named meshes, loaded with Three.js. It is the Brain Project atlas from Z-Anatomy and BodyParts3D, CC BY-SA 4.0. Deep nuclei and tract centerlines were registered from open atlases and are approximate to about 7 mm.</p><h3>Not in the model</h3><p>No spinal cord. No internal capsule as its own mesh. No uncus. No spinothalamic tract. No arachnoid granulations. No DICOM stack and no window or level tool. Cutting planes are sections of the mesh, not scans.</p><h3>Not finished</h3><p>Clinical cards cover the structures used in the cases and pathways, not every mesh. Meshes without a card show the atlas name only. This is teaching anatomy, not a device and not a surgical plan.</p><h3>How to open it</h3><p>From the brain in the Critical Care Hub, choose Learning Lab. The files are neuro-lab.html, neuro/brain.glb and neuro/manifest.json. Three.js is loaded from a network CDN. The licence is in neuro/LICENSE.txt.</p><div class="row"><button type="button" id="listview">Structure list</button></div>';
+  sheet.classList.add("open");
+  document.getElementById("shut").onclick = function(){ sheet.classList.remove("open"); };
+  document.getElementById("listview").onclick = function(){ moduleId = "list"; renderList(); };
+}
+function renderList(){
+  const labels = manifest.nodes.length ? manifest.nodes.map(function(n){ return n.label+" · "+n.side; }) : Array.from(byLabel.keys());
+  sheet.innerHTML = '<button type="button" class="close" id="shut">Close</button><p class="kicker">Atlas list</p><h2>Structures</h2><input class="find" id="find" aria-label="Filter structures"><div class="list" id="list">'+labels.map(function(label){
+    const clean = String(label).split(" · ")[0];
+    return '<button type="button" data-label="'+esc(clean)+'">'+esc(label)+'</button>';
+  }).join("")+'</div>';
+  sheet.classList.add("open");
+  bindList();
+}
+function openSheet(msg){
+  sheet.innerHTML = '<p>'+esc(msg)+'</p>';
+  sheet.classList.add("open");
+  renderAbout();
+}
+paint();
+boot();
+</script>
+</body>
+</html>
