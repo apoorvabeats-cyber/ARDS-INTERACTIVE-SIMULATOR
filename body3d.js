@@ -11,7 +11,7 @@ const definitions = new Map(ORGANS.map(organ => [organ.id, organ]));
 const state = {mode:'external', selected:null, auto:!reduced, organLayer:true, loaded:false,
   visible:new Set(ORGANS.map(organ => organ.id))};
 const groups = new Map(), rows = new Map(), pickMeshes = [];
-let renderer, scene, camera, controls, model, skin, targetRing, retryController;
+let renderer, scene, camera, controls, model, skin, retryController;
 let dirty = true, cameraTween = null, modelTween = false, lost = false, loadGeneration = 0;
 let fullDistance = 4, lastFrame = 0, lastTime = 0;
 let entryTimer = null, entryFinish = null, entering = false;
@@ -283,17 +283,11 @@ async function loadModel() {
 function environment() {
   // Scanner graphics are geometry; the human and every organ come only from the GLB.
   const floor = new THREE.Group(); scene.add(floor);
-  const material = new THREE.LineBasicMaterial({color:0x5ccfac,transparent:true,opacity:0.17});
-  for(const radius of [0.57,0.65,0.69]) {
-    const points = Array.from({length:97},(_,i) => new THREE.Vector3(Math.cos(i/96*Math.PI*2)*radius,0.002,Math.sin(i/96*Math.PI*2)*radius));
-    floor.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(points),material));
-  }
   for(let i=-5;i<=5;i++) {
     const points = [new THREE.Vector3(i*.17,-.006,-.9),new THREE.Vector3(i*.17,-.006,.9),new THREE.Vector3(-.9,-.006,i*.17),new THREE.Vector3(.9,-.006,i*.17)];
     floor.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(points),new THREE.LineBasicMaterial({color:0x59bc99,transparent:true,opacity:.055})));
   }
-  targetRing = new THREE.Mesh(new THREE.TorusGeometry(1,.005,6,96),new THREE.MeshBasicMaterial({color:0x8fffd2,transparent:true,opacity:.55,depthTest:false,depthWrite:false}));
-  targetRing.visible = false; targetRing.renderOrder = 5; scene.add(targetRing);
+
 }
 function resize() {
   if(!renderer) return;
@@ -337,13 +331,8 @@ function animate(now) {
   }
   const active = state.selected || highlight;
   for(const [id,group] of groups) for(const mesh of group.meshes) {
-    const intensity = id === active ? .15 : 0;
-    if(mesh.material.emissiveIntensity !== intensity) { mesh.material.emissive.set(0x36deb0); mesh.material.emissiveIntensity = intensity; dirty = true; }
-  }
-  if(targetRing) {
-    const group = groups.get(state.selected);
-    targetRing.visible = Boolean(group && state.loaded && state.mode !== 'external' && state.organLayer && state.visible.has(state.selected));
-    if(targetRing.visible) { targetRing.position.copy(group.center); targetRing.quaternion.copy(camera.quaternion); targetRing.scale.setScalar(Math.max(.04,group.box.getSize(new THREE.Vector3()).length()*.57)); }
+    const intensity = id === active ? .08 : 0;
+    if(mesh.material.emissiveIntensity !== intensity) { mesh.material.emissive.copy(mesh.material.color); mesh.material.emissiveIntensity = intensity; dirty = true; }
   }
   if(dirty) {
     renderer.render(scene,camera);

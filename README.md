@@ -22,13 +22,13 @@ Open `http://localhost:3000/`. Serve the complete repository over HTTP(S); ES mo
 - Camera controls reset the view, show the front/back, and toggle automatic rotation. With the canvas focused, arrow keys rotate, +/− zoom, Home resets, and Space toggles rotation.
 - **Learning Lab** and **Practice Arena** open the existing clinical rooms. Rooms without a simulator show their availability message. Original audio recordings and sound functions are retained; browser playback starts after interaction.
 
-The HUD contains decorative scan lines and circular instruments. Its readouts describe viewer state, not patient measurements. No bottom tabs or bottom-right camera buttons are used.
+The HUD retains a subtle scan line and floor grid; decorative scan/targeting circles and Live 3D / Reference headings are removed. Its readouts describe viewer state, not patient measurements. No bottom tabs or bottom-right camera buttons are used.
 
 ## Anatomical assets and scope
 
 `models/anatomy/human-reference.glb` is a 4.79 MB, 264,860-triangle assembly derived from **Human Reference Atlas United Male v1.5** (Kristen Browne and Heidi Schlehlein / HuBMAP, Visible Human Male data from NLM), plus the actual **BodyParts3D FJ2564 stomach** (© DBCLS). Both sources are CC BY 4.0. The small **Credits** link opens [a separate page](credits.html) containing required attribution and library details. The stomach is registered into the HRA assembly and identified separately in the model manifest and credits.
 
-This is simplified anatomical reference geometry with warm skin and tissue display colours under neutral lighting. It is not photorealistically textured, patient-specific, or clinically validated. Some source component surfaces overlap. See [full attribution, sources, licenses and adaptations](models/anatomy/ATTRIBUTION.md) and the [conversion manifest](models/anatomy/model-manifest.json).
+This is simplified anatomical reference geometry with warm skin and tissue display colours under neutral lighting. Selection uses a subtle glow in each tissue’s own colour, avoiding a green tint. It is not photorealistically textured, patient-specific, or clinically validated. Some source component surfaces overlap. See [full attribution, sources, licenses and adaptations](models/anatomy/ATTRIBUTION.md) and the [conversion manifest](models/anatomy/model-manifest.json).
 
 ## Files and dependencies
 
