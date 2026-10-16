@@ -2,7 +2,7 @@
 export function buildScanStructure(THREE) {
   const group = new THREE.Group();
   const bone = new THREE.MeshStandardMaterial({ color: 0xe0ded0, roughness: 0.63,
-    transparent: true, opacity: 0.52, depthWrite: false });
+    transparent: true, opacity: 0.34, depthWrite: false });
   const artery = new THREE.MeshStandardMaterial({ color: 0xa83d38, roughness: 0.48 });
   const vein = new THREE.MeshStandardMaterial({ color: 0x426a8f, roughness: 0.48 });
   const V = (p) => new THREE.Vector3(...p);
@@ -38,18 +38,6 @@ export function buildScanStructure(THREE) {
     tube([[side * 0.11, 0.913, 0], [side * 0.066, 0.858, 0.025], [0, 0.866, 0.037]], 0.006);
     tube([[side * 0.009, 1.29, -0.012], [side * 0.021, 1.12, -0.033], [side * 0.019, 0.94, -0.015]], 0.004, side === 1 ? artery : vein);
     tube([[side * 0.019, 1.3, 0.014], [side * 0.02, 1.437, 0.02], [side * 0.022, 1.52, 0.022]], 0.004, side === 1 ? artery : vein);
-  }
-  // Orbital rims, nasal bridge and jaw indicate the skull without covering the brain.
-  for (const side of [-1, 1]) {
-    const orbit = [];
-    for (let j = 0; j <= 32; j++) { const a = j / 32 * Math.PI * 2; orbit.push([side * 0.027 + Math.cos(a) * 0.018, 1.566 + Math.sin(a) * 0.014, 0.089 + Math.cos(a) * side * 0.003]); }
-    tube(orbit, 0.003);
-    tube([[side * 0.043, 1.565, 0.068], [side * 0.048, 1.533, 0.063], [side * 0.028, 1.505, 0.072], [0, 1.497, 0.081]], 0.0035);
-    tube([[side * 0.011, 1.576, 0.088], [0, 1.548, 0.107], [side * 0.008, 1.532, 0.095]], 0.003);
-  }
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 11 - 0.5) * 2.15;
-    ell([Math.sin(a) * 0.029, 1.518, 0.078 + Math.cos(a) * 0.014], [0.003, 0.005, 0.003]);
   }
   // Arms are populated from the actual posed GLB joints to keep bones and skin aligned.
   const arms = new THREE.Group(); group.add(arms);
