@@ -15,8 +15,8 @@ Open `http://localhost:3000/`. Serve the complete repository over HTTP(S); ES mo
 ## Explore
 
 - Drag with a mouse or one finger to rotate through 360°. Scroll or pinch with two fingers to zoom. Gestures pause automatic rotation.
-- Choose **External body**, **Internal anatomy**, or select an organ and choose **Examine organ** to isolate it. Changes fade smoothly.
-- Select a visible organ mesh or entry in **Structures**. The information panel shows its location, description, and source.
+- Choose **External body**, **Internal anatomy**, or select an organ and use **Examine organ** to inspect the selected organ in isolation. Changes fade smoothly.
+- Tap a visible organ or choose it in **Structures** to zoom into the actual 3D organ, then open its full-screen portal room. Choose **Learning Lab** or **Practice Arena** there; Back returns to the portals, then the full body. The information panel retains the selected organ’s details.
 - The 12 groups are brain, spinal cord, lungs, heart, liver, stomach, spleen, pancreas, kidneys, intestines, bladder, and major blood vessels.
 - Use the visibility checkboxes, **Organ layer**, search, and **Show all** to adjust the view. On phones, these appear in the **Organs** panel.
 - Camera controls reset the view, show the front/back, and toggle automatic rotation. With the canvas focused, arrow keys rotate, +/− zoom, Home resets, and Space toggles rotation.
