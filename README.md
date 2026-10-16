@@ -16,9 +16,9 @@ Open `http://localhost:3000/`. Serve the complete repository over HTTP(S); ES mo
 
 - Drag with a mouse or one finger to rotate through 360°. Scroll or pinch with two fingers to zoom. Gestures pause automatic rotation.
 - Choose **External body**, **Internal anatomy**, or select an organ and choose **Examine organ** to isolate it. Changes fade smoothly.
-- Select a visible organ mesh, projected label, or entry in **Structures**. The information panel shows its location, description, and source.
+- Select a visible organ mesh or entry in **Structures**. The information panel shows its location, description, and source.
 - The 12 groups are brain, spinal cord, lungs, heart, liver, stomach, spleen, pancreas, kidneys, intestines, bladder, and major blood vessels.
-- Use the visibility checkboxes, **Organ layer**, **Anatomical labels**, search, and **Show all** to adjust the view. On phones, these appear in the **Organs** panel.
+- Use the visibility checkboxes, **Organ layer**, search, and **Show all** to adjust the view. On phones, these appear in the **Organs** panel.
 - Camera controls reset the view, show the front/back, and toggle automatic rotation. With the canvas focused, arrow keys rotate, +/− zoom, Home resets, and Space toggles rotation.
 - **Learning Lab** and **Practice Arena** open the existing clinical rooms. Rooms without a simulator show their availability message. Original audio recordings and sound functions are retained; browser playback starts after interaction.
 
@@ -35,7 +35,7 @@ This is simplified anatomical reference geometry with display colors. It is not 
 | File | Purpose |
 | --- | --- |
 | `index.html` | Complete entry page, HUD markup, existing clinical rooms and audio |
-| `body3d.js` | GLTFLoader, camera, mode transitions, mesh picking, labels, visibility and error states |
+| `body3d.js` | GLTFLoader, camera, mode transitions, mesh picking, visibility and error states |
 | `anatomy/explorer-data.js` | Model configuration, required organ IDs, descriptions and room mapping |
 | `anatomy/explorer.css` | Responsive dark green/cyan HUD and reduced-motion styling |
 | `models/anatomy/` | Bundled GLB, provenance and attribution |
