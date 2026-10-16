@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildAtlasOrgans } from './anatomy/atlas-organs.js';
-import { buildScanStructure, buildScanPlatform } from './anatomy/scan-structure.js';
+import { buildScanStructure, buildScanPlatform } from './anatomy/scan-structure.js?v=20261016f';
 import { buildBody, createUniforms } from './anatomy/body-model.js';
 
 const canvas = document.getElementById('view');
@@ -34,9 +34,9 @@ function init() {
   scene.add(buildScanPlatform(THREE));
   let needsRender = true;
   controls.addEventListener('change', () => { needsRender = true; });
-  // Fresnel transparency preserves the body's contour without hiding the organs.
+  // Warm shaded skin preserves the human face and limbs around a transparent torso.
   const skinMaterial = new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, side: THREE.FrontSide,
+    transparent: true, depthWrite: true, side: THREE.FrontSide,
     uniforms: { opacity: { value: 1 }, surface: { value: null }, surfaceReady: { value: 0 } },
     vertexShader: `
       #include <common>
@@ -52,16 +52,39 @@ function init() {
         n=normalize(normalMatrix*objectNormal); viewDir=-mv.xyz; worldPoint=(modelMatrix*vec4(transformed,1.0)).xyz; worldNormal=normalize(mat3(modelMatrix)*objectNormal); gl_Position=projectionMatrix*mv;
       }`,
     fragmentShader: `varying vec3 n; varying vec3 viewDir; varying vec3 worldPoint; varying vec3 worldNormal; uniform float opacity; uniform sampler2D surface; uniform float surfaceReady;
-      void main(){ float rim=pow(1.0-abs(dot(normalize(n),normalize(viewDir))),2.1);
-        float light=0.5+0.5*max(0.0,dot(normalize(n),normalize(vec3(-0.5,0.7,1.0))));
-        float torso=step(abs(worldPoint.x),0.16)*step(0.91,worldPoint.y)*step(worldPoint.y,1.4);
-        vec3 skin=mix(vec3(0.48,0.34,0.30)*light,vec3(0.70,0.87,0.91),pow(rim,0.6));
+      void main(){
+        vec3 normal=normalize(n), view=normalize(viewDir);
+        float rim=pow(1.0-abs(dot(normal,view)),3.0);
+        float key=max(0.0,dot(normal,normalize(vec3(-0.65,0.8,1.0))));
+        float fill=max(0.0,dot(normal,normalize(vec3(0.8,0.2,0.5))));
+        float light=0.28+key*0.72+fill*0.15;
+        float torso=(1.0-smoothstep(0.135,0.17,abs(worldPoint.x)))
+          *smoothstep(0.88,0.94,worldPoint.y)*(1.0-smoothstep(1.36,1.43,worldPoint.y));
+        float grain=fract(sin(dot(worldPoint,vec3(1271.1,3117.7,748.2)))*43758.5453);
+        vec3 skin=vec3(0.55,0.31,0.22)*light*(0.98+grain*0.04);
+        skin+=vec3(0.36,0.60,0.68)*rim*0.24;
         vec2 uv=vec2(0.5046+worldPoint.x*1.274,0.007+worldPoint.y*0.583);
         vec3 detail=texture2D(surface,clamp(uv,0.0,1.0)).rgb;
         float front=pow(max(0.0,worldNormal.z),0.5)*surfaceReady;
         float hasDetail=smoothstep(0.025,0.10,dot(detail,vec3(0.333)));
-        skin=mix(skin,detail*1.45+vec3(0.07,0.09,0.10),front*0.74*hasDetail);
-        float alpha=(0.38+rim*0.50)*mix(1.0,0.30,torso);
+        // Preserve the human face; the reference's skull overlay belongs inside the scan.
+        float belowFace=1.0-smoothstep(1.46,1.50,worldPoint.y);
+        skin=mix(skin,detail*1.25,front*0.38*hasDetail*belowFace);
+        // Color the existing facial geometry rather than drawing a skull over it.
+        vec2 eye=vec2(abs(worldPoint.x)-0.025,worldPoint.y-1.566);
+        float eyeFront=smoothstep(0.131,0.140,worldPoint.z);
+        float sclera=(1.0-smoothstep(0.78,1.0,length(eye/vec2(0.010,0.004))))*eyeFront;
+        float iris=(1.0-smoothstep(0.0026,0.0035,length(eye)))*sclera;
+        float pupil=(1.0-smoothstep(0.0011,0.0017,length(eye)))*sclera;
+        skin=mix(skin,vec3(0.66,0.62,0.55)*light,sclera);
+        skin=mix(skin,vec3(0.055,0.034,0.022),iris);
+        skin=mix(skin,vec3(0.006),pupil);
+        vec2 brow=vec2((abs(worldPoint.x)-0.025)/0.016,(worldPoint.y-1.582)/0.0028);
+        float eyebrow=(1.0-smoothstep(0.7,1.0,length(brow)))*smoothstep(0.13,0.145,worldPoint.z);
+        skin=mix(skin,vec3(0.13,0.075,0.045)*light,eyebrow*0.65);
+        float cranialWindow=smoothstep(1.585,1.62,worldPoint.y);
+        float alpha=mix(1.0,0.09,torso);
+        alpha=mix(alpha,0.20,cranialWindow);
         gl_FragColor=vec4(skin,alpha*opacity);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
