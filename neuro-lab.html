@@ -44,8 +44,21 @@ a.back{position:fixed;top:10px;left:10px;z-index:5;color:var(--muted);text-decor
 .note{color:var(--muted);font-size:13px}
 .list button{display:block;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid rgba(127,212,230,.12);padding:10px 0;min-height:44px}
 input.find{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);padding:8px 0;margin:8px 0}
+
 .score{font-variant-numeric:tabular-nums;color:var(--green)}
+.aim{position:fixed;z-index:4;top:138px;left:14px;right:14px;margin:0;pointer-events:none;font-family:Fraunces,Georgia,serif;font-weight:520;font-size:26px;letter-spacing:-.03em;text-shadow:0 10px 28px #000}
+.stage{position:fixed;z-index:6;left:10px;right:10px;bottom:calc(74px + env(safe-area-inset-bottom));display:none;background:rgba(8,16,24,.94);border:1px solid var(--line);border-radius:16px;padding:8px 8px 10px}
+.stage.on{display:block}
+.stage-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.stage-top .kicker{margin:0}
+.stage canvas{width:100%;height:156px;display:block;border-radius:10px;background:#050b10}
+.cap{min-height:2.6em;margin:8px 4px 0;font-size:14px}
+.topics{display:flex;flex-direction:column;gap:8px}
+.topics button{text-align:left;border:1px solid var(--line);background:transparent;border-radius:14px;padding:10px 12px;min-height:52px}
+.topics button strong{font-weight:600}
 @media(min-width:900px){
+  .stage{left:16px;right:auto;width:min(440px,36vw);bottom:18px}
+  .aim{top:88px;max-width:46vw}
   .sheet{left:auto;top:0;width:min(420px,38vw);max-height:none;height:100%;border-top:0;border-left:1px solid var(--line)}
   .dock{right:min(420px,38vw)}
 }
@@ -58,6 +71,13 @@ input.find{width:100%;background:transparent;border:0;border-bottom:1px solid va
 <div class="bar mods" id="mods" role="tablist" aria-label="Anatomy modules"></div>
 <div class="bar layers" id="layers" aria-label="Layer visibility"></div>
 <div class="dock" id="dock"></div>
+<p class="aim" id="aim"></p>
+<div class="stage" id="stage">
+  <div class="stage-top"><p class="kicker" id="vtitle">Study</p><button type="button" class="close" id="stage-x" style="position:static">Close</button></div>
+  <canvas id="reel" width="640" height="360" aria-label="Teaching sequence"></canvas>
+  <p class="cap" id="cap"></p>
+  <div class="row"><button type="button" id="replay">Play again</button><button type="button" id="studies">All studies</button></div>
+</div>
 <section class="sheet" id="sheet" aria-live="polite"></section>
 <div class="load" id="load"><div><p>Opening the brain atlas…</p><p class="note" id="loadmsg"></p></div></div>
 <script type="module">
@@ -73,6 +93,7 @@ const MODULES = [
   {id:"csf", title:"Ventricles", cats:["ventricles","meninges_dura"], text:"Ventricles, choroid plexus, aqueduct, falx and tentorium. Arachnoid granulations are not a mesh."},
   {id:"tracts", title:"Tracts", cats:["tracts"], text:"This atlas has no spinal cord mesh. The pathways below are the ones that were built. The spinothalamic tract is not among them."},
   {id:"vessels", title:"Vessels", cats:["arteries","veins_sinuses"], text:"Arterial segments of the circle of Willis and the dural sinuses included in the model."},
+  {id:"vasc", title:"Vascular lab", cats:["arteries","veins_sinuses"], text:"Neurovascular studies. The model moves to the vessels. A sequence shows the change and what it causes."},
   {id:"paths", title:"Pathways", cats:["cortex","tracts","white_matter","diencephalon","cranial_nerves","ventricles","veins_sinuses"], text:"Step through a pathway. Each step isolates meshes that are actually in the atlas."},
   {id:"sections", title:"Sections", cats:["cortex","ventricles","white_matter","brainstem","deep_grey","arteries"], text:"Axial, coronal and sagittal planes cut the 3D atlas. They are not CT or MRI slices. No DICOM volume is bundled, so there is no window or level control."},
   {id:"pressure", title:"Pressure", cats:["meninges_dura","cerebellum","cranial_nerves","brainstem"], text:"Herniation is taught on the tentorium, the falx, the cerebellar tonsil and the oculomotor nerve. The uncus is not a named mesh."},
@@ -452,6 +473,10 @@ const byLabel = new Map();
 let manifest = {nodes:[], categories:{}};
 let selected = null;
 let moduleId = "cortex";
+let lesson = null;
+let playT = 0;
+let fly = null;
+let vascId = null;
 let pathStep = 0;
 let pathId = "motor";
 let caseId = "mca";
@@ -532,7 +557,11 @@ function sceneAdd(){
     camera.position.copy(home.pos);
     controls.target.copy(home.target);
     loadEl.classList.add("gone");
-    applyModule();
+    if(lesson){ showLabels(lesson.meshes); frameLabels(lesson.meshes, lesson.view); }
+    else {
+      applyModule();
+      if(moduleId==="vasc") frameLabels(["Basilar artery","Internal carotid artery","Anterior cerebral artery","Posterior cerebral artery","Middle cerebral artery (M1-segment)","Superior sagittal sinus"], "base");
+    }
     if(sheet.classList.contains("open") && moduleId==="cortex") renderModule();
   }, function(ev){
     if(ev.total) loadMsg.textContent = Math.round(ev.loaded / ev.total * 100) + "%";
@@ -563,9 +592,24 @@ function up(e){
   const hits = ray.intersectObjects(meshes.filter(function(m){ return m.visible; }), false);
   if(hits[0]) openMesh(hits[0].object);
 }
-function frame(){
+let frameLast = 0;
+function frame(now){
   requestAnimationFrame(frame);
+  const dt = Math.min(0.05, frameLast ? (now - frameLast) / 1000 : 0.016);
+  frameLast = now;
+  if(fly){
+    fly.t = Math.min(1, fly.t + dt / 1.15);
+    const k = fly.t * fly.t * (3 - 2 * fly.t);
+    camera.position.lerpVectors(fly.from, fly.to, k);
+    controls.target.lerpVectors(fly.tFrom, fly.tTo, k);
+    if(fly.t >= 1) fly = null;
+  }
   if(controls) controls.update();
+  if(lesson && !reduced){
+    if(playT < lesson.dur) playT += dt;
+    drawLesson();
+    pulseFocus();
+  }
   if(renderer) renderer.render(scene, camera);
 }
 function resize(){
@@ -690,12 +734,516 @@ function esc(s){
     return "\u0026quot;";
   });
 }
+
+function clamp01(k){ return Math.max(0, Math.min(1, k)); }
+function phase(t, a, b){ return clamp01((t - a) / (b - a)); }
+function mix(a, b, k){ return a + (b - a) * k; }
+function willisMap(w, h){
+  const cx = w * 0.5, cy = h * 0.5, s = Math.min(w, h);
+  const P = function(x, y){ return [cx + x * s, cy + y * s]; };
+  return {
+    vertL:[P(-0.06,0.42), P(0,0.28)],
+    vertR:[P(0.06,0.42), P(0,0.28)],
+    bas:[P(0,0.28), P(0,0.08)],
+    pcaL:[P(0,0.08), P(-0.16,0.14), P(-0.28,0.24)],
+    pcaR:[P(0,0.08), P(0.16,0.14), P(0.28,0.24)],
+    pcomL:[P(-0.22,0.0), P(-0.2,0.12)],
+    pcomR:[P(0.22,0.0), P(0.2,0.12)],
+    icaL:[P(-0.34,0.2), P(-0.22,0.0)],
+    icaR:[P(0.34,0.2), P(0.22,0.0)],
+    mcaL:[P(-0.22,0.0), P(-0.46,-0.02)],
+    mcaR:[P(0.22,0.0), P(0.46,-0.02)],
+    acaL:[P(-0.22,0.0), P(-0.1,-0.14), P(-0.06,-0.32)],
+    acaR:[P(0.22,0.0), P(0.1,-0.14), P(0.06,-0.32)],
+    acomm:[P(-0.08,-0.12), P(0.08,-0.12)]
+  };
+}
+function strokePath(ctx, pts, width, color){
+  if(!pts || pts.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for(let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.stroke();
+}
+function pathLen(pts){
+  let n = 0;
+  for(let i = 1; i < pts.length; i++) n += Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]);
+  return n;
+}
+function pointAt(pts, dist){
+  let left = dist;
+  for(let i = 1; i < pts.length; i++){
+    const seg = Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]);
+    if(left <= seg){
+      const k = seg ? left / seg : 0;
+      return [mix(pts[i-1][0], pts[i][0], k), mix(pts[i-1][1], pts[i][1], k)];
+    }
+    left -= seg;
+  }
+  return pts[pts.length - 1];
+}
+function flowDots(ctx, pts, t, speed, color, count){
+  const L = pathLen(pts);
+  if(!L) return;
+  ctx.fillStyle = color;
+  for(let i = 0; i < count; i++){
+    const d = ((t * speed + i / count) % 1) * L;
+    const p = pointAt(pts, d);
+    ctx.beginPath();
+    ctx.arc(p[0], p[1], 2.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+function wash(ctx, w, h){
+  ctx.fillStyle = "#071018";
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = "rgba(127,212,230,.08)";
+  ctx.lineWidth = 1;
+  for(let x = 32; x < w; x += 32){
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  }
+}
+function tag(ctx, text, x, y){
+  ctx.fillStyle = "rgba(231,241,244,.8)";
+  ctx.font = "13px Figtree, sans-serif";
+  ctx.fillText(text, x, y);
+}
+function headOutline(ctx, w, h){
+  ctx.beginPath();
+  ctx.ellipse(w*0.72, h*0.48, w*0.2, h*0.34, 0, 0, Math.PI*2);
+  ctx.strokeStyle = "rgba(231,241,244,.4)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+function drawVessels(ctx, g, keys, width, color, grow){
+  keys.forEach(function(key, i){
+    const show = grow == null ? 1 : clamp01(grow * keys.length - i);
+    if(show <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, show);
+    strokePath(ctx, g[key], width, color);
+    ctx.restore();
+  });
+}
+function territoryHead(ctx, w, h, lit){
+  const cx = w*0.73, cy = h*0.48, rx = w*0.18, ry = h*0.3;
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
+  ctx.clip();
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = lit.aca || "rgba(62,224,160,.15)";
+  ctx.fillRect(cx - rx, cy - ry, rx*0.55, ry*2);
+  ctx.fillStyle = lit.mca || "rgba(127,212,230,.15)";
+  ctx.fillRect(cx - rx*0.45, cy - ry, rx*1.15, ry*2);
+  ctx.fillStyle = lit.pca || "rgba(226,180,138,.2)";
+  ctx.fillRect(cx - rx, cy + ry*0.35, rx*2, ry*0.7);
+  ctx.restore();
+  headOutline(ctx, w, h);
+  tag(ctx, "ACA", cx - rx + 6, cy - 8);
+  tag(ctx, "MCA", cx - 10, cy + 4);
+  tag(ctx, "PCA", cx - 16, cy + ry*0.55);
+}
+function drawCircle(ctx, w, h, t){
+  wash(ctx, w, h);
+  const g = willisMap(w * 0.86, h);
+  const keys = ["vertL","vertR","bas","pcaL","pcaR","icaL","icaR","mcaL","mcaR","acaL","acaR","pcomL","pcomR","acomm"];
+  drawVessels(ctx, g, keys, 7, "#c5dde6", phase(t, 0.2, 4));
+  keys.forEach(function(key){ if(t > 1.2) flowDots(ctx, g[key], t, 0.28, "#9fe7ff", 3); });
+  if(t > 4){
+    ctx.save();
+    ctx.globalAlpha = phase(t, 4, 6);
+    territoryHead(ctx, w, h, {
+      aca:"rgba(62,224,160,.85)",
+      mca:"rgba(90,170,230,.9)",
+      pca:"rgba(226,180,138,.9)"
+    });
+    ctx.restore();
+  }
+  tag(ctx, t < 4 ? "Circle of Willis" : "Arterial territories", 16, 28);
+}
+function drawLvo(ctx, w, h, t){
+  wash(ctx, w, h);
+  const g = willisMap(w * 0.78, h);
+  drawVessels(ctx, g, ["icaL","mcaL","acaL","icaR","bas","pcaL","pcaR"], 7, "#9fb4c0", 1);
+  const clot = phase(t, 2.2, 3.4);
+  const path = g.mcaL;
+  const site = pointAt(path, pathLen(path) * 0.42);
+  if(t < 2.4) flowDots(ctx, g.icaL.concat(g.mcaL.slice(1)), t, 0.45, "#9fe7ff", 6);
+  else flowDots(ctx, g.icaL, t, 0.2, "#e7f1f4", 3);
+  if(clot > 0){
+    ctx.fillStyle = "#1b1f24";
+    ctx.strokeStyle = "#e2b48a";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(site[0], site[1], 8 + 6*clot, 5 + 2*clot, -0.2, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+  }
+  const dark = phase(t, 4.2, 7);
+  territoryHead(ctx, w, h, {
+    aca:"rgba(62,224,160,.75)",
+    mca: dark > 0.05 ? "rgba(120,40,40,"+(0.35+0.55*dark)+")" : "rgba(90,170,230,.85)",
+    pca:"rgba(226,180,138,.8)"
+  });
+  tag(ctx, clot < 1 ? "Open M1" : "M1 occlusion", 16, 28);
+}
+function drawCollat(ctx, w, h, t){
+  wash(ctx, w, h);
+  const g = willisMap(w * 0.86, h);
+  drawVessels(ctx, g, ["icaL","icaR","mcaL","mcaR","acaL","acaR","acomm","pcomL","pcomR","pcaL","pcaR","bas"], 6, "#8aa0ab", 1);
+  const site = pointAt(g.mcaL, pathLen(g.mcaL) * 0.45);
+  ctx.fillStyle = "#14181c";
+  ctx.beginPath(); ctx.arc(site[0], site[1], 7, 0, Math.PI*2); ctx.fill();
+  if(t > 2.4){
+    ctx.save();
+    ctx.globalAlpha = phase(t, 2.4, 4);
+    strokePath(ctx, g.acomm, 5, "#3ee0a0");
+    flowDots(ctx, g.acaR.concat(g.acomm).concat(g.acaL.slice().reverse()), t, 0.35, "#b8ffdf", 5);
+    ctx.restore();
+  }
+  if(t > 5){
+    ctx.save();
+    ctx.globalAlpha = phase(t, 5, 7);
+    ctx.setLineDash([4, 5]);
+    strokePath(ctx, [[w*0.62,h*0.34],[w*0.48,h*0.42],[w*0.36,h*0.4]], 2, "#e2b48a");
+    ctx.setLineDash([]);
+    tag(ctx, "Pial collateral", w*0.48, h*0.32);
+    ctx.restore();
+  }
+  tag(ctx, "Collateral routes", 16, 28);
+}
+function spasmShape(ctx, x0, x1, y, base, narrow){
+  const segs = 48;
+  ctx.beginPath();
+  for(let i = 0; i <= segs; i++){
+    const k = i / segs;
+    const band = Math.exp(-Math.pow((k - 0.58) / 0.11, 2));
+    const r = base * (1 - band * narrow);
+    const x = mix(x0, x1, k);
+    if(i === 0) ctx.moveTo(x, y - r); else ctx.lineTo(x, y - r);
+  }
+  for(let i = segs; i >= 0; i--){
+    const k = i / segs;
+    const band = Math.exp(-Math.pow((k - 0.58) / 0.11, 2));
+    const r = base * (1 - band * narrow);
+    ctx.lineTo(mix(x0, x1, k), y + r);
+  }
+  ctx.closePath();
+}
+function drawSpasm(ctx, w, h, t){
+  wash(ctx, w, h);
+  const narrow = phase(t, 2.2, 5.2);
+  const y = h * 0.46, x0 = w * 0.1, x1 = w * 0.9, base = h * 0.11;
+  spasmShape(ctx, x0, x1, y, base, narrow);
+  ctx.fillStyle = "#d5e4ea";
+  ctx.fill();
+  spasmShape(ctx, x0, x1, y, base * 0.62, narrow);
+  const hurt = phase(t, 5.4, 8);
+  ctx.fillStyle = hurt > 0.5 ? "#9a3040" : "#e23b4a";
+  ctx.fill();
+  const speed = mix(0.55, 0.12, narrow);
+  for(let i = 0; i < 7; i++){
+    let k = (t * speed + i / 7) % 1;
+    const band = Math.exp(-Math.pow((k - 0.58) / 0.11, 2));
+    if(narrow > 0.65 && k > 0.62) continue;
+    ctx.fillStyle = "#fff";
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.arc(mix(x0, x1, k), y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.globalAlpha = 0.25 + 0.75 * hurt;
+  ctx.fillStyle = hurt > 0.2 ? "#e07a7a" : "#3ee0a0";
+  ctx.beginPath();
+  ctx.ellipse(w*0.78, h*0.78, 58, 26, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  tag(ctx, narrow < 0.05 ? "Normal lumen" : (hurt < 0.2 ? "Vasospasm" : "Distal ischaemia"), 16, 28);
+}
+function drawVeins(ctx, w, h, t){
+  wash(ctx, w, h);
+  const cx = w*0.48, top = h*0.16, bot = h*0.78;
+  const sss = [[cx, top],[cx, h*0.22],[w*0.62, h*0.34]];
+  const straight = [[cx, h*0.48],[w*0.58, h*0.4]];
+  const trans = [[w*0.62, h*0.34],[w*0.7, h*0.5]];
+  const sig = [[w*0.7, h*0.5],[w*0.66, bot]];
+  const cortical = [[w*0.28, h*0.4],[cx, h*0.28]];
+  const deep = [[w*0.34, h*0.5],[cx, h*0.48]];
+  const grow = phase(t, 0.2, 3);
+  [["sss",sss],["straight",straight],["trans",trans],["sig",sig]].forEach(function(pair, i){
+    if(grow * 4 < i) return;
+    strokePath(ctx, pair[1], 8, "#7fd4e6");
+  });
+  if(t > 2) strokePath(ctx, cortical, 3, "#d5e4ea");
+  if(t > 3) strokePath(ctx, deep, 3, "#e2b48a");
+  if(t > 1) flowDots(ctx, cortical.concat(sss.slice(1)).concat(trans).concat(sig), t, 0.22, "#e7f1f4", 5);
+  if(t > 3.2) flowDots(ctx, deep.concat(straight).concat(trans).concat(sig), t, 0.22, "#e2b48a", 4);
+  tag(ctx, "Venous drainage", 16, 28);
+  tag(ctx, "Superior sagittal sinus", cx - 70, top - 6);
+}
+function drawCvst(ctx, w, h, t){
+  drawVeins(ctx, w, h, Math.min(t, 2.2));
+  const clot = phase(t, 2.4, 5);
+  if(clot > 0){
+    ctx.fillStyle = "#2a241c";
+    ctx.strokeStyle = "#e2b48a";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(w*0.42, h*0.18, 70*clot, 16, 8) : ctx.rect(w*0.42, h*0.18, 70*clot, 16);
+    ctx.fill(); ctx.stroke();
+  }
+  const bleed = phase(t, 5.2, 8);
+  if(bleed > 0){
+    ctx.save();
+    ctx.globalAlpha = bleed;
+    ctx.fillStyle = "#9a3040";
+    ctx.beginPath();
+    ctx.ellipse(w*0.34, h*0.36, 36, 18, -0.4, 0, Math.PI*2);
+    ctx.fill();
+    ctx.setLineDash([3, 4]);
+    ctx.strokeStyle = "rgba(231,241,244,.7)";
+    ctx.strokeRect(w*0.22, h*0.28, 90, 70);
+    ctx.restore();
+    tag(ctx, "Crosses arterial borders", 16, h - 18);
+  }
+  tag(ctx, clot < 0.2 ? "Sinus open" : "Sinus thrombosis", 16, 28);
+}
+function drawAneurysm(ctx, w, h, t){
+  wash(ctx, w, h);
+  const y = h*0.52, x0 = w*0.12, x1 = w*0.62;
+  strokePath(ctx, [[x0,y],[x1,y]], 16, "#d5e4ea");
+  strokePath(ctx, [[w*0.48,y],[w*0.48, h*0.22]], 10, "#d5e4ea");
+  const grow = phase(t, 2.2, 5);
+  const ax = w*0.48, ay = y;
+  if(grow > 0){
+    ctx.beginPath();
+    ctx.ellipse(ax + 18*grow, ay - 28*grow, 10 + 22*grow, 12 + 26*grow, -0.5, 0, Math.PI*2);
+    const grd = ctx.createRadialGradient(ax, ay - 20*grow, 4, ax, ay - 24*grow, 40);
+    grd.addColorStop(0, "#ffd0d0");
+    grd.addColorStop(1, "#9a3040");
+    ctx.fillStyle = grd;
+    ctx.fill();
+    ctx.strokeStyle = "#e7f1f4";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  const leak = phase(t, 6.2, 8.2);
+  if(leak > 0){
+    ctx.save();
+    ctx.globalAlpha = leak;
+    for(let i = 0; i < 8; i++){
+      ctx.fillStyle = "#e23b4a";
+      ctx.beginPath();
+      ctx.arc(ax + 28 + i*10, ay - 48 - i*6, 3 + leak*2, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  tag(ctx, "III", w*0.7, y + 6);
+  strokePath(ctx, [[w*0.66, y-8],[w*0.84, y-28]], 3, "#e2b48a");
+  tag(ctx, grow < 0.05 ? "Even wall" : (leak < 0.2 ? "Sac at the branch" : "Subarachnoid leak"), 16, 28);
+}
+function drawAvm(ctx, w, h, t){
+  wash(ctx, w, h);
+  const ax = w*0.18, ay = h*0.55, vx = w*0.78, vy = h*0.42;
+  strokePath(ctx, [[ax, ay],[w*0.4, h*0.5]], 8, "#e23b4a");
+  tag(ctx, "Artery", ax, ay + 22);
+  const nidus = phase(t, 2.4, 4.5);
+  if(nidus < 0.15){
+    strokePath(ctx, [[w*0.4,h*0.5],[w*0.48,h*0.46],[w*0.56,h*0.5],[w*0.64,h*0.46]], 2, "#9fd4c4");
+    tag(ctx, "Capillaries", w*0.42, h*0.38);
+  } else {
+    ctx.strokeStyle = "rgba(226,180,138,.9)";
+    ctx.lineWidth = 1.6;
+    for(let i = 0; i < 10; i++){
+      ctx.beginPath();
+      ctx.arc(w*0.5, h*0.48, 10 + i*3.2, i, i + 1.6);
+      ctx.stroke();
+    }
+    tag(ctx, "Nidus", w*0.46, h*0.28);
+  }
+  const early = phase(t, 4.2, 6.5);
+  strokePath(ctx, [[w*0.6,h*0.48],[vx, vy]], 7, early > 0.4 ? "#e07a7a" : "#7fd4e6");
+  tag(ctx, early > 0.4 ? "Vein fills early" : "Vein", vx - 70, vy - 10);
+  if(t > 6){
+    ctx.save();
+    ctx.globalAlpha = phase(t, 6, 8);
+    ctx.fillStyle = "rgba(80,90,100,.85)";
+    ctx.beginPath();
+    ctx.ellipse(w*0.5, h*0.72, 70, 22, 0, 0, Math.PI*2);
+    ctx.fill();
+    tag(ctx, "Steal", w*0.46, h*0.76);
+    ctx.restore();
+  }
+}
+const VASC = [
+  {id:"circle", title:"Circle and territories", area:"Circle of Willis", view:"base", dur:9,
+    meshes:["Internal carotid artery","Anterior cerebral artery","Anterior communicating artery","Posterior communicating artery","Posterior cerebral artery","Basilar artery","Vertebral artery","Middle cerebral artery (M1-segment)"],
+    scenes:[{t:0,text:"The internal carotid and basilar systems meet at the skull base."},{t:3.2,text:"Anterior cerebral arteries supply the medial hemisphere. Middle cerebral arteries supply the lateral surface."},{t:6.2,text:"Posterior cerebral arteries supply the occiput, the medial temporal lobe and much of the thalamus."}],
+    draw:drawCircle},
+  {id:"lvo", title:"Large-vessel occlusion", area:"Middle cerebral stem", view:"side", dur:9,
+    meshes:["Internal carotid artery","Middle cerebral artery (M1-segment)","Insular branches of middle cerebral artery (M2-segment)","Middle cerebral artery (M3 segment)","Precentral gyrus","Opercular part of inferior frontal gyrus"],
+    scenes:[{t:0,text:"Flow runs from the internal carotid into the middle cerebral stem."},{t:2.8,text:"A clot stops in the M1 segment. This is a large-vessel occlusion."},{t:5.6,text:"The lateral hemisphere loses flow: face, arm, and language or attention. The leg cortex may be spared."}],
+    draw:drawLvo},
+  {id:"collat", title:"Collateral circulation", area:"Communicating arteries", view:"base", dur:9,
+    meshes:["Anterior communicating artery","Anterior cerebral artery","Posterior communicating artery","Posterior cerebral artery","Middle cerebral artery (M1-segment)","Ophthalmic artery","Internal carotid artery"],
+    scenes:[{t:0,text:"The middle cerebral stem is blocked."},{t:3,text:"The anterior communicating artery can fill the opposite anterior cerebral artery. A posterior communicating artery can feed the posterior cerebral artery."},{t:6,text:"Pial collaterals from the anterior and posterior cerebral arteries refill cortex slowly, and often not enough."}],
+    draw:drawCollat},
+  {id:"spasm", title:"Cerebral vasospasm", area:"Circle arteries", view:"base", dur:9,
+    meshes:["Internal carotid artery","Middle cerebral artery (M1-segment)","Anterior cerebral artery","Basilar artery","Posterior cerebral artery"],
+    scenes:[{t:0,text:"The lumen is open and flow is laminar."},{t:2.4,text:"Days after subarachnoid blood, the wall tightens. This is vasospasm."},{t:5.8,text:"Distal flow falls. The territory can infarct. That is delayed cerebral ischaemia."}],
+    draw:drawSpasm},
+  {id:"veins", title:"Venous drainage", area:"Dural sinuses", view:"top", dur:9,
+    meshes:["Superior sagittal sinus","Inferior sagittal sinus","Straight sinus","Transverse sinus","Sigmoid sinus","Cavernous sinus"],
+    scenes:[{t:0,text:"Cortical veins drain toward the superior sagittal sinus. Those veins are not separate meshes, so the sequence draws them."},{t:3.2,text:"Deep veins meet the straight sinus."},{t:6.2,text:"Both sinuses reach the transverse sinus, then the sigmoid sinus, on the way to the jugular vein."}],
+    draw:drawVeins},
+  {id:"cvst", title:"Sinus thrombosis", area:"Superior sagittal sinus", view:"top", dur:9,
+    meshes:["Superior sagittal sinus","Falx cerebri","Paracentral gyrus and sulcus"],
+    scenes:[{t:0,text:"The superior sagittal sinus is open."},{t:2.6,text:"Thrombus forms in the sinus and outflow stops."},{t:5.6,text:"Pressure backs into the cortex. The infarct crosses arterial borders and often bleeds. Parasagittal cortex explains the leg weakness and the seizures."}],
+    draw:drawCvst},
+  {id:"aneurysm", title:"Aneurysm anatomy", area:"Posterior communicating artery", view:"base", dur:9,
+    meshes:["Posterior communicating artery","Internal carotid artery","Oculomotor nerve (III)","Anterior communicating artery"],
+    scenes:[{t:0,text:"The wall is even where the posterior communicating artery leaves the carotid."},{t:2.8,text:"A sac forms at the branch point. The dome is the thin part."},{t:6,text:"The dome can rupture into the subarachnoid space. This aneurysm sits beside the oculomotor nerve."}],
+    draw:drawAneurysm},
+  {id:"avm", title:"Arteriovenous malformation", area:"Artery to sinus", view:"side", dur:9,
+    meshes:["Middle cerebral artery (M3 segment)","Parietal branches of middle cerebral artery","Superior sagittal sinus"],
+    scenes:[{t:0,text:"A normal artery ends in capillaries, then a vein. The atlas has no malformation mesh."},{t:3,text:"In a malformation the artery feeds a nidus and the vein fills at once."},{t:6.2,text:"There is no capillary bed. The risks are haemorrhage and steal from nearby brain."}],
+    draw:drawAvm}
+];
+function captionAt(item, t){
+  let text = item.scenes[0].text;
+  item.scenes.forEach(function(scene){ if(t >= scene.t) text = scene.text; });
+  return text;
+}
+function drawLesson(){
+  const reel = document.getElementById("reel");
+  const cap = document.getElementById("cap");
+  if(!reel || !lesson) return;
+  const ctx = reel.getContext("2d");
+  lesson.draw(ctx, reel.width, reel.height, playT);
+  ctx.fillStyle = "rgba(127,212,230,.25)";
+  ctx.fillRect(0, reel.height - 4, reel.width, 4);
+  ctx.fillStyle = "#7fd4e6";
+  ctx.fillRect(0, reel.height - 4, reel.width * clamp01(playT / lesson.dur), 4);
+  const line = captionAt(lesson, playT);
+  if(cap && cap.textContent !== line) cap.textContent = line;
+}
+function frameLabels(labels, view){
+  if(!camera || !meshes.length || !controls) return;
+  const box = new THREE.Box3();
+  let hit = 0;
+  meshes.forEach(function(mesh){
+    if(labels.indexOf(mesh.userData.bx_label) === -1) return;
+    box.expandByObject(mesh);
+    hit += 1;
+  });
+  if(!hit || box.isEmpty()) return;
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const radius = Math.max(size.length() * 0.42, (extent || 1) * 0.2);
+  const dist = radius / Math.sin((camera.fov * Math.PI / 180) / 2) * 0.85;
+  const dirs = {
+    base: new THREE.Vector3(0.15, -0.45, 1),
+    top: new THREE.Vector3(0.05, 1, 0.2),
+    side: new THREE.Vector3(1, 0.12, 0.45),
+    front: new THREE.Vector3(0, 0.08, 1)
+  };
+  const dir = (dirs[view] || dirs.base).clone().normalize();
+  const to = center.clone().add(dir.multiplyScalar(dist));
+  const tTo = center.clone();
+  if(view !== "top") tTo.y -= radius * 0.15;
+  fly = {from: camera.position.clone(), to: to, tFrom: controls.target.clone(), tTo: tTo, t: 0};
+  controls.autoRotate = false;
+}
+function pulseFocus(){
+  if(!lesson) return;
+  const names = {};
+  lesson.meshes.forEach(function(name){ names[name] = true; });
+  const warm = lesson.id === "spasm" ? phase(playT, 2, 6) : (lesson.id === "lvo" ? phase(playT, 3, 6) : 0);
+  const k = 0.22 + 0.38 * (0.5 + 0.5 * Math.sin(playT * 3));
+  meshes.forEach(function(mesh){
+    if(!names[mesh.userData.bx_label]) return;
+    mats(mesh).forEach(function(mat){
+      mat.emissive = mat.emissive || new THREE.Color();
+      if(warm > 0.2) mat.emissive.setRGB(0.55 * warm, 0.12, 0.1);
+      else mat.emissive.set(0x1a6b58);
+      mat.emissiveIntensity = k;
+    });
+  });
+}
+function renderVasc(){
+  lesson = null;
+  document.getElementById("stage").classList.remove("on");
+  document.getElementById("aim").textContent = "";
+  applyModule();
+  frameLabels(["Basilar artery","Internal carotid artery","Anterior cerebral artery","Posterior cerebral artery","Middle cerebral artery (M1-segment)","Superior sagittal sinus"], "base");
+  sheet.innerHTML = '<button type="button" class="close" id="shut">Close</button><p class="kicker">Neurovascular laboratory</p><h2>Choose a study</h2><p>The view moves to that circulation. A short sequence then plays the normal state, the change, and what it causes. These are drawn teaching sequences, not patient angiograms. The atlas has no thrombus, nidus or aneurysm sac as its own mesh.</p><div class="topics">'+VASC.map(function(item){
+    return '<button type="button" data-vasc="'+item.id+'"><strong>'+esc(item.title)+'</strong><br><span class="note">'+esc(item.area)+'</span></button>';
+  }).join("")+'</div>';
+  sheet.classList.add("open");
+  sheet.scrollTop = 0;
+  document.getElementById("shut").onclick = function(){
+    sheet.classList.remove("open");
+    lesson = null;
+  };
+  sheet.querySelectorAll("[data-vasc]").forEach(function(btn){
+    btn.onclick = function(){ playVasc(btn.getAttribute("data-vasc")); };
+  });
+}
+function playVasc(id){
+  const item = VASC.find(function(entry){ return entry.id === id; });
+  if(!item) return;
+  vascId = id;
+  lesson = item;
+  playT = reduced ? item.dur : 0;
+  sheet.classList.remove("open");
+  const stage = document.getElementById("stage");
+  stage.classList.add("on");
+  document.getElementById("vtitle").textContent = item.title;
+  document.getElementById("aim").textContent = item.area;
+  document.getElementById("replay").textContent = reduced ? "Next" : "Play again";
+  showLabels(item.meshes);
+  frameLabels(item.meshes, item.view);
+  drawLesson();
+}
+document.getElementById("replay").onclick = function(){
+  if(!lesson) return;
+  if(reduced){
+    const next = lesson.scenes.find(function(scene){ return scene.t > playT + 0.05; });
+    playT = next ? next.t : 0;
+  }else playT = 0;
+  drawLesson();
+};
+document.getElementById("studies").onclick = function(){ renderVasc(); };
+document.getElementById("stage-x").onclick = function(){
+  lesson = null;
+  document.getElementById("stage").classList.remove("on");
+  document.getElementById("aim").textContent = "";
+  applyModule();
+};
+
 function paint(){
   document.getElementById("mods").innerHTML = MODULES.map(function(mod){
     return '<button type="button"'+(mod.id===moduleId?' class="on"':'')+' data-mod="'+mod.id+'">'+esc(mod.title)+'</button>';
   }).join("");
   document.getElementById("mods").querySelectorAll("[data-mod]").forEach(function(btn){
-    btn.onclick = function(){ moduleId = btn.getAttribute("data-mod"); caseOpen = moduleId==="cases"; applyModule(); paint(); if(moduleId!=="cases") renderModule(); else renderCase(); };
+    btn.onclick = function(){
+      moduleId = btn.getAttribute("data-mod");
+      caseOpen = moduleId==="cases";
+      lesson = null;
+      document.getElementById("stage").classList.remove("on");
+      document.getElementById("aim").textContent = "";
+      applyModule();
+      paint();
+      if(moduleId==="vasc") renderVasc();
+      else if(moduleId!=="cases") renderModule();
+      else renderCase();
+    };
   });
   paintDock();
   paintLayers();
@@ -761,6 +1309,7 @@ function applyModule(){
 function renderModule(){
   const mod = MODULES.find(function(item){ return item.id === moduleId; });
   if(!mod) return;
+  if(moduleId === "vasc"){ renderVasc(); return; }
   if(moduleId === "paths"){ renderPath(); return; }
   if(moduleId === "sections"){ renderSections(); return; }
   if(moduleId === "list"){ renderList(); return; }
