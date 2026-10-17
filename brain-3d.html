@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111a">
+<title>Interactive 3D Brain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520&family=Figtree:wght@460;600&display=swap" rel="stylesheet">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+<style>
+:root{--bg:#07111a;--fg:#e7f1f4;--muted:#93a8b3;--line:rgba(127,212,230,.28);--cyan:#7fd4e6}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:Figtree,sans-serif}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+#view{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+a.back{position:fixed;top:10px;left:10px;z-index:5;color:var(--muted);text-decoration:none;min-height:40px;display:flex;align-items:center}
+.bar{position:fixed;z-index:4;left:0;right:0;display:flex;gap:6px;overflow:auto;padding:0 10px 6px;-webkit-overflow-scrolling:touch}
+.bar.structs{top:48px}
+.bar.views{top:92px}
+.bar button,.dock button{flex:0 0 auto;border:1px solid var(--line);background:rgba(7,17,26,.72);color:var(--fg);border-radius:999px;min-height:36px;padding:0 12px}
+.bar button.on,.dock button.on{border-color:var(--cyan);color:var(--cyan)}
+.dock{position:fixed;z-index:4;left:0;right:0;bottom:0;display:flex;gap:8px;align-items:center;overflow:auto;padding:8px 10px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(transparent,rgba(7,17,26,.94) 28%)}
+.dock label{flex:0 0 auto;display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.dock input[type=range]{width:110px}
+.sheet{position:fixed;z-index:6;left:0;right:0;bottom:0;max-height:min(48dvh,460px);overflow:auto;background:rgba(8,16,24,.96);border-top:1px solid var(--line);padding:14px 16px calc(16px + env(safe-area-inset-bottom));transform:translateY(110%);transition:transform .35s ease}
+.sheet.open{transform:none}
+.sheet h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:28px;margin:0 0 4px;letter-spacing:-.03em}
+.kicker{margin:0;color:var(--cyan);letter-spacing:.14em;text-transform:uppercase;font-size:11px}
+.sheet p{margin:8px 0;line-height:1.45}
+.sheet h3{margin:14px 0 4px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#e2b48a}
+.close{position:absolute;top:8px;right:8px;border:0;background:transparent;color:var(--muted);min-width:44px;min-height:44px}
+.note{color:var(--muted);font-size:13px}
+.load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:7;background:var(--bg);text-align:center;padding:24px}
+.load.gone{display:none}
+@media(min-width:900px){
+  .sheet{left:auto;top:0;width:min(420px,38vw);max-height:none;height:100%;border-top:0;border-left:1px solid var(--line)}
+  .dock{right:min(420px,38vw)}
+}
+@media(prefers-reduced-motion:reduce){.sheet{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="Three dimensional brain. Drag to turn it a full circle. Pinch to zoom. Tap a structure."></canvas>
+<a class="back" href="hub.html">Brain</a>
+<div class="bar structs" id="structs" aria-label="Structures"></div>
+<div class="bar views" id="views" aria-label="Surfaces"></div>
+<div class="dock" id="dock"></div>
+<section class="sheet" id="sheet" aria-live="polite"></section>
+<div class="load" id="load"><div><p>Opening the brain…</p><p class="note" id="loadmsg"></p></div></div>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const FRONTAL = ["Superior frontal gyrus","Middle frontal gyrus","Inferior frontal sulcus","Superior frontal sulcus","Opercular part of inferior frontal gyrus","Triangular part of inferior frontal gyrus","Orbital part of inferior frontal gyrus","Orbital gyri","Orbital gyri (Frontomarginal gyrus and sulcus)","Orbital sulci (H-shaped orbital sulci)","Orbital sulci (Lateral Orbital sulcus)","Straight gyrus (Gyrus rectus)","Olfactory sulcus","Precentral gyrus","Precentral sulcus (Superior part)","Precentral sulcus (inferior part)","Transverse frontopolar gyrus and sulcus","Paracentral gyrus and sulcus","Paracentral sulcus"];
+const PARIETAL = ["Postcentral gyrus","Postcentral sulcus","Superior parietal lobule","Supramarginal gyrus","Angular gyrus","Precuneus","Intraparietal sulcus","Sulcus interm prim-Jensen","Subparietal sulcus"];
+const TEMPORAL = ["Superior temporal gyrus (Lateral part)","Middle temporal gyrus","Inferior temporal gyrus","Superior temporal sulcus","Inferior temporal sulcus","Temporal pole","Temporal plane","Transverse temporal gyri","Lateral occipitotemporal gyrus","Medial occipitotemporal gyrus (Parahippocampal)","Occipitotemporal sulcus (Lateral part)","Collateral sulcus"];
+const OCCIPITAL = ["Occipital pole","Cuneus","Lingual gyrus","Superior occipital gyri","Lateral occipital gyrus (Middle occipital gyrus)","Inferior occipital gyrus and sulcus","Calcarine sulcus","Anterior occipital sulcus","Transverse occipital sulcus","Lunate sulcus","Parieto-occipital sulcus","Posterior transverse collateral sulcus"];
+const INSULA = ["Insula (Subcentral gyrus and ant. and post. sulci)","Circular sulcus of insula","Lat Fis-ant-Horizont","Lat Fis-ant-Vertical","Lat Fis-post"];
+const BASAL = ["Caudate nucleus","Putamen","Globus pallidus external","Globus pallidus internal","Nucleus accumbens","Subthalamic nucleus","Substantia nigra"];
+const THALAMUS = ["Anterior nuclei of thalamus","Intralaminar and lateral posterior nuclei","Mediodorsal nucleus","Pulvinar","Ventral anterior nucleus","Ventral laterodorsal nucleus","Ventral lateroventral nucleus","Lateral geniculate body","Medial geniculate body"];
+const HYPO = ["Anterior hypothalamus","Lateral hypothalamus","Posterior hypothalamus","Preoptic hypothalamus","Tuberal hypothalamus","Mamillary body"];
+
+const GROUPS = [
+  {id:"frontal", title:"Frontal lobe", color:"#e0b59a", labels:FRONTAL, deep:false,
+    location:"The part of each hemisphere in front of the central sulcus, including the lateral, orbital and medial surfaces. The paracentral mesh also carries the sensory cortex for the leg.",
+    functions:"Planning, attention and voluntary movement. The precentral gyrus is the primary motor cortex: face and arm on the lateral surface, leg on the medial surface. In the dominant hemisphere the opercular and triangular parts of the inferior frontal gyrus form Broca's area.",
+    supply:"Middle cerebral artery on the lateral surface. Anterior cerebral artery on the medial surface, including the paracentral leg area.",
+    clinical:"Lateral injury weakens the opposite face and arm. If the dominant inferior frontal gyrus is involved, speech is non-fluent and comprehension is relatively spared. Medial injury weakens the opposite leg."},
+  {id:"parietal", title:"Parietal lobe", color:"#7fa8b8", labels:PARIETAL, deep:false,
+    location:"Behind the central sulcus, above the lateral fissure, and in front of the parieto-occipital sulcus. The precuneus is the medial surface.",
+    functions:"The postcentral gyrus is the primary somatosensory cortex. The superior parietal lobule guides reaching. The supramarginal and angular gyri take part in language and calculation in the dominant hemisphere, and in spatial attention in the other.",
+    supply:"Middle cerebral artery laterally. Anterior cerebral artery for the medial parietal cortex.",
+    clinical:"A non-dominant lesion causes neglect of the opposite side of space. A dominant inferior parietal lesion disturbs language, writing and calculation. Cortical sensory loss is not a length-dependent neuropathy."},
+  {id:"temporal", title:"Temporal lobe", color:"#c49a78", labels:TEMPORAL, deep:false,
+    location:"Below the lateral fissure, in the middle cranial fossa. The hippocampus and amygdala sit in its medial part and are opened separately.",
+    functions:"Hearing is in the transverse temporal gyri. The dominant posterior temporal cortex is involved in understanding language. The medial temporal lobe forms new memory. The planum temporale sits beside that language cortex. This atlas has no mesh named Wernicke.",
+    supply:"Middle cerebral artery on the lateral surface. Posterior cerebral artery and the anterior choroidal artery medially.",
+    clinical:"A dominant posterior lesion impairs comprehension. Injury on both medial temporal lobes causes a lasting failure to form new memories. Seizures often begin in this lobe."},
+  {id:"occipital", title:"Occipital lobe", color:"#8aaa8e", labels:OCCIPITAL, deep:false,
+    location:"The posterior pole, behind the parieto-occipital sulcus. Primary visual cortex lies in the banks of the calcarine sulcus. The mesh is the sulcus, not a separate macular object.",
+    functions:"Vision. The upper bank sees the lower field. The lower bank sees the upper field.",
+    supply:"Posterior cerebral artery. The occipital pole can be supplied by the middle cerebral artery, which is why central vision is sometimes spared.",
+    clinical:"A posterior cerebral infarct causes a contralateral homonymous field defect. Weakness is slight unless the midbrain or thalamus is included."},
+  {id:"insula", title:"Insula", color:"#c4847c", labels:INSULA, deep:false, buried:true,
+    location:"Cortex buried in the lateral fissure, covered by the frontal, parietal and temporal opercula. The circular sulcus is its border.",
+    functions:"Taste, visceral sensation, and integration of autonomic and emotional information.",
+    supply:"Insular branches of the middle cerebral artery, the M2 segment.",
+    clinical:"Early middle-cerebral ischaemia can efface the insular ribbon on CT. Injury can disturb autonomic control, and seizures can start here."},
+  {id:"callosum", title:"Corpus callosum", color:"#d5d0c6", labels:["Corpus callosum"], deep:true,
+    location:"The midline commissure between the hemispheres. From front to back: rostrum, genu, body and splenium. This mesh is the whole callosum, not four separate parts.",
+    functions:"It carries cortex-to-cortex fibres from one hemisphere to the other.",
+    supply:"The pericallosal artery, from the anterior cerebral artery, supplies most of it. The splenium also receives posterior cerebral branches.",
+    clinical:"A splenium infarct, together with a left occipital lesion, can leave a person able to write but unable to read. Surgical section disconnects the hemispheres."},
+  {id:"basal", title:"Basal ganglia", color:"#a85b4e", labels:BASAL, deep:true,
+    location:"Deep in each hemisphere, lateral to the thalamus. Caudate and putamen are the striatum. The globus pallidus lies against them. The subthalamic nucleus and substantia nigra continue the circuit into the midbrain. The internal capsule between them is not its own mesh.",
+    functions:"They select and scale movement, and they take part in cognitive and limbic loops. Dopamine from the substantia nigra pars compacta reaches the striatum.",
+    supply:"Lenticulostriate arteries from the M1 segment. The recurrent artery of Heubner, from the anterior cerebral artery, supplies the anterior head of the caudate. The anterior choroidal artery supplies the pallidum.",
+    clinical:"A small deep infarct causes a lacunar syndrome: face, arm and leg equally weak, without aphasia or a field cut. Hypertensive haemorrhage often starts in the putamen. Loss of nigral dopamine is the lesion of Parkinson disease, which is not an acute stroke."},
+  {id:"thalamus", title:"Thalamus", color:"#c47c62", labels:THALAMUS, deep:true,
+    location:"On either side of the third ventricle, above the midbrain. The lateral and medial geniculate bodies are the visual and auditory relays, included here.",
+    functions:"Relay for sensation, motor circuits from the basal ganglia and cerebellum, vision, hearing, memory and alertness.",
+    supply:"Polar branches of the posterior communicating artery, paramedian and inferolateral branches of the posterior cerebral artery, and posterior choroidal arteries.",
+    clinical:"A lateral thalamic stroke causes hemisensory loss, and pain can follow. A paramedian infarct makes the patient sleepy and hard to rouse. A geniculate lesion cuts vision or hearing rather than touch."},
+  {id:"hypo", title:"Hypothalamus", color:"#b56a58", labels:HYPO, deep:true,
+    location:"Below the thalamus, in the walls and floor of the third ventricle, above the pituitary stalk. The mamillary bodies are included.",
+    functions:"Temperature, thirst, appetite, circadian rhythm, and control of the pituitary.",
+    supply:"Small perforators from the anterior communicating, posterior communicating and posterior cerebral arteries.",
+    clinical:"Injury can disturb sodium, temperature or wakefulness. A mass here, or just below it, can compress the optic chiasm."},
+  {id:"hippo", title:"Hippocampus", color:"#6f9a8a", labels:["Hippocampus"], deep:true,
+    location:"Medial temporal lobe, in the floor of the temporal horn of the lateral ventricle.",
+    functions:"Formation of new episodic memory, and a relay in the Papez circuit through the fornix.",
+    supply:"Posterior cerebral artery and anterior choroidal artery.",
+    clinical:"Both hippocampi must be injured to cause a lasting amnestic state. One side produces a milder, material-specific change. The hippocampus can swell during a prolonged seizure."},
+  {id:"amygdala", title:"Amygdala", color:"#a85a5a", labels:["Basolateral complex","Central nucleus","Corticomedial group","Lateral nucleus"], deep:true,
+    location:"Medial temporal lobe, just in front of the hippocampus. The atlas has the nuclear groups, whose parent is the amygdaloid body. There is no single outer shell.",
+    functions:"Emotional memory, especially fear, and the autonomic response that goes with it.",
+    supply:"Anterior choroidal artery, with contributions from the middle cerebral and posterior cerebral arteries.",
+    clinical:"Injury on both sides dulls recognition of fear. The amygdala is also a common source of temporal-lobe seizures."},
+  {id:"cerebellum", title:"Cerebellum", color:"#8d7568", labels:[], cats:["cerebellum"], deep:false,
+    location:"The posterior fossa, behind the pons and medulla, under the tentorium. The vermis is midline. The hemispheres lie to either side.",
+    functions:"Timing and coordination of movement, balance, and motor learning. A hemisphere serves the same side of the body.",
+    supply:"Posterior inferior cerebellar artery, anterior inferior cerebellar artery and superior cerebellar artery.",
+    clinical:"A hemisphere lesion causes ataxia on the same side. A vermis lesion disturbs gait more than the limbs. Swelling can drive the tonsil through the foramen magnum and stop breathing."},
+  {id:"stem", title:"Brainstem", color:"#6d8580", labels:[], cats:["brainstem"], deep:true,
+    location:"Midbrain, pons and medulla, in front of the cerebellum. The midbrain passes through the tentorial opening. The spinal cord is not in this model.",
+    functions:"Cranial-nerve nuclei, arousal, and the long tracts between the hemispheres and the spinal cord.",
+    supply:"Posterior cerebral perforators and the basilar artery for the midbrain and pons. Vertebral and anterior spinal arteries for the medulla.",
+    clinical:"A cranial-nerve sign on one side and limb weakness on the other places the lesion in the brainstem. Loss of arousal follows when the midbrain tegmentum is involved. A lateral medullary infarct spares limb power."}
+];
+
+const PARTS = {
+  "Precentral gyrus":"Primary motor cortex. Face and arm are lateral. The leg continues onto the medial paracentral cortex.",
+  "Paracentral gyrus and sulcus":"Medial motor and sensory cortex for the opposite foot and leg.",
+  "Opercular part of inferior frontal gyrus":"In the dominant hemisphere this is part of Broca's area.",
+  "Triangular part of inferior frontal gyrus":"The anterior part of Broca's area in the dominant hemisphere.",
+  "Postcentral gyrus":"Primary somatosensory cortex.",
+  "Supramarginal gyrus":"Inferior parietal cortex. Dominant side: language. The other side: spatial attention.",
+  "Angular gyrus":"Inferior parietal cortex involved in reading, calculation and spatial attention.",
+  "Transverse temporal gyri":"Primary auditory cortex.",
+  "Temporal plane":"Beside the posterior language cortex. A mesh named Wernicke is not in this atlas.",
+  "Calcarine sulcus":"Primary visual cortex lies in the banks of this sulcus.",
+  "Cuneus":"Upper bank of the visual cortex, the lower field.",
+  "Lingual gyrus":"Lower bank of the visual cortex, the upper field.",
+  "Caudate nucleus":"Dorsal striatum. The head forms the lateral wall of the frontal horn.",
+  "Putamen":"Dorsal striatum, lateral to the pallidum. A common site of hypertensive haemorrhage.",
+  "Globus pallidus internal":"The main output nucleus. It inhibits the thalamus.",
+  "Subthalamic nucleus":"A small nucleus under the thalamus. A stroke here can fling the opposite limbs.",
+  "Substantia nigra":"The midbrain source of dopamine to the striatum.",
+  "Lateral geniculate body":"The thalamic relay for vision.",
+  "Medial geniculate body":"The thalamic relay for hearing.",
+  "Pulvinar":"The posterior nucleus of the thalamus.",
+  "Midbrain":"The upper brainstem, with the oculomotor nuclei and the cerebral peduncles.",
+  "Pons":"The middle brainstem. The basilar artery lies on its front.",
+  "Medulla oblongata":"The lower brainstem, at the foramen magnum.",
+  "Tonsil of cerebellum":"The inferior cerebellar lobule beside the medulla. It is the part forced through the foramen magnum."
+};
+
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const canvas = document.getElementById("view");
+const sheet = document.getElementById("sheet");
+const loadEl = document.getElementById("load");
+const loadMsg = document.getElementById("loadmsg");
+const scene = new THREE.Scene();
+let renderer, camera, controls, model;
+const meshes = [];
+const byLabel = new Map();
+let manifest = {nodes:[]};
+let extent = 1;
+let leftSign = 1;
+let groupId = null;
+let picked = null;
+let coded = false;
+let surface = 1;
+let viewMode = "lateral";
+let sideFlip = false;
+let spin = false;
+let fly = null;
+const VIEWS = [
+  {id:"superior", title:"Superior"},
+  {id:"inferior", title:"Inferior"},
+  {id:"lateral", title:"Lateral"},
+  {id:"medial", title:"Medial"}
+];
+
+function mats(mesh){ return Array.isArray(mesh.material) ? mesh.material : [mesh.material]; }
+function esc(s){
+  return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+    if(c==="&") return "\u0026amp;";
+    if(c==="<") return "\u0026lt;";
+    if(c===">") return "\u0026gt;";
+    return "\u0026quot;";
+  });
+}
+function groupOfLabel(label, cat, parent){
+  if(parent === "Amygdaloid body") return GROUPS.find(function(g){ return g.id==="amygdala"; });
+  if(parent === "Thalamus") return GROUPS.find(function(g){ return g.id==="thalamus"; });
+  if(parent === "Hypothalamus") return GROUPS.find(function(g){ return g.id==="hypo"; });
+  for(let i = 0; i < GROUPS.length; i++){
+    const g = GROUPS[i];
+    if(g.cats && g.cats.indexOf(cat) !== -1) return g;
+    if(g.labels.indexOf(label) !== -1) return g;
+  }
+  return null;
+}
+function groupById(id){ return GROUPS.find(function(g){ return g.id===id; }) || null; }
+function shownSide(){ return sideFlip ? "right" : "left"; }
+function shell(mesh){
+  return mesh.userData.bx_cat === "cortex" || mesh.userData.bx_label === "White matter of telencephalon";
+}
+function boot(){
+  try{
+    renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true, alpha:false});
+  }catch(err){
+    fail("WebGL did not start.");
+    return;
+  }
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+  renderer.setSize(innerWidth, innerHeight, false);
+  renderer.setClearColor(0x07111a, 1);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  scene.add(new THREE.HemisphereLight(0xf2efe8, 0x101820, 0.9));
+  const key = new THREE.DirectionalLight(0xfff4ea, 1.25);
+  key.position.set(2.2, 3, 4);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0x9ec4d6, 0.45);
+  fill.position.set(-3, 1, -2);
+  scene.add(fill);
+  camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 50);
+  controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.minDistance = 0.15;
+  controls.maxDistance = 8;
+  const loader = new GLTFLoader();
+  const draco = new DRACOLoader();
+  draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
+  loader.setDRACOLoader(draco);
+  loader.load("neuro/brain.glb", function(gltf){
+    model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    model.position.sub(center);
+    const size = box.getSize(new THREE.Vector3());
+    extent = Math.max(size.x, size.y, size.z) * 0.55;
+    model.traverse(function(obj){
+      if(!obj.isMesh) return;
+      const ex = obj.userData || {};
+      obj.material = obj.material.clone();
+      mats(obj).forEach(function(mat){
+        mat.userData.base = mat.color.clone();
+        mat.emissive = new THREE.Color(0x000000);
+        mat.emissiveIntensity = 0;
+      });
+      meshes.push(obj);
+      const label = ex.bx_label || obj.name;
+      if(!byLabel.has(label)) byLabel.set(label, []);
+      byLabel.get(label).push(obj);
+    });
+    scene.add(model);
+    measureLeft();
+    assignGroups();
+    controls.target.set(0, 0, 0);
+    look("lateral", true);
+    loadEl.classList.add("gone");
+    paint();
+  }, function(ev){
+    if(ev.total) loadMsg.textContent = Math.round(ev.loaded / ev.total * 100) + "%";
+  }, function(){
+    fail("The brain model did not load.");
+  });
+  fetch("neuro/manifest.json").then(function(r){ return r.json(); }).then(function(data){
+    manifest = data;
+    assignGroups();
+    paint();
+  }).catch(function(){ loadMsg.textContent = "The label file did not load."; });
+  addEventListener("resize", resize);
+  canvas.addEventListener("pointerdown", down);
+  canvas.addEventListener("pointerup", up);
+  requestAnimationFrame(frame);
+}
+function measureLeft(){
+  let sum = 0, n = 0;
+  meshes.forEach(function(mesh){
+    if(mesh.userData.bx_side !== "left") return;
+    const box = new THREE.Box3().setFromObject(mesh);
+    sum += box.getCenter(new THREE.Vector3()).x;
+    n += 1;
+  });
+  leftSign = n && sum / n < 0 ? -1 : 1;
+}
+function assignGroups(){
+  const parentOf = new Map();
+  (manifest.nodes || []).forEach(function(node){ if(node.parent) parentOf.set(node.id, node.parent); });
+  meshes.forEach(function(mesh){
+    const parent = parentOf.get(mesh.userData.bx_id) || "";
+    mesh.userData.bx_parent = parent;
+    const g = groupOfLabel(mesh.userData.bx_label, mesh.userData.bx_cat, parent);
+    mesh.userData.bx_group = g ? g.id : "";
+  });
+}
+function fail(msg){
+  loadEl.classList.add("gone");
+  sheet.innerHTML = "<p>"+esc(msg)+"</p>";
+  sheet.classList.add("open");
+}
+let downPt = null;
+function down(e){ downPt = {x:e.clientX, y:e.clientY}; spin = false; paint(); }
+function up(e){
+  if(!downPt || !meshes.length) return;
+  const moved = Math.hypot(e.clientX - downPt.x, e.clientY - downPt.y);
+  downPt = null;
+  if(moved > 8) return;
+  const rect = canvas.getBoundingClientRect();
+  const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(ndc, camera);
+  const hits = ray.intersectObjects(meshes.filter(function(m){ return m.visible; }), false);
+  if(!hits[0]) return;
+  const mesh = hits[0].object;
+  picked = mesh;
+  if(mesh.userData.bx_group) groupId = mesh.userData.bx_group;
+  if(groupById(groupId) && groupById(groupId).deep && surface > 0.72) surface = 0.28;
+  applyLook();
+  openCard(mesh);
+  paint();
+}
+let frameLast = 0;
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, frameLast ? (now - frameLast) / 1000 : 0.016);
+  frameLast = now;
+  if(fly && camera && controls){
+    fly.t = Math.min(1, fly.t + dt / 0.85);
+    const k = fly.t * fly.t * (3 - 2 * fly.t);
+    camera.position.lerpVectors(fly.from, fly.to, k);
+    controls.target.lerpVectors(fly.tFrom, fly.tTo, k);
+    if(fly.t >= 1) fly = null;
+  }
+  if(controls){
+    controls.autoRotate = spin && !reduced;
+    controls.autoRotateSpeed = 0.8;
+    controls.update();
+  }
+  if(renderer) renderer.render(scene, camera);
+}
+function resize(){
+  if(!renderer) return;
+  renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth / Math.max(1, innerHeight);
+  camera.updateProjectionMatrix();
+}
+function moveCam(to, target){
+  if(!camera || !controls) return;
+  const dest = target ? target.clone() : new THREE.Vector3();
+  if(reduced){
+    camera.position.copy(to);
+    controls.target.copy(dest);
+    fly = null;
+    return;
+  }
+  fly = {from: camera.position.clone(), to: to.clone(), tFrom: controls.target.clone(), tTo: dest, t: 0};
+}
+function look(mode, instant){
+  viewMode = mode;
+  const d = extent * 2.35;
+  const lateralSign = shownSide()==="left" ? leftSign : -leftSign;
+  let to;
+  if(mode==="superior") to = new THREE.Vector3(0, d, 0.02);
+  else if(mode==="inferior") to = new THREE.Vector3(0, -d, 0.02);
+  else if(mode==="medial") to = new THREE.Vector3(-lateralSign * d * 0.9, extent * 0.02, 0.08);
+  else to = new THREE.Vector3(lateralSign * d, extent * 0.04, extent * 0.35);
+  if(instant){
+    camera.position.copy(to);
+    controls.target.set(0, 0, 0);
+  }else moveCam(to, new THREE.Vector3());
+  applyLook();
+}
+function frameGroup(id){
+  const box = new THREE.Box3();
+  let n = 0;
+  meshes.forEach(function(mesh){
+    if(mesh.userData.bx_group !== id || !mesh.visible) return;
+    box.expandByObject(mesh);
+    n += 1;
+  });
+  if(!n || box.isEmpty()) return;
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const radius = Math.max(size.length() * 0.55, extent * 0.25);
+  const dist = radius / Math.sin((camera.fov * Math.PI / 180) / 2) * 0.72;
+  const offset = camera.position.clone().sub(controls.target);
+  if(offset.lengthSq() < 1e-6) offset.set(0, 0, 1);
+  offset.normalize().multiplyScalar(dist);
+  moveCam(center.clone().add(offset), center);
+}
+function applyLook(){
+  const hide = viewMode==="medial" ? (shownSide()==="left" ? "right" : "left") : "";
+  meshes.forEach(function(mesh){
+    const side = mesh.userData.bx_side || "";
+    mesh.visible = !hide || side !== hide;
+    const mine = groupId && mesh.userData.bx_group === groupId;
+    const hot = picked && mesh === picked;
+    const g = groupId ? groupById(groupId) : null;
+    let alpha = 1;
+    if(shell(mesh) && !mine){
+      alpha = surface;
+      if(g && (g.deep || g.buried)) alpha = Math.min(alpha, 0.28);
+    }
+    mats(mesh).forEach(function(mat){
+      if(coded && mesh.userData.bx_group) mat.color.set(groupById(mesh.userData.bx_group).color);
+      else if(mat.userData.base) mat.color.copy(mat.userData.base);
+      mat.transparent = alpha < 0.98;
+      mat.opacity = alpha;
+      mat.depthWrite = alpha > 0.55;
+      mat.emissive.set(hot ? 0xf2f6f8 : mine ? 0x12343a : 0x000000);
+      mat.emissiveIntensity = hot ? 0.45 : mine ? 0.22 : 0;
+    });
+  });
+}
+function openCard(mesh){
+  const g = groupById(mesh.userData.bx_group);
+  const label = mesh.userData.bx_label || mesh.name;
+  const side = mesh.userData.bx_side ? " · "+mesh.userData.bx_side : "";
+  let html = '<button type="button" class="close" id="shut">Close</button>';
+  if(g){
+    html += '<p class="kicker">'+esc(g.title)+esc(side)+'</p>';
+    html += '<h2>'+esc(label)+'</h2>';
+    if(PARTS[label]) html += '<p>'+esc(PARTS[label])+'</p>';
+    html += block("Anatomical location", g.location);
+    html += block("Function", g.functions);
+    html += block("Blood supply", g.supply);
+    html += block("Clinical relevance", g.clinical);
+  }else{
+    const node = (manifest.nodes || []).find(function(n){ return n.id === mesh.userData.bx_id; });
+    html += '<p class="kicker">Atlas structure</p><h2>'+esc(label)+'</h2>';
+    html += block("Anatomical location", node && node.region ? node.region : "Named in the atlas. It is not one of the thirteen study structures.");
+    html += '<p class="note">Function, blood supply and clinical relevance for this mesh are in the neuroanatomy lab, where a card exists. Nothing is invented here.</p>';
+    html += '<p><a href="neuro-lab.html">Open the neuroanatomy lab</a></p>';
+  }
+  html += '<p class="note">Model: Z-Anatomy / BodyParts3D, CC BY-SA 4.0. Registered deep nuclei are approximate to about 7 mm.</p>';
+  sheet.innerHTML = html;
+  sheet.classList.add("open");
+  sheet.scrollTop = 0;
+  document.getElementById("shut").onclick = function(){ sheet.classList.remove("open"); };
+}
+function block(title, text){ return '<h3>'+esc(title)+'</h3><p>'+esc(text)+'</p>'; }
+function selectGroup(id){
+  groupId = id;
+  picked = null;
+  const g = groupById(id);
+  if(g && (g.deep || g.buried) && surface > 0.72) surface = 0.28;
+  applyLook();
+  frameGroup(id);
+  openGroup(g);
+  paint();
+}
+function openGroup(g){
+  if(!g) return;
+  let html = '<button type="button" class="close" id="shut">Close</button>';
+  html += '<p class="kicker">Study structure</p><h2>'+esc(g.title)+'</h2>';
+  html += block("Anatomical location", g.location);
+  html += block("Function", g.functions);
+  html += block("Blood supply", g.supply);
+  html += block("Clinical relevance", g.clinical);
+  html += '<p class="note">Tap the model to highlight one part. Model: Z-Anatomy / BodyParts3D, CC BY-SA 4.0. Registered deep nuclei are approximate to about 7 mm.</p>';
+  sheet.innerHTML = html;
+  sheet.classList.add("open");
+  sheet.scrollTop = 0;
+  document.getElementById("shut").onclick = function(){ sheet.classList.remove("open"); };
+}
+function paint(){
+  document.getElementById("structs").innerHTML = GROUPS.map(function(g){
+    return '<button type="button"'+(g.id===groupId?' class="on"':'')+' data-group="'+g.id+'">'+esc(g.title.replace(" lobe",""))+'</button>';
+  }).join("");
+  document.getElementById("structs").querySelectorAll("[data-group]").forEach(function(btn){
+    btn.onclick = function(){ selectGroup(btn.getAttribute("data-group")); };
+  });
+  document.getElementById("views").innerHTML = VIEWS.map(function(v){
+    return '<button type="button"'+(v.id===viewMode?' class="on"':'')+' data-view="'+v.id+'">'+esc(v.title)+'</button>';
+  }).join("") + '<button type="button" id="flip">Other side</button>';
+  document.getElementById("views").querySelectorAll("[data-view]").forEach(function(btn){
+    btn.onclick = function(){ look(btn.getAttribute("data-view")); paint(); };
+  });
+  document.getElementById("flip").onclick = function(){
+    sideFlip = !sideFlip;
+    if(viewMode==="superior" || viewMode==="inferior") viewMode = "lateral";
+    look(viewMode);
+    paint();
+  };
+  document.getElementById("dock").innerHTML =
+    '<button type="button" id="in">Closer</button>'+
+    '<button type="button" id="out">Further</button>'+
+    '<button type="button"'+(spin?' class="on"':'')+' id="spin">Turn</button>'+
+    '<button type="button" id="reset">Reset</button>'+
+    '<button type="button"'+(coded?' class="on"':'')+' id="coded">'+(coded?'Natural tissue':'Colour regions')+'</button>'+
+    '<label>Surface <input id="fade" type="range" min="0.16" max="1" step="0.02" value="'+surface+'" aria-label="Surface opacity"></label>';
+  document.getElementById("in").onclick = function(){ zoomBy(0.8); };
+  document.getElementById("out").onclick = function(){ zoomBy(1.25); };
+  document.getElementById("spin").onclick = function(){ spin = !spin; paint(); };
+  document.getElementById("reset").onclick = function(){
+    groupId = null; picked = null; coded = false; surface = 1; sideFlip = false; spin = false;
+    sheet.classList.remove("open");
+    look("lateral");
+    paint();
+  };
+  document.getElementById("coded").onclick = function(){ coded = !coded; applyLook(); paint(); };
+  document.getElementById("fade").oninput = function(event){
+    surface = Number(event.target.value);
+    applyLook();
+  };
+}
+function zoomBy(k){
+  if(!camera || !controls) return;
+  const offset = camera.position.clone().sub(controls.target);
+  const next = offset.length() * k;
+  if(next < extent * 0.45 || next > extent * 6) return;
+  offset.multiplyScalar(k);
+  camera.position.copy(controls.target).add(offset);
+  fly = null;
+}
+paint();
+boot();
+</script>
+</body>
+</html>
