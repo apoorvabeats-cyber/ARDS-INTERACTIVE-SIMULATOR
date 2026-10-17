@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111a">
+<title>Brain dissection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520&family=Figtree:wght@460;600&display=swap" rel="stylesheet">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+<style>
+:root{--bg:#07111a;--fg:#e7f1f4;--muted:#93a8b3;--line:rgba(127,212,230,.28);--cyan:#7fd4e6}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:Figtree,sans-serif}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+#view{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+a.back{position:fixed;top:8px;left:10px;z-index:5;color:var(--muted);text-decoration:none;min-height:36px;display:flex;align-items:center}
+.bar{position:fixed;z-index:4;left:0;right:0;display:flex;gap:6px;overflow:auto;padding:0 10px;-webkit-overflow-scrolling:touch}
+.bar.structs{top:44px}
+.bar button{flex:0 0 auto;border:1px solid var(--line);background:rgba(7,17,26,.78);border-radius:999px;min-height:36px;padding:0 12px}
+.bar button.on{border-color:var(--cyan);color:var(--cyan)}
+.cutbar{position:fixed;z-index:4;left:0;right:0;display:flex;gap:6px;align-items:center;overflow:auto;padding:6px 10px;background:rgba(7,17,26,.88);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.cutbar label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;flex:1}
+.cutbar input[type=range]{width:100%;min-width:90px}
+.mark{position:fixed;z-index:3;margin:0;pointer-events:none;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+#tags{position:fixed;z-index:3;pointer-events:none}
+.tag{position:absolute;transform:translate(-50%,-140%);color:#f4fbff;font-size:12px;text-shadow:0 1px 6px #000;white-space:nowrap}
+.sheet{position:fixed;z-index:6;left:0;right:0;bottom:0;max-height:min(42dvh,420px);overflow:auto;background:rgba(8,16,24,.96);border-top:1px solid var(--line);padding:14px 16px calc(14px + env(safe-area-inset-bottom));transform:translateY(110%);transition:transform .35s ease}
+.sheet.open{transform:none}
+.sheet h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:26px;margin:0 0 4px}
+.kicker{margin:0;color:var(--cyan);letter-spacing:.14em;text-transform:uppercase;font-size:11px}
+.sheet h3{margin:12px 0 4px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#e2b48a}
+.sheet p{margin:6px 0;line-height:1.45}
+.close{position:absolute;top:6px;right:6px;border:0;background:transparent;color:var(--muted);min-width:44px;min-height:44px}
+.note{color:var(--muted);font-size:13px}
+.load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:7;background:var(--bg);text-align:center;padding:24px}
+.load.gone{display:none}
+@media(prefers-reduced-motion:reduce){.sheet{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="Whole brain above, dissection below. Drag the upper brain to turn it. Slide the depth to move the cut."></canvas>
+<a class="back" href="hub.html">Brain</a>
+<p class="mark" id="markTop" style="top:8px;right:12px">Whole brain</p>
+<div class="bar structs" id="structs"></div>
+<div class="cutbar" id="cutbar"></div>
+<p class="mark" id="markBot">Section</p>
+<div id="tags"></div>
+<section class="sheet" id="sheet"></section>
+<div class="load" id="load"><div><p>Opening the dissection…</p><p class="note" id="loadmsg"></p></div></div>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const THAL = ["Anterior nuclei of thalamus","Intralaminar and lateral posterior nuclei","Mediodorsal nucleus","Pulvinar","Ventral anterior nucleus","Ventral laterodorsal nucleus","Ventral lateroventral nucleus","Lateral geniculate body","Medial geniculate body"];
+const LENT = ["Putamen","Globus pallidus external","Globus pallidus internal"];
+const BORDER = ["Caudate nucleus"].concat(LENT, THAL);
+const STUDIES = [
+  {id:"latvent", title:"Lateral ventricles", labels:["Lateral ventricle"], color:"#6fbfc4", cut:"horizontal", aim:[0.15,1,0.25],
+    where:"A C-shaped CSF space in each hemisphere: frontal horn, body, atrium, occipital horn and temporal horn.",
+    clinical:"On a horizontal cut the frontal horns are separated by the septum, with the caudate head on the outside. Enlargement is hydrocephalus. This mesh is the ventricle, not the choroid plexus."},
+  {id:"third", title:"Third ventricle", labels:["Third ventricle"], color:"#8fd0c8", cut:"sagittal", aim:[1,0.25,0.05],
+    where:"The midline CSF slit between the two thalami. Fluid enters from the lateral ventricles and leaves through the aqueduct.",
+    clinical:"A mass in the thalamus or pineal region can block it. The lateral ventricles then enlarge and the fourth ventricle stays normal if the block is above the aqueduct."},
+  {id:"caudate", title:"Caudate nucleus", labels:["Caudate nucleus"], color:"#d08a6a", cut:"horizontal", aim:[0.2,1,0.15],
+    where:"Grey matter in the wall of the lateral ventricle. The head is beside the frontal horn. The body follows the ventricle back. The tail runs toward the temporal lobe.",
+    clinical:"The anterior head is supplied by the recurrent artery of Heubner. The body is supplied by lenticulostriate arteries. A small deep infarct here is a lacunar stroke."},
+  {id:"lentiform", title:"Lentiform nucleus", labels:LENT, color:"#c46558", cut:"horizontal", aim:[0.35,1,0.1],
+    where:"Putamen on the outside and globus pallidus on the inside, together lens-shaped. The atlas names those parts. It has no single lentiform mesh.",
+    clinical:"This nucleus is lateral to the internal capsule. Hypertensive haemorrhage often starts in the putamen. The lenticulostriate arteries from the middle cerebral stem supply it."},
+  {id:"capsule", title:"Internal capsule", labels:[], color:"#e7e1d6", cut:"horizontal", aim:[0.2,1,0.05], borders:BORDER,
+    where:"The white-matter sheet between the caudate and thalamus medially and the lentiform nucleus laterally. Anterior limb, genu, then posterior limb.",
+    clinical:"This atlas has no internal-capsule mesh, so the cut is placed between those nuclei and they are marked, not recolored as if they were the capsule. The posterior limb carries the corticospinal fibres. A lesion there weakens the opposite face, arm and leg together."},
+  {id:"thalamus", title:"Thalamus", labels:THAL, color:"#d4896a", cut:"horizontal", aim:[1,0.35,0.08],
+    where:"A paired nuclear mass on either side of the third ventricle, above the midbrain and medial to the posterior limb of the internal capsule.",
+    clinical:"The polar artery comes from the posterior communicating artery. Paramedian and inferolateral arteries come from the posterior cerebral artery. A lateral infarct causes hemisensory loss."},
+  {id:"callosum", title:"Corpus callosum", labels:["Corpus callosum"], color:"#d9d3c7", cut:"sagittal", aim:[1,0.55,0.08],
+    where:"The midline commissure. It forms the roof of the lateral ventricles. Rostrum, genu, body and splenium are one mesh here.",
+    clinical:"The pericallosal artery supplies most of it. The splenium also receives posterior cerebral branches. It is the landmark above the ventricles on a sagittal cut."},
+  {id:"hippo", title:"Hippocampus", labels:["Hippocampus"], color:"#7eaa96", cut:"coronal", aim:[1,-0.15,0.35],
+    where:"Medial temporal lobe, in the floor of the temporal horn. On a coronal cut it lies medial to the horn and below the thalamus.",
+    clinical:"Both sides must be injured to erase the ability to form new memories. The supply is the posterior cerebral artery and the anterior choroidal artery."},
+  {id:"midbrain", title:"Midbrain", labels:["Midbrain"], color:"#7f948c", cut:"sagittal", aim:[0.15,0.15,1],
+    where:"The upper brainstem, passing through the tentorial opening. The cerebral peduncles are anterior. The colliculi are posterior.",
+    clinical:"A medial midbrain lesion can catch the oculomotor nerve and the corticospinal fibres, so the eye and the opposite limbs fail together."},
+  {id:"pons", title:"Pons", labels:["Pons"], color:"#75908a", cut:"sagittal", aim:[0,0.02,1],
+    where:"The middle brainstem, between the midbrain and the medulla, in front of the fourth ventricle. The basilar artery lies on its anterior surface.",
+    clinical:"A ventral pontine lesion hits the corticospinal fibres. A lateral lesion can hit the facial nucleus and the hearing and balance pathways."},
+  {id:"medulla", title:"Medulla", labels:["Medulla oblongata"], color:"#6d8580", cut:"sagittal", aim:[0,-0.15,1],
+    where:"The lower brainstem, at the foramen magnum, in front of the cerebellum. The pyramids are the ventral corticospinal bundles.",
+    clinical:"A medial infarct hits the pyramid. A lateral infarct, usually posterior inferior cerebellar artery, causes a crossed sensory syndrome and spares limb power."}
+];
+
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const canvas = document.getElementById("view");
+const sheet = document.getElementById("sheet");
+const loadEl = document.getElementById("load");
+const loadMsg = document.getElementById("loadmsg");
+const tags = document.getElementById("tags");
+const intactScene = new THREE.Scene();
+const sectionScene = new THREE.Scene();
+const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+let renderer, intactCam, sectionCam, controls;
+let intactRoot, sectionRoot;
+const intactMeshes = [];
+const sectionMeshes = [];
+let extent = 1;
+let leftSign = 1;
+let studyId = null;
+let cut = "horizontal";
+let depth = 0.55;
+let labelsOn = true;
+let fly = null;
+let splitH = 0;
+const centers = new Map();
+
+function mats(mesh){ return Array.isArray(mesh.material) ? mesh.material : [mesh.material]; }
+function esc(s){
+  return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+    if(c==="&") return "\u0026amp;";
+    if(c==="<") return "\u0026lt;";
+    if(c===">") return "\u0026gt;";
+    return "\u0026quot;";
+  });
+}
+function studyById(id){ return STUDIES.find(function(s){ return s.id===id; }) || null; }
+function addLights(scene){
+  scene.add(new THREE.HemisphereLight(0xf3efe8, 0x121820, 0.95));
+  const key = new THREE.DirectionalLight(0xfff6ee, 1.15);
+  key.position.set(2.4, 3.2, 3.2);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xb7d0dc, 0.55);
+  fill.position.set(-2, 1, -2);
+  scene.add(fill);
+}
+function ownMaterials(root, list){
+  root.traverse(function(obj){
+    if(!obj.isMesh) return;
+    const src = obj.material;
+    obj.material = Array.isArray(src) ? src.map(function(m){ return m.clone(); }) : src.clone();
+    mats(obj).forEach(function(mat){
+      mat.userData.base = mat.color.clone();
+      mat.emissive = new THREE.Color(0x000000);
+      mat.clippingPlanes = [];
+    });
+    list.push(obj);
+  });
+}
+function boot(){
+  try{ renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true}); }
+  catch(err){ fail("WebGL did not start."); return; }
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+  renderer.setSize(innerWidth, innerHeight, false);
+  renderer.setClearColor(0x07111a, 1);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.localClippingEnabled = true;
+  renderer.autoClear = false;
+  addLights(intactScene);
+  addLights(sectionScene);
+  intactCam = new THREE.PerspectiveCamera(35, 1, 0.01, 50);
+  sectionCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 40);
+  controls = new OrbitControls(intactCam, canvas);
+  controls.enableDamping = true;
+  controls.enabled = false;
+  const loader = new GLTFLoader();
+  const draco = new DRACOLoader();
+  draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
+  loader.setDRACOLoader(draco);
+  loader.load("neuro/brain.glb", function(gltf){
+    intactRoot = gltf.scene;
+    const box = new THREE.Box3().setFromObject(intactRoot);
+    const center = box.getCenter(new THREE.Vector3());
+    intactRoot.position.sub(center);
+    extent = Math.max(box.getSize(new THREE.Vector3()).x, box.getSize(new THREE.Vector3()).y, box.getSize(new THREE.Vector3()).z) * 0.5;
+    ownMaterials(intactRoot, intactMeshes);
+    intactScene.add(intactRoot);
+    sectionRoot = intactRoot.clone(true);
+    ownMaterials(sectionRoot, sectionMeshes);
+    sectionScene.add(sectionRoot);
+    let sum = 0, n = 0;
+    intactMeshes.forEach(function(mesh){
+      if(mesh.userData.bx_side !== "left") return;
+      sum += new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3()).x;
+      n += 1;
+    });
+    leftSign = n && sum / n < 0 ? -1 : 1;
+    STUDIES.forEach(function(item){
+      const labels = item.labels.length ? item.labels : ["Putamen","Caudate nucleus"].concat(THAL);
+      centers.set(item.id, centroid(labels));
+    });
+    intactCam.position.set(leftSign * extent * 2.6, extent * 0.3, extent * 1.4);
+    controls.target.set(0, 0, 0);
+    applyCut();
+    paintMeshes();
+    loadEl.classList.add("gone");
+    layout();
+    paint();
+  }, function(ev){
+    if(ev.total) loadMsg.textContent = Math.round(ev.loaded / ev.total * 100) + "%";
+  }, function(){ fail("The brain model did not load."); });
+  addEventListener("resize", layout);
+  canvas.addEventListener("pointerdown", down);
+  canvas.addEventListener("pointerup", up);
+  requestAnimationFrame(frame);
+}
+function fail(msg){
+  loadEl.classList.add("gone");
+  sheet.innerHTML = "<p>"+esc(msg)+"</p>";
+  sheet.classList.add("open");
+}
+function layout(){
+  if(!renderer) return;
+  renderer.setSize(innerWidth, innerHeight, false);
+  splitH = Math.round(innerHeight * 0.46);
+  document.getElementById("cutbar").style.top = (splitH - 22) + "px";
+  document.getElementById("markBot").style.top = (splitH + 8) + "px";
+  document.getElementById("markBot").style.right = "12px";
+  tags.style.top = splitH + "px";
+  tags.style.height = (innerHeight - splitH) + "px";
+  tags.style.left = "0";
+  tags.style.right = "0";
+  placeSectionCam();
+}
+function placeSectionCam(){
+  if(!sectionCam) return;
+  const d = extent * 3.2;
+  if(cut==="horizontal"){
+    sectionCam.position.set(0, d, 0);
+    sectionCam.up.set(0, 0, 1);
+  }else if(cut==="coronal"){
+    sectionCam.position.set(0, 0, d);
+    sectionCam.up.set(0, 1, 0);
+  }else{
+    sectionCam.position.set(leftSign * d, 0, 0);
+    sectionCam.up.set(0, 1, 0);
+  }
+  sectionCam.lookAt(0, 0, 0);
+  const botH = Math.max(1, innerHeight - splitH);
+  const aspect = innerWidth / botH;
+  const half = extent * 1.25;
+  sectionCam.left = -half * aspect;
+  sectionCam.right = half * aspect;
+  sectionCam.top = half;
+  sectionCam.bottom = -half;
+  sectionCam.updateProjectionMatrix();
+  if(intactCam){
+    intactCam.aspect = innerWidth / Math.max(1, splitH);
+    intactCam.updateProjectionMatrix();
+  }
+}
+function applyCut(){
+  const pos = THREE.MathUtils.lerp(-extent * 0.92, extent * 0.92, depth);
+  if(cut==="horizontal"){ plane.normal.set(0, 1, 0); plane.constant = -pos; }
+  else if(cut==="coronal"){ plane.normal.set(0, 0, 1); plane.constant = -pos; }
+  else { plane.normal.set(leftSign, 0, 0); plane.constant = -pos * leftSign; }
+  placeSectionCam();
+}
+function paintMeshes(){
+  const study = studyById(studyId);
+  const labels = study ? study.labels : [];
+  const borders = study && study.borders ? study.borders : [];
+  [intactMeshes, sectionMeshes].forEach(function(list, index){
+    const section = index === 1;
+    list.forEach(function(mesh){
+      const label = mesh.userData.bx_label;
+      const on = labels.indexOf(label) !== -1;
+      const border = !on && borders.indexOf(label) !== -1;
+      mesh.renderOrder = on && !section ? 2 : 0;
+      mats(mesh).forEach(function(mat){
+        if(on && study) mat.color.set(study.color);
+        else if(mat.userData.base) mat.color.copy(mat.userData.base);
+        mat.emissive.set(on && study ? study.color : border ? 0x9fd0ea : 0x000000);
+        mat.emissiveIntensity = on ? 0.32 : border ? 0.22 : 0;
+        mat.clippingPlanes = section && !on ? [plane] : [];
+        mat.clipShadows = true;
+        if(section) mat.side = THREE.DoubleSide;
+        mat.depthTest = !(on && !section);
+        mat.transparent = false;
+        mat.opacity = 1;
+      });
+    });
+  });
+}
+function centroid(labels){
+  const box = new THREE.Box3();
+  let n = 0;
+  intactMeshes.forEach(function(mesh){
+    if(labels.indexOf(mesh.userData.bx_label) === -1) return;
+    box.expandByObject(mesh);
+    n += 1;
+  });
+  if(!n || box.isEmpty()) return new THREE.Vector3();
+  return box.getCenter(new THREE.Vector3());
+}
+function depthFor(coord){
+  return THREE.MathUtils.clamp((coord + extent * 0.92) / (extent * 1.84), 0.04, 0.96);
+}
+function showOnBrain(study){
+  const center = centers.get(study.id);
+  if(!center) return;
+  const aim = study.aim || [0, 0.2, 1];
+  const dir = new THREE.Vector3(aim[0], aim[1], aim[2]);
+  if(Math.abs(aim[0]) > 0.4) dir.x *= leftSign;
+  dir.normalize();
+  const dist = extent * 2.55;
+  const to = center.clone().add(dir.multiplyScalar(dist));
+  if(reduced){
+    intactCam.position.copy(to);
+    controls.target.copy(center);
+    fly = null;
+  }else{
+    fly = {from: intactCam.position.clone(), to: to, tFrom: controls.target.clone(), tTo: center.clone(), t: 0};
+  }
+}
+function selectStudy(id){
+  const study = studyById(id);
+  if(!study) return;
+  if(!intactMeshes.length) return;
+  studyId = id;
+  cut = study.cut;
+  const center = centers.get(id) || new THREE.Vector3();
+  const coord = cut==="horizontal" ? center.y : cut==="coronal" ? center.z : center.x * leftSign;
+  depth = depthFor(coord);
+  applyCut();
+  paintMeshes();
+  showOnBrain(study);
+  openStudy(study);
+  paint();
+}
+function openStudy(study){
+  sheet.innerHTML = '<button type="button" class="close" id="shut">Close</button><p class="kicker">Dissection</p><h2>'+esc(study.title)+'</h2><h3>Where it sits</h3><p>'+esc(study.where)+'</p><h3>At the bedside</h3><p>'+esc(study.clinical)+'</p><p class="note">The same structure is coloured on the whole brain. The rest keeps its tissue colour. Model: Z-Anatomy / BodyParts3D, CC BY-SA 4.0.</p>';
+  sheet.classList.add("open");
+  sheet.scrollTop = 0;
+  document.getElementById("shut").onclick = function(){ sheet.classList.remove("open"); };
+}
+function studyForLabel(label){
+  return STUDIES.find(function(s){ return s.labels.indexOf(label) !== -1; }) || null;
+}
+let downPt = null;
+function down(e){
+  downPt = {x:e.clientX, y:e.clientY};
+  controls.enabled = e.clientY < splitH;
+}
+function up(e){
+  controls.enabled = false;
+  if(!downPt) return;
+  const moved = Math.hypot(e.clientX - downPt.x, e.clientY - downPt.y);
+  downPt = null;
+  if(moved > 8) return;
+  const rect = canvas.getBoundingClientRect();
+  const ndc = new THREE.Vector2();
+  const ray = new THREE.Raycaster();
+  if(e.clientY < splitH){
+    ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    ndc.y = -((e.clientY - rect.top) / Math.max(1, splitH)) * 2 + 1;
+    ray.setFromCamera(ndc, intactCam);
+    const hits = ray.intersectObjects(intactMeshes, false);
+    if(hits[0]) chooseMesh(hits[0].object);
+  }else{
+    ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    ndc.y = -((e.clientY - splitH) / Math.max(1, innerHeight - splitH)) * 2 + 1;
+    ray.setFromCamera(ndc, sectionCam);
+    const hits = ray.intersectObjects(sectionMeshes, false);
+    if(hits[0]) chooseMesh(hits[0].object);
+  }
+}
+function chooseMesh(mesh){
+  const found = studyForLabel(mesh.userData.bx_label);
+  if(found) selectStudy(found.id);
+}
+let frameLast = 0;
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, frameLast ? (now - frameLast) / 1000 : 0.016);
+  frameLast = now;
+  if(fly && intactCam){
+    fly.t = Math.min(1, fly.t + dt / 1.15);
+    const k = fly.t * fly.t * (3 - 2 * fly.t);
+    intactCam.position.lerpVectors(fly.from, fly.to, k);
+    controls.target.lerpVectors(fly.tFrom, fly.tTo, k);
+    if(fly.t >= 1) fly = null;
+  }
+  if(controls) controls.update();
+  if(!renderer || !splitH) return;
+  const w = innerWidth, h = innerHeight, bot = h - splitH;
+  renderer.setScissorTest(true);
+  renderer.setViewport(0, bot, w, splitH);
+  renderer.setScissor(0, bot, w, splitH);
+  renderer.clear();
+  renderer.render(intactScene, intactCam);
+  renderer.setViewport(0, 0, w, bot);
+  renderer.setScissor(0, 0, w, bot);
+  renderer.clear();
+  renderer.render(sectionScene, sectionCam);
+  placeTags();
+}
+function placeTags(){
+  if(!labelsOn || !sectionCam || !splitH){ tags.innerHTML = ""; return; }
+  const study = studyById(studyId);
+  const wanted = [];
+  STUDIES.forEach(function(item){
+    const center = centers.get(item.id);
+    if(!center) return;
+    const dist = plane.distanceToPoint(center);
+    const near = Math.abs(dist) < extent * 0.12;
+    if((study && study.id === item.id) || (near && item.labels.length)) wanted.push({title:item.title, center:center});
+  });
+  const bot = innerHeight - splitH;
+  tags.innerHTML = wanted.map(function(item){
+    const v = item.center.clone().project(sectionCam);
+    if(v.z < -1 || v.z > 1) return "";
+    const x = (v.x * 0.5 + 0.5) * innerWidth;
+    const y = (1 - (v.y * 0.5 + 0.5)) * bot;
+    if(x < 0 || x > innerWidth || y < 0 || y > bot) return "";
+    return '<span class="tag" style="left:'+x+'px;top:'+y+'px">'+esc(item.title)+'</span>';
+  }).join("");
+}
+function paint(){
+  document.getElementById("structs").innerHTML = STUDIES.map(function(item){
+    return '<button type="button"'+(item.id===studyId?' class="on"':'')+' data-id="'+item.id+'">'+esc(item.title)+'</button>';
+  }).join("");
+  document.getElementById("structs").querySelectorAll("[data-id]").forEach(function(btn){
+    btn.onclick = function(){ selectStudy(btn.getAttribute("data-id")); };
+  });
+  document.getElementById("cutbar").innerHTML =
+    ["horizontal","coronal","sagittal"].map(function(id){
+      const name = id.charAt(0).toUpperCase()+id.slice(1);
+      return '<button type="button"'+(cut===id?' class="on"':'')+' data-cut="'+id+'">'+name+'</button>';
+    }).join("")+
+    '<button type="button"'+(labelsOn?' class="on"':'')+' id="labels">'+(labelsOn?'Labels on':'Labels off')+'</button>'+
+    '<label>Depth <input id="depth" type="range" min="0.04" max="0.96" step="0.005" value="'+depth+'" aria-label="Section depth"></label>';
+  document.getElementById("cutbar").querySelectorAll("[data-cut]").forEach(function(btn){
+    btn.onclick = function(){
+      cut = btn.getAttribute("data-cut");
+      applyCut();
+      paintMeshes();
+      paint();
+    };
+  });
+  document.getElementById("labels").onclick = function(){ labelsOn = !labelsOn; if(!labelsOn) tags.innerHTML = ""; paint(); };
+  document.getElementById("depth").oninput = function(event){
+    depth = Number(event.target.value);
+    applyCut();
+    paintMeshes();
+  };
+}
+paint();
+boot();
+</script>
+</body>
+</html>

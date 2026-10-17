@@ -326,10 +326,17 @@ function up(e){
   if(!hits[0]) return;
   const mesh = hits[0].object;
   picked = mesh;
-  if(mesh.userData.bx_group) groupId = mesh.userData.bx_group;
-  if(groupById(groupId) && groupById(groupId).deep && surface > 0.72) surface = 0.28;
-  applyLook();
-  openCard(mesh);
+  spin = false;
+  if(mesh.userData.bx_group){
+    groupId = mesh.userData.bx_group;
+    showStructure(groupId);
+    openCard(mesh);
+  }else{
+    groupId = null;
+    applyLook();
+    showMesh(mesh);
+    openCard(mesh);
+  }
   paint();
 }
 let frameLast = 0;
@@ -338,7 +345,7 @@ function frame(now){
   const dt = Math.min(0.05, frameLast ? (now - frameLast) / 1000 : 0.016);
   frameLast = now;
   if(fly && camera && controls){
-    fly.t = Math.min(1, fly.t + dt / 0.85);
+    fly.t = Math.min(1, fly.t + dt / 1.15);
     const k = fly.t * fly.t * (3 - 2 * fly.t);
     camera.position.lerpVectors(fly.from, fly.to, k);
     controls.target.lerpVectors(fly.tFrom, fly.tTo, k);
@@ -383,23 +390,47 @@ function look(mode, instant){
   }else moveCam(to, new THREE.Vector3());
   applyLook();
 }
-function frameGroup(id){
+const AIM = {
+  frontal:[0, 0.14, 1],
+  parietal:[0, 1, -0.2],
+  temporal:[1, 0.04, 0.2],
+  occipital:[0, 0.1, -1],
+  insula:[1, 0.08, 0.25],
+  callosum:[1, 0.4, 0.12],
+  basal:[1, 0.12, 0.28],
+  thalamus:[1, 0.22, 0.12],
+  hypo:[0.1, -0.2, 1],
+  hippo:[0.9, -0.4, 0.2],
+  amygdala:[0.75, -0.12, 0.5],
+  cerebellum:[0.1, -0.2, -1],
+  stem:[0, -0.08, 1]
+};
+function showStructure(id){
   const box = new THREE.Box3();
   let n = 0;
   meshes.forEach(function(mesh){
-    if(mesh.userData.bx_group !== id || !mesh.visible) return;
+    if(mesh.userData.bx_group !== id) return;
     box.expandByObject(mesh);
     n += 1;
   });
   if(!n || box.isEmpty()) return;
   const center = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3());
-  const radius = Math.max(size.length() * 0.55, extent * 0.25);
-  const dist = radius / Math.sin((camera.fov * Math.PI / 180) / 2) * 0.72;
-  const offset = camera.position.clone().sub(controls.target);
-  if(offset.lengthSq() < 1e-6) offset.set(0, 0, 1);
-  offset.normalize().multiplyScalar(dist);
-  moveCam(center.clone().add(offset), center);
+  const aim = AIM[id] || [0, 0.1, 1];
+  const dir = new THREE.Vector3(aim[0], aim[1], aim[2]);
+  if(id==="temporal" || id==="insula" || id==="callosum" || id==="basal" || id==="thalamus" || id==="hippo" || id==="amygdala") dir.x *= leftSign;
+  dir.normalize();
+  const dist = extent * 2.45;
+  viewMode = "";
+  moveCam(center.clone().add(dir.multiplyScalar(dist)), center);
+  applyLook();
+}
+function showMesh(mesh){
+  const box = new THREE.Box3().setFromObject(mesh);
+  const center = box.getCenter(new THREE.Vector3());
+  const dir = camera.position.clone().sub(controls.target);
+  if(dir.lengthSq() < 1e-6) dir.set(0, 0.1, 1);
+  dir.normalize();
+  moveCam(center.clone().add(dir.multiplyScalar(extent * 2.2)), center);
 }
 function applyLook(){
   const hide = viewMode==="medial" ? (shownSide()==="left" ? "right" : "left") : "";
@@ -408,20 +439,21 @@ function applyLook(){
     mesh.visible = !hide || side !== hide;
     const mine = groupId && mesh.userData.bx_group === groupId;
     const hot = picked && mesh === picked;
-    const g = groupId ? groupById(groupId) : null;
-    let alpha = 1;
-    if(shell(mesh) && !mine){
-      alpha = surface;
-      if(g && (g.deep || g.buried)) alpha = Math.min(alpha, 0.28);
-    }
+    const lone = hot && !groupId;
+    const alpha = shell(mesh) ? surface : 1;
     mats(mesh).forEach(function(mat){
-      if(coded && mesh.userData.bx_group) mat.color.set(groupById(mesh.userData.bx_group).color);
+      const own = groupById(mesh.userData.bx_group);
+      if(mine && own) mat.color.set(own.color);
+      else if(lone) mat.color.set("#7fd4e6");
+      else if(coded && !groupId && own) mat.color.set(own.color);
       else if(mat.userData.base) mat.color.copy(mat.userData.base);
       mat.transparent = alpha < 0.98;
       mat.opacity = alpha;
       mat.depthWrite = alpha > 0.55;
-      mat.emissive.set(hot ? 0xf2f6f8 : mine ? 0x12343a : 0x000000);
-      mat.emissiveIntensity = hot ? 0.45 : mine ? 0.22 : 0;
+      if(mine && own) mat.emissive.set(own.color);
+      else if(lone) mat.emissive.set("#7fd4e6");
+      else mat.emissive.set(0x000000);
+      mat.emissiveIntensity = mine || lone ? 0.28 : 0;
     });
   });
 }
@@ -455,11 +487,9 @@ function block(title, text){ return '<h3>'+esc(title)+'</h3><p>'+esc(text)+'</p>
 function selectGroup(id){
   groupId = id;
   picked = null;
-  const g = groupById(id);
-  if(g && (g.deep || g.buried) && surface > 0.72) surface = 0.28;
-  applyLook();
-  frameGroup(id);
-  openGroup(g);
+  spin = false;
+  showStructure(id);
+  openGroup(groupById(id));
   paint();
 }
 function openGroup(g){
