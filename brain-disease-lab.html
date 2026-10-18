@@ -1,0 +1,1707 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111a">
+<title>Brain Disease Learning Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520&family=Figtree:wght@460;600&display=swap" rel="stylesheet">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+<style>
+:root{--bg:#07111a;--fg:#e7f1f4;--muted:#93a8b3;--line:rgba(127,212,230,.28);--cyan:#7fd4e6;--warm:#e2b48a;--green:#3ee0a0;--card:rgba(10,22,32,.92)}
+*{box-sizing:border-box}
+html,body{margin:0;background:
+  radial-gradient(1200px 500px at 10% -10%, rgba(127,212,230,.08), transparent 50%),
+  var(--bg);color:var(--fg);font-family:Figtree,sans-serif}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+a{color:var(--cyan)}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:16px 16px 0}
+header a.back{color:var(--muted);text-decoration:none;min-height:44px;display:flex;align-items:center}
+h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:clamp(26px,6vw,40px);letter-spacing:-.03em;margin:0;line-height:1.05}
+h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:clamp(22px,4vw,30px);letter-spacing:-.03em;margin:0 0 8px}
+h3{margin:14px 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--warm)}
+.kicker{margin:0 0 4px;color:var(--cyan);letter-spacing:.16em;text-transform:uppercase;font-size:11px}
+.context{margin:0;padding:0 16px 4px;color:var(--muted);font-size:13px}
+.scroller{display:flex;gap:8px;overflow:auto;padding:12px 14px 8px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.scroller::-webkit-scrollbar{display:none}
+.scroller button{flex:0 0 auto;border:1px solid var(--line);background:rgba(7,17,26,.72);border-radius:999px;min-height:40px;padding:0 14px}
+.scroller button.on{border-color:var(--cyan);color:#07111a;background:var(--cyan)}
+.sections button{min-height:40px}
+.layout{display:block}
+main{padding:4px 14px 40px}
+.lead{color:#d5e4ea;line-height:1.55;font-size:16px}
+.note{color:var(--muted);font-size:13px;line-height:1.5}
+.grid{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.card{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:16px;padding:14px;min-height:52px}
+.card b{display:block;font-weight:600}
+.card span{display:block;color:var(--muted);font-size:13.5px;margin-top:4px;line-height:1.4}
+.card.on{border-color:var(--green)}
+.badge{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan);margin-bottom:8px}
+.stage{display:flex;flex-direction:column;gap:10px}
+.stage .player{order:1}
+.stage .controls{order:2}
+.stage .side-l{order:3}
+.stage .side-r{order:4}
+.player{background:#050b10;border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.player canvas{width:100%;height:auto;display:block;background:#050b10;touch-action:manipulation}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.controls button,.backrow button{border:1px solid var(--line);background:#0c1a24;border-radius:999px;min-height:44px;padding:0 16px}
+.controls input[type=range]{flex:1 1 160px;min-width:140px;height:44px}
+.panel{border:1px solid var(--line);border-radius:16px;padding:14px;background:rgba(8,16,24,.9)}
+.panel p{margin:6px 0;line-height:1.45}
+.step.on{border-color:var(--green);color:var(--green)}
+.step.on span{color:#cfe7df}
+.algo button{width:100%}
+.algo button.on{border-color:var(--green)}
+.warn{border-left:3px solid var(--warm);padding-left:10px}
+.backrow{margin:0 0 8px}
+@media(min-width:980px){
+  header,main,.context,.scroller{padding-left:28px;padding-right:28px}
+  .layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:8px;align-items:start;padding-right:20px}
+  .sections{flex-direction:column;max-height:calc(100vh - 150px);position:sticky;top:12px;padding-top:0}
+  .sections button{border-radius:12px;width:100%}
+  .stage.wide{display:grid;grid-template-columns:minmax(220px,260px) minmax(0,1fr) minmax(220px,280px);grid-template-areas:"left player right" "controls controls controls";gap:12px}
+  .stage.wide .player{grid-area:player;order:0}
+  .stage.wide .side-l{grid-area:left;order:0}
+  .stage.wide .side-r{grid-area:right;order:0}
+  .stage.wide .controls{grid-area:controls;order:0}
+}
+@media(prefers-reduced-motion:reduce){.card{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <div><p class="kicker">Critical care · brain</p><h1>Disease learning lab</h1></div>
+  <a class="back" href="hub.html">Brain</a>
+</header>
+<div class="scroller diseases" id="diseases" role="tablist" aria-label="Brain diseases"></div>
+<p class="context" id="context"></p>
+<div class="layout">
+  <nav class="scroller sections" id="sections" aria-label="Chapter sections"></nav>
+  <main id="work"></main>
+</div>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const SECTIONS = [
+  ["overview","01","Overview","Overview and definition"],
+  ["anatomy","02","Anatomy","Relevant anatomy"],
+  ["etiology","03","Etiology","Etiology and risk factors"],
+  ["path","04","Pathophysiology","Pathophysiology"],
+  ["clinical","05","Clinical","Clinical manifestations"],
+  ["invest","06","Investigations","Investigations"],
+  ["ddx","07","Differential","Differential diagnosis"],
+  ["algo","08","Management","Management algorithm"],
+  ["meds","09","Medications","Medications"],
+  ["procedures","10","Procedures","Procedures"],
+  ["monitor","11","Monitoring","Monitoring"],
+  ["complications","12","Complications","Complications"],
+  ["prognosis","13","Prognosis","Prognosis and rehabilitation"],
+  ["case","14","Case","Interactive clinical case"],
+  ["assess","15","Assessment","Assessment and references"]
+];
+
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const work = document.getElementById("work");
+let diseaseId = "tbi";
+let sectionId = "procedures";
+let topicId = "";
+let player = null;
+let playerToken = 0;
+let brainToken = 0;
+let algoStep = 0;
+let casePick = null;
+let caseLocked = false;
+let quizPick = {};
+let quizLocked = {};
+let spotId = "";
+let anatomyCleanup = null;
+
+function esc(s){
+  return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+    if(c==="&") return "\u0026amp;";
+    if(c==="<") return "\u0026lt;";
+    if(c===">") return "\u0026gt;";
+    return "\u0026quot;";
+  });
+}
+function clamp(k){ return Math.max(0, Math.min(1, k)); }
+function mix(a,b,k){ return a+(b-a)*k; }
+function phase(t,a,b){ return clamp((t-a)/(b-a)); }
+function disease(){ return DISEASES.find(function(d){ return d.id===diseaseId; }) || DISEASES[0]; }
+function showDef(id){ return SHOWS[id]; }
+
+function wash(ctx,w,h){
+  ctx.fillStyle = "#071018";
+  ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle = "rgba(127,212,230,.08)";
+  ctx.lineWidth = 1;
+  for(let x=40;x<w;x+=40){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+}
+function tag(ctx, text, x, y){
+  ctx.fillStyle = "rgba(231,241,244,.88)";
+  ctx.font = "15px Figtree, sans-serif";
+  ctx.fillText(text, x, y);
+}
+function line(ctx, pts, width, color){
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.stroke();
+}
+function headSide(ctx, cx, cy, rx, ry){
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
+  ctx.strokeStyle = "rgba(231,241,244,.55)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx*0.86, ry*0.86, 0, 0, Math.PI*2);
+  ctx.strokeStyle = "rgba(226,180,138,.35)";
+  ctx.stroke();
+}
+function ventricle(ctx, cx, cy, s){
+  ctx.beginPath();
+  ctx.moveTo(cx-s*0.2, cy-s*0.55);
+  ctx.quadraticCurveTo(cx+s*0.15, cy-s*0.2, cx-s*0.05, cy+s*0.05);
+  ctx.quadraticCurveTo(cx-s*0.35, cy+s*0.45, cx-s*0.15, cy+s*0.7);
+  ctx.strokeStyle = "#7fd4e6";
+  ctx.lineWidth = 8;
+  ctx.stroke();
+}
+
+function plate(ctx, text, x, y){
+  ctx.font = "15px Figtree, sans-serif";
+  const w = ctx.measureText(text).width;
+  ctx.fillStyle = "rgba(5,11,16,.86)";
+  ctx.fillRect(x-5, y-15, w+10, 22);
+  ctx.fillStyle = "#e7f1f4";
+  ctx.fillText(text, x, y);
+}
+function drawEvd(ctx, w, h, t){
+  wash(ctx,w,h);
+  const cap = t<3 ? "1  Mark the entry" : t<6 ? "2  Open a burr hole" : t<10 ? "3  Pass toward the frontal horn" : t<13 ? "4  CSF returns and pressure falls" : "5  Tunnel the catheter and set the height";
+  ctx.fillStyle = "#e7f1f4";
+  ctx.font = "600 20px Figtree, sans-serif";
+  ctx.fillText(cap, 22, 34);
+
+  const cx = w*0.33, cy = h*0.58, rx = w*0.18, ry = h*0.3;
+  ctx.beginPath();
+  ctx.moveTo(cx-rx*0.72, cy-ry*0.2);
+  ctx.bezierCurveTo(cx-rx*0.95, cy-ry*0.85, cx-rx*0.15, cy-ry*1.08, cx+rx*0.2, cy-ry*0.9);
+  ctx.bezierCurveTo(cx+rx*0.95, cy-ry*0.55, cx+rx*1.05, cy+ry*0.05, cx+rx*0.62, cy+ry*0.42);
+  ctx.bezierCurveTo(cx+rx*0.2, cy+ry*0.78, cx-rx*0.35, cy+ry*0.62, cx-rx*0.72, cy+ry*0.2);
+  ctx.closePath();
+  ctx.fillStyle = "#121a22";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(231,241,244,.72)";
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  const hornX = cx+rx*0.16, hornY = cy-ry*0.05;
+  ctx.beginPath();
+  ctx.moveTo(hornX-16, hornY-30);
+  ctx.quadraticCurveTo(hornX+24, hornY-6, hornX-2, hornY+6);
+  ctx.quadraticCurveTo(hornX-30, hornY+28, hornX-6, hornY+40);
+  ctx.strokeStyle = "rgba(127,212,230,.9)";
+  ctx.lineWidth = 9;
+  ctx.lineCap = "round";
+  ctx.stroke();
+
+  const nasionX = cx+rx*0.84, nasionY = cy-ry*0.02;
+  ctx.fillStyle = "#e2b48a";
+  ctx.beginPath(); ctx.arc(nasionX, nasionY, 4.5, 0, 7); ctx.fill();
+  plate(ctx, "Nasion", nasionX+10, nasionY+4);
+
+  const kx = cx+rx*0.05, ky = cy-ry*0.78;
+  const mark = phase(t, 0.3, 2.2);
+  ctx.save();
+  ctx.globalAlpha = 0.45+0.55*mark;
+  ctx.setLineDash([5,5]);
+  ctx.strokeStyle = "#7fd4e6";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(nasionX-6, nasionY-16); ctx.lineTo(kx+8, ky+10); ctx.stroke();
+  ctx.restore();
+  ctx.setLineDash([]);
+  if(mark>0.35) plate(ctx, "11 cm behind nasion", kx-20, ky-22);
+  ctx.fillStyle = "#7fd4e6";
+  ctx.beginPath(); ctx.arc(kx, ky, 5+1.5*Math.sin(t*3)*mark, 0, 7); ctx.fill();
+  plate(ctx, "Kocher point", kx-138, ky+6);
+
+  const burr = phase(t, 3, 5.6);
+  if(burr>0){
+    ctx.strokeStyle = "#e7f1f4";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(kx, ky, 6+7*burr, 0, Math.PI*2); ctx.stroke();
+  }
+
+  const tipx = hornX-4, tipy = hornY-8;
+  const adv = phase(t, 6, 10);
+  if(adv>0){
+    const x = mix(kx, tipx, adv), y = mix(ky, tipy, adv);
+    line(ctx, [[kx,ky],[x,y]], 5, "#e2b48a");
+    ctx.fillStyle = "#e2b48a";
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
+  }
+  if(t >= 6) plate(ctx, "5–6 cm", 22, h - 28);
+  plate(ctx, "Frontal horn", 22, h - 54);
+
+  const drain = phase(t, 10.2, 13.2);
+  if(drain>0){
+    ctx.strokeStyle = "rgba(159,231,255,"+(0.4+0.5*drain)+")";
+    ctx.lineWidth = 12;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(hornX-16, hornY-30);
+    ctx.quadraticCurveTo(hornX+24, hornY-6, hornX-2, hornY+6);
+    ctx.stroke();
+    ctx.fillStyle = "#9fe7ff";
+    for(let i=0;i<6;i++){
+      const k = (t*0.35+i/6)%1;
+      ctx.globalAlpha = drain*(1-k);
+      ctx.beginPath(); ctx.arc(kx-16-k*70, ky-8, 3.2, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    plate(ctx, "CSF out", kx-150, ky-18);
+  }
+
+  const icx = w*0.73, icy = h*0.16;
+  const icp = Math.round(mix(28, 12, drain));
+  plate(ctx, "ICP  "+icp+" mmHg", icx, icy+8);
+  ctx.strokeStyle = drain>0.45 ? "#3ee0a0" : "#e2b48a";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for(let i=0;i<56;i++){
+    const x = icx+i*3.1;
+    const fall = i>34 ? mix(0, 26, drain) : 0;
+    const y = icy+48+fall+Math.sin(i*0.65+t*3)*3.5;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  const ax = w*0.82, ay = h*0.7, ar = Math.min(w,h)*0.13;
+  ctx.beginPath(); ctx.arc(ax, ay, ar, 0, 7);
+  ctx.strokeStyle = "rgba(231,241,244,.5)"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ax, ay-ar+4); ctx.lineTo(ax-6, ay-ar-10); ctx.lineTo(ax+6, ay-ar-10); ctx.closePath();
+  ctx.fillStyle = "#e2b48a"; ctx.fill();
+  plate(ctx, "Nose", ax-18, ay-ar-16);
+  ctx.strokeStyle = "rgba(127,212,230,.75)";
+  ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(ax, ay-ar*0.55); ctx.lineTo(ax, ay+ar*0.62); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(127,212,230,.45)";
+  ctx.beginPath(); ctx.ellipse(ax-ar*0.28, ay-ar*0.08, 6, 12, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(ax+ar*0.28, ay-ar*0.08, 6, 12, 0, 0, 7); ctx.fill();
+  const entryX = ax+ar*0.38, entryY = ay-ar*0.62;
+  ctx.fillStyle = "#7fd4e6";
+  ctx.beginPath(); ctx.arc(entryX, entryY, 4, 0, 7); ctx.fill();
+  if(adv>0) line(ctx, [[entryX, entryY],[ax+ar*0.18, ay-ar*0.12]], 3, "#e2b48a");
+  plate(ctx, "3 cm off midline", ax - ar, ay + ar + 40);
+}
+
+function drawEtt(ctx,w,h,t){
+  wash(ctx,w,h);
+  const y = h*0.55;
+  line(ctx, [[w*0.12,y],[w*0.42,y-20],[w*0.55,y+10],[w*0.78,y+30]], 16, "#24343c");
+  line(ctx, [[w*0.12,y],[w*0.42,y-20],[w*0.55,y+10],[w*0.78,y+30]], 8, "#7a4a4a");
+  tag(ctx, "Mouth", w*0.12, y-24);
+  tag(ctx, "Cords", w*0.5, y-8);
+  tag(ctx, "Trachea", w*0.7, y+56);
+  const adv = phase(t, 1.5, 6);
+  const x = mix(w*0.16, w*0.74, adv);
+  const yy = mix(y-6, y+26, adv);
+  line(ctx, [[w*0.1,y-30],[x,yy]], 6, "#d5e4ea");
+  if(t>6.5){
+    tag(ctx, "EtCO2", w*0.62, h*0.22);
+    ctx.strokeStyle = "#3ee0a0";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(w*0.62, h*0.36);
+    ctx.lineTo(w*0.68, h*0.36);
+    ctx.lineTo(w*0.68, h*0.24);
+    ctx.lineTo(w*0.82, h*0.24);
+    ctx.lineTo(w*0.82, h*0.36);
+    ctx.lineTo(w*0.9, h*0.36);
+    ctx.stroke();
+  }
+  tag(ctx, t<3 ? "Open the airway" : t<7 ? "Tube through the cords" : "Confirm with carbon dioxide", 24, 36);
+}
+
+function drawBolt(ctx,w,h,t){
+  wash(ctx,w,h);
+  headSide(ctx, w*0.4, h*0.55, w*0.24, h*0.34);
+  const adv = phase(t, 2, 6);
+  const x = w*0.4+w*0.02, y0 = h*0.55-h*0.34;
+  line(ctx, [[x, y0-10],[x, mix(y0, h*0.48, adv)]], 4, "#e2b48a");
+  ctx.fillStyle = "#7fd4e6";
+  ctx.fillRect(x-8, y0-28, 16, 18);
+  tag(ctx, "Parenchymal monitor", x-80, y0-40);
+  tag(ctx, "Skull", x+16, y0+10);
+  const icp = 22+Math.sin(t*2)*3;
+  tag(ctx, "ICP "+icp.toFixed(0)+" mmHg", w*0.62, h*0.3);
+  ctx.strokeStyle = "#7fd4e6";
+  ctx.beginPath();
+  for(let i=0;i<50;i++){
+    const px = w*0.6+i*5;
+    const py = h*0.42+Math.sin(i*0.45+t*3)*10;
+    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+  tag(ctx, "It measures pressure. It does not drain CSF.", 24, h-28);
+}
+
+function drawCrani(ctx,w,h,t){
+  wash(ctx,w,h);
+  const lift = phase(t, 2.2, 6);
+  const open = phase(t, 6.2, 9);
+  ctx.strokeStyle = "rgba(231,241,244,.7)";
+  ctx.lineWidth = 8;
+  ctx.beginPath(); ctx.arc(w*0.4, h*0.58, 90, Math.PI, 0); ctx.stroke();
+  ctx.fillStyle = "#c47a6a";
+  ctx.beginPath(); ctx.ellipse(w*0.4, h*0.58, 70, 28+18*open, 0, 0, 7); ctx.fill();
+  ctx.save();
+  ctx.translate(0, -70*lift);
+  ctx.strokeStyle = "#d5e4ea";
+  ctx.lineWidth = 8;
+  ctx.beginPath(); ctx.arc(w*0.4, h*0.58, 90, Math.PI*1.05, Math.PI*1.85); ctx.stroke();
+  ctx.restore();
+  tag(ctx, lift<0.2 ? "Bone still on" : "Bone flap lifted", 24, 36);
+  tag(ctx, "Swollen hemisphere", w*0.28, h*0.78);
+  tag(ctx, "Specialist operation", w*0.62, h*0.3);
+}
+
+const CT_SPOTS = [
+  {id:"sdh", title:"Acute subdural", text:"A crescent of acute blood over the hemisphere. It can cross suture lines. Mass effect and shift decide the pace."},
+  {id:"shift", title:"Midline shift", text:"The septum between the frontal horns is pushed off the midline. Shift is a sign of mass effect, not a diagnosis by itself."},
+  {id:"cistern", title:"Basal cisterns", text:"Compressed or absent basal cisterns mean the brain is tight. This is a pressure emergency."},
+  {id:"contusion", title:"Contusion", text:"Hemorrhagic bruising, often frontal or temporal, and often worse on the second scan than the first."},
+  {id:"ivh", title:"Blood in the ventricle", text:"Blood inside a ventricle can block CSF flow. That is one reason an external drain is considered."}
+];
+function drawCt(ctx,w,h,t,step){
+  wash(ctx,w,h);
+  hotspots = [];
+  const cx = w*0.48, cy = h*0.52, r = Math.min(w,h)*0.32;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.strokeStyle="rgba(231,241,244,.45)"; ctx.lineWidth=3; ctx.stroke();
+  ctx.fillStyle = "#1a242c"; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,r*0.78,0,7); ctx.fillStyle="#2a343c"; ctx.fill();
+  const show = function(id){ return CT_SPOTS[step] && CT_SPOTS[step].id===id || spotId===id; };
+  ctx.fillStyle = show("sdh") ? "#e07a7a" : "rgba(224,122,122,.45)";
+  ctx.beginPath(); ctx.ellipse(cx-r*0.42, cy, r*0.16, r*0.55, 0, 0, 7); ctx.fill();
+  hotspots.push({id:"sdh", x:cx-r*0.42, y:cy, r:r*0.28});
+  ctx.strokeStyle = show("shift") ? "#e2b48a" : "rgba(226,180,138,.6)";
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(cx+r*0.12, cy-r*0.45); ctx.lineTo(cx+r*0.12, cy+r*0.2); ctx.stroke();
+  hotspots.push({id:"shift", x:cx+r*0.12, y:cy-r*0.1, r:36});
+  ctx.fillStyle = show("cistern") ? "#7fd4e6" : "rgba(127,212,230,.25)";
+  ctx.beginPath(); ctx.arc(cx, cy+r*0.42, 16, 0, 7); ctx.fill();
+  hotspots.push({id:"cistern", x:cx, y:cy+r*0.42, r:28});
+  ctx.fillStyle = show("contusion") ? "#c45050" : "rgba(196,80,80,.4)";
+  ctx.fillRect(cx+r*0.15, cy-r*0.2, 28, 22);
+  hotspots.push({id:"contusion", x:cx+r*0.22, y:cy-r*0.12, r:28});
+  ctx.fillStyle = show("ivh") ? "#d7e8f2" : "rgba(215,232,242,.35)";
+  ctx.fillRect(cx-10, cy-r*0.05, 18, 28);
+  hotspots.push({id:"ivh", x:cx, y:cy+8, r:24});
+  tag(ctx, "Teaching diagram, not a patient scan", 20, 32);
+  tag(ctx, "Tap a finding", w*0.62, h*0.78);
+}
+
+function drawArt(ctx,w,h,t){
+  wash(ctx,w,h);
+  ctx.strokeStyle = "#d5c4b0";
+  ctx.lineWidth = 18;
+  ctx.beginPath(); ctx.moveTo(w*0.15,h*0.6); ctx.quadraticCurveTo(w*0.45,h*0.3,w*0.8,h*0.55); ctx.stroke();
+  line(ctx, [[w*0.25,h*0.55],[w*0.7,h*0.48]], 6, "#e23b4a");
+  const adv = phase(t, 1.5, 6);
+  const x = mix(w*0.32, w*0.62, adv);
+  line(ctx, [[x, h*0.28],[x, h*0.5]], 3, "#e7f1f4");
+  tag(ctx, "Radial artery", w*0.48, h*0.4);
+  tag(ctx, "Wrist", w*0.18, h*0.72);
+  ctx.strokeStyle = "#e23b4a";
+  ctx.beginPath();
+  for(let i=0;i<40;i++){
+    const px=w*0.55+i*6, py=h*0.22+ (i%8===0? -14:0);
+    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+  tag(ctx, t<3 ? "Feel the pulse, use ultrasound if you can" : "Catheter in the artery", 24, 36);
+}
+
+function drawCvc(ctx,w,h,t){
+  wash(ctx,w,h);
+  headSide(ctx, w*0.28, h*0.42, 70, 80);
+  line(ctx, [[w*0.34,h*0.55],[w*0.55,h*0.75]], 22, "#c4b2a2");
+  line(ctx, [[w*0.4,h*0.5],[w*0.48,h*0.7]], 8, "#3a6ea5");
+  line(ctx, [[w*0.46,h*0.48],[w*0.54,h*0.68]], 7, "#e23b4a");
+  const adv = phase(t, 2, 7);
+  line(ctx, [[w*0.36,h*0.42],[mix(w*0.36,w*0.44,adv), mix(h*0.42,h*0.58,adv)]], 3, "#e7f1f4");
+  ctx.strokeStyle = "#9fd4e6";
+  ctx.strokeRect(w*0.62, h*0.28, 180, 120);
+  ctx.fillStyle = "#3a6ea5";
+  ctx.beginPath(); ctx.ellipse(w*0.7, h*0.42, 22, 16, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#e23b4a";
+  ctx.beginPath(); ctx.arc(w*0.78, h*0.4, 10, 0, 7); ctx.fill();
+  tag(ctx, "Vein", w*0.66, h*0.36);
+  tag(ctx, "Artery", w*0.8, h*0.36);
+  tag(ctx, "Ultrasound view", w*0.62, h*0.26);
+  tag(ctx, "Compress the vein. The artery pulses.", 24, h-24);
+}
+
+function drawCoil(ctx,w,h,t){
+  wash(ctx,w,h);
+  line(ctx, [[w*0.15,h*0.7],[w*0.4,h*0.55],[w*0.62,h*0.4]], 7, "#c5dde6");
+  const grow = phase(t, 1, 4);
+  ctx.beginPath();
+  ctx.ellipse(w*0.66, h*0.34, 16+18*grow, 20+22*grow, -0.4, 0, 7);
+  ctx.fillStyle = "#9a3040"; ctx.fill();
+  const coil = phase(t, 4.5, 9);
+  ctx.strokeStyle = "#e2b48a";
+  ctx.lineWidth = 2;
+  for(let i=0;i<8*coil;i++){
+    ctx.beginPath();
+    ctx.arc(w*0.66, h*0.34, 4+i*2, i, i+1.4);
+    ctx.stroke();
+  }
+  tag(ctx, coil<0.2 ? "Sac at a branch point" : "Coils fill the sac", 24, 36);
+  tag(ctx, "Specialist endovascular procedure", 24, h-28);
+}
+
+function drawEvt(ctx,w,h,t){
+  wash(ctx,w,h);
+  line(ctx, [[w*0.1,h*0.55],[w*0.78,h*0.48]], 12, "#c5dde6");
+  const clot = phase(t, 0.4, 2);
+  ctx.fillStyle = "#2a241c";
+  ctx.fillRect(w*0.48, h*0.43, 36, 16);
+  const pull = phase(t, 3, 8);
+  if(pull>0){
+    line(ctx, [[w*0.2,h*0.55],[mix(w*0.55,w*0.3,pull), h*0.5]], 2, "#e2b48a");
+    ctx.fillRect(mix(w*0.48, w*0.28, pull), h*0.43, 28, 14);
+  }
+  tag(ctx, pull<0.15 ? "Clot in a large artery" : "Stent retriever withdraws the clot", 24, 36);
+  const back = phase(t, 8, 10);
+  ctx.globalAlpha = back;
+  ctx.fillStyle = "#3ee0a0";
+  ctx.fillRect(w*0.7, h*0.62, 80, 28);
+  ctx.globalAlpha = 1;
+  tag(ctx, "Territory reperfused", w*0.66, h*0.78);
+}
+
+function drawLp(ctx,w,h,t){
+  wash(ctx,w,h);
+  for(let i=0;i<4;i++){
+    ctx.fillStyle = "#d5e4ea";
+    ctx.fillRect(w*0.3, h*0.25+i*48, 160, 18);
+  }
+  const adv = phase(t, 2, 7);
+  line(ctx, [[w*0.55, h*0.15],[w*0.55, mix(h*0.2, h*0.62, adv)]], 3, "#e2b48a");
+  tag(ctx, "Lumbar spinous processes", w*0.28, h*0.2);
+  tag(ctx, "Needle into the CSF space", w*0.58, h*0.4);
+  if(t>8) tag(ctx, "Do not proceed if imaging shows a mass or the patient is coagulopathic.", 20, h-24);
+}
+
+function drawShunt(ctx,w,h,t){
+  wash(ctx,w,h);
+  headSide(ctx, w*0.3, h*0.4, 80, 90);
+  ventricle(ctx, w*0.28, h*0.42, 50);
+  const adv = phase(t, 1, 8);
+  line(ctx, [[w*0.3,h*0.28],[w*0.48,h*0.55],[mix(w*0.5,w*0.75,adv), mix(h*0.6,h*0.75,adv)]], 3, "#e2b48a");
+  tag(ctx, "Ventricle", w*0.12, h*0.7);
+  tag(ctx, "Catheter tunnelled toward the abdomen", w*0.4, h*0.88);
+}
+
+function drawClock(ctx,w,h,t){
+  wash(ctx,w,h);
+  ctx.strokeStyle = "#7fd4e6";
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(w*0.4, h*0.52, 80, 0, 7); ctx.stroke();
+  const a = -Math.PI/2 + phase(t,0,8)*Math.PI*1.4;
+  line(ctx, [[w*0.4,h*0.52],[w*0.4+Math.cos(a)*60, h*0.52+Math.sin(a)*60]], 3, "#e2b48a");
+  tag(ctx, "Last known well", w*0.62, h*0.35);
+  tag(ctx, "4.5 h thrombolysis window if eligible", w*0.58, h*0.48);
+  tag(ctx, "Large-vessel occlusion can still go to thrombectomy later", w*0.52, h*0.62);
+}
+
+function brainOutline(ctx,cx,cy,r){
+  ctx.beginPath(); ctx.ellipse(cx,cy,r*1.15,r,0,0,7);
+  ctx.strokeStyle="rgba(231,241,244,.55)"; ctx.lineWidth=2; ctx.stroke();
+}
+function drawTbiPrimary(ctx,w,h,t){
+  wash(ctx,w,h);
+  brainOutline(ctx, w*0.4, h*0.5, 90);
+  const hit = phase(t, 0.5, 2.5);
+  ctx.fillStyle = "#e2b48a";
+  ctx.beginPath(); ctx.arc(mix(w*0.08,w*0.22,hit), h*0.35, 10, 0, 7); ctx.fill();
+  ctx.globalAlpha = phase(t, 2.2, 4);
+  ctx.fillStyle = "#9a3040";
+  ctx.beginPath(); ctx.ellipse(w*0.28, h*0.48, 22, 14, 0, 0, 7); ctx.fill();
+  ctx.globalAlpha = phase(t, 4, 6);
+  ctx.beginPath(); ctx.ellipse(w*0.5, h*0.5, 16, 12, 0, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1;
+  tag(ctx, "Impact", 24, 36);
+  tag(ctx, "Coup", w*0.18, h*0.7);
+  tag(ctx, "Contrecoup", w*0.52, h*0.72);
+}
+function drawTbiSecond(ctx,w,h,t){
+  wash(ctx,w,h);
+  brainOutline(ctx, w*0.45, h*0.5, 100);
+  const items = ["Hypoxia","Hypotension","Swelling","Ischaemia"];
+  items.forEach(function(name,i){
+    const on = t > 1+i*1.6;
+    ctx.globalAlpha = on ? 1 : 0.25;
+    ctx.strokeStyle = on ? "#e07a7a" : "#7fd4e6";
+    ctx.strokeRect(w*0.62, h*0.22+i*48, 180, 36);
+    tag(ctx, name, w*0.66, h*0.46+i*48);
+  });
+  ctx.globalAlpha = 1;
+  tag(ctx, "The second injury is often preventable", 24, 36);
+}
+function drawEdema(ctx,w,h,t){
+  wash(ctx,w,h);
+  const g = phase(t, 1, 7);
+  brainOutline(ctx, w*0.45, h*0.52, 80+30*g);
+  tag(ctx, g<0.3 ? "Brain volume normal" : "Volume rises inside a rigid skull", 24, 36);
+  tag(ctx, "Pressure then rises steeply", 24, h-28);
+}
+function drawCpp(ctx,w,h,t){
+  wash(ctx,w,h);
+  const icp = Math.round(mix(12, 30, phase(t,1,5)));
+  const map = 85;
+  tag(ctx, "MAP "+map, w*0.15, h*0.35);
+  tag(ctx, "ICP "+icp, w*0.42, h*0.35);
+  tag(ctx, "CPP "+(map-icp), w*0.68, h*0.35);
+  tag(ctx, "CPP = MAP − ICP", 24, 40);
+  ctx.fillStyle = icp>22 ? "#e07a7a" : "#3ee0a0";
+  ctx.fillRect(w*0.2, h*0.55, (map-icp)*4, 28);
+  tag(ctx, "If ICP rises and MAP does not, perfusion falls", 24, h-30);
+}
+function drawIcpCurve(ctx,w,h,t){
+  wash(ctx,w,h);
+  ctx.strokeStyle = "#7fd4e6";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(w*0.15, h*0.75);
+  ctx.quadraticCurveTo(w*0.4, h*0.72, w*0.55, h*0.6);
+  ctx.quadraticCurveTo(w*0.7, h*0.4, w*0.82, h*0.22);
+  ctx.stroke();
+  const k = phase(t, 0.5, 8);
+  const x = mix(w*0.2, w*0.78, k);
+  const y = h*0.75 - Math.pow(k, 2.2)*h*0.5;
+  ctx.fillStyle = "#e2b48a";
+  ctx.beginPath(); ctx.arc(x,y,6,0,7); ctx.fill();
+  tag(ctx, "Volume", w*0.7, h*0.84);
+  tag(ctx, "Pressure", w*0.08, h*0.24);
+}
+function drawHern(ctx,w,h,t){
+  wash(ctx,w,h);
+  ctx.strokeStyle = "rgba(231,241,244,.5)";
+  ctx.beginPath(); ctx.moveTo(w*0.15,h*0.55); ctx.lineTo(w*0.85,h*0.55); ctx.stroke();
+  tag(ctx, "Tentorium", w*0.7, h*0.5);
+  const shift = phase(t, 1.5, 6);
+  ctx.fillStyle = "#c47a6a";
+  ctx.beginPath(); ctx.ellipse(w*0.4, mix(h*0.4, h*0.62, shift), 40, 18, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#e2b48a";
+  ctx.beginPath(); ctx.arc(w*0.58, h*0.6, 5, 0, 7); ctx.fill();
+  tag(ctx, "Third nerve", w*0.6, h*0.68);
+  tag(ctx, shift<0.4 ? "Temporal lobe above the tentorium" : "Medial temporal lobe crosses. The pupil enlarges.", 20, 36);
+}
+function drawSahRupture(ctx,w,h,t){
+  wash(ctx,w,h);
+  line(ctx, [[w*0.15,h*0.6],[w*0.7,h*0.45]], 8, "#d5e4ea");
+  const g = phase(t, 0.8, 4);
+  ctx.beginPath(); ctx.ellipse(w*0.55, h*0.48, 10+24*g, 14+28*g, -0.5, 0, 7);
+  ctx.fillStyle = "#9a3040"; ctx.fill();
+  const leak = phase(t, 4.5, 8);
+  ctx.globalAlpha = leak;
+  ctx.fillStyle = "#e23b4a";
+  for(let i=0;i<8;i++){ ctx.beginPath(); ctx.arc(w*0.6+i*12, h*0.4-i*8, 4, 0, 7); ctx.fill(); }
+  ctx.globalAlpha = 1;
+  tag(ctx, g<0.5 ? "Branch-point sac" : leak<0.2 ? "Dome thins" : "Rupture into the CSF space", 24, 36);
+}
+function drawSahBlood(ctx,w,h,t){
+  wash(ctx,w,h);
+  brainOutline(ctx, w*0.45, h*0.5, 110);
+  const k = phase(t, 0.6, 6);
+  ctx.globalAlpha = 0.2+0.7*k;
+  ctx.fillStyle = "#9a3040";
+  ctx.beginPath(); ctx.ellipse(w*0.45, h*0.62, 70, 18, 0, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1;
+  tag(ctx, "Blood in the basal cisterns", 24, 36);
+}
+function drawSahIcp(ctx,w,h,t){
+  wash(ctx,w,h);
+  const spike = phase(t, 1, 3.5);
+  const fall = phase(t, 4, 7);
+  const icp = Math.round(mix(15, mix(70, 28, fall), spike));
+  tag(ctx, "ICP "+icp, w*0.2, h*0.4);
+  tag(ctx, "A sudden spike can stop cerebral blood flow for seconds", 24, 36);
+  ctx.fillStyle = "#e07a7a";
+  ctx.fillRect(w*0.2, h*0.55, 40, -icp*2);
+}
+function drawEbi(ctx,w,h,t){
+  wash(ctx,w,h);
+  brainOutline(ctx, w*0.42, h*0.52, 100);
+  ctx.globalAlpha = phase(t, 1, 5);
+  ctx.fillStyle = "rgba(224,122,122,.35)";
+  ctx.beginPath(); ctx.ellipse(w*0.42, h*0.52, 90, 70, 0, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1;
+  tag(ctx, "Early global injury, not only the sac", 24, 36);
+  tag(ctx, "Inflammation, microcirculatory failure, ionic shifts", 24, h-28);
+}
+function drawHydro(ctx,w,h,t){
+  wash(ctx,w,h);
+  brainOutline(ctx, w*0.45, h*0.5, 110);
+  const g = phase(t, 0.8, 7);
+  ctx.strokeStyle = "#7fd4e6";
+  ctx.lineWidth = 10;
+  ctx.beginPath(); ctx.ellipse(w*0.38, h*0.48, 12+16*g, 28+20*g, 0, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(w*0.55, h*0.48, 12+16*g, 28+20*g, 0, 0, 7); ctx.stroke();
+  tag(ctx, "Ventricles enlarge when CSF cannot leave", 24, 36);
+}
+function drawSpasm(ctx,w,h,t){
+  wash(ctx,w,h);
+  const narrow = phase(t, 1.5, 5);
+  const y = h*0.48, x0=w*0.12, x1=w*0.88, base=h*0.1;
+  ctx.beginPath();
+  for(let i=0;i<=40;i++){
+    const k=i/40;
+    const band=Math.exp(-Math.pow((k-0.55)/0.12,2));
+    const r=base*(1-band*0.65*narrow);
+    const x=mix(x0,x1,k);
+    if(i===0) ctx.moveTo(x,y-r); else ctx.lineTo(x,y-r);
+  }
+  for(let i=40;i>=0;i--){
+    const k=i/40;
+    const band=Math.exp(-Math.pow((k-0.55)/0.12,2));
+    const r=base*(1-band*0.65*narrow);
+    ctx.lineTo(mix(x0,x1,k), y+r);
+  }
+  ctx.fillStyle = narrow>0.4 ? "#9a3040" : "#e23b4a";
+  ctx.fill();
+  tag(ctx, narrow<0.1 ? "Artery open" : "Days later the artery narrows", 24, 36);
+}
+function drawDci(ctx,w,h,t){
+  wash(ctx,w,h);
+  brainOutline(ctx, w*0.45, h*0.5, 100);
+  const k = phase(t, 1, 6);
+  ctx.globalAlpha = k;
+  ctx.fillStyle = "#7a3030";
+  ctx.beginPath(); ctx.ellipse(w*0.55, h*0.48, 36, 28, 0, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1;
+  tag(ctx, "Delayed ischaemia", 24, 36);
+  tag(ctx, "Not only the narrowed artery on angiography", 24, h-28);
+}
+function drawMca(ctx,w,h,t){
+  wash(ctx,w,h);
+  line(ctx, [[w*0.12,h*0.6],[w*0.4,h*0.5],[w*0.75,h*0.46]], 8, "#c5dde6");
+  const clot = phase(t, 1.2, 3);
+  ctx.fillStyle="#1b1f24";
+  ctx.beginPath(); ctx.ellipse(w*0.48, h*0.5, 8+8*clot, 6, 0, 0, 7); ctx.fill();
+  const dark = phase(t, 3.5, 7);
+  ctx.globalAlpha = 0.25+0.6*dark;
+  ctx.fillStyle = "#7a3030";
+  ctx.beginPath(); ctx.ellipse(w*0.7, h*0.32, 50, 28, 0, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1;
+  tag(ctx, "MCA stem occlusion", 24, 36);
+  tag(ctx, "Lateral cortex loses flow: face, arm, language", 24, h-28);
+}
+function drawNimo(ctx,w,h,t){
+  wash(ctx,w,h);
+  const open = 0.45+0.55*phase(t, 2, 6);
+  line(ctx, [[w*0.1,h*0.5],[w*0.9,h*0.5]], 22*open+6, "#e23b4a");
+  ctx.fillStyle = "#7fd4e6";
+  for(let i=0;i<6;i++){
+    const x = w*0.2+i*70;
+    ctx.globalAlpha = t>1.5 ? 0.9 : 0.2;
+    ctx.fillRect(x, h*0.36, 18, 28);
+  }
+  ctx.globalAlpha = 1;
+  tag(ctx, "Nimodipine blocks calcium entry into vessel muscle", 20, 36);
+  tag(ctx, "Enteral, 60 mg every 4 hours, 21 days", 20, h-28);
+}
+function drawOsm(ctx,w,h,t){
+  wash(ctx,w,h);
+  const shrink = phase(t, 1, 6);
+  brainOutline(ctx, w*0.4, h*0.5, 100-20*shrink);
+  tag(ctx, "Water shifts out of brain tissue", 24, 36);
+  tag(ctx, "A bridge. Not a cure for the mass.", 24, h-28);
+}
+function drawBenzo(ctx,w,h,t){
+  wash(ctx,w,h);
+  const calm = phase(t, 1.2, 5);
+  ctx.strokeStyle = calm>0.6 ? "#3ee0a0" : "#e07a7a";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for(let i=0;i<60;i++){
+    const amp = mix(28, 6, calm);
+    const x=w*0.15+i*8, y=h*0.5+Math.sin(i*0.7+t*6)*amp;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  tag(ctx, calm<0.4 ? "Seizure activity" : "Benzodiazepine first", 24, 36);
+}
+function drawHeparin(ctx,w,h,t){
+  wash(ctx,w,h);
+  line(ctx, [[w*0.2,h*0.35],[w*0.5,h*0.55],[w*0.75,h*0.4]], 10, "#7fd4e6");
+  const clot = 1-phase(t, 2, 8);
+  ctx.globalAlpha = 0.3+0.7*clot;
+  ctx.fillStyle = "#2a241c";
+  ctx.fillRect(w*0.46, h*0.5, 40*clot+8, 16);
+  ctx.globalAlpha = 1;
+  tag(ctx, "Anticoagulation is the usual treatment", 24, 36);
+  tag(ctx, "Even when a little venous blood is already there", 24, h-28);
+}
+function drawReverse(ctx,w,h,t){
+  wash(ctx,w,h);
+  const stop = phase(t, 1, 6);
+  ctx.fillStyle = "#9a3040";
+  ctx.beginPath(); ctx.ellipse(w*0.35, h*0.55, 30+40*(1-stop), 20+24*(1-stop), 0, 0, 7); ctx.fill();
+  tag(ctx, stop<0.3 ? "Bleeding continues" : "Anticoagulation reversed, pressure lowered smoothly", 20, 36);
+}
+
+const SHOWS = {
+  evd:{dur:16, paint:drawEvd, steps:[
+    {t:0, title:"Mark the entry", text:"Kocher's point is about 11 cm back from the nasion and about 3 cm from the midline, just in front of the coronal suture. Know which ventricle you are aiming at from the scan."},
+    {t:3, title:"Open the skull", text:"A twist drill or burr hole is made at that point after a sterile preparation. The dura is opened only enough for the catheter."},
+    {t:6, title:"Pass the catheter", text:"Aim toward the ipsilateral medial canthus and the tragus, so the catheter enters the frontal horn. A typical pass is marked near 5 to 6 cm. Do not force it deeper."},
+    {t:10, title:"Confirm CSF", text:"Clear or blood-stained CSF should flow. A poor flow means the tip may be in the wrong place. Image if you are not sure."},
+    {t:13, title:"Tunnel and measure", text:"The catheter is tunnelled, connected to a closed drainage system, and set at the prescribed height. ICP can be transduced when the drain is closed."}
+  ]},
+  ett:{dur:10, paint:drawEtt, steps:[
+    {t:0, title:"Why the airway", text:"Hypoxia and hypercarbia raise intracranial pressure. Intubation is for patients who cannot protect the airway or who need controlled ventilation."},
+    {t:3, title:"The pass", text:"A rapid sequence induction aims to avoid a long apnoea and a blood-pressure crash. The tube crosses the vocal cords."},
+    {t:7, title:"Confirm", text:"Sustained exhaled carbon dioxide confirms tracheal placement. Then control carbon dioxide and blood pressure. Do not hyperventilate as a routine."}
+  ]},
+  bolt:{dur:10, paint:drawBolt, steps:[
+    {t:0, title:"What it is", text:"A parenchymal monitor sits in the brain substance and measures pressure. It does not drain cerebrospinal fluid."},
+    {t:3, title:"Placement", text:"It is usually placed frontally, through a small hole, by a trained operator. Coagulation is corrected first."},
+    {t:6, title:"The number", text:"The waveform and the number guide treatment. A reading without a clinical story is not a diagnosis."}
+  ]},
+  crani:{dur:11, paint:drawCrani, steps:[
+    {t:0, title:"When it is considered", text:"Decompression is for selected mass lesions and for intracranial pressure that will not yield. It is a neurosurgical operation, not a bedside procedure."},
+    {t:3, title:"The flap", text:"Bone is removed so the swollen hemisphere has somewhere to go. The dura is opened wide enough for that purpose."},
+    {t:7, title:"Afterwards", text:"The bone is stored or left off. Complications include bleeding, infection, hydrocephalus and the syndrome of the trephined later."}
+  ]},
+  ct:{dur:12, paint:drawCt, inspect:true, steps:CT_SPOTS.map(function(s,i){ return {t:i*2.2, title:s.title, text:s.text}; })},
+  art:{dur:9, paint:drawArt, steps:[
+    {t:0, title:"Why", text:"Beat-to-beat arterial pressure matters when cerebral perfusion is tight. The radial artery is the usual first site."},
+    {t:3, title:"The vessel", text:"Ultrasound makes the artery and the nearby structures obvious. A catheter is advanced and connected to a flushed transducer at the right height."},
+    {t:6, title:"Afterwards", text:"Watch the hand. Remove the line when it is no longer guiding treatment."}
+  ]},
+  cvc:{dur:10, paint:drawCvc, steps:[
+    {t:0, title:"Why", text:"A central vein is used for reliable access and for some vasoactive infusions. It is not required for every brain injury."},
+    {t:2, title:"Ultrasound", text:"The vein compresses. The artery pulses and does not. The needle is watched entering the vein."},
+    {t:6, title:"Wire and catheter", text:"A wire, then a catheter, then confirmation that the tip is venous before anything caustic is infused. Pneumothorax and arterial puncture are the early risks."}
+  ]},
+  coil:{dur:11, paint:drawCoil, steps:[
+    {t:0, title:"The sac", text:"Most ruptured aneurysms sit at branch points on the circle of Willis. The dome is the weak part."},
+    {t:4, title:"Filling", text:"From an arterial catheter, coils are packed into the sac so blood no longer enters it. Clipping is the open alternative. Both are specialist procedures."},
+    {t:8, title:"After", text:"Securing the aneurysm stops the next rupture. It does not by itself treat hydrocephalus, vasospasm or delayed ischaemia."}
+  ]},
+  evt:{dur:11, paint:drawEvt, steps:[
+    {t:0, title:"The occlusion", text:"A clot in a large intracranial artery, often the middle cerebral stem, threatens a wide territory."},
+    {t:3, title:"Retrieval", text:"A stent retriever or aspiration catheter is used, in a suitably selected patient, to remove the clot."},
+    {t:8, title:"Reperfusion", text:"The aim is restored flow before the territory dies. The time window depends on imaging and the pathway, not on a guess."}
+  ]},
+  lp:{dur:10, paint:drawLp, steps:[
+    {t:0, title:"Why", text:"A lumbar puncture samples CSF when meningitis or subarachnoid blood is the question and imaging does not already answer it."},
+    {t:3, title:"The pass", text:"The needle passes between lumbar spinous processes into the CSF space."},
+    {t:8, title:"When not to", text:"Do not puncture if a mass or tight brain makes herniation likely, or if coagulation is unsafe. Image first when that risk is real."}
+  ]},
+  shunt:{dur:10, paint:drawShunt, steps:[
+    {t:0, title:"Temporary versus lasting", text:"An external drain is temporary. A shunt is an implanted path from ventricle to another compartment, usually the peritoneum."},
+    {t:4, title:"The path", text:"The ventricular catheter, the valve and the distal catheter are placed in an operation."},
+    {t:7, title:"Failure", text:"Shunts block and they infect. A sleepy patient with a shunt needs that thought early."}
+  ]},
+  clock:{dur:9, paint:drawClock, steps:[
+    {t:0, title:"The clock", text:"Time starts at last known well, not at the moment the patient was found."},
+    {t:3, title:"Thrombolysis", text:"Alteplase is considered up to 4.5 hours when exclusions have been checked. The dose is 0.9 mg/kg, maximum 90 mg."},
+    {t:6, title:"Thrombectomy", text:"A large-vessel occlusion may still be treated by mechanical thrombectomy on a longer imaging-selected clock."}
+  ]},
+  tbiPrimary:{dur:8, paint:drawTbiPrimary, steps:[
+    {t:0, title:"Primary injury", text:"The impact tears axons and vessels and bruises cortex. This damage is already done when the patient arrives."},
+    {t:3, title:"Coup and contrecoup", text:"Injury is at the impact and often opposite it, where the brain rebounds."}
+  ]},
+  tbiSecond:{dur:9, paint:drawTbiSecond, steps:[
+    {t:0, title:"Secondary injury", text:"The hours after trauma decide how much more brain is lost."},
+    {t:2, title:"The drivers", text:"Hypoxia, hypotension, swelling, seizures and raised pressure extend the damage. These are the targets of care."}
+  ]},
+  edema:{dur:8, paint:drawEdema, steps:[
+    {t:0, title:"Oedema", text:"Cytotoxic and vasogenic swelling increase brain volume."},
+    {t:3, title:"The box", text:"The skull does not expand. After a point, small increases in volume cause large increases in pressure."}
+  ]},
+  cpp:{dur:8, paint:drawCpp, steps:[
+    {t:0, title:"Perfusion pressure", text:"Cerebral perfusion pressure is mean arterial pressure minus intracranial pressure."},
+    {t:3, title:"The fall", text:"If pressure inside the skull rises and blood pressure does not, the brain is under-perfused."}
+  ]},
+  icp:{dur:9, paint:drawIcpCurve, steps:[
+    {t:0, title:"Compliance", text:"Early volume is tolerated. The pressure curve then steepens."},
+    {t:4, title:"Clinical meaning", text:"A patient can look stable and then deteriorate quickly once that steep part is reached."}
+  ]},
+  hern:{dur:8, paint:drawHern, steps:[
+    {t:0, title:"Across the tentorium", text:"The medial temporal lobe is forced through the tentorial opening."},
+    {t:3, title:"The pupil", text:"The oculomotor nerve is compressed. The pupil on that side enlarges. The opposite limbs become weak."}
+  ]},
+  sahRupture:{dur:9, paint:drawSahRupture, steps:[
+    {t:0, title:"The sac", text:"An aneurysm forms at a branch point. The dome is weakest."},
+    {t:4, title:"Rupture", text:"Blood leaves the artery at arterial pressure and enters the subarachnoid space."}
+  ]},
+  sahBlood:{dur:8, paint:drawSahBlood, steps:[
+    {t:0, title:"Where the blood goes", text:"Blood fills the basal cisterns and can track into the ventricles or the brain itself."}
+  ]},
+  sahIcp:{dur:8, paint:drawSahIcp, steps:[
+    {t:0, title:"The pressure spike", text:"Intracranial pressure can jump at the moment of rupture. Cerebral blood flow can briefly stop. That is one mechanism of the sudden coma."}
+  ]},
+  ebi:{dur:8, paint:drawEbi, steps:[
+    {t:0, title:"Early brain injury", text:"The first 72 hours bring global inflammation, microcirculatory failure and ionic injury, not only the effect of the clot."}
+  ]},
+  hydro:{dur:8, paint:drawHydro, steps:[
+    {t:0, title:"Hydrocephalus", text:"Blood blocks CSF pathways. The ventricles enlarge. The patient becomes sleepier, and an external drain is then considered."}
+  ]},
+  spasm:{dur:8, paint:drawSpasm, steps:[
+    {t:0, title:"Vasospasm", text:"From about day 3, and for up to two weeks, arteries can narrow. This is a radiographic finding."}
+  ]},
+  dci:{dur:8, paint:drawDci, steps:[
+    {t:0, title:"Delayed cerebral ischaemia", text:"A new deficit or a fall in consciousness in that window. Angiographic spasm explains only part of it. Treat the patient, not only the picture of the artery."}
+  ]},
+  mca:{dur:9, paint:drawMca, steps:[
+    {t:0, title:"Occlusion", text:"Clot lodges in the middle cerebral stem or one of its divisions."},
+    {t:4, title:"The territory", text:"Face and arm are weak. In the dominant hemisphere, language fails. The leg may be relatively spared because it is anterior-cerebral cortex."}
+  ]},
+  nimo:{dur:8, paint:drawNimo, steps:[
+    {t:0, title:"What it does", text:"Nimodipine is a calcium-channel blocker used enterally after aneurysmal subarachnoid haemorrhage."},
+    {t:3, title:"How it is given", text:"60 mg every 4 hours for 21 days, if the blood pressure allows. It is not an intravenous drug in ordinary practice. It does not replace securing the aneurysm."}
+  ]},
+  osm:{dur:8, paint:drawOsm, steps:[
+    {t:0, title:"Osmotherapy", text:"Mannitol or hypertonic saline pulls water out of brain tissue for a time. Watch sodium, osmolality, volume and the clinical response."}
+  ]},
+  benzo:{dur:8, paint:drawBenzo, steps:[
+    {t:0, title:"First drug", text:"A benzodiazepine stops the seizure. Lorazepam 4 mg intravenously, repeated once, is the usual adult teaching dose. Intramuscular midazolam if there is no vein."}
+  ]},
+  heparin:{dur:9, paint:drawHeparin, steps:[
+    {t:0, title:"The sinus", text:"Thrombus in a dural sinus blocks venous outflow."},
+    {t:3, title:"Anticoagulation", text:"Heparin is the usual treatment, including when a modest venous haemorrhage is already present. Worsening clot, falling consciousness or refractory pressure raises the question of endovascular removal in a specialist centre."}
+  ]},
+  reverse:{dur:8, paint:drawReverse, steps:[
+    {t:0, title:"Stop the bleeding", text:"Reverse anticoagulation with the specific agent. Lower systolic pressure smoothly toward about 140 if it is high. Avoid a crash fall."}
+  ]}
+};
+
+function evdTopic(indication){
+  return {id:"evd", name:"External ventricular drain", show:"evd",
+    indication:indication,
+    prerequisites:["A scan that shows the target ventricle","A plan for coagulation","A sterile field and a trained operator","Consent when the situation allows"],
+    risks:["Haemorrhage along the tract","Infection and ventriculitis","Catheter in the wrong place","Over-drainage"],
+    specialist:"This is a specialist procedure. The animation is a teaching sequence, not a licence to perform it and not a filmed operation."};
+}
+function proc(id, name, show, indication, prerequisites, risks){
+  return {id:id, name:name, show:show, indication:indication, prerequisites:prerequisites, risks:risks,
+    specialist:"Perform it only if you are trained and the clinical indication is real. This page is a teaching sequence, not a filmed procedure and not a device manual."};
+}
+
+const DISEASES = [
+  {id:"tbi", name:"TBI", full:"Traumatic brain injury",
+    overview:{definition:"Brain dysfunction caused by an external force. Severity is grouped by the Glasgow coma scale: mild 13–15, moderate 9–12, severe 3–8.", classification:"Primary damage occurs at impact. Secondary damage occurs afterwards from hypoxia, hypotension, swelling, seizures and pressure. Lesions may be focal, diffuse, closed or penetrating.", significance:"The injury already done cannot be undone. Care is aimed at preventing the next injury and finding lesions that need an operation."},
+    anatomy:{note:"The ventricles, the tentorium and the brainstem are the landmarks for pressure, drains and herniation.", labels:["Lateral ventricle","Third ventricle","Tentorium cerebelli","Midbrain","Oculomotor nerve (III)"]},
+    etiology:["Falls, especially in older adults and on anticoagulants","Road traffic collisions","Assault and penetrating injury","Alcohol and other intoxicants, which also confound the examination"],
+    path:[
+      {id:"primary", name:"Primary injury", show:"tbiPrimary", link:"The bruise and the torn axons are the starting deficit."},
+      {id:"second", name:"Secondary injury", show:"tbiSecond", link:"Hypoxia and hypotension double the harm. They are treated aggressively."},
+      {id:"edema", name:"Cerebral oedema", show:"edema", link:"Swelling raises pressure and can force herniation."},
+      {id:"cpp", name:"Disturbed perfusion", show:"cpp", link:"Keep blood pressure up and pressure inside the skull down."},
+      {id:"icp", name:"Raised intracranial pressure", show:"icp", link:"Once compliance is lost, deterioration is sudden."},
+      {id:"hern", name:"Herniation", show:"hern", link:"A new dilated pupil is a compression emergency."}
+    ],
+    clinical:[
+      {sign:"Falling consciousness", mechanism:"Rising pressure, a new mass, a seizure, or hypoxia."},
+      {sign:"Unequal pupil", mechanism:"Oculomotor nerve compressed at the tentorial edge, usually on the side of the mass."},
+      {sign:"Hemiparesis", mechanism:"The opposite corticospinal pathway, or the peduncle pressed against the tentorium."},
+      {sign:"Battle sign, raccoon eyes, CSF leak", mechanism:"Basal skull fracture. Do not pack a CSF leak blindly."}
+    ],
+    invest:[
+      {test:"CT head", look:"Blood, shift, cisterns, vault fractures, foreign bodies. Repeat if the patient changes."},
+      {test:"CT cervical spine", look:"Do not clear the neck by wishful thinking in a comatose patient."},
+      {test:"Glucose, coagulation, alcohol, pregnancy when relevant", look:"A reversible metabolic coma can sit beside a real injury."}
+    ],
+    ddx:[
+      {name:"Ischaemic stroke", split:"A sudden deficit without trauma. CT is different. History of a fall may be the consequence, not the cause."},
+      {name:"Seizure and a post-ictal state", split:"Look for bites, incontinence and a known epilepsy. Still scan if trauma or the story is poor."},
+      {name:"Intoxication", split:"It explains drowsiness badly and a blown pupil not at all."}
+    ],
+    algo:["Airway, oxygen, and a blood pressure that you would accept in theatre","Immobilise the spine until it is cleared","Urgent CT if the coma scale is low, there is a focal sign, a seizure, anticoagulation, or worsening","Reverse anticoagulation and call neurosurgery for a surgical mass","Prevent hypoxia, hypotension and fever. Treat seizures. Escalate osmotherapy and a drain or surgery for refractory pressure"],
+    meds:[
+      {id:"osm", name:"Hyperosmolar therapy", show:"osm", mech:"Pulls water out of brain tissue.", indication:"A bridge for rising pressure or herniation.", dose:"Mannitol 0.25–1 g/kg, or hypertonic saline per local protocol and suitable access.", harm:"Volume loss, renal injury, sodium swings. Not a substitute for an operation that is indicated."},
+      {id:"benzo", name:"Benzodiazepine", show:"benzo", mech:"Stops seizure activity.", indication:"A witnessed seizure.", dose:"Lorazepam 4 mg intravenously, once repeated if needed.", harm:"Respiratory depression. Be ready to support the airway."}
+    ],
+    procedures:[
+      proc("ett","Endotracheal intubation","ett","The patient cannot protect the airway, or ventilation must be controlled to protect the brain.",["Monitoring","A plan that avoids hypoxia and hypotension","Cervical spine held if not cleared"],["Failed airway","Hypotension on induction","Right main bronchus"]),
+      evdTopic("Blood in the ventricles, hydrocephalus, or a need to measure and drain when pressure is part of the problem."),
+      proc("bolt","Parenchymal ICP monitor","bolt","Pressure monitoring when a drain is not the right catheter, in a patient being managed for severe injury.",["Coagulation plan","A trained operator"],["Haemorrhage","Infection","A number that is disbelieved or worshipped"]),
+      proc("crani","Decompressive craniectomy","crani","A surgical mass, or intracranial pressure that does not respond, in a patient selected by neurosurgery.",["Imaging","Theatre, not the ward"],["Bleeding","Infection","Later hydrocephalus and the syndrome of the trephined"]),
+      proc("ct","Emergency CT reading","ct","Every moderate or severe injury, and any mild injury with a red flag.",["The patient is safe to travel, or is escorted"],["A normal early scan does not retire a worsening patient"]),
+      proc("art","Arterial line","art","Beat-to-beat pressure while perfusion is being defended.",["Ultrasound if the pulse is not obvious"],["Ischaemia of the hand","Infection"]),
+      proc("cvc","Central venous catheter","cvc","Reliable access for selected infusions. Not an automatic step.",["Ultrasound"],["Arterial puncture","Pneumothorax","Infection"])
+    ],
+    monitor:["Glasgow coma scale and pupils, recorded as numbers not adjectives","End-tidal carbon dioxide once intubated, usually aimed near 35–40 mmHg, not chronic hyperventilation","Arterial pressure. Cerebral perfusion pressure is mean arterial pressure minus intracranial pressure","Temperature, sodium, glucose, haemoglobin"],
+    complications:[
+      {name:"Herniation", mechanism:"A mass or swelling forces brain across a fixed edge.", recognition:"New dilated pupil, falling consciousness, posturing.", management:"Osmotherapy, airway, urgent surgical review. Do not wait for the next ward round."},
+      {name:"Seizures", mechanism:"Irritated cortex.", recognition:"Overt convulsions or unexplained swings.", management:"Benzodiazepine, then search for a new mass. Routine long prophylaxis is not for every injury."},
+      {name:"Ventriculitis", mechanism:"A drain is a foreign body.", recognition:"Fever, falling consciousness, a worsening CSF profile.", management:"Cultures and antibiotics. Involve neurosurgery about the catheter."}
+    ],
+    prognosis:"Outcome tracks age, pupils, motor score, hypoxia, hypotension and the scan. A first-day verdict is often wrong. Rehabilitation starts while the patient is still in the unit.",
+    rehab:"Physiotherapy, speech, mood and return to driving or work are planned, not hoped for.",
+    case:{stem:"A 42-year-old falls from a ladder. On arrival the coma scale is 7. The right pupil is 6 mm and poorly reactive. Blood pressure is 90/50. CT has not been done. What is the first priority?",
+      choices:[{id:"a", label:"Intubate, restore blood pressure, then scan on the way to neurosurgery"},{id:"b", label:"A large dose of mannitol and wait for the scan report before treating the airway"},{id:"c", label:"Hyperventilate to a carbon dioxide of 20 and defer the blood pressure"},{id:"d", label:"Diagnostic lumbar puncture to exclude subarachnoid blood"}],
+      answer:"a", why:"Hypoxia and hypotension are secondary injuries happening now. The airway and the blood pressure come first, then the scan and the surgeon. Mannitol is a bridge, not a substitute. Extreme hyperventilation starves the brain. A lumbar puncture in this patient can kill."},
+    quiz:[
+      {q:"Cerebral perfusion pressure equals", choices:["Mean arterial pressure minus intracranial pressure","Systolic pressure minus heart rate","Intracranial pressure minus mean arterial pressure"], answer:0, why:"CPP = MAP − ICP."},
+      {q:"A new dilated pupil on the side of a mass most often means", choices:["Oculomotor compression at the tentorial edge","A retinal detachment","Morphine"], answer:0, why:"The third nerve runs at the tentorial edge."}
+    ],
+    refs:["Brain Trauma Foundation. Guidelines for the Management of Severe Traumatic Brain Injury, 4th edition.","Practice simulator already on this hub: TBI interactive simulator."],
+    sim:"TBI_Interactive_Simulator_v5_ICP_Anisocoria.html"},
+
+  {id:"sah", name:"SAH", full:"Subarachnoid haemorrhage",
+    overview:{definition:"Bleeding into the subarachnoid space, most often from a ruptured saccular aneurysm. It presents with a sudden, maximal headache, collapse, or both.", classification:"Clinical grade, commonly Hunt and Hess or World Federation of Neurological Surgeons, plus the amount of blood on CT, which relates to later spasm and delayed ischaemia.", significance:"Two clocks run at once: rebleeding in the first hours, and delayed ischaemia in the first two weeks."},
+    anatomy:{note:"The circle of Willis is where most aneurysms sit. The ventricles are where hydrocephalus declares itself.", labels:["Anterior communicating artery","Posterior communicating artery","Middle cerebral artery (M1-segment)","Basilar artery","Lateral ventricle"]},
+    etiology:["Ruptured saccular aneurysm, the usual cause of spontaneous SAH","Hypertension, smoking, family history, polycystic kidney disease","Trauma, perimesencephalic venous bleeds, arteriovenous malformations and vasculitis are the other stories","A negative CT does not retire a typical sudden headache. Lumbar puncture or further vascular imaging still has a role in the right window."],
+    path:[
+      {id:"rupture", name:"Aneurysm formation and rupture", show:"sahRupture", link:"Secure the aneurysm so it does not rupture again."},
+      {id:"blood", name:"Blood in the subarachnoid space", show:"sahBlood", link:"The CT pattern and the vessel study identify the cause."},
+      {id:"spike", name:"Acute pressure elevation", show:"sahIcp", link:"Explains sudden coma. Airway and blood pressure first."},
+      {id:"ebi", name:"Early brain injury", show:"ebi", link:"The first three days are not a quiet interval."},
+      {id:"hydro", name:"Hydrocephalus", show:"hydro", link:"A sleepy patient may need an external drain."},
+      {id:"spasm", name:"Vasospasm", show:"spasm", link:"A narrowed artery on imaging, usually after day 3."},
+      {id:"dci", name:"Delayed cerebral ischaemia", show:"dci", link:"A new clinical deficit. Nimodipine, euvolaemia and induced pressure are the medical tools."}
+    ],
+    clinical:[
+      {sign:"Thunderclap headache", mechanism:"Blood under arterial pressure in the CSF space."},
+      {sign:"Collapse or coma", mechanism:"The intracranial pressure spike at rupture."},
+      {sign:"Third-nerve palsy", mechanism:"A posterior communicating aneurysm pressing the nerve. Pupil involved until proved otherwise."},
+      {sign:"New deficit in week one or two", mechanism:"Delayed cerebral ischaemia until proved otherwise."}
+    ],
+    invest:[
+      {test:"Non-contrast CT", look:"Blood in the cisterns. Sensitivity falls as hours pass."},
+      {test:"CT or catheter angiography", look:"Find the aneurysm. Know which sac bled if there are several."},
+      {test:"Lumbar puncture", look:"If CT is negative and the story is strong, look for bilirubin, not only red cells, in the right time window."}
+    ],
+    ddx:[
+      {name:"Thunderclap migraine or reversible vasoconstriction", split:"Still image the vessels. Do not diagnose migraine in a first maximal sudden headache without a work-up."},
+      {name:"Pituitary apoplexy", split:"Headache, eye signs and cortisol failure. A different scan pattern."},
+      {name:"Bacterial meningitis", split:"Fever and a stiff neck without a sudden maximal onset. CSF is the test when it is safe."}
+    ],
+    algo:["Airway and a blood pressure that is high enough to perfuse and not so high that the unsecured aneurysm rebleeds","Urgent CT, then vascular imaging","Nimodipine enterally, and secure the aneurysm early in a centre that can","External drain for hydrocephalus","Watch the delayed-ischaemia window. Treat a new deficit as ischaemia until proved otherwise"],
+    meds:[
+      {id:"nimo", name:"Nimodipine", show:"nimo", mech:"Calcium-channel blockade in cerebral vessels and, possibly, a cellular protective effect.", indication:"Aneurysmal subarachnoid haemorrhage.", dose:"60 mg enterally every 4 hours for 21 days. If pressure falls, 30 mg every 2 hours is a common adjustment.", harm:"Hypotension. It is not given as an ordinary intravenous infusion."}
+    ],
+    procedures:[
+      evdTopic("Hydrocephalus or intraventricular blood with a falling conscious level."),
+      proc("coil","Securing the aneurysm","coil","A ruptured aneurysm needs to be coiled or clipped so it does not bleed again.",["A neurovascular centre","A secured airway if the grade is poor"],["Thromboembolism","Rupture during the procedure","A residual neck"]),
+      proc("ct","Reading the first CT","ct","Blood in cisterns, ventricle size, and an associated haematoma.",["The patient can travel safely"],["A negative early CT does not end a classic story"])
+    ],
+    monitor:["Conscious level and a focal chart, several times a day through the spasm window","Blood pressure. After the aneurysm is secure, pressure is supported if delayed ischaemia appears","Sodium. Hyponatraemia is common and is not an instruction to dry the patient out","Transcranial Doppler or perfusion imaging where the centre uses them. They do not replace the examination"],
+    complications:[
+      {name:"Rebleeding", mechanism:"The unsecured dome ruptures again.", recognition:"Sudden worsening, a new seizure, a surge of blood on repeat CT.", management:"Secure the aneurysm. Until then, control extremes of blood pressure."},
+      {name:"Delayed ischaemia", mechanism:"Spasm plus microcirculatory failure.", recognition:"A new deficit or a drop in consciousness after day 3.", management:"Nimodipine, euvolaemia, and induced hypertension once the aneurysm is secure."},
+      {name:"Hydrocephalus", mechanism:"CSF pathways blocked by blood.", recognition:"Slowing cognition, small pupils, a tight ventricle on CT.", management:"External ventricular drain."}
+    ],
+    prognosis:"Grade at presentation and rebleeding dominate early outcome. Survivors need follow-up of other aneurysms, blood pressure, smoking, and cognitive recovery.",
+    rehab:"Fatigue, memory and mood last longer than the angiogram. Name them and refer.",
+    case:{stem:"A 55-year-old has a sudden worst headache and vomits. CT shows blood in the basal cisterns. Blood pressure is 190/100. The patient is drowsy but protecting the airway. What is the priority bundle?",
+      choices:[{id:"a", label:"Vascular imaging, nimodipine, blood-pressure control and early securing of the aneurysm"},{id:"b", label:"Heparin, because a clot must be the cause"},{id:"c", label:"A lumbar puncture immediately, before any imaging"},{id:"d", label:"Discharge if the headache eases with analgesia"}],
+      answer:"a", why:"This is aneurysmal subarachnoid haemorrhage until the vessel study says otherwise. Heparin is the wrong drug. A lumbar puncture is for a negative CT, not for blood already seen. The headache easing does not secure the aneurysm."},
+    quiz:[
+      {q:"Nimodipine after aneurysmal SAH is given", choices:["Enterally, 60 mg every 4 hours for 21 days","As a routine intravenous infusion for 3 days","Only if angiography shows spasm"], answer:0, why:"It is started early and continued 21 days, not reserved for a spasm picture."},
+      {q:"Delayed cerebral ischaemia is", choices:["A clinical deterioration in the spasm window","Any headache on day 1","The same thing as the first rupture"], answer:0, why:"It is a clinical diagnosis. Angiographic spasm is only part of the mechanism."}
+    ],
+    refs:["AHA/ASA guideline for aneurysmal subarachnoid haemorrhage (Hoh and colleagues, 2023 update).","Practice simulator on this hub: subarachnoid haemorrhage simulator."],
+    sim:"Subarachnoid_Hemorrhage_Interactive_Simulator_v1.html"},
+
+  {id:"stroke", name:"Stroke", full:"Acute ischaemic stroke",
+    overview:{definition:"An acute arterial occlusion or a fall in flow that kills brain in a vascular territory.", classification:"By territory and by whether a large vessel is occluded. Time from last known well, and imaging of the core, decide treatment.", significance:"Minutes matter. The exam localises. The CT excludes blood. The vessel image decides thrombectomy."},
+    anatomy:{note:"Middle cerebral artery for face and arm, anterior cerebral for the leg, posterior cerebral for the field.", labels:["Middle cerebral artery (M1-segment)","Anterior cerebral artery","Posterior cerebral artery","Precentral gyrus"]},
+    etiology:["Cardioembolism, often atrial fibrillation","Large-artery atherosclerosis","Small-vessel lipohyalinosis","Dissection, hypercoagulable states and paradoxical embolus in the right host"],
+    path:[{id:"mca", name:"Middle cerebral occlusion", show:"mca", link:"Face and arm weakness, and aphasia or neglect, depending on the hemisphere."}],
+    clinical:[
+      {sign:"Face and arm weaker than the leg", mechanism:"Lateral cortex, middle cerebral territory."},
+      {sign:"Leg weaker than the arm", mechanism:"Medial cortex, anterior cerebral territory."},
+      {sign:"Field cut without much weakness", mechanism:"Occipital cortex, posterior cerebral territory."},
+      {sign:"Equal face, arm and leg", mechanism:"A deep lacunar pathway, not a cortical one."}
+    ],
+    invest:[
+      {test:"Non-contrast CT", look:"Exclude haemorrhage before a lytic drug. Early ischaemic signs do not forbid treatment by themselves."},
+      {test:"CT angiography", look:"Large-vessel occlusion."},
+      {test:"Glucose", look:"Hypoglycaemia copies a stroke and is treated first."}
+    ],
+    ddx:[
+      {name:"Haemorrhage", split:"The scan, not the exam, separates it."},
+      {name:"Seizure with Todd paresis", split:"A history of a convulsion. Still image if the clock is running."},
+      {name:"Migraine aura", split:"Positive spreading symptoms. Do not delay a real stroke pathway for this guess."}
+    ],
+    algo:["Last known well, glucose, and a focused exam","Non-contrast CT","Thrombolysis if eligible, alteplase 0.9 mg/kg up to 90 mg","CT angiography and thrombectomy if a large vessel is occluded","Admit to a unit that can watch blood pressure and the airway"],
+    meds:[
+      {id:"clock", name:"Alteplase", show:"clock", mech:"Converts plasminogen to plasmin and lyses fresh clot.", indication:"Ischaemic stroke within the eligibility window, haemorrhage excluded.", dose:"0.9 mg/kg, maximum 90 mg. Ten percent as a bolus, the rest over 60 minutes.", harm:"Bleeding, including intracranial haemorrhage. Blood pressure must be in range before and during the infusion."}
+    ],
+    procedures:[
+      proc("clock","Thrombolysis clock","clock","A disabling deficit, a known time, and no exclusion.",["Blood pressure controlled","Haemorrhage excluded"],["Symptomatic intracranial haemorrhage"]),
+      proc("evt","Mechanical thrombectomy","evt","A large-vessel occlusion in a patient who still has tissue to save.",["A thrombectomy centre","Vessel imaging"],["Perforation","Distal embolus","Reperfusion injury"])
+    ],
+    monitor:["Blood pressure. After thrombolysis the ceiling is strict","Neurological checks frequently for the first day","Glucose, temperature, swallowing before anything is given by mouth"],
+    complications:[
+      {name:"Haemorrhagic transformation", mechanism:"Dead tissue bleeds, more so after a lytic drug.", recognition:"Sudden worsening, a new headache.", management:"Stop the lytic, repeat CT, reverse if the protocol says so."},
+      {name:"Malignant oedema", mechanism:"A large hemispheric infarct swells over 48 hours.", recognition:"Falling consciousness in a young large-stroke patient.", management:"Osmotherapy as a bridge and early neurosurgical discussion about decompression."}
+    ],
+    prognosis:"Age, the deficit, recanalisation and rehabilitation decide independence. Atrial fibrillation found later still needs a prevention plan.",
+    rehab:"Early therapy, secondary prevention, and a driving and work conversation.",
+    case:{stem:"Sudden right face and arm weakness, effortful speech, comprehension preserved. Leg is strong. CT shows no blood. Last known well was 90 minutes ago. What territory and what next?",
+      choices:[{id:"a", label:"Left middle cerebral superior division. Check eligibility and give a lytic if safe, and image the vessel"},{id:"b", label:"Left anterior cerebral artery. Heparin infusion"},{id:"c", label:"Right posterior cerebral artery. No imaging needed"},{id:"d", label:"Lumbar puncture before any scan"}],
+      answer:"a", why:"Face and arm plus non-fluent speech is superior-division middle cerebral territory. The clock is open. The vessel image looks for a clot that thrombectomy can reach."},
+    quiz:[
+      {q:"Alteplase dose in ischaemic stroke", choices:["0.9 mg/kg, maximum 90 mg","1.5 mg/kg with no maximum","60 mg every 4 hours"], answer:0, why:"The stroke dose is not the cardiac dose and not the nimodipine dose."}
+    ],
+    refs:["AHA/ASA guideline for the early management of acute ischaemic stroke, 2019 update.","Practice simulator on this hub: acute ischaemic stroke simulator."],
+    sim:"Acute_Ischemic_Stroke_Simulator_V6_FINAL.html?v=20260925s"},
+
+  {id:"ich", name:"ICH", full:"Intracerebral haemorrhage",
+    overview:{definition:"Bleeding into the brain substance. Hypertension and amyloid angiopathy are the common causes. Anticoagulation makes every bleed larger.", classification:"By site: deep, lobar, cerebellar, brainstem. By cause: hypertensive, amyloid, vascular malformation, tumour, venous.", significance:"The bleed grows in the first hours. Reversal and blood pressure are time-critical. The cerebellum is a special surgical problem."},
+    anatomy:{note:"The putamen is a classic hypertensive site. The ventricle matters because blood there causes hydrocephalus.", labels:["Putamen","Caudate nucleus","Lateral ventricle","Tonsil of cerebellum"]},
+    etiology:["Chronic hypertension, deep locations","Cerebral amyloid angiopathy, lobar locations in older adults","Anticoagulants and antiplatelet drugs","Arteriovenous malformations, cavernomas, aneurysms that point into the brain, venous thrombosis"],
+    path:[{id:"reverse", name:"Haematoma expansion", show:"reverse", link:"The first hours are when the clot grows. Reverse anticoagulation and control pressure."}],
+    clinical:[
+      {sign:"Sudden deficit that worsens over minutes", mechanism:"The clot is expanding."},
+      {sign:"Headache and vomiting", mechanism:"Raised pressure."},
+      {sign:"A cerebellar bleed", mechanism:"Ataxia, vomiting, and then a sudden stop of breathing if the fourth ventricle is compressed."}
+    ],
+    invest:[
+      {test:"Non-contrast CT", look:"Location, volume, intraventricular blood, hydrocephalus."},
+      {test:"CT angiography", look:"A spot of contrast inside the clot predicts expansion. Also looks for a malformation."},
+      {test:"Coagulation panel and a drug history", look:"Warfarin, a thrombin inhibitor, a Xa inhibitor, or none."}
+    ],
+    ddx:[
+      {name:"Ischaemic stroke with haemorrhagic conversion", split:"The history of a lytic drug or a known infarct."},
+      {name:"Tumour that has bled", split:"Oedema out of proportion, an odd location. Later MRI."}
+    ],
+    algo:["Airway if the coma scale is falling","Reverse anticoagulation with the specific agent","Lower systolic pressure smoothly if it is very high, toward about 140, without a crash","Neurosurgery for cerebellar haemorrhage with mass effect, and for hydrocephalus","Avoid platelet folklore and steroid folklore"],
+    meds:[
+      {id:"reverse", name:"Reversal and pressure", show:"reverse", mech:"Replace the missing clotting step and reduce the driving pressure.", indication:"Anticoagulant-related or hypertensive deep haemorrhage.", dose:"Agent-specific reversal. Blood pressure per the 2022 AHA pathway, smoothly.", harm:"Thrombosis from reversal agents. Cerebral and renal ischaemia if pressure is dropped too fast."}
+    ],
+    procedures:[
+      evdTopic("Intraventricular blood or hydrocephalus with a falling conscious level."),
+      proc("ct","Reading the haemorrhage CT","ct","Site, volume, ventricles and cisterns.",["The patient can travel"],["A cerebellar clot with a compressed fourth ventricle cannot wait for morning"])
+    ],
+    monitor:["Conscious level every hour at first","Blood pressure","Sodium and glucose"],
+    complications:[
+      {name:"Hydrocephalus", mechanism:"Blood blocks the ventricles.", recognition:"Worsening drowsiness.", management:"External drain."},
+      {name:"Expansion", mechanism:"Ongoing bleeding.", recognition:"A larger deficit, a larger clot on the early repeat scan.", management:"Reversal and pressure. Surgery in selected cases."}
+    ],
+    prognosis:"Volume, the coma scale, intraventricular blood and infratentorial site dominate. Do not declare futility from the first hour alone.",
+    rehab:"Blood pressure control is secondary prevention for hypertensive bleeds. Lobar bleeds in the elderly raise the amyloid question.",
+    case:{stem:"Sudden left hemiparesis and vomiting. CT shows a right putaminal haemorrhage with no intravascular contrast. The patient takes warfarin and the INR is 3.4. First action?",
+      choices:[{id:"a", label:"Reverse warfarin now and control blood pressure"},{id:"b", label:"Alteplase, because of the weakness"},{id:"c", label:"Heparin, in case there is also a sinus thrombus"},{id:"d", label:"Observe the INR overnight"}],
+      answer:"a", why:"This is anticoagulant-related intracerebral haemorrhage. Alteplase and heparin make it worse. Reversal is immediate."},
+    quiz:[
+      {q:"A cerebellar haemorrhage with a compressed fourth ventricle", choices:["Needs urgent neurosurgical review","Is treated with lumbar puncture first","Is always an ischaemic stroke"], answer:0, why:"The posterior fossa does not tolerate a mass. Breathing fails next."}
+    ],
+    refs:["AHA/ASA 2022 guideline for spontaneous intracerebral haemorrhage.","Practice simulator on this hub: intracerebral haemorrhage simulator."],
+    sim:"Intracerebral_Hemorrhage_Interactive_Simulator_v1.html?v=20260925s"},
+
+  {id:"se", name:"Status", full:"Status epilepticus",
+    overview:{definition:"A seizure that does not stop, or repeated seizures without recovery. Convulsive status is an emergency because the brain and the airway are both failing.", classification:"Convulsive, focal with impaired awareness, and non-convulsive, which hides in a coma.", significance:"The longer it lasts, the harder it is to stop and the more neurons are lost."},
+    anatomy:{note:"Temporal cortex and the hippocampus are frequent sources. The motor cortex produces the convulsion.", labels:["Hippocampus","Precentral gyrus","Temporal pole"]},
+    etiology:["Missed antiseizure medication","Acute brain injury, bleed, tumour or infection","Hypoglycaemia, hyponatraemia, alcohol withdrawal","A new drug or a toxin"],
+    path:[{id:"benzo", name:"From seizure to self-sustaining seizure", show:"benzo", link:"Benzodiazepines work best early. Delay makes the seizure drug-resistant."}],
+    clinical:[
+      {sign:"Continuous convulsion", mechanism:"Motor cortex driven without a break."},
+      {sign:"Coma after the shaking stops", mechanism:"Non-convulsive status until an EEG says otherwise."}
+    ],
+    invest:[
+      {test:"Glucose immediately", look:"Treat hypoglycaemia before you call it epilepsy."},
+      {test:"Electrolytes, antiseizure drug level if relevant", look:"Sodium and a missed dose."},
+      {test:"CT, then EEG", look:"A structural cause, and electrical status when the clinical signs have gone quiet."}
+    ],
+    ddx:[
+      {name:"Psychogenic non-epileptic spells", split:"Eyes closed, asynchronous movements, a long spell without hypoxia. Do not miss a real seizure by overusing this label."},
+      {name:"Syncope with a few jerks", split:"A clear trigger and immediate recovery."}
+    ],
+    algo:["Glucose, airway, oxygen","Benzodiazepine at a full dose, once repeated","A second-line drug: levetiracetam 60 mg/kg up to 4.5 g, or fosphenytoin, or valproate if safe","If it continues, anaesthetic infusion and EEG in a unit","Look for the cause while the drugs run"],
+    meds:[
+      {id:"benzo", name:"Lorazepam or midazolam", show:"benzo", mech:"Enhances GABA and stops the seizure.", indication:"The first drug in status.", dose:"Lorazepam 4 mg IV, repeat once. Midazolam 10 mg intramuscularly if there is no vein.", harm:"Apnoea. Be ready to ventilate."}
+    ],
+    procedures:[
+      proc("ett","Intubation for refractory status","ett","The seizure continues after second-line drugs, or the airway is failing.",["Anaesthetic plan","EEG as soon as it can be arranged"],["Hypotension from the induction drugs"])
+    ],
+    monitor:["Airway and oxygen continuously","EEG once the convulsion stops but the patient does not wake","Drug levels and sodium"],
+    complications:[
+      {name:"Neuronal injury", mechanism:"Unremitting electrical activity.", recognition:"The seizure's duration.", management:"Stop it. Do not stack tiny benzodiazepine doses."},
+      {name:"Aspiration", mechanism:"An unprotected airway.", recognition:"Hypoxia, later an infiltrate.", management:"Position, suction, intubate if needed."}
+    ],
+    prognosis:"Cause matters more than the seizure itself. Anoxic status after cardiac arrest is a different and graver illness.",
+    rehab:"Review the trigger, the drug that failed, and driving rules.",
+    case:{stem:"A 30-year-old is still convulsing in the ambulance after 8 minutes. Glucose is normal. No intravenous access. First drug?",
+      choices:[{id:"a", label:"Intramuscular midazolam now, then intravenous access and a second-line drug if it continues"},{id:"b", label:"Oral carbamazepine"},{id:"c", label:"A CT before any drug"},{id:"d", label:"Lumbar puncture first"}],
+      answer:"a", why:"Give a proper benzodiazepine by the route you have. Imaging and CSF come after the seizure is being treated."},
+    quiz:[
+      {q:"The first drug in convulsive status is", choices:["A benzodiazepine at a full dose","Oral levetiracetam only","Heparin"], answer:0, why:"Early GABA drugs stop more seizures than late ones."}
+    ],
+    refs:["American Epilepsy Society guideline on convulsive status epilepticus, and the ESETT trial of second-line drugs.","Practice simulator on this hub: status epilepticus simulator."],
+    sim:"Status_Epilepticus_Interactive_Simulator_v2_EDITABLE.html?v=20260925s"},
+
+  {id:"icp", name:"ICP", full:"Raised intracranial pressure",
+    overview:{definition:"Pressure inside the skull high enough to reduce cerebral perfusion or to force herniation. It is a state, not a disease. The cause still has to be named.", classification:"Mass lesion, swelling, hydrocephalus, venous obstruction, and a combination.", significance:"The number matters only together with the cause and the clinical picture."},
+    anatomy:{note:"The tentorium, the foramen magnum and the ventricles are the passages that fail.", labels:["Tentorium cerebelli","Lateral ventricle","Fourth ventricle","Tonsil of cerebellum","Oculomotor nerve (III)"]},
+    etiology:["Trauma, bleed, tumour, abscess","Hydrocephalus","Venous sinus thrombosis","A metabolic or hypoxic brain that has swollen"],
+    path:[
+      {id:"icp", name:"The pressure-volume curve", show:"icp", link:"Small extra volume eventually causes a large rise in pressure."},
+      {id:"cpp", name:"Perfusion falls", show:"cpp", link:"CPP = MAP − ICP."},
+      {id:"hern", name:"Herniation", show:"hern", link:"A fixed edge and a shifting brain."}
+    ],
+    clinical:[
+      {sign:"Headache, vomiting, a sixth-nerve palsy", mechanism:"Pressure, not a localising brainstem stroke."},
+      {sign:"Cushing response", mechanism:"Hypertension and bradycardia when the medulla is compressed. A late sign."},
+      {sign:"A new dilated pupil", mechanism:"Third-nerve compression."}
+    ],
+    invest:[
+      {test:"CT", look:"The cause: mass, ventricle size, cisterns."},
+      {test:"A pressure monitor", look:"Only when it will change management, placed by a trained operator."}
+    ],
+    ddx:[
+      {name:"Migraine", split:"No progressive drowsiness and a normal scan when the story is worrying."},
+      {name:"Primary hypertension", split:"Does not blow a pupil."}
+    ],
+    algo:["Name the cause on imaging","Airway and a proper blood pressure","Head up, neck straight, treat fever, carbon dioxide and seizures","Osmotherapy as a bridge","Drain hydrocephalus. Operate on a surgical mass. Call for refractory pressure"],
+    meds:[{id:"osm", name:"Osmotherapy", show:"osm", mech:"Shifts water out of brain.", indication:"A bridge while the cause is treated.", dose:"Local protocol.", harm:"Not a destination."}],
+    procedures:[
+      evdTopic("Hydrocephalus or blood in the ventricles as the cause of the pressure."),
+      proc("bolt","ICP monitor","bolt","When the number will change care and a drain is not indicated.",["Trained operator"],["Haemorrhage","Infection"])
+    ],
+    monitor:["The cause, not only the number","Pupils and coma scale","Carbon dioxide and temperature"],
+    complications:[
+      {name:"Herniation", mechanism:"As above.", recognition:"Pupil, posture, apnoea.", management:"Osmotherapy and definitive relief of the mass or the ventricle."}
+    ],
+    prognosis:"The cause decides. A treated hydrocephalus is a different illness from a devastated hypoxic brain.",
+    rehab:"Depends entirely on the disease that raised the pressure.",
+    case:{stem:"After a large hemispheric infarct a 50-year-old becomes sleepier. The left pupil enlarges. CT shows swelling and shift, not a new bleed. Best immediate frame?",
+      choices:[{id:"a", label:"Airway, osmotherapy as a bridge, urgent neurosurgical discussion about decompression"},{id:"b", label:"Lumbar puncture to lower the pressure"},{id:"c", label:"Nimodipine"},{id:"d", label:"Observation until the morning scan"}],
+      answer:"a", why:"This is herniation from swelling. A lumbar puncture can make it worse. Nimodipine is for aneurysmal subarachnoid haemorrhage."},
+    quiz:[
+      {q:"CPP equals", choices:["MAP minus ICP","ICP minus MAP","Heart rate times stroke volume"], answer:0, why:"Perfusion pressure is the arterial pressure minus the pressure outside the vessels."}
+    ],
+    refs:["Brain Trauma Foundation thresholds are often borrowed, but the cause of the pressure still has to be treated."],
+    sim:""},
+
+  {id:"hydro", name:"Hydrocephalus", full:"Hydrocephalus",
+    overview:{definition:"Enlargement of the ventricles from too much CSF, a block to its flow, or a failure of absorption. In the unit it is usually obstructive or blood-related.", classification:"Obstructive, communicating, and normal-pressure hydrocephalus which is a clinic disease, not an ICU emergency.", significance:"Acute hydrocephalus kills by pressure. A drain treats the mechanism."},
+    anatomy:{note:"Lateral ventricles, third ventricle, aqueduct, fourth ventricle. The block's level decides which ventricles enlarge.", labels:["Lateral ventricle","Third ventricle","Aqueduct of midbrain","Fourth ventricle"]},
+    etiology:["Blood in the CSF after SAH or ICH","Aqueduct stenosis or a posterior fossa mass","Meningitis and failed absorption","A blocked shunt"],
+    path:[{id:"hydro", name:"Ventricular enlargement", show:"hydro", link:"CSF that cannot leave expands the ventricles and raises pressure."}],
+    clinical:[
+      {sign:"Slowing consciousness, small pupils, downward gaze", mechanism:"Pressure on the diencephalon from an expanding third ventricle."},
+      {sign:"A known shunt and a headache", mechanism:"Think blockage or infection first."}
+    ],
+    invest:[
+      {test:"CT", look:"Which ventricles are large. A normal fourth ventricle with large lateral and third ventricles suggests an aqueduct block."},
+      {test:"The shunt series and CSF if infection is possible", look:"A disconnected shunt, or a CSF white-cell count."}
+    ],
+    ddx:[
+      {name:"Atrophy", split:"Large ventricles and large sulci. No pressure symptoms."},
+      {name:"Raised pressure from a mass", split:"The mass is on the scan. The ventricles may be small, not large."}
+    ],
+    algo:["Scan","If acute and symptomatic, an external drain","Treat the cause: blood, infection, a posterior fossa mass","A shunt later, if the need is lasting"],
+    meds:[{id:"osm", name:"Osmotherapy", show:"osm", mech:"A bridge only.", indication:"While the drain is being arranged.", dose:"Local protocol.", harm:"Does not restore CSF flow."}],
+    procedures:[
+      evdTopic("Acute symptomatic hydrocephalus."),
+      proc("shunt","Ventriculoperitoneal shunt","shunt","A lasting need for CSF diversion, after infection is excluded.",["Neurosurgery"],["Blockage","Infection","Over-drainage"])
+    ],
+    monitor:["Conscious level after the drain","The drainage volume and the set height","CT if the patient changes"],
+    complications:[
+      {name:"Over-drainage", mechanism:"The drain is too low.", recognition:"Headache that is worse upright, a subdural collection.", management:"Raise the set point. Talk to neurosurgery."},
+      {name:"Infection", mechanism:"Colonised catheter.", recognition:"Fever and a CSF pleocytosis.", management:"Antibiotics and usually removal."}
+    ],
+    prognosis:"Excellent when the block is relieved and the brain was not already destroyed. Poor when hydrocephalus was a late sign of a devastated brain.",
+    rehab:"Shunt teaching for the family: fever, headache, drowsiness mean return.",
+    case:{stem:"Day 2 after subarachnoid haemorrhage the patient is harder to wake. CT shows larger lateral ventricles than yesterday. Next step?",
+      choices:[{id:"a", label:"External ventricular drain"},{id:"b", label:"Lumbar puncture in an unsecured, drowsy patient as the first move"},{id:"c", label:"Nimodipine dose increase only"},{id:"d", label:"Discharge planning"}],
+      answer:"a", why:"This is acute hydrocephalus. A drain treats it. A lumbar puncture is the wrong first move in a drowsy patient."},
+    quiz:[
+      {q:"Large lateral and third ventricles with a normal fourth ventricle suggest a block at", choices:["The aqueduct","The lumbar cistern","The frontal sinus"], answer:0, why:"The fourth ventricle has not yet received the CSF."}
+    ],
+    refs:["Standard neurosurgical teaching on CSF diversion. Pair with the SAH guideline when blood is the cause."],
+    sim:""},
+
+  {id:"cns", name:"CNS infection", full:"Meningitis and encephalitis",
+    overview:{definition:"Infection of the meninges, the brain, or both. Bacterial meningitis is a septic emergency. HSV encephalitis is a treatable cause of temporal-lobe illness.", classification:"Acute bacterial, viral encephalitis, chronic fungal or tuberculous, and abscess.", significance:"Antibiotics and aciclovir are given on suspicion. The CSF confirms them when it is safe to obtain."},
+    anatomy:{note:"The meninges, the temporal lobe for HSV, and the ventricle if an abscess ruptures.", labels:["Temporal pole","Hippocampus","Lateral ventricle"]},
+    etiology:["Streptococcus pneumoniae and Neisseria meningitidis in adults","Listeria in older and immunocompromised adults","HSV-1 for sporadic encephalitis","A nearby sinus or ear for an abscess"],
+    path:[{id:"lp", name:"Infection in the CSF space", show:"lp", link:"CSF is the sample. Imaging comes first when herniation is a risk."}],
+    clinical:[
+      {sign:"Fever, headache, neck stiffness, a petechial rash", mechanism:"Bacterial meningitis, and meningococcus until proved otherwise."},
+      {sign:"Fever, confusion, aphasia, temporal seizures", mechanism:"HSV encephalitis until proved otherwise."}
+    ],
+    invest:[
+      {test:"Blood cultures, then antibiotics", look:"Do not wait for the lumbar puncture to treat."},
+      {test:"CT before LP if there is a focal sign, a low coma scale, a fit, or immunosuppression", look:"A mass or tight basal cisterns forbid the needle."},
+      {test:"CSF", look:"Cell count, protein, glucose, Gram stain, viral PCR."}
+    ],
+    ddx:[
+      {name:"SAH", split:"Sudden maximal onset, blood on CT, not a fever-first illness."},
+      {name:"Autoimmune encephalitis", split:"A psychiatric prodrome and a negative infection work-up. Treat HSV anyway until PCR returns."}
+    ],
+    algo:["Blood cultures","Dexamethasone, then ceftriaxone and vancomycin. Add ampicillin if listeria is plausible. Add aciclovir if encephalitis is plausible","CT if the lumbar puncture is not clearly safe","Then CSF","Narrow the drugs when the organism is known"],
+    meds:[
+      {id:"benzo", name:"Aciclovir and antibacterials", show:"benzo", mech:"Aciclovir stops HSV replication. Ceftriaxone and vancomycin cover the usual bacteria. Ampicillin covers listeria.", indication:"Given on suspicion.", dose:"Adult teaching doses: ceftriaxone 2 g twice daily, vancomycin per level, ampicillin 2 g every 4 hours, aciclovir 10 mg/kg every 8 hours, dexamethasone 10 mg every 6 hours for suspected pneumococcal meningitis.", harm:"Nephrotoxicity from aciclovir if the patient is dry. Allergies."}
+    ],
+    procedures:[
+      proc("lp","Lumbar puncture","lp","To identify the organism once it is safe.",["No mass effect","Safe coagulation"],["Herniation if those rules are ignored","Post-LP headache"])
+    ],
+    monitor:["Conscious level","Sodium. SIADH is common","Renal function on aciclovir"],
+    complications:[
+      {name:"Herniation", mechanism:"A tight, swollen brain.", recognition:"A falling coma scale or a new pupil.", management:"Do not perform the lumbar puncture. Treat pressure and the organism."},
+      {name:"Infarct or hydrocephalus", mechanism:"Vasculitis or a blocked CSF path.", recognition:"A new deficit.", management:"Image again."}
+    ],
+    prognosis:"Minutes of delay in bacterial meningitis cost lives. HSV treated late leaves a temporal-lobe injury that does not reverse.",
+    rehab:"Hearing, seizures and memory need follow-up.",
+    case:{stem:"Fever, headache and a petechial rash. Coma scale 14. No focal sign. What first?",
+      choices:[{id:"a", label:"Blood cultures, dexamethasone and antibiotics immediately. Lumbar puncture if it will not delay the dose"},{id:"b", label:"Wait for CSF Gram stain before any drug"},{id:"c", label:"Nimodipine"},{id:"d", label:"Heparin"}],
+      answer:"a", why:"Suspected bacterial meningitis is treated at once. The puncture confirms the organism. It must not delay the first dose."},
+    quiz:[
+      {q:"HSV encephalitis is treated, before PCR returns, with", choices:["Aciclovir","Nimodipine","Alteplase"], answer:0, why:"Aciclovir is time-critical."}
+    ],
+    refs:["IDSA guidance on bacterial meningitis, and the de Gans trial of dexamethasone.","Practice tool on this hub: CNS infection algorithm."],
+    sim:"CNS_Infection_Interactive_Algorithm_v7.html?v=20260925s"},
+
+  {id:"cvt", name:"CVT", full:"Cerebral venous thrombosis",
+    overview:{definition:"Thrombus in a dural sinus or a cerebral vein. Outflow fails, pressure rises, and venous infarction follows. The infarct often bleeds and it crosses arterial territories.", classification:"By sinus: superior sagittal, transverse, sigmoid, deep veins, cavernous.", significance:"It mimics migraine, idiopathic intracranial hypertension, stroke and encephalopathy. Anticoagulation is the treatment even when a little blood is already present."},
+    anatomy:{note:"The superior sagittal sinus and the deep drainage into the straight sinus.", labels:["Superior sagittal sinus","Straight sinus","Transverse sinus"]},
+    etiology:["Post-partum state and oral contraception","Thrombophilia and cancer","Local infection, especially near the cavernous sinus","Dehydration and inflammatory disease"],
+    path:[{id:"heparin", name:"Venous outflow stops", show:"heparin", link:"Pressure backs into cortex. Anticoagulation is the usual treatment."}],
+    clinical:[
+      {sign:"Headache that builds, worse than previous headaches", mechanism:"Intracranial hypertension from blocked venous outflow."},
+      {sign:"Seizure and a parasagittal deficit", mechanism:"Superior sagittal sinus. The leg cortex sits against that sinus."},
+      {sign:"Encephalopathy", mechanism:"Deep venous thrombosis."}
+    ],
+    invest:[
+      {test:"CT or MR venography", look:"An empty delta, an absent sinus, a cord sign. Plain CT can be normal."},
+      {test:"D-dimer", look:"A negative test does not retire a strong story, especially if the headache has lasted."}
+    ],
+    ddx:[
+      {name:"Idiopathic intracranial hypertension", split:"No thrombus on a proper venogram."},
+      {name:"Arterial stroke", split:"A territory that matches an artery, and a vessel image that shows it."},
+      {name:"SAH", split:"Thunderclap onset and blood in cisterns. Cortical SAH can rarely be venous. Image the veins if the arteries are clean."}
+    ],
+    algo:["Venous imaging when the story fits","Heparin, even with a modest venous haemorrhage","Treat seizures and pressure","Repeat imaging if the patient worsens","Endovascular therapy only for deterioration in a specialist centre"],
+    meds:[
+      {id:"heparin", name:"Heparin", show:"heparin", mech:"Stops propagation of thrombus.", indication:"Acute cerebral venous thrombosis.", dose:"A therapeutic heparin infusion per local protocol, then an oral anticoagulant.", harm:"Bleeding. The presence of a small venous haemorrhage is not, by itself, a reason to withhold heparin."}
+    ],
+    procedures:[
+      proc("heparin","Endovascular clot removal","evt","Only when anticoagulation fails and the patient is deteriorating, in a centre that does it.",["A specialist decision"],["Perforation","Incomplete recanalisation"])
+    ],
+    monitor:["Vision, because papilloedema threatens sight","Conscious level","The leg and seizures if the superior sagittal sinus is involved"],
+    complications:[
+      {name:"Venous infarction with haemorrhage", mechanism:"Back-pressure.", recognition:"A new deficit and blood on CT that crosses arterial boundaries.", management:"Usually continue anticoagulation. Escalate if the mass is life-threatening."},
+      {name:"Chronic intracranial hypertension", mechanism:"A sinus that stays narrow.", recognition:"Ongoing headache and papilloedema.", management:"Pressure treatment and ophthalmology."}
+    ],
+    prognosis:"Better than a similar-looking arterial stroke, if anticoagulation is started. Deep venous clots and coma are the poor end of the range.",
+    rehab:"Provoking factors, the length of anticoagulation, and a haematology opinion.",
+    case:{stem:"A woman three weeks post partum has a week of worsening headache, then a seizure and left leg weakness. CT shows a small parasagittal haemorrhage that does not match one artery. Next test and first treatment?",
+      choices:[{id:"a", label:"Venography, and therapeutic heparin if a sinus is thrombosed"},{id:"b", label:"Alteplase immediately"},{id:"c", label:"A lumbar puncture as the only test"},{id:"d", label:"Platelets and observation"}],
+      answer:"a", why:"This is the classic story of superior sagittal sinus thrombosis. Anticoagulation proceeds even with a small venous bleed. Alteplase is the wrong drug."},
+    quiz:[
+      {q:"Venous infarcts typically", choices:["Cross arterial territories and often bleed","Respect the middle cerebral artery and never bleed","Start in the putamen from hypertension"], answer:0, why:"Venous pressure does not follow the arterial map."}
+    ],
+    refs:["European Stroke Organisation guideline on cerebral venous thrombosis, and the AHA/ASA statement."],
+    sim:""},
+
+  {id:"death", name:"Brain death", full:"Death by neurological criteria",
+    overview:{definition:"The irreversible loss of all brain function, including the brainstem, in a person with a known catastrophic cause. It is a determination made by qualified physicians under a protocol.", classification:"Clinical determination, with ancillary tests only when parts of the examination cannot be completed.", significance:"The standards exist so that death is neither declared lightly nor delayed without reason. This page is not a protocol you can apply alone."},
+    anatomy:{note:"The brainstem reflexes and the drive to breathe live in the medulla and pons. They are what the examination tests.", labels:["Midbrain","Pons","Medulla oblongata"]},
+    etiology:["A known, irreversible cause: haemorrhage, infarction, hypoxia, trauma","Confounders must be absent: sedatives, neuromuscular blockers, severe metabolic disturbance, hypothermia"],
+    path:[{id:"cpp", name:"Flow fails", show:"cpp", link:"When intracranial pressure meets arterial pressure, cerebral perfusion stops. That is the physiology. The determination is clinical and protocolised."}],
+    clinical:[
+      {sign:"Coma with no response", mechanism:"Cerebral and brainstem function is absent."},
+      {sign:"Absent brainstem reflexes", mechanism:"Pupils, cornea, oculocephalic and caloric responses, gag and cough."},
+      {sign:"No respiratory effort when the protocolled apnea test is performed", mechanism:"The medullary drive has gone. This test is done only by clinicians credentialed to do it, after prerequisites are met."}
+    ],
+    invest:[
+      {test:"Establish the cause and exclude confounders", look:"Imaging that explains the state. A drug history. Temperature and metabolic panel."},
+      {test:"Ancillary test if the clinical exam cannot be finished", look:"Cerebral blood flow studies or others named in the local protocol. An ancillary test does not replace a protocol."}
+    ],
+    ddx:[
+      {name:"Locked-in syndrome", split:"The patient is awake. Upward gaze may be preserved. This is not brain death."},
+      {name:"Residual sedation", split:"The examination is deferred. A drug level or the passage of time is required by protocol."}
+    ],
+    algo:["Confirm a known irreversible cause","Exclude confounders","Two examinations by qualified physicians, as the local law requires","Apnea testing only inside that protocol","Ancillary testing only when indicated","Only then is death by neurological criteria determined"],
+    meds:[{id:"osm", name:"No therapeutic drug", show:"osm", mech:"There is no medication on this page that determines or treats brain death.", indication:"Support of organs for donation is a separate, consent-based pathway.", dose:"Not applicable.", harm:"Do not use this chapter as an order set."}],
+    procedures:[
+      {id:"none", name:"Why there is no procedure demonstration", show:"cpp",
+        indication:"Death by neurological criteria is a clinical determination under law and hospital protocol. It is not a bedside procedure to rehearse from an animation.",
+        prerequisites:["A qualified examiner","The local protocol open in front of them"],
+        risks:["Declaring death while a confounder is still present"],
+        specialist:"No animation here walks through an apnea test. Use your institution's protocol and the people credentialed to perform it."}
+    ],
+    monitor:["Prerequisites of the protocol, documented","Not a therapeutic monitor. The question is determination, not titration"],
+    complications:[
+      {name:"A false determination", mechanism:"A missed confounder or an incomplete exam.", recognition:"Any retained brainstem reflex.", management:"Stop. The criteria are not met."}
+    ],
+    prognosis:"Death by neurological criteria is death. Organ support afterwards is a question of donation and family care, not of recovery.",
+    rehab:"Family explanation, faith and cultural needs, and the organ-donation pathway if it is separate and consented.",
+    case:{stem:"A comatose patient has no corneal reflex. Propofol was stopped 30 minutes ago. The nurse asks if brain death can be declared now. What do you say?",
+      choices:[{id:"a", label:"No. Sedation has not cleared, one reflex is not an examination, and only a full protocol by qualified physicians can determine this"},{id:"b", label:"Yes, the absent corneal reflex is enough"},{id:"c", label:"Yes, if the family agrees"},{id:"d", label:"Order mannitol and reassess in ten minutes"}],
+      answer:"a", why:"A single reflex, a recent sedative, and the absence of a protocolled examination mean the criteria are not met. Family agreement does not create the diagnosis."},
+    quiz:[
+      {q:"Locked-in syndrome differs because", choices:["The patient is awake","The patient has no need for a cause","It is treated with nimodipine"], answer:0, why:"Wakefulness means the brain is not dead."}
+    ],
+    refs:["World Brain Death Project, 2020.","The AAN guidance on determination of brain death, applied only through local credentialing."],
+    sim:""}
+];
+
+let hotspots = [];
+
+function readHash(){
+  const parts = location.hash.replace(/^#/, "").split("/").filter(Boolean);
+  if(parts[0] && DISEASES.some(function(d){ return d.id===parts[0]; })) diseaseId = parts[0];
+  if(parts[1] && SECTIONS.some(function(s){ return s[0]===parts[1]; })) sectionId = parts[1];
+  topicId = parts[2] || "";
+}
+function writeHash(){
+  const next = topicId ? diseaseId+"/"+sectionId+"/"+topicId : diseaseId+"/"+sectionId;
+  if(location.hash.replace(/^#/, "") !== next) history.replaceState(null, "", "#"+next);
+}
+function paintChrome(){
+  document.getElementById("diseases").innerHTML = DISEASES.map(function(d){
+    return '<button type="button"'+(d.id===diseaseId?' class="on"':'')+' data-d="'+d.id+'">'+esc(d.name)+'</button>';
+  }).join("");
+  document.getElementById("diseases").querySelectorAll("[data-d]").forEach(function(btn){
+    btn.onclick = function(){
+      diseaseId = btn.getAttribute("data-d");
+      topicId = "";
+      casePick = null; caseLocked = false; spotId = "";
+      writeHash(); render();
+    };
+  });
+  document.getElementById("sections").innerHTML = SECTIONS.map(function(s){
+    return '<button type="button"'+(s[0]===sectionId?' class="on"':'')+' data-s="'+s[0]+'">'+s[1]+'  '+esc(s[2])+'</button>';
+  }).join("");
+  document.getElementById("sections").querySelectorAll("[data-s]").forEach(function(btn){
+    btn.onclick = function(){
+      sectionId = btn.getAttribute("data-s");
+      topicId = "";
+      algoStep = 0; spotId = "";
+      writeHash(); render();
+    };
+  });
+  const dNow = disease();
+  const sNow = SECTIONS.find(function(item){ return item[0]===sectionId; });
+  document.getElementById("context").textContent = dNow.full + "  ·  " + (sNow ? sNow[1] + "  " + sNow[3] : "");
+}
+function sectionTitle(){
+  const s = SECTIONS.find(function(item){ return item[0]===sectionId; });
+  return s ? s[3] : "";
+}
+function openTopic(id){
+  topicId = id;
+  spotId = "";
+  writeHash();
+  render();
+  work.scrollIntoView({behavior: reduced ? "auto" : "smooth", block:"start"});
+}
+function render(){
+  playerToken++;
+  brainToken++;
+  if(anatomyCleanup){ anatomyCleanup(); anatomyCleanup = null; }
+  paintChrome();
+  writeHash();
+  const d = disease();
+  const head = '<p class="kicker">'+esc(d.full)+'</p><h2>'+esc(sectionTitle())+'</h2>';
+  if(sectionId==="overview") renderOverview(d, head);
+  else if(sectionId==="anatomy") renderAnatomy(d, head);
+  else if(sectionId==="etiology") renderList(d, head, "Causes and risks", d.etiology);
+  else if(sectionId==="path") renderCatalogue(d, head, d.path, "Each mechanism opens an animated sequence.");
+  else if(sectionId==="clinical") renderPairs(d, head, "Sign", d.clinical, "sign", "mechanism");
+  else if(sectionId==="invest") renderPairs(d, head, "Test", d.invest, "test", "look");
+  else if(sectionId==="ddx") renderPairs(d, head, "Alternative", d.ddx, "name", "split");
+  else if(sectionId==="algo") renderAlgo(d, head);
+  else if(sectionId==="meds") renderCatalogue(d, head, d.meds, "Open a drug to see its mechanism.");
+  else if(sectionId==="procedures") renderCatalogue(d, head, d.procedures, "Open a procedure for a visual demonstration, not a text-only page.");
+  else if(sectionId==="monitor") renderList(d, head, "Watch these", d.monitor);
+  else if(sectionId==="complications") renderComplications(d, head);
+  else if(sectionId==="prognosis") renderPrognosis(d, head);
+  else if(sectionId==="case") renderCase(d, head);
+  else renderAssess(d, head);
+}
+function renderOverview(d, head){
+  work.innerHTML = head+'<p class="lead">'+esc(d.overview.definition)+'</p><h3>Classification</h3><p class="lead">'+esc(d.overview.classification)+'</p><h3>Why it matters</h3><p class="lead">'+esc(d.overview.significance)+'</p>'+simLink(d)+footnote();
+}
+function renderList(d, head, title, items){
+  work.innerHTML = head+'<h3>'+esc(title)+'</h3><div class="grid">'+items.map(function(item){
+    return '<div class="card"><b>'+esc(item)+'</b></div>';
+  }).join("")+'</div>'+footnote();
+}
+function renderPairs(d, head, kicker, items, a, b){
+  work.innerHTML = head+'<div class="grid">'+items.map(function(item){
+    return '<div class="card"><span class="badge">'+esc(kicker)+'</span><b>'+esc(item[a])+'</b><span>'+esc(item[b])+'</span></div>';
+  }).join("")+'</div>'+footnote();
+}
+function renderComplications(d, head){
+  work.innerHTML = head+'<div class="grid">'+d.complications.map(function(item){
+    return '<div class="card"><b>'+esc(item.name)+'</b><span>'+esc(item.mechanism)+'</span><span>'+esc(item.recognition)+'</span><span>'+esc(item.management)+'</span></div>';
+  }).join("")+'</div>'+footnote();
+}
+function renderPrognosis(d, head){
+  work.innerHTML = head+'<p class="lead">'+esc(d.prognosis)+'</p><h3>Recovery</h3><p class="lead">'+esc(d.rehab)+'</p>'+simLink(d)+footnote();
+}
+function renderCatalogue(d, head, items, intro){
+  const topic = items.find(function(item){ return item.id===topicId; });
+  if(topic){ renderShow(d, topic); return; }
+  work.innerHTML = head+'<p class="note">'+esc(intro)+'</p><div class="grid">'+items.map(function(item){
+    const def = showDef(item.show);
+    const kind = def && def.inspect ? "Interactive diagram" : "Animated teaching sequence";
+    return '<button type="button" class="card" data-topic="'+item.id+'"><span class="badge">'+kind+'</span><b>'+esc(item.name)+'</b><span>'+esc(item.link || item.indication || item.mech || "")+'</span></button>';
+  }).join("")+'</div>'+footnote();
+  work.querySelectorAll("[data-topic]").forEach(function(btn){
+    btn.onclick = function(){ openTopic(btn.getAttribute("data-topic")); };
+  });
+}
+function renderShow(d, topic){
+  const def = showDef(topic.show);
+  if(!def){ work.innerHTML = "<p>This demonstration is not linked.</p>"; return; }
+  const steps = def.steps;
+  work.innerHTML =
+    '<p class="kicker">'+esc(d.full)+' · '+esc(sectionTitle())+'</p>'+
+    '<div class="backrow"><button type="button" id="backcat">Back to the list</button></div>'+
+    '<div class="stage wide">'+
+      '<div class="panel side-l"><span class="badge">'+(def.inspect?"Interactive diagram":"Animated teaching sequence")+'</span><h2>'+esc(topic.name)+'</h2>'+
+        (topic.indication?'<h3>Indication</h3><p>'+esc(topic.indication)+'</p>':"")+
+        (topic.mech?'<h3>Mechanism</h3><p>'+esc(topic.mech)+'</p>':"")+
+        (topic.link?'<p>'+esc(topic.link)+'</p>':"")+
+        (topic.dose?'<h3>Teaching dose</h3><p>'+esc(topic.dose)+'</p>':"")+
+        (topic.prerequisites?'<h3>Before you start</h3>'+topic.prerequisites.map(function(x){return '<p>'+esc(x)+'</p>';}).join(""):"")+
+        '<p class="note warn">'+esc(topic.specialist || "Teaching material for clinicians. Not an order and not a filmed procedure.")+'</p>'+
+      '</div>'+
+      '<div class="player"><canvas id="reel" width="960" height="540" aria-label="Teaching animation"></canvas></div>'+
+      '<div class="panel side-r"><h3>Steps</h3><div class="grid" id="steps">'+steps.map(function(s,i){
+        return '<button type="button" class="card step" data-step="'+i+'"><b>'+esc(s.title)+'</b><span>'+esc(s.text)+'</span></button>';
+      }).join("")+'</div>'+(topic.risks?'<h3>Risks</h3>'+topic.risks.map(function(x){return '<p>'+esc(x)+'</p>';}).join(""):"")+(topic.harm?'<h3>Harm</h3><p>'+esc(topic.harm)+'</p>':"")+'</div>'+
+      '<div class="controls"><button type="button" id="play">'+(reduced?'Play':'Pause')+'</button><button type="button" id="replay">Replay</button>'+
+        '<input id="scrub" type="range" min="0" max="'+def.dur+'" step="0.05" value="0" aria-label="Timeline">'+
+        '<button type="button" id="slow">0.75×</button><button type="button" id="fast">1.5×</button></div>'+
+    '</div>';
+  document.getElementById("backcat").onclick = function(){ topicId=""; writeHash(); render(); };
+  const canvas = document.getElementById("reel");
+  const ctx = canvas.getContext("2d");
+  player = {t:0, playing:!reduced, speed:1, step:-1, dur:def.dur};
+  const scrub = document.getElementById("scrub");
+  const playBtn = document.getElementById("play");
+  function currentStep(){
+    let idx = 0;
+    steps.forEach(function(s,i){ if(player.t+0.05 >= s.t) idx = i; });
+    return idx;
+  }
+  function paintFrame(){
+    const idx = currentStep();
+    def.paint(ctx, canvas.width, canvas.height, player.t, idx);
+    if(idx !== player.step){
+      player.step = idx;
+      work.querySelectorAll(".step").forEach(function(btn,i){ btn.classList.toggle("on", i===idx); });
+    }
+    scrub.value = String(player.t);
+  }
+  function seek(t, pause){
+    player.t = Math.max(0, Math.min(def.dur, t));
+    if(pause) player.playing = false;
+    playBtn.textContent = player.playing ? "Pause" : "Play";
+    paintFrame();
+  }
+  playBtn.onclick = function(){ player.playing = !player.playing; playBtn.textContent = player.playing ? "Pause" : "Play"; };
+  document.getElementById("replay").onclick = function(){ player.t = 0; player.playing = true; playBtn.textContent = "Pause"; paintFrame(); };
+  document.getElementById("slow").onclick = function(){ player.speed = 0.75; };
+  document.getElementById("fast").onclick = function(){ player.speed = 1.5; };
+  scrub.oninput = function(){ seek(Number(scrub.value), true); };
+  work.querySelectorAll(".step").forEach(function(btn){
+    btn.onclick = function(){ seek(steps[Number(btn.getAttribute("data-step"))].t, true); };
+  });
+  canvas.onclick = function(event){
+    if(!def.inspect) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX-rect.left)/rect.width*canvas.width;
+    const y = (event.clientY-rect.top)/rect.height*canvas.height;
+    const hit = hotspots.find(function(h){ return Math.hypot(h.x-x, h.y-y) < h.r; });
+    if(!hit) return;
+    spotId = hit.id;
+    const idx = CT_SPOTS.findIndex(function(s){ return s.id===hit.id; });
+    if(idx>=0) seek(steps[idx].t, true);
+  };
+  paintFrame();
+  const token = ++playerToken;
+  let last = 0;
+  function loop(now){
+    if(token !== playerToken) return;
+    requestAnimationFrame(loop);
+    const dt = Math.min(0.05, last ? (now-last)/1000 : 0.016);
+    last = now;
+    if(player && player.playing){
+      player.t += dt*player.speed;
+      if(player.t >= player.dur){ player.t = player.dur; player.playing = false; playBtn.textContent = "Play"; }
+      paintFrame();
+    }
+  }
+  requestAnimationFrame(loop);
+}
+function renderAlgo(d, head){
+  work.innerHTML = head+'<p class="note">Tap a step, or walk the pathway. Doses elsewhere on the page are teaching reminders, not orders.</p><div class="grid algo" id="algo">'+d.algo.map(function(step,i){
+    return '<button type="button" class="card'+(i===algoStep?' on"':'"')+' data-i="'+i+'"><b>Step '+(i+1)+'</b><span>'+esc(step)+'</span></button>';
+  }).join("")+'</div><div class="controls"><button type="button" id="walk">Walk the pathway</button></div>'+simLink(d)+footnote();
+  work.querySelectorAll("[data-i]").forEach(function(btn){
+    btn.onclick = function(){ algoStep = Number(btn.getAttribute("data-i")); renderAlgo(d, head); };
+  });
+  document.getElementById("walk").onclick = function(){
+    algoStep = (algoStep+1) % d.algo.length;
+    renderAlgo(d, head);
+  };
+}
+function renderAnatomy(d, head){
+  work.innerHTML = head+'<p class="lead">'+esc(d.anatomy.note)+'</p><p class="note">This is a real glTF model, the same atlas as the 3D brain lab. It is not a video. Drag to turn it. Only the structures named for this disease are coloured.</p><div class="player"><canvas id="anat"></canvas></div><p><a href="brain-3d.html">Open the full interactive brain</a></p>'+footnote();
+  mountAnatomy(d.anatomy.labels || []);
+}
+function mountAnatomy(labels){
+  const canvas = document.getElementById("anat");
+  if(!canvas) return;
+  canvas.width = 960; canvas.height = 540;
+  let renderer;
+  try{ renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true}); }
+  catch(err){ return; }
+  renderer.setSize(canvas.clientWidth || 640, 360, false);
+  renderer.setClearColor(0x071018, 1);
+  const scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(0xf2efe8, 0x101820, 1));
+  const key = new THREE.DirectionalLight(0xffffff, 1.1);
+  key.position.set(2,3,4); scene.add(key);
+  const camera = new THREE.PerspectiveCamera(35, 16/9, 0.01, 50);
+  const controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  const token = ++brainToken;
+  const loader = new GLTFLoader();
+  const draco = new DRACOLoader();
+  draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
+  loader.setDRACOLoader(draco);
+  loader.load("neuro/brain.glb", function(gltf){
+    if(token !== brainToken) return;
+    const model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    model.position.sub(box.getCenter(new THREE.Vector3()));
+    const size = box.getSize(new THREE.Vector3());
+    const extent = Math.max(size.x, size.y, size.z);
+    camera.position.set(0, extent*0.05, extent*0.9);
+    scene.add(model);
+    const wanted = {};
+    labels.forEach(function(name){ wanted[name] = true; });
+    const focus = new THREE.Box3();
+    let n = 0;
+    model.traverse(function(obj){
+      if(!obj.isMesh) return;
+      obj.material = obj.material.clone();
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      const on = !!wanted[obj.userData.bx_label];
+      mats.forEach(function(mat){
+        if(on){ mat.color.set("#7fd4e6"); mat.emissive = new THREE.Color("#7fd4e6"); mat.emissiveIntensity = 0.25; }
+      });
+      if(on){ focus.expandByObject(obj); n++; }
+    });
+    if(n){
+      const c = focus.getCenter(new THREE.Vector3());
+      controls.target.copy(c);
+      camera.position.copy(c).add(new THREE.Vector3(0, extent*0.05, extent*0.55));
+    }
+  });
+  let frame = 0;
+  anatomyCleanup = function(){
+    cancelAnimationFrame(frame);
+    controls.dispose();
+    renderer.dispose();
+    renderer.forceContextLoss();
+    draco.dispose();
+  };
+  function loop(){
+    if(token !== brainToken) return;
+    frame = requestAnimationFrame(loop);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  const viewW = Math.max(320, canvas.clientWidth || 640);
+  const viewH = Math.round(viewW * 9 / 16);
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.setSize(viewW, viewH, false);
+  camera.aspect = viewW / viewH;
+  camera.updateProjectionMatrix();
+  frame = requestAnimationFrame(loop);
+}
+function renderCase(d, head){
+  const item = d.case;
+  work.innerHTML = head+'<span class="badge">Clinical case</span><p class="lead">'+esc(item.stem)+'</p><div class="grid" id="choices">'+item.choices.map(function(choice){
+    return '<button type="button" class="card" data-c="'+choice.id+'"><b>'+esc(choice.label)+'</b></button>';
+  }).join("")+'</div><div class="controls"><button type="button" id="lock">Submit</button></div><p id="why" class="lead"></p>'+footnote();
+  work.querySelectorAll("[data-c]").forEach(function(btn){
+    btn.onclick = function(){
+      if(caseLocked) return;
+      casePick = btn.getAttribute("data-c");
+      work.querySelectorAll("[data-c]").forEach(function(other){ other.classList.toggle("on", other===btn); });
+    };
+  });
+  document.getElementById("lock").onclick = function(){
+    if(!casePick){ document.getElementById("why").textContent = "Choose a response first."; return; }
+    caseLocked = true;
+    work.querySelectorAll("[data-c]").forEach(function(btn){
+      const id = btn.getAttribute("data-c");
+      btn.classList.toggle("on", id===item.answer);
+    });
+    const right = casePick === item.answer;
+    document.getElementById("why").textContent = (right ? "Correct. " : "Not that one. ")+item.why;
+  };
+  if(caseLocked) document.getElementById("lock").click();
+}
+function renderAssess(d, head){
+  const key = "bd-"+d.id;
+  work.innerHTML = head+'<span class="badge">Questions</span><div id="qs">'+d.quiz.map(function(q,i){
+    return '<div class="card"><b>'+esc(q.q)+'</b><div class="grid">'+q.choices.map(function(choice, n){
+      return '<button type="button" data-q="'+i+'" data-n="'+n+'">'+esc(choice)+'</button>';
+    }).join("")+'</div><p class="note" id="why-'+i+'"></p></div>';
+  }).join("")+'</div><h3>References</h3>'+d.refs.map(function(r){return '<p class="note">'+esc(r)+'</p>';}).join("")+simLink(d)+footnote();
+  work.querySelectorAll("[data-q]").forEach(function(btn){
+    btn.onclick = function(){
+      const i = Number(btn.getAttribute("data-q"));
+      if(quizLocked[key+i]) return;
+      quizLocked[key+i] = true;
+      const n = Number(btn.getAttribute("data-n"));
+      const q = d.quiz[i];
+      const right = n === q.answer;
+      work.querySelectorAll('[data-q="'+i+'"]').forEach(function(other){
+        other.classList.toggle("on", Number(other.getAttribute("data-n"))===q.answer);
+      });
+      document.getElementById("why-"+i).textContent = (right?"Correct. ":"Not that one. ")+q.why;
+    };
+  });
+}
+function simLink(d){
+  if(!d.sim) return "";
+  return '<p><a href="'+esc(d.sim)+'">Open the practice simulator for this disease</a></p>';
+}
+function footnote(){
+  return '<p class="note">Doses are teaching reminders for clinicians, not prescriptions. Sequences are drawn animations. The anatomy view is a 3D model. Nothing here is a filmed operation.</p>';
+}
+window.addEventListener("hashchange", function(){ readHash(); render(); });
+readHash();
+if(!location.hash){ diseaseId = "tbi"; sectionId = "procedures"; topicId = ""; }
+render();
+
+</script>
+</body>
+</html>
