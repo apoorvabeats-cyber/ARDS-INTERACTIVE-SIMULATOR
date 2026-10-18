@@ -581,29 +581,6 @@ export function mountFilm(canvas, hud, onGrab){
   function direct(id, t, A){
     const s = span;
     const side = new THREE.Vector3(rightSign, 0.08, 0.15).normalize();
-    if(id === "evd"){
-      const open = phase(t, 3, 5.6);
-      const pass = phase(t, 6, 10);
-      const drain = phase(t, 10.2, 13);
-      const outer = L.entry.clone().addScaledVector(L.entryN, s * 0.1);
-      A.disc("burr", L.entry, L.entryN, s * 0.05, open);
-      if(pass > 0){
-        A.tube("cath", [outer, L.entry, L.horn], s * 0.0085, pass, 0xf7f4ec);
-        A.sphere("tip", outer.clone().lerp(L.horn, pass), s * 0.013, 0xf7f4ec, 1);
-        A.veil(mix(0.42, 0.12, pass));
-        A.tint(["Lateral ventricle"], 0xd7f1fb, 0.55);
-      }
-      if(drain > 0){
-        A.flow("csf", [L.horn, L.entry, outer], t, s * 0.012, 0xe7fbff, 0.28);
-      }
-      const target = t < 5.8 ? L.entry : L.entry.clone().lerp(L.horn, 0.45);
-      const dist = t < 3 ? s * 1.2 : t < 5.8 ? s * 0.55 : s * 0.72;
-      const yaw = 0.95 * rightSign;
-      const pitch = t < 5.8 ? 0.62 : 0.38;
-      A.look(target, dist, yaw, pitch, t < 3 ? 34 : 30);
-      const icp = Math.round(mix(28, 13, drain));
-      return t < 3 ? "Kocher point, just in front of the coronal suture" : t < 6 ? "Burr hole" : t < 10 ? "Catheter toward the frontal horn" : "CSF  ·  ICP " + icp;
-    }
     if(id === "bolt"){
       const pass = phase(t, 2.2, 6);
       const tip = L.entry.clone().lerp(L.horn.clone().add(new THREE.Vector3(0, s * 0.04, 0)), 0.45);
