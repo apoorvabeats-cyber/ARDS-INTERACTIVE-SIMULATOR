@@ -52,6 +52,8 @@ main{padding:4px 14px 40px}
 .player canvas{width:100%;height:auto;display:block;background:#050b10;touch-action:none}
 .player:after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,.5) 100%)}
 .hud{position:absolute;left:12px;right:12px;bottom:10px;z-index:2;color:#e7f1f4;font-size:13px;line-height:1.35;text-shadow:0 1px 3px #000;pointer-events:none}
+.player.clip:after{display:none}
+.player video{width:100%;max-height:72vh;display:block;background:#000;object-fit:contain}
 .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .controls button,.backrow button{border:1px solid var(--line);background:#0c1a24;border-radius:999px;min-height:44px;padding:0 16px}
 .controls input[type=range]{flex:1 1 160px;min-width:140px;height:44px}
@@ -160,10 +162,10 @@ const SHOWS = {
     {t:10, title:"Confirm CSF", text:"Clear or blood-stained CSF should flow. A poor flow means the tip may be in the wrong place. Image if you are not sure."},
     {t:13, title:"Tunnel and measure", text:"The catheter is tunnelled, connected to a closed drainage system, and set at the prescribed height. ICP can be transduced when the drain is closed."}
   ]},
-  ett:{dur:10, steps:[
-    {t:0, title:"Why the airway", text:"Hypoxia and hypercarbia raise intracranial pressure. Intubation is for patients who cannot protect the airway or who need controlled ventilation."},
-    {t:3, title:"The pass", text:"A rapid sequence induction aims to avoid a long apnoea and a blood-pressure crash. The tube crosses the vocal cords."},
-    {t:7, title:"Confirm", text:"Sustained exhaled carbon dioxide confirms tracheal placement. Then control carbon dioxide and blood pressure. Do not hyperventilate as a routine."}
+  ett:{dur:13.4, clip:"neuro/intubation.mp4", steps:[
+    {t:0, title:"Open the airway", text:"The blade lifts the tongue and brings the cords into view. Hypoxia and hypercarbia raise intracranial pressure. Intubation is for a patient who cannot protect the airway, or who needs ventilation controlled."},
+    {t:3.6, title:"The pass", text:"A rapid sequence induction aims to avoid a long apnoea and a blood-pressure crash. The tube crosses the vocal cords."},
+    {t:9, title:"Confirm", text:"The tube is through the cords. Sustained exhaled carbon dioxide confirms the trachea. Then control carbon dioxide and blood pressure. Do not hyperventilate as a routine."}
   ]},
   bolt:{dur:10, steps:[
     {t:0, title:"What it is", text:"A parenchymal monitor sits in the brain substance and measures pressure. It does not drain cerebrospinal fluid."},
@@ -847,12 +849,82 @@ function renderCatalogue(d, head, items, intro){
   if(topic){ renderShow(d, topic); return; }
   work.innerHTML = head+'<p class="note">'+esc(intro)+'</p><div class="grid">'+items.map(function(item){
     const def = showDef(item.show);
-    const kind = def && def.inspect ? "3D teaching view" : "3D teaching sequence";
+    const kind = def && def.clip ? "Animation" : def && def.inspect ? "3D teaching view" : "3D teaching sequence";
     return '<button type="button" class="card" data-topic="'+item.id+'"><span class="badge">'+kind+'</span><b>'+esc(item.name)+'</b><span>'+esc(item.link || item.indication || item.mech || "")+'</span></button>';
   }).join("")+'</div>'+footnote();
   work.querySelectorAll("[data-topic]").forEach(function(btn){
     btn.onclick = function(){ openTopic(btn.getAttribute("data-topic")); };
   });
+}
+function bindClip(def, steps){
+  const video = document.getElementById("reel");
+  const hud = document.getElementById("hud");
+  const playBtn = document.getElementById("play");
+  const scrub = document.getElementById("scrub");
+  player = {t:0, playing:!reduced, speed:1, step:-1, dur:def.dur};
+  let jump = false;
+  filmCleanup = function(){
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+  };
+  function currentStep(){
+    let idx = 0;
+    steps.forEach(function(s,i){ if(player.t+0.05 >= s.t) idx = i; });
+    return idx;
+  }
+  function paintChrome(){
+    const idx = currentStep();
+    if(hud && steps[idx]) hud.textContent = steps[idx].title;
+    if(idx !== player.step){
+      player.step = idx;
+      work.querySelectorAll(".step").forEach(function(btn,i){ btn.classList.toggle("on", i===idx); });
+    }
+    scrub.value = String(player.t);
+    scrub.max = String(player.dur);
+  }
+  function seek(t, pause){
+    player.t = Math.max(0, Math.min(player.dur, t));
+    jump = true;
+    if(pause) player.playing = false;
+    playBtn.textContent = player.playing ? "Pause" : "Play";
+    try{ video.currentTime = player.t; }catch(err){}
+    if(player.playing) video.play().catch(function(){ player.playing = false; playBtn.textContent = "Play"; });
+    else video.pause();
+    paintChrome();
+  }
+  playBtn.onclick = function(){
+    player.playing = !player.playing;
+    playBtn.textContent = player.playing ? "Pause" : "Play";
+    if(player.playing){
+      if(video.currentTime >= (video.duration || player.dur) - 0.05) video.currentTime = 0;
+      video.play().catch(function(){ player.playing = false; playBtn.textContent = "Play"; });
+    }else video.pause();
+  };
+  document.getElementById("replay").onclick = function(){ seek(0, false); player.playing = true; playBtn.textContent = "Pause"; video.play().catch(function(){}); };
+  document.getElementById("slow").onclick = function(){ player.speed = 0.75; video.playbackRate = 0.75; };
+  document.getElementById("fast").onclick = function(){ player.speed = 1.5; video.playbackRate = 1.5; };
+  scrub.oninput = function(){ seek(Number(scrub.value), true); };
+  work.querySelectorAll(".step").forEach(function(btn){
+    btn.onclick = function(){ seek(steps[Number(btn.getAttribute("data-step"))].t, true); };
+  });
+  video.addEventListener("loadedmetadata", function(){
+    if(video.duration && isFinite(video.duration)) player.dur = video.duration;
+    paintChrome();
+  });
+  video.addEventListener("timeupdate", function(){
+    if(jump){ jump = false; return; }
+    player.t = video.currentTime || 0;
+    paintChrome();
+  });
+  video.addEventListener("ended", function(){
+    player.playing = false;
+    player.t = player.dur;
+    playBtn.textContent = "Play";
+    paintChrome();
+  });
+  paintChrome();
+  if(player.playing) video.play().catch(function(){ player.playing = false; playBtn.textContent = "Play"; });
 }
 function renderShow(d, topic){
   const def = showDef(topic.show);
@@ -862,7 +934,7 @@ function renderShow(d, topic){
     '<p class="kicker">'+esc(d.full)+' · '+esc(sectionTitle())+'</p>'+
     '<div class="backrow"><button type="button" id="backcat">Back to the list</button></div>'+
     '<div class="stage wide">'+
-      '<div class="panel side-l"><span class="badge">'+(def.inspect?"3D teaching view":"3D teaching sequence")+'</span><h2>'+esc(topic.name)+'</h2>'+
+      '<div class="panel side-l"><span class="badge">'+(def.clip?"Animation":def.inspect?"3D teaching view":"3D teaching sequence")+'</span><h2>'+esc(topic.name)+'</h2>'+
         (topic.indication?'<h3>Indication</h3><p>'+esc(topic.indication)+'</p>':"")+
         (topic.mech?'<h3>Mechanism</h3><p>'+esc(topic.mech)+'</p>':"")+
         (topic.link?'<p>'+esc(topic.link)+'</p>':"")+
@@ -870,7 +942,9 @@ function renderShow(d, topic){
         (topic.prerequisites?'<h3>Before you start</h3>'+topic.prerequisites.map(function(x){return '<p>'+esc(x)+'</p>';}).join(""):"")+
         '<p class="note warn">'+esc(topic.specialist || "Teaching material for clinicians. Not an order and not a filmed procedure.")+'</p>'+
       '</div>'+
-      '<div class="player"><canvas id="reel" width="960" height="540" aria-label="Three dimensional teaching sequence. Drag to look around."></canvas><div id="hud"></div></div>'+
+      '<div class="player'+(def.clip?' clip':'')+'">'+(def.clip
+        ? '<video id="reel" playsinline preload="auto" src="'+esc(def.clip)+'" aria-label="Endotracheal intubation animation"></video>'
+        : '<canvas id="reel" width="960" height="540" aria-label="Three dimensional teaching sequence. Drag to look around."></canvas>')+'<div id="hud"></div></div>'+
       '<div class="panel side-r"><h3>Steps</h3><div class="grid" id="steps">'+steps.map(function(s,i){
         return '<button type="button" class="card step" data-step="'+i+'"><b>'+esc(s.title)+'</b><span>'+esc(s.text)+'</span></button>';
       }).join("")+'</div>'+(topic.risks?'<h3>Risks</h3>'+topic.risks.map(function(x){return '<p>'+esc(x)+'</p>';}).join(""):"")+(topic.harm?'<h3>Harm</h3><p>'+esc(topic.harm)+'</p>':"")+'</div>'+
@@ -879,6 +953,7 @@ function renderShow(d, topic){
         '<button type="button" id="slow">0.75×</button><button type="button" id="fast">1.5×</button></div>'+
     '</div>';
   document.getElementById("backcat").onclick = function(){ topicId=""; writeHash(); render(); };
+  if(def.clip){ bindClip(def, steps); return; }
   const canvas = document.getElementById("reel");
   const hud = document.getElementById("hud");
   player = {t:0, playing:!reduced, speed:1, step:-1, dur:def.dur};
