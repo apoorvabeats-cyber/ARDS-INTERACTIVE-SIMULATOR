@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#071018">
+<title>OSCE World</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520&family=Figtree:wght@460;650&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#071018;color:#f3efe6}
+body{font-family:Figtree,ui-sans-serif,sans-serif;line-height:1.45;min-height:100dvh}
+button,a{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible{outline:2px solid #f3efe6;outline-offset:3px}
+header{display:flex;align-items:center;gap:10px;padding:12px 14px;position:sticky;top:0;background:#071018;z-index:2}
+header a{color:#b7b1a4;text-decoration:none;min-height:44px;display:flex;align-items:center}
+header strong{flex:1;font-family:Fraunces,Georgia,serif;font-weight:520;font-size:20px}
+.gas div:last-child{grid-column:1 / -1}
+header button{min-height:44px;border-radius:999px;border:1px solid rgba(243,239,230,.28);background:transparent;padding:0 14px}
+#voice[aria-pressed="true"]{border-color:#7fd4e6;color:#7fd4e6}
+main{padding:6px 14px 48px;max-width:720px;margin:0 auto}
+h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:34px;letter-spacing:-.03em;line-height:1;margin:8px 0}
+.lede{color:#b7b1a4;margin:0 0 12px}
+.modes{display:flex;flex-direction:column;gap:8px}
+.mode{text-align:left;border:0;border-radius:16px;padding:16px;min-height:88px;background:#102028;box-shadow:inset 0 0 0 1px rgba(127,212,230,.35)}
+.mode b{display:block;font-family:Fraunces,Georgia,serif;font-size:24px;font-weight:520}
+.mode span{display:block;margin-top:4px;color:#b7b1a4}
+.gas{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0}
+.gas div{background:#10161c;border-radius:12px;padding:10px}
+.gas dt{color:#8a8478;font-size:12px}
+.gas dd{margin:2px 0 0;font-variant-numeric:tabular-nums;font-weight:650}
+.prompt{font-size:18px;margin:12px 0}
+.choice{display:block;width:100%;text-align:left;background:#10161c;border:1px solid rgba(243,239,230,.16);border-radius:12px;padding:12px;min-height:48px;margin:8px 0}
+.choice.right{border-color:#8fbf9a}
+.choice.wrong{border-color:#d27b73}
+.choice:disabled{opacity:1}
+.fb{border-radius:12px;padding:12px;margin-top:8px;background:#10161c}
+.next{margin-top:12px;min-height:48px;border:0;border-radius:12px;padding:12px 16px;background:#7fd4e6;color:#071018;font-weight:650}
+.score{color:#8a8478;font-variant-numeric:tabular-nums}
+svg.ecg{width:100%;height:auto;background:#081018;border-radius:12px;display:block}
+.groups{display:flex;gap:8px;overflow:auto;padding-bottom:6px}
+.groups button,.drugs button{flex:none;min-height:40px;border-radius:999px;border:1px solid rgba(243,239,230,.2);background:transparent;padding:0 12px;margin:0 8px 8px 0}
+.groups button.on,.drugs button.on{border-color:#7fd4e6;color:#7fd4e6}
+.calc{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.calc label{font-size:13px;color:#b7b1a4}
+.calc input{width:100%;background:transparent;border:0;border-bottom:1px solid rgba(243,239,230,.3);color:#f3efe6;padding:8px 0;font-size:16px}
+.out{grid-column:1/-1;font-variant-numeric:tabular-nums}
+.fine{color:#8a8478;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <a href="index.html">Atlas</a>
+  <strong>OSCE World</strong>
+  <button type="button" id="stations">Stations</button>
+  <button type="button" id="voice" aria-pressed="true">Voice on</button>
+</header>
+<main id="app"></main>
+<script src="osce-data.js?v=20261021g"></script>
+<script>
+const app = document.getElementById("app");
+const voiceBtn = document.getElementById("voice");
+let voiceOn = localStorage.getItem("osce-voice") !== "off";
+voiceBtn.setAttribute("aria-pressed", voiceOn ? "true" : "false");
+voiceBtn.textContent = voiceOn ? "Voice on" : "Voice off";
+voiceBtn.onclick = function(){
+  voiceOn = !voiceOn;
+  localStorage.setItem("osce-voice", voiceOn ? "on" : "off");
+  voiceBtn.setAttribute("aria-pressed", voiceOn ? "true" : "false");
+  voiceBtn.textContent = voiceOn ? "Voice on" : "Voice off";
+  if(!voiceOn && window.speechSynthesis) speechSynthesis.cancel();
+  else say("Voice on.");
+};
+document.getElementById("stations").onclick = function(){
+  mode = "";
+  history.replaceState(null, "", "osce.html?v=20261021g");
+  if(window.speechSynthesis) speechSynthesis.cancel();
+  home();
+};
+function say(text){
+  if(!voiceOn || !window.speechSynthesis || !text) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 0.96;
+  u.lang = "en-IN";
+  speechSynthesis.speak(u);
+}
+function esc(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return "&#" + c.charCodeAt(0) + ";";
+  });
+}
+function store(){
+  try { return JSON.parse(localStorage.getItem("osce-sim-v1") || "{}"); }
+  catch(e){ return {}; }
+}
+function mark(mode, ok){
+  const all = store();
+  const rec = all[mode] || {asked:0, correct:0};
+  rec.asked += 1;
+  if(ok) rec.correct += 1;
+  all[mode] = rec;
+  localStorage.setItem("osce-sim-v1", JSON.stringify(all));
+  return rec;
+}
+function scoreLine(mode){
+  const rec = store()[mode];
+  if(!rec || !rec.asked) return "Not started";
+  return rec.correct + " of " + rec.asked;
+}
+const params = new URLSearchParams(location.search);
+let mode = params.get("mode") || "";
+const FIELDS = ["indication","dose","infusion","preparation","renal","hepatic","contra","monitoring","adverse","reversal","evidence"];
+const FIELD_LABEL = {
+  indication:"Indication in the ICU",
+  dose:"Adult dose",
+  infusion:"Infusion",
+  preparation:"Preparation",
+  renal:"Renal adjustment",
+  hepatic:"Hepatic adjustment",
+  contra:"Contraindications and cautions",
+  monitoring:"Monitoring",
+  adverse:"Adverse effects",
+  reversal:"Reversal or antidote",
+  evidence:"Evidence and source"
+};
+
+function home(){
+  app.innerHTML =
+    "<h1>Choose the station</h1>"+
+    "<p class='lede'>One station at a time. The voice reads the question, then the answer after you choose. Teaching doses, not a prescription.</p>"+
+    "<div class='modes'>"+
+      "<button class='mode' data-go='abg'><b>ABG</b><span>25 gases. Name the disorder, then the cause. "+esc(scoreLine("abg"))+"</span></button>"+
+      "<button class='mode' data-go='drug'><b>ICU drugs</b><span>Pick from the checklist. The questions walk the monograph. "+esc(scoreLine("drug"))+"</span></button>"+
+      "<button class='mode' data-go='ecg'><b>ECG</b><span>50 teaching traces. Name it, then the treatment. "+esc(scoreLine("ecg"))+"</span></button>"+
+    "</div>";
+  app.querySelectorAll("[data-go]").forEach(function(btn){
+    btn.onclick = function(){
+      mode = btn.getAttribute("data-go");
+      history.replaceState(null, "", "?mode="+mode+"&v=20261021g");
+      start();
+    };
+  });
+  say("OSCE World. Choose an arterial blood gas, a drug, or an ECG.");
+}
+
+let abgOrder = [];
+let abgAt = 0;
+let abgStep = "id";
+function shuffled(step){
+  const options = step.options.slice();
+  const correct = options[step.answer];
+  for(let i = options.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = options[i];
+    options[i] = options[j];
+    options[j] = tmp;
+  }
+  return {prompt:step.prompt, say:step.say, options:options, answer:options.indexOf(correct)};
+}
+function startAbg(){
+  abgOrder = OSCE_DATA.abg.map(function(_, i){ return i; }).sort(function(){ return Math.random()-0.5; });
+  abgAt = 0;
+  abgStep = "id";
+  renderAbg();
+}
+function renderAbg(){
+  const item = OSCE_DATA.abg[abgOrder[abgAt]];
+  const v = item.values;
+  const step = shuffled(abgStep==="id" ? item.identify : item.cause);
+  const gas = [["pH", v.ph],["PaCO2", v.pco2],["HCO3", v.hco3],["PaO2", v.po2],["Na", v.na],["Cl", v.cl],["Lactate", v.lactate],["FiO2", v.fio2],["Note", v.note]];
+  app.innerHTML =
+    "<p class='score'>"+(abgAt+1)+" of 25 · "+esc(scoreLine("abg"))+"</p>"+
+    "<h1>Arterial blood gas</h1>"+
+    "<div class='gas'>"+gas.map(function(row){ return "<div><dt>"+esc(row[0])+"</dt><dd>"+esc(row[1])+"</dd></div>"; }).join("")+"</div>"+
+    "<p class='prompt'>"+esc(step.prompt)+"</p>"+
+    step.options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
+    "<p class='fb' id='fb' hidden></p><button class='next' id='next' hidden>Continue</button>"+
+    "<p class='fine'>Teaching case. Not a patient result.</p>";
+  say(v.ph+", carbon dioxide "+v.pco2+", bicarbonate "+v.hco3+". "+step.prompt);
+  app.querySelectorAll(".choice").forEach(function(btn){
+    btn.onclick = function(){ answerAbg(item, step, Number(btn.getAttribute("data-i"))); };
+  });
+}
+function answerAbg(item, step, i){
+  const buttons = app.querySelectorAll(".choice");
+  buttons.forEach(function(btn){ btn.disabled = true; });
+  const ok = i === step.answer;
+  buttons[i].classList.add(ok ? "right" : "wrong");
+  if(!ok) buttons[step.answer].classList.add("right");
+  mark("abg", ok);
+  const fb = document.getElementById("fb");
+  fb.hidden = false;
+  fb.textContent = (ok ? "Correct. " : "Not that. ") + step.say;
+  say((ok ? "Correct. " : "Not that. ") + step.say);
+  const next = document.getElementById("next");
+  next.hidden = false;
+  next.onclick = function(){
+    if(abgStep==="id" && ok){ abgStep = "cause"; renderAbg(); return; }
+    abgStep = "id";
+    abgAt += 1;
+    if(abgAt >= abgOrder.length) abgAt = 0;
+    renderAbg();
+  };
+}
+
+let groupId = "A";
+let picked = [];
+let drugQueue = [];
+let drugAt = 0;
+let fieldAt = 0;
+function startDrug(){
+  groupId = "A";
+  picked = [];
+  renderDrugPick();
+}
+function renderDrugPick(){
+  const group = OSCE_DATA.groups.find(function(g){ return g.id===groupId; });
+  app.innerHTML =
+    "<p class='score'>Drugs · "+esc(scoreLine("drug"))+"</p>"+
+    "<h1>ICU drug checklist</h1>"+
+    "<p class='lede'>Select the drugs. The station then asks one field at a time. Voice stays on.</p>"+
+    "<div class='groups'>"+OSCE_DATA.groups.map(function(g){
+      return "<button type='button' data-g='"+g.id+"'"+(g.id===groupId?" class='on'":"")+">"+esc(g.id+". "+g.name)+"</button>";
+    }).join("")+"</div>"+
+    "<div class='drugs'>"+group.drugs.map(function(id){
+      const drug = OSCE_DATA.drugs[id];
+      const on = picked.indexOf(id)!==-1;
+      return "<button type='button' data-d='"+id+"'"+(on?" class='on'":"")+">"+esc(drug.name)+"</button>";
+    }).join("")+"</div>"+
+    "<button class='next' id='begin'>Ask these drugs</button>"+
+    "<p class='fine'>If you select none, this group is used. Doses are published teaching doses. Confirm them before you give a drug.</p>";
+  app.querySelectorAll("[data-g]").forEach(function(btn){
+    btn.onclick = function(){ groupId = btn.getAttribute("data-g"); renderDrugPick(); };
+  });
+  app.querySelectorAll("[data-d]").forEach(function(btn){
+    btn.onclick = function(){
+      const id = btn.getAttribute("data-d");
+      const at = picked.indexOf(id);
+      if(at===-1) picked.push(id); else picked.splice(at, 1);
+      btn.classList.toggle("on");
+    };
+  });
+  document.getElementById("begin").onclick = function(){
+    const group = OSCE_DATA.groups.find(function(g){ return g.id===groupId; });
+    drugQueue = picked.length ? picked.slice() : group.drugs.slice();
+    drugAt = 0;
+    fieldAt = 0;
+    say("Starting "+OSCE_DATA.drugs[drugQueue[0]].name);
+    renderDrugQ();
+  };
+}
+function others(id, field){
+  const pool = Object.keys(OSCE_DATA.drugs).filter(function(key){
+    return key!==id && OSCE_DATA.drugs[key][field] && OSCE_DATA.drugs[key][field] !== OSCE_DATA.drugs[id][field];
+  });
+  const out = [];
+  while(out.length < 3 && pool.length){
+    const key = pool.splice(Math.floor(Math.random()*pool.length), 1)[0];
+    out.push(OSCE_DATA.drugs[key][field]);
+  }
+  return out;
+}
+function renderDrugQ(){
+  const id = drugQueue[drugAt];
+  const drug = OSCE_DATA.drugs[id];
+  const field = FIELDS[fieldAt];
+  const correct = drug[field];
+  const options = others(id, field);
+  options.splice(Math.floor(Math.random()*(options.length+1)), 0, correct);
+  const answer = options.indexOf(correct);
+  app.innerHTML =
+    "<p class='score'>"+esc(drug.name)+" · "+(fieldAt+1)+" of "+FIELDS.length+" · drug "+(drugAt+1)+" of "+drugQueue.length+" · "+esc(scoreLine("drug"))+"</p>"+
+    "<h1>"+esc(drug.name)+"</h1>"+
+    "<p class='prompt'>"+esc(FIELD_LABEL[field])+". Which statement is right?</p>"+
+    options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
+    "<p class='fb' id='fb' hidden></p><div id='calc'></div><button class='next' id='next' hidden>Continue</button>";
+  say(drug.name+". "+FIELD_LABEL[field]+". Which statement is right?");
+  app.querySelectorAll(".choice").forEach(function(btn){
+    btn.onclick = function(){
+      const i = Number(btn.getAttribute("data-i"));
+      app.querySelectorAll(".choice").forEach(function(b){ b.disabled = true; });
+      const ok = i === answer;
+      btn.classList.add(ok ? "right" : "wrong");
+      if(!ok) app.querySelectorAll(".choice")[answer].classList.add("right");
+      mark("drug", ok);
+      const fb = document.getElementById("fb");
+      fb.hidden = false;
+      fb.textContent = (ok ? "Correct. " : "Not that. ") + correct;
+      say((ok ? "Correct. " : "Not that. ") + correct);
+      if(field==="infusion" && drug.calc){
+        document.getElementById("calc").innerHTML = calculator(drug);
+        document.getElementById("dose").dispatchEvent(new Event("input", {bubbles:true}));
+      }
+      const next = document.getElementById("next");
+      next.hidden = false;
+      next.onclick = function(){
+        fieldAt += 1;
+        if(fieldAt >= FIELDS.length){ fieldAt = 0; drugAt += 1; }
+        if(drugAt >= drugQueue.length){ drugAt = 0; say("That list is finished."); renderDrugPick(); return; }
+        renderDrugQ();
+      };
+    };
+  });
+}
+function calculator(drug){
+  const c = drug.calc;
+  return "<div class='calc'><label>Weight, kg<input id='kg' inputmode='decimal' value='70'></label>"+
+    "<label>Dose, "+esc(c.doseUnit)+"<input id='dose' inputmode='decimal' value='"+c.dose+"'></label>"+
+    "<p class='out' id='rate'></p><p class='fine'>"+esc(c.mix)+"</p></div>";
+}
+document.addEventListener("input", function(event){
+  if(event.target.id!=="kg" && event.target.id!=="dose") return;
+  const id = drugQueue[drugAt];
+  const drug = OSCE_DATA.drugs[id];
+  if(!drug || !drug.calc) return;
+  const kg = Number(document.getElementById("kg").value);
+  const dose = Number(document.getElementById("dose").value);
+  const c = drug.calc;
+  if(!kg || !dose){ document.getElementById("rate").textContent = ""; return; }
+  const factor = c.perHour ? 1 : 60;
+  const perHour = c.perKg ? dose * kg * factor / c.conc : dose * factor / c.conc;
+  document.getElementById("rate").textContent = perHour.toFixed(1)+" mL/h at "+c.conc+" "+c.concUnit+".";
+});
+
+let ecgOrder = [];
+let ecgAt = 0;
+let ecgStep = "name";
+function startEcg(){
+  ecgOrder = OSCE_DATA.ecg.map(function(_, i){ return i; }).sort(function(){ return Math.random()-0.5; });
+  ecgAt = 0;
+  ecgStep = "name";
+  renderEcg();
+}
+function renderEcg(){
+  const item = OSCE_DATA.ecg[ecgOrder[ecgAt]];
+  const step = shuffled(ecgStep==="name" ? item.nameQ : item.treatQ);
+  app.innerHTML =
+    "<p class='score'>"+(ecgAt+1)+" of 50 · "+esc(scoreLine("ecg"))+"</p>"+
+    "<h1>"+esc(item.lead)+" teaching trace</h1>"+
+    ecgSvg(item)+
+    "<p class='prompt'>"+esc(step.prompt)+"</p>"+
+    step.options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
+    "<p class='fb' id='fb' hidden></p><button class='next' id='next' hidden>Continue</button>"+
+    "<p class='fine'>Drawn for teaching. Not a patient recording.</p>";
+  say(item.lead+". "+step.prompt);
+  app.querySelectorAll(".choice").forEach(function(btn){
+    btn.onclick = function(){
+      const i = Number(btn.getAttribute("data-i"));
+      app.querySelectorAll(".choice").forEach(function(b){ b.disabled = true; });
+      const ok = i === step.answer;
+      btn.classList.add(ok ? "right" : "wrong");
+      if(!ok) app.querySelectorAll(".choice")[step.answer].classList.add("right");
+      mark("ecg", ok);
+      const fb = document.getElementById("fb");
+      fb.hidden = false;
+      fb.textContent = (ok ? "Correct. " : "Not that. ") + step.say;
+      say((ok ? "Correct. " : "Not that. ") + step.say);
+      const next = document.getElementById("next");
+      next.hidden = false;
+      next.onclick = function(){
+        if(ecgStep==="name" && ok){ ecgStep = "treat"; renderEcg(); return; }
+        ecgStep = "name";
+        ecgAt += 1;
+        if(ecgAt >= ecgOrder.length) ecgAt = 0;
+        renderEcg();
+      };
+    };
+  });
+}
+function gauss(x, c, w){ const z = (x-c)/w; return Math.exp(-z*z); }
+function ecgSvg(item){
+  const sr = 200;
+  const seconds = 6;
+  const n = sr * seconds;
+  const y = new Array(n).fill(0);
+  const s = item.draw;
+  if(s.kind==="vf"){
+    for(let i=0;i<n;i++) y[i] = Math.sin(i/3)* (0.4+0.6*Math.sin(i/17)) + Math.sin(i/1.3)*0.25;
+  } else if(s.kind==="asystole"){
+    for(let i=0;i<n;i++) y[i] = Math.sin(i/8)*0.02;
+  } else {
+    const beats = [];
+    let t = 0.15;
+    while(t < seconds-0.05){
+      let rr = 60/s.rate;
+      if(s.irregular) rr *= 0.62 + ((iHash(t)*0.7));
+      beats.push(t);
+      t += rr;
+    }
+    const pTimes = [];
+    if(s.kind==="chb"){
+      let p = 0.05;
+      while(p < seconds){ pTimes.push(p); p += 60/78; }
+    }
+    beats.forEach(function(bt, bi){
+      addQrs(y, sr, bt, s, bi);
+    });
+    if(s.kind==="chb") pTimes.forEach(function(pt){ addP(y, sr, pt, 0.12); });
+    else if(s.p!==false) beats.forEach(function(bt){ addP(y, sr, bt - (s.pr||0.16), s.pAmp||0.12); });
+    if(s.kind==="flutter"){
+      for(let i=0;i<n;i++) y[i] += Math.sin(i/sr*2*Math.PI*5)*0.12 - 0.04;
+    }
+    if(s.kind==="torsades"){
+      for(let i=0;i<n;i++) y[i] *= Math.sin(i/sr*2*Math.PI*0.45);
+    }
+  }
+  let d = "";
+  const mid = 78;
+  const gain = 42;
+  for(let i=0;i<n;i++){
+    const x = (i/(n-1))*600+8;
+    const yy = mid - y[i]*gain;
+    d += (i?"L":"M")+x.toFixed(1)+" "+yy.toFixed(1)+" ";
+  }
+  return "<svg class='ecg' viewBox='0 0 616 150' role='img' aria-label='Teaching electrocardiogram trace'>"+
+    "<rect width='616' height='150' fill='#081018'/>"+
+    "<path d='M8 78 H28 M18 68 V88' fill='none' stroke='#7fd4e6' stroke-width='1.2'/>"+
+    "<path d='"+d+"' fill='none' stroke='#d7fff0' stroke-width='1.4'/>"+
+    "<text x='36' y='22' fill='#8a8478' font-size='12'>"+esc(item.lead)+"</text></svg>";
+}
+function iHash(t){
+  const x = Math.sin(t*12.9898)*43758.5453;
+  return x - Math.floor(x);
+}
+function addP(y, sr, t, amp){
+  const c = Math.round(t*sr);
+  for(let i=-16;i<=16;i++){
+    const k = c+i;
+    if(k>=0 && k<y.length) y[k] += amp * gauss(i, 0, 6);
+  }
+}
+function addQrs(y, sr, t, s, bi){
+  const c = Math.round(t*sr);
+  const wide = s.qrs || 0.08;
+  const span = Math.round(wide*sr);
+  const r = s.r==null ? 1 : s.r;
+  const twist = s.kind==="torsades" ? (bi%6-3)/3 : 1;
+  for(let i=-span;i<=span;i++){
+    const k = c+i;
+    if(k<0 || k>=y.length) continue;
+    const u = i/span;
+    let v = 0;
+    if(u>-0.85 && u<-0.35) v = -(s.q||0.15);
+    else if(u<=0.15) v = r * twist * Math.sin((u+0.35)/0.5*Math.PI);
+    else v = -(s.s||0.25)*twist;
+    y[k] += v;
+  }
+  const st = s.st || 0;
+  const stStart = c + Math.round(span*0.7);
+  for(let i=0;i<Math.round(0.16*sr);i++){
+    const k = stStart+i;
+    if(k>=0 && k<y.length) y[k] += st;
+  }
+  const tAmp = s.t==null ? 0.28 : s.t;
+  const tc = c + Math.round((wide+0.2)*sr);
+  for(let i=-20;i<=20;i++){
+    const k = tc+i;
+    if(k>=0 && k<y.length) y[k] += tAmp * gauss(i, 0, 8);
+  }
+  if(s.u){
+    const uc = tc + 28;
+    for(let i=-14;i<=14;i++){
+      const k = uc+i;
+      if(k>=0 && k<y.length) y[k] += 0.12 * gauss(i, 0, 6);
+    }
+  }
+}
+
+function start(){
+  if(mode==="abg") startAbg();
+  else if(mode==="drug") startDrug();
+  else if(mode==="ecg") startEcg();
+  else home();
+}
+start();
+</script>
+</body>
+</html>
