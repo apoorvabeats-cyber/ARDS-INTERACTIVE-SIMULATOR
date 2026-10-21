@@ -40,16 +40,22 @@ rim.position.set(0.2, 1.6, -2.2);
 scene.add(rim);
 
 const ring = new THREE.Mesh(
-  new THREE.TorusGeometry(0.42, 0.004, 12, 96),
-  new THREE.MeshBasicMaterial({ color: 0x7fd4e6, transparent: true, opacity: 0.85 })
+  new THREE.TorusGeometry(0.5, 0.006, 16, 120),
+  new THREE.MeshBasicMaterial({ color: 0xb7f3ff, transparent: true, opacity: 0.95 })
 );
 ring.rotation.x = Math.PI / 2;
 scene.add(ring);
-const hoop = new THREE.Mesh(
-  new THREE.TorusGeometry(0.62, 0.0025, 8, 80),
-  new THREE.MeshBasicMaterial({ color: 0x7fd4e6, transparent: true, opacity: 0.28 })
+const disc = new THREE.Mesh(
+  new THREE.RingGeometry(0.34, 0.5, 80),
+  new THREE.MeshBasicMaterial({ color: 0x7fd4e6, transparent: true, opacity: 0.18, side: THREE.DoubleSide })
 );
-hoop.rotation.x = Math.PI / 2.4;
+disc.rotation.x = -Math.PI / 2;
+scene.add(disc);
+const hoop = new THREE.Mesh(
+  new THREE.TorusGeometry(0.72, 0.003, 8, 100),
+  new THREE.MeshBasicMaterial({ color: 0x7fd4e6, transparent: true, opacity: 0.35 })
+);
+hoop.rotation.x = Math.PI / 2.15;
 scene.add(hoop);
 
 const byOrgan = {};
@@ -222,13 +228,16 @@ loader.load("models/anatomy/human-reference.glb", function(gltf){
       mat.side = THREE.FrontSide;
       if(part === "body"){
         mat.transparent = true;
-        mat.opacity = 0.72;
+        mat.opacity = 0.5;
         mat.depthWrite = false;
-        mat.roughness = 0.62;
+        mat.roughness = 0.42;
+        mat.color.setHex(0xf0cbb8);
+        mat.emissive = new THREE.Color(0x4a2c22);
+        mat.emissiveIntensity = 0.35;
       }else if(!SKIN[part]){
         mat.emissive = mat.color.clone();
-        mat.emissiveIntensity = 0.16;
-        obj.userData.baseEmissive = 0.16;
+        mat.emissiveIntensity = 0.28;
+        obj.userData.baseEmissive = 0.28;
         organMeshes.push(obj);
         const organ = TO_ORGAN[part];
         if(organ){
@@ -250,9 +259,14 @@ loader.load("models/anatomy/human-reference.glb", function(gltf){
   dist = homeDist;
   distTo = homeDist;
   window.__hraBox = { y: +size.y.toFixed(3), dist: +homeDist.toFixed(3), minY: +box.min.y.toFixed(3), maxY: +box.max.y.toFixed(3) };
-  ring.position.y = box.min.y + 0.02;
-  ring.scale.setScalar(Math.max(size.x, size.z) * 0.72);
-  hoop.position.copy(center);
+  const span = Math.max(size.x, size.z);
+  const radius = Math.max(0.42, span * 0.72);
+  ring.position.y = box.min.y + 0.015;
+  ring.scale.setScalar(radius / 0.5);
+  disc.position.y = box.min.y + 0.012;
+  disc.scale.setScalar(radius / 0.5);
+  hoop.position.set(center.x, center.y * 0.55, center.z);
+  hoop.scale.setScalar(radius / 0.72);
   ready = true;
   window.__hraReady = true;
   sayLoad("");
