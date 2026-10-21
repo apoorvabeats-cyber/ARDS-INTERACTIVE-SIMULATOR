@@ -149,7 +149,7 @@ body.filming header,body.filming .trace,body.filming .halo,body.filming .invite,
 .room{display:none;min-height:100dvh;padding:14px 14px 22px}
 body.in .atlas,body.in header,body.in .approach{display:none}
 body.in .room{display:flex;flex-direction:column}
-.back{align-self:flex-start;background:none;border:0;color:var(--muted);padding:8px 0;min-height:44px}
+.back{align-self:stretch;text-align:right;background:none;border:0;color:var(--muted);padding:8px 0;min-height:44px}
 .room h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:42px;letter-spacing:-.035em;margin:6px 0 8px;line-height:.95}
 .lede{margin:0;max-width:38rem;color:var(--muted);line-height:1.45}
 .parts{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
@@ -253,7 +253,6 @@ body{height:auto;min-height:100dvh}
 .hud-header{position:absolute;z-index:8;top:24px;right:28px;gap:8px}
 .sound{width:auto;padding:0 13px;color:var(--fg);font-size:12px;background:#0c1823;min-height:38px;border-color:var(--line);border-radius:20px}
 #sound::before{content:"Sound on"}#sound[aria-pressed="false"]::before{content:"Sound off"}
-#replay::before{content:"Replay sound"}
 .skip{color:var(--fg);font-size:12px;width:auto;padding:0 12px;z-index:9;position:absolute;top:130px;left:32px}
 .skip::before{content:"Skip intro"}
 .atlas .hud-center{left:0;right:230px;top:94px;bottom:100px}
@@ -304,7 +303,6 @@ body.in .organ-nav,body.in .viewer-controls{display:none}
 <header class="hud-header">
   <input id="find" type="search" hidden tabindex="-1" enterkeyhint="search" placeholder="" aria-label="Search simulators">
   <button type="button" class="sound" id="sound" aria-pressed="true" aria-label="Sound"></button>
-  <button type="button" class="sound replay" id="replay" aria-label="Replay"></button>
 </header>
 <p class="touch" id="touch"></p>
 <div class="invite" id="invite">
@@ -321,7 +319,6 @@ body.in .organ-nav,body.in .viewer-controls{display:none}
     <nav class="mode-switch" aria-label="Visualization mode">
       <button type="button" data-mode="external" aria-pressed="true">External body</button>
       <button type="button" data-mode="internal" aria-pressed="false">Internal anatomy</button>
-      <button type="button" data-mode="isolated" aria-pressed="false" disabled>Isolate organ</button>
     </nav>
   </div>
   <div class="explorer-grid">
@@ -360,11 +357,6 @@ const ORGANS = [
     line:"The room for consciousness, vessels and seizure. The scan is part of the case, not a slide.",
     spots:[{x:50,y:13.2}],
     plate:"brain-close.jpg",
-    parts:[
-      {id:"hemi", name:"Hemispheres"},
-      {id:"circ", name:"Cerebral circulation"},
-      {id:"stem", name:"Brainstem"}
-    ],
     learn:[
       ["hemi circ stem","Interactive 3D brain","Rotate the brain, choose a surface, and open a lobe or a deep structure.","brain-3d.html"],
       ["hemi circ stem","Brain dissection","Cut horizontal, coronal and sagittal planes, slide the depth, and match the structure on the whole brain.","brain-dissect.html"],
@@ -1056,7 +1048,11 @@ function openTitle(card){
   surge(0.7);
   grow(card, "title", function(){
     hush();
-    location.href = card.getAttribute("href");
+    let href = card.getAttribute("href") || "";
+    if(current && href.indexOf("Practice_Simulator.html")!==-1 && href.indexOf("from=")===-1){
+      href += (href.indexOf("?")===-1 ? "?" : "&") + "from=" + encodeURIComponent(current);
+    }
+    location.href = href;
   });
 }
 function placeBrain(spot){
@@ -1442,8 +1438,13 @@ function playLine(src){
 }
 function playWelcome(){
   if(!soundOn || welcomed) return;
-  welcomed = true;
-  playLine("welcome.mp3");
+  const line = document.getElementById("line");
+  line.muted = false;
+  line.volume = 0.95;
+  line.src = "welcome.mp3";
+  const pending = line.play();
+  if(pending && pending.then) pending.then(function(){ welcomed = true; }).catch(function(){});
+  else welcomed = true;
 }
 function bootSound(){}
 function setSound(on){
@@ -1459,10 +1460,6 @@ function setSound(on){
 document.getElementById("sound").onclick = function(){
   setSound(!soundOn);
 };
-document.getElementById("replay").onclick = function(){
-  if(!soundOn) setSound(true);
-  playScore();
-};
 let begun = false;
 function beginShow(){
   if(begun) return;
@@ -1471,17 +1468,12 @@ function beginShow(){
   document.body.classList.add("begun");
   playIntro();
 }
-document.addEventListener("pointerdown", function(event){
-  if(!begun){
-    beginShow();
-    playScore();
-    startWave();
-    if(!(event.target.closest && event.target.closest(".hot"))) playWelcome();
-    return;
-  }
-  if(welcomed) return;
-  if(event.target.closest && event.target.closest(".hot, .sound, .skip, .replay, input")) return;
-  playWelcome();
+document.addEventListener("pointerdown", function(){
+  if(!begun) beginShow();
+  const ctx = ensureAudio();
+  if(ctx && ctx.state==="suspended") ctx.resume();
+  if(!welcomed) playWelcome();
+  if(soundOn) startWave();
 }, true);
 let introTimers = [];
 function finishIntro(){
@@ -1575,6 +1567,22 @@ document.querySelectorAll("[data-organ]").forEach(function(button){
   });
 });
 startShow();
+beginShow();
+playScore();
+startWave();
+playWelcome();
+(function openSavedDoors(){
+  const id = new URLSearchParams(location.search).get("doors");
+  if(!id || !organById(id)) return;
+  current = id;
+  part = "all";
+  inside = null;
+  finishIntro();
+  setSpin(false);
+  document.body.classList.add("in","enter");
+  document.body.classList.remove("inside","lab","arena","osce","reference","opening","scanning");
+  renderRoom();
+})();
 setTimeout(function(){
   if(!window.__anatomyBoot){
     document.getElementById("load-title").textContent = "The 3D library could not load";

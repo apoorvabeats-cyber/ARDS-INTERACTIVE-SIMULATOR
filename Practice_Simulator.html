@@ -18,6 +18,7 @@ button:disabled{cursor:default}
 button:focus-visible,a:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;justify-content:space-between;padding:12px 14px;background:#071b3a;color:#fff}
 .top a,.top button.linkish{color:#dbe9ff;background:none;border:0;padding:8px 0;min-height:44px;text-decoration:none;font-weight:700}
+#nav[hidden]{display:none}
 .crumb{font-weight:800;font-size:15px;text-align:center;flex:1;min-width:0}
 .progress{font-variant-numeric:tabular-nums;color:#dbe9ff;font-size:14px;white-space:nowrap}
 .wrap{max-width:980px;margin:0 auto;padding:16px 14px 120px}
@@ -94,7 +95,8 @@ ul{margin:8px 0 0;padding-left:18px}
 </head>
 <body>
 <header class="top">
-  <a id="nav" href="hub.html">Hub</a>
+  <a id="doors" href="index.html?doors=brain">Back to the doors</a>
+  <a id="nav" href="index.html" hidden>Cases</a>
   <div class="crumb" id="crumb">Practice Simulator</div>
   <div class="progress" id="progress"></div>
 </header>
@@ -111,6 +113,14 @@ const crumb = document.getElementById("crumb");
 const progress = document.getElementById("progress");
 const vitalsEl = document.getElementById("vitals");
 const nav = document.getElementById("nav");
+const doors = document.getElementById("doors");
+function doorsHref(){
+  const q = new URLSearchParams(location.search);
+  const map = {neuro:"brain", lungs:"lungs", circulation:"heart", gi:"bowel", liver:"liver"};
+  const organ = q.get("from") || map[q.get("focus")] || "";
+  return organ ? "index.html?doors=" + encodeURIComponent(organ) : "index.html";
+}
+doors.href = doorsHref();
 
 let item = null;
 let mode = "learn";
@@ -130,8 +140,6 @@ let orderKey = "";
 let choiceOrder = [];
 let audioCtx = null;
 
-if (location.hostname.endsWith("github.io")) nav.href = "hub.html";
-else nav.href = "/";
 
 function clearOrder(){ orderKey = ""; choiceOrder = []; }
 function toTop(){
@@ -612,8 +620,8 @@ function render(){
     const spec = focusSpec();
     crumb.textContent = spec ? spec.title : "Practice Simulator";
     progress.textContent = "";
-    nav.textContent = "Hub";
-    nav.onclick = null;
+    nav.hidden = true;
+    doors.href = doorsHref();
     setBar([]);
     const shown = visibleCases();
     app.innerHTML = '<section class="hero"><h1>' + esc(spec ? spec.title : "Practice Simulator") + "</h1><p>" + esc(spec ? spec.line : "The chart and the image come first. Choose the study, click the finding, and live with the next set of numbers. Learn mode stops a miss. Exam mode waits until the debrief.") + '</p><div class="steps"><div><b>01</b>Select the study</div><div><b>02</b>Click the finding</div><div><b>03</b>Decide the next move</div><div><b>04</b>Reassess</div></div></section>' +
@@ -627,7 +635,9 @@ function render(){
     });
     return;
   }
+  nav.hidden = false;
   nav.textContent = "Cases";
+  doors.href = doorsHref();
   nav.onclick = function(event){ event.preventDefault(); goCatalog(); };
   crumb.textContent = item.title;
   if (phase === "intro"){
