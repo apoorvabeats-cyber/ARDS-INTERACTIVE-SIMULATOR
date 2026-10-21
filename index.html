@@ -155,9 +155,9 @@ body.in .room{display:flex;flex-direction:column}
 .parts{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
 .parts button{background:transparent;border:1px solid var(--line);border-radius:999px;padding:8px 12px;min-height:44px;color:var(--muted)}
 .parts button.on{color:var(--fg);border-color:var(--fg)}
-.portals{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;perspective:900px;min-height:0}
+.portals{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;perspective:900px;min-height:0}
 .portal{
-  position:relative;border:0;border-radius:18px;min-height:280px;text-align:left;padding:16px;
+  position:relative;border:0;border-radius:18px;min-height:148px;text-align:left;padding:14px;
   transform-style:preserve-3d;overflow:hidden;color:var(--fg);
 }
 .portal.lab{background:
@@ -171,11 +171,24 @@ body.in .room{display:flex;flex-direction:column}
 .portal.lab::after,.portal.arena::after{content:"";position:absolute;left:12%;right:12%;bottom:16px;height:42px;border:1px solid rgba(127,212,230,.28);border-radius:50%;transform:rotateX(68deg);pointer-events:none}
 .portal.arena::after{border-color:rgba(226,180,138,.35)}
 .portal.arena::before{content:"";position:absolute;top:16px;right:14px;width:42%;height:22px;opacity:.75;background:linear-gradient(#e2b48a,#e2b48a) 0 10px/100% 1px no-repeat,repeating-linear-gradient(90deg,transparent 0 7px,rgba(226,180,138,.85) 7px 8px)}
+.portal.osce{background:
+  radial-gradient(80% 50% at 50% 100%,rgba(170,196,168,.18),transparent 70%),
+  radial-gradient(120% 80% at 50% 0%,#1c3324 0%,#101612 55%,#071018 100%);
+  box-shadow:inset 0 0 0 1px rgba(170,196,168,.45)}
+.portal.reference{background:
+  radial-gradient(80% 50% at 50% 100%,rgba(214,198,150,.16),transparent 70%),
+  radial-gradient(120% 80% at 50% 0%,#2c2818 0%,#14140f 55%,#071018 100%);
+  box-shadow:inset 0 0 0 1px rgba(214,198,150,.4)}
+.portal.on{box-shadow:inset 0 0 0 2px #f3efe6}
 body.inside.lab{background:#07161c}
 body.inside.arena{background:#140e0b}
+body.inside.osce{background:#0d1610}
+body.inside.reference{background:#14140f}
 .portal span{display:block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
 .portal.lab span{color:var(--cool)}
 .portal.arena span{color:var(--warm)}
+.portal.osce span{color:#b7d2b8}
+.portal.reference span{color:#e2d2a2}
 .portal strong{display:block;margin-top:16px;font-family:Fraunces,Georgia,serif;font-size:22px;font-weight:520;letter-spacing:-.03em;line-height:1.05}
 .portal em{display:block;margin-top:8px;font-style:normal;color:var(--muted);line-height:1.35;font-size:13px}
 body.enter .portal.lab{animation:fromLeft .75s cubic-bezier(.22,.7,.2,1) both}
@@ -183,8 +196,16 @@ body.enter .portal.arena{animation:fromRight .75s cubic-bezier(.22,.7,.2,1) both
 @keyframes fromLeft{from{opacity:0;transform:translateX(-36px)}to{opacity:1;transform:none}}
 @keyframes fromRight{from{opacity:0;transform:translateX(36px)}to{opacity:1;transform:none}}
 .shelf{display:none;margin-top:8px}
-body.inside .portals{display:none}
+body.inside .portals{flex:none}
+body.inside .portal{min-height:0;padding:12px}
+body.inside .portal em,body.inside .portal::before,body.inside .portal::after{display:none}
+body.inside .portal strong{margin-top:4px;font-size:16px}
 body.inside .shelf{display:block}
+.refhead{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:16px 0 6px}
+.tasks{margin:10px 0;padding-left:18px;color:var(--muted)}
+.tick{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.tick input{width:22px;height:22px;margin-top:2px;flex:none}
+.mark{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:14px}
 .card{display:block;text-decoration:none;padding:14px 0;border-top:1px solid var(--line);min-height:44px}
 .card b{display:block;font-size:17px;font-weight:600}
 .card span{display:block;margin-top:4px;color:var(--muted);line-height:1.4}
@@ -195,6 +216,8 @@ body.inside .shelf{display:block}
 .veil.away{opacity:0}
 .veil.lab{background:radial-gradient(120% 90% at 50% 0%,#12343f,#071018 72%)}
 .veil.arena{background:radial-gradient(120% 90% at 50% 0%,#3a2a1c,#140e0b 72%)}
+.veil.osce{background:radial-gradient(120% 90% at 50% 0%,#1c3324,#071018 72%)}
+.veil.reference{background:radial-gradient(120% 90% at 50% 0%,#2c2818,#14140f 72%)}
 .veil.title{background:#071018}
 .veil strong{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:40px;letter-spacing:-.03em;line-height:1}
 body.inside .shelf .card{animation:titleIn 1.15s ease both}
@@ -570,47 +593,352 @@ function paint(){
   });
   figure.insertAdjacentHTML("beforeend", html.join(""));
 }
+let osceSection = "procedural";
+let refSection = "guidelines";
+let osceStation = null;
+let mockCircuit = null;
+const OSCE_SECTIONS = [
+  ["procedural","Procedural OSCE"],
+  ["investigation","Investigation OSCE"],
+  ["emergency","Emergency OSCE"],
+  ["viva","Viva & Communication"],
+  ["mock","Mock Examinations"],
+  ["analytics","Performance Analytics"]
+];
+const REF_SECTIONS = [
+  ["guidelines","Latest guidelines"],
+  ["formulas","Scoring checklists and formulas"],
+  ["materials","Clinical reference materials"]
+];
+const OSCE = [
+  {id:"ett", section:"procedural", title:"Endotracheal intubation", minutes:"8 min",
+    stem:"A 67-year-old woman with a left-hemisphere stroke is vomiting and tiring. The neck has not been cleared. Intubate her.",
+    tasks:["State the risks to the brain.","Name the holds, the drugs, and the check that the tube is tracheal."],
+    items:[
+      ["Roles, suction, and a difficult-airway plan are spoken before any drug.","critical"],
+      ["Inline stabilization is asked for. The neck is not extended."],
+      ["She is preoxygenated."],
+      ["The plan avoids a long apnoea and a crash in blood pressure.","critical"],
+      ["The tube is seen through the cords, not assumed."],
+      ["Sustained exhaled carbon dioxide confirms the trachea.","critical"],
+      ["Carbon dioxide and blood pressure are then controlled. Routine hyperventilation is refused."]
+    ],
+    link:["Open the intubation film","brain-disease-lab.html?v=click1#tbi/procedures/ett"]},
+  {id:"art", section:"procedural", title:"Arterial catheter", minutes:"8 min",
+    stem:"Beat-to-beat pressure is required. The right radial artery is chosen. Explain and perform the insertion on the model.",
+    tasks:["Consent, position, and a sterile field.","Say what you do if the hand becomes pale."],
+    items:[
+      ["Allen or ultrasound assessment is mentioned, and consent covers pain, bleeding, and ischemia."],
+      ["The wrist is extended on a firm support. The field is sterile.","critical"],
+      ["Ultrasound or palpation identifies the artery before the needle."],
+      ["The catheter is advanced only when pulsatile blood is seen.","critical"],
+      ["It is secured, zeroed at the phlebostatic axis, and a square wave is checked."],
+      ["A pale, cold hand means the catheter comes out and the hand is reassessed.","critical"]
+    ]},
+  {id:"abg", section:"investigation", title:"Arterial blood gas", minutes:"8 min",
+    stem:"pH 7.22, PaCO2 28 mmHg, PaO2 68 mmHg on 60 percent oxygen, HCO3 14 mmol/L, lactate 5.8 mmol/L, sodium 138, chloride 102.",
+    tasks:["Name the primary disorder and the compensation.","Say what you would do next, not only the label."],
+    items:[
+      ["Metabolic acidosis is the primary disorder.","critical"],
+      ["The carbon dioxide is low, so there is respiratory compensation."],
+      ["The anion gap is raised. Lactate accounts for much of it.","critical"],
+      ["PaO2 is low for 60 percent oxygen. An A–a gradient is mentioned."],
+      ["The next act is resuscitation and a search for shock or sepsis, not bicarbonate as a routine.","critical"]
+    ]},
+  {id:"ct", section:"investigation", title:"Non-contrast head CT", minutes:"8 min",
+    stem:"Sudden aphasia and right hemiparesis. Last known well 80 minutes ago. The non-contrast CT is on the screen.",
+    tasks:["Say what the scan must exclude.","Say what it cannot, by itself, decide."],
+    items:[
+      ["Hemorrhage is excluded before any thrombolytic.","critical"],
+      ["A hyperdense artery is looked for and, if seen, tied to the syndrome."],
+      ["Early hypodensity is described without calling a faint blur a completed infarct."],
+      ["The scan does not replace a look at the vessels when thrombectomy may help.","critical"],
+      ["The decision is timed against last known well, not against when the scan finished."]
+    ],
+    link:["Open the stroke practice case","Practice_Simulator.html?focus=neuro&v=20261021c"]},
+  {id:"sepsis", section:"emergency", title:"Septic shock", minutes:"8 min",
+    stem:"Pneumonia. Mean arterial pressure 58 after one litre of crystalloid. Lactate 4.6 mmol/L. He is confused.",
+    tasks:["Cultures and the first antibiotic.","The vasopressor, and where it may run."],
+    items:[
+      ["Blood cultures are taken without delaying the antibiotic if the delay would be long.","critical"],
+      ["A suitable antibiotic is named for the likely source and given now."],
+      ["Further fluid is judged by the circulation, not by a fixed large quota."],
+      ["Norepinephrine is the first vasopressor.","critical"],
+      ["A peripheral start is accepted if a central vein would delay the drug, and the site is watched."],
+      ["The source is named. A plan for the airway is included because he is confused."]
+    ],
+    link:["Open the shock practice case","Practice_Simulator.html?focus=circulation&v=20261021c"]},
+  {id:"seizure", section:"emergency", title:"Status epilepticus", minutes:"8 min",
+    stem:"A tonic-clonic seizure has already lasted six minutes. There is intravenous access. Glucose is 96 mg/dL.",
+    tasks:["First drug and the clock.","What you do if the seizure is still going at 15 minutes."],
+    items:[
+      ["Airway, oxygen, and glucose are checked while the drug is drawn.","critical"],
+      ["A benzodiazepine is given at once, not after a long observation.","critical"],
+      ["The time of onset and the time of the dose are spoken."],
+      ["A second-line agent is named if seizures continue: levetiracetam, valproate, or fosphenytoin."],
+      ["Refractory status goes to anesthesia and the intensive-care unit, not to repeated small benzodiazepine doses.","critical"]
+    ]},
+  {id:"family", section:"viva", title:"Explain the breathing tube", minutes:"8 min",
+    stem:"Her daughter is outside. The patient cannot protect her airway. You have recommended intubation. Speak to the daughter.",
+    tasks:["Plain words.","What the tube does, and what it does not promise."],
+    items:[
+      ["You introduce yourself and ask what she already understands."],
+      ["You say her mother is not protecting her airway, in words a relative can use again.","critical"],
+      ["You explain the tube, the ventilator, and the need for sedation."],
+      ["You do not promise survival or a full recovery.","critical"],
+      ["You invite questions and say when you will come back."]
+    ]},
+  {id:"lytic", section:"viva", title:"Explain thrombolysis", minutes:"8 min",
+    stem:"The deficit is disabling. There is no hemorrhage. Last known well is inside 4.5 hours. Speak to the patient about alteplase.",
+    tasks:["Benefit, bleeding, and the alternative of not treating.","A recommendation, not a menu with no opinion."],
+    items:[
+      ["You state the diagnosis and why time matters.","critical"],
+      ["You explain the chance of a better recovery and the risk of serious bleeding, including in the brain."],
+      ["You give a recommendation."],
+      ["You check understanding rather than only asking for a signature.","critical"],
+      ["You say what happens next, minute by minute."]
+    ]}
+];
+const REFERENCE = [
+  {section:"guidelines", title:"Reperfusion in ischemic stroke",
+    body:["Non-contrast CT comes first, to exclude hemorrhage.","Alteplase is 0.9 mg/kg, maximum 90 mg, ten percent as a bolus and the rest over one hour, inside 4.5 hours of last known well in an eligible patient. Blood pressure is brought below 185/110 before the drug.","A large-vessel occlusion can still go to thrombectomy, including selected patients up to 24 hours. The drug and the procedure are not rivals.","These are teaching reminders of widely published thresholds, not a local protocol."]},
+  {section:"guidelines", title:"Septic shock",
+    body:["Take cultures and give an antibiotic that covers the likely source. Do not let the culture ritual delay the drug.","Give crystalloid for hypoperfusion, then reassess. A large fixed volume is not a target.","Norepinephrine is the first vasopressor. It may start in a watched peripheral vein if a central catheter would delay it.","Lactate is a marker of trouble. Chasing it to normal is not the treatment."]},
+  {section:"guidelines", title:"ARDS ventilation",
+    body:["Predicted body weight, not actual weight, sets the tidal volume. Six millilitres per kilogram is the usual target.","Keep plateau pressure at or under 30 cm H2O. Driving pressure is watched.","Prone positioning is for moderate to severe ARDS, often when the ratio of arterial oxygen to inspired oxygen is under about 150 despite a proper PEEP."]},
+  {section:"guidelines", title:"Acute pancreatitis",
+    body:["Diagnose with typical pain plus a lipase at least three times the upper limit. Contrast CT is not required on the first day when those two are clear.","Lactated Ringer at a moderate rate is preferred to a prolonged high-rate infusion. The WATERFALL trial is why the aggressive arm is not the default.","Do not give antibiotics for necrosis alone. Feed the gut. Infected necrosis, shown by gas or by sepsis, is drained. It is not opened first.","Gallstones are removed later. Urgent ERCP is for cholangitis or a stone still blocking the duct."]},
+  {section:"guidelines", title:"Acute liver failure",
+    body:["Definition: encephalopathy and an INR of at least 1.5 from an acute injury, without cirrhosis, inside 26 weeks.","Paracetamol: start intravenous N-acetylcysteine immediately. A common course is 150 mg/kg over one hour, then 50 mg/kg over four hours, then 100 mg/kg over 16 hours, and it continues if the liver is failing.","Paracetamol King's College: arterial pH under 7.30 after resuscitation, or all three of grade III–IV encephalopathy, INR above 6.5, and creatinine above 3.4 mg/dL.","Other causes: INR above 6.5, or any three of age under 10 or over 40, an unfavorable cause such as a drug reaction, jaundice more than seven days before encephalopathy, INR above 3.5, and bilirubin above 17.5 mg/dL.","Stop the causative drug. Do not paint over the INR with plasma unless there is bleeding or a procedure."]},
+  {section:"formulas", title:"Perfusion and the ventilator",
+    body:["Mean arterial pressure = diastolic + (systolic − diastolic) / 3.","Cerebral perfusion pressure = mean arterial pressure − intracranial pressure.","Predicted body weight, men: 50 + 0.91 × (height in centimetres − 152.4). Women: 45.5 + 0.91 × (height in centimetres − 152.4).","Tidal volume target in ARDS is about 6 mL for each kilogram of that weight."]},
+  {section:"formulas", title:"Gas and the anion gap",
+    body:["Alveolar oxygen is approximated by 150 − (PaCO2 / 0.8) while breathing room air at sea level. The A–a gradient is that number minus PaO2.","Anion gap = sodium − (chloride + bicarbonate). A raised gap with a low pH is a high-gap metabolic acidosis until proved otherwise.","Winter's formula estimates the carbon dioxide that should accompany a metabolic acidosis: 1.5 × bicarbonate + 8, give or take 2."]},
+  {section:"formulas", title:"Corrected laboratories",
+    body:["Sodium falls about 1.6 mmol/L for every 100 mg/dL the glucose sits above 100. Add that back when you judge the tonicity.","Corrected calcium = measured calcium + 0.8 × (4 − albumin in g/dL). Use the ionized calcium when the decision is close.","Osmol gap = measured osmolality − (2 × sodium + glucose/18 + urea/6), with glucose and urea in mg/dL."]},
+  {section:"formulas", title:"OSCE pass rule used here",
+    body:["A station passes at 70 percent of the ticks, and only if every critical item was done.","A mock circuit is the mean of its stations. One failed critical item fails that station.","Marks stay on this device. They are practice, not a college result."]},
+  {section:"materials", title:"Hyperkalemia",
+    body:["If the ECG is changing or the potassium is dangerously high, give intravenous calcium to stabilize the membrane.","Shift potassium with insulin and glucose. A beta agonist can be added. Recheck the glucose.","Remove potassium with a kaliuresis if the kidneys can answer, or with dialysis if they cannot. A resin is slow and is not the emergency.","Stop the cause: the drug, the missed dialysis, the dying muscle."]},
+  {section:"materials", title:"Status epilepticus, the order",
+    body:["Benzodiazepine immediately once a convulsion is prolonged. Check glucose.","If it continues, one adequate dose of levetiracetam, valproate, or fosphenytoin. Under-dosing is a common fail.","Still seizing: anesthesia, a secured airway, and continuous EEG. Repeating tiny doses of benzodiazepine is not a plan."]},
+  {section:"materials", title:"Intracranial pressure, the bedside",
+    body:["Raise the head, keep the neck straight, treat fever, and do not let carbon dioxide drift.","A new anisocoria is a herniation until proved otherwise. Osmotic therapy is for that moment, not a standing order to hyperventilate for hours.","An external ventricular drain can measure and remove cerebrospinal fluid. A parenchymal monitor measures only. Neither replaces the reason the pressure rose."],
+    link:["Open the disease learning lab","brain-disease-lab.html?v=click1"]},
+  {section:"materials", title:"What this centre is not",
+    body:["These are teaching reminders of widely used critical-care practice.","They are not a local protocol, a prescription, or a substitute for the clinician at the bedside.","Doses written here are the published teaching doses. Confirm them before you give a drug."]}
+];
+function osceRecord(){
+  try { return JSON.parse(localStorage.getItem("osce-world-v1") || "{}"); }
+  catch(e){ return {}; }
+}
+function saveOsce(id, percent, pass){
+  const all = osceRecord();
+  const prev = all[id] || {attempts:0, best:0, passes:0};
+  prev.attempts += 1;
+  prev.best = Math.max(prev.best || 0, percent);
+  if(pass) prev.passes += 1;
+  prev.lastPass = pass;
+  all[id] = prev;
+  localStorage.setItem("osce-world-v1", JSON.stringify(all));
+}
+function stationById(id){ return OSCE.find(function(item){ return item.id===id; }); }
+function portalBar(){
+  const tab = function(id, cls, kicker, title, em){
+    return '<button type="button" class="portal '+cls+(inside===cls?" on":"")+'" id="'+id+'"><span>'+kicker+'</span><strong>'+title+'</strong><em>'+em+'</em></button>';
+  };
+  return '<div class="portals">'+
+    tab("openLab","lab","01","Learning Lab","Anatomy, imaging and the pathway.")+
+    tab("openArena","arena","02","Practice Arena","The live case. The monitor moves after you decide.")+
+    tab("openOsce","osce","03","OSCE World","Stations, a mock circuit, and your marks.")+
+    tab("openReference","reference","04","Reference Centre","Guidelines, formulas, and bedside references.")+
+    "</div>";
+}
+function bindPortals(){
+  document.getElementById("openLab").onclick = function(){ fillPortal("lab", this); };
+  document.getElementById("openArena").onclick = function(){ fillPortal("arena", this); };
+  document.getElementById("openOsce").onclick = function(){ fillPortal("osce", this); };
+  document.getElementById("openReference").onclick = function(){ fillPortal("reference", this); };
+}
+function chipRow(list, currentId, attr){
+  return '<div class="parts">'+list.map(function(item){
+    return '<button type="button" data-'+attr+'="'+item[0]+'"'+(currentId===item[0]?' class="on"':'')+'>'+esc(item[1])+'</button>';
+  }).join("")+"</div>";
+}
+function practiceScores(){
+  try { return JSON.parse(localStorage.getItem("practice-simulator-scores") || "{}"); }
+  catch(e){ return {}; }
+}
+function analyticsHtml(){
+  const names = [
+    ["stroke","Acute ischemic stroke"],
+    ["sah","Subarachnoid hemorrhage"],
+    ["ards","ARDS"],
+    ["shock","Septic shock"],
+    ["pancreatitis","Acute pancreatitis"],
+    ["alf","Acute liver failure, paracetamol"],
+    ["alf-drug","Acute liver failure, not paracetamol"]
+  ];
+  const practice = practiceScores();
+  const osce = osceRecord();
+  const practiceRows = names.map(function(row){
+    const best = practice[row[0]] && practice[row[0]].best;
+    return "<div class='station'><b>"+esc(row[1])+"</b><span>"+(best?"Best "+best+"%":"Not sat")+"</span></div>";
+  }).join("");
+  const osceRows = OSCE.map(function(station){
+    const rec = osce[station.id];
+    const line = rec ? rec.attempts+" sat · best "+rec.best+"%"+(rec.passes?" · passed "+rec.passes:"") : "Not sat";
+    return "<div class='station'><b>"+esc(station.title)+"</b><span>"+esc(line)+"</span></div>";
+  }).join("");
+  const mock = osce["mock-circuit"];
+  return "<p class='lede'>Marks stored on this device. A station passes at 70 percent, with every critical item done.</p>"+
+    "<h3 class='refhead'>Practice arena</h3>"+practiceRows+
+    "<h3 class='refhead'>OSCE stations</h3>"+osceRows+
+    "<h3 class='refhead'>Last mock circuit</h3><p class='lede'>"+(mock?esc(mock.best+"% · "+(mock.lastPass?"passed":"not passed")):"Not sat")+"</p>";
+}
+function stationList(section){
+  return OSCE.filter(function(item){ return item.section===section; }).map(function(item){
+    const rec = osceRecord()[item.id];
+    const badge = rec ? "Best "+rec.best+"%" : item.minutes;
+    return '<button type="button" class="card station" data-station="'+item.id+'"><b>'+esc(item.title)+'</b><span>'+esc(badge)+'</span></button>';
+  }).join("");
+}
+function mockIntro(){
+  return "<p class='lede'>Four stations, in order: intubation, the blood gas, septic shock, and the conversation with a daughter. Submit each sheet. The circuit score is the mean. One missed critical item fails that station.</p>"+
+    '<button type="button" class="portal osce" id="startMock" style="min-height:0;margin-top:12px"><span>Circuit</span><strong>Start the mock</strong><em>About half an hour.</em></button>';
+}
+function sheetHtml(station){
+  const ticks = station.items.map(function(item, index){
+    const critical = item[1]==="critical";
+    return '<label class="tick"><input type="checkbox" data-tick="'+index+'"'+(critical?' data-critical="1"':'')+'><span>'+esc(item[0])+(critical?' <b>Critical</b>':'')+'</span></label>';
+  }).join("");
+  const link = station.link ? '<a class="card" href="'+esc(station.link[1])+'"><b>'+esc(station.link[0])+'</b><span>Leaves this sheet for the atlas case.</span></a>' : "";
+  return "<p class='lede' style='letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--faint)'>"+esc(station.minutes)+(mockCircuit?" · Mock":"")+"</p>"+
+    "<h2>"+esc(station.title)+"</h2>"+
+    "<p class='lede'>"+esc(station.stem)+"</p>"+
+    "<ul class='tasks'>"+station.tasks.map(function(line){ return "<li>"+esc(line)+"</li>"; }).join("")+"</ul>"+
+    ticks+
+    '<button type="button" class="portal osce" id="markSheet" style="min-height:0;margin-top:12px"><span>Examiner</span><strong>Mark this station</strong><em>70 percent, and every critical item.</em></button>'+
+    '<p class="mark" id="markResult" hidden></p>'+link;
+}
+function osceShelf(){
+  if(osceStation){
+    const station = stationById(osceStation);
+    return station ? sheetHtml(station) : analyticsHtml();
+  }
+  const chips = chipRow(OSCE_SECTIONS, osceSection, "osce");
+  let body = "";
+  if(osceSection==="analytics") body = analyticsHtml();
+  else if(osceSection==="mock") body = mockIntro();
+  else body = stationList(osceSection) || "<p class='empty'>No station in this section yet.</p>";
+  return chips+body;
+}
+function referenceShelf(){
+  const chips = chipRow(REF_SECTIONS, refSection, "ref");
+  const articles = REFERENCE.filter(function(item){ return item.section===refSection; }).map(function(item){
+    const link = item.link ? '<a class="card" href="'+esc(item.link[1])+'"><b>'+esc(item.link[0])+'</b><span>Opens in the atlas.</span></a>' : "";
+    return "<article class='station'><h3 class='refhead'>"+esc(item.title)+"</h3>"+item.body.map(function(line){ return "<p class='lede'>"+esc(line)+"</p>"; }).join("")+link+"</article>";
+  }).join("");
+  return chips+articles;
+}
+function markStation(station){
+  const boxes = Array.prototype.slice.call(document.querySelectorAll("[data-tick]"));
+  const done = boxes.filter(function(box){ return box.checked; }).length;
+  const missedCritical = boxes.some(function(box){ return box.getAttribute("data-critical") && !box.checked; });
+  const percent = boxes.length ? Math.round(done / boxes.length * 100) : 0;
+  const pass = percent >= 70 && !missedCritical;
+  const result = document.getElementById("markResult");
+  result.hidden = false;
+  result.textContent = percent+"%. "+(missedCritical?"A critical item was missed. ":"")+(pass?"Station passed.":"Station not passed.");
+  if(mockCircuit){
+    mockCircuit.marks.push({id:station.id, percent:percent, pass:pass});
+    const next = mockCircuit.ids[mockCircuit.marks.length];
+    if(next){
+      osceStation = next;
+      renderRoom();
+      return;
+    }
+    const mean = Math.round(mockCircuit.marks.reduce(function(sum, item){ return sum+item.percent; }, 0) / mockCircuit.marks.length);
+    const circuitPass = mockCircuit.marks.every(function(item){ return item.pass; });
+    saveOsce("mock-circuit", mean, circuitPass);
+    mockCircuit = null;
+    osceStation = null;
+    osceSection = "analytics";
+    renderRoom();
+    return;
+  }
+  saveOsce(station.id, percent, pass);
+}
+
 function renderRoom(){
   const organ = organById(current);
   if(!organ) return;
   const learn = learnRows(organ);
   const practice = rowsOf(organ.practice);
-  const parts = organ.parts ? '<div class="parts"><button type="button" data-part="all"'+(part==="all"?' class="on"':"")+'>Whole organ</button>'+organ.parts.map(function(item){
+  const showParts = organ.parts && (inside==="lab" || !inside);
+  const parts = showParts ? '<div class="parts"><button type="button" data-part="all"'+(part==="all"?' class="on"':"")+'>Whole organ</button>'+organ.parts.map(function(item){
     return '<button type="button" data-part="'+item.id+'"'+(part===item.id?' class="on"':"")+'>'+esc(item.name)+'</button>';
   }).join("")+"</div>" : "";
-  const shelfTitle = inside==="lab" ? "Learning Lab" : "Practice Arena";
-  const shelfRows = inside==="lab" ? learn : practice;
-  const shelfEmpty = inside==="lab"
-    ? (organ.soon || "Nothing in the learning lab yet.")
-    : (organ.soon || "Nothing in the practice arena yet.");
+  let shelfTitle = "Choose a door";
+  let shelfBody = "";
+  if(inside==="lab"){
+    shelfTitle = "Learning Lab";
+    shelfBody = learn.length?cards(learn):'<p class="empty">'+esc(organ.soon || "Nothing in the learning lab yet.")+'</p>';
+  } else if(inside==="arena"){
+    shelfTitle = "Practice Arena";
+    shelfBody = practice.length?cards(practice):'<p class="empty">'+esc(organ.soon || "Nothing in the practice arena yet.")+'</p>';
+  } else if(inside==="osce"){
+    shelfTitle = "OSCE World";
+    shelfBody = osceShelf();
+  } else if(inside==="reference"){
+    shelfTitle = "Reference Centre";
+    shelfBody = referenceShelf();
+  }
+  const heading = inside==="osce" ? "OSCE World" : inside==="reference" ? "Reference Centre" : organ.name;
+  const lede = inside==="osce" ? "Five kinds of station, then a mock circuit. The marks stay on this device." : inside==="reference" ? "Guidelines, formulas, and the bedside notes the stations assume." : organ.line;
   room.innerHTML =
-    '<button type="button" class="back" id="back">'+(inside?"Back to the portals":"Back to the body")+'</button>'+
+    '<button type="button" class="back" id="back">'+(inside?"Back to the doors":"Back to the body")+'</button>'+
     '<p class="lede" style="letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--faint)">'+esc(organ.room)+'</p>'+
-    '<h2>'+esc(organ.name)+'</h2>'+
-    '<p class="lede">'+esc(organ.line)+'</p>'+
+    '<h2>'+esc(heading)+'</h2>'+
+    '<p class="lede">'+esc(lede)+'</p>'+
     parts+
-    '<div class="portals">'+
-      '<button type="button" class="portal lab" id="openLab"><span>Left</span><strong>Learning Lab</strong><em>Anatomy, imaging and the pathway.</em></button>'+
-      '<button type="button" class="portal arena" id="openArena"><span>Right</span><strong>Practice Arena</strong><em>The live case. The monitor moves after you decide.</em></button>'+
-    '</div>'+
-    '<div class="shelf"><p class="lede" style="letter-spacing:.14em;text-transform:uppercase;font-size:12px">'+shelfTitle+'</p>'+
-      (shelfRows.length?cards(shelfRows):'<p class="empty">'+esc(shelfEmpty)+'</p>')+
-    '</div>';
+    portalBar()+
+    (inside?('<div class="shelf"><p class="lede" style="letter-spacing:.14em;text-transform:uppercase;font-size:12px">'+shelfTitle+'</p>'+shelfBody+'</div>'):"");
   document.getElementById("back").onclick = function(){
-    if(inside){ inside=null; document.body.classList.remove("inside","lab","arena"); renderRoom(); }
+    if(osceStation){ osceStation=null; mockCircuit=null; renderRoom(); return; }
+    if(inside){ inside=null; document.body.classList.remove("inside","lab","arena","osce","reference"); renderRoom(); }
     else leave();
   };
-  document.getElementById("openLab").onclick = function(){ fillPortal("lab", this); };
-  document.getElementById("openArena").onclick = function(){ fillPortal("arena", this); };
+  bindPortals();
+  const closeSheet = document.getElementById("closeSheet");
+  if(closeSheet) closeSheet.onclick = function(){ osceStation=null; if(mockCircuit){ mockCircuit=null; } renderRoom(); };
+  const markSheet = document.getElementById("markSheet");
+  if(markSheet) markSheet.onclick = function(){ markStation(stationById(osceStation)); };
+  const startMock = document.getElementById("startMock");
+  if(startMock) startMock.onclick = function(){
+    mockCircuit = {ids:["ett","abg","sepsis","family"], marks:[]};
+    osceStation = "ett";
+    renderRoom();
+  };
   room.querySelectorAll("[data-part]").forEach(function(btn){
     btn.onclick = function(){ part=btn.getAttribute("data-part"); renderRoom(); };
   });
+  room.querySelectorAll("[data-osce]").forEach(function(btn){
+    btn.onclick = function(){ osceSection=btn.getAttribute("data-osce"); osceStation=null; renderRoom(); };
+  });
+  room.querySelectorAll("[data-ref]").forEach(function(btn){
+    btn.onclick = function(){ refSection=btn.getAttribute("data-ref"); renderRoom(); };
+  });
+  room.querySelectorAll("[data-station]").forEach(function(btn){
+    btn.onclick = function(){ osceStation=btn.getAttribute("data-station"); renderRoom(); };
+  });
 }
 function openPath(which){
+  if(inside!==which){ osceStation=null; mockCircuit=null; }
   inside = which;
   document.body.classList.add("inside");
-  document.body.classList.toggle("lab", which==="lab");
-  document.body.classList.toggle("arena", which==="arena");
+  document.body.classList.remove("lab","arena","osce","reference");
+  document.body.classList.add(which);
   renderRoom();
 }
 let traveling = false;
@@ -638,9 +966,12 @@ function grow(el, kind, end){
   }, kind==="title" ? 980 : 860);
 }
 function fillPortal(which, el){
-  speak(which==="lab" ? "Welcome to Learning Lab." : "Welcome to Practice Arena.");
+  if(inside && inside!==which){ openPath(which); return; }
+  if(inside===which){ return; }
+  const welcome = {lab:"Welcome to Learning Lab.", arena:"Welcome to Practice Arena.", osce:"Welcome to OSCE World.", reference:"Welcome to the Reference Centre."};
+  speak(welcome[which] || "");
   surge(0.35);
-  grow(el, which==="lab" ? "lab" : "arena", function(){ openPath(which); });
+  grow(el, which, function(){ openPath(which); });
 }
 function openTitle(card){
   surge(0.7);
@@ -672,7 +1003,7 @@ function enter(id, spot){
   current = id;
   part = "all";
   inside = null;
-  document.body.classList.remove("inside","lab","arena");
+  document.body.classList.remove("inside","lab","arena","osce","reference");
   bootSound();
   speak(spot.name || organ.name);
   finishIntro();
