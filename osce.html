@@ -40,7 +40,14 @@ h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:34px;letter-spac
 .fb{border-radius:12px;padding:12px;margin-top:8px;background:#10161c}
 .next{margin-top:12px;min-height:48px;border:0;border-radius:12px;padding:12px 16px;background:#7fd4e6;color:#071018;font-weight:650}
 .score{color:#8a8478;font-variant-numeric:tabular-nums}
-svg.ecg{width:100%;height:auto;background:#081018;border-radius:12px;display:block}
+svg.ecg{display:block;background:#fff;max-width:none}
+.ecgwrap{overflow-x:auto;border-radius:12px;background:#fbf6f4;margin:8px 0;-webkit-overflow-scrolling:touch}
+.tablets{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.tablet{display:block;width:100%;text-align:left;border:0;border-radius:16px;padding:14px 16px;min-height:64px;background:#102028;box-shadow:inset 0 0 0 1px rgba(243,239,230,.18)}
+.tablet b{display:block;font-family:Fraunces,Georgia,serif;font-size:20px;font-weight:520;line-height:1.15}
+.tablet span{display:block;margin-top:4px;color:#b7b1a4;font-size:14px}
+.tablet.on{box-shadow:inset 0 0 0 2px #7fd4e6}
+.backrow{background:none;border:0;color:#b7b1a4;padding:8px 0;min-height:44px}
 .groups{display:flex;gap:8px;overflow:auto;padding-bottom:6px}
 .groups button,.drugs button{flex:none;min-height:40px;border-radius:999px;border:1px solid rgba(243,239,230,.2);background:transparent;padding:0 12px;margin:0 8px 8px 0}
 .groups button.on,.drugs button.on{border-color:#7fd4e6;color:#7fd4e6}
@@ -49,6 +56,9 @@ svg.ecg{width:100%;height:auto;background:#081018;border-radius:12px;display:blo
 .calc input{width:100%;background:transparent;border:0;border-bottom:1px solid rgba(243,239,230,.3);color:#f3efe6;padding:8px 0;font-size:16px}
 .out{grid-column:1/-1;font-variant-numeric:tabular-nums}
 .fine{color:#8a8478;font-size:13px}
+.lightbox{background:#05070c;border-radius:12px;padding:8px;margin:10px 0}
+.lightbox img{width:100%;max-height:58dvh;object-fit:contain;display:block;background:#000;border-radius:8px}
+.mod{margin:0 0 6px;color:#8a8478;letter-spacing:.14em;text-transform:uppercase;font-size:12px}
 </style>
 </head>
 <body>
@@ -59,7 +69,8 @@ svg.ecg{width:100%;height:auto;background:#081018;border-radius:12px;display:blo
   <button type="button" id="voice" aria-pressed="true">Voice on</button>
 </header>
 <main id="app"></main>
-<script src="osce-data.js?v=20261021g"></script>
+<script src="osce-data.js?v=20261021p"></script>
+<script src="osce-stations.js?v=20261021p"></script>
 <script>
 const app = document.getElementById("app");
 const voiceBtn = document.getElementById("voice");
@@ -76,16 +87,51 @@ voiceBtn.onclick = function(){
 };
 document.getElementById("stations").onclick = function(){
   mode = "";
-  history.replaceState(null, "", "osce.html?v=20261021g");
+  history.replaceState(null, "", "osce.html?v=20261021p");
   if(window.speechSynthesis) speechSynthesis.cancel();
   home();
 };
+function spellLetters(word){
+  const names = {A:"Ay",B:"Bee",C:"See",D:"Dee",E:"Ee",F:"Eff",G:"Gee",H:"Aitch",I:"Eye",J:"Jay",K:"Kay",L:"Ell",M:"Em",N:"En",O:"Oh",P:"Pee",Q:"Cue",R:"Ar",S:"Ess",T:"Tee",U:"You",V:"Vee",W:"Double you",X:"Ex",Y:"Why",Z:"Zee"};
+  return word.split("").map(function(ch){ return names[ch] || ch; }).join(". ");
+}
+function speakable(text){
+  let out = String(text);
+  const phrases = [
+    ["PaCO2", spellLetters("PACO")+" two"],
+    ["PaO2", spellLetters("PAO")+" two"],
+    ["EtCO2", "end tidal carbon dioxide"],
+    ["SpO2", "oxygen saturation"],
+    ["FiO2", spellLetters("FIO")+" two"],
+    ["HCO3", "bicarbonate"],
+    ["mmHg", "millimetres of mercury"],
+    ["NSTEMI", "non "+spellLetters("ST")+" elevation myocardial infarction"],
+    ["STEMI", spellLetters("ST")+" elevation myocardial infarction"],
+    ["HFNC", "high flow nasal oxygen"],
+    ["PEEP", "peep"],
+    ["BP", "blood pressure"],
+    ["pH", "pee aitch"]
+  ];
+  phrases.forEach(function(pair){
+    out = out.replace(new RegExp("\\b"+pair[0]+"\\b","g"), pair[1]);
+  });
+  const nums = {1:"one",2:"two",3:"three",4:"four",5:"five",6:"six"};
+  out = out.replace(/\bV([1-6])\b/g, function(_, d){ return "V "+nums[d]; });
+  out = out.replace(/\bIII\b/g, "three");
+  out = out.replace(/\bII\b/g, "two");
+  out = out.replace(/\b[A-Z]{2,6}\b/g, function(word){ return spellLetters(word); });
+  return out;
+}
 function say(text){
   if(!voiceOn || !window.speechSynthesis || !text) return;
   speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 0.96;
+  const u = new SpeechSynthesisUtterance(speakable(text));
+  u.rate = 0.9;
   u.lang = "en-IN";
+  const voices = speechSynthesis.getVoices ? speechSynthesis.getVoices() : [];
+  const voice = voices.filter(function(v){ return /^en-IN/i.test(v.lang||""); })[0]
+    || voices.filter(function(v){ return /^en/i.test(v.lang||""); })[0];
+  if(voice) u.voice = voice;
   speechSynthesis.speak(u);
 }
 function esc(s){
@@ -136,15 +182,17 @@ function home(){
       "<button class='mode' data-go='abg'><b>ABG</b><span>25 gases. Name the disorder, then the cause. "+esc(scoreLine("abg"))+"</span></button>"+
       "<button class='mode' data-go='drug'><b>ICU drugs</b><span>Pick from the checklist. The questions walk the monograph. "+esc(scoreLine("drug"))+"</span></button>"+
       "<button class='mode' data-go='ecg'><b>ECG</b><span>50 teaching traces. Name it, then the treatment. "+esc(scoreLine("ecg"))+"</span></button>"+
+      "<button class='mode' data-go='kit'><b>Instruments</b><span>Pick from the bay. The station asks what it is for, then the check that matters. "+esc(scoreLine("kit"))+"</span></button>"+
+      "<button class='mode' data-go='film'><b>Radiology</b><span>X-ray, CT, or MRI. The film, then the finding, then the treatment. "+esc(scoreLine("film"))+"</span></button>"+
     "</div>";
   app.querySelectorAll("[data-go]").forEach(function(btn){
     btn.onclick = function(){
       mode = btn.getAttribute("data-go");
-      history.replaceState(null, "", "?mode="+mode+"&v=20261021g");
+      history.replaceState(null, "", "?mode="+mode+"&v=20261021p");
       start();
     };
   });
-  say("OSCE World. Choose an arterial blood gas, a drug, or an ECG.");
+  say("OSCE World. Choose a gas, a drug, a trace, an instrument, or a film.");
 }
 
 let abgOrder = [];
@@ -180,7 +228,7 @@ function renderAbg(){
     step.options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
     "<p class='fb' id='fb' hidden></p><button class='next' id='next' hidden>Continue</button>"+
     "<p class='fine'>Teaching case. Not a patient result.</p>";
-  say(v.ph+", carbon dioxide "+v.pco2+", bicarbonate "+v.hco3+". "+step.prompt);
+  say(abgStep==="id" ? "What is the main acid-base disorder?" : "What is the most likely cause?");
   app.querySelectorAll(".choice").forEach(function(btn){
     btn.onclick = function(){ answerAbg(item, step, Number(btn.getAttribute("data-i"))); };
   });
@@ -213,29 +261,43 @@ let drugQueue = [];
 let drugAt = 0;
 let fieldAt = 0;
 function startDrug(){
-  groupId = "A";
+  groupId = "";
   picked = [];
-  renderDrugPick();
+  renderDrugGroups();
 }
-function renderDrugPick(){
-  const group = OSCE_DATA.groups.find(function(g){ return g.id===groupId; });
+function renderDrugGroups(){
   app.innerHTML =
     "<p class='score'>Drugs · "+esc(scoreLine("drug"))+"</p>"+
-    "<h1>ICU drug checklist</h1>"+
-    "<p class='lede'>Select the drugs. The station then asks one field at a time. Voice stays on.</p>"+
-    "<div class='groups'>"+OSCE_DATA.groups.map(function(g){
-      return "<button type='button' data-g='"+g.id+"'"+(g.id===groupId?" class='on'":"")+">"+esc(g.id+". "+g.name)+"</button>";
-    }).join("")+"</div>"+
-    "<div class='drugs'>"+group.drugs.map(function(id){
+    "<h1>ICU drug groups</h1>"+
+    "<p class='lede'>Choose one group. The drugs in that group open on the next screen.</p>"+
+    "<div class='tablets'>"+OSCE_DATA.groups.map(function(g){
+      return "<button type='button' class='tablet' data-g='"+g.id+"'><b>"+esc(g.id+". "+g.name)+"</b><span>"+g.drugs.length+" drugs</span></button>";
+    }).join("")+"</div>";
+  say("Choose a drug group.");
+  app.querySelectorAll("[data-g]").forEach(function(btn){
+    btn.onclick = function(){
+      groupId = btn.getAttribute("data-g");
+      picked = [];
+      renderDrugList();
+    };
+  });
+}
+function renderDrugList(){
+  const group = OSCE_DATA.groups.find(function(g){ return g.id===groupId; });
+  app.innerHTML =
+    "<button type='button' class='backrow' id='drugBack'>All groups</button>"+
+    "<p class='score'>Drugs · "+esc(scoreLine("drug"))+"</p>"+
+    "<h1>"+esc(group.id+". "+group.name)+"</h1>"+
+    "<p class='lede'>Select the drugs. The station then asks one field at a time.</p>"+
+    "<div class='tablets'>"+group.drugs.map(function(id){
       const drug = OSCE_DATA.drugs[id];
       const on = picked.indexOf(id)!==-1;
-      return "<button type='button' data-d='"+id+"'"+(on?" class='on'":"")+">"+esc(drug.name)+"</button>";
+      return "<button type='button' class='tablet"+(on?" on":"")+"' data-d='"+id+"'><b>"+esc(drug.name)+"</b></button>";
     }).join("")+"</div>"+
     "<button class='next' id='begin'>Ask these drugs</button>"+
-    "<p class='fine'>If you select none, this group is used. Doses are published teaching doses. Confirm them before you give a drug.</p>";
-  app.querySelectorAll("[data-g]").forEach(function(btn){
-    btn.onclick = function(){ groupId = btn.getAttribute("data-g"); renderDrugPick(); };
-  });
+    "<p class='fine'>If you select none, this whole group is used. Doses are published teaching doses. Confirm them before you give a drug.</p>";
+  say(group.name+". Select the drugs.");
+  document.getElementById("drugBack").onclick = function(){ renderDrugGroups(); };
   app.querySelectorAll("[data-d]").forEach(function(btn){
     btn.onclick = function(){
       const id = btn.getAttribute("data-d");
@@ -245,7 +307,6 @@ function renderDrugPick(){
     };
   });
   document.getElementById("begin").onclick = function(){
-    const group = OSCE_DATA.groups.find(function(g){ return g.id===groupId; });
     drugQueue = picked.length ? picked.slice() : group.drugs.slice();
     drugAt = 0;
     fieldAt = 0;
@@ -300,7 +361,7 @@ function renderDrugQ(){
       next.onclick = function(){
         fieldAt += 1;
         if(fieldAt >= FIELDS.length){ fieldAt = 0; drugAt += 1; }
-        if(drugAt >= drugQueue.length){ drugAt = 0; say("That list is finished."); renderDrugPick(); return; }
+        if(drugAt >= drugQueue.length){ drugAt = 0; say("That list is finished."); renderDrugList(); return; }
         renderDrugQ();
       };
     };
@@ -345,7 +406,7 @@ function renderEcg(){
     "<p class='prompt'>"+esc(step.prompt)+"</p>"+
     step.options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
     "<p class='fb' id='fb' hidden></p><button class='next' id='next' hidden>Continue</button>"+
-    "<p class='fine'>Drawn for teaching. Not a patient recording.</p>";
+    "<p class='fine'>One small square is 0.04 seconds. The block on the left is 1 millivolt. Swipe the paper. Teaching strip, not a patient recording.</p>";
   say(item.lead+". "+step.prompt);
   app.querySelectorAll(".choice").forEach(function(btn){
     btn.onclick = function(){
@@ -371,109 +432,517 @@ function renderEcg(){
     };
   });
 }
-function gauss(x, c, w){ const z = (x-c)/w; return Math.exp(-z*z); }
 function ecgSvg(item){
-  const sr = 200;
-  const seconds = 6;
+  const sr = 400;
+  const seconds = 8;
   const n = sr * seconds;
-  const y = new Array(n).fill(0);
-  const s = item.draw;
-  if(s.kind==="vf"){
-    for(let i=0;i<n;i++) y[i] = Math.sin(i/3)* (0.4+0.6*Math.sin(i/17)) + Math.sin(i/1.3)*0.25;
-  } else if(s.kind==="asystole"){
-    for(let i=0;i<n;i++) y[i] = Math.sin(i/8)*0.02;
-  } else {
-    const beats = [];
-    let t = 0.15;
-    while(t < seconds-0.05){
-      let rr = 60/s.rate;
-      if(s.irregular) rr *= 0.62 + ((iHash(t)*0.7));
-      beats.push(t);
-      t += rr;
+  const y = new Float32Array(n);
+  traceInto(y, sr, seconds, item.draw || {});
+  const px = 5.6;
+  const w = Math.round(25 * px * seconds) + 28;
+  const h = Math.round(42 * px);
+  const baseline = Math.round(24 * px);
+  let grid = "";
+  for(let x = 14; x < w - 8; x += px){
+    const major = Math.round((x - 14) / px) % 5 === 0;
+    grid += "<line x1='"+x.toFixed(1)+"' y1='8' x2='"+x.toFixed(1)+"' y2='"+(h-8)+"' stroke='"+(major?"#e7a3ab":"#f6d5d8")+"' stroke-width='"+(major?"1":"0.6")+"'/>";
+  }
+  for(let yy = 8; yy < h - 8; yy += px){
+    const major = Math.round((yy - 8) / px) % 5 === 0;
+    grid += "<line x1='14' y1='"+yy.toFixed(1)+"' x2='"+(w-8)+"' y2='"+yy.toFixed(1)+"' stroke='"+(major?"#e7a3ab":"#f6d5d8")+"' stroke-width='"+(major?"1":"0.6")+"'/>";
+  }
+  const x0 = 16;
+  const calTop = baseline - 10 * px;
+  const calW = 0.2 * 25 * px;
+  let d = "M"+x0.toFixed(1)+" "+baseline.toFixed(1);
+  d += " L"+(x0+6)+" "+baseline.toFixed(1);
+  d += " L"+(x0+6)+" "+calTop.toFixed(1);
+  d += " L"+(x0+6+calW).toFixed(1)+" "+calTop.toFixed(1);
+  d += " L"+(x0+6+calW).toFixed(1)+" "+baseline.toFixed(1);
+  const xSig = x0 + 0.55 * 25 * px;
+  for(let i = 0; i < n; i++){
+    const mv = Math.max(-2.05, Math.min(2.15, y[i]));
+    const x = xSig + (i / sr) * 25 * px;
+    const py = baseline - mv * 10 * px;
+    d += (i===0 ? " L" : " L")+x.toFixed(1)+" "+py.toFixed(1);
+  }
+  const lead = esc(item.lead || "II");
+  return "<div class='ecgwrap'><svg class='ecg' viewBox='0 0 "+w+" "+h+"' width='"+w+"' height='"+h+"' role='img' aria-label='Electrocardiogram teaching strip, lead "+lead+"'>"+
+    "<rect width='"+w+"' height='"+h+"' fill='#fffdfb'/>"+grid+
+    "<path d='"+d+"' fill='none' stroke='#1a1a1a' stroke-width='1.65' stroke-linejoin='miter' stroke-linecap='butt'/>"+
+    "<text x='16' y='22' fill='#3a2a2a' font-size='15' font-family='Figtree,sans-serif'>"+lead+"    25 mm/s    10 mm/mV</text></svg></div>";
+}
+function put(y, sr, t0, t1, fn){
+  if(!(t1 > t0)) return;
+  let a = Math.floor(t0 * sr);
+  let b = Math.ceil(t1 * sr);
+  if(b < 0 || a >= y.length) return;
+  if(a < 0) a = 0;
+  if(b >= y.length) b = y.length - 1;
+  const span = t1 - t0;
+  for(let i = a; i <= b; i++){
+    const u = (i / sr - t0) / span;
+    if(u < 0 || u > 1) continue;
+    y[i] += fn(u);
+  }
+}
+function hump(y, sr, t, amp, width){
+  if(!amp) return;
+  put(y, sr, t - width / 2, t + width / 2, function(u){
+    return amp * 0.5 * (1 - Math.cos(2 * Math.PI * u));
+  });
+}
+function spike(y, sr, t, amp, width){
+  if(!amp) return;
+  put(y, sr, t - width / 2, t + width / 2, function(u){
+    return amp * (1 - Math.abs(u * 2 - 1));
+  });
+}
+function hold(y, sr, t0, t1, amp){
+  if(!amp || !(t1 > t0)) return;
+  put(y, sr, t0, t1, function(){ return amp; });
+}
+function needle(y, sr, t, amp){
+  const c = Math.round(t * sr);
+  if(c >= 1 && c < y.length - 1){
+    y[c - 1] += amp * 0.15;
+    y[c] += amp;
+    y[c + 1] += amp * 0.15;
+  }
+}
+function beat(y, sr, t, o){
+  o = o || {};
+  const rr = o.rr || 0.8;
+  const pAmp = o.p === false ? 0 : (o.pAmp == null ? 0.16 : o.pAmp);
+  const pr = o.pr == null ? 0.16 : o.pr;
+  const qrs = o.qrs || 0.08;
+  const wide = qrs >= 0.12;
+  const twist = o.twist == null ? 1 : o.twist;
+  const r0 = o.r == null ? 1.15 : o.r;
+  const r = r0 * twist;
+  const q = o.q || 0;
+  const sAmp = o.s == null ? Math.min(wide ? 0.4 : 0.3, Math.max(0.08, Math.abs(r0) * 0.32)) : o.s;
+  const st = o.st || 0;
+  const tAmp = o.t == null ? 0.32 : o.t;
+  const room = Math.max(0.09, rr * 0.34);
+  const tDelay = Math.min(0.2 + (o.qt || 0), room);
+  if(pAmp) hump(y, sr, t - pr, pAmp, 0.09);
+  if(o.prDown) hold(y, sr, t - pr + 0.05, t - 0.04, -0.08);
+  if(o.delta){
+    put(y, sr, t - 0.07, t - 0.008, function(u){ return Math.abs(r) * 0.4 * u; });
+  }
+  if(o.spike) needle(y, sr, t - 0.04, 2);
+  const rw = wide ? Math.min(0.08, qrs * 0.5) : 0.026;
+  if(q) spike(y, sr, t - rw * 0.85, -Math.abs(q), 0.02);
+  spike(y, sr, t, r, rw);
+  if(sAmp){
+    const sSign = r < 0 && o.s == null ? -1 : 1;
+    spike(y, sr, t + rw * 0.9, -Math.abs(sAmp) * sSign, wide ? 0.045 : 0.024);
+  }
+  const j = t + (wide ? qrs * 0.48 : 0.036);
+  const tPeak = j + tDelay;
+  if(o.scoop){
+    put(y, sr, j, tPeak, function(u){ return (st || -0.2) * Math.sin(Math.PI * u); });
+  } else if(o.coved){
+    put(y, sr, j, tPeak + 0.06, function(u){ return (st || 0.4) * (1 - u) - 0.12 * u; });
+  } else if(st){
+    hold(y, sr, j, Math.max(j + 0.04, tPeak - 0.06), st);
+  }
+  if(o.osborne) spike(y, sr, j + 0.01, 0.42, 0.022);
+  if(o.peaked) spike(y, sr, tPeak, tAmp, 0.08);
+  else if(tAmp) hump(y, sr, tPeak, tAmp, o.wideT ? 0.2 : 0.14);
+  if(o.u) hump(y, sr, tPeak + 0.16, 0.22, 0.1);
+}
+function addFlutter(y, sr){
+  const cycle = 60 / 300;
+  for(let i = 0; i < y.length; i++){
+    const u = ((i / sr) % cycle) / cycle;
+    const v = u < 0.78 ? (-0.22 + 0.4 * (u / 0.78)) : (0.18 - 0.4 * ((u - 0.78) / 0.22));
+    y[i] += v;
+  }
+}
+function addAf(y, sr){
+  for(let i = 0; i < y.length; i++){
+    const t = i / sr;
+    y[i] += 0.05 * Math.sin(2 * Math.PI * 6.8 * t) + 0.035 * Math.sin(2 * Math.PI * 10.5 * t + 1.1);
+  }
+}
+function rbbbBeat(y, sr, t){
+  hump(y, sr, t - 0.16, 0.14, 0.08);
+  spike(y, sr, t, 0.4, 0.02);
+  spike(y, sr, t + 0.032, -0.8, 0.028);
+  spike(y, sr, t + 0.078, 1.2, 0.026);
+  hump(y, sr, t + 0.24, -0.38, 0.13);
+}
+function lbbbBeat(y, sr, t){
+  hump(y, sr, t - 0.18, 0.12, 0.08);
+  spike(y, sr, t + 0.01, -0.4, 0.03);
+  spike(y, sr, t + 0.055, -1.2, 0.05);
+  spike(y, sr, t + 0.1, -0.62, 0.035);
+  hold(y, sr, t + 0.13, t + 0.24, 0.16);
+  hump(y, sr, t + 0.3, 0.32, 0.12);
+}
+function eachBeat(seconds, rate, irregular, fn){
+  let t = 0.55;
+  let i = 0;
+  while(t < seconds - 0.28){
+    let rr = 60 / Math.max(rate, 20);
+    if(irregular) rr *= 0.52 + Math.abs(Math.sin(t * 9.1 + i)) * 0.85;
+    fn(t, rr, i);
+    t += rr;
+    i++;
+  }
+}
+function traceInto(y, sr, seconds, s){
+  const kind = s.kind || "nsr";
+  const rate = s.rate || 72;
+  if(kind === "vf"){
+    for(let i = 0; i < y.length; i++){
+      const t = i / sr;
+      const freq = 4.2 + 2.4 * Math.sin(t * 1.6);
+      const amp = 0.35 + 0.85 * Math.abs(Math.sin(t * 2.1));
+      y[i] = amp * Math.sin(2 * Math.PI * freq * t + Math.sin(t * 3));
     }
-    const pTimes = [];
-    if(s.kind==="chb"){
-      let p = 0.05;
-      while(p < seconds){ pTimes.push(p); p += 60/78; }
+    return;
+  }
+  if(kind === "asystole"){
+    for(let i = 0; i < y.length; i++) y[i] = Math.sin(i / 19) * 0.015;
+    return;
+  }
+  if(kind === "flutter") addFlutter(y, sr);
+  if(kind === "af" || kind === "wpwaf") addAf(y, sr);
+  if(kind === "mobitz1"){
+    let t = 0.7;
+    while(t < seconds - 0.35){
+      beat(y, sr, t, {pr:0.16, rr:0.95});
+      beat(y, sr, t + 0.92, {pr:0.26, rr:0.95});
+      beat(y, sr, t + 1.9, {pr:0.4, rr:1});
+      hump(y, sr, t + 2.85, 0.16, 0.08);
+      t += 3.55;
     }
-    beats.forEach(function(bt, bi){
-      addQrs(y, sr, bt, s, bi);
+    return;
+  }
+  if(kind === "mobitz2"){
+    let t = 0.6;
+    let n = 0;
+    while(t < seconds - 0.15){
+      hump(y, sr, t, 0.15, 0.08);
+      if(n % 3 !== 2) beat(y, sr, t + 0.2, {p:false, rr:0.9});
+      n++;
+      t += 0.86;
+    }
+    return;
+  }
+  if(kind === "chb"){
+    let p = 0.4;
+    while(p < seconds - 0.05){ hump(y, sr, p, 0.15, 0.075); p += 60 / 85; }
+    let q = 0.85;
+    while(q < seconds - 0.3){
+      beat(y, sr, q, {p:false, qrs:0.14, r:1.15, s:0.15, t:-0.28, rr:1.4});
+      q += 60 / 40;
+    }
+    return;
+  }
+  if(kind === "rbbb" || kind === "bifascicular"){
+    eachBeat(seconds, s.rate || 75, false, function(t){ rbbbBeat(y, sr, t); });
+    return;
+  }
+  if(kind === "lbbb"){
+    eachBeat(seconds, s.rate || 78, false, function(t){ lbbbBeat(y, sr, t); });
+    return;
+  }
+  if(kind === "stemi" || kind === "rvmi"){
+    const elev = kind === "rvmi" ? 0.3 : 0.45;
+    eachBeat(seconds, rate, false, function(t){
+      hump(y, sr, t - 0.16, 0.14, 0.08);
+      spike(y, sr, t - 0.028, -0.4, 0.016);
+      spike(y, sr, t, 0.9, 0.02);
+      put(y, sr, t + 0.03, t + 0.36, function(u){
+        if(u < 0.42) return elev;
+        const v = (u - 0.42) / 0.58;
+        return elev * Math.cos(v * Math.PI * 0.5);
+      });
     });
-    if(s.kind==="chb") pTimes.forEach(function(pt){ addP(y, sr, pt, 0.12); });
-    else if(s.p!==false) beats.forEach(function(bt){ addP(y, sr, bt - (s.pr||0.16), s.pAmp||0.12); });
-    if(s.kind==="flutter"){
-      for(let i=0;i<n;i++) y[i] += Math.sin(i/sr*2*Math.PI*5)*0.12 - 0.04;
+    return;
+  }
+  if(kind === "brugada"){
+    eachBeat(seconds, s.rate || 70, false, function(t){
+      hump(y, sr, t - 0.16, 0.12, 0.08);
+      spike(y, sr, t, 0.7, 0.024);
+      put(y, sr, t + 0.02, t + 0.34, function(u){ return 0.48 * Math.pow(1 - u, 1.15) - 0.28 * u; });
+    });
+    return;
+  }
+  if(kind === "pvc"){
+    let t = 0.55;
+    let n = 0;
+    while(t < seconds - 0.4){
+      if(n % 3 === 2){
+        beat(y, sr, t, {p:false, qrs:0.16, r:1.55, s:0.15, t:-0.5, rr:1.1});
+        t += 1.2;
+      } else {
+        beat(y, sr, t, {rr:0.8});
+        t += 60 / 78;
+      }
+      n++;
     }
-    if(s.kind==="torsades"){
-      for(let i=0;i<n;i++) y[i] *= Math.sin(i/sr*2*Math.PI*0.45);
+    return;
+  }
+  if(kind === "nsvt"){
+    let t = 0.5;
+    beat(y, sr, t, {rr:0.8}); t += 0.82;
+    beat(y, sr, t, {rr:0.8}); t += 0.7;
+    for(let i = 0; i < 6 && t < seconds - 0.28; i++){
+      beat(y, sr, t, {p:false, qrs:0.15, r:1.45, s:0.1, t:-0.35, rr:0.36});
+      t += 0.36;
     }
+    t += 0.25;
+    while(t < seconds - 0.3){ beat(y, sr, t, {rr:0.8}); t += 0.82; }
+    return;
   }
-  let d = "";
-  const mid = 78;
-  const gain = 42;
-  for(let i=0;i<n;i++){
-    const x = (i/(n-1))*600+8;
-    const yy = mid - y[i]*gain;
-    d += (i?"L":"M")+x.toFixed(1)+" "+yy.toFixed(1)+" ";
-  }
-  return "<svg class='ecg' viewBox='0 0 616 150' role='img' aria-label='Teaching electrocardiogram trace'>"+
-    "<rect width='616' height='150' fill='#081018'/>"+
-    "<path d='M8 78 H28 M18 68 V88' fill='none' stroke='#7fd4e6' stroke-width='1.2'/>"+
-    "<path d='"+d+"' fill='none' stroke='#d7fff0' stroke-width='1.4'/>"+
-    "<text x='36' y='22' fill='#8a8478' font-size='12'>"+esc(item.lead)+"</text></svg>";
-}
-function iHash(t){
-  const x = Math.sin(t*12.9898)*43758.5453;
-  return x - Math.floor(x);
-}
-function addP(y, sr, t, amp){
-  const c = Math.round(t*sr);
-  for(let i=-16;i<=16;i++){
-    const k = c+i;
-    if(k>=0 && k<y.length) y[k] += amp * gauss(i, 0, 6);
-  }
-}
-function addQrs(y, sr, t, s, bi){
-  const c = Math.round(t*sr);
-  const wide = s.qrs || 0.08;
-  const span = Math.round(wide*sr);
-  const r = s.r==null ? 1 : s.r;
-  const twist = s.kind==="torsades" ? (bi%6-3)/3 : 1;
-  for(let i=-span;i<=span;i++){
-    const k = c+i;
-    if(k<0 || k>=y.length) continue;
-    const u = i/span;
-    let v = 0;
-    if(u>-0.85 && u<-0.35) v = -(s.q||0.15);
-    else if(u<=0.15) v = r * twist * Math.sin((u+0.35)/0.5*Math.PI);
-    else v = -(s.s||0.25)*twist;
-    y[k] += v;
-  }
-  const st = s.st || 0;
-  const stStart = c + Math.round(span*0.7);
-  for(let i=0;i<Math.round(0.16*sr);i++){
-    const k = stStart+i;
-    if(k>=0 && k<y.length) y[k] += st;
-  }
-  const tAmp = s.t==null ? 0.28 : s.t;
-  const tc = c + Math.round((wide+0.2)*sr);
-  for(let i=-20;i<=20;i++){
-    const k = tc+i;
-    if(k>=0 && k<y.length) y[k] += tAmp * gauss(i, 0, 8);
-  }
-  if(s.u){
-    const uc = tc + 28;
-    for(let i=-14;i<=14;i++){
-      const k = uc+i;
-      if(k>=0 && k<y.length) y[k] += 0.12 * gauss(i, 0, 6);
+  if(kind === "capture"){
+    let t = 0.45;
+    let n = 0;
+    while(t < seconds - 0.12){
+      needle(y, sr, t, 2.1);
+      if(n === 3) beat(y, sr, t + 0.06, {p:false, qrs:0.13, r:0.95, rr:1});
+      n++;
+      t += 1;
     }
+    return;
   }
+  eachBeat(seconds, rate, !!s.irregular, function(t, rr, i){
+    const o = {
+      p: s.p,
+      pAmp: s.pAmp,
+      pr: s.pr,
+      qrs: s.qrs,
+      r: s.r,
+      q: s.q,
+      s: s.s,
+      st: s.st,
+      t: s.t,
+      u: s.u,
+      rr: rr
+    };
+    if(kind === "flutter" || kind === "af") o.p = false;
+    if(kind === "torsades"){
+      o.p = false;
+      o.qrs = 0.14;
+      o.twist = Math.sin(i / 2.1);
+      o.r = 1.35;
+      o.t = -0.15 * o.twist;
+      o.s = 0.1;
+    }
+    if(kind === "alternans") o.r = (o.r == null ? 1.15 : o.r) * (i % 2 ? 0.42 : 1);
+    if(kind === "wpwaf"){ o.p = false; o.delta = true; o.qrs = 0.13; }
+    if(kind === "paced"){ o.p = false; o.spike = true; o.qrs = 0.16; o.r = -1.15; o.s = 0; o.t = 0.28; o.st = 0.08; }
+    if(kind === "osborne"){ o.osborne = true; o.st = 0.12; }
+    if(kind === "longqt"){ o.qt = 0.32; o.wideT = true; }
+    if(kind === "hyperk"){ o.pAmp = 0.035; o.qrs = 0.15; o.r = 0.7; o.t = 1.15; o.peaked = true; o.st = 0; }
+    if(kind === "wellens"){ o.t = -0.85; o.st = 0; o.r = 0.95; o.q = 0; }
+    if(kind === "dewinter"){ o.st = -0.28; o.t = 1.05; o.peaked = true; }
+    if(kind === "sgarbossa"){ o.qrs = 0.16; o.r = 1.05; o.st = 0.4; o.t = 0.2; o.s = 0.05; }
+    if(kind === "pericarditis"){ o.st = 0.18; o.prDown = true; o.t = 0.28; }
+    if(kind === "digoxin"){ o.scoop = true; o.st = -0.22; o.t = 0.02; }
+    if(kind === "posterior"){ o.r = 1.45; o.st = -0.28; o.t = 0.4; o.q = 0; o.s = 0.05; }
+    if(kind === "lvh"){ o.r = Math.max(o.r || 1.2, 1.85); o.st = -0.2; o.t = -0.45; }
+    if(kind === "std"){ o.st = o.st == null ? -0.2 : Math.min(o.st, -0.18); o.t = Math.min(o.t == null ? -0.2 : o.t, -0.35); }
+    if(kind === "stemi" || kind === "rvmi"){ o.st = Math.max(o.st || 0.2, kind === "rvmi" ? 0.28 : 0.4); }
+    if(kind === "early"){ o.st = 0.1; o.osborne = true; o.t = 0.4; }
+    if(kind === "mat"){ o.pAmp = 0.08 + (i % 3) * 0.09; o.pr = 0.12 + (i % 3) * 0.04; }
+    if(kind === "junctional"){ o.p = false; o.t = 0.3; hump(y, sr, t + 0.12, -0.1, 0.06); }
+    if(kind === "vt"){ o.p = false; o.qrs = o.qrs || 0.16; o.r = o.r || 1.45; o.t = o.t == null ? -0.35 : o.t; o.s = 0.08; }
+    if(kind === "svt"){ o.p = false; o.qrs = 0.07; o.t = 0.12; }
+    if(kind === "wide" || kind === "agonal" || kind === "idioventricular"){
+      o.p = kind === "wide" ? o.p : false;
+      o.qrs = Math.max(o.qrs || 0.14, kind === "agonal" ? 0.2 : 0.15);
+    }
+    if(kind === "hypok"){ o.t = 0.08; o.u = true; o.st = -0.06; }
+    beat(y, sr, t, o);
+  });
+}
+let kitGroup = "airway";
+let kitPicked = [];
+let kitQueue = [];
+let kitAt = 0;
+let kitStep = "use";
+function kitGroupById(id){
+  return OSCE_STATIONS.kit.find(function(group){ return group.id===id; });
+}
+function kitItem(id){
+  let found = null;
+  OSCE_STATIONS.kit.forEach(function(group){
+    group.items.forEach(function(item){ if(item.id===id) found = item; });
+  });
+  return found;
+}
+function kitOthers(id, field){
+  const pool = [];
+  OSCE_STATIONS.kit.forEach(function(group){
+    group.items.forEach(function(item){
+      if(item.id!==id && item[field]) pool.push(item[field]);
+    });
+  });
+  const out = [];
+  while(out.length < 3 && pool.length){
+    out.push(pool.splice(Math.floor(Math.random()*pool.length), 1)[0]);
+  }
+  return out;
+}
+function startKit(){
+  kitGroup = "airway";
+  kitPicked = [];
+  renderKitPick();
+  say("Select the instruments. I will ask what each one is for.");
+}
+function renderKitPick(){
+  const group = kitGroupById(kitGroup);
+  app.innerHTML =
+    "<p class='score'>Instruments · "+esc(scoreLine("kit"))+"</p>"+
+    "<h1>Instruments</h1>"+
+    "<p class='lede'>Select what is on the bay. The station asks what each one is for, then the check that matters. The voice reads both.</p>"+
+    "<div class='groups'>"+OSCE_STATIONS.kit.map(function(g){
+      return "<button type='button' data-g='"+g.id+"'"+(g.id===kitGroup?" class='on'":"")+">"+esc(g.name)+"</button>";
+    }).join("")+"</div>"+
+    "<div class='drugs'>"+group.items.map(function(item){
+      const on = kitPicked.indexOf(item.id)!==-1;
+      return "<button type='button' data-d='"+item.id+"'"+(on?" class='on'":"")+">"+esc(item.name)+"</button>";
+    }).join("")+"</div>"+
+    "<button class='next' id='begin'>Ask the use</button>"+
+    "<p class='fine'>If you select none, this group is used. Teaching use, not a local checklist.</p>";
+  app.querySelectorAll("[data-g]").forEach(function(btn){
+    btn.onclick = function(){ kitGroup = btn.getAttribute("data-g"); renderKitPick(); };
+  });
+  app.querySelectorAll("[data-d]").forEach(function(btn){
+    btn.onclick = function(){
+      const id = btn.getAttribute("data-d");
+      const at = kitPicked.indexOf(id);
+      if(at===-1) kitPicked.push(id); else kitPicked.splice(at, 1);
+      btn.classList.toggle("on");
+    };
+  });
+  document.getElementById("begin").onclick = function(){
+    const group = kitGroupById(kitGroup);
+    kitQueue = kitPicked.length ? kitPicked.slice() : group.items.map(function(item){ return item.id; });
+    kitAt = 0;
+    kitStep = "use";
+    renderKitQ();
+  };
+}
+function renderKitQ(){
+  const item = kitItem(kitQueue[kitAt]);
+  const field = kitStep;
+  const correct = item[field];
+  const options = kitOthers(item.id, field);
+  options.splice(Math.floor(Math.random()*(options.length+1)), 0, correct);
+  const answer = options.indexOf(correct);
+  const prompt = field==="use" ? "What is it for?" : "Which check matters?";
+  app.innerHTML =
+    "<p class='score'>"+esc(item.name)+" · "+(field==="use"?"Use":"The check")+" · "+(kitAt+1)+" of "+kitQueue.length+" · "+esc(scoreLine("kit"))+"</p>"+
+    "<h1>"+esc(item.name)+"</h1>"+
+    "<p class='prompt'>"+esc(prompt)+"</p>"+
+    options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
+    "<p class='fb' id='fb' hidden></p><button class='next' id='next' hidden>Continue</button>";
+  say(item.name+". "+prompt);
+  app.querySelectorAll(".choice").forEach(function(btn){
+    btn.onclick = function(){
+      const i = Number(btn.getAttribute("data-i"));
+      app.querySelectorAll(".choice").forEach(function(b){ b.disabled = true; });
+      const ok = i === answer;
+      btn.classList.add(ok ? "right" : "wrong");
+      if(!ok) app.querySelectorAll(".choice")[answer].classList.add("right");
+      mark("kit", ok);
+      const fb = document.getElementById("fb");
+      fb.hidden = false;
+      fb.textContent = (ok ? "Correct. " : "Not that. ") + correct;
+      say((ok ? "Correct. " : "Not that. ") + correct);
+      const next = document.getElementById("next");
+      next.hidden = false;
+      next.onclick = function(){
+        if(kitStep==="use"){ kitStep = "check"; renderKitQ(); return; }
+        kitStep = "use";
+        kitAt += 1;
+        if(kitAt >= kitQueue.length){ say("That list is finished."); renderKitPick(); return; }
+        renderKitQ();
+      };
+    };
+  });
+}
+
+let filmMod = "xray";
+function filmsIn(mod){
+  return OSCE_STATIONS.films.filter(function(film){ return film.mod===mod; });
+}
+function startFilm(){
+  filmMod = "xray";
+  renderFilmPick();
+  say("Choose a chest film. Then name the finding, and the treatment.");
+}
+function renderFilmPick(){
+  const mods = [["xray","X-ray"],["ct","CT"],["mri","MRI"]];
+  const list = filmsIn(filmMod);
+  app.innerHTML =
+    "<p class='score'>Radiology · "+esc(scoreLine("film"))+"</p>"+
+    "<h1>Radiology</h1>"+
+    "<p class='lede'>Choose one film. The diagnosis is not in the list. You get the picture, then the finding, then the treatment.</p>"+
+    "<div class='groups'>"+mods.map(function(row){
+      return "<button type='button' data-m='"+row[0]+"'"+(row[0]===filmMod?" class='on'":"")+">"+esc(row[1])+"</button>";
+    }).join("")+"</div>"+
+    list.map(function(film){
+      return "<button class='choice' data-f='"+film.id+"'><b>"+esc(film.modLabel)+".</b> "+esc(film.blurb)+"</button>";
+    }).join("")+
+    "<p class='fine'>"+list.length+" films in this pool. Teaching films, not patient studies.</p>";
+  app.querySelectorAll("[data-m]").forEach(function(btn){
+    btn.onclick = function(){ filmMod = btn.getAttribute("data-m"); renderFilmPick(); };
+  });
+  app.querySelectorAll("[data-f]").forEach(function(btn){
+    btn.onclick = function(){ renderFilm(btn.getAttribute("data-f"), "finding"); };
+  });
+}
+function renderFilm(id, stepName){
+  const film = OSCE_STATIONS.films.find(function(item){ return item.id===id; });
+  const step = shuffled(film[stepName]);
+  app.innerHTML =
+    "<p class='score'>"+esc(film.modLabel)+" · "+esc(scoreLine("film"))+"</p>"+
+    "<p class='mod'>"+esc(film.modLabel)+"</p>"+
+    "<div class='lightbox'><img src='"+esc(film.src)+"?v=20261021p' alt='Teaching "+esc(film.modLabel)+" for this station'></div>"+
+    "<p class='lede'>"+esc(film.stem)+"</p>"+
+    "<p class='prompt'>"+esc(step.prompt)+"</p>"+
+    step.options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
+    "<p class='fb' id='fb' hidden></p><button class='next' id='next' hidden>Continue</button>"+
+    "<p class='fine'>Teaching film. Not a patient study.</p>";
+  say(film.stem+" "+step.prompt);
+  app.querySelectorAll(".choice").forEach(function(btn){
+    btn.onclick = function(){
+      const i = Number(btn.getAttribute("data-i"));
+      app.querySelectorAll(".choice").forEach(function(b){ b.disabled = true; });
+      const ok = i === step.answer;
+      btn.classList.add(ok ? "right" : "wrong");
+      if(!ok) app.querySelectorAll(".choice")[step.answer].classList.add("right");
+      mark("film", ok);
+      const fb = document.getElementById("fb");
+      fb.hidden = false;
+      const lead = stepName==="finding" ? film.title+". " : "";
+      fb.textContent = (ok ? "Correct. " : "Not that. ") + lead + step.say;
+      say((ok ? "Correct. " : "Not that. ") + lead + step.say);
+      const next = document.getElementById("next");
+      next.hidden = false;
+      next.textContent = stepName==="finding" ? "Ask the treatment" : "Back to the films";
+      next.onclick = function(){
+        if(stepName==="finding"){ renderFilm(id, "treat"); return; }
+        renderFilmPick();
+      };
+    };
+  });
 }
 
 function start(){
   if(mode==="abg") startAbg();
   else if(mode==="drug") startDrug();
   else if(mode==="ecg") startEcg();
+  else if(mode==="kit") startKit();
+  else if(mode==="film") startFilm();
   else home();
 }
 start();
