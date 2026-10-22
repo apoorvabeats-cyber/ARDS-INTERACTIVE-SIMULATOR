@@ -149,6 +149,8 @@ body.filming header,body.filming .trace,body.filming .halo,body.filming .invite,
 .room{display:none;min-height:100dvh;padding:14px 14px 22px}
 body.in .atlas,body.in header,body.in .approach{display:none}
 body.in .room{display:flex;flex-direction:column}
+body.hud3d.in .atlas,body.hud3d.in header,body.hud3d.in .approach{display:none !important}
+body.hud3d.in .room{display:flex;position:fixed;inset:0;z-index:40;height:100dvh;min-height:100dvh;overflow:auto;background:#071018}
 .back{align-self:stretch;text-align:right;background:none;border:0;color:var(--muted);padding:8px 0;min-height:44px}
 .room h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:42px;letter-spacing:-.035em;margin:6px 0 8px;line-height:.95}
 .lede{margin:0;max-width:38rem;color:var(--muted);line-height:1.45}
@@ -188,7 +190,13 @@ body.inside.reference{background:#14140f}
 .portal.osce span{color:#b7d2b8}
 .portal.reference span{color:#e2d2a2}
 .portal strong{display:block;margin-top:6px;font-family:Fraunces,Georgia,serif;font-size:28px;font-weight:520;letter-spacing:-.03em;line-height:1.05}
-.portal em{display:block;margin-top:6px;font-style:normal;color:var(--muted);line-height:1.35;font-size:15px}
+.mcq-stem{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;line-height:1.35;letter-spacing:-.02em;margin:8px 0 14px}
+.mcq-opt{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;min-height:64px;padding:14px;margin:0 0 8px;border-radius:14px;border:1px solid var(--line);background:#0c1822;font-size:16px;line-height:1.35}
+.mcq-opt b{font-family:Fraunces,Georgia,serif;color:#7fd4e6;min-width:1.2em;font-weight:520}
+.mcq-opt.right{border-color:#7dcea0;background:#10241c}
+.mcq-opt.wrong{border-color:#c46a6a;background:#241416}
+.mcq-opt:disabled{cursor:default}
+.mcq-note{margin-top:8px}
 body.enter .portal.lab{animation:fromLeft .75s cubic-bezier(.22,.7,.2,1) both}
 body.enter .portal.arena{animation:fromRight .75s cubic-bezier(.22,.7,.2,1) both}
 @keyframes fromLeft{from{opacity:0;transform:translateX(-36px)}to{opacity:1;transform:none}}
@@ -360,20 +368,9 @@ body.hud3d .bubble-btn img{width:46px;height:46px;border-radius:50%;object-fit:c
         <button type="button" data-tab="osce">OSCE World</button>
         <button type="button" data-tab="drugs">Drugs and doses</button>
         <button type="button" data-tab="formulas">Formulas</button>
-        <button type="button" data-tab="organs">Organs and diseases</button>
+        <button type="button" data-tab="test">Test the brain</button>
       </nav>
-      <div class="bubbles" id="bubbles" hidden>
-        <button type="button" class="backbub" id="bubbles-back">Sections</button>
-        <button type="button" class="bubble-btn" data-organ="brain"><img src="brain-close.jpg" alt=""><span>Brain</span></button>
-        <button type="button" class="bubble-btn" data-organ="thyroid"><img src="plates/thyroid.jpg" alt=""><span>Thyroid</span></button>
-        <button type="button" class="bubble-btn" data-organ="lungs"><img src="plates/lungs.jpg" alt=""><span>Lungs</span></button>
-        <button type="button" class="bubble-btn" data-organ="heart"><img src="plates/heart.jpg" alt=""><span>Heart</span></button>
-        <button type="button" class="bubble-btn" data-organ="liver"><img src="plates/liver.jpg" alt=""><span>Liver</span></button>
-        <button type="button" class="bubble-btn" data-organ="stomach"><img src="plates/stomach.jpg" alt=""><span>Stomach</span></button>
-        <button type="button" class="bubble-btn" data-organ="bowel"><img src="plates/gi.jpg" alt=""><span>Bowel</span></button>
-        <button type="button" class="bubble-btn" data-organ="spleen"><img src="plates/spleen.jpg" alt=""><span>Spleen</span></button>
-        <button type="button" class="bubble-btn" data-organ="kidneys"><img src="plates/kidneys.jpg" alt=""><span>Kidneys</span></button>
-      </div>
+      <nav class="rail-tabs" id="organ-tabs" hidden></nav>
     </aside>
     <section class="stage-col" aria-label="Rotating anatomical model">
       <div class="holo" aria-hidden="true"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i></div>
@@ -390,6 +387,7 @@ body.hud3d .bubble-btn img{width:46px;height:46px;border-radius:50%;object-fit:c
 
 <section class="room" id="room"></section>
 <section class="results" id="results"></section>
+<script src="mcq-bank.js?v=20261022a"></script>
 <script>
 const ORGANS = [
   {
@@ -831,8 +829,6 @@ function portalBar(){
   return '<div class="portals">'+
     tab("openLab","lab","01","Learning Lab","Open the anatomy, the films, and the pathways.")+
     tab("openArena","arena","02","Practice Arena","Take one case. The numbers move after you decide.")+
-    tab("openOsce","osce","03","OSCE World","The gas, the drug, the trace, the instrument, or the film.")+
-    tab("openReference","reference","04","Reference Centre","Guidelines, scores, and the formulas.")+
     "</div>";
 }
 function bindPortals(){
@@ -1006,15 +1002,27 @@ function renderRoom(){
     shelfBody = referenceShelf();
   }
   room.innerHTML =
-    '<button type="button" class="back" id="back">Back to the body</button>'+
+    '<button type="button" class="back" id="back">'+(inside?"Back to the doors":"Back to the body")+'</button>'+
     '<p class="lede" style="letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--faint)">'+esc(organ.room)+'</p>'+
-    '<h2>'+esc(organ.name)+'</h2>'+
-    '<p class="lede">'+esc(organ.line)+'</p>'+
-    '<h3 class="refhead">Learning Lab</h3>'+
-    (learn.length?cards(learn):'<p class="empty">'+esc(organ.soon || "Nothing in the learning lab yet.")+'</p>')+
-    '<h3 class="refhead">Practice Arena</h3>'+
-    (practice.length?cards(practice):'<p class="empty">'+esc(organ.soon || "Nothing in the practice arena yet.")+'</p>');
-  document.getElementById("back").onclick = function(){ leave(); };
+    '<h2>'+esc(inside==="lab"?"Learning Lab":inside==="arena"?"Practice Arena":organ.name)+'</h2>'+
+    '<p class="lede">'+esc(inside?organ.name+". "+organ.line:organ.line)+'</p>'+
+    (inside?('<div class="shelf"><p class="lede" style="letter-spacing:.14em;text-transform:uppercase;font-size:12px">'+shelfTitle+'</p>'+shelfBody+'</div>'):portalBar());
+  room.scrollTop = 0;
+  document.getElementById("back").onclick = function(){
+    if(inside){
+      inside = null;
+      document.body.classList.remove("inside","lab","arena","osce","reference");
+      renderRoom();
+      return;
+    }
+    leave();
+  };
+  if(!inside){
+    const lab = document.getElementById("openLab");
+    const arena = document.getElementById("openArena");
+    if(lab) lab.onclick = function(){ fillPortal("lab", this); };
+    if(arena) arena.onclick = function(){ fillPortal("arena", this); };
+  }
   const closeSheet = document.getElementById("closeSheet");
   if(closeSheet) closeSheet.onclick = function(){ osceStation=null; if(mockCircuit){ mockCircuit=null; } renderRoom(); };
   const markSheet = document.getElementById("markSheet");
@@ -1605,6 +1613,120 @@ function formulaBlock(){
     return "<article class='station'><h3 class='refhead'>"+esc(item.title)+"</h3>"+item.body.map(function(line){ return "<p class='lede'>"+esc(line)+"</p>"; }).join("")+"</article>";
   }).join("");
 }
+function closePage(){
+  document.body.classList.remove("in","enter","inside","lab","arena","osce","reference");
+  if(window.resetAtlas) window.resetAtlas();
+  window.scrollTo(0,0);
+}
+function showOrganTabs(){
+  const nav = document.getElementById("organ-tabs");
+  const buttons = ORGANS.filter(function(organ){
+    return organ.id!=="multi" && ((organ.learn && organ.learn.length) || (organ.practice && organ.practice.length));
+  }).map(function(organ){
+    return '<button type="button" data-organ="'+organ.id+'">'+esc(organ.name)+'</button>';
+  }).join("");
+  nav.innerHTML = '<button type="button" id="organs-back">Sections</button>'+buttons;
+  document.getElementById("rail-tabs").hidden = true;
+  nav.hidden = false;
+  document.getElementById("organs-back").onclick = function(){
+    nav.hidden = true;
+    document.getElementById("rail-tabs").hidden = false;
+  };
+}
+let mcqSystem = null;
+let mcqIndex = 0;
+let mcqPicked = null;
+let mcqScore = 0;
+function mcqPool(){
+  if(!window.MCQ_BANK) return [];
+  if(mcqSystem==="all") return MCQ_BANK.items;
+  return MCQ_BANK.items.filter(function(item){ return item.system===mcqSystem; });
+}
+function renderTest(){
+  finishIntro();
+  setSpin(false);
+  current = null;
+  inside = null;
+  document.body.classList.add("in","enter");
+  document.body.classList.remove("inside","lab","arena","osce","reference","opening","scanning");
+  if(!window.MCQ_BANK){
+    room.innerHTML = '<button type="button" class="back" id="back">Back to the body</button><h2>Test the brain</h2><p class="empty">The questions did not load. Reload the page.</p>';
+    document.getElementById("back").onclick = closePage;
+    return;
+  }
+  if(!mcqSystem){
+    const systems = MCQ_BANK.systems.map(function(name){
+      const count = MCQ_BANK.items.filter(function(item){ return item.system===name; }).length;
+      return '<button type="button" class="portal lab" data-mcq-system="'+esc(name)+'"><span>'+count+' questions</span><strong>'+esc(name)+'</strong><em>Commit to one answer. Then read why.</em><i class="go" aria-hidden="true"></i></button>';
+    }).join("");
+    room.innerHTML =
+      '<button type="button" class="back" id="back">Back to the body</button>'+
+      '<p class="lede" style="letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--faint)">Critical care</p>'+
+      '<h2>Test the brain</h2>'+
+      '<p class="lede">One hundred single-best-answer questions. Choose before the explanation. These are teaching points, not a local protocol.</p>'+
+      '<div class="portals">'+systems+
+      '<button type="button" class="portal arena" data-mcq-system="all"><span>100 questions</span><strong>All systems</strong><em>The full bank, in order.</em><i class="go" aria-hidden="true"></i></button></div>';
+    document.getElementById("back").onclick = closePage;
+    room.querySelectorAll("[data-mcq-system]").forEach(function(btn){
+      btn.onclick = function(){
+        mcqSystem = btn.getAttribute("data-mcq-system");
+        mcqIndex = 0;
+        mcqPicked = null;
+        mcqScore = 0;
+        renderTest();
+      };
+    });
+    room.scrollTop = 0;
+    return;
+  }
+  const pool = mcqPool();
+  if(!pool.length || mcqIndex>=pool.length){
+    room.innerHTML =
+      '<button type="button" class="back" id="back">Back to the systems</button>'+
+      '<h2>Test the brain</h2>'+
+      '<p class="lede">'+mcqScore+' of '+(pool.length||0)+' correct.</p>'+
+      '<button type="button" class="portal lab" id="mcq-systems"><strong>Choose another system</strong></button>';
+    document.getElementById("back").onclick = function(){ mcqSystem=null; renderTest(); };
+    document.getElementById("mcq-systems").onclick = function(){ mcqSystem=null; renderTest(); };
+    room.scrollTop = 0;
+    return;
+  }
+  const q = pool[mcqIndex];
+  const letters = ["A","B","C","D","E"];
+  const opts = q.options.map(function(text, index){
+    const letter = letters[index];
+    let cls = "mcq-opt";
+    if(mcqPicked){
+      if(letter===q.answer) cls += " right";
+      else if(letter===mcqPicked) cls += " wrong";
+    }
+    return '<button type="button" class="'+cls+'" data-letter="'+letter+'"'+(mcqPicked?" disabled":"")+'><b>'+letter+'</b><span>'+esc(text)+'</span></button>';
+  }).join("");
+  const note = mcqPicked
+    ? '<div class="mcq-note"><p class="lede"><b>'+(mcqPicked===q.answer?"Correct. ":"Not this one. The answer is "+q.answer+". ")+'</b>'+esc(q.explain)+'</p><button type="button" class="portal lab" id="mcq-next"><strong>'+(mcqIndex+1===pool.length?"See the score":"Next question")+'</strong></button></div>'
+    : "";
+  room.innerHTML =
+    '<button type="button" class="back" id="back">Back to the systems</button>'+
+    '<p class="lede" style="letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--faint)">'+esc(q.system)+' · '+(mcqIndex+1)+' of '+pool.length+'</p>'+
+    '<h2 class="mcq-stem">'+esc(q.stem)+'</h2>'+
+    '<div class="mcq-opts">'+opts+'</div>'+note;
+  document.getElementById("back").onclick = function(){ mcqSystem=null; mcqPicked=null; renderTest(); };
+  room.querySelectorAll("[data-letter]").forEach(function(btn){
+    btn.onclick = function(){
+      if(mcqPicked) return;
+      mcqPicked = btn.getAttribute("data-letter");
+      if(mcqPicked===q.answer) mcqScore += 1;
+      renderTest();
+    };
+  });
+  const next = document.getElementById("mcq-next");
+  if(next) next.onclick = function(){
+    mcqPicked = null;
+    mcqIndex += 1;
+    renderTest();
+  };
+  room.scrollTop = 0;
+}
 function openRail(which){
   finishIntro();
   setSpin(false);
@@ -1615,13 +1737,7 @@ function openRail(which){
   let title = "";
   let lede = "";
   let bodyHtml = "";
-  if(which==="train"){
-    const organ = organById("brain");
-    title = "Train your brain";
-    lede = "Models, dissections, and the brain emergencies.";
-    bodyHtml = '<h3 class="refhead">Learning Lab</h3>'+cards(learnRows(organ))+
-      '<h3 class="refhead">Practice Arena</h3>'+cards(rowsOf(organ.practice));
-  }else if(which==="osce"){
+  if(which==="osce"){
     title = "OSCE World";
     lede = "Five spoken stations. The voice asks the question. You choose.";
     bodyHtml = osceShelf();
@@ -1638,26 +1754,22 @@ function openRail(which){
     '<button type="button" class="back" id="back">Back to the body</button>'+
     '<h2>'+esc(title)+'</h2>'+
     '<p class="lede">'+esc(lede)+'</p>'+bodyHtml;
-  document.getElementById("back").onclick = function(){
-    document.body.classList.remove("in","enter","inside","lab","arena","osce","reference");
-    if(window.resetAtlas) window.resetAtlas();
-  };
+  room.scrollTop = 0;
+  document.getElementById("back").onclick = closePage;
 }
 document.getElementById("rail-tabs").addEventListener("click", function(event){
   const btn = event.target.closest("[data-tab]");
   if(!btn) return;
   const tab = btn.getAttribute("data-tab");
-  if(tab==="organs"){
-    document.getElementById("rail-tabs").hidden = true;
-    document.getElementById("bubbles").hidden = false;
-    return;
-  }
+  if(tab==="train"){ showOrganTabs(); return; }
+  if(tab==="test"){ mcqSystem=null; mcqPicked=null; renderTest(); return; }
   openRail(tab);
 });
-document.getElementById("bubbles-back").onclick = function(){
-  document.getElementById("bubbles").hidden = true;
-  document.getElementById("rail-tabs").hidden = false;
-};
+document.getElementById("organ-tabs").addEventListener("click", function(event){
+  const btn = event.target.closest("[data-organ]");
+  if(!btn) return;
+  enter(btn.getAttribute("data-organ"));
+});
 startShow();
 beginShow();
 playScore();
@@ -1678,6 +1790,6 @@ playWelcome();
 if(!reduced) requestAnimationFrame(drawDust);
 </script>
 <!-- pages-build 20261021s -->
-<script type="module" src="hud-body.js?v=20261021v"></script>
+<script type="module" src="hud-body.js?v=20261022a"></script>
 </body>
 </html>
