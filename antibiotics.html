@@ -64,7 +64,7 @@ input,select{width:100%;background:#0c1822;border:1px solid var(--line);border-r
 <h1 id="title">Antibiotics</h1>
 <p class="notice" id="notice"></p>
 <div id="app"></div>
-<script src="abx-data.js?v=20261022d"></script>
+<script src="abx-data.js?v=20261023a"></script>
 <script>
 const app = document.getElementById("app");
 const title = document.getElementById("title");
@@ -110,10 +110,10 @@ function back(label, fn){
 function home(){
   view = "home"; openId = null; title.textContent = "Antibiotics";
   app.innerHTML = "";
-  app.appendChild(back("Back to the body", function(){ location.href = "index.html?v=20261022d"; }));
+  app.appendChild(back("Back to the body", function(){ location.href = "index.html?v=20261023a"; }));
   const lede = document.createElement("p");
   lede.className = "lede";
-  lede.textContent = "Three layers. The penicillins are loaded. Other classes are not invented to fill the bank.";
+  lede.textContent = "Three layers. Penicillins and cephalosporins are loaded. Other classes are not invented to fill the bank.";
   const doors = document.createElement("div");
   doors.className = "doors";
   doors.innerHTML =
@@ -267,11 +267,19 @@ function doseReport(data){
   const clearance = crcl(data.age, data.sex, data.weight, data.scr, data.unit);
   const sub = row.sub;
   let renal = sub.renalText;
-  if(clearance!=null && clearance<30) renal += " The calculated clearance is under 30 mL/min, so the renal sentence above applies with more force. This page still does not substitute a reduced dose.";
-  else if(clearance!=null && clearance<60) renal += " The calculated clearance is under 60 mL/min. Confirm whether this formulation is one that the monograph adjusts.";
   let hepatic = sub.hepaticText;
-  if((data.liver==="moderate" || data.liver==="severe") && row.drug.id==="amox-clav"){
-    hepatic = "Moderate or severe hepatic impairment plus amoxicillin–clavulanate: liver injury is the stated risk. No reduced milligram is in the bank. Check liver tests and the monograph.";
+  if(row.drug.id==="ceftriaxone"){
+    renal = "Ceftriaxone often does not require adjustment for isolated renal impairment at usual doses.";
+    if(clearance!=null && clearance<30) renal += " Calculated clearance is under 30 mL/min. Confirm that the impairment is isolated. This page does not substitute a reduced dose.";
+    else if(clearance!=null && clearance<60) renal += " Calculated clearance is under 60 mL/min. The usual-dose sentence is about isolated renal impairment.";
+    if(data.liver==="severe" && (data.rrt!=="none" || clearance==null || clearance<60)) hepatic = "Combined severe renal and hepatic dysfunction requires caution with ceftriaxone. No numeric hepatic dose is in the bank.";
+    else hepatic = "Biliary complications are a stated adverse effect. No numeric hepatic dose reduction is in the bank.";
+  } else {
+    if(clearance!=null && clearance<30) renal += " The calculated clearance is under 30 mL/min, so the renal sentence above applies with more force. This page still does not substitute a reduced dose.";
+    else if(clearance!=null && clearance<60) renal += " The calculated clearance is under 60 mL/min. Confirm whether this formulation is one that the monograph adjusts.";
+    if((data.liver==="moderate" || data.liver==="severe") && row.drug.id==="amox-clav"){
+      hepatic = "Moderate or severe hepatic impairment plus amoxicillin–clavulanate: liver injury is the stated risk. No reduced milligram is in the bank. Check liver tests and the monograph.";
+    }
   }
   let rrt = "No renal replacement is selected. "+sub.rrtText;
   if(data.rrt==="crrt") rrt = "CRRT is selected. "+sub.rrtText;
@@ -280,6 +288,10 @@ function doseReport(data){
   let severe = "";
   if(data.severe==="yes" && row.drug.id==="pen-g") severe = "Severe infection: the bank says high-dose penicillin G regimens may be required. The exact high dose is indication-specific.";
   if(data.severe==="yes" && row.drug.id==="pip-tazo") severe = "Severe infection: extended-infusion piperacillin–tazobactam is used in selected cases. The interval still has to account for clearance and replacement therapy.";
+  if(data.severe==="yes" && row.drug.id==="cefepime") severe = "Severe infection: optimized infusion strategies may be required. The exact infusion is not given as a different milligram in this bank.";
+  if(data.severe==="yes" && row.drug.id==="ceftriaxone") severe = "Severe infection, including meningitis: higher doses may be required. The exact meningitis dose is not in this bank.";
+  if(data.severe==="yes" && row.drug.id==="ceftol-tazo") severe = "Selected severe indications use the 3 g every 8 hours example, not the 1.5 g urinary example.";
+  if(row.drug.id==="cefepime" && (data.rrt!=="none" || (clearance!=null && clearance<60))) severe = (severe?severe+" ":"")+"New encephalopathy or myoclonus should trigger an urgent review of renal clearance, dose, and alternative causes.";
   const clearanceLine = clearance==null
     ? "Creatinine clearance was not calculated. Age, weight, and creatinine are all required."
     : "Cockcroft–Gault estimate: "+clearance.toFixed(0)+" mL/min. This is not a measured clearance.";
@@ -302,12 +314,19 @@ function engine(){
       "<option value='enterococcus'>Enterococcus, susceptibility known or pending</option>"+
       "<option value='listeria'>Listeria monocytogenes</option>"+
       "<option value='esbl'>Serious ESBL-producing Enterobacterales infection</option>"+
+      "<option value='mssa'>Susceptible MSSA, skin, surgical prophylaxis, or selected urinary infection</option>"+
+      "<option value='meningitis'>Meningitis, where a third-generation cephalosporin is being considered</option>"+
+      "<option value='pseudomonas'>Susceptible Pseudomonas aeruginosa</option>"+
+      "<option value='ndm'>NDM-producing organism</option>"+
+      "<option value='cre'>Carbapenem-resistant Enterobacterales</option>"+
+      "<option value='crab'>Carbapenem-resistant Acinetobacter</option>"+
+      "<option value='cefepime-neuro'>New encephalopathy or myoclonus during cefepime</option>"+
     "</select>"+
     "<label>Shock</label><select name='shock'><option value='no'>Not septic shock</option><option value='yes'>Septic shock</option></select>"+
-    "<label>Penicillin allergy</label><select name='allergy'><option value='none'>No penicillin allergy stated</option><option value='delayed'>Delayed or unclear reaction</option><option value='immediate'>Serious immediate hypersensitivity</option></select>"+
+    "<label>Penicillin or cephalosporin allergy</label><select name='allergy'><option value='none'>No beta-lactam allergy stated</option><option value='delayed'>Delayed or unclear reaction</option><option value='immediate'>Serious immediate hypersensitivity</option></select>"+
     "<label>Organism named on the culture</label><input name='organism' autocomplete='off' placeholder='Leave blank if no culture'>"+
     "<label>Reported susceptibility</label><select name='susc'><option value='unknown'>Not reported</option><option value='S'>Susceptible</option><option value='I'>Intermediate or susceptible dose-dependent</option><option value='R'>Resistant</option></select>"+
-    "<label>Resistance mechanism</label><select name='mech'><option value='none'>None stated</option><option value='esbl'>ESBL</option><option value='other'>Other mechanism</option></select>"+
+    "<label>Resistance mechanism</label><select name='mech'><option value='none'>None stated</option><option value='esbl'>ESBL</option><option value='ndm'>NDM</option><option value='cre'>CRE</option><option value='crab'>CRAB</option><option value='other'>Other mechanism</option></select>"+
     "<label>MIC, if the laboratory reported one</label><input name='mic' autocomplete='off' placeholder='No breakpoint is stored in this bank'>"+
     "<button class='go' type='submit'>Run the check</button>";
   const out = document.createElement("div");
@@ -335,11 +354,12 @@ function engineReport(data){
   const lines = [];
   const organism = (data.organism||"").trim();
   if(data.allergy==="immediate"){
-    lines.push("Serious immediate hypersensitivity is stated. Do not choose a penicillin from this bank. Cross-reactivity with other beta-lactams depends on the allergy history and the side-chain. No alternative class is loaded.");
+    lines.push("Serious immediate hypersensitivity is stated. Do not choose a penicillin or a cephalosporin from this bank. Cross-reactivity with other beta-lactams depends on the allergy history and the side-chain. No non-beta-lactam class is loaded.");
   } else {
-    if(data.allergy==="delayed") lines.push("The allergy is delayed or unclear. A penicillin is not automatically excluded, and it is not automatically safe. Use the history and the side-chain.");
+    if(data.allergy==="delayed") lines.push("The allergy is delayed or unclear. A beta-lactam is not automatically excluded, and it is not automatically safe. Use the history and the side-chain.");
     if(data.focus==="esbl" || data.mech==="esbl"){
       lines.push("Piperacillin–tazobactam should not automatically be considered definitive therapy for every serious ESBL-producing Enterobacterales infection. The organism, site, susceptibility, severity, and current guidance decide.");
+      lines.push("A cephalosporin is not added automatically for ESBL. Ceftazidime–avibactam inhibits selected serine beta-lactamases, but this bank does not make it definitive therapy.");
       lines.push(gramLine(organism, "pip-tazo", "Piperacillin–tazobactam"));
     }
     if(data.focus==="enterococcus" || data.focus==="listeria"){
@@ -358,16 +378,52 @@ function engineReport(data){
     if(data.focus==="strep"){
       if(data.susc==="R") lines.push("The report says resistant. A natural penicillin is not supported for this isolate.");
       else {
-        lines.push("Susceptible streptococcal infection is a stated use of the natural penicillins.");
+        lines.push("Susceptible streptococcal infection is a stated use of the natural penicillins. Ceftriaxone also lists susceptible streptococci.");
         if(data.shock==="yes") lines.push("Septic shock needs an intravenous plan. Penicillin V and amoxicillin by mouth are not empirical substitutes for IV therapy.");
         else lines.push("Penicillin V teaching example, for a selected infection that can be treated orally: 250–500 mg every 6 hours.");
+        lines.push("Ceftriaxone teaching example for many infections: 1–2 g IV every 24 hours.");
         lines.push(gramLine(organism, "pen-g", "Penicillin G"));
       }
     }
-    if(data.focus==="unspecified" && data.mech!=="esbl"){
+    if(data.focus==="mssa"){
+      if(data.susc==="R") lines.push("The report says resistant. A first-generation cephalosporin is not supported for this isolate.");
+      else {
+        lines.push("Surgical prophylaxis, susceptible MSSA, skin and soft-tissue infection, and selected urinary infection are stated uses of the first-generation cephalosporins.");
+        lines.push("Cefazolin teaching dose: 1–2 g IV every 8 hours for many indications. Cephalexin teaching example: 500 mg orally every 6–12 hours, depending on indication.");
+        if(data.shock==="yes") lines.push("Septic shock: the intravenous example in this generation is cefazolin, not the oral cephalexin example.");
+        lines.push(gramLine(organism, "cefazolin", "Cefazolin"));
+      }
+    }
+    if(data.focus==="meningitis"){
+      lines.push("Ceftriaxone teaching dose for many infections is 1–2 g IV every 24 hours. Higher doses may be required for meningitis. The exact meningitis dose is not in this bank.");
+      lines.push("Ceftriaxone has important neonatal contraindications and precautions involving IV calcium-containing solutions.");
+    }
+    if(data.focus==="pseudomonas"){
+      if(data.susc==="R") lines.push("The report says resistant. Do not use the antipseudomonal teaching doses as if this isolate were susceptible.");
+      else {
+        lines.push("Ceftazidime has antipseudomonal activity and weaker Gram-positive activity than ceftriaxone. Teaching dose for severe susceptible infection: 2 g IV every 8 hours, with indication-specific adjustments.");
+        lines.push("Cefepime covers susceptible Pseudomonas aeruginosa. Teaching dose: commonly 2 g IV every 8–12 hours. Renal adjustment is essential.");
+        lines.push("Ceftaroline does not provide dependable antipseudomonal coverage.");
+        lines.push("Ceftolozane–tazobactam is an enhanced antipseudomonal option. It is not a universal treatment for CRE or CRAB, and these agents are not interchangeable.");
+        lines.push(gramLine(organism, "cefepime", "Cefepime"));
+      }
+    }
+    if(data.focus==="ndm" || data.mech==="ndm"){
+      lines.push("Ceftazidime–avibactam does not reliably treat NDM-producing organisms when used alone.");
+    }
+    if(data.focus==="cre" || data.mech==="cre"){
+      lines.push("Ceftolozane–tazobactam is not a universal treatment for carbapenem-resistant Enterobacterales.");
+    }
+    if(data.focus==="crab" || data.mech==="crab"){
+      lines.push("Ceftolozane–tazobactam is not a universal treatment for carbapenem-resistant Acinetobacter.");
+    }
+    if(data.focus==="cefepime-neuro"){
+      lines.push("New encephalopathy or myoclonus during cefepime therapy should trigger an urgent review of renal clearance, dose, and alternative causes.");
+    }
+    if(data.focus==="unspecified" && data.mech!=="esbl" && data.mech!=="ndm" && data.mech!=="cre" && data.mech!=="crab"){
       lines.push("This syndrome is not one of the applications written into the bank. No empirical drug is added.");
     }
-    if(data.mech==="other") lines.push("Another resistance mechanism is named. The bank has no rule for it. Do not stretch the ESBL pearl to cover it.");
+    if(data.mech==="other") lines.push("Another resistance mechanism is named. The bank has no rule for it. Do not stretch the ESBL or NDM sentence to cover it.");
   }
   if((data.mic||"").trim()) lines.push("MIC entered: "+data.mic.trim()+". No breakpoint is stored here, so this page does not call that MIC susceptible or resistant.");
   if(data.susc==="I") lines.push("Intermediate or dose-dependent susceptibility needs the laboratory definition and the dose the monograph ties to that category. The bank does not convert it into a susceptible result.");
