@@ -199,6 +199,43 @@ window.ABX = {
               ]
             }
           ]
+        },
+        {
+          id: "carbapenems",
+          name: "Class 3. Carbapenems",
+          subclasses: [
+            {
+              id: "carbapenems",
+              name: "Carbapenems",
+              moa: "Bind penicillin-binding proteins and inhibit bacterial cell-wall synthesis.",
+              pharm: "Broad-spectrum, time-dependent bactericidal agents.",
+              spectrum: "Meropenem and imipenem: broad Gram-positive, Gram-negative, and anaerobic coverage. Ertapenem lacks reliable activity against Pseudomonas aeruginosa, Acinetobacter species, and enterococci. Doripenem has antipseudomonal activity, but availability and recommended uses vary.",
+              contra: [
+                "Serious relevant beta-lactam hypersensitivity.",
+                "Seizure disorders and renal impairment require careful selection and dosing.",
+                "Carbapenems can markedly reduce valproate concentrations."
+              ],
+              adverse: [
+                "Gastrointestinal symptoms",
+                "Hypersensitivity",
+                "Cytopenias",
+                "Seizures, especially with imipenem accumulation",
+                "Liver-test abnormalities"
+              ],
+              renal: "required",
+              renalText: "Renal adjustment is required.",
+              hepaticText: "Liver-test abnormalities are listed. No numeric hepatic dose reduction is in this teaching bank.",
+              rrtText: "Renal adjustment is required, including when clearance is replaced. An exact CRRT or SLED milligram dose is not in this teaching bank. Verify the monograph.",
+              monitor: "Renal function, mental status, seizure risk, CBC and liver function when indicated, cultures, and clinical response.",
+              pearl: "Do not use a carbapenem merely because an organism is resistant to a narrower agent. Confirm the likely resistance mechanism and use the narrowest effective therapy.",
+              drugs: [
+                {id:"meropenem", name:"Meropenem", dose:"1 g IV every 8 hours for many severe infections. Indication-specific higher doses may be used.", notes:["Broad Gram-positive, Gram-negative, and anaerobic coverage.","The exact higher dose is not in this teaching bank.","Can markedly reduce valproate concentrations."]},
+                {id:"imipenem", name:"Imipenem–cilastatin", dose:"Commonly 500 mg IV every 6 hours, depending on indication and formulation.", notes:["Broad Gram-positive, Gram-negative, and anaerobic coverage.","Seizures are a particular concern when imipenem accumulates.","Can markedly reduce valproate concentrations."]},
+                {id:"ertapenem", name:"Ertapenem", dose:"1 g IV every 24 hours.", notes:["Lacks reliable activity against Pseudomonas aeruginosa, Acinetobacter species, and enterococci.","Can markedly reduce valproate concentrations."]},
+                {id:"doripenem", name:"Doripenem", dose:"Historical regimens commonly use 500 mg IV every 8 hours. Current availability and approved indications must be verified.", notes:["Antipseudomonal activity, but availability and recommended uses vary.","Can markedly reduce valproate concentrations."]}
+              ]
+            }
+          ]
         }
       ]
     }

@@ -64,7 +64,7 @@ input,select{width:100%;background:#0c1822;border:1px solid var(--line);border-r
 <h1 id="title">Antibiotics</h1>
 <p class="notice" id="notice"></p>
 <div id="app"></div>
-<script src="abx-data.js?v=20261023a"></script>
+<script src="abx-data.js?v=20261023b"></script>
 <script>
 const app = document.getElementById("app");
 const title = document.getElementById("title");
@@ -110,10 +110,10 @@ function back(label, fn){
 function home(){
   view = "home"; openId = null; title.textContent = "Antibiotics";
   app.innerHTML = "";
-  app.appendChild(back("Back to the body", function(){ location.href = "index.html?v=20261023a"; }));
+  app.appendChild(back("Back to the body", function(){ location.href = "index.html?v=20261023b"; }));
   const lede = document.createElement("p");
   lede.className = "lede";
-  lede.textContent = "Three layers. Penicillins and cephalosporins are loaded. Other classes are not invented to fill the bank.";
+  lede.textContent = "Three layers. Penicillins, cephalosporins, and carbapenems are loaded. Other classes are not invented to fill the bank.";
   const doors = document.createElement("div");
   doors.className = "doors";
   doors.innerHTML =
@@ -291,6 +291,14 @@ function doseReport(data){
   if(data.severe==="yes" && row.drug.id==="cefepime") severe = "Severe infection: optimized infusion strategies may be required. The exact infusion is not given as a different milligram in this bank.";
   if(data.severe==="yes" && row.drug.id==="ceftriaxone") severe = "Severe infection, including meningitis: higher doses may be required. The exact meningitis dose is not in this bank.";
   if(data.severe==="yes" && row.drug.id==="ceftol-tazo") severe = "Selected severe indications use the 3 g every 8 hours example, not the 1.5 g urinary example.";
+  if(row.sub.id==="carbapenems"){
+    if(data.severe==="yes"){
+      severe = "In critical illness, prolonged infusion and individualized beta-lactam exposure may improve target attainment.";
+      if(row.drug.id==="meropenem") severe += " Indication-specific higher meropenem doses may be used. The exact higher dose is not in this bank.";
+    }
+    if(row.drug.id==="imipenem" && (data.rrt!=="none" || (clearance!=null && clearance<60))) severe = (severe?severe+" ":"")+"Seizures are a particular concern when imipenem accumulates. Seizure disorders and renal impairment need careful selection. This page does not substitute a reduced milligram.";
+    severe = (severe?severe+" ":"")+"Carbapenems can markedly reduce valproate concentrations.";
+  }
   if(row.drug.id==="cefepime" && (data.rrt!=="none" || (clearance!=null && clearance<60))) severe = (severe?severe+" ":"")+"New encephalopathy or myoclonus should trigger an urgent review of renal clearance, dose, and alternative causes.";
   const clearanceLine = clearance==null
     ? "Creatinine clearance was not calculated. Age, weight, and creatinine are all required."
@@ -321,9 +329,10 @@ function engine(){
       "<option value='cre'>Carbapenem-resistant Enterobacterales</option>"+
       "<option value='crab'>Carbapenem-resistant Acinetobacter</option>"+
       "<option value='cefepime-neuro'>New encephalopathy or myoclonus during cefepime</option>"+
+      "<option value='narrow-fail'>Resistant to a narrower agent, carbapenem being considered</option>"+
     "</select>"+
     "<label>Shock</label><select name='shock'><option value='no'>Not septic shock</option><option value='yes'>Septic shock</option></select>"+
-    "<label>Penicillin or cephalosporin allergy</label><select name='allergy'><option value='none'>No beta-lactam allergy stated</option><option value='delayed'>Delayed or unclear reaction</option><option value='immediate'>Serious immediate hypersensitivity</option></select>"+
+    "<label>Beta-lactam allergy</label><select name='allergy'><option value='none'>No beta-lactam allergy stated</option><option value='delayed'>Delayed or unclear reaction</option><option value='immediate'>Serious immediate hypersensitivity</option></select>"+
     "<label>Organism named on the culture</label><input name='organism' autocomplete='off' placeholder='Leave blank if no culture'>"+
     "<label>Reported susceptibility</label><select name='susc'><option value='unknown'>Not reported</option><option value='S'>Susceptible</option><option value='I'>Intermediate or susceptible dose-dependent</option><option value='R'>Resistant</option></select>"+
     "<label>Resistance mechanism</label><select name='mech'><option value='none'>None stated</option><option value='esbl'>ESBL</option><option value='ndm'>NDM</option><option value='cre'>CRE</option><option value='crab'>CRAB</option><option value='other'>Other mechanism</option></select>"+
@@ -354,12 +363,13 @@ function engineReport(data){
   const lines = [];
   const organism = (data.organism||"").trim();
   if(data.allergy==="immediate"){
-    lines.push("Serious immediate hypersensitivity is stated. Do not choose a penicillin or a cephalosporin from this bank. Cross-reactivity with other beta-lactams depends on the allergy history and the side-chain. No non-beta-lactam class is loaded.");
+    lines.push("Serious immediate hypersensitivity is stated. Do not choose a penicillin, a cephalosporin, or a carbapenem from this bank. Cross-reactivity with other beta-lactams depends on the allergy history and the side-chain. No non-beta-lactam class is loaded.");
   } else {
     if(data.allergy==="delayed") lines.push("The allergy is delayed or unclear. A beta-lactam is not automatically excluded, and it is not automatically safe. Use the history and the side-chain.");
     if(data.focus==="esbl" || data.mech==="esbl"){
       lines.push("Piperacillin–tazobactam should not automatically be considered definitive therapy for every serious ESBL-producing Enterobacterales infection. The organism, site, susceptibility, severity, and current guidance decide.");
       lines.push("A cephalosporin is not added automatically for ESBL. Ceftazidime–avibactam inhibits selected serine beta-lactamases, but this bank does not make it definitive therapy.");
+      lines.push("Do not use a carbapenem merely because the organism is resistant to a narrower agent. Confirm the mechanism and use the narrowest effective therapy.");
       lines.push(gramLine(organism, "pip-tazo", "Piperacillin–tazobactam"));
     }
     if(data.focus==="enterococcus" || data.focus==="listeria"){
@@ -370,6 +380,7 @@ function engineReport(data){
         if(data.susc==="unknown") lines.push("Susceptibility is not on the report yet. Keep this as a targeted plan for a susceptible isolate, not as proof that this isolate is susceptible.");
         lines.push(gramLine(organism, "ampi", "Ampicillin"));
       }
+      if(data.focus==="enterococcus") lines.push("Ertapenem lacks reliable activity against enterococci.");
     }
     if(data.focus==="syphilis"){
       lines.push("Syphilis is a stated use of the natural penicillins. Benzathine penicillin G is indication-specific deep intramuscular treatment. Never administer that formulation intravenously.");
@@ -405,6 +416,7 @@ function engineReport(data){
         lines.push("Cefepime covers susceptible Pseudomonas aeruginosa. Teaching dose: commonly 2 g IV every 8–12 hours. Renal adjustment is essential.");
         lines.push("Ceftaroline does not provide dependable antipseudomonal coverage.");
         lines.push("Ceftolozane–tazobactam is an enhanced antipseudomonal option. It is not a universal treatment for CRE or CRAB, and these agents are not interchangeable.");
+        lines.push("Ertapenem lacks reliable activity against Pseudomonas aeruginosa. Doripenem has antipseudomonal activity, but availability and recommended uses vary. The historical doripenem example is 500 mg IV every 8 hours and must be verified. Meropenem and imipenem are described as broad Gram-negative agents. This bank does not add a Pseudomonas claim that was not written for them.");
         lines.push(gramLine(organism, "cefepime", "Cefepime"));
       }
     }
@@ -413,12 +425,17 @@ function engineReport(data){
     }
     if(data.focus==="cre" || data.mech==="cre"){
       lines.push("Ceftolozane–tazobactam is not a universal treatment for carbapenem-resistant Enterobacterales.");
+      lines.push("Carbapenem resistance means a carbapenem teaching dose is not a susceptibility result. Confirm the mechanism and use the narrowest effective therapy.");
     }
     if(data.focus==="crab" || data.mech==="crab"){
       lines.push("Ceftolozane–tazobactam is not a universal treatment for carbapenem-resistant Acinetobacter.");
+      lines.push("Ertapenem lacks reliable activity against Acinetobacter species. Carbapenem resistance means a carbapenem teaching dose is not a susceptibility result.");
     }
     if(data.focus==="cefepime-neuro"){
       lines.push("New encephalopathy or myoclonus during cefepime therapy should trigger an urgent review of renal clearance, dose, and alternative causes.");
+    }
+    if(data.focus==="narrow-fail"){
+      lines.push("Do not use a carbapenem merely because an organism is resistant to a narrower agent. Confirm the likely resistance mechanism and use the narrowest effective therapy.");
     }
     if(data.focus==="unspecified" && data.mech!=="esbl" && data.mech!=="ndm" && data.mech!=="cre" && data.mech!=="crab"){
       lines.push("This syndrome is not one of the applications written into the bank. No empirical drug is added.");
