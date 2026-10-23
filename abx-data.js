@@ -316,6 +316,50 @@ window.ABX = {
           ]
         }
       ]
+    },
+    {
+      id: "aminoglycoside",
+      name: "Aminoglycosides",
+      groups: [
+        {
+          id: "aminoglycosides",
+          name: "Class 6. Aminoglycosides",
+          subclasses: [
+            {
+              id: "aminoglycosides",
+              name: "Aminoglycosides",
+              moa: "Bind the 30S ribosomal subunit, causing misreading of mRNA and inhibition of protein synthesis.",
+              pharm: "Concentration-dependent bactericidal activity, with a post-antibiotic effect. Predominantly renal elimination. Limited activity against anaerobes. Poor CSF penetration.",
+              contra: [
+                "Serious hypersensitivity.",
+                "Myasthenia gravis and other conditions in which neuromuscular blockade is hazardous.",
+                "Significant renal impairment requires individualized dosing.",
+                "Pregnancy requires careful risk–benefit assessment."
+              ],
+              adverse: [
+                "Acute kidney injury",
+                "Cochlear and vestibular toxicity",
+                "Neuromuscular blockade",
+                "Electrolyte disturbances",
+                "Rare hypersensitivity"
+              ],
+              renal: "required",
+              renalText: "Use renal function, weight, dosing strategy, and measured drug concentrations. Do not simply apply a fixed daily dose in renal failure.",
+              hepaticText: "No hepatic dose change is stated for the aminoglycosides in this teaching bank.",
+              rrtText: "Do not simply apply a fixed daily dose when clearance is replaced. An exact CRRT or SLED milligram dose is not in this teaching bank. Use the selected protocol and measured concentrations.",
+              monitor: "Baseline and serial creatinine, urine output, serum drug concentrations according to the selected protocol, hearing and vestibular symptoms during prolonged therapy, and electrolytes during extended courses.",
+              pearl: "Avoid prolonged aminoglycoside exposure when a less toxic, equally effective alternative is available. These doses are not interchangeable across indications or dosing protocols.",
+              drugs: [
+                {id:"amikacin", name:"Amikacin", dose:"Commonly 15–20 mg/kg IV per dose for selected infections. The interval is determined by renal function and drug-level monitoring.", notes:["Not interchangeable with the gentamicin or tobramycin example.","Poor CSF penetration. Limited activity against anaerobes."]},
+                {id:"gentamicin", name:"Gentamicin", dose:"Extended-interval regimens commonly use 5–7 mg/kg IV for selected indications.", notes:["Not interchangeable with another indication or another aminoglycoside protocol.","Poor CSF penetration. Limited activity against anaerobes."]},
+                {id:"tobramycin", name:"Tobramycin", dose:"Commonly 5–7 mg/kg IV for selected indications.", notes:["Not interchangeable with the amikacin example or with a different protocol.","Poor CSF penetration. Limited activity against anaerobes."]},
+                {id:"streptomycin", name:"Streptomycin", dose:"No separate adult dose example is in this teaching bank. Verify the indication and the protocol.", notes:["Listed with the aminoglycosides. The bank does not add a dose that was not supplied."]},
+                {id:"plazomicin", name:"Plazomicin", dose:"Indication-specific, weight-based dosing with renal adjustment. No milligram per kilogram is in this teaching bank.", notes:["Do not copy the amikacin, gentamicin, or tobramycin milligram onto plazomicin."]}
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 };

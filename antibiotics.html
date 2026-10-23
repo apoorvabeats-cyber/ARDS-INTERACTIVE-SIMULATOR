@@ -64,7 +64,7 @@ input,select{width:100%;background:#0c1822;border:1px solid var(--line);border-r
 <h1 id="title">Antibiotics</h1>
 <p class="notice" id="notice"></p>
 <div id="app"></div>
-<script src="abx-data.js?v=20261023d"></script>
+<script src="abx-data.js?v=20261023e"></script>
 <script>
 const app = document.getElementById("app");
 const title = document.getElementById("title");
@@ -110,10 +110,10 @@ function back(label, fn){
 function home(){
   view = "home"; openId = null; title.textContent = "Antibiotics";
   app.innerHTML = "";
-  app.appendChild(back("Back to the body", function(){ location.href = "index.html?v=20261023d"; }));
+  app.appendChild(back("Back to the body", function(){ location.href = "index.html?v=20261023e"; }));
   const lede = document.createElement("p");
   lede.className = "lede";
-  lede.textContent = "Three layers. Penicillins, cephalosporins, carbapenems, aztreonam, and the beta-lactamase inhibitor combinations are loaded. Other classes are not invented to fill the bank.";
+  lede.textContent = "Three layers. Beta-lactams through the aminoglycosides are loaded. Other classes are not invented to fill the bank.";
   const doors = document.createElement("div");
   doors.className = "doors";
   doors.innerHTML =
@@ -310,6 +310,14 @@ function doseReport(data){
   if(row.drug.id==="azt-avi"){
     severe = (severe?severe+" ":"")+"Do not copy the aztreonam dose or the ceftazidime–avibactam dose onto aztreonam–avibactam. Availability and approval vary.";
   }
+  if(row.sub.id==="aminoglycosides"){
+    const kg = Number(data.weight);
+    const lowRenal = data.rrt!=="none" || (clearance!=null && clearance<60);
+    if(row.drug.id==="amikacin" && kg>0) severe = "Teaching arithmetic only, from 15–20 mg/kg at the entered weight: "+Math.round(15*kg)+"–"+Math.round(20*kg)+" mg per dose. Not a prescription. The interval follows renal function and measured levels.";
+    if((row.drug.id==="gentamicin" || row.drug.id==="tobramycin") && kg>0) severe = "Teaching arithmetic only, from 5–7 mg/kg at the entered weight: "+Math.round(5*kg)+"–"+Math.round(7*kg)+" mg per dose. Not a prescription, and not interchangeable with another protocol.";
+    if(lowRenal) severe = (severe?severe+" ":"")+"Do not simply apply a fixed daily dose in renal failure. No CRRT or SLED milligram is in this bank.";
+    severe = (severe?severe+" ":"")+"Avoid prolonged exposure when a less toxic, equally effective alternative is available. Myasthenia gravis makes neuromuscular blockade hazardous. Pregnancy needs a separate risk–benefit assessment.";
+  }
   if(row.drug.id==="cefepime" && (data.rrt!=="none" || (clearance!=null && clearance<60))) severe = (severe?severe+" ":"")+"New encephalopathy or myoclonus should trigger an urgent review of renal clearance, dose, and alternative causes.";
   const clearanceLine = clearance==null
     ? "Creatinine clearance was not calculated. Age, weight, and creatinine are all required."
@@ -344,6 +352,7 @@ function engine(){
       "<option value='crab'>Carbapenem-resistant Acinetobacter</option>"+
       "<option value='cefepime-neuro'>New encephalopathy or myoclonus during cefepime</option>"+
       "<option value='narrow-fail'>Resistant to a narrower agent, carbapenem being considered</option>"+
+      "<option value='aminoglycoside'>Aminoglycoside being considered</option>"+
     "</select>"+
     "<label>Shock</label><select name='shock'><option value='no'>Not septic shock</option><option value='yes'>Septic shock</option></select>"+
     "<label>Beta-lactam allergy</label><select name='allergy'><option value='none'>No beta-lactam allergy stated</option><option value='delayed'>Delayed or unclear reaction</option><option value='immediate'>Serious immediate hypersensitivity</option><option value='ceftaz'>Ceftazidime allergy stated</option></select>"+
@@ -426,6 +435,7 @@ function engineReport(data){
     if(data.focus==="meningitis"){
       lines.push("Ceftriaxone teaching dose for many infections is 1–2 g IV every 24 hours. Higher doses may be required for meningitis. The exact meningitis dose is not in this bank.");
       lines.push("Ceftriaxone has important neonatal contraindications and precautions involving IV calcium-containing solutions.");
+      lines.push("Aminoglycosides have poor CSF penetration. None is added here as meningitis treatment.");
     }
     if(data.focus==="pseudomonas"){
       if(data.susc==="R") lines.push("The report says resistant. Do not use the antipseudomonal teaching doses as if this isolate were susceptible.");
@@ -441,6 +451,7 @@ function engineReport(data){
     }
     if(data.focus==="anaerobe"){
       lines.push("Aztreonam has no reliable anaerobic coverage. No anaerobic regimen is added from this class.");
+      lines.push("Aminoglycosides have limited activity against anaerobes. None is added for an anaerobic infection.");
     }
     if(data.focus==="kpc" || data.mech==="kpc"){
       if(data.susc==="R") lines.push("The report says resistant. Do not use a KPC regimen as if this isolate were susceptible.");
@@ -474,6 +485,11 @@ function engineReport(data){
     }
     if(data.focus==="narrow-fail"){
       lines.push("Do not use a carbapenem merely because an organism is resistant to a narrower agent. Confirm the likely resistance mechanism and use the narrowest effective therapy.");
+    }
+    if(data.focus==="aminoglycoside"){
+      lines.push("Avoid prolonged aminoglycoside exposure when a less toxic, equally effective alternative is available.");
+      lines.push("The stated examples are not interchangeable. Amikacin: commonly 15–20 mg/kg IV per dose, with the interval set by renal function and levels. Gentamicin and tobramycin: 5–7 mg/kg IV for selected indications. Plazomicin is weight-based, with no milligram per kilogram in this bank. Streptomycin has no dose in this bank.");
+      lines.push("Poor CSF penetration. Limited activity against anaerobes. Do not apply a fixed daily dose in renal failure.");
     }
     if(data.focus==="unspecified" && data.mech!=="esbl" && data.mech!=="ndm" && data.mech!=="cre" && data.mech!=="crab" && data.mech!=="kpc" && data.mech!=="oxa48"){
       lines.push("This syndrome is not one of the applications written into the bank. No empirical drug is added.");
