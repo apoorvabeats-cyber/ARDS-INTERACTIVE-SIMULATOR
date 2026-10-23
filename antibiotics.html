@@ -64,7 +64,7 @@ input,select{width:100%;background:#0c1822;border:1px solid var(--line);border-r
 <h1 id="title">Antibiotics</h1>
 <p class="notice" id="notice"></p>
 <div id="app"></div>
-<script src="abx-data.js?v=20261023b"></script>
+<script src="abx-data.js?v=20261023d"></script>
 <script>
 const app = document.getElementById("app");
 const title = document.getElementById("title");
@@ -110,10 +110,10 @@ function back(label, fn){
 function home(){
   view = "home"; openId = null; title.textContent = "Antibiotics";
   app.innerHTML = "";
-  app.appendChild(back("Back to the body", function(){ location.href = "index.html?v=20261023b"; }));
+  app.appendChild(back("Back to the body", function(){ location.href = "index.html?v=20261023d"; }));
   const lede = document.createElement("p");
   lede.className = "lede";
-  lede.textContent = "Three layers. Penicillins, cephalosporins, and carbapenems are loaded. Other classes are not invented to fill the bank.";
+  lede.textContent = "Three layers. Penicillins, cephalosporins, carbapenems, aztreonam, and the beta-lactamase inhibitor combinations are loaded. Other classes are not invented to fill the bank.";
   const doors = document.createElement("div");
   doors.className = "doors";
   doors.innerHTML =
@@ -274,12 +274,14 @@ function doseReport(data){
     else if(clearance!=null && clearance<60) renal += " Calculated clearance is under 60 mL/min. The usual-dose sentence is about isolated renal impairment.";
     if(data.liver==="severe" && (data.rrt!=="none" || clearance==null || clearance<60)) hepatic = "Combined severe renal and hepatic dysfunction requires caution with ceftriaxone. No numeric hepatic dose is in the bank.";
     else hepatic = "Biliary complications are a stated adverse effect. No numeric hepatic dose reduction is in the bank.";
-  } else {
+  } else if(row.drug.renalForce!==false) {
     if(clearance!=null && clearance<30) renal += " The calculated clearance is under 30 mL/min, so the renal sentence above applies with more force. This page still does not substitute a reduced dose.";
     else if(clearance!=null && clearance<60) renal += " The calculated clearance is under 60 mL/min. Confirm whether this formulation is one that the monograph adjusts.";
     if((data.liver==="moderate" || data.liver==="severe") && row.drug.id==="amox-clav"){
       hepatic = "Moderate or severe hepatic impairment plus amoxicillin–clavulanate: liver injury is the stated risk. No reduced milligram is in the bank. Check liver tests and the monograph.";
     }
+  } else if((data.liver==="moderate" || data.liver==="severe") && row.drug.id==="amox-clav"){
+    hepatic = "Moderate or severe hepatic impairment plus amoxicillin–clavulanate: liver injury is the stated risk. No reduced milligram is in the bank. Check liver tests and the monograph.";
   }
   let rrt = "No renal replacement is selected. "+sub.rrtText;
   if(data.rrt==="crrt") rrt = "CRRT is selected. "+sub.rrtText;
@@ -298,6 +300,15 @@ function doseReport(data){
     }
     if(row.drug.id==="imipenem" && (data.rrt!=="none" || (clearance!=null && clearance<60))) severe = (severe?severe+" ":"")+"Seizures are a particular concern when imipenem accumulates. Seizure disorders and renal impairment need careful selection. This page does not substitute a reduced milligram.";
     severe = (severe?severe+" ":"")+"Carbapenems can markedly reduce valproate concentrations.";
+  }
+  if(row.drug.id==="mero-vabor" || row.drug.id==="imi-rele"){
+    severe = (severe?severe+" ":"")+"The carbapenem in this combination can markedly reduce valproate concentrations. No reduced renal milligram is in the bank.";
+  }
+  if(row.drug.id==="imi-rele" && (data.rrt!=="none" || (clearance!=null && clearance<60))){
+    severe = (severe?severe+" ":"")+"Seizures are a particular concern when the imipenem component accumulates. This page does not substitute a reduced milligram.";
+  }
+  if(row.drug.id==="azt-avi"){
+    severe = (severe?severe+" ":"")+"Do not copy the aztreonam dose or the ceftazidime–avibactam dose onto aztreonam–avibactam. Availability and approval vary.";
   }
   if(row.drug.id==="cefepime" && (data.rrt!=="none" || (clearance!=null && clearance<60))) severe = (severe?severe+" ":"")+"New encephalopathy or myoclonus should trigger an urgent review of renal clearance, dose, and alternative causes.";
   const clearanceLine = clearance==null
@@ -325,6 +336,9 @@ function engine(){
       "<option value='mssa'>Susceptible MSSA, skin, surgical prophylaxis, or selected urinary infection</option>"+
       "<option value='meningitis'>Meningitis, where a third-generation cephalosporin is being considered</option>"+
       "<option value='pseudomonas'>Susceptible Pseudomonas aeruginosa</option>"+
+      "<option value='anaerobe'>Anaerobic infection</option>"+
+      "<option value='kpc'>KPC-producing organism</option>"+
+      "<option value='oxa48'>OXA-48-like carbapenemase</option>"+
       "<option value='ndm'>NDM-producing organism</option>"+
       "<option value='cre'>Carbapenem-resistant Enterobacterales</option>"+
       "<option value='crab'>Carbapenem-resistant Acinetobacter</option>"+
@@ -332,10 +346,10 @@ function engine(){
       "<option value='narrow-fail'>Resistant to a narrower agent, carbapenem being considered</option>"+
     "</select>"+
     "<label>Shock</label><select name='shock'><option value='no'>Not septic shock</option><option value='yes'>Septic shock</option></select>"+
-    "<label>Beta-lactam allergy</label><select name='allergy'><option value='none'>No beta-lactam allergy stated</option><option value='delayed'>Delayed or unclear reaction</option><option value='immediate'>Serious immediate hypersensitivity</option></select>"+
+    "<label>Beta-lactam allergy</label><select name='allergy'><option value='none'>No beta-lactam allergy stated</option><option value='delayed'>Delayed or unclear reaction</option><option value='immediate'>Serious immediate hypersensitivity</option><option value='ceftaz'>Ceftazidime allergy stated</option></select>"+
     "<label>Organism named on the culture</label><input name='organism' autocomplete='off' placeholder='Leave blank if no culture'>"+
     "<label>Reported susceptibility</label><select name='susc'><option value='unknown'>Not reported</option><option value='S'>Susceptible</option><option value='I'>Intermediate or susceptible dose-dependent</option><option value='R'>Resistant</option></select>"+
-    "<label>Resistance mechanism</label><select name='mech'><option value='none'>None stated</option><option value='esbl'>ESBL</option><option value='ndm'>NDM</option><option value='cre'>CRE</option><option value='crab'>CRAB</option><option value='other'>Other mechanism</option></select>"+
+    "<label>Resistance mechanism</label><select name='mech'><option value='none'>None stated</option><option value='esbl'>ESBL</option><option value='kpc'>KPC</option><option value='oxa48'>OXA-48-like</option><option value='ndm'>NDM</option><option value='cre'>CRE</option><option value='crab'>CRAB</option><option value='other'>Other mechanism</option></select>"+
     "<label>MIC, if the laboratory reported one</label><input name='mic' autocomplete='off' placeholder='No breakpoint is stored in this bank'>"+
     "<button class='go' type='submit'>Run the check</button>";
   const out = document.createElement("div");
@@ -363,9 +377,10 @@ function engineReport(data){
   const lines = [];
   const organism = (data.organism||"").trim();
   if(data.allergy==="immediate"){
-    lines.push("Serious immediate hypersensitivity is stated. Do not choose a penicillin, a cephalosporin, or a carbapenem from this bank. Cross-reactivity with other beta-lactams depends on the allergy history and the side-chain. No non-beta-lactam class is loaded.");
+    lines.push("Serious immediate hypersensitivity is stated. Do not choose a penicillin, a cephalosporin, or a carbapenem from this bank. Cross-reactivity with other beta-lactams depends on the allergy history and the side-chain. Aztreonam is not automatically safe: serious hypersensitivity to aztreonam is a contraindication, and ceftazidime allergy must be assessed because the drugs share a side chain. No non-beta-lactam class is loaded.");
   } else {
     if(data.allergy==="delayed") lines.push("The allergy is delayed or unclear. A beta-lactam is not automatically excluded, and it is not automatically safe. Use the history and the side-chain.");
+    if(data.allergy==="ceftaz") lines.push("Ceftazidime allergy is stated. Assess aztreonam carefully because the drugs share a side chain. Serious hypersensitivity to aztreonam is a contraindication.");
     if(data.focus==="esbl" || data.mech==="esbl"){
       lines.push("Piperacillin–tazobactam should not automatically be considered definitive therapy for every serious ESBL-producing Enterobacterales infection. The organism, site, susceptibility, severity, and current guidance decide.");
       lines.push("A cephalosporin is not added automatically for ESBL. Ceftazidime–avibactam inhibits selected serine beta-lactamases, but this bank does not make it definitive therapy.");
@@ -381,6 +396,7 @@ function engineReport(data){
         lines.push(gramLine(organism, "ampi", "Ampicillin"));
       }
       if(data.focus==="enterococcus") lines.push("Ertapenem lacks reliable activity against enterococci.");
+      lines.push("Aztreonam has no reliable Gram-positive coverage, so it is not an enterococcal or Listeria option in this bank.");
     }
     if(data.focus==="syphilis"){
       lines.push("Syphilis is a stated use of the natural penicillins. Benzathine penicillin G is indication-specific deep intramuscular treatment. Never administer that formulation intravenously.");
@@ -395,6 +411,7 @@ function engineReport(data){
         lines.push("Ceftriaxone teaching example for many infections: 1–2 g IV every 24 hours.");
         lines.push(gramLine(organism, "pen-g", "Penicillin G"));
       }
+      lines.push("Aztreonam has no reliable Gram-positive coverage.");
     }
     if(data.focus==="mssa"){
       if(data.susc==="R") lines.push("The report says resistant. A first-generation cephalosporin is not supported for this isolate.");
@@ -404,6 +421,7 @@ function engineReport(data){
         if(data.shock==="yes") lines.push("Septic shock: the intravenous example in this generation is cefazolin, not the oral cephalexin example.");
         lines.push(gramLine(organism, "cefazolin", "Cefazolin"));
       }
+      lines.push("Aztreonam has no reliable Gram-positive coverage.");
     }
     if(data.focus==="meningitis"){
       lines.push("Ceftriaxone teaching dose for many infections is 1–2 g IV every 24 hours. Higher doses may be required for meningitis. The exact meningitis dose is not in this bank.");
@@ -417,11 +435,29 @@ function engineReport(data){
         lines.push("Ceftaroline does not provide dependable antipseudomonal coverage.");
         lines.push("Ceftolozane–tazobactam is an enhanced antipseudomonal option. It is not a universal treatment for CRE or CRAB, and these agents are not interchangeable.");
         lines.push("Ertapenem lacks reliable activity against Pseudomonas aeruginosa. Doripenem has antipseudomonal activity, but availability and recommended uses vary. The historical doripenem example is 500 mg IV every 8 hours and must be verified. Meropenem and imipenem are described as broad Gram-negative agents. This bank does not add a Pseudomonas claim that was not written for them.");
+        lines.push("Aztreonam covers aerobic Gram-negative organisms, including susceptible Pseudomonas. Teaching dose: commonly 1–2 g IV every 8 hours for severe susceptible infections. It has no reliable Gram-positive or anaerobic coverage. Renal adjustment is required.");
         lines.push(gramLine(organism, "cefepime", "Cefepime"));
       }
     }
+    if(data.focus==="anaerobe"){
+      lines.push("Aztreonam has no reliable anaerobic coverage. No anaerobic regimen is added from this class.");
+    }
+    if(data.focus==="kpc" || data.mech==="kpc"){
+      if(data.susc==="R") lines.push("The report says resistant. Do not use a KPC regimen as if this isolate were susceptible.");
+      lines.push("Ceftazidime–avibactam is important for susceptible organisms producing selected serine beta-lactamases, including KPC. Teaching regimen: 2.5 g IV every 8 hours, infused over 2–3 hours. It does not reliably cover NDM when used alone.");
+      lines.push("Meropenem–vaborbactam includes KPC-producing organisms when susceptible. Teaching regimen: 4 g IV every 8 hours, infused over 3 hours. It is not a dependable treatment for NDM or OXA-48-like carbapenemases.");
+      lines.push("Imipenem–cilastatin–relebactam provides activity against selected serine beta-lactamase-producing organisms. Teaching regimen: 1.25 g IV every 6 hours for the appropriate indication. It is not a universal solution for metallo-beta-lactamase-producing organisms.");
+    }
+    if(data.focus==="oxa48" || data.mech==="oxa48"){
+      lines.push("Ceftazidime–avibactam is important for many OXA-48-like enzymes when the organism is susceptible. Teaching regimen: 2.5 g IV every 8 hours, infused over 2–3 hours. It does not reliably cover NDM when used alone.");
+      lines.push("Meropenem–vaborbactam is not a dependable treatment for OXA-48-like carbapenemases.");
+    }
     if(data.focus==="ndm" || data.mech==="ndm"){
+      lines.push("An inhibitor active against selected serine beta-lactamases may not inhibit a metallo-beta-lactamase such as NDM.");
       lines.push("Ceftazidime–avibactam does not reliably treat NDM-producing organisms when used alone.");
+      lines.push("Meropenem–vaborbactam is not a dependable treatment for NDM.");
+      lines.push("Imipenem–cilastatin–relebactam is not a universal solution for metallo-beta-lactamase-producing organisms.");
+      lines.push("Aztreonam–avibactam is designed for selected resistant Gram-negative organisms, including some metallo-beta-lactamase producers. No adult milligram is in this bank. Do not assume availability or approval, and do not copy another combination's dose.");
     }
     if(data.focus==="cre" || data.mech==="cre"){
       lines.push("Ceftolozane–tazobactam is not a universal treatment for carbapenem-resistant Enterobacterales.");
@@ -430,6 +466,8 @@ function engineReport(data){
     if(data.focus==="crab" || data.mech==="crab"){
       lines.push("Ceftolozane–tazobactam is not a universal treatment for carbapenem-resistant Acinetobacter.");
       lines.push("Ertapenem lacks reliable activity against Acinetobacter species. Carbapenem resistance means a carbapenem teaching dose is not a susceptibility result.");
+      lines.push("Sulbactam–durlobactam is specifically important for susceptible Acinetobacter baumannii complex infections. Teaching regimen: 1 g sulbactam plus 1 g durlobactam IV every 6 hours, infused over 3 hours, with renal adjustment. It must be used with the recommended accompanying therapy. That accompanying drug is not named here, so none is added.");
+      if(data.susc==="R") lines.push("The report says resistant. Do not use sulbactam–durlobactam as if this isolate were susceptible to it.");
     }
     if(data.focus==="cefepime-neuro"){
       lines.push("New encephalopathy or myoclonus during cefepime therapy should trigger an urgent review of renal clearance, dose, and alternative causes.");
@@ -437,7 +475,7 @@ function engineReport(data){
     if(data.focus==="narrow-fail"){
       lines.push("Do not use a carbapenem merely because an organism is resistant to a narrower agent. Confirm the likely resistance mechanism and use the narrowest effective therapy.");
     }
-    if(data.focus==="unspecified" && data.mech!=="esbl" && data.mech!=="ndm" && data.mech!=="cre" && data.mech!=="crab"){
+    if(data.focus==="unspecified" && data.mech!=="esbl" && data.mech!=="ndm" && data.mech!=="cre" && data.mech!=="crab" && data.mech!=="kpc" && data.mech!=="oxa48"){
       lines.push("This syndrome is not one of the applications written into the bank. No empirical drug is added.");
     }
     if(data.mech==="other") lines.push("Another resistance mechanism is named. The bank has no rule for it. Do not stretch the ESBL or NDM sentence to cover it.");

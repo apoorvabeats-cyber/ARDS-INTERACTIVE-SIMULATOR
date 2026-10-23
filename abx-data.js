@@ -193,7 +193,7 @@ window.ABX = {
               drugs: [
                 {id:"ceftaroline", name:"Ceftaroline", dose:"Commonly 600 mg IV every 12 hours for approved indications.", notes:["Does not provide dependable antipseudomonal coverage.","Activity against selected resistant Gram-positive organisms."]},
                 {id:"ceftobiprole", name:"Ceftobiprole", dose:"No separate adult dose example is in this teaching bank. Verify the formulation, the indication, and whether it is approved where you practise.", notes:["Activity against selected resistant Gram-positive organisms. The bank does not add a dose that was not supplied."]},
-                {id:"ceftaz-avi", name:"Ceftazidime–avibactam", dose:"2.5 g IV every 8 hours, infused over 2–3 hours according to the applicable regimen.", notes:["Does not reliably treat NDM-producing organisms when used alone.","Not interchangeable with the other agents in this group."]},
+                {id:"ceftaz-avi", name:"Ceftazidime–avibactam", dose:"2.5 g IV every 8 hours, infused over 2–3 hours according to the applicable regimen.", notes:["Important for susceptible organisms producing selected serine beta-lactamases, including KPC and many OXA-48-like enzymes.","Does not reliably cover NDM when used alone.","Not interchangeable with the other agents in this group."]},
                 {id:"ceftol-tazo", name:"Ceftolozane–tazobactam", dose:"1.5 g IV every 8 hours for complicated urinary infections. 3 g IV every 8 hours for selected severe indications.", notes:["Enhanced antipseudomonal beta-lactam plus beta-lactamase inhibitor.","Not a universal treatment for CRE or CRAB."]},
                 {id:"cefepime-enmeta", name:"Cefepime–enmetazobactam", dose:"2.5 g IV every 8 hours, infused over 2 hours for its approved indication.", notes:["Enmetazobactam inhibits selected beta-lactamases. Approval varies by country."]}
               ]
@@ -233,6 +233,84 @@ window.ABX = {
                 {id:"imipenem", name:"Imipenem–cilastatin", dose:"Commonly 500 mg IV every 6 hours, depending on indication and formulation.", notes:["Broad Gram-positive, Gram-negative, and anaerobic coverage.","Seizures are a particular concern when imipenem accumulates.","Can markedly reduce valproate concentrations."]},
                 {id:"ertapenem", name:"Ertapenem", dose:"1 g IV every 24 hours.", notes:["Lacks reliable activity against Pseudomonas aeruginosa, Acinetobacter species, and enterococci.","Can markedly reduce valproate concentrations."]},
                 {id:"doripenem", name:"Doripenem", dose:"Historical regimens commonly use 500 mg IV every 8 hours. Current availability and approved indications must be verified.", notes:["Antipseudomonal activity, but availability and recommended uses vary.","Can markedly reduce valproate concentrations."]}
+              ]
+            }
+          ]
+        },
+        {
+          id: "monobactams",
+          name: "Class 4. Monobactams",
+          subclasses: [
+            {
+              id: "aztreonam",
+              name: "Aztreonam",
+              moa: "Binds primarily to PBP3 and inhibits Gram-negative bacterial cell-wall synthesis.",
+              spectrum: "Aerobic Gram-negative organisms, including susceptible Pseudomonas. No reliable Gram-positive or anaerobic coverage.",
+              contra: [
+                "Serious hypersensitivity to aztreonam.",
+                "Assess ceftazidime allergy carefully because the drugs share a side chain."
+              ],
+              adverse: ["Rash", "Liver-test abnormalities", "Gastrointestinal symptoms", "Occasional cytopenias"],
+              renal: "required",
+              renalText: "Renal adjustment is required.",
+              hepaticText: "Liver-test abnormalities are listed. No numeric hepatic dose reduction is in this teaching bank.",
+              rrtText: "Renal adjustment is required, including when clearance is replaced. An exact CRRT or SLED milligram dose is not in this teaching bank. Verify the monograph.",
+              monitor: "Renal function, liver function when appropriate, cultures, and clinical response.",
+              drugs: [
+                {id:"aztreonam", name:"Aztreonam", dose:"Commonly 1–2 g IV every 8 hours for severe susceptible infections. The exact regimen depends on indication.", notes:["No reliable Gram-positive or anaerobic coverage.","Serious hypersensitivity to aztreonam is a contraindication. Ceftazidime allergy must be assessed because the drugs share a side chain."]}
+              ]
+            }
+          ]
+        },
+        {
+          id: "bli-class",
+          name: "Class 5. Beta-lactamase inhibitors and combinations",
+          subclasses: [
+            {
+              id: "inhibitors",
+              name: "Beta-lactamase inhibitors",
+              moa: "Inhibit selected beta-lactamases, protecting the accompanying beta-lactam from enzymatic degradation.",
+              spectrum: "Inhibitors have different activity profiles. An inhibitor active against selected serine beta-lactamases may not inhibit metallo-beta-lactamases such as NDM.",
+              contra: ["Use the contraindication of the accompanying beta-lactam. These inhibitors are not given alone in this teaching bank."],
+              adverse: ["See the accompanying beta-lactam. No separate inhibitor adverse-effect list was supplied."],
+              renal: "unstated",
+              renalText: "These inhibitors are not dosed alone in this teaching bank. No separate renal milligram was supplied.",
+              hepaticText: "No hepatic dose change for an inhibitor alone is stated in this teaching bank.",
+              rrtText: "No CRRT or SLED dose for an inhibitor alone is in this teaching bank.",
+              monitor: "Follow the accompanying combination: renal function, hypersensitivity, liver function when appropriate, CBC during prolonged treatment, infusion compatibility, culture results, and emerging resistance.",
+              pearl: "An inhibitor active against selected serine beta-lactamases may not inhibit metallo-beta-lactamases such as NDM.",
+              drugs: [
+                {id:"clavulanate", name:"Clavulanate", dose:"Not administered alone in this teaching bank. See amoxicillin–clavulanate.", renalForce:false},
+                {id:"sulbactam", name:"Sulbactam", dose:"Not administered alone in this teaching bank. See ampicillin–sulbactam and sulbactam–durlobactam.", renalForce:false},
+                {id:"tazobactam", name:"Tazobactam", dose:"Not administered alone in this teaching bank. See piperacillin–tazobactam and ceftolozane–tazobactam.", renalForce:false},
+                {id:"avibactam", name:"Avibactam", dose:"Not administered alone in this teaching bank. See ceftazidime–avibactam. Aztreonam–avibactam has no separate milligram in this bank.", renalForce:false},
+                {id:"vaborbactam", name:"Vaborbactam", dose:"Not administered alone in this teaching bank. See meropenem–vaborbactam.", renalForce:false},
+                {id:"relebactam", name:"Relebactam", dose:"Not administered alone in this teaching bank. See imipenem–cilastatin–relebactam.", renalForce:false},
+                {id:"durlobactam", name:"Durlobactam", dose:"Not administered alone in this teaching bank. See sulbactam–durlobactam.", renalForce:false},
+                {id:"enmetazobactam", name:"Enmetazobactam", dose:"Not administered alone in this teaching bank. See cefepime–enmetazobactam.", renalForce:false}
+              ]
+            },
+            {
+              id: "inhibitor-combinations",
+              name: "Important combinations",
+              moa: "The inhibitor protects the accompanying beta-lactam from selected beta-lactamases. Activity depends on which inhibitor is used.",
+              spectrum: "Ceftazidime–avibactam covers selected serine beta-lactamases, including KPC and many OXA-48-like enzymes, and does not reliably cover NDM alone. Meropenem–vaborbactam includes KPC when susceptible and is not dependable for NDM or OXA-48-like carbapenemases. Imipenem–cilastatin–relebactam covers selected serine beta-lactamases and is not a universal metallo-beta-lactamase treatment. Sulbactam–durlobactam is for susceptible Acinetobacter baumannii complex. Aztreonam–avibactam is designed for selected resistant Gram-negative organisms, including some metallo-beta-lactamase producers.",
+              contra: [
+                "Use the contraindication of the beta-lactam in the combination.",
+                "Aztreonam–avibactam: do not assume availability or approval in every jurisdiction."
+              ],
+              adverse: ["See the accompanying beta-lactam. Hypersensitivity remains a class concern."],
+              renal: "selected",
+              renalText: "Renal adjustment is stated for sulbactam–durlobactam. The other new combinations do not have a reduced milligram in this teaching bank.",
+              hepaticText: "No numeric hepatic dose reduction is stated for these combinations in the teaching bank.",
+              rrtText: "An exact CRRT or SLED milligram dose is not in this teaching bank. Verify the monograph and, for aztreonam–avibactam, the local product information.",
+              monitor: "Renal function, hypersensitivity, liver function when appropriate, CBC during prolonged treatment, infusion compatibility, culture results, and emerging resistance.",
+              pearl: "Ceftazidime–avibactam is filed with the cephalosporins. Its teaching regimen is 2.5 g IV every 8 hours over 2–3 hours. It is important for susceptible KPC and many OXA-48-like enzymes, and it does not reliably cover NDM when used alone. These combinations are not interchangeable.",
+              drugs: [
+                {id:"mero-vabor", name:"Meropenem–vaborbactam", dose:"4 g IV every 8 hours, infused over 3 hours, for the appropriate indication.", renalForce:false, notes:["Activity includes KPC-producing organisms when susceptible.","Not a dependable treatment for NDM or OXA-48-like carbapenemases.","The meropenem component can markedly reduce valproate concentrations. No reduced renal milligram is in this bank."]},
+                {id:"imi-rele", name:"Imipenem–cilastatin–relebactam", dose:"1.25 g IV every 6 hours for the appropriate indication.", renalForce:false, notes:["Activity against selected serine beta-lactamase-producing organisms.","Not a universal solution for metallo-beta-lactamase-producing organisms.","The imipenem component carries the seizure concern when imipenem accumulates. It can also reduce valproate concentrations. No reduced renal milligram is in this bank."]},
+                {id:"sul-dur", name:"Sulbactam–durlobactam", dose:"1 g sulbactam plus 1 g durlobactam IV every 6 hours, infused over 3 hours, with renal adjustment.", notes:["Specifically important for susceptible Acinetobacter baumannii complex infections.","Must be used with the recommended accompanying therapy. That accompanying drug is not named in this bank.","No reduced milligram for renal impairment is in this bank."]},
+                {id:"azt-avi", name:"Aztreonam–avibactam", dose:"No adult milligram is in this teaching bank. Dosing must follow the approved local product information and renal function.", renalForce:false, notes:["Designed for selected resistant Gram-negative organisms, including some metallo-beta-lactamase producers.","Do not assume availability or approval in every jurisdiction.","Do not copy the aztreonam or ceftazidime–avibactam milligram onto this combination."]}
               ]
             }
           ]
