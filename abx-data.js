@@ -36,7 +36,7 @@ window.ABX = {
                 {id:"pen-g", name:"Penicillin G", dose:"Indication-specific IV dosing. High-dose regimens may be required for severe infections.", notes:["Excessive high-dose exposure can cause neurotoxicity and seizures."]},
                 {id:"pen-v", name:"Penicillin V", dose:"Commonly 250–500 mg orally every 6 hours for selected infections."},
                 {id:"pen-benz", name:"Benzathine penicillin G", dose:"Indication-specific deep IM administration. Never administer intravenously.", notes:["Never give this formulation intravenously."]},
-                {id:"pen-proc", name:"Procaine penicillin G", dose:"No separate adult dose example is in this teaching bank. Verify the formulation and the indication.", notes:["Listed with the natural penicillins. The bank does not add a dose that was not supplied."]}
+                {id:"pen-proc", name:"Procaine penicillin G", dose:"Intramuscular only. The supplied text did not give a number.", guideline:"US label example: 600,000 to 1,000,000 units deep IM daily for selected moderately severe pneumococcal, group A streptococcal, or staphylococcal infections. Primary, secondary, or latent syphilis with a negative spinal fluid: 600,000 units IM daily for 8 days. Never give this formulation intravenously or into an artery.", notes:["The bank did not invent this figure. It is the label example, kept separate from the supplied text.","Intramuscular only."]}
               ]
             },
             {
@@ -114,7 +114,7 @@ window.ABX = {
               drugs: [
                 {id:"cefazolin", name:"Cefazolin", dose:"1–2 g IV every 8 hours for many indications."},
                 {id:"cephalexin", name:"Cephalexin", dose:"Commonly 500 mg orally every 6–12 hours, depending on indication."},
-                {id:"cefadroxil", name:"Cefadroxil", dose:"No separate adult dose example is in this teaching bank. Verify the formulation and the indication.", notes:["Listed with the first-generation cephalosporins. The bank does not add a dose that was not supplied."]}
+                {id:"cefadroxil", name:"Cefadroxil", dose:"The supplied text listed the drug and did not give a number.", guideline:"US monograph example: 1 g orally once daily, or in two divided doses, for pharyngitis, tonsillitis, and skin infection. Uncomplicated lower urinary infection: 1–2 g orally daily. Other urinary infections: 2 g daily in two doses. Creatinine clearance 25–50 mL/min: 1 g, then 500 mg every 12 hours. Clearance 10–25: 500 mg every 24 hours. Clearance under 10: 500 mg every 36 hours.", notes:["Guideline figure, not part of the supplied text."]}
               ]
             },
             {
@@ -132,8 +132,8 @@ window.ABX = {
               drugs: [
                 {id:"cefuroxime", name:"Cefuroxime", dose:"Commonly 750 mg–1.5 g IV every 8 hours, depending on indication."},
                 {id:"cefoxitin", name:"Cefoxitin", dose:"Commonly 1–2 g IV every 6–8 hours for selected indications.", notes:["A cephamycin, with additional anaerobic activity."]},
-                {id:"cefotetan", name:"Cefotetan", dose:"No separate adult dose example is in this teaching bank. Verify the formulation and the indication.", notes:["A cephamycin, with additional anaerobic activity. The bank does not add a dose that was not supplied."]},
-                {id:"cefaclor", name:"Cefaclor", dose:"No separate adult dose example is in this teaching bank. Verify the formulation and the indication.", notes:["Listed with the second-generation cephalosporins. The bank does not add a dose that was not supplied."]}
+                {id:"cefotetan", name:"Cefotetan", dose:"The supplied text listed the drug and did not give a number.", guideline:"US label example: 1–2 g IV or IM every 12 hours for many moderate infections. Life-threatening infection: 3 g IV every 12 hours. Maximum 6 g/day. Surgical prophylaxis: 1 or 2 g IV once, 30–60 minutes before surgery. It has no useful activity against Chlamydia.", notes:["A cephamycin, with additional anaerobic activity.","Guideline figure, not part of the supplied text."]},
+                {id:"cefaclor", name:"Cefaclor", dose:"The supplied text listed the drug and did not give a number.", guideline:"US label example, immediate release: 250–500 mg orally every 8 hours. Extended-release 500 mg every 12 hours is clinically matched to immediate-release 250 mg every 8 hours, not to 500 mg every 8 hours.", notes:["Guideline figure, not part of the supplied text."]}
               ]
             },
             {
@@ -192,7 +192,7 @@ window.ABX = {
               pearl: "These agents are not interchangeable. Availability and regulatory approval vary by country. Ceftaroline does not provide dependable antipseudomonal coverage. Ceftazidime–avibactam does not reliably treat NDM-producing organisms when used alone. Ceftolozane–tazobactam is not a universal treatment for CRE or CRAB.",
               drugs: [
                 {id:"ceftaroline", name:"Ceftaroline", dose:"Commonly 600 mg IV every 12 hours for approved indications.", notes:["Does not provide dependable antipseudomonal coverage.","Activity against selected resistant Gram-positive organisms."]},
-                {id:"ceftobiprole", name:"Ceftobiprole", dose:"No separate adult dose example is in this teaching bank. Verify the formulation, the indication, and whether it is approved where you practise.", notes:["Activity against selected resistant Gram-positive organisms. The bank does not add a dose that was not supplied."]},
+                {id:"ceftobiprole", name:"Ceftobiprole", dose:"The supplied text listed the drug and did not give a number.", guideline:"FDA Zevtera label, adults: 667 mg ceftobiprole medocaril sodium, equivalent to 500 mg ceftobiprole, IV over 2 hours. Staphylococcus aureus bacteraemia: every 6 hours on days 1–8, then every 8 hours. Skin infection or community-acquired pneumonia: every 8 hours. Creatinine clearance above 150 mL/min: every 6 hours. Clearance 30 to under 50, skin or pneumonia: every 12 hours. Clearance under 15, including haemodialysis: 333 mg every 24 hours, after dialysis on dialysis days.", notes:["Activity against selected resistant Gram-positive organisms.","Guideline figure, not part of the supplied text. Approval varies by country."]},
                 {id:"ceftaz-avi", name:"Ceftazidime–avibactam", dose:"2.5 g IV every 8 hours, infused over 2–3 hours according to the applicable regimen.", notes:["Important for susceptible organisms producing selected serine beta-lactamases, including KPC and many OXA-48-like enzymes.","Does not reliably cover NDM when used alone.","Not interchangeable with the other agents in this group."]},
                 {id:"ceftol-tazo", name:"Ceftolozane–tazobactam", dose:"1.5 g IV every 8 hours for complicated urinary infections. 3 g IV every 8 hours for selected severe indications.", notes:["Enhanced antipseudomonal beta-lactam plus beta-lactamase inhibitor.","Not a universal treatment for CRE or CRAB."]},
                 {id:"cefepime-enmeta", name:"Cefepime–enmetazobactam", dose:"2.5 g IV every 8 hours, infused over 2 hours for its approved indication.", notes:["Enmetazobactam inhibits selected beta-lactamases. Approval varies by country."]}
@@ -310,7 +310,7 @@ window.ABX = {
                 {id:"mero-vabor", name:"Meropenem–vaborbactam", dose:"4 g IV every 8 hours, infused over 3 hours, for the appropriate indication.", renalForce:false, notes:["Activity includes KPC-producing organisms when susceptible.","Not a dependable treatment for NDM or OXA-48-like carbapenemases.","The meropenem component can markedly reduce valproate concentrations. No reduced renal milligram is in this bank."]},
                 {id:"imi-rele", name:"Imipenem–cilastatin–relebactam", dose:"1.25 g IV every 6 hours for the appropriate indication.", renalForce:false, notes:["Activity against selected serine beta-lactamase-producing organisms.","Not a universal solution for metallo-beta-lactamase-producing organisms.","The imipenem component carries the seizure concern when imipenem accumulates. It can also reduce valproate concentrations. No reduced renal milligram is in this bank."]},
                 {id:"sul-dur", name:"Sulbactam–durlobactam", dose:"1 g sulbactam plus 1 g durlobactam IV every 6 hours, infused over 3 hours, with renal adjustment.", notes:["Specifically important for susceptible Acinetobacter baumannii complex infections.","Must be used with the recommended accompanying therapy. That accompanying drug is not named in this bank.","No reduced milligram for renal impairment is in this bank."]},
-                {id:"azt-avi", name:"Aztreonam–avibactam", dose:"No adult milligram is in this teaching bank. Dosing must follow the approved local product information and renal function.", renalForce:false, notes:["Designed for selected resistant Gram-negative organisms, including some metallo-beta-lactamase producers.","Do not assume availability or approval in every jurisdiction.","Do not copy the aztreonam or ceftazidime–avibactam milligram onto this combination."]}
+                {id:"azt-avi", name:"Aztreonam–avibactam", dose:"The supplied text said to follow local product information and did not give a number.", renalForce:false, guideline:"FDA Emblaveo label for complicated intra-abdominal infection, with metronidazole, creatinine clearance above 50 mL/min: load 2.67 g (aztreonam 2 g plus avibactam 0.67 g), then 2 g (aztreonam 1.5 g plus avibactam 0.5 g) every 6 hours, each infused over 3 hours, for 5–14 days. Clearance above 30 to 50: same load, then 1 g every 6 hours. Clearance above 15 to 30: load 1.8 g, then 0.9 g every 8 hours. Clearance 15 or below, including haemodialysis: load 1.33 g, then 0.9 g every 12 hours, after dialysis on dialysis days. Do not copy the plain aztreonam dose onto this product.", notes:["Designed for selected resistant Gram-negative organisms, including some metallo-beta-lactamase producers.","Do not assume availability or approval in every jurisdiction.","Guideline figure for one approved indication. It is not a dose for every NDM infection."]}
               ]
             }
           ]
@@ -353,8 +353,49 @@ window.ABX = {
                 {id:"amikacin", name:"Amikacin", dose:"Commonly 15–20 mg/kg IV per dose for selected infections. The interval is determined by renal function and drug-level monitoring.", notes:["Not interchangeable with the gentamicin or tobramycin example.","Poor CSF penetration. Limited activity against anaerobes."]},
                 {id:"gentamicin", name:"Gentamicin", dose:"Extended-interval regimens commonly use 5–7 mg/kg IV for selected indications.", notes:["Not interchangeable with another indication or another aminoglycoside protocol.","Poor CSF penetration. Limited activity against anaerobes."]},
                 {id:"tobramycin", name:"Tobramycin", dose:"Commonly 5–7 mg/kg IV for selected indications.", notes:["Not interchangeable with the amikacin example or with a different protocol.","Poor CSF penetration. Limited activity against anaerobes."]},
-                {id:"streptomycin", name:"Streptomycin", dose:"No separate adult dose example is in this teaching bank. Verify the indication and the protocol.", notes:["Listed with the aminoglycosides. The bank does not add a dose that was not supplied."]},
-                {id:"plazomicin", name:"Plazomicin", dose:"Indication-specific, weight-based dosing with renal adjustment. No milligram per kilogram is in this teaching bank.", notes:["Do not copy the amikacin, gentamicin, or tobramycin milligram onto plazomicin."]}
+                {id:"streptomycin", name:"Streptomycin", dose:"The supplied text listed the drug and did not give a number.", guideline:"WHO drug-resistant tuberculosis handbook example: 15 mg/kg IM once daily, maximum generally 1 g. Age over 59 years: 10 mg/kg, maximum 750 mg. In renal failure, 12–15 mg/kg two or three times a week, not every day. Follow concentrations when possible.", notes:["Guideline figure for tuberculosis, not part of the supplied text.","Do not copy the gentamicin or amikacin example onto streptomycin."]},
+                {id:"plazomicin", name:"Plazomicin", dose:"The supplied text said weight-based dosing with renal adjustment and did not give a number.", guideline:"FDA Zemdri label, complicated urinary infection including pyelonephritis, when alternatives are limited: 15 mg/kg IV over 30 minutes every 24 hours if creatinine clearance is at least 60 mL/min, for 4–7 days. Clearance 30 to under 60: 10 mg/kg every 24 hours. Clearance 15 to under 30: 10 mg/kg every 48 hours. If clearance is under 90, keep the trough under 3 mcg/mL. The label has insufficient information for clearance under 15 mL/min, haemodialysis, or CRRT.", notes:["Do not copy the amikacin, gentamicin, or tobramycin milligram onto plazomicin.","Guideline figure, not part of the supplied text."]}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      id: "glycopeptide",
+      name: "Glycopeptides and lipoglycopeptides",
+      groups: [
+        {
+          id: "glycopeptides",
+          name: "Class 7. Glycopeptides",
+          subclasses: [
+            {
+              id: "glycopeptides",
+              name: "Glycopeptides",
+              moa: "Bind D-Ala-D-Ala termini of cell-wall precursors and inhibit peptidoglycan synthesis.",
+              spectrum: "Gram-positive organisms, including susceptible MRSA. No meaningful Gram-negative activity.",
+              contra: [
+                "Serious hypersensitivity.",
+                "Renal impairment.",
+                "Previous vancomycin-associated kidney injury.",
+                "Infusion reactions with rapid vancomycin administration."
+              ],
+              adverse: [
+                "Nephrotoxicity",
+                "Infusion-related flushing and hypotension",
+                "Neutropenia during prolonged therapy",
+                "Rare ototoxicity",
+                "Thrombocytopenia, particularly with teicoplanin"
+              ],
+              renal: "required",
+              renalText: "Renal function and measured concentrations are essential for individualized maintenance dosing.",
+              hepaticText: "No hepatic dose change is stated for the glycopeptides in the supplied text.",
+              rrtText: "Maintenance dosing follows clearance and measured concentrations. The ASHP/IDSA 2020 vancomycin example for conventional CRRT, effluent 20–25 mL/kg/h, is a 20–25 mg/kg load then 7.5–10 mg/kg every 12 hours. No SLED milligram is in that excerpt. Teicoplanin has no CRRT milligram in this bank.",
+              monitor: "Vancomycin AUC-guided monitoring when indicated and available. Creatinine and urine output. CBC during prolonged treatment. Clinical response and microbiological clearance.",
+              pearl: "Vancomycin exposure should be optimized to balance efficacy and kidney toxicity. A trough concentration alone may not adequately characterize exposure in every patient.",
+              drugs: [
+                {id:"vancomycin", name:"Vancomycin", dose:"IV loading and maintenance doses should be individualized by actual body weight, renal function, infection severity, and exposure monitoring.", guideline:"ASHP/IDSA/PIDS/SIDP 2020, serious MRSA, assuming a broth-microdilution MIC of 1 mg/L: 15–20 mg/kg actual body weight IV every 8–12 hours for most adults with normal renal function. Critically ill loading dose 20–35 mg/kg. Target AUC24/MIC 400–600, preferably checked in the first 24–48 hours. A trough alone may not describe exposure. Conventional CRRT at an effluent rate of 20–25 mL/kg/h: load 20–25 mg/kg, then 7.5–10 mg/kg every 12 hours. Guideline example, not a prescription.", notes:["No meaningful Gram-negative activity.","Infuse slowly enough to avoid flushing and hypotension."]},
+                {id:"teicoplanin", name:"Teicoplanin", dose:"Loading doses followed by maintenance therapy according to indication and renal function.", guideline:"BNF adult example. Serious Gram-positive infection: 6 mg/kg every 12 hours for 3 doses, then 6 mg/kg once daily. Streptococcal or enterococcal endocarditis, and bone or joint infection: 12 mg/kg every 12 hours for 3–5 doses, then 12 mg/kg once daily. Renal impairment changes the maintenance interval. Guideline example, not a prescription.", notes:["Thrombocytopenia is a particular concern with teicoplanin.","No meaningful Gram-negative activity.","No CRRT milligram is added."]}
               ]
             }
           ]

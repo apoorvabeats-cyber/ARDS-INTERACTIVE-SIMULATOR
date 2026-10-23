@@ -64,7 +64,7 @@ input,select{width:100%;background:#0c1822;border:1px solid var(--line);border-r
 <h1 id="title">Antibiotics</h1>
 <p class="notice" id="notice"></p>
 <div id="app"></div>
-<script src="abx-data.js?v=20261023e"></script>
+<script src="abx-data.js?v=20261023f"></script>
 <script>
 const app = document.getElementById("app");
 const title = document.getElementById("title");
@@ -110,10 +110,10 @@ function back(label, fn){
 function home(){
   view = "home"; openId = null; title.textContent = "Antibiotics";
   app.innerHTML = "";
-  app.appendChild(back("Back to the body", function(){ location.href = "index.html?v=20261023e"; }));
+  app.appendChild(back("Back to the body", function(){ location.href = "index.html?v=20261023f"; }));
   const lede = document.createElement("p");
   lede.className = "lede";
-  lede.textContent = "Three layers. Beta-lactams through the aminoglycosides are loaded. Other classes are not invented to fill the bank.";
+  lede.textContent = "Three layers. Beta-lactams through the glycopeptides are loaded. Where the supplied text had no milligram, a labeled guideline example is shown separately. Teaching figures only.";
   const doors = document.createElement("div");
   doors.className = "doors";
   doors.innerHTML =
@@ -197,6 +197,7 @@ function monograph(id){
   mono.innerHTML =
     "<p class='kicker'>"+esc(row.klass.name)+" · "+esc(sub.name)+"</p>"+
     "<h2>Teaching dose</h2><p>"+esc(row.drug.dose)+"</p>"+
+    (row.drug.guideline?"<h3>Guideline dose</h3><p>"+esc(row.drug.guideline)+"</p>":"")+
     (row.drug.notes?list(row.drug.notes):"")+
     "<h3>Mechanism</h3><p>"+esc(sub.moa||"")+"</p>"+
     (sub.pharm?"<h3>Pharmacology</h3><p>"+esc(sub.pharm)+"</p>":"")+
@@ -308,7 +309,7 @@ function doseReport(data){
     severe = (severe?severe+" ":"")+"Seizures are a particular concern when the imipenem component accumulates. This page does not substitute a reduced milligram.";
   }
   if(row.drug.id==="azt-avi"){
-    severe = (severe?severe+" ":"")+"Do not copy the aztreonam dose or the ceftazidime–avibactam dose onto aztreonam–avibactam. Availability and approval vary.";
+    severe = (severe?severe+" ":"")+"The labeled figure is for complicated intra-abdominal infection given with metronidazole. It is not a dose for every resistant Gram-negative infection, and it is not the plain aztreonam dose.";
   }
   if(row.sub.id==="aminoglycosides"){
     const kg = Number(data.weight);
@@ -318,11 +319,38 @@ function doseReport(data){
     if(lowRenal) severe = (severe?severe+" ":"")+"Do not simply apply a fixed daily dose in renal failure. No CRRT or SLED milligram is in this bank.";
     severe = (severe?severe+" ":"")+"Avoid prolonged exposure when a less toxic, equally effective alternative is available. Myasthenia gravis makes neuromuscular blockade hazardous. Pregnancy needs a separate risk–benefit assessment.";
   }
+  if(row.sub.id==="glycopeptides"){
+    const kg = Number(data.weight);
+    if(row.drug.id==="vancomycin" && kg>0){
+      severe = "ASHP/IDSA 2020 arithmetic only, at the entered actual weight: maintenance 15–20 mg/kg is "+Math.round(15*kg)+"–"+Math.round(20*kg)+" mg. A critically ill loading dose of 20–35 mg/kg is "+Math.round(20*kg)+"–"+Math.round(Math.min(35*kg,3000))+" mg, and the guideline caps many loading doses at 3000 mg. Not a prescription.";
+      if(data.rrt==="crrt") severe += " For conventional CRRT effluent of 20–25 mL/kg/h, the same guideline gives a 20–25 mg/kg load, then 7.5–10 mg/kg every 12 hours ("+Math.round(7.5*kg)+"–"+Math.round(10*kg)+" mg). That figure is not a SLED dose.";
+      else if(data.rrt==="sled") severe += " The 2020 guideline excerpt used here does not give a SLED milligram. Do not reuse the CRRT figure.";
+    }
+    if(row.drug.id==="teicoplanin" && kg>0){
+      severe = "BNF arithmetic only, at the entered weight: 6 mg/kg is "+Math.round(6*kg)+" mg and 12 mg/kg is "+Math.round(12*kg)+" mg. Serious Gram-positive infection: 6 mg/kg every 12 hours for 3 doses, then once daily. Endocarditis or bone and joint infection: 12 mg/kg every 12 hours for 3–5 doses, then once daily. Not a prescription.";
+    }
+    if(clearance!=null && clearance<60) severe = (severe?severe+" ":"")+"Renal impairment: maintenance must follow clearance and measured concentrations. This page does not invent a reduced milligram beyond the labeled bands already stated.";
+  }
+  if(row.drug.id==="plazomicin"){
+    const kg = Number(data.weight);
+    if((clearance!=null && clearance<15) || data.rrt!=="none") severe = (severe?severe+" ":"")+"The FDA label has insufficient information for clearance under 15 mL/min, haemodialysis, or CRRT. No replacement-therapy milligram is added.";
+    else if(clearance!=null && clearance<30 && kg>0) severe = (severe?severe+" ":"")+"FDA band for clearance 15 to under 30 mL/min: 10 mg/kg every 48 hours, about "+Math.round(10*kg)+" mg at the entered weight. Keep the trough under 3 mcg/mL.";
+    else if(clearance!=null && clearance<60 && kg>0) severe = (severe?severe+" ":"")+"FDA band for clearance 30 to under 60 mL/min: 10 mg/kg every 24 hours, about "+Math.round(10*kg)+" mg at the entered weight.";
+    else if(clearance!=null && clearance>=60 && kg>0) severe = (severe?severe+" ":"")+"FDA usual cUTI dose when clearance is at least 60 mL/min: 15 mg/kg every 24 hours, about "+Math.round(15*kg)+" mg at the entered weight, infused over 30 minutes.";
+    else if(kg>0) severe = (severe?severe+" ":"")+"Creatinine is needed before a plazomicin band is chosen. The FDA cUTI dose is 15 mg/kg every 24 hours only when clearance is at least 60 mL/min.";
+  }
+  if(row.drug.id==="streptomycin"){
+    const kg = Number(data.weight);
+    if(kg>0){
+      const daily = Math.min(Math.round(15*kg), 1000);
+      severe = (severe?severe+" ":"")+"WHO tuberculosis arithmetic only: 15 mg/kg is "+Math.round(15*kg)+" mg, generally capped at 1 g, so the daily example is "+daily+" mg. In renal failure use 12–15 mg/kg two or three times a week, not this daily figure.";
+    }
+  }
   if(row.drug.id==="cefepime" && (data.rrt!=="none" || (clearance!=null && clearance<60))) severe = (severe?severe+" ":"")+"New encephalopathy or myoclonus should trigger an urgent review of renal clearance, dose, and alternative causes.";
   const clearanceLine = clearance==null
     ? "Creatinine clearance was not calculated. Age, weight, and creatinine are all required."
     : "Cockcroft–Gault estimate: "+clearance.toFixed(0)+" mL/min. This is not a measured clearance.";
-  return "<div class='out'><p class='kicker'>"+esc(row.drug.name)+"</p><p><b>"+esc(row.drug.dose)+"</b></p><p>"+esc(clearanceLine)+"</p><p>"+esc(renal)+"</p><p>"+esc(hepatic)+"</p><p>"+esc(rrt)+"</p>"+(severe?"<p>"+esc(severe)+"</p>":"")+"<p>"+esc(sub.monitor)+"</p></div>";
+  return "<div class='out'><p class='kicker'>"+esc(row.drug.name)+"</p><p><b>"+esc(row.drug.dose)+"</b></p>"+(row.drug.guideline?"<p>"+esc(row.drug.guideline)+"</p>":"")+"<p>"+esc(clearanceLine)+"</p><p>"+esc(renal)+"</p><p>"+esc(hepatic)+"</p><p>"+esc(rrt)+"</p>"+(severe?"<p>"+esc(severe)+"</p>":"")+"<p>"+esc(sub.monitor)+"</p></div>";
 }
 function engine(){
   view = "engine"; title.textContent = "Prescribing check";
@@ -353,6 +381,7 @@ function engine(){
       "<option value='cefepime-neuro'>New encephalopathy or myoclonus during cefepime</option>"+
       "<option value='narrow-fail'>Resistant to a narrower agent, carbapenem being considered</option>"+
       "<option value='aminoglycoside'>Aminoglycoside being considered</option>"+
+      "<option value='mrsa'>Susceptible MRSA or other serious Gram-positive infection</option>"+
     "</select>"+
     "<label>Shock</label><select name='shock'><option value='no'>Not septic shock</option><option value='yes'>Septic shock</option></select>"+
     "<label>Beta-lactam allergy</label><select name='allergy'><option value='none'>No beta-lactam allergy stated</option><option value='delayed'>Delayed or unclear reaction</option><option value='immediate'>Serious immediate hypersensitivity</option><option value='ceftaz'>Ceftazidime allergy stated</option></select>"+
@@ -468,7 +497,7 @@ function engineReport(data){
       lines.push("Ceftazidime–avibactam does not reliably treat NDM-producing organisms when used alone.");
       lines.push("Meropenem–vaborbactam is not a dependable treatment for NDM.");
       lines.push("Imipenem–cilastatin–relebactam is not a universal solution for metallo-beta-lactamase-producing organisms.");
-      lines.push("Aztreonam–avibactam is designed for selected resistant Gram-negative organisms, including some metallo-beta-lactamase producers. No adult milligram is in this bank. Do not assume availability or approval, and do not copy another combination's dose.");
+      lines.push("Aztreonam–avibactam is designed for selected resistant Gram-negative organisms, including some metallo-beta-lactamase producers. The FDA cIAI example, with metronidazole and clearance above 50 mL/min, is a 2 g aztreonam plus 0.67 g avibactam load, then 1.5 g plus 0.5 g every 6 hours over 3 hours. That is one labeled indication, not a dose for every NDM infection, and approval varies.");
     }
     if(data.focus==="cre" || data.mech==="cre"){
       lines.push("Ceftolozane–tazobactam is not a universal treatment for carbapenem-resistant Enterobacterales.");
@@ -488,8 +517,19 @@ function engineReport(data){
     }
     if(data.focus==="aminoglycoside"){
       lines.push("Avoid prolonged aminoglycoside exposure when a less toxic, equally effective alternative is available.");
-      lines.push("The stated examples are not interchangeable. Amikacin: commonly 15–20 mg/kg IV per dose, with the interval set by renal function and levels. Gentamicin and tobramycin: 5–7 mg/kg IV for selected indications. Plazomicin is weight-based, with no milligram per kilogram in this bank. Streptomycin has no dose in this bank.");
+      lines.push("The stated examples are not interchangeable. Amikacin: commonly 15–20 mg/kg IV per dose, with the interval set by renal function and levels. Gentamicin and tobramycin: 5–7 mg/kg IV for selected indications. Plazomicin FDA cUTI example: 15 mg/kg every 24 hours when clearance is at least 60 mL/min. Streptomycin WHO tuberculosis example: 15 mg/kg daily, maximum generally 1 g.");
       lines.push("Poor CSF penetration. Limited activity against anaerobes. Do not apply a fixed daily dose in renal failure.");
+    }
+    if(data.focus==="mrsa"){
+      if(data.susc==="R") lines.push("The report says resistant. Do not use vancomycin or teicoplanin as if this isolate were susceptible.");
+      else {
+        lines.push("Glycopeptides cover Gram-positive organisms, including susceptible MRSA. They have no meaningful Gram-negative activity.");
+        lines.push("Vancomycin loading and maintenance stay individualized. ASHP/IDSA 2020 example for serious MRSA: 15–20 mg/kg actual body weight every 8–12 hours when renal function is normal, with an AUC/MIC target of 400–600 assuming an MIC of 1 mg/L. A trough alone may not describe exposure.");
+        lines.push("Teicoplanin BNF example for serious Gram-positive infection: 6 mg/kg every 12 hours for 3 doses, then 6 mg/kg once daily.");
+      }
+    }
+    if(data.focus==="pseudomonas" || data.focus==="esbl" || data.focus==="ndm" || data.focus==="kpc" || data.focus==="oxa48" || data.focus==="cre" || data.focus==="crab"){
+      lines.push("Vancomycin and teicoplanin have no meaningful Gram-negative activity. They are not added for this organism.");
     }
     if(data.focus==="unspecified" && data.mech!=="esbl" && data.mech!=="ndm" && data.mech!=="cre" && data.mech!=="crab" && data.mech!=="kpc" && data.mech!=="oxa48"){
       lines.push("This syndrome is not one of the applications written into the bank. No empirical drug is added.");
