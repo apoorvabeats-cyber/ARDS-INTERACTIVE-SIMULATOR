@@ -79,7 +79,7 @@
     const ctx = fit(monitor);
     const w = monitor.width, h = monitor.height;
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "rgba(4,12,18,.55)";
+    ctx.fillStyle = "rgba(2,8,6,.94)";
     ctx.fillRect(0, 0, w, h);
     const beat = sim.hr / 60;
     const lanes = [
@@ -119,7 +119,7 @@
     const ctx = fit(vent);
     const w = vent.width, h = vent.height;
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "rgba(5,14,24,.42)";
+    ctx.fillStyle = "rgba(4,10,16,.9)";
     ctx.fillRect(0, 0, w, h);
     const colors = ["#7fd4e6", "#e2b48a", "#9ad7ff"];
     const laneH = h / 3;
@@ -253,6 +253,7 @@
     live = true;
     document.body.classList.add("icu-live");
     raf = requestAnimationFrame(frameTick);
+    startAudio();
   }
   function unlock(){
     startAudio();
@@ -316,8 +317,9 @@
     unlock();
     const go = hit.getAttribute("data-go");
     if(go === "cart") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261024g", "ACLS");
-    else if(go === "vent") openModule("Ventilator_Waveform_Troubleshooting.html?v=20261024g", "Ventilator");
+    else if(go === "vent") openModule("Ventilator_Waveform_Troubleshooting.html?v=20261025a", "Ventilator");
     else if(go === "monitor") openShock();
+    else if(go === "dialysis") openModule("antibiotics.html?v=20261025a", "Dialysis and dosing");
     else if(go === "patient") leaveForBody();
   });
   document.getElementById("icu-audio").addEventListener("click", function(event){
