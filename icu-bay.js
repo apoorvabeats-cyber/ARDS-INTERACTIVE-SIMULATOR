@@ -311,12 +311,14 @@
     if(figure) figure.style.opacity = "1";
     if(typeof speak === "function") speak("Tap any organ.");
   }
+  window.openBody = leaveForBody;
   frame.addEventListener("click", function(event){
     const hit = event.target.closest("[data-go]");
     if(!hit || !live) return;
     unlock();
     const go = hit.getAttribute("data-go");
-    if(go === "cart") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261024g", "ACLS");
+    if(go === "cart") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261025c", "Crash cart");
+    else if(go === "defib") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261025c", "Defibrillator");
     else if(go === "vent") openModule("Ventilator_Waveform_Troubleshooting.html?v=20261025a", "Ventilator");
     else if(go === "monitor") openShock();
     else if(go === "dialysis") openModule("antibiotics.html?v=20261025a", "Dialysis and dosing");

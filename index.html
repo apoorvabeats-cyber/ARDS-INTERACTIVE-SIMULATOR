@@ -400,6 +400,10 @@ body.icu-open .icu{display:flex;align-items:center;justify-content:center;positi
 .bay-hit.pat::before{background:radial-gradient(ellipse at 50% 28%,rgba(255,196,120,.55),rgba(255,196,120,0) 72%);animation-delay:1s}
 .bay-hit.dial{left:63.8%;top:28.5%;width:14.8%;height:46%;border-radius:6px}
 .bay-hit.dial::before{background:radial-gradient(ellipse at 50% 42%,rgba(255,70,90,.55),rgba(255,70,90,0) 70%);animation-delay:1.4s}
+.bay-hit.defib{left:83.8%;top:34.6%;width:14.8%;height:15.8%;border-radius:12px}
+.bay-hit.defib::before{background:radial-gradient(ellipse at 50% 48%,rgba(255,214,70,.62),rgba(255,214,70,0) 70%);animation-delay:1.8s}
+.bay-hit.cart{left:81.8%;top:49.2%;width:17.6%;height:30%;border-radius:8px}
+.bay-hit.cart::before{background:radial-gradient(ellipse at 50% 42%,rgba(255,120,30,.58),rgba(255,120,30,0) 72%);animation-delay:2.2s}
 @keyframes glowWash{0%,100%{opacity:.55}50%{opacity:1}}
 .icu-audio{display:none}
 @media(max-width:820px) and (max-aspect-ratio:4/5){
@@ -453,6 +457,8 @@ body:not(.icu-open) #icu-return{display:inline-flex;align-items:center}
       <button type="button" class="bay-hit pat" data-go="patient" aria-label="Patient"></button>
       <button type="button" class="bay-hit ven" data-go="vent" aria-label="Ventilator"></button>
       <button type="button" class="bay-hit dial" data-go="dialysis" aria-label="Dialysis machine"></button>
+      <button type="button" class="bay-hit defib" data-go="defib" aria-label="Defibrillator"></button>
+      <button type="button" class="bay-hit cart" data-go="cart" aria-label="Crash cart"></button>
     </div>
   </div>
   <div class="icu-audio" id="icu-audio">
@@ -1531,29 +1537,57 @@ function stopAmbient(){
   });
   ambient = [];
 }
+function femaleVoice(){
+  if(!window.speechSynthesis) return null;
+  const voices = speechSynthesis.getVoices() || [];
+  const named = /female|samantha|victoria|karen|moira|fiona|tessa|serena|zira|susan|veena|heera|sonia|catherine|allison|ava|nicky|libby/i;
+  const en = voices.filter(function(voice){ return /^en/i.test(voice.lang || ""); });
+  return en.find(function(voice){ return named.test((voice.name || "") + " " + (voice.voiceURI || "")); })
+    || voices.find(function(voice){ return named.test((voice.name || "") + " " + (voice.voiceURI || "")); })
+    || en.find(function(voice){ return /en-GB|en-IN|en-AU/i.test(voice.lang) && !/male/i.test(voice.name || ""); })
+    || null;
+}
 function speak(text){
   if(!soundOn || !text) return;
-  const file = {
-    "Brain":"voice/brain.mp3",
-    "Thyroid":"voice/thyroid.mp3",
-    "Lungs":"voice/lungs.mp3",
-    "Heart":"voice/heart.mp3",
-    "Liver":"voice/liver.mp3",
-    "Stomach":"voice/stomach.mp3",
-    "Gastrointestinal":"voice/gastrointestinal.mp3",
-    "Spleen":"voice/spleen.mp3",
-    "Whole patient":"voice/whole.mp3",
-    "Kidneys":"voice/kidneys.mp3",
-    "Welcome to Learning Lab.":"voice/lab.mp3",
-    "Welcome to Practice Arena.":"voice/arena.mp3"
-  }[text];
-  if(file){ playLine(file); return; }
+  const onBody = document.body.classList.contains("body-only");
+  if(!onBody){
+    const file = {
+      "Brain":"voice/brain.mp3",
+      "Thyroid":"voice/thyroid.mp3",
+      "Lungs":"voice/lungs.mp3",
+      "Heart":"voice/heart.mp3",
+      "Liver":"voice/liver.mp3",
+      "Stomach":"voice/stomach.mp3",
+      "Gastrointestinal":"voice/gastrointestinal.mp3",
+      "Spleen":"voice/spleen.mp3",
+      "Whole patient":"voice/whole.mp3",
+      "Kidneys":"voice/kidneys.mp3",
+      "Welcome to Learning Lab.":"voice/lab.mp3",
+      "Welcome to Practice Arena.":"voice/arena.mp3"
+    }[text];
+    if(file){ playLine(file); return; }
+  }
   if(!window.speechSynthesis) return;
-  speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-IN";
-  utterance.rate = 0.96;
-  speechSynthesis.speak(utterance);
+  const say = function(){
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voice = onBody ? femaleVoice() : null;
+    utterance.lang = voice && voice.lang ? voice.lang : "en-IN";
+    utterance.rate = onBody ? 0.68 : 0.96;
+    utterance.pitch = onBody ? 1.14 : 1;
+    if(voice) utterance.voice = voice;
+    speechSynthesis.speak(utterance);
+  };
+  if(onBody && !speechSynthesis.getVoices().length){
+    const once = function(){
+      speechSynthesis.removeEventListener("voiceschanged", once);
+      say();
+    };
+    speechSynthesis.addEventListener("voiceschanged", once);
+    speechSynthesis.getVoices();
+    return;
+  }
+  say();
 }
 function startBed(){}
 function hush(){
@@ -1880,7 +1914,7 @@ document.getElementById("rail-tabs").addEventListener("click", function(event){
   const btn = event.target.closest("[data-tab]");
   if(!btn) return;
   const tab = btn.getAttribute("data-tab");
-  if(tab==="train"){ showOrganTabs(); return; }
+  if(tab==="train"){ if(window.openBody) window.openBody(); return; }
   if(tab==="test"){ mcqSystem=null; mcqPicked=null; renderTest(); return; }
   if(tab==="abg"){ renderAbg(); return; }
   openRail(tab);
@@ -1911,8 +1945,8 @@ if(!document.body.classList.contains("icu-open")){
 })();
 if(!reduced) requestAnimationFrame(drawDust);
 </script>
-<!-- pages-build 20261025a -->
-<script src="icu-bay.js?v=20261025a"></script>
+<!-- pages-build 20261025c -->
+<script src="icu-bay.js?v=20261025c"></script>
 <script type="module" src="hud-body.js?v=20261022a"></script>
 </body>
 </html>
