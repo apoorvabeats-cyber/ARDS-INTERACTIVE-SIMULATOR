@@ -192,3 +192,318 @@ const OSCE_STATIONS = {
         options: ["Control the pressure, magnesium, and obstetric care", "Alteplase for a presumed stroke", "Acyclovir as the only drug", "Heparin infusion"] } }
   ]
 };
+
+OSCE_STATIONS.near = {
+  "scope": {
+    "use": [
+      "It confirms the tube is already in the trachea by displaying exhaled carbon dioxide.",
+      "It delivers a set tidal volume once the airway is secure, in place of a ventilator.",
+      "It numbs the cords so the tube can be passed without anyone needing to see them."
+    ],
+    "check": [
+      "A chest film is the first confirmation. Do not look for carbon dioxide until that film is back.",
+      "If the cords were seen, no further check is required before ventilation starts.",
+      "A cuff pressure between 20 and 30 is itself the proof that the tube is tracheal."
+    ]
+  },
+  "tube": {
+    "use": [
+      "The bougie is the airway that stays in. The tube is only a guide and is then removed.",
+      "A stylet is how cuff pressure is measured after the tube is already in the trachea.",
+      "The tube is reserved for a patient who is already on a ventilator. A mask is the first secure airway."
+    ],
+    "check": [
+      "Force the tube over the bougie until it seats. Resistance means you should push harder.",
+      "A cuff pressure around 60 centimetres of water is the target, and it replaces carbon dioxide.",
+      "If the bougie passed, the tube is confirmed. Waveform capnography is optional."
+    ]
+  },
+  "bvm": {
+    "use": [
+      "The bag replaces the ventilator for days in injured lungs, at 6 millilitres per kilogram.",
+      "It is only a source of oxygen before a drug. It cannot ventilate someone who has stopped breathing.",
+      "It is the device that draws the continuous wave of exhaled carbon dioxide."
+    ],
+    "check": [
+      "One person, a hard squeeze, and a large breath until the abdomen rises.",
+      "Skip the jaw thrust once the mask is on. An oral airway blocks the bag and should stay out.",
+      "The check that matters is a printed 12-lead before the first breath."
+    ]
+  },
+  "suction": {
+    "use": [
+      "Suction is the oxygen supply you take when the wall outlet fails on a transfer.",
+      "It turns a liquid bronchodilator into a mist for asthma.",
+      "It is how you measure cuff pressure on the endotracheal tube."
+    ],
+    "check": [
+      "Leave it off until after the induction drug, so the noise does not disturb the room.",
+      "A unit that was tested yesterday does not need a test for this patient.",
+      "The check is a carbon dioxide wave, not whether the suction actually turns on."
+    ]
+  },
+  "co2": {
+    "use": [
+      "Waveform capnography is how you see the vocal cords. It replaces the laryngoscope.",
+      "It is a single colour change at the moment of intubation, and then it is disconnected.",
+      "It measures oxygen saturation in the same way the finger probe does."
+    ],
+    "check": [
+      "No wave is common. Wait for the chest film before you move the tube.",
+      "A one-time colour change is enough. A continuous wave is not required.",
+      "If both sides of the chest move, capnography can stay off."
+    ]
+  },
+  "ventilator": {
+    "use": [
+      "The ventilator is a mask for a patient who is still protecting the airway, so intubation can wait.",
+      "It only sets the oxygen. Rate and volume are left to the patient in every mode.",
+      "It is the device that delivers the shock for ventricular fibrillation."
+    ],
+    "check": [
+      "In injured lungs use 10 to 12 millilitres per kilogram of actual body weight, and silence the high-pressure alarm.",
+      "Plateau pressure is optional. Turn disconnect alarms off so the patient can be moved.",
+      "The only check is cuff pressure. Tidal volume does not matter once the tube is in."
+    ]
+  },
+  "niv": {
+    "use": [
+      "A mask is the airway of choice when the patient is vomiting and not protecting the airway.",
+      "High-flow nasal oxygen replaces a breathing tube in a moribund patient.",
+      "Mask ventilation is how a nebulized bronchodilator is given, and nothing else."
+    ],
+    "check": [
+      "Leave the mask on with no time limit if the saturation is rising, even if the patient is tiring.",
+      "A mask is safer than a tube when the patient is vomiting, because the mask collects it.",
+      "Do not plan intubation. Non-invasive ventilation is the destination for every hypoxic patient."
+    ]
+  },
+  "o2": {
+    "use": [
+      "The cylinder is the oxygen for a patient who is staying in the bed. Wall oxygen is only the backup.",
+      "Wall oxygen is the monitor of exhaled carbon dioxide.",
+      "The regulator is optional. A cylinder threads onto any ventilator outlet."
+    ],
+    "check": [
+      "Move the patient first, and read the cylinder gauge after you arrive.",
+      "A cylinder that was full yesterday does not need the gauge checked today.",
+      "The check is that the wall alarm has been silenced before the transfer."
+    ]
+  },
+  "neb": {
+    "use": [
+      "A nebulizer, by itself, is the treatment of airway swelling from anaphylaxis.",
+      "It delivers a vasopressor mist into a central venous line.",
+      "It replaces bedside suction when the secretions are thick."
+    ],
+    "check": [
+      "On a ventilator, ignore the volume the nebulizer adds. The set tidal volume cannot change.",
+      "A finished nebulizer is the check that the tube is in the trachea.",
+      "Silence the ventilator alarms while it runs, because the extra flow is expected."
+    ]
+  },
+  "mpm": {
+    "use": [
+      "The bedside monitor prints a diagnostic 12-lead and replaces the ECG machine.",
+      "It delivers the unsynchronized shock for ventricular fibrillation.",
+      "It reads core temperature from the blood-pressure cuff."
+    ],
+    "check": [
+      "A saturation number with no waveform is still reliable if the number is above 92.",
+      "Leave the alarm limits on the factory adult settings for every patient.",
+      "Silence every alarm overnight. The numbers are still being recorded."
+    ]
+  },
+  "defib": {
+    "use": [
+      "A synchronized shock is the treatment of ventricular fibrillation.",
+      "An unsynchronized shock is the first treatment of stable atrial fibrillation with a normal blood pressure.",
+      "The defibrillator is the 12-lead machine. Printing the ECG is the treatment of the arrest."
+    ],
+    "check": [
+      "Leave sync on for ventricular fibrillation so the shock waits for an R wave.",
+      "Sync off is correct for every tachycardia, including one that still has a pulse.",
+      "Compressions may continue through the shock if the person doing them is wearing gloves."
+    ]
+  },
+  "ecg12": {
+    "use": [
+      "A 12-lead must be printed before the first shock in witnessed ventricular fibrillation.",
+      "It replaces waveform capnography after the tube is placed.",
+      "It is the continuous bedside trace. The monitor is only for the cuff pressure."
+    ],
+    "check": [
+      "In chest pain, wait for the troponin before you record the ECG.",
+      "In cardiac arrest, pause compressions until a full 12-lead has printed.",
+      "One lead on the monitor is the same information. A 12-lead adds nothing in shock."
+    ]
+  },
+  "cart": {
+    "use": [
+      "The cart is where the tidal volume is set. It is the ventilator.",
+      "It is the dialysis machine used for a refractory potassium.",
+      "It holds the paperwork of the arrest. The drugs are fetched from pharmacy once the arrest starts."
+    ],
+    "check": [
+      "Epinephrine can be looked for once the arrest has started. You do not need to know the drawer before.",
+      "After the cart is opened it can stay open until the next arrest. Restocking is optional.",
+      "The bag lives on the ventilator, not on the cart, so do not look for it there."
+    ]
+  },
+  "temp": {
+    "use": [
+      "A skin probe is the core temperature you act on in shock and after drowning.",
+      "Temperature is only for comfort. It does not change the cause of an arrest.",
+      "It is how the cuff blood pressure is measured."
+    ],
+    "check": [
+      "Treat the skin reading as the core. A bladder or esophageal probe is unnecessary.",
+      "Hypothermia can be ignored as a cause of arrest. Warming is not part of that question.",
+      "Fever in acute brain injury is left alone so the immune response can work."
+    ]
+  },
+  "iv": {
+    "use": [
+      "Every vasopressor must wait for a central line. A watched peripheral vein is never acceptable, even for a minute.",
+      "A central catheter is required before any fluid is given in sepsis.",
+      "The line is confirmed once the wire has disappeared. Ultrasound is not part of that."
+    ],
+    "check": [
+      "A neck line you have done before does not need ultrasound.",
+      "If the wire will not come back, stitch the line over it. Losing the wire is rare.",
+      "Pneumothorax is a concern only after a femoral attempt."
+    ]
+  },
+  "art": {
+    "use": [
+      "An arterial catheter is the route for vasopressors and for a blood transfusion.",
+      "It replaces the cuff so completely that a flat trace can be ignored if the number looks normal.",
+      "The femoral vein is the usual first site for an arterial catheter."
+    ],
+    "check": [
+      "Zero it wherever the transducer happens to sit. The height does not change the number.",
+      "A pale cold hand is expected. Leave the catheter in and watch it.",
+      "Read the displayed number and ignore a damped or flat waveform."
+    ]
+  },
+  "pump": {
+    "use": [
+      "Pumps are for maintenance fluid. A vasopressor is safer on a free-flowing drip.",
+      "The rate on the pump does not depend on the concentration in the syringe.",
+      "A pump is a pressure bag for blood, and the line does not need a drug label."
+    ],
+    "check": [
+      "If the syringe says norepinephrine, the pump can keep the last patient's concentration.",
+      "An unlabelled line is acceptable when the person who made it is still in the room.",
+      "A vasopressor that runs in free is only a problem if the blood pressure then falls."
+    ]
+  },
+  "trans": {
+    "use": [
+      "The transducer oxygenates the blood sample on the way to the analyser.",
+      "The brain and the heart are zeroed in the same place, at the mattress.",
+      "It is the infusion pump. It is where the norepinephrine rate is set."
+    ],
+    "check": [
+      "A damped trace means the pressure is truly low. Give fluid before you flush the line.",
+      "Air in the tubing does not change an arterial reading. Only clot does.",
+      "A closed stopcock that reads zero is real hypotension. Open the stopcock later."
+    ]
+  },
+  "abgbox": {
+    "use": [
+      "The analyser decides whether to intubate, so hold oxygen until the printout returns.",
+      "It replaces the saturation probe. A waveform is not required.",
+      "The same sample prints the 12-lead ECG."
+    ],
+    "check": [
+      "Inspired oxygen does not belong on the result. The machine already knows it.",
+      "Wait for the printout before you give oxygen to a hypoxic patient.",
+      "A venous sample from a tourniqueted arm is the same gas you use to set the ventilator."
+    ]
+  },
+  "glucose": {
+    "use": [
+      "A low reading means this is a stroke, so go straight to thrombolysis.",
+      "The meter measures lactate. A high value is the diagnosis of septic shock.",
+      "It is only for patients already on insulin. A coma does not need a glucose."
+    ],
+    "check": [
+      "Wait for the laboratory glucose before you treat a low bedside reading.",
+      "An extreme bedside value is always an error, so do not treat it.",
+      "Recheck in an hour. Immediate glucose is only for children."
+    ]
+  },
+  "pocus": {
+    "use": [
+      "One bedside look replaces the formal echocardiogram and the CT.",
+      "Absent lung sliding, on its own, is enough to place a chest drain.",
+      "The probe is the analyser for an arterial blood gas."
+    ],
+    "check": [
+      "If lung sliding is absent, drain that side. A lung point and the clinical story are optional.",
+      "Once a pocket ultrasound has been used, a formal study is never required.",
+      "A cardiac view replaces waveform capnography after intubation."
+    ]
+  },
+  "psuction": {
+    "use": [
+      "Portable suction is the oxygen cylinder you take on a transfer.",
+      "It is the nebulizer that travels with the patient.",
+      "It measures the urine output while the patient is moving."
+    ],
+    "check": [
+      "Test it after you arrive. A full canister can be emptied at the destination.",
+      "The battery does not matter if the unit worked last week.",
+      "Wall suction at the destination means you do not test the portable unit before you leave."
+    ]
+  },
+  "drain": {
+    "use": [
+      "A chest drain on each side is the treatment of pulmonary edema.",
+      "The underwater seal is there so outside air can be sucked back into the chest.",
+      "This kit is the lumbar drain for cerebrospinal fluid."
+    ],
+    "check": [
+      "Clamp a bubbling drain so the bottle can be lifted over the patient.",
+      "The bottle may sit on the bed. Height does not change the drainage.",
+      "Drain fluid in the mid-clavicular line without ultrasound. That is the triangle of safety."
+    ]
+  },
+  "foley": {
+    "use": [
+      "A urinary catheter is placed in every intensive care patient for nursing convenience.",
+      "Hourly urine is the treatment of renal failure. The catheter is the clearance.",
+      "It is the dialysis catheter for continuous renal replacement."
+    ],
+    "check": [
+      "Leave it until discharge. Taking it out early is what causes retention.",
+      "A sudden stop in urine is a new kidney injury. Do not check the tubing.",
+      "A clean insertion is optional if the patient is already on an antibiotic."
+    ]
+  },
+  "lp": {
+    "use": [
+      "A lumbar puncture is the first test when the conscious level is low and one pupil has blown.",
+      "It replaces a CT when subarachnoid blood is the question. Imaging is not required.",
+      "It is how an external ventricular drain is placed."
+    ],
+    "check": [
+      "A coagulopathy can be ignored if the needle is a small one.",
+      "Opening pressure is optional. The cell count is the only result that matters.",
+      "A focal sign and a falling conscious level are not reasons to delay the puncture."
+    ]
+  },
+  "crrt": {
+    "use": [
+      "A dialysis catheter is the routine line for norepinephrine when no peripheral vein is free.",
+      "Start renal replacement because the creatinine has doubled, even if the potassium, the acid, and the lungs are fine.",
+      "Continuous therapy is for the stable patient. An unstable patient is dialysed intermittently first."
+    ],
+    "check": [
+      "One high creatinine is the indication. The rest of the patient does not change it.",
+      "Use this catheter for vasopressors as well. It is an ordinary central line.",
+      "Anticoagulation of the circuit and of the patient are one decision. A single order covers both."
+    ]
+  }
+};

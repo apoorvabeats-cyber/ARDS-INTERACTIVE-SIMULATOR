@@ -151,7 +151,7 @@ body.in .atlas,body.in header,body.in .approach{display:none}
 body.in .room{display:flex;flex-direction:column}
 body.hud3d.in .atlas,body.hud3d.in header,body.hud3d.in .approach{display:none !important}
 body.hud3d.in .room{display:flex;position:fixed;inset:0;z-index:40;height:100dvh;min-height:100dvh;overflow:auto;background:#071018}
-.back{align-self:stretch;text-align:right;background:none;border:0;color:var(--muted);padding:8px 0;min-height:44px}
+.back{align-self:flex-start;text-align:left;background:rgba(12,24,34,.92);border:1px solid rgba(127,212,230,.55);color:#e7f6fb;padding:0 16px;min-height:44px;border-radius:999px;margin:0 0 10px}
 .room h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:42px;letter-spacing:-.035em;margin:6px 0 8px;line-height:.95}
 .lede{margin:0;max-width:38rem;color:var(--muted);line-height:1.45}
 .parts{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
@@ -327,9 +327,7 @@ body.hud3d .holo i.tl{top:8%;left:6%;border-right:0;border-bottom:0}
 body.hud3d .holo i.tr{top:8%;right:6%;border-left:0;border-bottom:0}
 body.hud3d .holo i.bl{bottom:10%;left:6%;border-right:0;border-top:0}
 body.hud3d .holo i.br{bottom:10%;right:6%;border-left:0;border-top:0}
-body.hud3d .rings,body.hud3d .rings::before,body.hud3d .rings::after{position:absolute;left:22%;right:22%;top:8%;bottom:10%;border:1px solid rgba(127,212,230,.16);border-radius:50%;pointer-events:none}
-body.hud3d .rings::before{content:"";inset:8%;border-style:dashed;animation:spin 28s linear infinite}
-body.hud3d .rings::after{content:"";inset:18%;border-color:transparent rgba(190,240,255,.45);animation:spin 16s linear infinite reverse}
+body.hud3d .rings,body.hud3d .rings::before,body.hud3d .rings::after{display:none !important}
 body.hud3d .scan-line{position:absolute;left:28%;right:28%;height:2px;top:14%;pointer-events:none;background:linear-gradient(90deg,transparent,#dff,#fff,#dff,transparent);box-shadow:0 0 14px #7fd4e6;animation:sweep 4.8s ease-in-out infinite;opacity:.7}
 body.hud3d .model-note{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:min(520px,70vw);z-index:4;margin:0;text-align:center;font-size:10px;line-height:1.35;color:#8a8478;pointer-events:none}
 body.hud3d .load{font-size:13px;color:#b7b1a4;z-index:5}
@@ -422,7 +420,7 @@ body.icu-open .icu{display:flex;align-items:center;justify-content:center;positi
   .bay-hit::before,body.hud3d.icu-open .rail-tabs button{animation:none;opacity:1;transform:none}
 }
 #icu-return{display:none;min-height:36px;padding:0 12px;border-radius:999px;border:1px solid rgba(127,212,230,.45);background:rgba(6,14,22,.72);color:#e7f6fb;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
-body:not(.icu-open) #icu-return{display:inline-flex;align-items:center}
+body.body-only #icu-return{display:inline-flex !important;position:fixed;z-index:60;top:14px;left:14px;min-height:48px;padding:0 16px;font-size:15px;letter-spacing:.04em;text-transform:none}
 .organ-find{width:100%;min-height:36px;margin:0 0 8px;border:0;border-bottom:1px solid rgba(127,212,230,.35);background:transparent;color:#e7e1d6;font-size:14px}
 </style>
 </head>
@@ -436,12 +434,12 @@ body:not(.icu-open) #icu-return{display:inline-flex;align-items:center}
 <header class="hud-header">
   <input id="find" type="search" hidden tabindex="-1" enterkeyhint="search" placeholder="" aria-label="Search simulators">
   <button type="button" class="sound" id="sound" aria-pressed="true" aria-label="Sound"></button>
-  <button type="button" id="icu-return">ICU</button>
+  <button type="button" id="icu-return">Enter the ICU</button>
 </header>
 <p class="touch" id="touch"></p>
 <div class="invite" id="invite">
   <p>Critical care • body scan</p>
-  <h2>Turn the body. Tap an organ.</h2>
+  <h2>Turn the body.</h2>
 </div>
 <div class="approach" id="approach">
   <img id="plate" src="brain-close.jpg" alt="">
@@ -486,10 +484,10 @@ body:not(.icu-open) #icu-return{display:inline-flex;align-items:center}
       <div class="rings" aria-hidden="true"></div>
       <div class="scan-line" aria-hidden="true"></div>
       <div class="figure" id="figure">
-        <canvas id="view" tabindex="0" aria-label="Three dimensional human body. Drag to turn, pinch to zoom, tap an organ."></canvas>
+        <canvas id="view" tabindex="0" aria-label="Three dimensional human body. Drag to turn. Pinch to zoom."></canvas>
         <p class="load" id="load">Loading the anatomical model…</p>
       </div>
-      <p class="model-note">Human Reference Atlas, adult male, simplified for the browser. Drag to turn. Tap an organ. Not a patient study.</p>
+      <p class="model-note">Human Reference Atlas, adult male, simplified for the browser. Drag to turn. Not a patient study.</p>
     </section>
   </div>
 </main>
@@ -505,9 +503,7 @@ const ORGANS = [
     spots:[{x:50,y:13.2}],
     plate:"brain-close.jpg",
     learn:[
-      ["hemi circ stem","Interactive 3D brain","Rotate the brain, choose a surface, and open a lobe or a deep structure.","brain-3d.html"],
-      ["hemi circ stem","Brain dissection","Cut horizontal, coronal and sagittal planes, slide the depth, and match the structure on the whole brain.","brain-dissect.html"],
-      ["hemi circ stem","Brain disease lab","Fifteen chapters for each emergency. A procedure or a mechanism plays in 3D on the real brain.","brain-disease-lab.html?v=click1"],
+      ["hemi circ stem","Brain disease lab","Fifteen chapters for each emergency. A procedure or a mechanism plays in 3D on the real brain.","brain-disease-lab.html?v=20261026b"],
       ["hemi circ stem","Neuroanatomy Learning Lab","Turn a real brain model, open a structure, trace a pathway and sit a scored localization case.","neuro-lab.html"],
       ["hemi circ","Acute ischemic stroke","Assessment, NIHSS, imaging, thrombolysis and EVT.","Acute_Ischemic_Stroke_Simulator_V6_FINAL.html?v=20260925s"],
       ["hemi","Intracerebral hemorrhage","Blood pressure, reversal and the ICP pathway.","Intracerebral_Hemorrhage_Interactive_Simulator_v1.html?v=20260925s"],
@@ -1046,7 +1042,7 @@ function osceShelf(){
     ["film","Radiology","X-ray, CT, or MRI. The film, the finding, then the treatment.", line("film")]
   ];
   return stations.map(function(row){
-    return '<a class="card" href="osce.html?mode='+row[0]+'&v=20261021q"><b>'+esc(row[1])+'</b><span>'+esc(row[2])+" "+esc(row[3])+'</span></a>';
+    return '<a class="card" href="osce.html?mode='+row[0]+'&v=20261026b"><b>'+esc(row[1])+'</b><span>'+esc(row[2])+" "+esc(row[3])+'</span></a>';
   }).join("")+"<p class='lede'>The voice reads the question, then the answer you should have chosen. Doses are teaching doses, not a prescription.</p>";
 }
 function referenceShelf(){
@@ -1199,13 +1195,24 @@ function fillPortal(which, el){
   grow(el, which, function(){ openPath(which); });
 }
 function openTitle(card){
+  const titleEl = card.querySelector("b, strong");
+  const title = titleEl ? titleEl.textContent : "Module";
+  let href = card.getAttribute("href") || "";
+  if(current && href.indexOf("Practice_Simulator.html")!==-1 && href.indexOf("from=")===-1){
+    href += (href.indexOf("?")===-1 ? "?" : "&") + "from=" + encodeURIComponent(current);
+  }
+  if(inside==="lab"){
+    room.innerHTML =
+      '<button type="button" class="back" id="back">Learning lab</button>'+
+      '<h2>'+esc(title)+'</h2>'+
+      '<iframe class="abg-frame" title="'+esc(title)+'" src="'+esc(href)+'"></iframe>';
+    document.getElementById("back").onclick = function(){ renderRoom(); };
+    room.scrollTop = 0;
+    return;
+  }
   surge(0.7);
   grow(card, "title", function(){
     hush();
-    let href = card.getAttribute("href") || "";
-    if(current && href.indexOf("Practice_Simulator.html")!==-1 && href.indexOf("from=")===-1){
-      href += (href.indexOf("?")===-1 ? "?" : "&") + "from=" + encodeURIComponent(current);
-    }
     location.href = href;
   });
 }
@@ -1590,6 +1597,7 @@ function speak(text){
   say();
 }
 function startBed(){}
+window.keepScore = function(){ if(soundOn) startWave(); };
 function hush(){
   const line = document.getElementById("line");
   line.pause();
@@ -1896,8 +1904,7 @@ function openRail(which){
   }else if(which==="drugs"){
     title = "Drugs and doses";
     lede = "Teaching doses only. Confirm the monograph before a drug is given.";
-    bodyHtml = '<a class="card" href="antibiotics.html?v=20261026a"><b>Drug monographs</b><span>One hundred and ninety adult monographs in 31 classes, with a creatinine-clearance calculator and ten questions on every drug. The old fifty-six drug bank is gone.</span></a>'+
-      '<a class="card" href="osce.html?mode=drug&v=20261021q"><b>ICU drug checklist</b><span>Groups A to M. Each drug asks the monograph, then the infusion.</span></a>';
+    bodyHtml = '<a class="card" href="antibiotics.html?v=20261026b"><b>Drug monographs</b><span>One hundred and ninety adult monographs in 31 classes, with a creatinine-clearance calculator and ten questions on every drug.</span></a>';
   }else if(which==="formulas"){
     title = "Formulas";
     lede = "The calculations the simulators assume.";
@@ -1931,9 +1938,24 @@ if(!document.body.classList.contains("icu-open")){
   playWelcome();
   startWave();
 }
+(function openSavedLab(){
+  const id = new URLSearchParams(location.search).get("lab");
+  if(!id || !organById(id)) return;
+  document.body.classList.remove("icu-open");
+  document.body.classList.add("body-only");
+  current = id;
+  part = "all";
+  inside = "lab";
+  finishIntro();
+  setSpin(false);
+  document.body.classList.add("in","enter","inside","lab");
+  renderRoom();
+  if(window.keepScore) window.keepScore();
+})();
 (function openSavedDoors(){
   const id = new URLSearchParams(location.search).get("doors");
   if(!id || !organById(id)) return;
+  document.body.classList.remove("icu-open");
   current = id;
   part = "all";
   inside = null;
@@ -1946,7 +1968,7 @@ if(!document.body.classList.contains("icu-open")){
 if(!reduced) requestAnimationFrame(drawDust);
 </script>
 <!-- pages-build 20261025c -->
-<script src="icu-bay.js?v=20261025c"></script>
-<script type="module" src="hud-body.js?v=20261022a"></script>
+<script src="icu-bay.js?v=20261026b"></script>
+<script type="module" src="hud-body.js?v=20261026b"></script>
 </body>
 </html>

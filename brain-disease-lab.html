@@ -22,7 +22,7 @@ button{cursor:pointer}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 a{color:var(--cyan)}
 header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:16px 16px 0}
-header a.back{color:var(--muted);text-decoration:none;min-height:44px;display:flex;align-items:center}
+header a.back{color:var(--fg);text-decoration:none;min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:rgba(12,24,34,.92)}
 h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:clamp(26px,6vw,40px);letter-spacing:-.03em;margin:0;line-height:1.05}
 h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:clamp(22px,4vw,30px);letter-spacing:-.03em;margin:0 0 8px}
 h3{margin:14px 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--warm)}
@@ -33,6 +33,12 @@ h3{margin:14px 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercas
 .scroller button{flex:0 0 auto;border:1px solid var(--line);background:rgba(7,17,26,.72);border-radius:999px;min-height:40px;padding:0 14px}
 .scroller button.on{border-color:var(--cyan);color:#07111a;background:var(--cyan)}
 .sections button{min-height:40px}
+#diseases,#sections{flex-direction:column;overflow:visible;align-items:stretch}
+#diseases[hidden],#sections[hidden]{display:none !important}
+#diseases button,#sections button{width:100%;max-width:32rem;border-radius:14px;text-align:left;white-space:normal;min-height:48px;flex:none}
+#diseases button b{display:block;font-weight:600}
+#diseases button span{display:block;margin-top:3px;color:var(--muted);font-size:13px;font-weight:460}
+body.list-mode .layout{display:none !important}
 .layout{display:block}
 main{padding:4px 14px 40px}
 .lead{color:#d5e4ea;line-height:1.55;font-size:16px}
@@ -82,7 +88,7 @@ main{padding:4px 14px 40px}
 <body>
 <header>
   <div><p class="kicker">Critical care · brain</p><h1>Disease learning lab</h1></div>
-  <a class="back" href="hub.html">Brain</a>
+  <a class="back" href="index.html?lab=brain" target="_top">Learning lab</a>
 </header>
 <div class="scroller diseases" id="diseases" role="tablist" aria-label="Brain diseases"></div>
 <p class="context" id="context"></p>
@@ -118,7 +124,8 @@ const SECTIONS = [
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const work = document.getElementById("work");
 let diseaseId = "tbi";
-let sectionId = "procedures";
+let sectionId = "overview";
+let listMode = true;
 let topicId = "";
 let player = null;
 let playerToken = 0;
@@ -754,30 +761,67 @@ let hotspots = [];
 
 function readHash(){
   const parts = location.hash.replace(/^#/, "").split("/").filter(Boolean);
-  if(parts[0] && DISEASES.some(function(d){ return d.id===parts[0]; })) diseaseId = parts[0];
-  if(parts[1] && SECTIONS.some(function(s){ return s[0]===parts[1]; })) sectionId = parts[1];
+  if(!parts.length || !DISEASES.some(function(d){ return d.id===parts[0]; })){
+    listMode = true;
+    topicId = "";
+    return;
+  }
+  listMode = false;
+  diseaseId = parts[0];
+  sectionId = (parts[1] && SECTIONS.some(function(s){ return s[0]===parts[1]; })) ? parts[1] : "overview";
   topicId = parts[2] || "";
 }
 function writeHash(){
+  if(listMode){
+    if(location.hash) history.replaceState(null, "", location.pathname + location.search);
+    return;
+  }
   const next = topicId ? diseaseId+"/"+sectionId+"/"+topicId : diseaseId+"/"+sectionId;
   if(location.hash.replace(/^#/, "") !== next) history.replaceState(null, "", "#"+next);
 }
 function paintChrome(){
-  document.getElementById("diseases").innerHTML = DISEASES.map(function(d){
-    return '<button type="button"'+(d.id===diseaseId?' class="on"':'')+' data-d="'+d.id+'">'+esc(d.name)+'</button>';
-  }).join("");
-  document.getElementById("diseases").querySelectorAll("[data-d]").forEach(function(btn){
-    btn.onclick = function(){
-      diseaseId = btn.getAttribute("data-d");
-      topicId = "";
-      casePick = null; caseLocked = false; spotId = "";
-      writeHash(); render();
-    };
-  });
-  document.getElementById("sections").innerHTML = SECTIONS.map(function(s){
+  const diseases = document.getElementById("diseases");
+  const sections = document.getElementById("sections");
+  const context = document.getElementById("context");
+  document.body.classList.toggle("list-mode", listMode);
+  if(listMode){
+    diseases.hidden = false;
+    sections.hidden = true;
+    sections.innerHTML = "";
+    context.textContent = "Choose a disease. The next screen is overview, anatomy, and the other chapters.";
+    diseases.innerHTML = DISEASES.map(function(d){
+      return '<button type="button" data-d="'+d.id+'"><b>'+esc(d.name)+'</b><span>'+esc(d.full)+'</span></button>';
+    }).join("");
+    diseases.querySelectorAll("[data-d]").forEach(function(btn){
+      btn.onclick = function(){
+        diseaseId = btn.getAttribute("data-d");
+        sectionId = "overview";
+        topicId = "";
+        listMode = false;
+        casePick = null; caseLocked = false; spotId = "";
+        algoStep = 0;
+        quizPick = {}; quizLocked = {};
+        writeHash();
+        render();
+      };
+    });
+    return;
+  }
+  diseases.hidden = true;
+  diseases.innerHTML = "";
+  sections.hidden = false;
+  sections.innerHTML = '<button type="button" data-list="1">Diseases</button>'+SECTIONS.map(function(s){
     return '<button type="button"'+(s[0]===sectionId?' class="on"':'')+' data-s="'+s[0]+'">'+s[1]+'  '+esc(s[2])+'</button>';
   }).join("");
-  document.getElementById("sections").querySelectorAll("[data-s]").forEach(function(btn){
+  sections.querySelectorAll("[data-list]").forEach(function(btn){
+    btn.onclick = function(){
+      listMode = true;
+      topicId = "";
+      writeHash();
+      render();
+    };
+  });
+  sections.querySelectorAll("[data-s]").forEach(function(btn){
     btn.onclick = function(){
       sectionId = btn.getAttribute("data-s");
       topicId = "";
@@ -787,7 +831,7 @@ function paintChrome(){
   });
   const dNow = disease();
   const sNow = SECTIONS.find(function(item){ return item[0]===sectionId; });
-  document.getElementById("context").textContent = dNow.full + "  ·  " + (sNow ? sNow[1] + "  " + sNow[3] : "");
+  context.textContent = dNow.full + "  ·  " + (sNow ? sNow[1] + "  " + sNow[3] : "");
 }
 function sectionTitle(){
   const s = SECTIONS.find(function(item){ return item[0]===sectionId; });
@@ -807,6 +851,10 @@ function render(){
   if(filmCleanup){ filmCleanup(); filmCleanup = null; }
   paintChrome();
   writeHash();
+  if(listMode){
+    work.innerHTML = "";
+    return;
+  }
   const d = disease();
   const head = '<p class="kicker">'+esc(d.full)+'</p><h2>'+esc(sectionTitle())+'</h2>';
   if(sectionId==="overview") renderOverview(d, head);
@@ -1039,7 +1087,7 @@ function renderAlgo(d, head){
   };
 }
 function renderAnatomy(d, head){
-  work.innerHTML = head+'<p class="lead">'+esc(d.anatomy.note)+'</p><p class="note">This is a real glTF model, the same atlas as the 3D brain lab. It is not a video. Drag to turn it. Only the structures named for this disease are coloured.</p><div class="player"><canvas id="anat"></canvas></div><p><a href="brain-3d.html">Open the full interactive brain</a></p>'+footnote();
+  work.innerHTML = head+'<p class="lead">'+esc(d.anatomy.note)+'</p><p class="note">This is a real glTF model, the same atlas as the 3D brain lab. It is not a video. Drag to turn it. Only the structures named for this disease are coloured.</p><div class="player"><canvas id="anat"></canvas></div>'+footnote();
   mountAnatomy(d.anatomy.labels || []);
 }
 function mountAnatomy(labels){
@@ -1169,7 +1217,6 @@ function footnote(){
 }
 window.addEventListener("hashchange", function(){ readHash(); render(); });
 readHash();
-if(!location.hash){ diseaseId = "tbi"; sectionId = "procedures"; topicId = ""; }
 render();
 
 </script>

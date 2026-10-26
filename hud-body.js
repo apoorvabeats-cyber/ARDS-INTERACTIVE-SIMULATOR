@@ -39,25 +39,6 @@ const rim = new THREE.DirectionalLight(0x7fd4e6, 0.7);
 rim.position.set(0.2, 1.6, -2.2);
 scene.add(rim);
 
-const ring = new THREE.Mesh(
-  new THREE.TorusGeometry(0.5, 0.006, 16, 120),
-  new THREE.MeshBasicMaterial({ color: 0xb7f3ff, transparent: true, opacity: 0.95 })
-);
-ring.rotation.x = Math.PI / 2;
-scene.add(ring);
-const disc = new THREE.Mesh(
-  new THREE.RingGeometry(0.34, 0.5, 80),
-  new THREE.MeshBasicMaterial({ color: 0x7fd4e6, transparent: true, opacity: 0.18, side: THREE.DoubleSide })
-);
-disc.rotation.x = -Math.PI / 2;
-scene.add(disc);
-const hoop = new THREE.Mesh(
-  new THREE.TorusGeometry(0.72, 0.003, 8, 100),
-  new THREE.MeshBasicMaterial({ color: 0x7fd4e6, transparent: true, opacity: 0.35 })
-);
-hoop.rotation.x = Math.PI / 2.15;
-scene.add(hoop);
-
 const byOrgan = {};
 const organMeshes = [];
 let yaw = 0.35;
@@ -144,9 +125,6 @@ window.zoomIntoAnatomy = function(id, done){
 function frame(){
   requestAnimationFrame(frame);
   if(auto && !dragging && ready) yawTo += 0.004;
-  ring.rotation.z += 0.006;
-  hoop.rotation.z -= 0.003;
-  hoop.rotation.y += 0.004;
   placeCamera();
   resize();
   renderer.render(scene, camera);
@@ -259,14 +237,6 @@ loader.load("models/anatomy/human-reference.glb", function(gltf){
   dist = homeDist;
   distTo = homeDist;
   window.__hraBox = { y: +size.y.toFixed(3), dist: +homeDist.toFixed(3), minY: +box.min.y.toFixed(3), maxY: +box.max.y.toFixed(3) };
-  const span = Math.max(size.x, size.z);
-  const radius = Math.max(0.42, span * 0.72);
-  ring.position.y = box.min.y + 0.015;
-  ring.scale.setScalar(radius / 0.5);
-  disc.position.y = box.min.y + 0.012;
-  disc.scale.setScalar(radius / 0.5);
-  hoop.position.set(center.x, center.y * 0.55, center.z);
-  hoop.scale.setScalar(radius / 0.72);
   ready = true;
   window.__hraReady = true;
   sayLoad("");

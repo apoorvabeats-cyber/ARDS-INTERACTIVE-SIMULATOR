@@ -259,6 +259,18 @@
     startAudio();
     bedOn();
   }
+  function openEmptyBay(title){
+    const room = document.getElementById("room");
+    document.body.classList.add("in", "enter");
+    room.innerHTML =
+      '<button type="button" class="back" id="back">Back to ICU</button>'+
+      '<h2>'+title+'</h2>'+
+      '<p class="lede">This section is empty.</p>';
+    document.getElementById("back").onclick = function(){
+      document.body.classList.remove("in", "enter");
+      room.innerHTML = "";
+    };
+  }
   function openModule(url, title){
     const room = document.getElementById("room");
     document.body.classList.add("in", "enter");
@@ -296,12 +308,7 @@
   function leaveForBody(){
     document.body.classList.remove("icu-open");
     document.body.classList.add("body-only");
-    if(master && audioCtx) master.gain.setTargetAtTime(0, audioCtx.currentTime, 0.12);
-    const bed = document.getElementById("bed");
-    if(bed){
-      bed.volume = 0;
-      bed.pause();
-    }
+    if(typeof window.keepScore === "function") window.keepScore();
     const tabs = document.getElementById("rail-tabs");
     const bubbles = document.getElementById("organ-bubbles");
     if(tabs) tabs.hidden = true;
@@ -309,7 +316,6 @@
     if(typeof finishIntro === "function") finishIntro();
     const figure = document.getElementById("figure");
     if(figure) figure.style.opacity = "1";
-    if(typeof speak === "function") speak("Tap any organ.");
   }
   window.openBody = leaveForBody;
   frame.addEventListener("click", function(event){
@@ -321,7 +327,7 @@
     else if(go === "defib") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261025c", "Defibrillator");
     else if(go === "vent") openModule("Ventilator_Waveform_Troubleshooting.html?v=20261025a", "Ventilator");
     else if(go === "monitor") openShock();
-    else if(go === "dialysis") openModule("antibiotics.html?v=20261025a", "Dialysis and dosing");
+    else if(go === "dialysis") openEmptyBay("Dialysis");
     else if(go === "patient") leaveForBody();
   });
   document.getElementById("icu-audio").addEventListener("click", function(event){
