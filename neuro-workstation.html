@@ -1,0 +1,1507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111a">
+<title>Neuroimaging workstation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520&family=Figtree:wght@460;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07111a;--fg:#e7f1f4;--muted:#93a8b3;--line:rgba(127,212,230,.28);--cyan:#7fd4e6;--warm:#e2b48a;--green:#3ee0a0;--card:rgba(10,22,32,.92);--bad:#e07a68}
+*{box-sizing:border-box}
+html,body{margin:0;background:
+  radial-gradient(1000px 420px at 8% -10%, rgba(127,212,230,.08), transparent 50%),
+  var(--bg);color:var(--fg);font-family:Figtree,sans-serif}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+a{color:var(--cyan)}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:16px 16px 0}
+header a.back{color:var(--fg);text-decoration:none;min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:rgba(12,24,34,.92);white-space:nowrap}
+h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:clamp(26px,6vw,40px);letter-spacing:-.03em;margin:0;line-height:1.05}
+h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:clamp(22px,4vw,30px);letter-spacing:-.03em;margin:0 0 8px}
+.kicker{margin:0 0 4px;color:var(--cyan);letter-spacing:.16em;text-transform:uppercase;font-size:11px}
+main{padding:8px 14px 48px}
+.lead{color:#d5e4ea;line-height:1.5;font-size:16px;margin:8px 0}
+.note{color:var(--muted);font-size:13px;line-height:1.45}
+.grid{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.card,button.opt,button.mode{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:16px;padding:14px;min-height:52px;color:inherit}
+.card b,button.opt b{display:block;font-weight:600}
+.card span,button.opt span{display:block;color:var(--muted);font-size:13.5px;margin-top:4px;line-height:1.4}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+button.mode{min-height:72px}
+button.mode b{display:block}
+button.opt.on{border-color:var(--cyan)}
+button.opt.good{border-color:var(--green);color:var(--green)}
+button.opt.bad{border-color:var(--bad)}
+.viewer{margin:10px 0;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#05080c}
+svg.film{width:100%;height:auto;display:block;touch-action:manipulation;background:#05080c}
+svg.film .side{fill:#c5d5de;font:600 15px Figtree,sans-serif}
+svg.film .scale{fill:#93a8b3;font:11px Figtree,sans-serif}
+svg.film .tag{fill:#d5e4ea;font:600 12px Figtree,sans-serif}
+svg.film .hit{pointer-events:none}
+svg.film.live .hit{pointer-events:all;cursor:pointer}
+svg.film .hit.found{fill:rgba(62,224,160,.22);stroke:#3ee0a0;stroke-width:2}
+svg.film .hit.reveal{fill:rgba(226,180,138,.18);stroke:#e2b48a;stroke-width:2;stroke-dasharray:5 4}
+svg .ov[hidden]{display:none}
+figcaption{padding:8px 12px 10px;color:var(--muted);font-size:12px;letter-spacing:.02em}
+.ask{font-size:17px;line-height:1.4;margin:12px 0 8px}
+.fb{border-radius:14px;padding:12px 14px;line-height:1.45;margin:10px 0;border:1px solid var(--line)}
+.fb.ok{border-color:var(--green)}
+.fb.no{border-color:var(--warm)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.row button,button.go{border:1px solid var(--line);background:#0c1a24;border-radius:999px;min-height:44px;padding:0 16px}
+button.go:disabled{opacity:.4}
+.nih{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.nih label{display:grid;grid-template-columns:1fr 64px;gap:8px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px 10px;min-height:44px}
+.nih label.bad{border-color:var(--bad)}
+.nih label.good{border-color:var(--green)}
+.nih input{width:64px;min-height:40px;border-radius:8px;border:1px solid var(--line);background:#07111a;text-align:center}
+.nih .max{color:var(--muted);font-size:12px}
+.steps{display:flex;gap:6px;overflow:auto;padding:10px 0 2px;scrollbar-width:none}
+.steps button{flex:0 0 auto;min-height:40px;border-radius:999px;border:1px solid var(--line);background:transparent;padding:0 12px}
+.steps button.on{background:var(--cyan);color:#07111a;border-color:var(--cyan)}
+.steps button:disabled{opacity:.35}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pair button.shot{padding:0;overflow:hidden;border-radius:16px;border:1px solid var(--line);background:#05080c;text-align:left}
+.pair button.shot.good{border-color:var(--green)}
+.pair button.shot.bad{border-color:var(--bad)}
+.pair button.shot span{display:block;padding:8px 10px 10px;color:var(--muted);font-size:12px}
+.layers{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.layers button{border:1px solid var(--line);background:#0c1a24;border-radius:999px;min-height:40px;padding:0 12px}
+.layers button.on{border-color:var(--cyan);color:#07111a;background:var(--cyan)}
+.warn{border-left:3px solid var(--warm);padding-left:10px}
+.score{font-variant-numeric:tabular-nums}
+@media(min-width:840px){
+  header,main{padding-left:28px;padding-right:28px}
+  .viewer{max-width:640px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div><p class="kicker">Critical care · brain</p><h1>Neuroimaging workstation</h1></div>
+  <a class="back" id="toplink" href="index.html?lab=brain" target="_top">Learning lab</a>
+</header>
+<main id="app"></main>
+<script>
+(function(){
+"use strict";
+var MM = 0.5;
+var app = document.getElementById("app");
+var state = {route:"home", step:0, misses:0, locked:false, reveal:false, ok:false, pick:null, marks:{}, feedback:"", cleared:loadCleared(), stroke:null, compare:null, overlay:null, challenge:null};
+
+function loadCleared(){
+  try { return JSON.parse(localStorage.getItem("neuro-workstation-cleared") || "{}"); }
+  catch (err) { return {}; }
+}
+function saveCleared(){
+  try { localStorage.setItem("neuro-workstation-cleared", JSON.stringify(state.cleared)); }
+  catch (err) {}
+}
+function esc(s){
+  return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+    if (c === "&") return "&" + "amp;";
+    if (c === "<") return "&" + "lt;";
+    if (c === ">") return "&" + "gt;";
+    return "&" + "quot;";
+  });
+}
+function resetStep(){
+  state.step = 0;
+  state.misses = 0;
+  state.locked = false;
+  state.reveal = false;
+  state.ok = false;
+  state.pick = null;
+  state.marks = {};
+  state.feedback = "";
+}
+function go(route){
+  if (location.hash === "#" + route) enter(route);
+  else location.hash = route;
+}
+function enter(route){
+  state.route = route || "home";
+  resetStep();
+  if (route === "stroke") state.stroke = {stage:0, log:[]};
+  if (route === "compare") state.compare = {i:0, score:0, answered:false};
+  if (route === "overlay") state.overlay = {i:0, on:{}};
+  if (route === "challenge") state.challenge = {order:shuffle(CASES.map(function(c){ return c.id; })), i:0, part:0, score:0, done:false, log:[]};
+  render();
+}
+function shuffle(list){
+  var a = list.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
+function boneDefs(id){
+  return '<defs><radialGradient id="br'+id+'" cx="48%" cy="42%" r="68%"><stop offset="0" stop-color="#72787c"/><stop offset="1" stop-color="#3c4246"/></radialGradient><linearGradient id="bn'+id+'" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4f1ea"/><stop offset="1" stop-color="#b7b1a6"/></linearGradient><filter id="gr'+id+'"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="1" seed="3"/><feColorMatrix type="matrix" values="0 0 0 0 0.4  0 0 0 0 0.4  0 0 0 0 0.4  0 0 0 0.22 0"/></filter></defs>';
+}
+function liveClass(){
+  var step = activeStep();
+  return step && (step.kind === "click" || step.kind === "marks") ? " live" : "";
+}
+function ctOpen(id, label){
+  return '<svg class="film'+liveClass()+'" viewBox="0 0 400 420" role="img" aria-label="'+esc(label)+'">'+boneDefs(id)+
+    '<rect width="400" height="420" fill="#05080c"/>'+
+    '<ellipse cx="200" cy="196" rx="178" ry="184" fill="#241f1c"/>'+
+    '<ellipse class="hit" data-hit="skull" data-name="the skull" cx="200" cy="196" rx="164" ry="170" fill="url(#bn'+id+')"/>'+
+    '<ellipse cx="200" cy="200" rx="136" ry="144" fill="url(#br'+id+')"/>'+
+    '<ellipse cx="200" cy="200" rx="136" ry="144" fill="#000" opacity=".28" filter="url(#gr'+id+')"/>'+
+    '<ellipse cx="200" cy="200" rx="128" ry="134" fill="none" stroke="#8b9296" stroke-width="9" opacity=".45"/>'+
+    '<path d="M200 58 v34 M200 318 v28" stroke="#e4dfd6" stroke-width="2" opacity=".8"/>'+
+    '<text class="side" x="18" y="28">R</text><text class="side" x="382" y="28" text-anchor="end">L</text>';
+}
+function ctClose(){
+  return '<g class="scale"><line x1="22" y1="396" x2="42" y2="396" stroke="#93a8b3" stroke-width="1.5"/>'+
+    '<line x1="22" y1="391" x2="22" y2="401" stroke="#93a8b3"/><line x1="42" y1="391" x2="42" y2="401" stroke="#93a8b3"/>'+
+    '<text x="48" y="400">10 mm</text></g></svg>';
+}
+function sulci(side){
+  var west = '<g fill="none" stroke="#14181c" stroke-width="2.3" stroke-linecap="round"><path d="M96 146 q18 6 10 22"/><path d="M88 184 q20 4 8 20"/><path d="M104 224 q16 8 6 18"/><path d="M122 116 q14 10 8 18"/><path d="M78 208 q12 12 4 16"/><path d="M118 250 q10 8 2 14"/></g>';
+  var east = '<g fill="none" stroke="#14181c" stroke-width="2.3" stroke-linecap="round"><path d="M304 146 q-18 6 -10 22"/><path d="M312 184 q-20 4 -8 20"/><path d="M296 224 q-16 8 -6 18"/><path d="M278 116 q-14 10 -8 18"/><path d="M322 208 q-12 12 -4 16"/><path d="M282 250 q-10 8 -2 14"/></g>';
+  if (side === "west") return west;
+  if (side === "east") return east;
+  if (side === "none") return "";
+  return west + east;
+}
+function sylvian(){
+  return '<path d="M118 196 q28 16 48 6" fill="none" stroke="#12161a" stroke-width="3" stroke-linecap="round"/>'+
+    '<path d="M282 196 q-28 16 -48 6" fill="none" stroke="#12161a" stroke-width="3" stroke-linecap="round"/>';
+}
+function ventsNormal(){
+  return '<ellipse cx="168" cy="176" rx="13" ry="9" transform="rotate(-16 168 176)" fill="#101418"/>'+
+    '<ellipse cx="232" cy="176" rx="13" ry="9" transform="rotate(16 232 176)" fill="#101418"/>'+
+    '<ellipse cx="200" cy="196" rx="3.5" ry="9" fill="#101418"/>';
+}
+function scaleNote(){ return ""; }
+function hitEll(id, name, cx, cy, rx, ry){
+  return '<ellipse class="'+hitClass(id)+'" data-hit="'+id+'" data-name="'+esc(name)+'" cx="'+cx+'" cy="'+cy+'" rx="'+rx+'" ry="'+ry+'" fill="rgba(255,255,255,.012)"/>';
+}
+function hitPath(id, name, d){
+  return '<path class="'+hitClass(id)+'" data-hit="'+id+'" data-name="'+esc(name)+'" d="'+d+'" fill="rgba(255,255,255,.012)"/>';
+}
+function hitClass(id){
+  var step = activeStep();
+  var cls = "hit";
+  if (state.marks && state.marks[id]) cls += " found";
+  if (state.reveal && step) {
+    if (step.kind === "click" && step.target === id) cls += " reveal";
+    if (step.kind === "marks" && step.targets.indexOf(id) !== -1 && !state.marks[id]) cls += " reveal";
+  }
+  return cls;
+}
+function catcher(){
+  return '<ellipse class="hit" data-hit="brain" data-name="brain that is not the target" cx="200" cy="200" rx="130" ry="136" fill="rgba(255,255,255,.012)"/>';
+}
+
+function plateNormal(){
+  return ctOpen("n", "Normal non-contrast CT, schematic") + sulci("all") + sylvian() + ventsNormal() +
+    '<ellipse cx="156" cy="196" rx="16" ry="12" fill="#5a6166"/>'+
+    '<ellipse cx="244" cy="196" rx="16" ry="12" fill="#5a6166"/>'+
+    catcher() + ctClose();
+}
+function clotArt(){
+  return '<ellipse cx="250" cy="188" rx="39" ry="30" fill="#f3f1ea"/>'+
+    '<ellipse cx="256" cy="184" rx="14" ry="9" fill="#fff" opacity=".35"/>';
+}
+function ichVents(){
+  return '<ellipse cx="156" cy="178" rx="14" ry="10" transform="rotate(-16 156 178)" fill="#101418"/>'+
+    '<ellipse cx="214" cy="170" rx="7" ry="3.2" transform="rotate(12 214 170)" fill="#101418"/>'+
+    '<path d="M186 154 v62" stroke="#c9c3bc" stroke-width="2"/>'+
+    '<ellipse cx="186" cy="198" rx="3" ry="8" fill="#101418"/>';
+}
+function ambient(narrowEast){
+  return '<ellipse cx="176" cy="268" rx="16" ry="7" fill="#12161a"/>'+
+    '<ellipse cx="226" cy="270" rx="'+(narrowEast?7:16)+'" ry="'+(narrowEast?3:7)+'" fill="#12161a"/>'+
+    '<ellipse cx="200" cy="274" rx="14" ry="12" fill="#5c584f"/>';
+}
+function plateIch(caliper){
+  var caps = caliper
+    ? '<line x1="211" y1="188" x2="289" y2="188" stroke="#7fd4e6" stroke-width="1.4"/><text class="tag" x="214" y="180">A 4 cm</text>'+
+      '<line x1="250" y1="158" x2="250" y2="218" stroke="#e2b48a" stroke-width="1.4"/><text class="tag" x="256" y="208">B 3 cm</text>'
+    : "";
+  return ctOpen(caliper ? "ic" : "ih", "Non-contrast CT, left basal ganglia hemorrhage, schematic") +
+    sulci("west") + sylvian() + ichVents() + ambient(true) + clotArt() + caps +
+    catcher() +
+    hitEll("sulci", "the cortex over the clot, where the sulci are gone", 300, 168, 36, 48) +
+    hitEll("horn", "the compressed frontal horn", 214, 170, 22, 16) +
+    hitEll("septum", "the septum pellucidum", 186, 184, 14, 36) +
+    hitEll("clot", "the bright collection", 250, 188, 48, 40) +
+    ctClose();
+}
+function plateEarly(){
+  return ctOpen("ea", "Non-contrast CT, early left middle cerebral ischemia, schematic") +
+    sulci("all") + sylvian() + ventsNormal() +
+    '<path d="M232 164 q36 6 30 46 q-28 10 -40 -2 z" fill="#3a4044"/>'+
+    '<path d="M248 176 q22 4 16 24" fill="none" stroke="#2a2e32" stroke-width="6" stroke-linecap="round"/>'+
+    catcher() + hitEll("insula", "the insula", 256, 186, 36, 32) + ctClose();
+}
+function plateEstablished(){
+  return ctOpen("es", "Non-contrast CT, established left middle cerebral infarct, schematic") +
+    sulci("west") +
+    '<path d="M210 120 Q340 150 328 240 Q300 300 230 270 Q200 210 210 120 Z" fill="#2e3438"/>'+
+    ventsNormal() + catcher() + hitEll("infarct", "the dark territory", 270, 190, 55, 60) + ctClose();
+}
+function plateHt(){
+  return ctOpen("ht", "Non-contrast CT, hemorrhagic transformation, schematic") +
+    sulci("west") +
+    '<path d="M210 120 Q340 150 328 240 Q300 300 230 270 Q200 210 210 120 Z" fill="#2e3438"/>'+
+    '<ellipse cx="268" cy="196" rx="26" ry="20" fill="#f3f1ea"/>'+
+    catcher() + hitEll("bleed", "blood inside the infarct", 268, 196, 36, 30) + ctClose();
+}
+function plateEdh(){
+  return ctOpen("ed", "Non-contrast CT, right temporal extradural hematoma, schematic") +
+    sulci("all") + sylvian() + ventsNormal() +
+    '<path d="M62 168 C78 160 96 168 100 196 C96 230 76 246 62 236 C84 214 86 186 62 168 Z" fill="#f3f1ea"/>'+
+    '<path d="M58 188 l10 16" stroke="#1a1c1e" stroke-width="2"/>'+
+    '<path d="M70 150 l8 -16 M70 250 l6 16" stroke="#9aa0a4" stroke-width="1.2" opacity=".7"/>'+
+    catcher() + hitPath("edh", "the lens-shaped collection", "M62 168 C78 160 96 168 100 196 C96 230 76 246 62 236 C84 214 86 186 62 168 Z") + ctClose();
+}
+function plateSdh(){
+  return ctOpen("sd", "Non-contrast CT, left acute subdural hematoma, schematic") +
+    sulci("west") + sylvian() +
+    '<ellipse cx="176" cy="180" rx="12" ry="9" fill="#101418"/>'+
+    '<ellipse cx="210" cy="176" rx="6" ry="3" fill="#101418"/>'+
+    '<path d="M186 160 v50" stroke="#c9c3bc" stroke-width="2"/>'+
+    '<path d="M300 96 C338 150 336 270 296 328 C324 260 326 150 300 96 Z" fill="#f3f1ea"/>'+
+    catcher() + hitPath("sdh", "the crescent over the hemisphere", "M300 96 C338 150 336 270 296 328 C324 260 326 150 300 96 Z") + ctClose();
+}
+function plateTbi(){
+  return ctOpen("tb", "Non-contrast CT, extradural, subdural and contusion, schematic") +
+    sulci("west") +
+    '<path d="M62 168 C78 160 96 168 100 196 C96 230 76 246 62 236 C84 214 86 186 62 168 Z" fill="#f3f1ea"/>'+
+    '<path d="M58 188 l10 16" stroke="#1a1c1e" stroke-width="2"/>'+
+    '<path d="M300 108 C332 160 328 280 298 324 C322 270 324 160 300 108 Z" fill="#f3f1ea"/>'+
+    '<ellipse cx="132" cy="128" rx="8" ry="6" fill="#f3f1ea"/><ellipse cx="146" cy="138" rx="6" ry="5" fill="#e7e4dc"/><ellipse cx="124" cy="140" rx="5" ry="4" fill="#f7f5f0"/>'+
+    ventsNormal() + catcher() +
+    hitPath("edh", "the lens under the temporal bone", "M62 168 C78 160 96 168 100 196 C96 230 76 246 62 236 C84 214 86 186 62 168 Z") +
+    hitPath("sdh", "the crescent", "M300 108 C332 160 328 280 298 324 C322 270 324 160 300 108 Z") +
+    hitEll("iph", "the bruise inside the frontal lobe", 136, 134, 28, 24) +
+    ctClose();
+}
+function plateHydro(){
+  return ctOpen("hy", "Non-contrast CT, enlarged ventricles, schematic") +
+    sulci("all") +
+    '<ellipse cx="158" cy="168" rx="28" ry="20" fill="#101418"/>'+
+    '<ellipse cx="242" cy="168" rx="28" ry="20" fill="#101418"/>'+
+    '<ellipse cx="200" cy="206" rx="9" ry="18" fill="#101418"/>'+
+    '<ellipse cx="142" cy="248" rx="10" ry="6" fill="#101418"/>'+
+    '<ellipse cx="258" cy="248" rx="10" ry="6" fill="#101418"/>'+
+    '<ellipse cx="158" cy="168" rx="36" ry="28" fill="#1c2428" opacity=".45"/>'+
+    '<ellipse cx="242" cy="168" rx="36" ry="28" fill="#1c2428" opacity=".45"/>'+
+    catcher() + hitEll("vent", "the enlarged lateral ventricle", 200, 180, 78, 48) + ctClose();
+}
+function plateEdema(){
+  return ctOpen("oe", "Non-contrast CT, swollen hemisphere with herniation, schematic") +
+    sulci("east") +
+    '<ellipse cx="214" cy="176" rx="12" ry="8" fill="#101418"/>'+
+    '<ellipse cx="168" cy="174" rx="5" ry="2.4" fill="#101418"/>'+
+    '<path d="M214 156 v58" stroke="#c9c3bc" stroke-width="2"/>'+
+    '<ellipse cx="168" cy="270" rx="5" ry="2.5" fill="#12161a"/>'+
+    '<ellipse cx="230" cy="268" rx="16" ry="7" fill="#12161a"/>'+
+    '<ellipse cx="198" cy="276" rx="13" ry="11" fill="#5c584f"/>'+
+    '<path d="M150 250 q18 16 28 4" fill="none" stroke="#e2b48a" stroke-width="1.6" opacity=".0"/>'+
+    catcher() +
+    hitEll("sulci", "the effaced sulci", 96, 170, 40, 55) +
+    hitEll("horn", "the slit-like frontal horn", 168, 174, 22, 16) +
+    hitEll("cistern", "the effaced ambient cistern", 160, 268, 28, 20) +
+    ctClose();
+}
+function plateCvt(){
+  return ctOpen("cv", "CT venogram, empty delta, schematic") +
+    sulci("all") + ventsNormal() +
+    '<path d="M200 312 L176 352 L224 352 Z" fill="#f3f1ea"/>'+
+    '<path d="M200 322 L186 346 L214 346 Z" fill="#2a3034"/>'+
+    catcher() + hitPath("sinus", "the superior sagittal sinus", "M200 312 L176 352 L224 352 Z") + ctClose();
+}
+function plateMrv(){
+  return '<svg class="film'+liveClass()+'" viewBox="0 0 400 420" role="img" aria-label="MR venogram, schematic, missing left transverse sinus">'+
+    '<rect width="400" height="420" fill="#05080c"/>'+
+    '<text class="side" x="18" y="28">R</text><text class="side" x="382" y="28" text-anchor="end">L</text>'+
+    '<path d="M70 250 C70 80 330 80 330 250" fill="none" stroke="#e7eef2" stroke-width="8" stroke-linecap="round"/>'+
+    '<path d="M200 250 v40" stroke="#e7eef2" stroke-width="8"/>'+
+    '<path d="M200 290 C150 300 90 300 60 330" fill="none" stroke="#e7eef2" stroke-width="8" stroke-linecap="round"/>'+
+    '<text class="tag" x="48" y="360">flow</text>'+
+    catcher().replace('cx="200" cy="200" rx="130" ry="136"', 'cx="200" cy="210" rx="160" ry="150"') +
+    hitEll("transverse", "where the left transverse sinus should fill", 300, 300, 55, 36) +
+    "</svg>";
+}
+function platePres(){
+  return '<svg class="film'+liveClass()+'" viewBox="0 0 400 420" role="img" aria-label="FLAIR MRI, posterior reversible encephalopathy, schematic">'+
+    boneDefs("pr") +
+    '<rect width="400" height="420" fill="#070b10"/>'+
+    '<ellipse cx="200" cy="200" rx="150" ry="158" fill="#3e464c"/>'+
+    '<ellipse cx="200" cy="200" rx="150" ry="158" fill="none" stroke="#1a1e22" stroke-width="8"/>'+
+    sulci("all") + ventsNormal() +
+    '<path d="M90 250 q40 50 70 20 q-20 30 -70 10 z" fill="#d5dde6" opacity=".92"/>'+
+    '<path d="M310 250 q-40 50 -70 20 q20 30 70 10 z" fill="#d5dde6" opacity=".92"/>'+
+    '<text class="side" x="18" y="28">R</text><text class="side" x="382" y="28" text-anchor="end">L</text>'+
+    catcher() + hitEll("post", "the posterior white-matter signal", 200, 300, 120, 48) +
+    "</svg>";
+}
+function plateHie(){
+  return ctOpen("hi", "Non-contrast CT, hypoxic-ischemic injury, schematic") +
+    '<ellipse cx="200" cy="168" rx="120" ry="90" fill="#343a3e"/>'+
+    '<path d="M120 250 Q200 300 280 250 Q200 340 120 250 Z" fill="#9aa3a8"/>'+
+    '<text class="tag" x="150" y="300" opacity="0"> </text>'+
+    catcher() +
+    hitEll("hemi", "the swollen dark hemispheres", 200, 160, 90, 55) +
+    hitEll("cerebellum", "the relatively bright cerebellum", 200, 292, 70, 36) +
+    ctClose();
+}
+function plateDwiMca(){
+  return '<svg class="film" viewBox="0 0 400 420" role="img" aria-label="Diffusion MRI, left middle cerebral infarct, schematic">'+
+    '<rect width="400" height="420" fill="#05080c"/>'+
+    '<ellipse cx="200" cy="200" rx="148" ry="156" fill="#2a3136"/>'+
+    '<path d="M220 120 Q340 160 320 250 Q280 300 230 250 Q210 190 220 120 Z" fill="#f2f6f8"/>'+
+    '<text class="side" x="18" y="28">R</text><text class="side" x="382" y="28" text-anchor="end">L</text>'+
+    "</svg>";
+}
+function plateDwiHie(){
+  return '<svg class="film" viewBox="0 0 400 420" role="img" aria-label="Diffusion MRI, global hypoxic injury, schematic">'+
+    '<rect width="400" height="420" fill="#05080c"/>'+
+    '<ellipse cx="200" cy="200" rx="148" ry="156" fill="#2a3136"/>'+
+    '<ellipse cx="200" cy="200" rx="132" ry="140" fill="none" stroke="#f2f6f8" stroke-width="10"/>'+
+    '<ellipse cx="168" cy="200" rx="14" ry="10" fill="#f2f6f8"/>'+
+    '<ellipse cx="232" cy="200" rx="14" ry="10" fill="#f2f6f8"/>'+
+    '<text class="side" x="18" y="28">R</text><text class="side" x="382" y="28" text-anchor="end">L</text>'+
+    "</svg>";
+}
+function plateCta(){
+  return '<svg class="film'+liveClass()+'" viewBox="0 0 400 420" role="img" aria-label="CT angiogram axial MIP, left M1 cutoff, schematic">'+
+    '<rect width="400" height="420" fill="#05080c"/>'+
+    '<text class="side" x="18" y="28">R</text><text class="side" x="382" y="28" text-anchor="end">L</text>'+
+    '<path d="M200 300 v-40" stroke="#e8eef2" stroke-width="5" stroke-linecap="round"/>'+
+    '<path d="M200 270 C160 280 130 300 100 310" fill="none" stroke="#e8eef2" stroke-width="4"/>'+
+    '<path d="M200 270 C240 280 270 300 300 310" fill="none" stroke="#e8eef2" stroke-width="4"/>'+
+    '<path d="M150 230 C170 210 190 200 200 150" fill="none" stroke="#e8eef2" stroke-width="4"/>'+
+    '<path d="M250 230 C230 210 210 200 200 150" fill="none" stroke="#e8eef2" stroke-width="4"/>'+
+    '<path d="M148 214 C110 200 80 190 62 200" fill="none" stroke="#e8eef2" stroke-width="5" stroke-linecap="round"/>'+
+    '<path d="M70 188 l-8 10 M64 206 l-10 6" stroke="#e8eef2" stroke-width="2"/>'+
+    '<path d="M252 214 C278 206 292 204 300 206" fill="none" stroke="#e8eef2" stroke-width="5" stroke-linecap="round"/>'+
+    '<circle cx="304" cy="206" r="3.5" fill="#e8eef2"/>'+
+    catcher().replace('cx="200" cy="200" rx="130" ry="136"', 'cx="200" cy="210" rx="170" ry="150"') +
+    hitEll("cutoff", "the cut-off middle cerebral artery", 304, 206, 28, 28) +
+    "</svg>";
+}
+function plateIchOverlay(){
+  var on = (state.overlay && state.overlay.on) || {};
+  function g(name, inner){
+    return '<g class="ov" '+(on[name] ? "" : "hidden")+'>'+inner+"</g>";
+  }
+  return ctOpen("ov", "Non-contrast CT with teaching overlays") +
+    sulci("west") + sylvian() + ichVents() + ambient(true) + clotArt() +
+    g("territory",
+      '<path d="M150 78 h100 v62 h-100 z" fill="#e2b48a" opacity=".28"/>'+
+      '<path d="M70 150 Q40 210 90 270 Q150 230 160 170 Z" fill="#6aa7e8" opacity=".22"/>'+
+      '<path d="M230 140 Q350 170 330 260 Q250 240 236 170 Z" fill="#6aa7e8" opacity=".30"/>'+
+      '<path d="M120 286 h160 v36 h-160 z" fill="#7fd4e6" opacity=".25"/>'+
+      '<circle cx="250" cy="188" r="10" fill="none" stroke="#d4786a" stroke-width="2"/>') +
+    g("boundary", '<ellipse cx="250" cy="188" rx="44" ry="36" fill="none" stroke="#d4786a" stroke-width="2" stroke-dasharray="5 4"/>') +
+    g("midline", '<line x1="200" y1="70" x2="200" y2="310" stroke="#7fd4e6" stroke-dasharray="4 4" stroke-width="1.5"/><text class="tag" x="206" y="132">7 mm</text>') +
+    g("vent", '<ellipse cx="214" cy="170" rx="16" ry="10" fill="none" stroke="#7fd4e6" stroke-width="1.6"/>') +
+    g("cistern", '<ellipse cx="226" cy="270" rx="18" ry="10" fill="none" stroke="#e2b48a" stroke-width="1.6"/>') +
+    g("herniation", '<path d="M236 246 q-20 18 -28 8" fill="none" stroke="#e2b48a" stroke-width="1.8" marker-end="url(#ah)"/><path d="M168 150 q20 -16 28 -4" fill="none" stroke="#e2b48a" stroke-width="1.6"/>'+
+      '<text class="tag" x="120" y="140">subfalcine</text><text class="tag" x="228" y="246">uncal path</text>') +
+    ctClose();
+}
+
+var PLATE = {
+  normal: plateNormal,
+  ich: function(){ return plateIch(false); },
+  ichcal: function(){ return plateIch(true); },
+  early: plateEarly,
+  established: plateEstablished,
+  ht: plateHt,
+  edh: plateEdh,
+  sdh: plateSdh,
+  tbi: plateTbi,
+  hydro: plateHydro,
+  edema: plateEdema,
+  cvt: plateCvt,
+  mrv: plateMrv,
+  pres: platePres,
+  hie: plateHie,
+  dwimca: plateDwiMca,
+  dwihie: plateDwiHie,
+  cta: plateCta,
+  overlay: plateIchOverlay
+};
+
+function choose(ask, plateId, answer, options, why, hints){
+  return {kind:"choose", ask:ask, plate:plateId, answer:answer, options:options, why:why, hints:hints || []};
+}
+function clickStep(ask, plateId, target, explain, hints){
+  return {kind:"click", ask:ask, plate:plateId, target:target, explain:explain, hints:hints};
+}
+function marksStep(ask, plateId, targets, explain, hints){
+  return {kind:"marks", ask:ask, plate:plateId, targets:targets, explain:explain, hints:hints};
+}
+
+var STATIONS = {
+  ich: {
+    title: "Intracerebral hemorrhage",
+    aim: "Identify the site, estimate hematoma volume, and judge mass effect and midline shift.",
+    steps: [
+      clickStep("Where is the abnormality?", "ich", "clot",
+        "Acute blood is the bright oval in the deep left hemisphere. On this film the patient’s left is on your right. The site is the putamen, a classic hypertensive location.",
+        ["Acute blood is bright. Cerebrospinal fluid is dark. The skull is the bright rim, not the lesion.",
+         "Look deep on the patient’s left, which is the right half of this film."]),
+      choose("Which site is this?", "ich", "putamen", [
+        {id:"putamen", t:"Left putamen / basal ganglia"},
+        {id:"cortex", t:"Right cortical middle cerebral territory"},
+        {id:"cereb", t:"Cerebellar hemisphere"},
+        {id:"stem", t:"Brainstem"}
+      ], "Deep, not cortical, and above the tentorium. Hypertensive hemorrhage prefers the putamen, thalamus, pons and cerebellum. A lobar cortical bleed raises amyloid and other causes instead.", []),
+      {kind:"number", ask:"Estimate the volume with ABC/2.", plate:"ichcal", answer:24, unit:"mL",
+        note:"A is 4 cm, B is 3 cm. Blood is on eight slices of 5 mm, so C is 4 cm. C is not a line on this single image. Volume = A × B × C / 2.",
+        why:"4 × 3 × 4 / 2 = 24 mL. ABC/2 treats the clot as an ellipsoid. Irregular blood is measured less honestly by this shortcut. Volume describes the mass. It is not, by itself, an order to operate.",
+        hints:["Divide the product by 2. That is the ellipsoid correction.", "A × B × C is 48. Half of that is the volume."]},
+      marksStep("Mark every sign of mass effect on this film.", "ich", ["horn", "sulci", "septum"],
+        "Mass effect here is the slit-like frontal horn on the side of the clot, the sulci that have disappeared over it, and the septum pushed off the midline, away from the blood. The next step asks how far.",
+        ["There are three signs: ventricle, sulci, and the septum.", "The bright clot is the lesion you already marked. Mass effect is what the clot does to its neighbours."]),
+      choose("How far is the septum from the midline? Use the 10 mm scale.", "ich", "7", [
+        {id:"0", t:"No shift"},
+        {id:"3", t:"About 3 mm"},
+        {id:"7", t:"About 7 mm, toward the patient’s right"},
+        {id:"16", t:"About 16 mm"}
+      ], "The septum sits about 7 mm toward the patient’s right (your left), away from a left-sided mass. Shift is a measurement of mass effect, not a diagnosis. Cerebellar hemorrhage with compression is a clearer surgical emergency than this deep supratentorial clot. Deep hemorrhage is discussed with neurosurgery when the patient deteriorates. A single millimetre cutoff on this page is not an indication.", [])
+    ]
+  },
+  tbi: {
+    title: "Traumatic brain injury",
+    aim: "Identify extradural, subdural and intraparenchymal hemorrhage.",
+    steps: [
+      clickStep("Click the extradural hematoma.", "tbi", "edh",
+        "The lens sits under the right temporal bone and stops at the suture. Extradural blood is often arterial, classically the middle meningeal artery, and a fracture is often next to it.",
+        ["Extradural blood is biconvex. It is outside the brain and limited by the dura’s attachment at sutures.",
+         "It is on the patient’s right, the left side of this film, against the bone."]),
+      clickStep("Click the subdural hematoma.", "tbi", "sdh",
+        "The crescent over the left hemisphere can cross a suture. It does not cross the midline. Bridging veins are the usual source. Acuity is the brightness: this one is white, so it is acute.",
+        ["Subdural blood is a crescent along the inner table, not a lens and not inside the brain.",
+         "It is the long collection on the patient’s left, your right."]),
+      clickStep("Click the intraparenchymal hemorrhage.", "tbi", "iph",
+        "The mottled bright spots in the right frontal lobe are a contusion, inside the brain. Contusions prefer the frontal and temporal lobes and are often worse on the next scan.",
+        ["This one is inside the brain substance, not against the skull.",
+         "Look anteriorly in the patient’s right frontal lobe, your upper left."]),
+      choose("Which collection is limited by cranial sutures?", "tbi", "edh", [
+        {id:"edh", t:"Extradural"},
+        {id:"sdh", t:"Subdural"},
+        {id:"iph", t:"Contusion"},
+        {id:"all", t:"All three"}
+      ], "The dura is stuck at the sutures, so extradural blood stays lens-shaped. Subdural blood slides under the dura and crosses sutures. A contusion is not an extra-axial collection at all.", [])
+    ]
+  },
+  edema: {
+    title: "Cerebral edema",
+    aim: "Identify sulcal effacement, ventricular compression and the herniation pattern.",
+    steps: [
+      clickStep("Where are the sulci effaced?", "edema", "sulci",
+        "The patient’s right hemisphere, on your left, has lost its sulci. The surface is smooth because the swollen brain has pressed the cerebrospinal fluid out of them.",
+        ["Sulci are the dark lines at the surface. Find the side where those lines have gone.",
+         "Compare the two hemispheres. One still has folds."]),
+      clickStep("Where is the ventricle compressed?", "edema", "horn",
+        "The frontal horn on the swollen side is a slit. The opposite horn is still open, and the septum has moved away from the swelling. That is subfalcine shift.",
+        ["Look for a frontal horn that has been flattened, not the open one.",
+         "It is on the same side as the missing sulci."]),
+      clickStep("Where is the cistern effaced?", "edema", "cistern",
+        "The ambient cistern beside the midbrain on the swollen side is gone. The medial temporal lobe is moving into that space. That is uncal herniation. The third nerve is compressed there, so the pupil on that side enlarges.",
+        ["Cisterns are the dark cerebrospinal-fluid spaces beside the midbrain, low on this film.",
+         "One of them is still open. Click the one that has closed."]),
+      choose("A new dilated pupil on the side of the mass is which pattern?", "edema", "uncal", [
+        {id:"uncal", t:"Uncal herniation"},
+        {id:"sub", t:"Subfalcine herniation alone"},
+        {id:"tonsil", t:"Tonsillar herniation"},
+        {id:"none", t:"No herniation, only a migraine pupil"}
+      ], "Uncal herniation presses the oculomotor nerve. Subfalcine shift moves the septum and can threaten the anterior cerebral artery, but it does not dilate the pupil. Tonsillar herniation is at the foramen magnum and is not the film’s main sign. This plate shows both subfalcine shift and a threatened uncal path.", [])
+    ]
+  },
+  hydro: {
+    title: "Hydrocephalus",
+    aim: "Compare normal and enlarged ventricles.",
+    steps: [
+      clickStep("Click the abnormal ventricles.", "hydro", "vent",
+        "All of these ventricles are too large: both frontal horns, the third ventricle, and the temporal horns. A dark halo around the horns is transependymal fluid, which means the pressure is acute.",
+        ["Ventricles are the dark cerebrospinal-fluid spaces in the middle, not the sulci at the edge.",
+         "On this film they are ballooned, not slits."]),
+      {kind:"comparepick", ask:"Which film is the enlarged set? Click it.", plates:["normal", "hydro"], names:["Film A", "Film B"], answer:1,
+        why:"Film B has ballooned frontal horns, a wide third ventricle and temporal horns. Film A is a normal size. Enlargement is the finding. The level of the block still has to be named."},
+      choose("Large lateral and third ventricles, with temporal horns, in a patient who is getting sleepier. Best next step?", "hydro", "drain", [
+        {id:"drain", t:"Urgent neurosurgical review for drainage. Do not puncture the lumbar cistern first."},
+        {id:"lp", t:"Lumbar puncture as the only next step"},
+        {id:"lyte", t:"Thrombolysis"},
+        {id:"home", t:"Discharge if the pupils are equal"}
+      ], "Acute hydrocephalus is a pressure problem. A drain treats the mechanism when the patient is deteriorating. A lumbar puncture before you know the posterior fossa is safe can precipitate herniation. Equal pupils do not make an enlarging ventricle safe.", [])
+    ]
+  },
+  cvt: {
+    title: "Cerebral venous thrombosis",
+    aim: "Read a CT venogram and an MR venogram.",
+    steps: [
+      clickStep("On this CT venogram, where is the abnormality?", "cvt", "sinus",
+        "The triangle at the posterior midline is the superior sagittal sinus. Contrast outlines it. The dark center is thrombus: the empty delta. Plain CT can miss this completely.",
+        ["This is a contrast venogram. Thrombus is the dark defect inside a bright sinus, not a bright clot on a plain CT.",
+         "Look at the posterior midline, against the inner table. Posterior is the bottom of an axial film."]),
+      clickStep("On this MR venogram, where is the missing flow?", "mrv", "transverse",
+        "The superior sagittal sinus and the patient’s right transverse sinus fill. The left transverse sinus does not. Absence of flow is the finding. A hypoplastic sinus can mimic this, so the CT or MR source images still have to agree.",
+        ["Follow the bright sinus across the top and down both sides. One side stops.",
+         "The gap is on the patient’s left, your right."]),
+      choose("A small venous hemorrhage is already on the plain CT. What is the usual treatment of the thrombus?", "cvt", "hep", [
+        {id:"hep", t:"Therapeutic anticoagulation, unless a local contraindication is stronger than the clot"},
+        {id:"alteplase", t:"Intravenous alteplase as for arterial stroke"},
+        {id:"stop", t:"Withhold all anticoagulation because any blood is an absolute bar"},
+        {id:"asa", t:"Aspirin alone"}
+      ], "Venous thrombosis is treated with heparin even when a modest venous hemorrhage is already present. Alteplase is the wrong drug. A large expanding hematoma is a specialist decision, not a reason to invent a new rule on this page.", [])
+    ]
+  },
+  pres: {
+    title: "Posterior reversible encephalopathy",
+    aim: "Recognize the typical MRI pattern.",
+    steps: [
+      clickStep("Where is the abnormal signal on this FLAIR?", "pres", "post",
+        "Both posterior lobes are bright in the subcortical white matter. The pattern is roughly symmetric and it is not an arterial territory. That is vasogenic edema.",
+        ["FLAIR bright means edema. Look posteriorly, which is the bottom of this axial film.",
+         "It is on both sides. A single middle-cerebral infarct is not."]),
+      choose("What is the usual mechanism?", "pres", "vaso", [
+        {id:"vaso", t:"Vasogenic edema from endothelial dysfunction"},
+        {id:"cyto", t:"Cytotoxic edema in one arterial territory"},
+        {id:"bleed", t:"Acute arterial hemorrhage"},
+        {id:"abscess", t:"Ring-enhancing abscess"}
+      ], "Blood pressure, eclampsia, and drugs such as calcineurin inhibitors injure the endothelium. Fluid spreads in the white matter and often clears when the trigger is removed. It is not a thrombus you can thrombolyse. ‘Reversible’ is the usual course, not a promise.", []),
+      choose("Post-partum seizure, blood pressure 186/112, and this MRI. Next step?", "pres", "ecl", [
+        {id:"ecl", t:"Treat the eclampsia pathway and lower the pressure in a controlled way. No thrombolysis."},
+        {id:"lyt", t:"Alteplase for a posterior-cerebral occlusion"},
+        {id:"hep", t:"Heparin for arterial dissection"},
+        {id:"obs", t:"The MRI is classic migraine aura. Send her home on aspirin."}
+      ], "In this setting the imaging pattern is PRES and the illness is eclampsia until the obstetric team says otherwise. Magnesium and blood-pressure control belong to that pathway. The dose is not written here because the obstetric protocol owns it.", [])
+    ]
+  },
+  hie: {
+    title: "Hypoxic–ischemic brain injury",
+    aim: "Read the CT and MRI patterns in clinical context.",
+    steps: [
+      clickStep("On this CT, where is the injured brain?", "hie", "hemi",
+        "Both hemispheres are swollen and dark, and the gray–white boundary has gone. The cerebellum looks bright only because the hemispheres have become dark. That is the white-cerebellum sign, not a healthy glow.",
+        ["Compare the two compartments. The abnormal one is darker and swollen.",
+         "It is both cerebral hemispheres, not a wedge in one artery."]),
+      clickStep("Which structure is relatively spared on this CT?", "hie", "cerebellum",
+        "The cerebellum is spared relative to the hemispheres, so it looks bright. Sparing is a clue to a global insult. It is not a cerebellar hemorrhage.",
+        ["The bright structure at the bottom is not blood. Ask what it is sitting next to.",
+         "Posterior fossa, midline, both sides."]),
+      {kind:"comparepick", ask:"Which film is the diffusion MRI of the same kind of global injury?", plates:["hie", "dwihie"], names:["CT", "MRI"], answer:1,
+        why:"The diffusion image shows a bright cortical ribbon and bright basal ganglia on both sides, on a dark background. Restricted diffusion is the acute MRI sign. The CT shows the same global idea as lost gray–white differentiation."},
+      choose("Six hours after a prolonged cardiac arrest, this CT is obvious. What decision does the film authorize today?", "hie", "wait", [
+        {id:"wait", t:"Treat the post-arrest pathway. Do not assign a final prognosis from this single early film."},
+        {id:"dead", t:"The CT alone is brain death. Stop all care."},
+        {id:"lyt", t:"Thrombolyse both middle cerebral arteries."},
+        {id:"evd", t:"An external drain, because the ventricles are large."}
+      ], "Prognosis after hypoxia uses the examination, time, and often more than one modality. A bad CT is serious. It is not, by itself, a determination of death, and these ventricles are small, not hydrocephalic. There is no single arterial clot to retrieve.", [])
+    ]
+  },
+  death: {
+    title: "Brain death assessment",
+    aim: "The clinical evaluation, the prerequisites, and when an investigation is added. This is not a scan, and it is not a protocol.",
+    steps: [
+      {kind:"multi", ask:"Which of these must be true before anyone examines for death by neurological criteria? Select every true prerequisite. Leave the traps off.",
+        plate:null,
+        options:[
+          {id:"cause", t:"A known, irreversible cause of coma is documented", on:true},
+          {id:"temp", t:"Temperature is in the range the protocol requires, not a hypothermic coma", on:true},
+          {id:"drug", t:"Sedatives and neuromuscular blockers are absent, or have been excluded", on:true},
+          {id:"bp", t:"Arterial pressure is adequate for the examination", on:true},
+          {id:"met", t:"A severe metabolic or endocrine confounder has been dealt with", on:true},
+          {id:"cold", t:"The patient is being held at 33 °C on purpose", on:false},
+          {id:"prop", t:"Propofol is still infusing", on:false},
+          {id:"unknown", t:"No cause has been established, but the coma scale is 3", on:false},
+          {id:"family", t:"The family has agreed, and that agreement is what determines death", on:false}
+        ],
+        why:"Death by neurological criteria needs a cause, a body that is not confounded, and an examination by people credentialed to do it. Hypothermia, a running sedative, and an unknown cause all stop the process. Family agreement does not create the diagnosis, and family refusal of the concept is a legal question, not a finding on the film. The number of examiners is set by law and the hospital protocol. Do not import a number from this page. AAN pathways often cite a core temperature of at least 36 °C and a systolic pressure of at least 100 mmHg. Confirm the protocol in front of you."},
+      choose("Which set is the clinical examination?", null, "full", [
+        {id:"full", t:"Coma, absent brainstem reflexes, and an apnea test done inside the protocol"},
+        {id:"ct", t:"A CT that looks swollen"},
+        {id:"one", t:"One absent corneal reflex"},
+        {id:"eeg", t:"An EEG ordered instead of any examination"}
+      ], "The determination is clinical: coma, brainstem areflexia, and apnea. Imaging can show the catastrophe. It does not replace the examination. One reflex is not an examination.", []),
+      choose("What is the apnea test looking for? It is performed only by credentialed examiners.", null, "co2", [
+        {id:"co2", t:"No breathing effort while carbon dioxide rises to the protocol target"},
+        {id:"o2", t:"A rise in oxygen while the ventilator is set to 4 breaths"},
+        {id:"cough", t:"A cough when the trachea is sucked"},
+        {id:"bp", t:"A fall in blood pressure, which is itself the pass mark"}
+      ], "The medullary drive is being tested. A widely cited adult target is PaCO₂ at least 60 mmHg and at least 20 mmHg above the baseline, with no effort. Instability during the test is a reason to stop, not a pass. This page does not walk you through performing the test.", []),
+      choose("Both globes are ruptured, so the pupils cannot be examined, and the apnea test cannot be finished safely. What is an ancillary test for?", null, "gap", [
+        {id:"gap", t:"To complete a determination that the bedside examination cannot finish"},
+        {id:"always", t:"Required in every case, even after a complete examination"},
+        {id:"instead", t:"A substitute the family can request in place of any prerequisites"},
+        {id:"ct", t:"A normal CT rules death in"}
+      ], "Ancillary tests are for the gap: pupils that cannot be seen, an apnea test that cannot be finished, or a confounder the protocol says to resolve with a flow study or an electrical study. They do not override a retained reflex, and a normal CT is not one of them. Catheter angiography, radionuclide perfusion, and the studies named in the local protocol are the ones that count. Do not invent a study.", []),
+      choose("The patient is quadriplegic but looks up and blinks once for yes. What is this?", null, "lock", [
+        {id:"lock", t:"Locked-in syndrome. This is not brain death."},
+        {id:"bd", t:"Brain death, because the limbs do not move"},
+        {id:"sed", t:"Only sedation, so declare death and then give naloxone"},
+        {id:"pvs", t:"Permanent vegetative state, which is the same declaration"}
+      ], "Wakefulness and a reliable upward glance mean the tegmentum and the cortex are working. Locked-in syndrome is usually a ventral pontine injury. It is the mistake this examination exists to prevent.", [])
+    ]
+  }
+};
+
+var STROKE = [
+  {kind:"choose", title:"Presentation", activity:"Assess sudden-onset focal neurological deficits",
+    plate:null,
+    ask:"A 67-year-old man has sudden right face and arm weakness, a drifting right leg, and aphasia. Last known well was 70 minutes ago. Blood pressure is 168/94. Glucose is 6.9 mmol/L (124 mg/dL). What is the first read?",
+    answer:"path",
+    options:[
+      {id:"path", t:"A sudden focal deficit. Start the stroke pathway. Time starts at last known well."},
+      {id:"home", t:"Migraine. Send him home if the headache is mild."},
+      {id:"mri", t:"Wait for an MRI tomorrow before any other move."},
+      {id:"hep", t:"Give aspirin and heparin now, before any imaging."}
+    ],
+    why:"A sudden focal deficit is a stroke until the scan says otherwise. Seventy minutes is inside the usual thrombolysis window. Do not anticoagulate a brain that might be bleeding, and do not spend the window waiting for an elective MRI."},
+  {kind:"nihss", title:"Examination", activity:"Calculate the NIHSS and name the syndrome",
+    ask:"Score the examination you just did. Then the syndrome is asked.",
+    items:[
+      ["1a", "Alert", 0, 3],
+      ["1b", "Answers one question", 1, 2],
+      ["1c", "Performs one command", 1, 2],
+      ["2", "Gaze normal", 0, 2],
+      ["3", "No visual-field cut", 0, 3],
+      ["4", "Right lower face weak, forehead moves", 2, 3],
+      ["5a", "Right arm moves but cannot be held against gravity", 3, 4],
+      ["5b", "Left arm, no drift", 0, 4],
+      ["6a", "Right leg drifts, does not hit the bed", 1, 4],
+      ["6b", "Left leg, no drift", 0, 4],
+      ["7", "No limb ataxia", 0, 2],
+      ["8", "Mild sensory loss on the right", 1, 2],
+      ["9", "Fragmented sentences, still producing words", 2, 3],
+      ["10", "Mild dysarthria", 1, 2],
+      ["11", "No extinction or inattention", 0, 2]
+    ],
+    total:12,
+    syndromeAsk:"Which syndrome is this?",
+    syndrome:"lmca",
+    syndromeOptions:[
+      {id:"lmca", t:"Left middle cerebral artery, dominant hemisphere. Face and arm more than leg, with aphasia."},
+      {id:"laca", t:"Left anterior cerebral artery. The leg should lead."},
+      {id:"rmca", t:"Right middle cerebral artery. He would neglect, not lose language this way."},
+      {id:"post", t:"Posterior circulation. Gaze and cranial nerves would lead."}
+    ],
+    why:"The total is 12. Face and arm are worse than the leg, and language is involved, so this is the left middle cerebral artery, not the anterior cerebral artery. Dysarthria is scoreable because he is still producing words. A mute patient is untestable for dysarthria, not an automatic 2."},
+  {kind:"click", title:"Initial imaging", activity:"Interpret the non-contrast CT",
+    plate:"early", target:"insula",
+    ask:"Non-contrast CT, now. Where is the early ischemic change?",
+    explain:"The insular ribbon on the patient’s left is indistinct, and the cortex there is a little darker. There is no bright blood. One region of early change does not make this a completed infarct. Do not withhold a lytic for an insular ribbon alone.",
+    hints:["There is no bright blood. Look for gray matter that has lost its edge.", "Patient’s left insula, on the right of the film, just deep to the sylvian fissure."],
+    follow:{
+      ask:"Is there hemorrhage on this film?",
+      answer:"no",
+      options:[
+        {id:"no", t:"No hemorrhage. Early ischemia only."},
+        {id:"yes", t:"Yes. The dark area is blood."},
+        {id:"sah", t:"Subarachnoid blood fills the cisterns."}
+      ],
+      why:"Blood is bright on non-contrast CT. This film is a subtle darkening. A lytic is still a clinical decision, but the scan has not shown a bleed."
+    }},
+  {kind:"click", title:"Vascular imaging", activity:"Identify the artery and look for a large-vessel occlusion",
+    plate:"cta", target:"cutoff",
+    ask:"CT angiogram. Where is the occlusion?",
+    explain:"The patient’s left middle cerebral artery, on your right, stops in the M1 stem. The opposite candelabra is still there. That is a large-vessel occlusion.",
+    hints:["Compare the two middle cerebral arteries. One of them ends almost as soon as it starts.", "Patient’s left, your right, just lateral to the carotid tip."],
+    follow:{
+      ask:"Which vessel is occluded?",
+      answer:"m1",
+      options:[
+        {id:"m1", t:"Left middle cerebral artery, M1"},
+        {id:"aca", t:"Right anterior cerebral artery"},
+        {id:"bas", t:"Basilar artery"},
+        {id:"vert", t:"Neither. Both trees are open."}
+      ],
+      why:"The stump is the left M1. The basilar and both anterior cerebral arteries on this drawing still fill."
+    }},
+  {kind:"choose", title:"Treatment decision", activity:"Decide on intravenous thrombolysis and endovascular thrombectomy",
+    plate:null,
+    ask:"Last known well 70 minutes ago. NIHSS 12. No hemorrhage. Left M1 occlusion. No exclusion is written in the chart. Blood pressure is 168/94. What is the treatment frame?",
+    answer:"both",
+    options:[
+      {id:"both", t:"Intravenous thrombolysis and endovascular thrombectomy. Do not delay the lytic for the angiogram."},
+      {id:"evt", t:"Thrombectomy only. Thrombolysis is no longer used."},
+      {id:"lyt", t:"Thrombolysis only. A large-vessel occlusion does not change the plan."},
+      {id:"none", t:"Neither. Seventy minutes is outside every window."},
+      {id:"hep", t:"Heparin infusion."}
+    ],
+    why:"He is inside the 4.5-hour thrombolysis window and inside the early thrombectomy window, with a large-vessel occlusion and no bleed. The teaching dose of alteplase is 0.9 mg/kg, maximum 90 mg, 10% as a bolus and the rest over 60 minutes. Tenecteplase 0.25 mg/kg, maximum 25 mg, is an alternative where the pathway has adopted it. These are published teaching doses, not an order. Confirm the monograph. Blood pressure is already under 185/110. Heparin is not the acute arterial-stroke drug."},
+  {kind:"choose", title:"Complication", activity:"Respond to deterioration or suspected hemorrhagic transformation",
+    plate:null,
+    ask:"Two hours later, while the infusion is still running, he develops headache and vomiting and the NIHSS rises by 6. What now?",
+    answer:"stop",
+    options:[
+      {id:"stop", t:"Stop the infusion. Immediate non-contrast CT. Reverse only if hemorrhage is confirmed, with the agent the pathway names."},
+      {id:"finish", t:"Finish the bag so the dose is not wasted, then scan in the morning."},
+      {id:"crani", t:"Decompressive craniectomy now, with no imaging."},
+      {id:"lp", t:"Lumbar puncture to lower the pressure."}
+    ],
+    why:"Neurological deterioration on a lytic is hemorrhage until the CT says otherwise. Stopping the drug is immediate. Reversal follows the film, not a guess. A puncture or a craniotomy without a scan is the wrong operation."},
+  {kind:"click", title:"Reassessment", activity:"Read the examination and the follow-up imaging",
+    plate:"ht", target:"bleed",
+    ask:"Follow-up CT. Click the new finding.",
+    explain:"Bright blood now sits inside the dark infarct. That is hemorrhagic transformation, not a new deep hypertensive hemorrhage in a clean putamen and not an abscess.",
+    hints:["Look inside the territory that was ischemic. Something there is now bright.", "Patient’s left middle cerebral territory, your right."],
+    follow:{
+      ask:"He is drowsier and the left pupil is a little larger. What is the frame?",
+      answer:"hold",
+      options:[
+        {id:"hold", t:"Hold antithrombotics. Control the pressure. Neurosurgery if the mass effect is declaring itself. Do not restart the lytic."},
+        {id:"half", t:"Restart alteplase at half the dose."},
+        {id:"dapt", t:"Load aspirin and clopidogrel now."},
+        {id:"hep", t:"Therapeutic heparin, because the artery re-occluded until proved otherwise."}
+      ],
+      why:"The film shows blood in the infarct. Antithrombotics stop. A rising pupil is mass effect, which is a neurosurgical conversation, not a second dose of a lytic."
+    }},
+  {kind:"debrief", title:"Debrief", activity:"Review the decisions, the missed clues, and the guideline frame"}
+];
+
+var CASES = [
+  {id:"ich", plate:"ich", stem:"Sudden right face and arm weakness, headache and vomiting. Blood pressure 204/112. No anticoagulant.",
+    click:"clot", explain:"Bright blood in the left putamen.",
+    hints:["Acute blood is bright and deep, not a dark wedge.", "Patient’s left, your right."],
+    locAsk:"Localize it.", locAnswer:"put",
+    loc:[{id:"put", t:"Left basal ganglia"}, {id:"cor", t:"Right cortex"}, {id:"cer", t:"Cerebellum"}, {id:"sin", t:"Superior sagittal sinus"}],
+    locWhy:"Deep left hemisphere. The deficit is on the right, which matches.",
+    mechAnswer:"htn", mechAsk:"Likely mechanism?",
+    mech:[{id:"htn", t:"Hypertensive perforator rupture"}, {id:"emb", t:"Arterial embolus"}, {id:"bridge", t:"Bridging-vein tear"}, {id:"ven", t:"Dural sinus thrombus"}],
+    mechWhy:"Deep location plus this blood pressure is the hypertensive pattern. Amyloid prefers lobar cortex. A vein would not respect the putamen.",
+    nextAnswer:"bp", nextAsk:"Next step?",
+    next:[{id:"bp", t:"Lower the systolic pressure smoothly, watch the airway, and involve neurosurgery. No thrombolysis."}, {id:"lyt", t:"Alteplase"}, {id:"lp", t:"Lumbar puncture"}, {id:"home", t:"Aspirin and home"}],
+    nextWhy:"This is a bleed. Pressure is lowered smoothly, often discussed toward about 140 systolic if the patient will tolerate it, without a crash. The 2022 AHA pathway is the teaching frame, not a personal order. The cerebellum is not the site, so do not apply a cerebellar operative rule here."},
+  {id:"edh", plate:"edh", stem:"Struck on the right temple. A lucid interval, then drowsiness and left-sided weakness.",
+    click:"edh", explain:"Lens-shaped extradural blood under the right temporal bone, with a fracture line.",
+    hints:["Look against the bone, not inside the brain.", "Patient’s right, your left. It is biconvex."],
+    locAsk:"Localize it.", locAnswer:"edh",
+    loc:[{id:"edh", t:"Right temporal extradural"}, {id:"sdh", t:"Left subdural"}, {id:"iph", t:"Brainstem"}, {id:"sah", t:"Basal cisterns"}],
+    locWhy:"Biconvex, suture-limited, temporal, on the side of the blow.",
+    mechAnswer:"mma", mechAsk:"Likely mechanism?",
+    mech:[{id:"mma", t:"Arterial, often the middle meningeal artery, with a fracture"}, {id:"htn", t:"Hypertensive putamen"}, {id:"bridge", t:"Bridging vein"}, {id:"aneu", t:"Aneurysm in the sylvian fissure"}],
+    mechWhy:"The shape and the fracture are arterial extradural until a surgeon says otherwise.",
+    nextAnswer:"or", nextAsk:"Next step?",
+    next:[{id:"or", t:"Urgent neurosurgical evacuation. This deterioration is the emergency."}, {id:"obs", t:"Observe overnight. Extradural blood resorbs."}, {id:"lyt", t:"Thrombolysis for a lucid interval."}, {id:"lp", t:"Lumbar puncture."}],
+    nextWhy:"A deteriorating extradural hematoma is an operation, not a clinic review."},
+  {id:"sdh", plate:"sdh", stem:"Older adult, a fall, on a factor Xa inhibitor. Becoming drowsier, with right-sided weakness.",
+    click:"sdh", explain:"Acute subdural crescent over the left hemisphere. It crosses where a suture would be.",
+    hints:["A crescent along the inner table.", "Patient’s left, your right, and it is bright, so it is acute."],
+    locAsk:"Localize it.", locAnswer:"sdh",
+    loc:[{id:"sdh", t:"Left acute subdural"}, {id:"edh", t:"Right extradural"}, {id:"sah", t:"Subarachnoid"}, {id:"ich", t:"Right putamen"}],
+    locWhy:"Crescent, hemispheric, acute.",
+    mechAnswer:"vein", mechAsk:"Likely mechanism?",
+    mech:[{id:"vein", t:"Bridging veins, aggravated by the anticoagulant"}, {id:"mma", t:"Middle meningeal artery"}, {id:"htn", t:"Hypertensive perforator"}, {id:"mca", t:"Middle cerebral embolus"}],
+    mechWhy:"Subdural blood is venous. The drug is why it is large. The shape is not extradural.",
+    nextAnswer:"rev", nextAsk:"Next step?",
+    next:[{id:"rev", t:"Reverse the anticoagulant and get a neurosurgical review. Thickness, shift and the examination set the pace."}, {id:"asa", t:"Add aspirin."}, {id:"obs", t:"The crescent is chronic because it is white. Send him home."}, {id:"lyt", t:"Thrombolysis."}],
+    nextWhy:"White means acute, not chronic. Chronic subdural blood is dark. Reverse the Xa inhibitor with the specific agent. This page does not turn a measurement into an operation."},
+  {id:"hydro", plate:"hydro", stem:"Two days of headache, now hard to wake. No fever. Pupils are equal.",
+    click:"vent", explain:"Ballooned lateral and third ventricles and temporal horns.",
+    hints:["The dark spaces in the center are too big.", "Click the ventricles, not the skull."],
+    locAsk:"Localize it.", locAnswer:"vent",
+    loc:[{id:"vent", t:"Enlarged lateral and third ventricles"}, {id:"sul", t:"Cortical sulci only"}, {id:"edh", t:"Extradural collection"}, {id:"sin", t:"Empty delta"}],
+    locWhy:"This is ventricular enlargement, with transependymal fluid.",
+    mechAnswer:"block", mechAsk:"Likely mechanism?",
+    mech:[{id:"block", t:"Cerebrospinal fluid obstruction until proved otherwise"}, {id:"mca", t:"Arterial occlusion"}, {id:"bridge", t:"Subdural vein"}, {id:"pres", t:"Vasogenic edema of eclampsia"}],
+    mechWhy:"Acute enlargement is a block or a failure of absorption. The level is the next imaging question. It is not an arterial stroke.",
+    nextAnswer:"ns", nextAsk:"Next step?",
+    next:[{id:"ns", t:"Neurosurgical review for drainage. No lumbar puncture as the first move."}, {id:"lp", t:"Lumbar puncture now, to relieve it."}, {id:"lyt", t:"Thrombolysis."}, {id:"home", t:"Equal pupils mean he can go home."}],
+    nextWhy:"Equal pupils are not a clearance. A deteriorating patient with this film needs a drain conversation, not a ward discharge."},
+  {id:"pres", plate:"pres", stem:"Day 2 post partum. Blood pressure 186/112. A seizure and visual change. This is FLAIR.",
+    click:"post", explain:"Symmetric posterior subcortical edema.",
+    hints:["FLAIR-bright, both sides, posterior.", "Bottom of the film is posterior."],
+    locAsk:"Localize it.", locAnswer:"post",
+    loc:[{id:"post", t:"Bilateral posterior subcortical white matter"}, {id:"mca", t:"One middle cerebral territory"}, {id:"put", t:"Putamen"}, {id:"sin", t:"A single sinus"}],
+    locWhy:"Both posterior lobes, white matter more than a vascular wedge.",
+    mechAnswer:"vaso", mechAsk:"Likely mechanism?",
+    mech:[{id:"vaso", t:"Vasogenic edema, PRES, in the setting of eclampsia"}, {id:"cyto", t:"Cytotoxic arterial infarct"}, {id:"bleed", t:"Hemorrhage"}, {id:"abs", t:"Abscess"}],
+    mechWhy:"The pattern and the postpartum pressure crisis go together.",
+    nextAnswer:"ecl", nextAsk:"Next step?",
+    next:[{id:"ecl", t:"Eclampsia pathway and controlled blood-pressure treatment. Not a lytic."}, {id:"lyt", t:"Alteplase for a posterior cerebral occlusion."}, {id:"hep", t:"Heparin."}, {id:"obs", t:"Migraine aura. Home."}],
+    nextWhy:"Do not thrombolyse vasogenic edema. The obstetric pathway owns magnesium and delivery decisions."},
+  {id:"cvt", plate:"cvt", stem:"Three weeks post partum. A week of worsening headache, then a seizure. This film is a CT venogram.",
+    click:"sinus", explain:"Empty delta in the superior sagittal sinus.",
+    hints:["Contrast is bright. Thrombus is the dark hole inside it.", "Posterior midline."],
+    locAsk:"Localize it.", locAnswer:"sss",
+    loc:[{id:"sss", t:"Superior sagittal sinus"}, {id:"mca", t:"Middle cerebral artery"}, {id:"put", t:"Putamen"}, {id:"edh", t:"Extradural space"}],
+    locWhy:"A triangular filling defect in the midline sinus.",
+    mechAnswer:"ven", mechAsk:"Likely mechanism?",
+    mech:[{id:"ven", t:"Venous thrombosis"}, {id:"art", t:"Arterial embolus"}, {id:"trauma", t:"Arterial extradural"}, {id:"htn", t:"Hypertensive hemorrhage"}],
+    mechWhy:"The clinical week of headache and the empty delta are venous. The postpartum state is a risk, not a decoration.",
+    nextAnswer:"hep", nextAsk:"Next step?",
+    next:[{id:"hep", t:"Therapeutic anticoagulation. Confirm on the full venogram. A small venous bleed does not automatically forbid heparin."}, {id:"lyt", t:"Alteplase."}, {id:"asa", t:"Aspirin alone."}, {id:"obs", t:"Migraine. No vessel imaging."}],
+    nextWhy:"This film is already a venogram and it shows the thrombus. Anticoagulation is the usual treatment."},
+  {id:"hie", plate:"hie", stem:"Return of circulation after a prolonged arrest. This CT is six hours later.",
+    click:"hemi", explain:"Diffuse hemispheric edema with loss of gray–white differentiation. The cerebellum looks bright only by comparison.",
+    hints:["Both hemispheres, not one arterial wedge.", "The abnormal brain is the dark swollen part."],
+    locAsk:"Localize it.", locAnswer:"glob",
+    loc:[{id:"glob", t:"Both cerebral hemispheres, cerebellum relatively spared"}, {id:"mca", t:"One middle cerebral artery"}, {id:"edh", t:"Extradural"}, {id:"hydro", t:"Obstructive hydrocephalus"}],
+    locWhy:"Global, symmetric, posterior fossa relatively spared.",
+    mechAnswer:"hie", mechAsk:"Likely mechanism?",
+    mech:[{id:"hie", t:"Global hypoxic–ischemic injury"}, {id:"emb", t:"Bilateral emboli as the only idea"}, {id:"cvt", t:"Venous sinus thrombosis"}, {id:"pres", t:"PRES"}],
+    mechWhy:"The arrest is the cause. The film fits a global insult. PRES is posterior white matter in a pressure crisis, not this.",
+    nextAnswer:"icu", nextAsk:"Next step?",
+    next:[{id:"icu", t:"Post-arrest intensive care. Do not declare a prognosis, or brain death, from this film alone."}, {id:"bd", t:"This CT is brain death. Withdraw all support as the determination."}, {id:"lyt", t:"Thrombolyse both hemispheres."}, {id:"evd", t:"External drain for the large ventricles."}],
+    nextWhy:"The ventricles are small. Death by neurological criteria is a clinical protocol, not a CT sign."},
+  {id:"early", plate:"early", stem:"Last known well 70 minutes ago. Aphasia and right face and arm weakness. Non-contrast CT.",
+    click:"insula", explain:"Subtle loss of the left insular ribbon. No blood.",
+    hints:["There is no bright clot. Look for a blurred cortical ribbon.", "Patient’s left insula."],
+    locAsk:"Localize it.", locAnswer:"ins",
+    loc:[{id:"ins", t:"Left insula, early middle cerebral ischemia"}, {id:"ich", t:"Left putamen hemorrhage"}, {id:"sdh", t:"Subdural"}, {id:"normal", t:"A normal film with no localizing finding"}],
+    locWhy:"Early ischemia is a missing ribbon, not a bright hematoma.",
+    mechAnswer:"art", mechAsk:"Likely mechanism?",
+    mech:[{id:"art", t:"Arterial ischemia"}, {id:"htn", t:"Hypertensive hemorrhage"}, {id:"vein", t:"Venous infarct as the first assumption"}, {id:"trauma", t:"Contusion"}],
+    mechWhy:"The story is a sudden arterial syndrome and the film has no blood.",
+    nextAnswer:"vessel", nextAsk:"Next step?",
+    next:[{id:"vessel", t:"Vessel imaging now, and assess thrombolysis and thrombectomy. Do not give an antiplatelet first."}, {id:"asa", t:"Aspirin and a clinic review."}, {id:"hep", t:"Heparin."}, {id:"home", t:"The CT is not a finished infarct, so it is not a stroke."}],
+    nextWhy:"A nearly normal early CT is what you want before a lytic. It is not a reason to doubt the diagnosis."}
+];
+
+var COMPARE = [
+  {ask:"Which film is the acute hemorrhage?", plates:["normal", "ich"], names:["Normal CT", "Second CT"], answer:1,
+    why:"The second film has a bright deep collection. The first has dark ventricles and no blood."},
+  {ask:"Which film is the earlier ischemic change?", plates:["early", "established"], names:["First CT", "Second CT"], answer:0,
+    why:"The first film is a blurred insula. The second is a dark, established middle cerebral territory. Early does not mean trivial, but it is not the completed wedge."},
+  {ask:"Which film is the hemorrhagic transformation?", plates:["early", "ht"], names:["Before", "After"], answer:1,
+    why:"The later film has bright blood inside a dark infarct. The earlier film has no blood."},
+  {ask:"Click the hemorrhage, not the infarct.", plates:["ich", "established"], names:["Film A", "Film B"], answer:0,
+    why:"Film A is bright blood. Film B is a dark arterial territory. On non-contrast CT those are opposite densities."},
+  {ask:"Which ventricles are enlarged?", plates:["normal", "hydro"], names:["Film A", "Film B"], answer:1,
+    why:"Film B is hydrocephalus. Film A is a normal caliber."},
+  {ask:"Same left middle cerebral infarct. Which film is the MRI?", plates:["established", "dwimca"], names:["First", "Second"], answer:1,
+    why:"The second film is diffusion: dark background, bright restricted cortex, no white skull. The first is CT, where the infarct is dark and the skull is bright."}
+];
+
+var OVERLAY = [
+  {layer:"boundary", ask:"With the boundary on: is this blood inside the brain?", answer:"in",
+    options:[{id:"in", t:"Yes. Intraparenchymal."}, {id:"edh", t:"No. It is extradural."}, {id:"sdh", t:"No. It is subdural."}],
+    why:"The dashed edge is inside the hemisphere, not under the skull and not a crescent along it."},
+  {layer:"territory", ask:"Which supply is the clot sitting in?", answer:"perf",
+    options:[{id:"perf", t:"Lenticulostriate perforators, deep middle cerebral artery"}, {id:"aca", t:"Anterior cerebral cortical branches"}, {id:"pca", t:"Posterior cerebral artery"}, {id:"bridge", t:"Bridging veins"}],
+    why:"The pale blue wash is cortical middle cerebral territory. The clot is deep to that, in the perforator territory. The warm wash anteriorly is anterior cerebral. The cyan posteriorly is posterior cerebral. The original film stays visible under the wash."},
+  {layer:"midline", ask:"Which way is the septum pushed?", answer:"right",
+    options:[{id:"right", t:"Toward the patient’s right, your left, away from the clot"}, {id:"left", t:"Toward the clot"}, {id:"none", t:"It is still on the dashed midline"}],
+    why:"The dashed line is the midline. The septum is about 7 mm toward the patient’s right. Mass effect pushes away from the blood."},
+  {layer:"vent", ask:"What has happened to the frontal horn on the side of the clot?", answer:"slit",
+    options:[{id:"slit", t:"Compressed to a slit"}, {id:"big", t:"Ballooned, as in hydrocephalus"}, {id:"blood", t:"Packed with blood, which is the whole finding"}],
+    why:"The horn is flattened. That is ventricular compression from the mass, not hydrocephalus, and the blood is not inside the ventricle on this film."},
+  {layer:"cistern", ask:"The ambient cistern on the side of the clot is:", answer:"narrow",
+    options:[{id:"narrow", t:"Narrowed, not absent"}, {id:"gone", t:"Absent, with a completed uncal herniation"}, {id:"wide", t:"Wider than the other side"}],
+    why:"It is tighter than its partner. Narrowed is not the same as gone. Do not call herniation complete when the cistern is only narrowed."},
+  {layer:"herniation", ask:"Which paths are drawn?", answer:"both",
+    options:[{id:"both", t:"Subfalcine shift now, and the uncal path if the temporal lobe keeps moving"}, {id:"tonsil", t:"Tonsillar herniation only"}, {id:"none", t:"No path. The arrows are vessels."}],
+    why:"The septum has already shifted under the falx. The medial temporal arrow is the uncal path, drawn as the direction of travel, not as a completed herniation. The cistern is narrowed, not obliterated."}
+];
+
+function activeStep(){
+  if (state.route === "challenge") return challengeStep();
+  if (state.route === "compare") return compareStep();
+  if (state.route === "overlay") return overlayStep();
+  if (state.route === "stroke") return strokeStep();
+  var station = STATIONS[state.route];
+  if (!station) return null;
+  return station.steps[state.step] || null;
+}
+function strokeStep(){
+  if (!state.stroke) return null;
+  var stage = STROKE[state.stroke.stage];
+  if (!stage) return null;
+  if (stage.kind === "click" && state.stroke.followOpen) {
+    return {kind:"choose", plate:stage.plate, ask:stage.follow.ask, options:stage.follow.options, answer:stage.follow.answer, why:stage.follow.why};
+  }
+  return stage;
+}
+function challengeStep(){
+  var ch = state.challenge;
+  if (!ch || ch.done) return null;
+  var c = caseById(ch.order[ch.i]);
+  if (ch.part === 0) return {kind:"click", ask:"Where is the abnormality?", plate:c.plate, target:c.click, explain:c.explain, hints:c.hints, caption:c.stem};
+  if (ch.part === 1) return {kind:"choose", ask:c.locAsk, plate:c.plate, options:c.loc, answer:c.locAnswer, why:c.locWhy, caption:c.stem};
+  if (ch.part === 2) return {kind:"choose", ask:c.mechAsk, plate:c.plate, options:c.mech, answer:c.mechAnswer, why:c.mechWhy, caption:c.stem};
+  return {kind:"choose", ask:c.nextAsk, plate:c.plate, options:c.next, answer:c.nextAnswer, why:c.nextWhy, caption:c.stem};
+}
+function compareStep(){
+  var item = COMPARE[state.compare ? state.compare.i : 0];
+  if (!item) return null;
+  return {kind:"comparepick", ask:item.ask, plates:item.plates, names:item.names, answer:item.answer, why:item.why};
+}
+function overlayStep(){
+  var item = OVERLAY[state.overlay ? state.overlay.i : 0];
+  if (!item) return null;
+  return {kind:"choose", ask:item.ask, plate:"overlay", options:item.options, answer:item.answer, why:item.why, layer:item.layer};
+}
+function caseById(id){
+  return CASES.filter(function(c){ return c.id === id; })[0];
+}
+
+function figure(plateId, caption){
+  var fn = PLATE[plateId];
+  if (!fn) return "";
+  return '<figure class="viewer">'+fn()+'<figcaption>'+esc(caption || captionFor(plateId))+'</figcaption></figure>';
+}
+function captionFor(id){
+  var map = {
+    ich:"Non-contrast CT · schematic · patient’s right is on your left · anterior is up",
+    ichcal:"Same film, calipers on · C is the depth across slices, not this line",
+    early:"Non-contrast CT · early ischemia · schematic",
+    established:"Non-contrast CT · established infarct · schematic",
+    ht:"Non-contrast CT · hemorrhagic transformation · schematic",
+    tbi:"Non-contrast CT · three traumatic collections · schematic",
+    edh:"Non-contrast CT · extradural · schematic",
+    sdh:"Non-contrast CT · acute subdural · schematic",
+    hydro:"Non-contrast CT · ventricles · schematic",
+    edema:"Non-contrast CT · swelling and shift · schematic",
+    cvt:"CT venogram · schematic · posterior is at the bottom",
+    mrv:"MR venogram · schematic · flow is bright",
+    pres:"FLAIR · schematic · posterior is at the bottom",
+    hie:"Non-contrast CT · global hypoxia · schematic",
+    dwihie:"Diffusion MRI · schematic · restricted diffusion is bright",
+    dwimca:"Diffusion MRI · schematic",
+    cta:"CT angiogram, axial MIP · schematic",
+    normal:"Non-contrast CT · normal teaching plate",
+    overlay:"Non-contrast CT · overlays sit on top of the same film"
+  };
+  return map[id] || "Schematic teaching plate. Not a patient DICOM.";
+}
+
+function render(){
+  var route = state.route;
+  if (!route || route === "home") renderHome();
+  else if (route === "stroke") renderStroke();
+  else if (route === "compare") renderCompare();
+  else if (route === "overlay") renderOverlay();
+  else if (route === "challenge") renderChallenge();
+  else if (STATIONS[route]) renderStation();
+  else renderHome();
+  bind();
+}
+
+function renderHome(){
+  var stations = [
+    ["ich", "Intracerebral hemorrhage", "Site, volume, mass effect and midline shift."],
+    ["tbi", "Traumatic brain injury", "Extradural, subdural and intraparenchymal blood."],
+    ["edema", "Cerebral edema", "Sulcal effacement, ventricular compression, herniation."],
+    ["hydro", "Hydrocephalus", "Normal ventricles beside enlarged ones."],
+    ["cvt", "Cerebral venous thrombosis", "CT venogram and MR venogram."],
+    ["pres", "Posterior reversible encephalopathy", "The usual MRI pattern."],
+    ["hie", "Hypoxic–ischemic injury", "CT and MRI, read in the clinical context."],
+    ["death", "Brain death assessment", "Prerequisites, the examination, and when a test is added."]
+  ];
+  app.innerHTML =
+    '<p class="lead">Click the film. A correct click moves you on. A miss brings a hint, then the anatomy. These are schematic teaching plates in radiologic orientation, not a patient DICOM and not a prescription.</p>'+
+    '<div class="modes">'+
+      modeBtn("stroke", "Stroke pathway", "Eight stages, one patient, from the deficit to the debrief.")+
+      modeBtn("compare", "Compare", "Normal against abnormal, early against late, CT against MRI.")+
+      modeBtn("overlay", "Overlays", "Territories, the clot edge, shift, ventricles, cisterns, herniation.")+
+      modeBtn("challenge", "Unknown scan", "No diagnosis on the film. Localize, name the mechanism, choose the next step.")+
+    "</div>"+
+    "<h2>Stations</h2><div class='grid'>"+
+    stations.map(function(s){
+      var done = state.cleared[s[0]] ? " · done" : "";
+      return '<button type="button" class="card" data-go="'+s[0]+'"><b>'+esc(s[1])+done+'</b><span>'+esc(s[2])+'</span></button>';
+    }).join("")+
+    "</div>"+
+    '<p class="note warn">Doses named in the stroke pathway are published teaching doses. Confirm the monograph and the local pathway before any drug is given. Brain death is taught as a process. This page cannot determine it.</p>';
+}
+function modeBtn(route, title, text){
+  return '<button type="button" class="mode" data-go="'+route+'"><b>'+esc(title)+'</b><span>'+esc(text)+'</span></button>';
+}
+
+function renderStation(){
+  var station = STATIONS[state.route];
+  var step = station.steps[state.step];
+  var n = station.steps.length;
+  app.innerHTML =
+    '<div class="row"><button type="button" class="go" data-go="home">All stations</button></div>'+
+    '<p class="kicker">Station '+(state.step+1)+" of "+n+"</p><h2>"+esc(station.title)+"</h2>"+
+    '<p class="note">'+esc(station.aim)+"</p>"+
+    renderStep(step)+
+    navRow(state.step > 0, state.locked, state.step === n - 1 ? "Finish" : "Next");
+}
+function renderStep(step){
+  if (!step) return "";
+  var html = "";
+  if (step.plate) html += figure(step.plate, step.caption);
+  if (step.kind === "comparepick") {
+    html += '<p class="ask">'+esc(step.ask)+"</p>"+pairHtml(step);
+  } else if (step.kind === "nihss") {
+    html += nihssHtml(step);
+  } else if (step.kind === "multi") {
+    html += '<p class="ask">'+esc(step.ask)+"</p>"+multiHtml(step);
+  } else if (step.kind === "number") {
+    html += '<p class="ask">'+esc(step.ask)+'</p><p class="note">'+esc(step.note)+'</p>'+
+      '<div class="row"><input id="num" inputmode="decimal" aria-label="Volume in millilitres" placeholder="mL" style="min-height:44px;border-radius:12px;border:1px solid var(--line);background:#07111a;padding:0 12px;width:8rem">'+
+      '<button type="button" class="go" id="check">Check</button></div>';
+  } else if (step.kind === "debrief") {
+    html += debriefHtml();
+  } else {
+    html += '<p class="ask">'+esc(step.ask)+"</p>";
+    if (step.kind === "marks") html += '<p class="note">Marked '+Object.keys(state.marks).length+" of "+step.targets.length+".</p>";
+    if (step.options) html += optionsHtml(step);
+  }
+  html += feedbackHtml();
+  return html;
+}
+function optionsHtml(step){
+  return '<div class="grid">'+step.options.map(function(op){
+    return '<button type="button" class="opt '+optClass(op.id, step)+'" data-opt="'+esc(op.id)+'"><b>'+esc(op.t)+"</b></button>";
+  }).join("")+"</div>";
+}
+function optClass(id, step){
+  if (!state.locked) return state.pick === id ? "on" : "";
+  if (id === step.answer) return "good";
+  if (id === state.pick) return "bad";
+  return "";
+}
+function multiHtml(step){
+  var picked = state.pick || {};
+  return '<div class="grid">'+step.options.map(function(op){
+    var cls = "opt";
+    if (state.locked) cls += op.on ? " good" : (picked[op.id] ? " bad" : "");
+    else if (picked[op.id]) cls += " on";
+    return '<button type="button" class="'+cls+'" data-multi="'+esc(op.id)+'"><b>'+esc(op.t)+"</b></button>";
+  }).join("")+'</div><div class="row"><button type="button" class="go" id="check">Check</button></div>';
+}
+function pairHtml(step){
+  var cls = ["shot", "shot"];
+  if (state.locked) {
+    cls[step.answer] += " good";
+    if (state.pick !== null && Number(state.pick) !== step.answer) cls[state.pick] += " bad";
+  }
+  return '<div class="pair">'+step.plates.map(function(pid, i){
+    return '<button type="button" class="'+cls[i]+'" data-pick="'+i+'">'+(PLATE[pid]?PLATE[pid]():"")+'<span>'+esc(step.names[i])+"</span></button>";
+  }).join("")+"</div>";
+}
+function nihssHtml(step){
+  if (state.stroke && state.stroke.syndromeOpen) {
+    return '<p class="ask">NIHSS '+esc(String(step.total))+'.</p><p class="ask">'+esc(step.syndromeAsk)+"</p>"+
+      optionsHtml({options:step.syndromeOptions, answer:step.syndrome});
+  }
+  return '<p class="ask">'+esc(step.ask)+'</p><p class="note">Enter a score for each item. The maximum is written beside the box. Total <b class="score" id="live-total">0</b>.</p>'+
+    '<div class="nih">'+step.items.map(function(item, i){
+      var flag = "";
+      if (state.nihssFlags) flag = state.nihssFlags[i] ? " good" : " bad";
+      return '<label class="'+flag+'"><span>'+esc(item[0]+". "+item[1])+' <span class="max">0–'+item[3]+'</span></span>'+
+        '<input data-nih="'+i+'" inputmode="numeric" value="'+(state.nihssVals && state.nihssVals[i] != null ? esc(String(state.nihssVals[i])) : "")+'"></label>';
+    }).join("")+'</div><div class="row"><button type="button" class="go" id="check">Check the total</button></div>';
+}
+function feedbackHtml(){
+  if (!state.feedback) return "";
+  return '<div class="fb '+(state.ok ? "ok" : "no")+'" role="status">'+esc(state.feedback)+"</div>";
+}
+function navRow(back, nextOn, nextLabel){
+  return '<div class="row">'+(back ? '<button type="button" class="go" id="back">Back</button>' : "")+
+    '<button type="button" class="go" id="next" '+(nextOn ? "" : "disabled")+">"+esc(nextLabel || "Next")+"</button></div>";
+}
+
+function renderStroke(){
+  var st = state.stroke;
+  var stage = STROKE[st.stage];
+  app.innerHTML =
+    '<div class="row"><button type="button" class="go" data-go="home">All stations</button>'+
+    '<button type="button" class="go" id="restart">Restart pathway</button></div>'+
+    '<div class="steps">'+STROKE.map(function(s, i){
+      return '<button type="button" data-stage="'+i+'" class="'+(i===st.stage?"on":"")+'" '+(i>st.stage?"disabled":"")+">"+(i+1)+" "+esc(s.title)+"</button>";
+    }).join("")+"</div>"+
+    '<p class="kicker">Stage '+(st.stage+1)+" of 8 · "+esc(stage.activity)+"</p><h2>"+esc(stage.title)+"</h2>"+
+    renderStep(strokeStep())+
+    (stage.kind === "debrief" ? "" : navRow(st.stage > 0, state.locked, st.stage === STROKE.length - 2 ? "Debrief" : "Next"));
+}
+function debriefHtml(){
+  var log = state.stroke.log || [];
+  var misses = log.filter(function(row){ return !row.ok; });
+  var lines = log.map(function(row){
+    return "<p><b>"+(row.ok ? "Held. " : "Revise. ")+esc(row.title)+".</b> "+esc(row.text)+"</p>";
+  }).join("");
+  var clue = misses.length
+    ? "The misses above are the debrief. The clues that are easiest to drop are last known well, blood on the CT before a lytic, a large-vessel occlusion that still needs a retrieval plan, and stopping the infusion when he deteriorates."
+    : "Nothing in the pathway was missed. The clues that are still worth saying aloud: time starts at last known well, the CT must be free of blood before a lytic, an M1 occlusion is a retrieval as well as a lytic, and deterioration means stop and rescan.";
+  return '<p class="lead">'+esc(clue)+"</p>"+lines+
+    '<p class="note">Frame: early window, no hemorrhage, left M1, NIHSS 12. Teaching doses, not an order: alteplase 0.9 mg/kg (maximum 90 mg) or, where the pathway uses it, tenecteplase 0.25 mg/kg (maximum 25 mg). Hemorrhagic transformation stops antithrombotics. This is the AHA early-management frame as a teaching case, not a local protocol.</p>';
+}
+
+function renderCompare(){
+  var item = COMPARE[state.compare.i];
+  var last = state.compare.i >= COMPARE.length;
+  if (!item) {
+    app.innerHTML = '<div class="row"><button type="button" class="go" data-go="home">All stations</button></div>'+
+      "<h2>Comparison</h2><p class='lead'>"+state.compare.score+" of "+COMPARE.length+" on the first click.</p>"+
+      '<div class="row"><button type="button" class="go" data-go="compare">Again</button></div>';
+    return;
+  }
+  app.innerHTML =
+    '<div class="row"><button type="button" class="go" data-go="home">All stations</button></div>'+
+    '<p class="kicker">Pair '+(state.compare.i+1)+" of "+COMPARE.length+"</p><h2>Compare</h2>"+
+    renderStep(compareStep())+
+    navRow(false, state.locked, state.compare.i === COMPARE.length - 1 ? "Finish" : "Next");
+}
+function renderOverlay(){
+  var item = OVERLAY[state.overlay.i];
+  if (!item) {
+    app.innerHTML = '<div class="row"><button type="button" class="go" data-go="home">All stations</button></div><h2>Overlays</h2><p class="lead">The film under the color never changed. That is the point of an overlay.</p>';
+    return;
+  }
+  if (!state.overlay.on[item.layer] && !state.locked) {
+    /* the question still shows; Check path is the choose buttons */
+  }
+  app.innerHTML =
+    '<div class="row"><button type="button" class="go" data-go="home">All stations</button></div>'+
+    '<p class="kicker">Overlay '+(state.overlay.i+1)+" of "+OVERLAY.length+"</p><h2>Overlays</h2>"+
+    '<div class="layers">'+
+      [["boundary","Hematoma boundary"],["territory","Vascular territories"],["midline","Midline shift"],["vent","Ventricular compression"],["cistern","Cisternal effacement"],["herniation","Herniation pathway"]].map(function(pair){
+        var on = state.overlay.on[pair[0]] ? " on" : "";
+        return '<button type="button" class="'+on+'" data-layer="'+pair[0]+'">'+esc(pair[1])+"</button>";
+      }).join("")+"</div>"+
+    renderStep(overlayStep())+
+    navRow(false, state.locked, state.overlay.i === OVERLAY.length - 1 ? "Finish" : "Next");
+}
+function renderChallenge(){
+  var ch = state.challenge;
+  if (ch.done) {
+    var best = saveBest(ch.score, ch.order.length * 4);
+    app.innerHTML =
+      '<div class="row"><button type="button" class="go" data-go="home">All stations</button></div>'+
+      "<h2>Unknown scan</h2><p class='lead'>"+ch.score+" of "+(ch.order.length * 4)+" on the first try. Best saved on this device: "+best+".</p>"+
+      ch.log.map(function(row){
+        return '<p class="note"><b>'+esc(row.title)+".</b> "+esc(row.text)+"</p>";
+      }).join("")+
+      '<div class="row"><button type="button" class="go" data-go="challenge">New set</button></div>'+
+      '<p class="note">A point needs the first response to be right. Hints are free of charge and free of points.</p>';
+    return;
+  }
+  var c = caseById(ch.order[ch.i]);
+  var partName = ["Find it", "Localize", "Mechanism", "Next step"][ch.part];
+  app.innerHTML =
+    '<div class="row"><button type="button" class="go" data-go="home">All stations</button></div>'+
+    '<p class="kicker">Case '+(ch.i+1)+" of "+ch.order.length+" · "+partName+" · "+ch.score+" points</p>"+
+    "<h2>Unknown scan</h2><p class='lead'>"+esc(c.stem)+"</p>"+
+    renderStep(challengeStep())+
+    navRow(false, state.locked, "Next");
+}
+function saveBest(score, n){
+  var best = score;
+  try {
+    var prev = JSON.parse(localStorage.getItem("neuro-workstation-challenge") || "{}");
+    if (typeof prev.best === "number") best = Math.max(prev.best, score);
+    localStorage.setItem("neuro-workstation-challenge", JSON.stringify({best:best, n:n}));
+  } catch (err) {}
+  return best;
+}
+
+function bind(){
+  app.querySelectorAll("[data-go]").forEach(function(btn){
+    btn.onclick = function(){ go(btn.getAttribute("data-go")); };
+  });
+  var next = document.getElementById("next");
+  if (next) next.onclick = onNext;
+  var back = document.getElementById("back");
+  if (back) back.onclick = onBack;
+  var check = document.getElementById("check");
+  if (check) check.onclick = onCheck;
+  var restart = document.getElementById("restart");
+  if (restart) restart.onclick = function(){ enter("stroke"); };
+  app.querySelectorAll("[data-stage]").forEach(function(btn){
+    btn.onclick = function(){
+      var i = Number(btn.getAttribute("data-stage"));
+      if (i > state.stroke.stage) return;
+      state.stroke.stage = i;
+      state.stroke.followOpen = false;
+      resetStep();
+      var logged = state.stroke.log[i];
+      if (logged) {
+        state.locked = true;
+        state.ok = logged.ok;
+        state.feedback = logged.detail || logged.text;
+      }
+      render();
+    };
+  });
+  app.querySelectorAll("[data-opt]").forEach(function(btn){
+    btn.onclick = function(){ chooseOpt(btn.getAttribute("data-opt")); };
+  });
+  app.querySelectorAll("[data-multi]").forEach(function(btn){
+    btn.onclick = function(){
+      if (state.locked) return;
+      state.pick = state.pick || {};
+      var id = btn.getAttribute("data-multi");
+      state.pick[id] = !state.pick[id];
+      render();
+    };
+  });
+  app.querySelectorAll("[data-pick]").forEach(function(btn){
+    btn.onclick = function(){ pickFilm(Number(btn.getAttribute("data-pick"))); };
+  });
+  app.querySelectorAll("[data-layer]").forEach(function(btn){
+    btn.onclick = function(){
+      var id = btn.getAttribute("data-layer");
+      state.overlay.on[id] = !state.overlay.on[id];
+      render();
+    };
+  });
+  app.querySelectorAll("svg.film.live").forEach(function(svg){
+    svg.addEventListener("click", onFilm);
+  });
+  app.querySelectorAll("[data-nih]").forEach(function(input){
+    input.addEventListener("input", function(){
+      var total = 0;
+      app.querySelectorAll("[data-nih]").forEach(function(el){
+        var n = parseInt(el.value, 10);
+        if (!isNaN(n)) total += n;
+      });
+      var live = document.getElementById("live-total");
+      if (live) live.textContent = String(total);
+    });
+  });
+}
+
+function onFilm(event){
+  var step = activeStep();
+  if (!step || state.locked) return;
+  if (step.kind !== "click" && step.kind !== "marks") return;
+  var hit = event.target.closest("[data-hit]");
+  var id = hit ? hit.getAttribute("data-hit") : "outside";
+  var name = hit ? hit.getAttribute("data-name") : "outside the brain";
+  if (step.kind === "click") {
+    if (id === step.target) return pass(step.explain);
+    return fail(name, step);
+  }
+  if (step.targets.indexOf(id) === -1) return fail(name, step);
+  if (state.marks[id]) return;
+  state.marks[id] = true;
+  state.feedback = "Marked. "+(step.targets.length - Object.keys(state.marks).length)+" still to find.";
+  state.ok = true;
+  if (step.targets.every(function(t){ return state.marks[t]; })) return pass(step.explain);
+  render();
+}
+function fail(name, step){
+  state.misses += 1;
+  state.ok = false;
+  var hint = (step.hints && step.hints[Math.min(state.misses - 1, step.hints.length - 1)]) || "Look again at the density, not the skull.";
+  if (state.misses >= 2) {
+    state.reveal = true;
+    state.locked = true;
+    state.feedback = "That was "+name+". "+step.explain;
+  } else {
+    state.feedback = "That was "+name+". "+hint;
+  }
+  render();
+}
+function pass(text){
+  state.locked = true;
+  state.ok = state.misses === 0;
+  state.feedback = (state.ok ? "Correct. " : "") + text;
+  if (state.route === "challenge" && state.ok) state.challenge.score += 1;
+  render();
+}
+function chooseOpt(id){
+  var step = activeStep();
+  if (!step || state.locked) return;
+  if (step.layer && state.overlay && !state.overlay.on[step.layer]) {
+    state.feedback = "Turn that overlay on first. The film underneath should stay visible.";
+    state.ok = false;
+    render();
+    return;
+  }
+  var answer = step.answer;
+  if (step.kind === "nihss" && state.stroke && state.stroke.syndromeOpen) answer = step.syndrome;
+  state.pick = id;
+  state.locked = true;
+  state.ok = id === answer;
+  state.feedback = (state.ok ? "Correct. " : "Not that one. ") + (step.why || "");
+  if (state.route === "challenge" && state.ok && state.challenge.part > 0) state.challenge.score += 1;
+  render();
+}
+function pickFilm(index){
+  var step = activeStep();
+  if (!step || state.locked || step.kind !== "comparepick") return;
+  state.pick = index;
+  state.locked = true;
+  state.ok = index === step.answer;
+  state.feedback = (state.ok ? "Correct. " : "Not that film. ") + step.why;
+  if (state.route === "compare" && state.ok) state.compare.score += 1;
+  render();
+}
+function onCheck(){
+  var step = activeStep();
+  if (!step || state.locked) return;
+  if (step.kind === "number") return checkNumber(step);
+  if (step.kind === "multi") return checkMulti(step);
+  if (step.kind === "nihss") return checkNihss(step);
+}
+function checkNumber(step){
+  var raw = (document.getElementById("num").value || "").replace(/[^0-9.]/g, "");
+  var n = parseFloat(raw);
+  if (isNaN(n)) {
+    state.feedback = "Enter a number in millilitres.";
+    state.ok = false;
+    render();
+    return;
+  }
+  if (Math.abs(n - step.answer) < 0.6) {
+    state.misses = 0;
+    return pass(step.why);
+  }
+  state.misses += 1;
+  state.ok = false;
+  if (Math.abs(n - 48) < 0.6) state.feedback = "That is A × B × C without dividing by 2.";
+  else if (Math.abs(n - 12) < 0.6) state.feedback = "That has been halved twice, or the radii were used.";
+  else state.feedback = step.hints[Math.min(state.misses - 1, step.hints.length - 1)];
+  if (state.misses >= 2) {
+    state.locked = true;
+    state.feedback += " "+step.why;
+  }
+  render();
+}
+function checkMulti(step){
+  var picked = state.pick || {};
+  var ok = step.options.every(function(op){ return !!picked[op.id] === !!op.on; });
+  state.locked = true;
+  state.ok = ok;
+  state.feedback = (ok ? "Correct. " : "Not that set. ") + step.why;
+  render();
+}
+function checkNihss(step){
+  var flags = [];
+  var vals = [];
+  var total = 0;
+  var bad = 0;
+  app.querySelectorAll("[data-nih]").forEach(function(el, i){
+    var n = parseInt(el.value, 10);
+    vals[i] = el.value;
+    if (isNaN(n)) { flags[i] = false; bad += 1; return; }
+    total += n;
+    flags[i] = n === step.items[i][2];
+    if (!flags[i]) bad += 1;
+  });
+  state.nihssVals = vals;
+  state.nihssFlags = flags;
+  if (bad === 0 && total === step.total) {
+    state.stroke.syndromeOpen = true;
+    state.locked = false;
+    state.ok = true;
+    state.pick = null;
+    state.feedback = "The total is 12. Name the syndrome.";
+    render();
+    return;
+  }
+  state.ok = false;
+  state.feedback = bad + " item"+(bad===1?"":"s")+" do not match the bedside finding. The running total you entered is "+total+".";
+  render();
+}
+function onBack(){
+  if (state.route === "stroke") {
+    if (state.stroke.stage > 0) {
+      state.stroke.stage -= 1;
+      state.stroke.followOpen = false;
+      resetStep();
+    }
+    render();
+    return;
+  }
+  if (state.step > 0) {
+    state.step -= 1;
+    resetStep();
+    render();
+  }
+}
+function onNext(){
+  if (!state.locked && activeStep() && activeStep().kind !== "debrief") return;
+  if (state.route === "stroke") return nextStroke();
+  if (state.route === "compare") return nextCompare();
+  if (state.route === "overlay") return nextOverlay();
+  if (state.route === "challenge") return nextChallenge();
+  var station = STATIONS[state.route];
+  logStation();
+  if (state.step >= station.steps.length - 1) {
+    state.cleared[state.route] = true;
+    saveCleared();
+    go("home");
+    return;
+  }
+  state.step += 1;
+  resetStep();
+  render();
+}
+function logStation(){}
+function nextStroke(){
+  var st = state.stroke;
+  var stage = STROKE[st.stage];
+  if (stage.kind === "click" && stage.follow && !st.followOpen) {
+    st.clickOk = !!state.ok;
+    st.followOpen = true;
+    resetStep();
+    render();
+    return;
+  }
+  if (stage.kind !== "debrief") {
+    var ok = !!state.ok;
+    if (stage.kind === "click") ok = !!(st.clickOk && state.ok);
+    st.log[st.stage] = {
+      ok: ok,
+      title: stage.title,
+      text: ok ? "Your call matched the teaching frame." : "Your call did not match. "+shortWhy(stage),
+      detail: state.feedback
+    };
+  }
+  if (st.stage >= STROKE.length - 1) return;
+  st.stage += 1;
+  st.followOpen = false;
+  st.syndromeOpen = false;
+  resetStep();
+  if (STROKE[st.stage].kind === "debrief") state.locked = true;
+  render();
+}
+function shortWhy(stage){
+  if (stage.why) return stage.why;
+  if (stage.follow && stage.follow.why) return stage.follow.why;
+  return stage.explain || "";
+}
+function nextCompare(){
+  state.compare.i += 1;
+  resetStep();
+  render();
+}
+function nextOverlay(){
+  state.overlay.i += 1;
+  resetStep();
+  render();
+}
+function nextChallenge(){
+  var ch = state.challenge;
+  var c = caseById(ch.order[ch.i]);
+  if (!state.ok) {
+    var partName = ["Finding", "Site", "Mechanism", "Next step"][ch.part];
+    ch.log.push({title:"Case "+(ch.i+1)+" · "+partName, text:state.feedback || c.explain});
+  }
+  if (ch.part < 3) {
+    ch.part += 1;
+    resetStep();
+    render();
+    return;
+  }
+  ch.i += 1;
+  ch.part = 0;
+  if (ch.i >= ch.order.length) ch.done = true;
+  resetStep();
+  render();
+}
+
+window.addEventListener("hashchange", function(){
+  var route = (location.hash || "#").replace("#", "") || "home";
+  if (route === state.route) return;
+  enter(route);
+});
+var initial = (location.hash || "#").replace("#", "") || "home";
+enter(initial);
+})();
+</script>
+</body>
+</html>
