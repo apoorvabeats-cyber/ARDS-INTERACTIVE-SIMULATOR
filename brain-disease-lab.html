@@ -126,6 +126,8 @@ const work = document.getElementById("work");
 let diseaseId = "tbi";
 let sectionId = "overview";
 let listMode = true;
+let chapterMenu = false;
+let quizAt = 0;
 let topicId = "";
 let player = null;
 let playerToken = 0;
@@ -146,6 +148,41 @@ function esc(s){
     if(c===">") return "\u0026gt;";
     return "\u0026quot;";
   });
+}
+function stopSpoken(){
+  if(window.speechSynthesis) speechSynthesis.cancel();
+}
+function femaleVoice(){
+  if(!window.speechSynthesis) return null;
+  const voices = speechSynthesis.getVoices() || [];
+  const named = /female|samantha|victoria|karen|moira|fiona|tessa|serena|zira|susan|veena|heera|sonia|catherine|allison|ava|nicky|libby/i;
+  const en = voices.filter(function(voice){ return /^en/i.test(voice.lang || ""); });
+  return en.find(function(voice){ return named.test((voice.name || "") + " " + (voice.voiceURI || "")); })
+    || en.find(function(voice){ return /en-GB|en-IN|en-AU/i.test(voice.lang) && !/male/i.test(voice.name || ""); })
+    || null;
+}
+function speakLine(text){
+  if(!text || !window.speechSynthesis) return;
+  const say = function(){
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voice = femaleVoice();
+    utterance.lang = voice && voice.lang ? voice.lang : "en-GB";
+    utterance.rate = 0.92;
+    utterance.pitch = 1.06;
+    if(voice) utterance.voice = voice;
+    speechSynthesis.speak(utterance);
+  };
+  if(!speechSynthesis.getVoices().length){
+    const once = function(){
+      speechSynthesis.removeEventListener("voiceschanged", once);
+      say();
+    };
+    speechSynthesis.addEventListener("voiceschanged", once);
+    speechSynthesis.getVoices();
+    return;
+  }
+  say();
 }
 function clamp(k){ return Math.max(0, Math.min(1, k)); }
 function mix(a,b,k){ return a+(b-a)*k; }
@@ -362,7 +399,7 @@ const DISEASES = [
       {q:"A new dilated pupil on the side of a mass most often means", choices:["Oculomotor compression at the tentorial edge","A retinal detachment","Morphine"], answer:0, why:"The third nerve runs at the tentorial edge."}
     ],
     refs:["Brain Trauma Foundation. Guidelines for the Management of Severe Traumatic Brain Injury, 4th edition.","Practice simulator already on this hub: TBI interactive simulator."],
-    sim:"TBI_Interactive_Simulator_v5_ICP_Anisocoria.html", work:"neuro-workstation.html?v=20261027b#tbi"},
+    sim:"TBI_Interactive_Simulator_v5_ICP_Anisocoria.html", work:"neuro-workstation.html?v=20261027c#tbi"},
 
   {id:"sah", name:"SAH", full:"Subarachnoid haemorrhage",
     overview:{definition:"Bleeding into the subarachnoid space, most often from a ruptured saccular aneurysm. It presents with a sudden, maximal headache, collapse, or both.", classification:"Clinical grade, commonly Hunt and Hess or World Federation of Neurological Surgeons, plus the amount of blood on CT, which relates to later spasm and delayed ischaemia.", significance:"Two clocks run at once: rebleeding in the first hours, and delayed ischaemia in the first two weeks."},
@@ -463,7 +500,7 @@ const DISEASES = [
       {q:"Alteplase dose in ischaemic stroke", choices:["0.9 mg/kg, maximum 90 mg","1.5 mg/kg with no maximum","60 mg every 4 hours"], answer:0, why:"The stroke dose is not the cardiac dose and not the nimodipine dose."}
     ],
     refs:["AHA/ASA guideline for the early management of acute ischaemic stroke, 2019 update.","Practice simulator on this hub: acute ischaemic stroke simulator."],
-    sim:"Acute_Ischemic_Stroke_Simulator_V6_FINAL.html?v=20260925s", work:"neuro-workstation.html?v=20261027b#stroke"},
+    sim:"Acute_Ischemic_Stroke_Simulator_V6_FINAL.html?v=20260925s", work:"neuro-workstation.html?v=20261027c#stroke"},
 
   {id:"ich", name:"ICH", full:"Intracerebral haemorrhage",
     overview:{definition:"Bleeding into the brain substance. Hypertension and amyloid angiopathy are the common causes. Anticoagulation makes every bleed larger.", classification:"By site: deep, lobar, cerebellar, brainstem. By cause: hypertensive, amyloid, vascular malformation, tumour, venous.", significance:"The bleed grows in the first hours. Reversal and blood pressure are time-critical. The cerebellum is a special surgical problem."},
@@ -506,7 +543,7 @@ const DISEASES = [
       {q:"A cerebellar haemorrhage with a compressed fourth ventricle", choices:["Needs urgent neurosurgical review","Is treated with lumbar puncture first","Is always an ischaemic stroke"], answer:0, why:"The posterior fossa does not tolerate a mass. Breathing fails next."}
     ],
     refs:["AHA/ASA 2022 guideline for spontaneous intracerebral haemorrhage.","Practice simulator on this hub: intracerebral haemorrhage simulator."],
-    sim:"Intracerebral_Hemorrhage_Interactive_Simulator_v1.html?v=20260925s", work:"neuro-workstation.html?v=20261027b#ich"},
+    sim:"Intracerebral_Hemorrhage_Interactive_Simulator_v1.html?v=20260925s", work:"neuro-workstation.html?v=20261027c#ich"},
 
   {id:"se", name:"Status", full:"Status epilepticus",
     overview:{definition:"A seizure that does not stop, or repeated seizures without recovery. Convulsive status is an emergency because the brain and the airway are both failing.", classification:"Convulsive, focal with impaired awareness, and non-convulsive, which hides in a coma.", significance:"The longer it lasts, the harder it is to stop and the more neurons are lost."},
@@ -590,7 +627,7 @@ const DISEASES = [
       {q:"CPP equals", choices:["MAP minus ICP","ICP minus MAP","Heart rate times stroke volume"], answer:0, why:"Perfusion pressure is the arterial pressure minus the pressure outside the vessels."}
     ],
     refs:["Brain Trauma Foundation thresholds are often borrowed, but the cause of the pressure still has to be treated."],
-    sim:"", work:"neuro-workstation.html?v=20261027b#edema"},
+    sim:"", work:"neuro-workstation.html?v=20261027c#edema"},
 
   {id:"hydro", name:"Hydrocephalus", full:"Hydrocephalus",
     overview:{definition:"Enlargement of the ventricles from too much CSF, a block to its flow, or a failure of absorption. In the unit it is usually obstructive or blood-related.", classification:"Obstructive, communicating, and normal-pressure hydrocephalus which is a clinic disease, not an ICU emergency.", significance:"Acute hydrocephalus kills by pressure. A drain treats the mechanism."},
@@ -629,7 +666,7 @@ const DISEASES = [
       {q:"Large lateral and third ventricles with a normal fourth ventricle suggest a block at", choices:["The aqueduct","The lumbar cistern","The frontal sinus"], answer:0, why:"The fourth ventricle has not yet received the CSF."}
     ],
     refs:["Standard neurosurgical teaching on CSF diversion. Pair with the SAH guideline when blood is the cause."],
-    sim:"", work:"neuro-workstation.html?v=20261027b#hydro"},
+    sim:"", work:"neuro-workstation.html?v=20261027c#hydro"},
 
   {id:"cns", name:"CNS infection", full:"Meningitis and encephalitis",
     overview:{definition:"Infection of the meninges, the brain, or both. Bacterial meningitis is a septic emergency. HSV encephalitis is a treatable cause of temporal-lobe illness.", classification:"Acute bacterial, viral encephalitis, chronic fungal or tuberculous, and abscess.", significance:"Antibiotics and aciclovir are given on suspicion. The CSF confirms them when it is safe to obtain."},
@@ -712,7 +749,7 @@ const DISEASES = [
       {q:"Venous infarcts typically", choices:["Cross arterial territories and often bleed","Respect the middle cerebral artery and never bleed","Start in the putamen from hypertension"], answer:0, why:"Venous pressure does not follow the arterial map."}
     ],
     refs:["European Stroke Organisation guideline on cerebral venous thrombosis, and the AHA/ASA statement."],
-    sim:"", work:"neuro-workstation.html?v=20261027b#cvt"},
+    sim:"", work:"neuro-workstation.html?v=20261027c#cvt"},
 
   {id:"death", name:"Brain death", full:"Death by neurological criteria",
     overview:{definition:"The irreversible loss of all brain function, including the brainstem, in a person with a known catastrophic cause. It is a determination made by qualified physicians under a protocol.", classification:"Clinical determination, with ancillary tests only when parts of the examination cannot be completed.", significance:"The standards exist so that death is neither declared lightly nor delayed without reason. This page is not a protocol you can apply alone."},
@@ -754,7 +791,7 @@ const DISEASES = [
       {q:"Locked-in syndrome differs because", choices:["The patient is awake","The patient has no need for a cause","It is treated with nimodipine"], answer:0, why:"Wakefulness means the brain is not dead."}
     ],
     refs:["World Brain Death Project, 2020.","The AAN guidance on determination of brain death, applied only through local credentialing."],
-    sim:"", work:"neuro-workstation.html?v=20261027b#death"}
+    sim:"", work:"neuro-workstation.html?v=20261027c#death"}
 ];
 
 let hotspots = [];
@@ -763,11 +800,18 @@ function readHash(){
   const parts = location.hash.replace(/^#/, "").split("/").filter(Boolean);
   if(!parts.length || !DISEASES.some(function(d){ return d.id===parts[0]; })){
     listMode = true;
+    chapterMenu = false;
     topicId = "";
     return;
   }
   listMode = false;
   diseaseId = parts[0];
+  if(!parts[1]){
+    chapterMenu = true;
+    topicId = "";
+    return;
+  }
+  chapterMenu = false;
   sectionId = (parts[1] && SECTIONS.some(function(s){ return s[0]===parts[1]; })) ? parts[1] : "overview";
   topicId = parts[2] || "";
 }
@@ -776,7 +820,7 @@ function writeHash(){
     if(location.hash) history.replaceState(null, "", location.pathname + location.search);
     return;
   }
-  const next = topicId ? diseaseId+"/"+sectionId+"/"+topicId : diseaseId+"/"+sectionId;
+  const next = chapterMenu ? diseaseId : (topicId ? diseaseId+"/"+sectionId+"/"+topicId : diseaseId+"/"+sectionId);
   if(location.hash.replace(/^#/, "") !== next) history.replaceState(null, "", "#"+next);
 }
 function paintChrome(){
@@ -798,6 +842,8 @@ function paintChrome(){
         sectionId = "overview";
         topicId = "";
         listMode = false;
+        chapterMenu = true;
+        quizAt = 0;
         casePick = null; caseLocked = false; spotId = "";
         algoStep = 0;
         quizPick = {}; quizLocked = {};
@@ -809,29 +855,11 @@ function paintChrome(){
   }
   diseases.hidden = true;
   diseases.innerHTML = "";
-  sections.hidden = false;
-  sections.innerHTML = '<button type="button" data-list="1">Diseases</button>'+SECTIONS.map(function(s){
-    return '<button type="button"'+(s[0]===sectionId?' class="on"':'')+' data-s="'+s[0]+'">'+s[1]+'  '+esc(s[2])+'</button>';
-  }).join("");
-  sections.querySelectorAll("[data-list]").forEach(function(btn){
-    btn.onclick = function(){
-      listMode = true;
-      topicId = "";
-      writeHash();
-      render();
-    };
-  });
-  sections.querySelectorAll("[data-s]").forEach(function(btn){
-    btn.onclick = function(){
-      sectionId = btn.getAttribute("data-s");
-      topicId = "";
-      algoStep = 0; spotId = "";
-      writeHash(); render();
-    };
-  });
+  sections.hidden = true;
+  sections.innerHTML = "";
   const dNow = disease();
   const sNow = SECTIONS.find(function(item){ return item[0]===sectionId; });
-  context.textContent = dNow.full + "  ·  " + (sNow ? sNow[1] + "  " + sNow[3] : "");
+  context.textContent = chapterMenu ? (dNow.full + "  ·  Choose a chapter") : (dNow.full + "  ·  " + (sNow ? sNow[1] + "  " + sNow[3] : ""));
 }
 function sectionTitle(){
   const s = SECTIONS.find(function(item){ return item[0]===sectionId; });
@@ -840,11 +868,12 @@ function sectionTitle(){
 function openTopic(id){
   topicId = id;
   spotId = "";
+  chapterMenu = false;
   writeHash();
   render();
-  work.scrollIntoView({behavior: reduced ? "auto" : "smooth", block:"start"});
 }
 function render(){
+  stopSpoken();
   playerToken++;
   brainToken++;
   if(anatomyCleanup){ anatomyCleanup(); anatomyCleanup = null; }
@@ -855,8 +884,36 @@ function render(){
     work.innerHTML = "";
     return;
   }
+  if(chapterMenu){
+    work.innerHTML = '<div class="backrow"><button type="button" id="to-diseases">Diseases</button></div><div class="grid">'+
+      SECTIONS.map(function(s){
+        return '<button type="button" class="card" data-s="'+s[0]+'"><b>'+s[1]+"  "+esc(s[2])+'</b><span>'+esc(s[3])+'</span></button>';
+      }).join("")+"</div>";
+    document.getElementById("to-diseases").onclick = function(){
+      listMode = true;
+      chapterMenu = false;
+      topicId = "";
+      writeHash();
+      render();
+    };
+    work.querySelectorAll("[data-s]").forEach(function(btn){
+      btn.onclick = function(){
+        sectionId = btn.getAttribute("data-s");
+        chapterMenu = false;
+        topicId = "";
+        quizAt = 0;
+        algoStep = 0;
+        spotId = "";
+        casePick = null;
+        caseLocked = false;
+        writeHash();
+        render();
+      };
+    });
+    return;
+  }
   const d = disease();
-  const head = '<p class="kicker">'+esc(d.full)+'</p><h2>'+esc(sectionTitle())+'</h2>';
+  const head = '<div class="backrow"><button type="button" id="to-chapters">Chapters</button></div><p class="kicker">'+esc(d.full)+'</p><h2>'+esc(sectionTitle())+'</h2>';
   if(sectionId==="overview") renderOverview(d, head);
   else if(sectionId==="anatomy") renderAnatomy(d, head);
   else if(sectionId==="etiology") renderList(d, head, "Causes and risks", d.etiology);
@@ -872,6 +929,15 @@ function render(){
   else if(sectionId==="prognosis") renderPrognosis(d, head);
   else if(sectionId==="case") renderCase(d, head);
   else renderAssess(d, head);
+  const toChapters = document.getElementById("to-chapters");
+  if(toChapters) toChapters.onclick = function(){
+    chapterMenu = true;
+    topicId = "";
+    quizAt = 0;
+    writeHash();
+    render();
+  };
+  if(sectionId==="case" && d.case && !caseLocked) speakLine(d.case.stem);
 }
 function renderOverview(d, head){
   work.innerHTML = head+'<p class="lead">'+esc(d.overview.definition)+'</p><h3>Classification</h3><p class="lead">'+esc(d.overview.classification)+'</p><h3>Why it matters</h3><p class="lead">'+esc(d.overview.significance)+'</p>'+simLink(d)+footnote();
@@ -1182,31 +1248,47 @@ function renderCase(d, head){
       btn.classList.toggle("on", id===item.answer);
     });
     const right = casePick === item.answer;
-    document.getElementById("why").textContent = (right ? "Correct. " : "Not that one. ")+item.why;
+    const line = (right ? "Correct. " : "Not that one. ")+item.why;
+    document.getElementById("why").textContent = line;
+    speakLine(line);
   };
   if(caseLocked) document.getElementById("lock").click();
 }
 function renderAssess(d, head){
-  const key = "bd-"+d.id;
-  work.innerHTML = head+'<span class="badge">Questions</span><div id="qs">'+d.quiz.map(function(q,i){
-    return '<div class="card"><b>'+esc(q.q)+'</b><div class="grid">'+q.choices.map(function(choice, n){
-      return '<button type="button" data-q="'+i+'" data-n="'+n+'">'+esc(choice)+'</button>';
-    }).join("")+'</div><p class="note" id="why-'+i+'"></p></div>';
-  }).join("")+'</div><h3>References</h3>'+d.refs.map(function(r){return '<p class="note">'+esc(r)+'</p>';}).join("")+simLink(d)+footnote();
-  work.querySelectorAll("[data-q]").forEach(function(btn){
+  const q = d.quiz[quizAt];
+  if(!q){
+    work.innerHTML = head+'<p class="lead">That is the end of the questions.</p><div class="backrow"><button type="button" id="quiz-back">First question</button></div>'+d.refs.map(function(r){return '<p class="note">'+esc(r)+'</p>';}).join("")+simLink(d)+footnote();
+    document.getElementById("quiz-back").onclick = function(){ quizAt = 0; render(); };
+    return;
+  }
+  work.innerHTML = head+'<span class="badge">Question '+(quizAt+1)+' of '+d.quiz.length+'</span><div class="card"><b>'+esc(q.q)+'</b><div class="grid">'+q.choices.map(function(choice, n){
+    return '<button type="button" data-n="'+n+'">'+esc(choice)+'</button>';
+  }).join("")+'</div><p class="note" id="why-q"></p></div>'+
+    (quizAt+1<d.quiz.length ? '<div class="backrow"><button type="button" id="quiz-next" disabled>Next question</button></div>' : '')+
+    '<h3>References</h3>'+d.refs.map(function(r){return '<p class="note">'+esc(r)+'</p>';}).join("")+simLink(d)+footnote();
+  work.querySelectorAll("[data-n]").forEach(function(btn){
     btn.onclick = function(){
-      const i = Number(btn.getAttribute("data-q"));
-      if(quizLocked[key+i]) return;
-      quizLocked[key+i] = true;
+      if(quizLocked[d.id+"-"+quizAt]) return;
+      quizLocked[d.id+"-"+quizAt] = true;
       const n = Number(btn.getAttribute("data-n"));
-      const q = d.quiz[i];
       const right = n === q.answer;
-      work.querySelectorAll('[data-q="'+i+'"]').forEach(function(other){
+      work.querySelectorAll("[data-n]").forEach(function(other){
         other.classList.toggle("on", Number(other.getAttribute("data-n"))===q.answer);
       });
-      document.getElementById("why-"+i).textContent = (right?"Correct. ":"Not that one. ")+q.why;
+      const line = (right?"Correct. ":"Not that one. ")+q.why;
+      document.getElementById("why-q").textContent = line;
+      const next = document.getElementById("quiz-next");
+      if(next) next.disabled = false;
+      speakLine(line);
     };
   });
+  const next = document.getElementById("quiz-next");
+  if(next) next.onclick = function(){
+    quizLocked[d.id+"-"+quizAt] = false;
+    quizAt += 1;
+    render();
+  };
+  speakLine(q.q);
 }
 function simLink(d){
   var html = "";

@@ -24,8 +24,10 @@ h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;letter-spac
 .lede,.muted{color:var(--muted);line-height:1.5}
 .notice{margin:16px 0 0;padding:12px 14px;border:1px solid rgba(226,180,138,.45);border-radius:16px;color:var(--warm);line-height:1.45}
 .find{width:100%;margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:16px;min-height:48px}
-.chips{display:flex;gap:8px;overflow:auto;padding:12px 0 4px}
-.chips a,.chips button{flex:0 0 auto;min-height:44px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);text-decoration:none;display:inline-flex;align-items:center}
+.chips{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:12px 0 4px}
+.chips a,.chips button{width:100%;flex:none;min-height:44px;padding:0 12px;border-radius:14px;border:1px solid var(--line);background:transparent;color:var(--muted);text-decoration:none;display:flex;align-items:center;text-align:left}
+.sections{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.sections a{display:flex;align-items:center;min-height:52px;padding:10px 14px;border:1px solid var(--line);border-radius:14px;text-decoration:none;color:inherit}
 .chips .on{border-color:var(--cool);color:var(--cool)}
 .group{margin-top:28px}
 .drug,.classlink{display:block;width:100%;text-align:left;background:transparent;border:0;border-top:1px solid var(--line);padding:12px 0;min-height:44px;text-decoration:none;color:inherit}
@@ -111,11 +113,12 @@ label.field input,label.field select{display:block;width:100%;margin-top:4px;hei
   }
 
   function render() {
+    stopSpoken();
     clear(app);
     app.className = "wrap";
     var r = route();
     if (r.parts[0] === "c" && r.parts[1]) return renderClass(r.parts[1]);
-    if (r.parts[0] === "d" && r.parts[1]) return renderDrug(r.parts[1], r.params.from || "");
+    if (r.parts[0] === "d" && r.parts[1]) return renderDrug(r.parts[1], r.params.from || "", r.parts[2] || "", r.parts[3] || "0");
     renderHome();
   }
 
@@ -237,7 +240,50 @@ label.field input,label.field select{display:block;width:100%;margin-top:4px;hei
     return a;
   }
 
-  function renderDrug(id, from) {
+  var SECTIONS = [["moa", "Mechanism"], ["spectrum", "Spectrum"], ["icu", "ICU use"], ["adult", "Adult dose"], ["dose-calc", "Calculator"], ["renal", "Renal and hepatic"], ["pkpd", "PK/PD"], ["contraindications", "Contraindications"], ["adverse", "Adverse effects"], ["monitoring", "Monitoring"], ["resistance", "Resistance"], ["mcq", "MCQs"]];
+
+  function drugHash(id, section, from, extra) {
+    var hash = "#/d/" + id + (section ? "/" + section : "") + (extra ? "/" + extra : "");
+    if (from) hash += "?from=" + encodeURIComponent(from);
+    return hash;
+  }
+  function stopSpoken() {
+    if (window.speechSynthesis) speechSynthesis.cancel();
+  }
+  function femaleVoice() {
+    if (!window.speechSynthesis) return null;
+    var voices = speechSynthesis.getVoices() || [];
+    var named = /female|samantha|victoria|karen|moira|fiona|tessa|serena|zira|susan|veena|heera|sonia|catherine|allison|ava|nicky|libby/i;
+    var en = voices.filter(function (voice) { return /^en/i.test(voice.lang || ""); });
+    return en.find(function (voice) { return named.test((voice.name || "") + " " + (voice.voiceURI || "")); })
+      || en.find(function (voice) { return /en-GB|en-IN|en-AU/i.test(voice.lang) && !/male/i.test(voice.name || ""); })
+      || null;
+  }
+  function speakMcq(text) {
+    if (!text || !window.speechSynthesis) return;
+    var say = function () {
+      speechSynthesis.cancel();
+      var utterance = new SpeechSynthesisUtterance(text);
+      var voice = femaleVoice();
+      utterance.lang = voice && voice.lang ? voice.lang : "en-GB";
+      utterance.rate = 0.92;
+      utterance.pitch = 1.06;
+      if (voice) utterance.voice = voice;
+      speechSynthesis.speak(utterance);
+    };
+    if (!speechSynthesis.getVoices().length) {
+      var once = function () {
+        speechSynthesis.removeEventListener("voiceschanged", once);
+        say();
+      };
+      speechSynthesis.addEventListener("voiceschanged", once);
+      speechSynthesis.getVoices();
+      return;
+    }
+    say();
+  }
+
+  function renderDrug(id, from, section, qIndex) {
     var drug = drugById(id);
     if (!drug) {
       app.appendChild(homeBack());
@@ -262,36 +308,35 @@ label.field input,label.field select{display:block;width:100%;margin-top:4px;hei
       });
       app.appendChild(el("p", "muted", "Also listed under " + others.join(", ") + "."));
     }
-    var nav = el("nav", "chips");
-    nav.setAttribute("aria-label", "Monograph sections");
-    [["moa", "Mechanism"], ["spectrum", "Spectrum"], ["icu", "ICU use"], ["adult", "Adult dose"], ["dose-calc", "Calculator"], ["renal", "Renal and hepatic"], ["pkpd", "PK/PD"], ["contraindications", "Contraindications"], ["adverse", "Adverse effects"], ["monitoring", "Monitoring"], ["resistance", "Resistance"], ["mcq", "MCQs"]].forEach(function (item, index) {
-      var a = el("a", "", String(index + 1).padStart(2, "0") + " " + item[1]);
-      a.href = "#/d/" + drug.id + (from ? "?from=" + encodeURIComponent(from) : "") + "#" + item[0];
-      a.addEventListener("click", function (event) {
-        event.preventDefault();
-        var target = document.getElementById(item[0]);
-        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    var known = null;
+    for (var s = 0; s < SECTIONS.length; s++) if (SECTIONS[s][0] === section) known = SECTIONS[s];
+    if (!known) {
+      var menu = el("nav", "sections");
+      menu.setAttribute("aria-label", "Monograph sections");
+      SECTIONS.forEach(function (item, index) {
+        var a = el("a", "", String(index + 1).padStart(2, "0") + "  " + item[1]);
+        a.href = drugHash(drug.id, item[0], from, item[0] === "mcq" ? "0" : "");
+        menu.appendChild(a);
       });
-      nav.appendChild(a);
-    });
-    app.appendChild(nav);
-
-    var split = el("div", "split");
-    var left = el("div");
-    section(left, "moa", 1, "Mechanism of action", drug.moa);
-    section(left, "spectrum", 2, "Spectrum", drug.spectrum);
-    section(left, "icu", 3, "ICU indications", drug.icu);
-    section(left, "adult", 4, "Adult dose", drug.adult);
-    split.appendChild(left);
-    split.appendChild(calculator(drug));
-    app.appendChild(split);
-    section(app, "renal", 6, "Renal and hepatic adjustment", drug.renal + "\n" + drug.hepatic);
-    section(app, "pkpd", 7, "PK/PD", drug.pkpd);
-    section(app, "contraindications", 8, "Contraindications", drug.contraindications);
-    section(app, "adverse", 9, "Adverse effects", drug.adverse);
-    section(app, "monitoring", 10, "Monitoring", drug.monitoring);
-    section(app, "resistance", 11, "Resistance mechanisms", drug.resistance);
-    mcqs(drug);
+      app.appendChild(menu);
+      app.appendChild(el("p", "faint", "Teaching figures for adults. They do not replace the product label, a renal-replacement order, or a local antimicrobial policy."));
+      return;
+    }
+    var up = el("a", "back", "All sections");
+    up.href = drugHash(drug.id, "", from, "");
+    app.appendChild(up);
+    if (section === "moa") section(app, "moa", 1, "Mechanism of action", drug.moa);
+    else if (section === "spectrum") section(app, "spectrum", 2, "Spectrum", drug.spectrum);
+    else if (section === "icu") section(app, "icu", 3, "ICU indications", drug.icu);
+    else if (section === "adult") section(app, "adult", 4, "Adult dose", drug.adult);
+    else if (section === "dose-calc") app.appendChild(calculator(drug));
+    else if (section === "renal") section(app, "renal", 6, "Renal and hepatic adjustment", drug.renal + "\n" + drug.hepatic);
+    else if (section === "pkpd") section(app, "pkpd", 7, "PK/PD", drug.pkpd);
+    else if (section === "contraindications") section(app, "contraindications", 8, "Contraindications", drug.contraindications);
+    else if (section === "adverse") section(app, "adverse", 9, "Adverse effects", drug.adverse);
+    else if (section === "monitoring") section(app, "monitoring", 10, "Monitoring", drug.monitoring);
+    else if (section === "resistance") section(app, "resistance", 11, "Resistance mechanisms", drug.resistance);
+    else mcqs(drug, from, qIndex);
     app.appendChild(el("p", "faint", "Teaching figures for adults. They do not replace the product label, a renal-replacement order, or a local antimicrobial policy."));
   }
 
@@ -399,54 +444,41 @@ label.field input,label.field select{display:block;width:100%;margin-top:4px;hei
     return box;
   }
 
-  function mcqs(drug) {
+  function mcqs(drug, from, qIndex) {
+    var index = parseInt(qIndex, 10);
+    if (!isFinite(index) || index < 0 || index >= drug.mcq.length) index = 0;
+    var item = drug.mcq[index];
     var sec = el("section", "sec");
-    sec.id = "mcq";
-    sec.appendChild(el("p", "kicker", "12 · Exam questions"));
-    sec.appendChild(el("h2", null, "Ten single-best answers"));
-    var picks = drug.mcq.map(function () { return null; });
-    drug.mcq.forEach(function (item, index) {
-      var block = el("div", "mcq");
-      block.appendChild(el("p", null, (index + 1) + ". " + item.stem));
-      item.options.forEach(function (option, optionIndex) {
-        var b = el("button", "", option);
-        b.type = "button";
-        b.addEventListener("click", function () {
-          picks[index] = optionIndex;
-          Array.prototype.forEach.call(block.querySelectorAll("button"), function (child, i) {
-            child.className = i === optionIndex ? "pick" : "";
-          });
-        });
-        block.appendChild(b);
-      });
-      var why = el("p", "muted");
-      why.hidden = true;
-      block.appendChild(why);
-      block.dataset.index = String(index);
-      sec.appendChild(block);
-    });
-    var check = el("button", "check", "Check answers");
-    check.type = "button";
-    check.addEventListener("click", function () {
-      var blocks = sec.querySelectorAll(".mcq");
-      var correct = 0;
-      drug.mcq.forEach(function (item, index) {
-        var buttons = blocks[index].querySelectorAll("button");
-        buttons.forEach(function (button, optionIndex) {
+    sec.appendChild(el("p", "kicker", "12 · Question " + (index + 1) + " of " + drug.mcq.length));
+    sec.appendChild(el("h2", null, item.stem));
+    var picked = null;
+    item.options.forEach(function (option, optionIndex) {
+      var b = el("button", "", option);
+      b.type = "button";
+      b.addEventListener("click", function () {
+        if (picked !== null) return;
+        picked = optionIndex;
+        var buttons = sec.querySelectorAll("button");
+        buttons.forEach(function (button, i) {
           button.disabled = true;
-          if (optionIndex === item.answer) button.className = "good";
-          else if (picks[index] === optionIndex) button.className = "bad";
+          if (i === item.answer) button.className = "good";
+          else if (i === optionIndex) button.className = "bad";
         });
-        if (picks[index] === item.answer) correct += 1;
-        var why = blocks[index].querySelector("p.muted");
         why.hidden = false;
-        why.textContent = item.why;
+        why.textContent = (optionIndex === item.answer ? "Correct. " : "Not this one. ") + item.why;
+        speakMcq(why.textContent);
       });
-      check.textContent = correct + " of " + drug.mcq.length;
-      check.disabled = true;
+      sec.appendChild(b);
     });
-    sec.appendChild(check);
+    var why = el("p", "muted");
+    why.hidden = true;
+    sec.appendChild(why);
+    var next = el("a", "back", index + 1 === drug.mcq.length ? "Back to sections" : "Next question");
+    next.href = index + 1 === drug.mcq.length ? drugHash(drug.id, "", from, "") : drugHash(drug.id, "mcq", from, String(index + 1));
+    next.style.marginTop = "16px";
+    sec.appendChild(next);
     app.appendChild(sec);
+    speakMcq(item.stem);
   }
 
   window.addEventListener("hashchange", render);

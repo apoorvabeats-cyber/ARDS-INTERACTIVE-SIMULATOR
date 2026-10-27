@@ -259,7 +259,11 @@
     startAudio();
     bedOn();
   }
+  function quietLine(){
+    if(typeof window.stopSpoken === "function") window.stopSpoken();
+  }
   function openEmptyBay(title){
+    quietLine();
     const room = document.getElementById("room");
     document.body.classList.add("in", "enter");
     room.innerHTML =
@@ -272,6 +276,7 @@
     };
   }
   function openModule(url, title){
+    quietLine();
     const room = document.getElementById("room");
     document.body.classList.add("in", "enter");
     room.innerHTML =
@@ -284,6 +289,7 @@
     };
   }
   function openShock(){
+    quietLine();
     const room = document.getElementById("room");
     document.body.classList.add("in", "enter");
     room.innerHTML =
@@ -306,6 +312,7 @@
     });
   }
   function leaveForBody(){
+    quietLine();
     document.body.classList.remove("icu-open");
     document.body.classList.add("body-only");
     if(typeof window.keepScore === "function") window.keepScore();
@@ -352,6 +359,7 @@
     }
   });
   document.getElementById("icu-return").onclick = function(){
+    quietLine();
     document.body.classList.add("icu-open");
     document.body.classList.remove("in", "enter", "inside", "lab", "arena", "osce", "reference", "picking", "body-only");
     const bubbles = document.getElementById("organ-bubbles");
