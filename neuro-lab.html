@@ -16,7 +16,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:Figtree,sans-serif}
 button,input{font:inherit;color:inherit}
-button{cursor:pointer}
+button{cursor:pointer;-webkit-appearance:none;appearance:none}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 #view{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
 a.back{position:fixed;top:10px;left:10px;z-index:5;color:var(--muted);text-decoration:none;min-height:40px;display:flex;align-items:center}
@@ -34,7 +34,7 @@ a.back{position:fixed;top:10px;left:10px;z-index:5;color:var(--muted);text-decor
 .sheet h3{margin:14px 0 4px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm)}
 .close{position:absolute;top:8px;right:8px;border:0;background:transparent;color:var(--muted);min-width:44px;min-height:44px}
 .choices{display:flex;flex-direction:column;gap:8px;margin:10px 0}
-.choices button{text-align:left;border:1px solid var(--line);background:transparent;border-radius:12px;padding:10px 12px;min-height:44px}
+.choices button{text-align:left;border:1px solid var(--line);background:#0c1a24;color:#e7f1f4;border-radius:12px;padding:10px 12px;min-height:44px}
 .choices button.good{border-color:var(--green);color:var(--green)}
 .choices button.bad{border-color:#e07a7a;color:#e07a7a}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
@@ -1384,6 +1384,38 @@ function renderSections(){
 function planeRow(key, label){
   return '<h3>'+label+'</h3><label><input type="checkbox" id="on-'+key+'"> Show '+label.toLowerCase()+' plane</label><br><input id="k-'+key+'" type="range" min="-1" max="1" step="0.02" value="0" aria-label="'+label+' position">';
 }
+function femaleVoice(){
+  if(!window.speechSynthesis) return null;
+  const voices = speechSynthesis.getVoices() || [];
+  const named = /female|samantha|victoria|karen|moira|fiona|tessa|serena|zira|susan|veena|heera|sonia|catherine|allison|ava|nicky|libby/i;
+  const en = voices.filter(function(voice){ return /^en/i.test(voice.lang || ""); });
+  return en.find(function(voice){ return named.test((voice.name || "") + " " + (voice.voiceURI || "")); })
+    || en.find(function(voice){ return /en-GB|en-IN|en-AU/i.test(voice.lang) && !/male/i.test(voice.name || ""); })
+    || null;
+}
+function speakLine(text){
+  if(!text || !window.speechSynthesis) return;
+  const say = function(){
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voice = femaleVoice();
+    utterance.lang = voice && voice.lang ? voice.lang : "en-GB";
+    utterance.rate = 0.92;
+    utterance.pitch = 1.06;
+    if(voice) utterance.voice = voice;
+    speechSynthesis.speak(utterance);
+  };
+  if(!speechSynthesis.getVoices().length){
+    const once = function(){
+      speechSynthesis.removeEventListener("voiceschanged", once);
+      say();
+    };
+    speechSynthesis.addEventListener("voiceschanged", once);
+    speechSynthesis.getVoices();
+    return;
+  }
+  say();
+}
 function renderCase(){
   const item = CASES.find(function(c){ return c.id === caseId; }) || CASES[0];
   const open = !!revealed[item.id];
@@ -1417,6 +1449,8 @@ function renderCase(){
     points[item.id] = right ? Math.max(0, 2 - caseHints) : 0;
     sessionStorage.setItem("neuro-score", JSON.stringify(points));
     markChoices(item);
+    const named = item.choices.find(function(choice){ return choice.id===item.answer; });
+    speakLine(right ? "Correct. "+item.why : "Not that one. The answer is "+(named?named.label:"")+". "+item.why);
     showLabels(item.meshes);
     paintDock();
   };

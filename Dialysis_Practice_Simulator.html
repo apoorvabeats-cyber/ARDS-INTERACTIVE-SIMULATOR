@@ -34,8 +34,10 @@ button:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 .vit dt{font-size:12px;color:#5f6f86}
 .vit dd{margin:0;font-weight:800;font-variant-numeric:tabular-nums}
 .vit dd.warn{color:#b42318}
-.choice{display:block;width:100%;text-align:left;background:#fff;border:1px solid #d7e0ec;border-radius:12px;padding:12px;margin:8px 0;min-height:48px}
+.choice{display:block;width:100%;text-align:left;background:#fff;color:#14213d;border:1px solid #d7e0ec;border-radius:12px;padding:12px;margin:8px 0;min-height:48px;-webkit-appearance:none;appearance:none}
 .choice.on{border-color:#1457a6;background:#f3f8ff}
+.choice.good{border-color:#0f7a4a;background:#f3fbf6}
+.choice.bad{border-color:#b42318;background:#fdf4f4}
 .fb{border-radius:12px;padding:12px;margin-top:8px;background:#f4f7fb;border:1px solid #d7e0ec}
 .fb.good{border-color:#0f7a4a}
 .fb.bad{border-color:#b42318}
@@ -423,6 +425,35 @@ let mode = new URLSearchParams(location.search).get("mode") === "full" ? "full" 
 let item = null, index = 0, selected = null, log = [], live = null, started = 0, phase = "catalog";
 
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"\u0026amp;","<":"\u0026lt;",">":"\u0026gt;","\"":"\u0026quot;","'":"\u0026#39;"}[c];});}
+function femaleVoice(){
+  if(!window.speechSynthesis) return null;
+  const voices = speechSynthesis.getVoices() || [];
+  const named = /female|samantha|victoria|karen|moira|fiona|tessa|serena|zira|susan|veena|heera|sonia|catherine|allison|ava|nicky|libby/i;
+  const en = voices.filter(function(v){ return /^en/i.test(v.lang || ""); });
+  return en.find(function(v){ return named.test((v.name||"")+" "+(v.voiceURI||"")); })
+    || en.find(function(v){ return /en-GB|en-IN|en-AU/i.test(v.lang) && !/male/i.test(v.name||""); })
+    || null;
+}
+function speakLine(text){
+  if(!text || !window.speechSynthesis) return;
+  const say = function(){
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const voice = femaleVoice();
+    u.lang = voice && voice.lang ? voice.lang : "en-GB";
+    u.rate = 0.92;
+    u.pitch = 1.06;
+    if(voice) u.voice = voice;
+    speechSynthesis.speak(u);
+  };
+  if(!speechSynthesis.getVoices().length){
+    const once = function(){ speechSynthesis.removeEventListener("voiceschanged", once); say(); };
+    speechSynthesis.addEventListener("voiceschanged", once);
+    speechSynthesis.getVoices();
+    return;
+  }
+  say();
+}
 function list(){return (mode==="full"?FULL:MODULES);}
 function clock(){
   const el = document.getElementById("clock");
@@ -492,7 +523,12 @@ function render(){
     }).join("");
   } else {
     extra = stage.choices.map(function(c,i){
-      return '<button type="button" class="choice'+(selected===i?" on":"")+'" data-i="'+i+'">'+esc(c.t)+"</button>";
+      let mark = "";
+      if(phase==="feedback"){
+        if(c.ok===true) mark = " good";
+        else if(selected===i) mark = " bad";
+      } else if(selected===i) mark = " on";
+      return '<button type="button" class="choice'+mark+'" data-i="'+i+'">'+esc(c.t)+"</button>";
     }).join("");
   }
   const fb = phase==="feedback" ? '<div class="fb '+(log[log.length-1].ok?"good":"bad")+'">'+esc(log[log.length-1].why)+"</div>" : "";
@@ -533,7 +569,10 @@ function submit(){
   } else {
     const choice=stage.choices[selected];
     result={ok:choice.ok, why:choice.why, set:choice.set, critical:!!choice.critical, you:choice.t};
+    const right = stage.choices.find(function(c){ return c.ok===true; });
+    speakLine(choice.ok===true ? "Correct. "+choice.why : "Not that. The answer is "+(right?right.t:"")+". "+choice.why);
   }
+  if(stage.kind==="dials") speakLine((result.ok===true ? "Correct. " : "Not that. ") + result.why);
   apply(result.set);
   log.push({title:stage.title, you:result.you, why:result.why, ok:result.ok, critical:!!result.critical && !result.ok, points:result.ok===true?100:result.ok==="part"?60:0});
   phase="feedback";

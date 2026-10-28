@@ -24,7 +24,7 @@ export const ROOMS = {
       ['CNS infection', 'Meningitis, encephalitis, abscess and the ICU complications.', 'CNS_Infection_Interactive_Algorithm_v7.html?v=20260925s']
     ],
     practice: [
-      ['Neurology Practice Simulator', 'A patient, a study, and the next decision. Stroke and subarachnoid hemorrhage.', 'Practice_Simulator.html?focus=neuro&v=20261028j']
+      ['Neurology Practice Simulator', 'A patient, a study, and the next decision. Stroke and subarachnoid hemorrhage.', 'Practice_Simulator.html?focus=neuro&v=20261028m']
     ],
     soon: ''
   },
@@ -50,7 +50,7 @@ export const ROOMS = {
     ],
     practice: [
       ['Mechanical ventilation', 'Pressure, flow and volume. Name the pattern.', 'Ventilator_Waveform_Troubleshooting.html?v=20260925s'],
-      ['Respiratory Practice Simulator', 'ARDS. Click the opacity, name the severity, then set the tidal volume.', 'Practice_Simulator.html?focus=lungs&v=20261028j']
+      ['Respiratory Practice Simulator', 'ARDS. Click the opacity, name the severity, then set the tidal volume.', 'Practice_Simulator.html?focus=lungs&v=20261028m']
     ],
     soon: ''
   },
@@ -65,8 +65,8 @@ export const ROOMS = {
     ],
     practice: [
       ['Cardiac rhythm', 'A moving ECG, the arrest and the reversible causes.', 'Cardiac_Rhythm_Decision_Simulator_V29_FINAL_AUDITED.html?v=20260925t'],
-      ['Shock Practice Simulator', 'Septic shock. The small ventricle, the full IVC, then norepinephrine.', 'Practice_Simulator.html?focus=circulation&v=20261028j'],
-      ['Cardiac Practice Simulator', 'Infarction, heart block, cardiogenic shock, ventricular fibrillation, and tamponade.', 'Practice_Simulator.html?focus=heart&v=20261028j']
+      ['Shock Practice Simulator', 'Septic shock. The small ventricle, the full IVC, then norepinephrine.', 'Practice_Simulator.html?focus=circulation&v=20261028m'],
+      ['Cardiac Practice Simulator', 'Infarction, heart block, cardiogenic shock, ventricular fibrillation, and tamponade.', 'Practice_Simulator.html?focus=heart&v=20261028m']
     ],
     soon: ''
   },
@@ -75,7 +75,7 @@ export const ROOMS = {
     line: 'Failure, cirrhosis, infected ascites, and a blocked duct.',
     learn: [],
     practice: [
-      ['Liver Practice Simulator', 'Acute liver failure, decompensated cirrhosis, infected ascites, hepatorenal syndrome, and cholangitis.', 'Practice_Simulator.html?focus=liver&v=20261028j']
+      ['Liver Practice Simulator', 'Acute liver failure, decompensated cirrhosis, infected ascites, hepatorenal syndrome, and cholangitis.', 'Practice_Simulator.html?focus=liver&v=20261028m']
     ],
     soon: ''
   },
@@ -84,7 +84,7 @@ export const ROOMS = {
     line: 'Upper gastrointestinal bleeding. Variceal and non-variceal.',
     learn: [],
     practice: [
-      ['Upper gastrointestinal bleeding', 'Variceal and non-variceal. The endoscope, then the bundle that matches the lesion.', 'Practice_Simulator.html?focus=bleed&v=20261028j']
+      ['Upper gastrointestinal bleeding', 'Variceal and non-variceal. The endoscope, then the bundle that matches the lesion.', 'Practice_Simulator.html?focus=bleed&v=20261028m']
     ],
     soon: ''
   },
@@ -95,7 +95,7 @@ export const ROOMS = {
       ['Acute pancreatitis', 'Diagnosis, fluids, cause, and the step-up approach.', 'Acute_Pancreatitis_Simulator.html?v=20260926s']
     ],
     practice: [
-      ['GI Practice Simulator', 'Pancreatitis, variceal bleeding, a duodenal ulcer, and cholangitis.', 'Practice_Simulator.html?focus=gi&v=20261028j']
+      ['GI Practice Simulator', 'Pancreatitis, variceal bleeding, a duodenal ulcer, and cholangitis.', 'Practice_Simulator.html?focus=gi&v=20261028m']
     ],
     soon: ''
   },
@@ -109,11 +109,11 @@ export const ROOMS = {
       ['Antifungal resistance', 'C. auris, Mucorales, and the site the drug does not reach.', 'Antifungal_Resistance_Simulator.html?v=20260925s']
     ],
     practice: [
-      ['Integrated ICU cases', 'Every practice case, from the brain to the blood film.', 'Practice_Simulator.html?v=20261028j'],
-      ['Infection Practice Simulator', 'Septic shock, severe malaria, and dengue shock.', 'Practice_Simulator.html?focus=id&v=20261028j'],
-      ['Hematology Practice Simulator', 'Thrombotic thrombocytopenic purpura. The film, then plasma exchange.', 'Practice_Simulator.html?focus=heme&v=20261028j'],
-      ['Trauma Practice Simulator', 'Rib fractures, and an open pelvic ring.', 'Practice_Simulator.html?focus=trauma&v=20261028j'],
-      ['Toxicology Practice Simulator', 'Organophosphate poisoning. Atropine until the chest is dry.', 'Practice_Simulator.html?focus=tox&v=20261028j']
+      ['Integrated ICU cases', 'Every practice case, from the brain to the blood film.', 'Practice_Simulator.html?v=20261028m'],
+      ['Infection Practice Simulator', 'Septic shock, severe malaria, and dengue shock.', 'Practice_Simulator.html?focus=id&v=20261028m'],
+      ['Hematology Practice Simulator', 'Thrombotic thrombocytopenic purpura. The film, then plasma exchange.', 'Practice_Simulator.html?focus=heme&v=20261028m'],
+      ['Trauma Practice Simulator', 'Rib fractures, and an open pelvic ring.', 'Practice_Simulator.html?focus=trauma&v=20261028m'],
+      ['Toxicology Practice Simulator', 'Organophosphate poisoning. Atropine until the chest is dry.', 'Practice_Simulator.html?focus=tox&v=20261028m']
     ],
     soon: ''
   },
@@ -122,11 +122,11 @@ export const ROOMS = {
     line: 'Sodium, potassium, calcium, magnesium and phosphate.',
     learn: [
       ['Electrolytes', 'The number chooses the algorithm. Calcium starts from serum calcium and albumin.', 'Electrolyte_Disorders_Interactive_Simulator.html?v=20261014d'],
-      ['Dialysis Learning Lab', 'Ten modalities. The circuit, the dose, and why SLED sits inside prolonged intermittent therapy.', 'Dialysis_Learning_Lab.html?v=20261028k']
+      ['Dialysis Learning Lab', 'Ten modalities. The circuit, the dose, and why SLED sits inside prolonged intermittent therapy.', 'Dialysis_Learning_Lab.html?v=20261028m']
     ],
     practice: [
-      ['Renal Practice Simulator', 'Hyperkalemia, obstructed acute kidney injury, and missed dialysis.', 'Practice_Simulator.html?focus=kidney&v=20261028j'],
-      ['Dialysis practice', 'Indication, modality, prescription, and a whole session.', 'Dialysis_Practice_Simulator.html?v=20261028k']
+      ['Renal Practice Simulator', 'Hyperkalemia, obstructed acute kidney injury, and missed dialysis.', 'Practice_Simulator.html?focus=kidney&v=20261028m'],
+      ['Dialysis practice', 'Indication, modality, prescription, and a whole session.', 'Dialysis_Practice_Simulator.html?v=20261028m']
     ],
     soon: ''
   }

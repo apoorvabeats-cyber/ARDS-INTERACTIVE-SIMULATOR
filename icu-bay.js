@@ -283,9 +283,9 @@
       '<button type="button" class="back" id="back">Back to ICU</button>'+
       '<h2>Dialysis</h2>'+
       '<p class="lede">The machine is on. The learning lab is the circuit and the ten modalities. Practice is one skill, or a whole session.</p>'+
-      '<button type="button" class="card" data-mod="Dialysis_Learning_Lab.html?v=20261028k"><b>Dialysis Learning Lab</b><span>IHD, SLED, PIKRT, the continuous modes, ultrafiltration and the peritoneum. SLED sits inside prolonged intermittent therapy.</span></button>'+
-      '<button type="button" class="card" data-mod="Dialysis_Practice_Simulator.html?v=20261028k"><b>Practice by module</b><span>Indication, modality, prescription, the machine, alarms, fluids and anticoagulation.</span></button>'+
-      '<button type="button" class="card" data-mod="Dialysis_Practice_Simulator.html?mode=full&v=20261028k"><b>Full clinical cases</b><span>Shock, missed dialysis with wet lungs, and an injured brain. The whole session.</span></button>';
+      '<button type="button" class="card" data-mod="Dialysis_Learning_Lab.html?v=20261028m"><b>Dialysis Learning Lab</b><span>IHD, SLED, PIKRT, the continuous modes, ultrafiltration and the peritoneum. SLED sits inside prolonged intermittent therapy.</span></button>'+
+      '<button type="button" class="card" data-mod="Dialysis_Practice_Simulator.html?v=20261028m"><b>Practice by module</b><span>Indication, modality, prescription, the machine, alarms, fluids and anticoagulation.</span></button>'+
+      '<button type="button" class="card" data-mod="Dialysis_Practice_Simulator.html?mode=full&v=20261028m"><b>Full clinical cases</b><span>Shock, missed dialysis with wet lungs, and an injured brain. The whole session.</span></button>';
     document.getElementById("back").onclick = function(){
       document.body.classList.remove("in", "enter");
       room.innerHTML = "";

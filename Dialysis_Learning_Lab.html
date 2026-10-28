@@ -45,7 +45,7 @@ svg{width:100%;height:auto;display:block}
 .sliders input{width:100%;accent-color:#1457a6}
 .sliders label.dead{opacity:.4}
 .read{background:#f4f7fb;border-radius:12px;padding:10px 12px;margin-top:8px}
-.choice{display:block;width:100%;text-align:left;background:#fff;border:1px solid #d7e0ec;border-radius:12px;padding:12px;margin:8px 0;min-height:48px}
+.choice{display:block;width:100%;text-align:left;background:#fff;color:#14213d;border:1px solid #d7e0ec;border-radius:12px;padding:12px;margin:8px 0;min-height:48px;-webkit-appearance:none;appearance:none}
 .choice.good{border-color:#0f7a4a;background:#f3fbf6}
 .choice.bad{border-color:#b42318;background:#fdf4f4}
 .fb{margin-top:8px}
@@ -295,6 +295,35 @@ let tab = 0;
 let picked = {};
 
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"\u0026amp;","<":"\u0026lt;",">":"\u0026gt;","\"":"\u0026quot;","'":"\u0026#39;"}[c];});}
+function femaleVoice(){
+  if(!window.speechSynthesis) return null;
+  const voices = speechSynthesis.getVoices() || [];
+  const named = /female|samantha|victoria|karen|moira|fiona|tessa|serena|zira|susan|veena|heera|sonia|catherine|allison|ava|nicky|libby/i;
+  const en = voices.filter(function(v){ return /^en/i.test(v.lang || ""); });
+  return en.find(function(v){ return named.test((v.name||"")+" "+(v.voiceURI||"")); })
+    || en.find(function(v){ return /en-GB|en-IN|en-AU/i.test(v.lang) && !/male/i.test(v.name||""); })
+    || null;
+}
+function speakLine(text){
+  if(!text || !window.speechSynthesis) return;
+  const say = function(){
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const voice = femaleVoice();
+    u.lang = voice && voice.lang ? voice.lang : "en-GB";
+    u.rate = 0.92;
+    u.pitch = 1.06;
+    if(voice) u.voice = voice;
+    speechSynthesis.speak(u);
+  };
+  if(!speechSynthesis.getVoices().length){
+    const once = function(){ speechSynthesis.removeEventListener("voiceschanged", once); say(); };
+    speechSynthesis.addEventListener("voiceschanged", once);
+    speechSynthesis.getVoices();
+    return;
+  }
+  say();
+}
 
 function circuit(mod){
   const f = mod.flows;
@@ -396,7 +425,7 @@ function render(){
   if(tab===5){
     body = m.cases.map(function(c,i){
       return '<p><b>'+(i+1)+'.</b> '+esc(c.q)+'</p>'+c.options.map(function(o,j){
-        const mark = picked[i]===j ? (o.ok?' good':' bad') : '';
+        const mark = picked[i]===j ? (o.ok?' good':' bad') : (picked[i]!=null && o.ok ? ' good' : '');
         return '<button type="button" class="choice'+mark+'" data-c="'+i+'" data-o="'+j+'">'+esc(o.t)+'</button>';
       }).join("")+(picked[i]!=null ? '<p class="fb">'+(c.options[picked[i]].ok?'Right. ':'Not that. ')+esc(c.options[picked[i]].why)+'</p>' : '');
     }).join("");
@@ -432,6 +461,10 @@ function render(){
     document.querySelectorAll("[data-c]").forEach(function(b){
       b.onclick=function(){
         picked[b.getAttribute("data-c")] = Number(b.getAttribute("data-o"));
+        const item = m.cases[Number(b.getAttribute("data-c"))];
+        const opt = item.options[picked[b.getAttribute("data-c")]];
+        const right = item.options.find(function(o){ return o.ok; });
+        speakLine(opt.ok ? "Correct. "+opt.why : "Not that. The answer is "+(right?right.t:"")+". "+opt.why);
         render();
       };
     });

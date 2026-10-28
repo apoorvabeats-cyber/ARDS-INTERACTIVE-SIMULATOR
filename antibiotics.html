@@ -13,7 +13,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--fg)}
 body{font-family:Figtree,ui-sans-serif,sans-serif;min-height:100dvh;padding:16px 16px 56px}
-button,a,input,select{font:inherit;color:inherit}
+button,a,input,select{font:inherit;color:inherit;-webkit-appearance:none;appearance:none}
 button{cursor:pointer}
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
 .wrap{max-width:42rem;margin:0 auto}
@@ -45,10 +45,9 @@ label.field input,label.field select{display:block;width:100%;margin-top:4px;hei
 .warm{color:var(--warm);line-height:1.45}
 .faint{color:var(--faint);line-height:1.45}
 .mcq{border-top:1px solid var(--line);margin-top:16px;padding-top:12px}
-.mcq button{display:block;width:100%;text-align:left;background:transparent;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;min-height:44px;line-height:1.4}
-.mcq button.pick{border-color:var(--cool)}
-.mcq button.good{border-color:#3ee07a;color:#d7ffe8}
-.mcq button.bad{border-color:var(--warm);color:var(--warm)}
+.opt{display:block;width:100%;text-align:left;background:#0c1822;color:#f3efe6;border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:8px;min-height:48px;line-height:1.4}
+.opt.good{border-color:#3ee07a;color:#d7ffe8;background:#10241c}
+.opt.bad{border-color:#e2b48a;color:#f6e7d4;background:#241c14}
 .check{margin-top:16px;min-height:48px;border-radius:12px;border:1px solid var(--cool);background:transparent;color:var(--cool);padding:0 16px}
 .empty{color:var(--muted);border-top:1px solid var(--line);padding:18px 0}
 @media(min-width:960px){
@@ -603,20 +602,24 @@ label.field input,label.field select{display:block;width:100%;margin-top:4px;hei
     sec.appendChild(el("h2", null, item.stem));
     var picked = null;
     item.options.forEach(function (option, optionIndex) {
-      var b = el("button", "", option);
+      var b = el("button", "opt", option);
       b.type = "button";
       b.addEventListener("click", function () {
         if (picked !== null) return;
         picked = optionIndex;
-        var buttons = sec.querySelectorAll("button");
+        var buttons = sec.querySelectorAll(".opt");
+        var correctText = item.options[item.answer];
         buttons.forEach(function (button, i) {
           button.disabled = true;
-          if (i === item.answer) button.className = "good";
-          else if (i === optionIndex) button.className = "bad";
+          if (i === item.answer) button.className = "opt good";
+          else if (i === optionIndex) button.className = "opt bad";
         });
+        var line = optionIndex === item.answer
+          ? "Correct. " + item.why
+          : "Not this one. The answer is " + correctText + ". " + item.why;
         why.hidden = false;
-        why.textContent = (optionIndex === item.answer ? "Correct. " : "Not this one. ") + item.why;
-        speakMcq(why.textContent);
+        why.textContent = line;
+        speakMcq(line);
       });
       sec.appendChild(b);
     });

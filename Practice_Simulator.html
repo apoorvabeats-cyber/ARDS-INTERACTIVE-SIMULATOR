@@ -61,9 +61,10 @@ h2{margin:4px 0 6px;font-size:22px;line-height:1.15}
 .cap{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;background:#fff;padding:10px 12px;color:#5f6f86;font-size:13px}
 .cap .tools{display:flex;gap:6px;align-items:center}
 .icon{width:44px;height:44px;border-radius:10px;border:1px solid #d7e0ec;background:#fff;font-weight:800}
-.choice{display:flex;gap:10px;width:100%;text-align:left;background:#fff;border:1px solid #d7e0ec;border-radius:12px;padding:12px;min-height:48px;margin:8px 0}
+.choice{display:flex;gap:10px;width:100%;text-align:left;background:#fff;color:#14213d;border:1px solid #d7e0ec;border-radius:12px;padding:12px;min-height:48px;margin:8px 0;-webkit-appearance:none;appearance:none}
 .choice.on{border-color:#1457a6;background:#f3f8ff}
-.choice.hinted{border-color:#0f7a4a}
+.choice.hinted,.choice.right{border-color:#0f7a4a;background:#f3fbf6}
+.choice.wrong{border-color:#b42318;background:#fdf4f4}
 .choice .n{color:#5f6f86;font-variant-numeric:tabular-nums;font-weight:800}
 .choice:disabled{opacity:1}
 .fb{border-radius:12px;padding:12px;background:#f4f7fb;border:1px solid #d7e0ec;margin-top:8px}
@@ -169,31 +170,61 @@ function tone(ac, freq, start, dur, type, peak){
   o.start(start);
   o.stop(start + dur + 0.02);
 }
-function playVerdict(verdict){
-  if (mode === "exam") return;
-  const ac = soundCtx();
-  if (verdict === "wrong"){
-    if (!ac) return;
-    const t = ac.currentTime;
-    tone(ac, 880, t, 0.16, "square", 0.08);
-    tone(ac, 620, t + 0.18, 0.16, "square", 0.08);
-    tone(ac, 880, t + 0.36, 0.18, "square", 0.08);
+function femaleVoice(){
+  if (!window.speechSynthesis) return null;
+  const voices = speechSynthesis.getVoices() || [];
+  const named = /female|samantha|victoria|karen|moira|fiona|tessa|serena|zira|susan|veena|heera|sonia|catherine|allison|ava|nicky|libby/i;
+  const en = voices.filter(function(voice){ return /^en/i.test(voice.lang || ""); });
+  return en.find(function(voice){ return named.test((voice.name || "") + " " + (voice.voiceURI || "")); })
+    || en.find(function(voice){ return /en-GB|en-IN|en-AU/i.test(voice.lang) && !/male/i.test(voice.name || ""); })
+    || null;
+}
+function speakLine(text){
+  if (!text || !window.speechSynthesis) return;
+  const say = function(){
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voice = femaleVoice();
+    utterance.lang = voice && voice.lang ? voice.lang : "en-GB";
+    utterance.rate = 0.92;
+    utterance.pitch = 1.06;
+    if (voice) utterance.voice = voice;
+    speechSynthesis.speak(utterance);
+  };
+  if (!speechSynthesis.getVoices().length){
+    const once = function(){
+      speechSynthesis.removeEventListener("voiceschanged", once);
+      say();
+    };
+    speechSynthesis.addEventListener("voiceschanged", once);
+    speechSynthesis.getVoices();
     return;
   }
-  if (verdict !== "correct") return;
+  say();
+}
+function playVerdict(verdict, spoken){
+  if (mode === "exam"){
+    if (spoken) speakLine(spoken);
+    return;
+  }
+  const ac = soundCtx();
+  if (verdict === "wrong"){
+    if (ac){
+      const t = ac.currentTime;
+      tone(ac, 880, t, 0.16, "square", 0.08);
+      tone(ac, 620, t + 0.18, 0.16, "square", 0.08);
+      tone(ac, 880, t + 0.36, 0.18, "square", 0.08);
+    }
+    if (spoken) speakLine(spoken);
+    return;
+  }
+  if (verdict !== "correct" && verdict !== "partial") return;
   if (ac){
     const t = ac.currentTime;
     tone(ac, 523, t, 0.12, "sine", 0.07);
     tone(ac, 784, t + 0.1, 0.18, "sine", 0.07);
   }
-  try {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const said = new SpeechSynthesisUtterance("Correct");
-    said.lang = "en-US";
-    said.rate = 1;
-    window.speechSynthesis.speak(said);
-  } catch (e) {}
+  if (spoken) speakLine(spoken);
 }
 function orderedChoices(stage){
   const key = item.id + ":" + index + ":" + stage.id;
@@ -332,6 +363,16 @@ function finish(record, nextLive){
   phase = "feedback";
   render();
 }
+function rightChoiceLabel(stage){
+  const ideal = (stage.choices || []).find(function(choice){ return resolveChoice(choice, lkw()).verdict === "correct"; });
+  return ideal ? ideal.label : "";
+}
+function spokenVerdict(verdict, why, answer){
+  if (verdict === "correct") return "Correct. " + (mode === "learn" ? why : "");
+  if (verdict === "partial") return "Partly right. " + (mode === "learn" ? why : "");
+  if (mode !== "learn") return "Not that.";
+  return "Not that. The answer is " + (answer || "") + ". " + (why || "");
+}
 function onChoice(){
   const stage = item.stages[index];
   if (!stage.choices || !selected) return;
@@ -346,7 +387,7 @@ function onChoice(){
     if (choice.delayMin) live = Object.assign({}, live, {extraMin: live.extraMin + choice.delayMin});
     feedback = {title:"Not that", body: resolved.feedback, verdict:"wrong", canAdvance:false};
     phase = "feedback";
-    playVerdict("wrong");
+    playVerdict("wrong", spokenVerdict("wrong", resolved.feedback, rightChoiceLabel(stage)));
     render();
     return;
   }
@@ -378,7 +419,7 @@ function onChoice(){
     teach: mode === "exam" ? teachFor(resolved.feedback) : resolved.feedback,
     guideline: stage.guideline
   }, nextLive);
-  playVerdict(resolved.verdict);
+  playVerdict(resolved.verdict, spokenVerdict(resolved.verdict, resolved.feedback, rightChoiceLabel(stage)));
 }
 function brightnessAt(img, x, y){
   if (!img || !img.naturalWidth) return 0;
@@ -417,7 +458,10 @@ function onPick(x, y, brightness){
     strikes = {tries: strikes.tries + 1, hint: strikes.hint, critical: strikes.critical};
     feedback = {title: titleHint === "close" ? "Close" : "Not that", body: body, verdict:"wrong", canAdvance:false};
     phase = "feedback";
-    playVerdict("wrong");
+    playVerdict("wrong", spokenVerdict("wrong", body, (function(){
+      const rightRegion = (stage.regions || []).find(function(r){ return r.verdict === "correct"; });
+      return rightRegion ? rightRegion.you : (stage.brightAssist ? stage.brightAssist.you : "");
+    })()));
     render();
     return;
   }
@@ -440,7 +484,7 @@ function onPick(x, y, brightness){
     teach: mode === "exam" ? teachFor(body) : body,
     guideline: stage.guideline
   }, nextLive);
-  playVerdict(verdict);
+  playVerdict(verdict, spokenVerdict(verdict, body, ""));
 }
 function continueOn(){
   if (!feedback || !feedback.canAdvance){
@@ -515,15 +559,18 @@ function renderVitals(){
 function choiceList(stage){
   return orderedChoices(stage).map(function(choice, i){
     const resolved = resolveChoice(choice, lkw());
-    const hinted = mode === "learn" && strikes.hint && resolved.verdict === "correct";
     const on = selected === choice.id;
-    const cls = "choice" + (on ? " on" : "") + (hinted ? " hinted" : "");
+    const showWrong = mode === "learn" && phase === "feedback" && feedback && feedback.verdict === "wrong";
+    const right = showWrong && resolved.verdict === "correct";
+    const wrong = showWrong && on && resolved.verdict !== "correct";
+    const hinted = (mode === "learn" && strikes.hint && resolved.verdict === "correct") || right;
+    const cls = "choice" + (on && !wrong ? " on" : "") + (hinted ? " right" : "") + (wrong ? " wrong" : "");
     return '<button type="button" class="' + cls + '" data-choice="' + esc(choice.id) + '" ' + (phase !== "ask" ? "disabled" : "") + '><span class="n">' + String(i + 1).padStart(2, "0") + "</span><span>" + esc(choice.label) + "</span></button>";
   }).join("");
 }
 function imageBlock(stage){
   if (!stage.image) return "";
-  const reveal = mode === "learn" && (strikes.hint || (phase === "feedback" && feedback && feedback.verdict === "correct"));
+  const reveal = mode === "learn" && (strikes.hint || (phase === "feedback" && feedback && feedback.verdict !== "partial"));
   const regions = reveal ? (stage.regions || []).filter(function(r){ return r.verdict === "correct"; }) : [];
   const ellipses = regions.map(function(region){
     return '<ellipse cx="' + (region.cx * 100) + '" cy="' + (region.cy * 100) + '" rx="' + (region.rx * 100) + '" ry="' + (region.ry * 100) + '" fill="none" stroke="#1f9d62" stroke-width="0.6" stroke-dasharray="1.4 1"/>';

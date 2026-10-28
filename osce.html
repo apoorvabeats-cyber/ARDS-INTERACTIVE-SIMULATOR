@@ -12,7 +12,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;background:#071018;color:#f3efe6}
 body{font-family:Figtree,ui-sans-serif,sans-serif;line-height:1.45;min-height:100dvh}
-button,a{font:inherit;color:inherit}
+button,a{font:inherit;color:inherit;-webkit-appearance:none;appearance:none}
 button{cursor:pointer}
 button:focus-visible,a:focus-visible{outline:2px solid #f3efe6;outline-offset:3px}
 header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:12px 14px;position:sticky;top:0;background:#071018;z-index:2}
@@ -37,7 +37,7 @@ h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:34px;letter-spac
 .gas dt{color:#8a8478;font-size:12px}
 .gas dd{margin:2px 0 0;font-variant-numeric:tabular-nums;font-weight:650}
 .prompt{font-size:18px;margin:12px 0}
-.choice{display:block;width:100%;text-align:left;background:#10161c;border:1px solid rgba(243,239,230,.16);border-radius:12px;padding:12px;min-height:48px;margin:8px 0}
+.choice{display:block;width:100%;text-align:left;background:#10161c;color:#f3efe6;border:1px solid rgba(243,239,230,.16);border-radius:12px;padding:12px;min-height:48px;margin:8px 0}
 .choice.right{border-color:#8fbf9a}
 .choice.wrong{border-color:#d27b73}
 .choice:disabled{opacity:1}
@@ -191,15 +191,42 @@ function armClock(onExpire){
     onExpire();
   }, 1000);
 }
-function timeUp(markMode, go){
-  stopClock();
+function afterSpeech(text, then){
   const gen = clockGen;
-  if(markMode) mark(markMode, false);
-  say("Time up.");
-  setTimeout(function(){
+  let done = false;
+  const leave = function(){
+    if(done) return;
+    done = true;
     if(gen !== clockGen) return;
-    go();
-  }, 1400);
+    then();
+  };
+  if(!voiceOn || !window.speechSynthesis || !text){
+    setTimeout(leave, 2800);
+    return;
+  }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(speakable(text));
+  u.lang = "en-GB";
+  u.rate = 0.84;
+  u.pitch = 1.04;
+  u.volume = 0.82;
+  const voice = britishFemale();
+  if(voice) u.voice = voice;
+  u.onend = function(){ setTimeout(leave, 500); };
+  u.onerror = function(){ setTimeout(leave, 1200); };
+  speechSynthesis.speak(u);
+  setTimeout(leave, Math.min(22000, 5000 + String(text).length * 75));
+}
+function timeUp(markMode, answerIndex, spoken, go){
+  stopClock();
+  if(markMode) mark(markMode, false);
+  const buttons = app.querySelectorAll(".choice");
+  buttons.forEach(function(btn){ btn.disabled = true; });
+  if(buttons[answerIndex]) buttons[answerIndex].classList.add("right");
+  const line = "Time is up. The answer is " + spoken;
+  const fb = document.getElementById("fb");
+  if(fb){ fb.hidden = false; fb.textContent = line; }
+  afterSpeech(line, go);
 }
 function esc(s){
   return String(s).replace(/[&<>"']/g, function(c){
@@ -297,7 +324,7 @@ function renderAbg(){
     "<p class='fb' id='fb' hidden></p><button class='next' id='next' hidden>Continue</button>"+
     "<p class='fine'>Teaching case. Not a patient result.</p>";
   say(abgStep==="id" ? "What is the main acid-base disorder?" : "What is the most likely cause?");
-  armClock(function(){ timeUp("abg", function(){ advanceAbg(false); }); });
+  armClock(function(){ timeUp("abg", step.answer, step.options[step.answer] + ". " + step.say, function(){ advanceAbg(false); }); });
   app.querySelectorAll(".choice").forEach(function(btn){
     btn.onclick = function(){ answerAbg(item, step, Number(btn.getAttribute("data-i"))); };
   });
@@ -319,8 +346,8 @@ function answerAbg(item, step, i){
   mark("abg", ok);
   const fb = document.getElementById("fb");
   fb.hidden = false;
-  fb.textContent = (ok ? "Correct. " : "Not that. ") + step.say;
-  say((ok ? "Correct. " : "Not that. ") + step.say);
+  fb.textContent = (ok ? "Correct. " : "Not that. The answer is " + step.options[step.answer] + ". ") + step.say;
+  say(fb.textContent);
   const next = document.getElementById("next");
   next.hidden = false;
   next.onclick = function(){ advanceAbg(ok); };
@@ -413,7 +440,7 @@ function renderDrugQ(){
     options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
     "<p class='fb' id='fb' hidden></p><div id='calc'></div><button class='next' id='next' hidden>Continue</button>";
   say(drug.name+". "+FIELD_LABEL[field]+". Which statement is right?");
-  armClock(function(){ timeUp("drug", advanceDrug); });
+  armClock(function(){ timeUp("drug", answer, correct, advanceDrug); });
   app.querySelectorAll(".choice").forEach(function(btn){
     btn.onclick = function(){
       stopClock();
@@ -425,8 +452,8 @@ function renderDrugQ(){
       mark("drug", ok);
       const fb = document.getElementById("fb");
       fb.hidden = false;
-      fb.textContent = (ok ? "Correct. " : "Not that. ") + correct;
-      say((ok ? "Correct. " : "Not that. ") + correct);
+      fb.textContent = (ok ? "Correct. " : "Not that. The answer is ") + correct;
+      say(fb.textContent);
       if(field==="infusion" && drug.calc){
         document.getElementById("calc").innerHTML = calculator(drug);
         document.getElementById("dose").dispatchEvent(new Event("input", {bubbles:true}));
@@ -484,7 +511,7 @@ function renderEcg(){
     "<p class='fb' id='fb' hidden></p><button class='next' id='next' hidden>Continue</button>"+
     "<p class='fine'>One small square is 0.04 seconds. The block on the left is 1 millivolt. The paper is long. Swipe sideways. Teaching strip, not a patient recording.</p>";
   say(item.lead+". "+step.prompt);
-  armClock(function(){ timeUp("ecg", function(){ advanceEcg(false); }); });
+  armClock(function(){ timeUp("ecg", step.answer, step.options[step.answer] + ". " + step.say, function(){ advanceEcg(false); }); });
   app.querySelectorAll(".choice").forEach(function(btn){
     btn.onclick = function(){
       stopClock();
@@ -496,8 +523,8 @@ function renderEcg(){
       mark("ecg", ok);
       const fb = document.getElementById("fb");
       fb.hidden = false;
-      fb.textContent = (ok ? "Correct. " : "Not that. ") + step.say;
-      say((ok ? "Correct. " : "Not that. ") + step.say);
+      fb.textContent = (ok ? "Correct. " : "Not that. The answer is " + step.options[step.answer] + ". ") + step.say;
+      say(fb.textContent);
       const next = document.getElementById("next");
       next.hidden = false;
       next.onclick = function(){ advanceEcg(ok); };
@@ -941,7 +968,7 @@ function renderKitQ(){
     options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
     "<p class='fb' id='fb' hidden></p><button class='next' id='next' hidden>Continue</button>";
   say(item.name+". "+prompt);
-  armClock(function(){ timeUp("kit", advanceKit); });
+  armClock(function(){ timeUp("kit", answer, correct, advanceKit); });
   app.querySelectorAll(".choice").forEach(function(btn){
     btn.onclick = function(){
       stopClock();
@@ -953,8 +980,8 @@ function renderKitQ(){
       mark("kit", ok);
       const fb = document.getElementById("fb");
       fb.hidden = false;
-      fb.textContent = (ok ? "Correct. " : "Not that. ") + correct;
-      say((ok ? "Correct. " : "Not that. ") + correct);
+      fb.textContent = (ok ? "Correct. " : "Not that. The answer is ") + correct;
+      say(fb.textContent);
       const next = document.getElementById("next");
       next.hidden = false;
       next.onclick = advanceKit;
@@ -1033,7 +1060,8 @@ function renderFilm(id, stepName){
     step.options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
     "<p class='fb' id='fb' hidden></p><button class='next' id='next' hidden>Continue</button>";
   say(film.stem+" "+step.prompt);
-  armClock(function(){ timeUp("film", function(){ advanceFilm(id, stepName); }); });
+  const filmLead = stepName==="finding" ? film.title+". " : "";
+  armClock(function(){ timeUp("film", step.answer, step.options[step.answer] + ". " + filmLead + step.say, function(){ advanceFilm(id, stepName); }); });
   app.querySelectorAll(".choice").forEach(function(btn){
     btn.onclick = function(){
       stopClock();
@@ -1045,9 +1073,9 @@ function renderFilm(id, stepName){
       mark("film", ok);
       const fb = document.getElementById("fb");
       fb.hidden = false;
-      const lead = stepName==="finding" ? film.title+". " : "";
-      fb.textContent = (ok ? "Correct. " : "Not that. ") + lead + step.say;
-      say((ok ? "Correct. " : "Not that. ") + lead + step.say);
+      const lead = filmLead;
+      fb.textContent = (ok ? "Correct. " : "Not that. The answer is " + step.options[step.answer] + ". ") + lead + step.say;
+      say(fb.textContent);
       const next = document.getElementById("next");
       next.hidden = false;
       next.textContent = stepName==="finding" ? "Ask the treatment" : "Back to the films";
