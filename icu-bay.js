@@ -262,6 +262,19 @@
   function quietLine(){
     if(typeof window.stopSpoken === "function") window.stopSpoken();
   }
+  function bindModules(room){
+    room.querySelectorAll("[data-mod]").forEach(function(card){
+      card.onclick = function(event){
+        event.preventDefault();
+        event.stopPropagation();
+        openModule(card.getAttribute("data-mod"), card.querySelector("b").textContent);
+      };
+    });
+  }
+  function holdRoom(room){
+    room.style.pointerEvents = "none";
+    setTimeout(function(){ room.style.pointerEvents = ""; }, 500);
+  }
   function openDialysis(){
     quietLine();
     const room = document.getElementById("room");
@@ -270,19 +283,15 @@
       '<button type="button" class="back" id="back">Back to ICU</button>'+
       '<h2>Dialysis</h2>'+
       '<p class="lede">The machine is on. The learning lab is the circuit and the ten modalities. Practice is one skill, or a whole session.</p>'+
-      '<a class="card" data-mod="Dialysis_Learning_Lab.html?v=20261028k"><b>Dialysis Learning Lab</b><span>IHD, SLED, PIKRT, the continuous modes, ultrafiltration and the peritoneum. SLED sits inside prolonged intermittent therapy.</span></a>'+
-      '<a class="card" data-mod="Dialysis_Practice_Simulator.html?v=20261028k"><b>Practice by module</b><span>Indication, modality, prescription, the machine, alarms, fluids and anticoagulation.</span></a>'+
-      '<a class="card" data-mod="Dialysis_Practice_Simulator.html?mode=full&v=20261028k"><b>Full clinical cases</b><span>Shock, missed dialysis with wet lungs, and an injured brain. The whole session.</span></a>';
+      '<button type="button" class="card" data-mod="Dialysis_Learning_Lab.html?v=20261028k"><b>Dialysis Learning Lab</b><span>IHD, SLED, PIKRT, the continuous modes, ultrafiltration and the peritoneum. SLED sits inside prolonged intermittent therapy.</span></button>'+
+      '<button type="button" class="card" data-mod="Dialysis_Practice_Simulator.html?v=20261028k"><b>Practice by module</b><span>Indication, modality, prescription, the machine, alarms, fluids and anticoagulation.</span></button>'+
+      '<button type="button" class="card" data-mod="Dialysis_Practice_Simulator.html?mode=full&v=20261028k"><b>Full clinical cases</b><span>Shock, missed dialysis with wet lungs, and an injured brain. The whole session.</span></button>';
     document.getElementById("back").onclick = function(){
       document.body.classList.remove("in", "enter");
       room.innerHTML = "";
     };
-    room.querySelectorAll("[data-mod]").forEach(function(card){
-      card.onclick = function(event){
-        event.preventDefault();
-        openModule(card.getAttribute("data-mod"), card.querySelector("b").textContent);
-      };
-    });
+    bindModules(room);
+    holdRoom(room);
   }
   function openModule(url, title){
     quietLine();
@@ -305,20 +314,16 @@
       '<button type="button" class="back" id="back">Back to ICU</button>'+
       '<h2>Monitor</h2>'+
       '<p class="lede">The wall monitor is a simulation. Choose the shock module that already exists.</p>'+
-      '<a class="card" data-mod="Shock_Bay.html?v=20261024e"><b>Shock bay</b><span>Phenotypes of shock, and a ventilator you control.</span></a>'+
-      '<a class="card" data-mod="Shock_Identification_Management_Simulator.html?v=20261024e"><b>Shock identification</b><span>MAP, cardiac index and the phenotype.</span></a>'+
-      '<a class="card" data-mod="Shock_POCUS_RUSH_Simulator.html?v=20261024e"><b>Shock and POCUS</b><span>RUSH exam, ScvO2 and lactate.</span></a>'+
-      '<a class="card" data-mod="Shock_Telemetry_POCUS_Simulator.html?v=20261024e"><b>Shock telemetry</b><span>Arterial line, IVC, PPV and the vasopressor.</span></a>';
+      '<button type="button" class="card" data-mod="Shock_Bay.html?v=20261024e"><b>Shock bay</b><span>Phenotypes of shock, and a ventilator you control.</span></button>'+
+      '<button type="button" class="card" data-mod="Shock_Identification_Management_Simulator.html?v=20261024e"><b>Shock identification</b><span>MAP, cardiac index and the phenotype.</span></button>'+
+      '<button type="button" class="card" data-mod="Shock_POCUS_RUSH_Simulator.html?v=20261024e"><b>Shock and POCUS</b><span>RUSH exam, ScvO2 and lactate.</span></button>'+
+      '<button type="button" class="card" data-mod="Shock_Telemetry_POCUS_Simulator.html?v=20261024e"><b>Shock telemetry</b><span>Arterial line, IVC, PPV and the vasopressor.</span></button>';
     document.getElementById("back").onclick = function(){
       document.body.classList.remove("in", "enter");
       room.innerHTML = "";
     };
-    room.querySelectorAll("[data-mod]").forEach(function(card){
-      card.onclick = function(event){
-        event.preventDefault();
-        openModule(card.getAttribute("data-mod"), card.querySelector("b").textContent);
-      };
-    });
+    bindModules(room);
+    holdRoom(room);
   }
   function leaveForBody(){
     quietLine();
