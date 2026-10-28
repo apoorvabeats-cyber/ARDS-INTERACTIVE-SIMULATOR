@@ -118,6 +118,7 @@ label.field input,label.field select{display:block;width:100%;margin-top:4px;hei
     clear(app);
     app.className = "wrap";
     var r = route();
+    if (r.parts[0] === "abx") return renderAbx();
     if (r.parts[0] === "icu" && r.parts[1] === "d" && r.parts[2]) return renderIcuDrug(r.parts[2], r.params.from || "");
     if (r.parts[0] === "icu" && r.parts[1]) return renderIcuGroup(r.parts[1]);
     if (r.parts[0] === "c" && r.parts[1]) return renderClass(r.parts[1]);
@@ -130,7 +131,7 @@ label.field input,label.field select{display:block;width:100%;margin-top:4px;hei
     app.appendChild(el("p", "kicker", "Critical care hub"));
     var h = el("h1", null, "Drugs and doses");
     app.appendChild(h);
-    app.appendChild(el("p", "lede", "Critical care drugs, then thirty-one antimicrobial classes. Open a heading. Every fact for that drug is on the next page."));
+    app.appendChild(el("p", "lede", "Headings are in alphabetical order. Antimicrobials opens by class, with the full monograph on every drug."));
     var notice = el("p", "notice", "Teaching doses only. Not a prescription. Confirm the product label and the local antimicrobial policy before a dose is given.");
     app.appendChild(notice);
     var input = el("input", "find");
@@ -148,6 +149,7 @@ label.field input,label.field select{display:block;width:100%;margin-top:4px;hei
           return words.every(function (word) { return hay.indexOf(word) !== -1; });
         }).sort(function (a, b) { return a.name.localeCompare(b.name); });
         var icuHits = icuDrugs().filter(function (drug) {
+          if (drug._group === "E") return false;
           var hay = [drug.name, drug.indication, drug.dose, drug.infusion, drug.evidence].join(" ").toLowerCase();
           return words.every(function (word) { return hay.indexOf(word) !== -1; });
         });
@@ -157,29 +159,23 @@ label.field input,label.field select{display:block;width:100%;margin-top:4px;hei
         hits.forEach(function (drug) { list.appendChild(drugLink(drug, drug.classes[0])); });
         return;
       }
-      var icuBlock = el("section", "group");
-      icuBlock.appendChild(el("p", "kicker", "Critical care"));
-      OSCE_DATA.groups.forEach(function (group) {
+      var tabs = OSCE_DATA.groups.filter(function (group) { return group.id !== "E"; }).map(function (group) {
+        return { name: group.name, href: "#/icu/" + group.id, blurb: group.drugs.length + " drugs. Each page has the indication, dose, infusion, preparation, renal and hepatic adjustment, cautions, monitoring, adverse effects, reversal, and the source." };
+      });
+      var classCount = 0;
+      bank.groups.forEach(function (group) { classCount += group.classes.length; });
+      tabs.push({ name: "Antimicrobials", href: "#/abx", blurb: classCount + " classes. Mechanism, spectrum, ICU use, adult dose, calculator, renal adjustment, hepatic adjustment, PK/PD, contraindications, adverse effects, monitoring, resistance, reversal, and the source." });
+      tabs.sort(function (a, b) { return a.name.localeCompare(b.name); });
+      var block = el("section", "group");
+      block.appendChild(el("p", "kicker", "Headings"));
+      tabs.forEach(function (tab) {
         var a = el("a", "classlink");
-        a.href = "#/icu/" + group.id;
-        a.appendChild(el("b", null, group.name));
-        a.appendChild(el("span", null, group.drugs.length + " drugs. Each page has the indication, dose, infusion, preparation, renal and hepatic adjustment, cautions, monitoring, adverse effects, reversal, and the source."));
-        icuBlock.appendChild(a);
+        a.href = tab.href;
+        a.appendChild(el("b", null, tab.name));
+        a.appendChild(el("span", null, tab.blurb));
+        block.appendChild(a);
       });
-      list.appendChild(icuBlock);
-      bank.groups.forEach(function (group) {
-        var block = el("section", "group");
-        block.appendChild(el("p", "kicker", group.label));
-        group.classes.forEach(function (info) {
-          var a = el("a", "classlink");
-          a.href = "#/c/" + info.id;
-          a.appendChild(el("b", null, info.label));
-          var n = inClass(info.id).length;
-          a.appendChild(el("span", null, info.blurb + " " + n + (n === 1 ? " drug." : " drugs.")));
-          block.appendChild(a);
-        });
-        list.appendChild(block);
-      });
+      list.appendChild(block);
     }
     input.addEventListener("input", function () { paint(input.value); });
     paint("");
@@ -222,7 +218,8 @@ label.field input,label.field select{display:block;width:100%;margin-top:4px;hei
   }
   function renderIcuGroup(id) {
     var group = icuGroup(id);
-    if (!group) {
+    if (!group || id === "E") {
+      if (id === "E") return renderAbx();
       app.appendChild(homeBack());
       app.appendChild(el("h1", null, "Section not found"));
       return;
@@ -284,6 +281,28 @@ label.field input,label.field select{display:block;width:100%;margin-top:4px;hei
     app.appendChild(el("p", "faint", "Teaching figures for adults. They do not replace the product label or a local protocol."));
   }
 
+  function renderAbx() {
+    var back = el("a", "back", "All headings");
+    back.href = "#/";
+    app.appendChild(back);
+    app.appendChild(el("p", "kicker", "Antimicrobials"));
+    app.appendChild(el("h1", null, "Antimicrobials"));
+    app.appendChild(el("p", "lede", "Class by class. Open a class, then a drug. The monograph has the mechanism, the spectrum, the ICU use, the adult dose, the calculator, renal adjustment, hepatic adjustment, PK/PD, contraindications, adverse effects, monitoring, resistance, reversal, and the source."));
+    bank.groups.forEach(function (group) {
+      var block = el("section", "group");
+      block.appendChild(el("p", "kicker", group.label));
+      group.classes.forEach(function (info) {
+        var a = el("a", "classlink");
+        a.href = "#/c/" + info.id;
+        a.appendChild(el("b", null, info.label));
+        var n = inClass(info.id).length;
+        a.appendChild(el("span", null, info.blurb + " " + n + (n === 1 ? " drug." : " drugs.")));
+        block.appendChild(a);
+      });
+      app.appendChild(block);
+    });
+  }
+
   function renderClass(id) {
     var found = findClass(id);
     if (!found) {
@@ -291,7 +310,9 @@ label.field input,label.field select{display:block;width:100%;margin-top:4px;hei
       app.appendChild(el("h1", null, "Class not found"));
       return;
     }
-    app.appendChild(homeBack());
+    var back = el("a", "back", "Antimicrobials");
+    back.href = "#/abx";
+    app.appendChild(back);
     app.appendChild(el("p", "kicker", found.group.label));
     app.appendChild(el("h1", null, found.info.label));
     app.appendChild(el("p", "lede", found.info.blurb));
