@@ -24,7 +24,7 @@ export const ROOMS = {
       ['CNS infection', 'Meningitis, encephalitis, abscess and the ICU complications.', 'CNS_Infection_Interactive_Algorithm_v7.html?v=20260925s']
     ],
     practice: [
-      ['Neurology Practice Simulator', 'A patient, a study, and the next decision. Stroke and subarachnoid hemorrhage.', 'Practice_Simulator.html?focus=neuro&v=20261028g']
+      ['Neurology Practice Simulator', 'A patient, a study, and the next decision. Stroke and subarachnoid hemorrhage.', 'Practice_Simulator.html?focus=neuro&v=20261028h']
     ],
     soon: ''
   },
@@ -50,7 +50,7 @@ export const ROOMS = {
     ],
     practice: [
       ['Mechanical ventilation', 'Pressure, flow and volume. Name the pattern.', 'Ventilator_Waveform_Troubleshooting.html?v=20260925s'],
-      ['Respiratory Practice Simulator', 'ARDS. Click the opacity, name the severity, then set the tidal volume.', 'Practice_Simulator.html?focus=lungs&v=20261028g']
+      ['Respiratory Practice Simulator', 'ARDS. Click the opacity, name the severity, then set the tidal volume.', 'Practice_Simulator.html?focus=lungs&v=20261028h']
     ],
     soon: ''
   },
@@ -65,30 +65,39 @@ export const ROOMS = {
     ],
     practice: [
       ['Cardiac rhythm', 'A moving ECG, the arrest and the reversible causes.', 'Cardiac_Rhythm_Decision_Simulator_V29_FINAL_AUDITED.html?v=20260925t'],
-      ['Shock Practice Simulator', 'Septic shock. The small ventricle, the full IVC, then norepinephrine.', 'Practice_Simulator.html?focus=circulation&v=20261028g']
+      ['Shock Practice Simulator', 'Septic shock. The small ventricle, the full IVC, then norepinephrine.', 'Practice_Simulator.html?focus=circulation&v=20261028h'],
+      ['Cardiac Practice Simulator', 'Infarction, heart block, cardiogenic shock, ventricular fibrillation, and tamponade.', 'Practice_Simulator.html?focus=heart&v=20261028h']
     ],
     soon: ''
   },
   liver: {
     name: 'Liver', room: 'Hepatic',
-    line: 'Acute liver failure and encephalopathy.',
-    learn: [], practice: [],
-    soon: 'The Liver Failure Simulator is not built yet.'
+    line: 'Failure, cirrhosis, infected ascites, and a blocked duct.',
+    learn: [],
+    practice: [
+      ['Liver Practice Simulator', 'Acute liver failure, decompensated cirrhosis, infected ascites, hepatorenal syndrome, and cholangitis.', 'Practice_Simulator.html?focus=liver&v=20261028h']
+    ],
+    soon: ''
   },
   stomach: {
     name: 'Stomach', room: 'Gastrointestinal',
-    line: 'The upper abdomen. The working case sits with the gastrointestinal section.',
-    learn: [], practice: [],
-    soon: 'Pancreatitis is in the gastrointestinal section.'
+    line: 'Upper gastrointestinal bleeding. Variceal and non-variceal.',
+    learn: [],
+    practice: [
+      ['Upper gastrointestinal bleeding', 'Variceal and non-variceal. The endoscope, then the bundle that matches the lesion.', 'Practice_Simulator.html?focus=bleed&v=20261028h']
+    ],
+    soon: ''
   },
   bowel: {
     name: 'Gastrointestinal', room: 'Gastrointestinal',
-    line: 'Stomach, pancreas and bowel.',
+    line: 'Pancreatitis, bleeding, and a blocked bile duct.',
     learn: [
       ['Acute pancreatitis', 'Diagnosis, fluids, cause, and the step-up approach.', 'Acute_Pancreatitis_Simulator.html?v=20260926s']
     ],
-    practice: [],
-    soon: 'The Acute GI Practice Simulator is the next bay.'
+    practice: [
+      ['GI Practice Simulator', 'Pancreatitis, variceal bleeding, a duodenal ulcer, and cholangitis.', 'Practice_Simulator.html?focus=gi&v=20261028h']
+    ],
+    soon: ''
   },
   multi: {
     name: 'Whole patient', room: 'Multiorgan',
@@ -100,7 +109,10 @@ export const ROOMS = {
       ['Antifungal resistance', 'C. auris, Mucorales, and the site the drug does not reach.', 'Antifungal_Resistance_Simulator.html?v=20260925s']
     ],
     practice: [
-      ['Integrated ICU cases', 'Stroke, subarachnoid hemorrhage, ARDS and septic shock, one after another.', 'Practice_Simulator.html?v=20261028g']
+      ['Integrated ICU cases', 'Every practice case, from the brain to the blood film.', 'Practice_Simulator.html?v=20261028h'],
+      ['Infection Practice Simulator', 'Septic shock and severe malaria.', 'Practice_Simulator.html?focus=id&v=20261028h'],
+      ['Hematology Practice Simulator', 'Thrombotic thrombocytopenic purpura. The film, then plasma exchange.', 'Practice_Simulator.html?focus=heme&v=20261028h'],
+      ['Trauma Practice Simulator', 'Rib fractures, and an open pelvic ring.', 'Practice_Simulator.html?focus=trauma&v=20261028h']
     ],
     soon: ''
   },
@@ -110,8 +122,10 @@ export const ROOMS = {
     learn: [
       ['Electrolytes', 'The number chooses the algorithm. Calcium starts from serum calcium and albumin.', 'Electrolyte_Disorders_Interactive_Simulator.html?v=20261014d']
     ],
-    practice: [],
-    soon: 'The Nephrology Practice Simulator is not built yet. The learning lab is open.'
+    practice: [
+      ['Renal Practice Simulator', 'Hyperkalemia, obstructed acute kidney injury, and missed dialysis.', 'Practice_Simulator.html?focus=kidney&v=20261028h']
+    ],
+    soon: ''
   }
 };
 
