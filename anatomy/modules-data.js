@@ -24,7 +24,7 @@ export const ROOMS = {
       ['CNS infection', 'Meningitis, encephalitis, abscess and the ICU complications.', 'CNS_Infection_Interactive_Algorithm_v7.html?v=20260925s']
     ],
     practice: [
-      ['Neurology Practice Simulator', 'A patient, a study, and the next decision. Stroke and subarachnoid hemorrhage.', 'Practice_Simulator.html?focus=neuro&v=20261014e']
+      ['Neurology Practice Simulator', 'A patient, a study, and the next decision. Stroke and subarachnoid hemorrhage.', 'Practice_Simulator.html?focus=neuro&v=20261028g']
     ],
     soon: ''
   },
@@ -50,7 +50,7 @@ export const ROOMS = {
     ],
     practice: [
       ['Mechanical ventilation', 'Pressure, flow and volume. Name the pattern.', 'Ventilator_Waveform_Troubleshooting.html?v=20260925s'],
-      ['Respiratory Practice Simulator', 'ARDS. Click the opacity, name the severity, then set the tidal volume.', 'Practice_Simulator.html?focus=lungs&v=20261014e']
+      ['Respiratory Practice Simulator', 'ARDS. Click the opacity, name the severity, then set the tidal volume.', 'Practice_Simulator.html?focus=lungs&v=20261028g']
     ],
     soon: ''
   },
@@ -65,7 +65,7 @@ export const ROOMS = {
     ],
     practice: [
       ['Cardiac rhythm', 'A moving ECG, the arrest and the reversible causes.', 'Cardiac_Rhythm_Decision_Simulator_V29_FINAL_AUDITED.html?v=20260925t'],
-      ['Shock Practice Simulator', 'Septic shock. The small ventricle, the full IVC, then norepinephrine.', 'Practice_Simulator.html?focus=circulation&v=20261014e']
+      ['Shock Practice Simulator', 'Septic shock. The small ventricle, the full IVC, then norepinephrine.', 'Practice_Simulator.html?focus=circulation&v=20261028g']
     ],
     soon: ''
   },
@@ -100,7 +100,7 @@ export const ROOMS = {
       ['Antifungal resistance', 'C. auris, Mucorales, and the site the drug does not reach.', 'Antifungal_Resistance_Simulator.html?v=20260925s']
     ],
     practice: [
-      ['Integrated ICU cases', 'Stroke, subarachnoid hemorrhage, ARDS and septic shock, one after another.', 'Practice_Simulator.html?v=20261014e']
+      ['Integrated ICU cases', 'Stroke, subarachnoid hemorrhage, ARDS and septic shock, one after another.', 'Practice_Simulator.html?v=20261028g']
     ],
     soon: ''
   },
