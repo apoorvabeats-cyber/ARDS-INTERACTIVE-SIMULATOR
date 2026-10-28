@@ -105,7 +105,7 @@ export const ROOMS = {
     learn: [
       ['Shock bay', 'Phenotypes of shock, and a ventilator you control.', 'Shock_Bay.html?v=20260925s'],
       ['Antibiotics', 'The culture, the resistance, and the toxicity that changes the choice.', 'Antibiotic_Simulator.html?v=20260928e'],
-      ['IDSA selection', 'KPC, OXA-48, NDM, and the dose that follows the clearance.', 'IDSA_Antibiotic_Selection_Simulator.html?v=20260928g'],
+      ['IDSA selection', 'KPC, OXA-48, NDM, and the dose that follows the 2026 guidance.', 'IDSA_Antibiotic_Selection_Simulator.html?v=20261028p'],
       ['Antifungal resistance', 'C. auris, Mucorales, and the site the drug does not reach.', 'Antifungal_Resistance_Simulator.html?v=20260925s']
     ],
     practice: [

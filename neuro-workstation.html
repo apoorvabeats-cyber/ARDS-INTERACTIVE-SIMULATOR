@@ -118,7 +118,6 @@ function esc(s){
   });
 }
 function resetStep(){
-  state.step = 0;
   state.misses = 0;
   state.locked = false;
   state.reveal = false;
@@ -134,6 +133,7 @@ function go(route){
 function enter(route){
   stopSpoken();
   state.route = route || "home";
+  state.step = 0;
   resetStep();
   if (route === "stroke") state.stroke = {stage:0, log:[], menu:true};
   if (route === "compare") state.compare = {i:0, score:0, answered:false};
@@ -593,14 +593,36 @@ var STATIONS = {
   },
   hie: {
     title: "Hypoxic–ischemic brain injury",
-    aim: "The decision after hypoxia. A reusable patient CT of the white-cerebellum sign was not in the open-license set, so this station does not show a drawing.",
+    aim: "Separate a global hypoxic injury from a focal arterial infarct, and do not declare an outcome from one early film.",
     steps: [
-      choose("Six hours after a prolonged cardiac arrest the CT is said to show diffuse edema and a bright cerebellum by comparison. What decision does that report authorize today?", null, "wait", [
+      choose("Six hours after a prolonged cardiac arrest the report describes diffuse edema and a relatively bright cerebellum. What decision does that report authorize today?", null, "wait", [
         {id:"wait", t:"Treat the post-arrest pathway. Do not assign a final prognosis from this single early film."},
         {id:"dead", t:"The CT alone is brain death. Stop all care."},
         {id:"lyt", t:"Thrombolyse both middle cerebral arteries."},
         {id:"evd", t:"An external drain, because the ventricles are large."}
-      ], "Prognosis after hypoxia uses the examination, time, and often more than one modality. A bad CT is serious. It is not, by itself, a determination of death, and these ventricles are small, not hydrocephalic. There is no single arterial clot to retrieve.", [])
+      ], "Prognosis after hypoxia uses the examination, time, and often more than one modality. A bad CT is serious. It is not, by itself, a determination of death. There is no single arterial clot on that description, and the ventricles of diffuse edema are small, not hydrocephalic.", []),
+      clickStep("This published diffusion MRI is not a global hypoxic pattern. Click the restricted cortex.", "dwimca", "dwi",
+        "The bright cortex on the diffusion panel is restricted diffusion, and the matching ADC is dark. That is a focal cortical infarct. Global hypoxic injury restricts more widely, often in deep grey as well as cortex, and this open-license set does not contain that film. Do not relabel this picture as a white-cerebellum CT.",
+        ["Look at the diffusion panel, the left half of the figure.",
+         "The bright ribbon is cortex, not the skull and not the ventricle."]),
+      choose("What does the diffusion image you just clicked show?", "dwimca", "focal", [
+        {id:"global", t:"Global hypoxic–ischemic injury, because any bright MRI is hypoxia"},
+        {id:"focal", t:"A focal cortical infarct. Restricted diffusion in one territory, confirmed by a dark ADC"},
+        {id:"bleed", t:"Acute hemorrhage. Diffusion bright means blood"},
+        {id:"pres", t:"Vasogenic edema of PRES. The ADC would be bright, and it is not"}
+      ], "True restriction is bright on diffusion and dark on the ADC map, in a limited territory. Blood can be bright on CT, not by this rule. PRES is usually vasogenic and does not restrict like this.", []),
+      choose("Which pattern, if a later CT actually showed it, would support diffuse hypoxic injury rather than one arterial infarct?", null, "diffuse", [
+        {id:"one", t:"A single dark wedge in the middle cerebral territory"},
+        {id:"dot", t:"One hyperdense middle cerebral artery"},
+        {id:"diffuse", t:"Diffuse loss of grey–white differentiation, with deep grey and cortex involved, sometimes a relatively spared cerebellum"},
+        {id:"lens", t:"A lens of blood against the temporal bone"}
+      ], "A single arterial territory is an infarct until proved otherwise. Diffuse oedema after a circulatory arrest is the hypoxic pattern. A lens is extradural blood. This page still does not show a white-cerebellum CT, because that film is not in the open-license set.", []),
+      choose("The pupils are equal, sedation was stopped an hour ago, and the early CT is poor. A colleague asks to declare death by neurological criteria now. What do you say?", null, "no", [
+        {id:"no", t:"No. Confounders are not cleared, and one early scan cannot determine death."},
+        {id:"yes", t:"Yes. A poor CT after arrest is the determination."},
+        {id:"family", t:"Yes, if the family agrees that the scan is enough."},
+        {id:"cool", t:"Yes, but only while the patient is still at 33 °C."}
+      ], "Death by neurological criteria needs a known cause, absent confounders, and a protocolled examination. Targeted temperature management and a recent sedative both postpone that examination. Family agreement does not create the diagnosis.", [])
     ]
   },
   death: {
@@ -896,9 +918,16 @@ function challengeStep(){
   if (!ch || ch.done) return null;
   var c = caseById(ch.order[ch.i]);
   if (ch.part === 0) return {kind:"click", ask:"Where is the abnormality?", plate:c.plate, target:c.click, explain:c.explain, hints:c.hints, caption:c.stem};
-  if (ch.part === 1) return {kind:"choose", ask:c.locAsk, plate:c.plate, options:c.loc, answer:c.locAnswer, why:c.locWhy, caption:c.stem};
-  if (ch.part === 2) return {kind:"choose", ask:c.mechAsk, plate:c.plate, options:c.mech, answer:c.mechAnswer, why:c.mechWhy, caption:c.stem};
-  return {kind:"choose", ask:c.nextAsk, plate:c.plate, options:c.next, answer:c.nextAnswer, why:c.nextWhy, caption:c.stem};
+  var key = ch.i + ":" + ch.part;
+  if (ch.part === 1) return {kind:"choose", ask:c.locAsk, plate:c.plate, options:shuffledCopy(c.loc, key), answer:c.locAnswer, why:c.locWhy, caption:c.stem};
+  if (ch.part === 2) return {kind:"choose", ask:c.mechAsk, plate:c.plate, options:shuffledCopy(c.mech, key), answer:c.mechAnswer, why:c.mechWhy, caption:c.stem};
+  return {kind:"choose", ask:c.nextAsk, plate:c.plate, options:shuffledCopy(c.next, key), answer:c.nextAnswer, why:c.nextWhy, caption:c.stem};
+}
+function shuffledCopy(list, key){
+  var ch = state.challenge;
+  if (!ch.bags) ch.bags = {};
+  if (!ch.bags[key]) ch.bags[key] = shuffle(list.slice());
+  return ch.bags[key];
 }
 function compareStep(){
   var item = COMPARE[state.compare ? state.compare.i : 0];
@@ -1069,7 +1098,7 @@ function renderHome(){
     ["hydro", "Hydrocephalus", "Normal ventricles beside enlarged ones."],
     ["cvt", "Cerebral venous thrombosis", "CT venogram and MR venogram."],
     ["pres", "Posterior reversible encephalopathy", "The usual MRI pattern."],
-    ["hie", "Hypoxic–ischemic injury", "CT and MRI, read in the clinical context."],
+    ["hie", "Hypoxic–ischemic injury", "Five questions. A real diffusion MRI, then the decision the film does not authorize."],
     ["death", "Brain death assessment", "Prerequisites, the examination, and when a test is added."]
   ];
   app.innerHTML =
@@ -1198,7 +1227,7 @@ function renderStroke(){
     '<button type="button" class="go" id="restart">Restart pathway</button></div>'+
     '<p class="kicker">Stage '+(st.stage+1)+" of 8 · "+esc(stage.activity)+"</p><h2>"+esc(stage.title)+"</h2>"+
     renderStep(strokeStep())+
-    (stage.kind === "debrief" ? "" : navRow(st.stage > 0, state.locked, st.stage === STROKE.length - 2 ? "Debrief" : "Next"));
+    (stage.kind === "debrief" ? "" : navRow(st.stage > 0, state.locked, st.stage === STROKE.length - 2 ? "Debrief" : "Next question"));
 }
 function debriefHtml(){
   var log = state.stroke.log || [];
@@ -1408,7 +1437,7 @@ function chooseOpt(id){
   state.ok = id === answer;
   var named = "";
   (step.options || []).forEach(function(op){ if(op.id === answer) named = op.t || ""; });
-  state.feedback = state.ok ? "Correct. " + (step.why || "") : "Not that one. The answer is " + named + ". " + (step.why || "");
+  state.feedback = state.ok ? "Correct. " + (step.why || "") : "That is incorrect. The correct answer is " + named + ". " + (step.why || "");
   if (state.route === "challenge" && state.ok && state.challenge.part > 0) state.challenge.score += 1;
   render();
 }
@@ -1459,7 +1488,7 @@ function checkMulti(step){
   var ok = step.options.every(function(op){ return !!picked[op.id] === !!op.on; });
   state.locked = true;
   state.ok = ok;
-  state.feedback = (ok ? "Correct. " : "Not that set. ") + step.why;
+  state.feedback = (ok ? "Correct. " : "That is incorrect. ") + step.why;
   render();
 }
 function checkNihss(step){

@@ -598,10 +598,18 @@ function frame(now){
   const dt = Math.min(0.05, frameLast ? (now - frameLast) / 1000 : 0.016);
   frameLast = now;
   if(fly){
-    fly.t = Math.min(1, fly.t + dt / 1.15);
+    fly.t = Math.min(1, fly.t + dt / 0.95);
     const k = fly.t * fly.t * (3 - 2 * fly.t);
-    camera.position.lerpVectors(fly.from, fly.to, k);
-    controls.target.lerpVectors(fly.tFrom, fly.tTo, k);
+    const target = fly.tFrom.clone().lerp(fly.tTo, k);
+    const dirA = fly.from.clone().sub(fly.tFrom);
+    const dirB = fly.to.clone().sub(fly.tTo);
+    const len = dirA.length() * (1 - k) + dirB.length() * k;
+    const up = new THREE.Vector3(0, 1, 0);
+    const qa = new THREE.Quaternion().setFromUnitVectors(up, dirA.clone().normalize());
+    const qb = new THREE.Quaternion().setFromUnitVectors(up, dirB.clone().normalize());
+    qa.slerp(qb, k);
+    camera.position.copy(target).add(up.applyQuaternion(qa).multiplyScalar(Math.max(len, 0.05)));
+    controls.target.copy(target);
     if(fly.t >= 1) fly = null;
   }
   if(controls) controls.update();
@@ -627,28 +635,71 @@ function nodeOf(mesh){
   const id = mesh.userData.bx_id;
   return manifest.nodes.find(function(n){ return n.id === id; }) || null;
 }
+const CAT_HEX = {
+  cortex: 0xd98b78,
+  cranial_nerves: 0xf0c94d,
+  brainstem: 0xd08958,
+  tracts: 0xf4ead4,
+  diencephalon: 0xe0a04a,
+  arteries: 0xe23b4a,
+  white_matter: 0xf7f1e4,
+  veins_sinuses: 0x3d8fd4,
+  cerebellum: 0xd45d86,
+  deep_grey: 0xc6b15a,
+  ventricles: 0x5ed0e6,
+  meninges_dura: 0x9eb0b8
+};
+function baseColor(mesh){
+  return CAT_HEX[mesh.userData.bx_cat] || 0xb7c4cc;
+}
+function paintMesh(mesh, mode){
+  const base = new THREE.Color(baseColor(mesh));
+  mats(mesh).forEach(function(mat){
+    if(!mat.color) return;
+    mat.metalness = 0.05;
+    mat.roughness = 0.42;
+    mat.emissive = mat.emissive || new THREE.Color();
+    if(mode === "hot"){
+      mat.color.copy(base).lerp(new THREE.Color(0xfff4cc), 0.45);
+      mat.emissive.copy(base).lerp(new THREE.Color(0xffe7a0), 0.35);
+      mat.emissiveIntensity = 0.9;
+      mat.opacity = 1;
+      mat.transparent = false;
+      mat.depthWrite = true;
+    }else if(mode === "dim"){
+      mat.color.copy(base).multiplyScalar(0.22);
+      mat.emissive.set(0x000000);
+      mat.emissiveIntensity = 0;
+      mat.opacity = 0.28;
+      mat.transparent = true;
+      mat.depthWrite = false;
+    }else{
+      mat.color.copy(base);
+      mat.emissive.set(0x000000);
+      mat.emissiveIntensity = 0;
+      mat.opacity = 1;
+      mat.transparent = false;
+      mat.depthWrite = true;
+    }
+  });
+}
 function showLabels(labels){
   const wanted = new Set(labels);
   meshes.forEach(function(mesh){
     const on = wanted.has(mesh.userData.bx_label);
     mesh.visible = on;
-    mats(mesh).forEach(function(mat){
-      mat.emissive = mat.emissive || new THREE.Color();
-      mat.emissive.set(on ? 0x143028 : 0x000000);
-      mat.emissiveIntensity = on ? 0.35 : 0;
-    });
+    if(on) paintMesh(mesh, "base");
   });
 }
 function applyVisibility(){
   meshes.forEach(function(mesh){
     const cat = mesh.userData.bx_cat;
-    mesh.visible = !hidden.has(cat);
-    mats(mesh).forEach(function(mat){
-      const hot = selected && mesh === selected;
-      mat.emissive = mat.emissive || new THREE.Color();
-      mat.emissive.set(hot ? 0x0d3b32 : 0x000000);
-      mat.emissiveIntensity = hot ? 0.55 : 0;
-    });
+    const show = !hidden.has(cat);
+    mesh.visible = show;
+    if(!show) return;
+    const label = mesh.userData.bx_label;
+    const hot = selected && label && label === (selected.userData.bx_label || selected.name);
+    paintMesh(mesh, selected ? (hot ? "hot" : "dim") : "base");
   });
 }
 function applyClip(){
@@ -664,6 +715,15 @@ function applyClip(){
   meshes.forEach(function(mesh){
     mats(mesh).forEach(function(mat){ mat.clippingPlanes = list; mat.clipShadows = true; });
   });
+}
+function viewFor(mesh){
+  const side = String(mesh.userData.bx_side || "").toLowerCase();
+  const cat = mesh.userData.bx_cat;
+  if(cat === "arteries" || cat === "veins_sinuses" || cat === "brainstem") return "base";
+  if(cat === "ventricles") return "front";
+  if(side.indexOf("left") >= 0) return "sideL";
+  if(side.indexOf("right") >= 0) return "sideR";
+  return "side";
 }
 function view(which){
   if(!home) return;
@@ -682,6 +742,7 @@ function openMesh(mesh){
   selected = mesh;
   applyVisibility();
   const label = mesh.userData.bx_label || mesh.name;
+  frameLabels([label], viewFor(mesh));
   const node = nodeOf(mesh);
   const card = CARDS[label];
   const side = mesh.userData.bx_side || "";
@@ -1151,6 +1212,8 @@ function frameLabels(labels, view){
     base: new THREE.Vector3(0.15, -0.45, 1),
     top: new THREE.Vector3(0.05, 1, 0.2),
     side: new THREE.Vector3(1, 0.12, 0.45),
+    sideL: new THREE.Vector3(-1, 0.16, 0.35),
+    sideR: new THREE.Vector3(1, 0.16, 0.35),
     front: new THREE.Vector3(0, 0.08, 1)
   };
   const dir = (dirs[view] || dirs.base).clone().normalize();
@@ -1343,7 +1406,7 @@ function bindList(){
     const btn = event.target.closest("[data-label]");
     if(!btn) return;
     const group = byLabel.get(btn.getAttribute("data-label"));
-    if(group && group[0]){ showLabels([btn.getAttribute("data-label")]); openMesh(group[0]); }
+    if(group && group[0]) openMesh(group[0]);
   };
 }
 function renderPath(){
