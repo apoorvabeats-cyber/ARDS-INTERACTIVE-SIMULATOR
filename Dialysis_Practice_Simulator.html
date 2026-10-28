@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#071b3a">
+<title>Dialysis Practice Simulator</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#f4f7fb;color:#14213d}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;line-height:1.45}
+button{font:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+.top{position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;padding:12px 14px;background:#071b3a;color:#fff}
+.top button{background:none;border:0;color:#dbe9ff;font-weight:800;min-height:44px}
+.top b{flex:1;text-align:center}
+.top span{font-variant-numeric:tabular-nums;color:#dbe9ff;font-size:14px}
+.wrap{max-width:880px;margin:0 auto;padding:16px 14px 110px}
+.hero{background:linear-gradient(135deg,#071b3a,#1457a6);color:#fff;border-radius:22px;padding:22px 18px}
+.hero h1{font-size:clamp(28px,7vw,40px);line-height:1.05;margin:0 0 8px}
+.hero p{margin:0;color:#dbe9ff}
+.switch{display:flex;gap:8px;margin:12px 0}
+.switch button{flex:1;min-height:64px;border-radius:14px;border:1px solid #d7e0ec;background:#fff;text-align:left;padding:10px 12px}
+.switch button.on{border-color:#1457a6;background:#f3f8ff}
+.switch b{display:block}
+.switch span{color:#5f6f86;font-size:14px}
+.card{display:block;width:100%;text-align:left;background:#fff;border:1px solid #d7e0ec;border-radius:16px;padding:14px;margin:10px 0}
+.card b{display:block;font-size:18px}
+.card span{color:#5f6f86}
+.kicker{color:#1457a6;font-weight:800;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.panel{background:#fff;border:1px solid #d7e0ec;border-radius:16px;padding:14px;margin:12px 0}
+.vit{display:grid;grid-template-columns:repeat(3,1fr);background:#fff;border:1px solid #d7e0ec;border-radius:16px;overflow:hidden}
+.vit div{padding:8px 10px;border-top:1px solid #e6edf5}
+.vit dt{font-size:12px;color:#5f6f86}
+.vit dd{margin:0;font-weight:800;font-variant-numeric:tabular-nums}
+.vit dd.warn{color:#b42318}
+.choice{display:block;width:100%;text-align:left;background:#fff;border:1px solid #d7e0ec;border-radius:12px;padding:12px;margin:8px 0;min-height:48px}
+.choice.on{border-color:#1457a6;background:#f3f8ff}
+.fb{border-radius:12px;padding:12px;margin-top:8px;background:#f4f7fb;border:1px solid #d7e0ec}
+.fb.good{border-color:#0f7a4a}
+.fb.bad{border-color:#b42318}
+.bar{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:#f4f7fb;border-top:1px solid #d7e0ec}
+.bar button{flex:1;min-height:48px;border:0;border-radius:12px;background:#1457a6;color:#fff;font-weight:800}
+.bar button.ghost{background:#fff;color:#14213d;border:1px solid #d7e0ec}
+.bar button:disabled{opacity:.45}
+label.slide{display:block;font-weight:700;margin:10px 0}
+label.slide input{width:100%;accent-color:#1457a6}
+.fine{color:#5f6f86;font-size:13px}
+h2{margin:4px 0 8px}
+</style>
+</head>
+<body>
+<div class="top"><button type="button" id="home">Modules</button><b id="crumb">Dialysis practice</b><span id="clock"></span></div>
+<main class="wrap" id="app"></main>
+<div class="bar" id="bar" hidden></div>
+<script>
+function C(t, ok, why, set, critical){
+  const o = {t:t, ok:ok, why:why};
+  if(set) o.set = set;
+  if(critical) o.critical = true;
+  return o;
+}
+function S(title, lead, prompt, choices){
+  return {kind:"choice", title:title, lead:lead, prompt:prompt, choices:choices};
+}
+const MODULES = [
+  {id:"indication", group:"module", title:"Dialysis indication", blurb:"The number is not the indication. The ECG, the lungs and the pH are.",
+   who:"64-year-old man, missed two haemodialysis sessions",
+   history:["Anuric. Weight up 4 kg.","Potassium 6.8 mmol/L. Bicarbonate 12 mmol/L. Urea 40 mmol/L.","Oxygen 90 percent on air. Cannot lie flat."],
+   open:{map:104, hr:98, k:6.8, ph:7.18, spo2:90, line:"Peaked T waves on the monitor."},
+   stages:[
+     S("The tracing is peaked","Potassium is 6.8 and the T waves are peaked. He is breathless, but he is talking.","What is the first drug, before any blood flow?",[
+       C("Calcium, to stabilise the membrane, then prepare dialysis", true, "Calcium does not lower potassium. It is why you are allowed to spend the next minutes connecting a circuit.", {line:"Calcium in. Peaked waves softening.", map:106}),
+       C("Start the blood pump with no calcium, because dialysis is the cure", false, "A sine wave can arrive while you are still priming.", {line:"Still peaked. Pump not the first act."}, true),
+       C("Exchange resin, and a chest radiograph in the morning", false, "Resin is slow. The lungs and the potassium are today's emergency.", {k:6.9})
+     ]),
+     S("Is dialysis indicated at all?","Calcium is in. He cannot lie flat. Bicarbonate is 12. He is anuric.","Which finding makes dialysis the right tool?",[
+       C("The combination: lungs he cannot oxygenate, a dangerous potassium, and no urine", true, "AEIOU is a memory aid. Here you have fluid, potassium and acid, and no kidney to answer.", {line:"Indication accepted."}),
+       C("The urea of 40 by itself, even if he were comfortable", false, "A urea without a clinical problem is not an emergency session."),
+       C("Creatinine, which we have not even been given", false, "You do not need a creatinine threshold to treat this ECG and these lungs.")
+     ]),
+     S("A second patient","A woman with creatinine 3.1 mg/dL, potassium 4.6, pH 7.38, clear lungs, and urine 40 mL/h. Someone books her for emergency dialysis because the creatinine 'looks renal'.","What do you do?",[
+       C("Do not dialyse her for the number. Find the cause and watch the potassium", true, "Indication is clinical. This blood is not an emergency circuit."),
+       C("Four-hour haemodialysis tonight so the creatinine looks normal", false, "You would be exposing her to a circuit she does not need."),
+       C("Slow continuous ultrafiltration, in case the number is fluid", false, "She has no fluid problem in the story.")
+     ]),
+     S("The anuric man again","He has received calcium and insulin-glucose. Potassium is 6.1. He is still hypoxic and anuric.","Do you still dialyse?",[
+       C("Yes. Shifting bought time. Removal still has to happen", true, "Insulin moved potassium. It did not remove it, and the lungs are still wet.", {k:6.1, line:"Session indicated. Shift was a bridge."}),
+       C("No. 6.1 is safe forever in an anuric man", false, "6.1 will be 7 again, and he cannot breathe.", null, true),
+       C("Only if the creatinine is repeated first", false, "The indication is already on the monitor and the oxygen.")
+     ])
+   ]},
+  {id:"modality", group:"module", title:"Modality selection", blurb:"IHD, SLED or PIKRT, continuous therapy, or the peritoneum. The pressure chooses with you.",
+   who:"58-year-old woman with septic shock",
+   history:["Norepinephrine 0.4 micrograms/kg/min. Lactate 5.8.","Potassium 6.4. pH 7.14. Anuric for 14 hours.","No brain injury. A continuous machine and a haemodialysis machine are both free."],
+   open:{map:68, hr:124, k:6.4, ph:7.14, spo2:94, line:"Cold hands. High-dose vasopressor."},
+   stages:[
+     S("Choose the family","She needs clearance. She will not tolerate a litre an hour off.","Which modality family?",[
+       C("Continuous therapy. CVVHD or CVVHDF at a modest net removal", true, "The vasopressor dose is the reason not to start with intermittent haemodialysis.", {line:"Continuous circuit chosen.", map:70}),
+       C("Four-hour intermittent haemodialysis with usual ultrafiltration", false, "Usual ultrafiltration is how this blood pressure ends.", {map:58}, true),
+       C("Isolated ultrafiltration", false, "The pH is 7.14 and the potassium is 6.4. Water removal will not fix either.")
+     ]),
+     S("The machine you have","Later that week the continuous machine is down. A man on 0.06 micrograms/kg/min of norepinephrine needs potassium clearance. No brain injury.","What is honest?",[
+       C("SLED, and say that it is prolonged intermittent therapy on the haemodialysis machine", true, "SLED is inside PIKRT. It is the right middle path when continuous therapy is unavailable.", {line:"SLED as PIKRT."}),
+       C("Refuse, because SLED and PIKRT must never be used as related ideas", false, "That argument delays a real session. SLED is a form of PIKRT."),
+       C("A standard four-hour session, because any blood pump is the same", false, "The hours and the ultrafiltration rate are the difference he will feel.")
+     ]),
+     S("No blood access","Bleeding, a failed line, potassium 5.8 and rising slowly, no ECG changes. A surgeon can place a peritoneal catheter. No dialyser is available tonight.","What can you actually start?",[
+       C("Acute peritoneal dialysis, frequent exchanges, and a potassium check", true, "The peritoneum is the membrane you can actually use. Measure it. Do not pretend it is a dialyser."),
+       C("Resin only", false, "You have a way to dialyse. Resin is not that way."),
+       C("Wait for a dialyser tomorrow with no other plan", false, "Tomorrow is a plan only if the potassium and the lungs agree. Write the peritoneal prescription.")
+     ]),
+     S("The brain","Intracerebral haemorrhage, urea very high, pressure labile. Continuous therapy is free.","What do you avoid?",[
+       C("A hard intermittent session. Prefer continuous therapy and a gentle first solute drop", true, "Disequilibrium in a swollen brain is the complication this choice exists to prevent.", {line:"Continuous. Modest first clearance."}),
+       C("The fastest urea drop the intermittent machine can manage", false, "That is how the brain swells further.", null, true),
+       C("Peritoneal dialysis as the automatic brain-safe choice, even though a continuous machine is free and the team has never run acute PD", false, "Gentle is not the same as unfamiliar. Use the continuous blood therapy you can run well.")
+     ])
+   ]},
+  {id:"prescription", group:"module", title:"Dialysis prescription", blurb:"Blood flow, dialysate, hours, bath, and how fast the fluid leaves.",
+   who:"70 kg man, usual intermittent schedule, today fluid-overloaded",
+   history:["Potassium 5.6. Bicarbonate 18.","Wants 2 litres off. Blood pressure 150/80, no vasopressor.","Fistula works."],
+   open:{map:100, hr:84, k:5.6, ph:7.32, spo2:94, line:"Wet, but the pressure is safe."},
+   stages:[
+     S("Blood and dialysate flow","Standard intermittent session. Fistula is buzzing.","What flows do you set?",[
+       C("Blood flow about 300 mL/min and dialysate about 500 mL/min", true, "Dialysate faster than blood is why urea clearance is high. These are ordinary intermittent settings.", {line:"Qb 300. Qd 500."}),
+       C("Blood flow 80 and dialysate off", false, "That is not intermittent haemodialysis. You have just cancelled the clearance."),
+       C("Blood flow 450 and dialysate 800 in a brand-new fistula that barely matured", false, "The access has to survive the prescription. This story's fistula works, but chasing the maximum is not the skill.")
+     ]),
+     S("The bath","Potassium is 5.6, not 7. He is not acidotic enough to need a heroic bicarbonate.","Which bath?",[
+       C("A moderate potassium bath, not zero, and bicarbonate enough to move the 18", true, "A zero potassium bath is for a higher, more dangerous potassium, and it can overshoot. Do not chase a normal potassium into hypokalaemia.", {k:4.6, line:"Bath running. Potassium falling gently."}),
+       C("Potassium-free bath for every session, regardless", false, "Intradialytic hypokalaemia causes arrhythmias. Match the bath to the starting number."),
+       C("No bicarbonate. Acidosis is not a dialysis problem", false, "A bicarbonate of 18 with no kidney is exactly a dialysis problem, among others.")
+     ]),
+     {kind:"dials", title:"Fluid removal", lead:"He will tolerate a session. Two litres over four hours is 500 mL/h, about 7 mL/kg/h.", prompt:"Set the ultrafiltration.",
+      dials:[{id:"uf", label:"Ultrafiltration", min:0, max:1500, start:500, unit:"mL/h"}],
+      judge:function(v){
+        if(v.uf>=400 && v.uf<=700) return {ok:true, why:"Around 500 mL/h removes the 2 litres in four hours without a heroic hourly rate.", set:{line:"UF about "+v.uf+" mL/h.", map:96}};
+        if(v.uf>1000) return {ok:false, critical:true, why:"Over a litre an hour in a 70 kg man is how intradialytic hypotension is manufactured.", set:{map:72, line:"Pressure falling. UF too hard."}};
+        return {ok:false, why:"Too little, and the lungs will look the same at the end of the session.", set:{spo2:92, line:"Still wet."}};
+      }},
+     S("The pressure dips to 88 systolic near the end","Cramps. He is still talking. 1.6 of the 2 litres are off.","What do you change?",[
+       C("Slow or pause ultrafiltration. A small bolus only if he stays low. Do not give a litre out of habit", true, "The symptom is the ultrafiltration. Treat that lever first.", {map:96, line:"UF slowed. Pressure back."}),
+       C("A litre of saline and then resume the same ultrafiltration", false, "You just put back the fluid the session was for."),
+       C("Turn the blood flow to 500 so it 'looks stronger'", false, "Blood flow is not a vasopressor. The ultrafiltration is the cause.")
+     ])
+   ]},
+  {id:"machine", group:"module", title:"Machine operation", blurb:"Prime, connect, run, watch, and stop without returning dangerous blood.",
+   who:"A primed-looking haemodialysis machine and a confirmed fistula",
+   history:["Right radiocephalic fistula. Bruit present.","Potassium 6.2. Haemoglobin stable.","No haemolysis, no air seen."],
+   open:{map:98, hr:80, k:6.2, ph:7.30, spo2:97, line:"Machine in the bay. Not yet connected."},
+   stages:[
+     S("Before blood touches the circuit","The nurse asks whether to connect first and prime afterwards.","What is the order?",[
+       C("Prime with saline first. Confirm the access. Then connect", true, "An unprimed circuit is an air embolism. Identity and the fistula come before the pump.", {line:"Circuit primed. Fistula checked."}),
+       C("Connect and start the pump. Priming wastes time", false, "That is how air reaches the venous return.", null, true),
+       C("Prime with the dialysate, by turning it into the blood path", false, "Dialysate stays outside the fibres. The blood path is primed with saline.")
+     ]),
+     S("Starting","Lines are connected. Alarms are on.","How do you start?",[
+       C("Blood pump slowly, watch the arterial and venous pressures, then increase toward the prescription", true, "A slow start shows you a kink, a clamp, or a failing fistula before the whole blood volume is in the circuit.", {line:"Pump on. Pressures acceptable."}),
+       C("Blood pump straight to 400", false, "You will discover a bad line at full speed."),
+       C("Alarms off, so the session is not interrupted", false, "The alarms are the session.", null, true)
+     ]),
+     S("Ending a normal session","Two litres are off. Potassium is 4.2. The circuit looks normal. No pink serum.","How do you finish?",[
+       C("Return the blood with saline and close the fistula properly", true, "The circuit is safe. The blood goes back. Then a proper hold on the puncture.", {line:"Blood returned. Session complete.", k:4.2}),
+       C("Leave the needles in and walk away", false, "A fistula puncture is a bleed until it is held."),
+       C("Discard the blood. Returning is never allowed", false, "Discard when the blood is unsafe, not as a ritual.")
+     ]),
+     S("The serum in the circuit turns pink","You notice haemolysis halfway. The patient is restless.","What do you do with that blood?",[
+       C("Stop. Do not return it. Check the dialysate and the water. Treat the patient, not the schedule", true, "Haemolysed blood is a potassium and a haemoglobin emergency. Returning it makes both worse.", {line:"Pump stopped. Blood discarded.", k:6.6}, true),
+       C("Return it quickly so the haemoglobin does not fall", false, "You would be returning free potassium and broken red cells.", null, true),
+       C("Ignore the colour. Machines tint the blood", false, "Pink serum is haemolysis until proved otherwise.")
+     ])
+   ]},
+  {id:"crrt", group:"module", title:"CKRT prescription", blurb:"CVVH, CVVHD or CVVHDF. One effluent dose. Filtration fraction included.",
+   who:"80 kg man, septic shock, anuric",
+   history:["Norepinephrine 0.25 micrograms/kg/min.","Potassium 6.1. pH 7.16.","Continuous machine free. No liver failure."],
+   open:{map:72, hr:118, k:6.1, ph:7.16, spo2:95, line:"Unstable. Needs a continuous dose."},
+   stages:[
+     S("Which continuous mode?","You want small-solute control without an extreme filtration fraction.","What do you run?",[
+       C("CVVHDF or CVVHD. If you choose CVVH, plan the replacement and the filtration fraction out loud", true, "All three can be correct if the effluent dose is real. The error is a mode with no dose.", {line:"Continuous mode selected."}),
+       C("SCUF, because continuous words are all the same", false, "SCUF will not move this potassium or this pH."),
+       C("Intermittent haemodialysis at a litre an hour off", false, "The vasopressor has already answered that.", {map:60})
+     ]),
+     S("The dose","80 kg. You want the range the trials support.","What effluent do you aim to deliver?",[
+       C("About 25 mL/kg/h, which is 2000 mL/h, delivered into the bag", true, "KDIGO's practical target is 20 to 25 mL/kg/h of delivered effluent. Higher doses did not save more lives.", {line:"Effluent target 2000 mL/h."}),
+       C("40 mL/kg/h, because the older trials used it and more is kinder", false, "Those arms did not win. They used more fluid and more effort."),
+       C("Net removal of 2000 mL/h from the patient", false, "That is two litres of him an hour. Effluent is mostly dialysate and replacement, not the patient's blood volume.", null, true)
+     ]),
+     S("Split the 2000","You chose CVVHDF.","How do you split it?",[
+       C("Dialysate and replacement together make 2000, including a small net removal. Not 2000 of each", true, "The bag should read about 2 litres an hour, not 4.", {line:"Qd plus Qr plus net UF ≈ 2000 mL/h."}),
+       C("Dialysate 2000 and replacement 2000", false, "That double-counts the dose."),
+       C("Replacement 2000, blood flow 100, all post-filter", false, "Work the filtration fraction. That combination concentrates the filter until it clots.")
+     ]),
+     S("The filter clots at 04:00","Effluent for the night is 900 mL/h on average. The chart still says 25 mL/kg/h.","What is the dose?",[
+       C("The delivered effluent. Write the gap and replace the filter", true, "A prescription that did not run is not a dose.", {line:"Delivered dose written. New filter."}),
+       C("The prescribed number. The clot is a nursing detail", false, "The clot is the dose."),
+       C("Stop continuous therapy forever. It clots, so it does not work", false, "Circuits clot when the plan ignores anticoagulation and downtime. Fix those.")
+     ])
+   ]},
+  {id:"emergency", group:"module", title:"Dialysis emergencies", blurb:"Hypotension, arrhythmia, air, haemolysis, and disequilibrium.",
+   who:"Five events. Each one is a different failure",
+   history:["You are the person at the machine.","The patient was stable at the start of the session.","Do not treat them all with saline."],
+   open:{map:100, hr:88, k:5.2, ph:7.34, spo2:98, line:"Session underway."},
+   stages:[
+     S("Hypotension","Systolic pressure 78. Cramping. Ultrafiltration has taken a litre in the last hour. Lungs were wet at the start and are better.","First move?",[
+       C("Stop ultrafiltration. Legs up if he will tolerate it. A small bolus only if he stays low", true, "Turn off the cause before you pour the oedema back.", {map:92, line:"UF off. Pressure recovering."}),
+       C("A litre, and leave the ultrafiltration on", false, "That is how the session achieves nothing.", {spo2:90}),
+       C("Adrenaline infusion as the routine next step", false, "He is empty relative to the ultrafiltration, not in anaphylaxis. Stop the fluid removal first.")
+     ]),
+     S("Air","The venous chamber is low and you hear a gulp. He is suddenly short of breath and frightened.","What is the sequence?",[
+       C("Stop the pump. Clamp the venous line. Left side, head down. Oxygen. Call for help", true, "Stop more air entering, keep what is in the heart from moving on, and give oxygen.", {line:"Pump stopped. Venous line clamped.", spo2:88}, true),
+       C("Increase the blood pump to push the air through", false, "You would be delivering the embolus.", null, true),
+       C("Sit him up so the air rises to the head", false, "Head up sends arterial air toward the brain. Left side, head down, is the position.")
+     ]),
+     S("Haemolysis","The blood in the line is port-wine. He has back pain.","Return the blood?",[
+       C("No. Stop the pump. Do not reinfuse. Check dialysate temperature and composition. Watch the potassium", true, "Haemolysed blood is a toxin in the circuit. Returning it is the second injury.", {k:6.9, line:"Circuit stopped. Blood not returned."}, true),
+       C("Yes, quickly, then a unit of red cells", false, "You reinfuse potassium and haemoglobin debris."),
+       C("Slow the pump and finish the session", false, "The session is now the injury.")
+     ]),
+     S("Disequilibrium","Urea started at 55 mmol/L. Ninety minutes in he is confused and vomiting. Blood pressure is 140. No fever.","What do you do?",[
+       C("Slow or stop the clearance. Treat seizures if they start. Do not chase the urea down today", true, "A fast osmotic drop swells the brain. The rest of the urea can wait for a gentler plan.", {line:"Clearance slowed. Watching the brain."}),
+       C("Increase dialysate flow. Confusion means he needs more clearance", false, "More clearance is the cause.", null, true),
+       C("Thrombolysis, because confusion on dialysis is always a stroke", false, "Think of disequilibrium first when the urea was this high and the session was hard. A stroke still gets a look if the signs are focal.")
+     ]),
+     S("Arrhythmia","The monitor shows a wide slow rhythm and the potassium from an hour ago was 6.7. He is dizzy. Pressure 90.","What is the immediate drug, and what about the session?",[
+       C("Calcium now. Keep a clearance running if the circuit is safe. Do not ignore the rhythm for a bath change", true, "The membrane comes first. Dialysis is still the removal. A bath change does not replace calcium.", {line:"Calcium given. Session continued.", map:96}),
+       C("Stop dialysis and give resin", false, "You are holding the treatment that removes potassium, and resin is slow.", null, true),
+       C("A beta blocker for a wide slow rhythm", false, "You would slow a failing conduction system further.")
+     ])
+   ]},
+  {id:"alarms", group:"module", title:"Machine alarms", blurb:"Arterial pressure, venous pressure, transmembrane pressure, blood leak, clot.",
+   who:"Continuous therapy, hour six",
+   history:["Blood flow 180 mL/min.","Filter was white at the start.","Effluent has been steady."],
+   open:{map:74, hr:110, k:5.4, ph:7.28, spo2:96, line:"Arterial pressure normal. Venous normal. TMP quiet."},
+   stages:[
+     S("Arterial pressure","The arterial pressure is more negative than about -250 mmHg. The pump is stuttering.","What failed?",[
+       C("The draw: a kink, a clot on the arterial side, or the line against the wall. Lower the blood flow and fix the access. Do not silence it", true, "The pump is sucking on an obstruction. More speed makes the pressure worse.", {line:"Access unkinked. Arterial pressure safer."}),
+       C("The filter. Change it without looking at the catheter", false, "A very negative arterial pressure is upstream of the filter."),
+       C("Turn the alarm limit down so it stops ringing", false, "The limit was the last thing protecting the access.", null, true)
+     ]),
+     S("Venous pressure","Venous pressure is now above about 250 mmHg. Arterial pressure is normal.","Where do you look?",[
+       C("The return: clamp, kink, or clot on the venous limb", true, "Blood is getting out of the patient and cannot get back in.", {line:"Venous clamp found. Pressure falls."}),
+       C("The dialysate bags", false, "Dialysate pressure is not the venous return."),
+       C("Increase ultrafiltration to 'relieve' the pressure", false, "You would remove fluid from a patient whose return is blocked.")
+     ]),
+     S("High transmembrane pressure","TMP has risen steadily. The filter looks dark. Effluent has slowed.","What is it?",[
+       C("Clot in the filter, or ultrafiltration beyond what the fibres will allow. Rinse only if the protocol says a salvage is safe. Otherwise change the set", true, "A dark filter and a rising TMP is clot. Pushing on is how the circuit stops completely.", {line:"Filter changed. TMP reset."}),
+       C("Ignore it until the effluent is zero", false, "Zero effluent is a long time with no dose."),
+       C("Raise blood flow to 400 to ram the clot through", false, "You will rupture fibres or shut the access down.")
+     ]),
+     S("Blood leak","The effluent sensor says blood. The waste bag is pink.","What do you do?",[
+       C("Stop. Do not return the blood. Change the set. Recheck haemoglobin", true, "The membrane has failed. The blood path and the dialysate path are talking to each other.", {line:"Blood leak. Circuit down. Blood not returned."}, true),
+       C("Override the sensor. They are fussy", false, "A pink effluent is the one time the sensor is the diagnosis.", null, true),
+       C("Continue and transfuse to keep up", false, "You would be feeding a ruptured filter.")
+     ])
+   ]},
+  {id:"fluid", group:"module", title:"Fluid and electrolytes", blurb:"Potassium, acid, overload, and the shift that happens after the session.",
+   who:"59-year-old man, anuric, on a session now",
+   history:["Started potassium 6.9, calcium already given.","Bicarbonate 11. Lungs wet.","Weight up 3 kg."],
+   open:{map:102, hr:96, k:6.9, ph:7.16, spo2:91, line:"Session's first half hour."},
+   stages:[
+     S("Potassium bath","The bath is being set.","What potassium do you dialyse against?",[
+       C("A low bath, not necessarily zero, with a plan to recheck before the end", true, "You need a gradient. A zero bath can finish at 2.8 and a ventricular arrhythmia. Recheck.", {k:5.4, line:"Potassium falling. Recheck planned."}),
+       C("A bath of 4 mmol/L, the same as a normal person, so it feels gentle", false, "There is almost no gradient from 6.9. The ECG will still be waiting."),
+       C("No bath potassium listed. The nurse can choose", false, "The bath is the prescription.")
+     ]),
+     S("Acid","Bicarbonate is 11. The machine can run a bicarbonate bath.","What do you expect?",[
+       C("The bicarbonate will rise during the session. Do not bolus intravenous bicarbonate as well just to watch a number", true, "The bath is the buffer. Extra intravenous bicarbonate on top is a sodium and a volume load he may not need.", {ph:7.28, line:"Bicarbonate rising from the bath."}),
+       C("Intravenous bicarbonate 8.4 percent, 250 mL, plus a high bath", false, "That is a large sodium load in a wet patient."),
+       C("No bicarbonate correction. The pH will follow the potassium on its own", false, "Acid is a separate prescription. The bath is how dialysis treats it.")
+     ]),
+     S("Fluid","Oxygen is 91 percent. You planned 3 litres off in four hours.","Is that plan wise?",[
+       C("No. Spread it, or take less today. A hypoxic wet patient still arrests from a hard ultrafiltration", true, "Three litres in four hours is 750 mL/h. If the pressure holds you may get there. Write a stop rule.", {line:"UF slowed. Stop rule written.", spo2:93}),
+       C("Yes. The radiograph demands 3 litres whatever the pressure does", false, "A radiograph does not outrank a falling blood pressure.", {map:70}, true),
+       C("Take 3 litres in the first hour, then rest", false, "That hour is the injury.")
+     ]),
+     S("After the session","Potassium was 3.6 at disconnect. Two hours later the monitor shows weakness returning and potassium is 6.0. He is anuric.","What happened?",[
+       C("Rebound from cells, and no kidney to excrete it. Recheck, and plan the next removal. Do not assume the session cured the day", true, "Dialysis clears the blood. The cells refill it. Anuria means the refill stays.", {k:6.0, line:"Rebound. Next removal planned."}),
+       C("The laboratory is wrong because you dialysed", false, "Rebound is physiology, not a lab error."),
+       C("Give insulin and send him home with no further plan", false, "Insulin is another shift. He needs a removal plan.")
+     ])
+   ]},
+  {id:"anticoag", group:"module", title:"Anticoagulation", blurb:"Heparin, no heparin, or regional citrate. The liver gets a vote.",
+   who:"Three different circuits",
+   history:["Choose for the patient in front of you.","A filter is cheaper than a bleed.","Citrate is a drug, not a rinse."],
+   open:{map:88, hr:100, k:5.5, ph:7.30, spo2:96, line:"Circuit not yet anticoagulated."},
+   stages:[
+     S("Stable intermittent session","No bleed, no surgery, platelets normal, fistula session for fluid and potassium.","What do you use?",[
+       C("A standard heparin protocol, with a stop rule before the end so the fistula can be held", true, "Heparin is appropriate when nothing is bleeding and the session is short.", {line:"Heparin. Fistula hold planned."}),
+       C("Citrate, because it is newer", false, "Regional citrate is a continuous-therapy technique. It is not required for this fistula."),
+       C("Nothing, and no flushes, for a four-hour session", false, "Some heparin-free sessions are deliberate. None of them are 'forget the circuit'.")
+     ]),
+     S("He bled this morning","Anuric, septic, needs continuous therapy. A line was placed. The surgical drain is still bloodstained. The liver is working.","What anticoagulation?",[
+       C("Heparin-free with a rinse plan, or regional citrate if the team runs it safely", true, "Systemic heparin is the wrong default on a fresh bleed. Citrate keeps the filter alive and the patient is not anticoagulated if the protocol is right.", {line:"No systemic heparin."}),
+       C("A large heparin bolus so the new filter is safe", false, "The filter is not the organ that is bleeding.", null, true),
+       C("No circuit at all until the drain is clear for a week", false, "He may die of potassium before the drain is pretty. Choose a no-heparin plan.")
+     ]),
+     S("The liver has failed","Bilirubin 12 mg/dL, INR 3.2, lactate 8, on a continuous circuit. Someone suggests regional citrate.","Do you agree?",[
+       C("No. Citrate is metabolised by the liver and muscle. Accumulation drops the ionised calcium and raises the total-to-ionised ratio. Use another plan", true, "Severe liver failure is the classic reason citrate becomes a poison. Watch ionised calcium if it was already running.", {line:"Citrate avoided. Ionised calcium on the plan."}),
+       C("Yes. Citrate is always regional and always safe", false, "Regional means the patient is spared heparin, not that citrate cannot accumulate.", null, true),
+       C("Double the citrate if the INR is high, to 'cover the liver'", false, "The INR is why you do not add citrate.")
+     ]),
+     S("Heparin-induced thrombocytopenia","Platelets fell from 220 to 60 on day 6 of heparin. The filter clotted. Antibodies are pending. He needs ongoing continuous therapy.","What do you stop?",[
+       C("All heparin, including flushes and locks. Use a non-heparin plan while the test is pending", true, "Waiting for the assay while you keep rinsing with heparin is how the platelets keep falling.", {line:"Heparin stopped. Alternative circuit plan."}),
+       C("Keep catheter-lock heparin. Locks do not count", false, "Locks count."),
+       C("Platelet transfusion so the heparin can continue", false, "You would be feeding the consumption.")
+     ])
+   ]},
+  {id:"challenge", group:"module", title:"Clinical case challenge", blurb:"One patient. Modality, prescription, and a complication, in one sitting.",
+   who:"46-year-old man, methanol ingestion",
+   history:["Found with windshield fluid. Osmolar gap 48. pH 7.08.","Vision is blurred. Bicarbonate 8.","Fomepizole is in the cupboard. A haemodialysis machine is free. He is not shocked."],
+   open:{map:96, hr:110, k:4.2, ph:7.08, spo2:99, line:"High osmolar gap. Blurred vision."},
+   stages:[
+     S("What removes the poison?","Fomepizole blocks alcohol dehydrogenase. It does not remove the methanol already absorbed, or the formate.","What else?",[
+       C("Intermittent haemodialysis now, and fomepizole. Do not wait for a level if the gap, the pH and the story agree", true, "A high clearance is the point. He is not shocked, so intermittent haemodialysis is the right tool.", {line:"Fomepizole in. Dialysis started.", ph:7.20}),
+       C("Fomepizole only. Dialysis is old-fashioned", false, "The block stops new toxic metabolites. It does not clear what is circulating.", null, true),
+       C("Acute peritoneal dialysis as the first choice, with a machine free next door", false, "The peritoneum is too slow for this anion gap when a dialyser is free.")
+     ]),
+     S("The session","He is on the machine. pH is rising. Vision is no better yet.","When do you stop?",[
+       C("Not at a prettier pH alone. Continue until the methanol is low and the acid stays corrected, and repeat after, because it rebounds", true, "Stopping on the first normal gas is how the gap returns from tissue.", {line:"Level planned. Not stopped on one gas."}),
+       C("Stop at one hour. The pH moved, so the poison has gone", false, "Formate and methanol are not a one-hour story."),
+       C("Stop fomepizole the moment the pump starts", false, "Until the level is actually low, the enzyme still needs to be blocked. Dose fomepizole for the dialysis, which removes it too.")
+     ]),
+     S("He cramps and the systolic pressure is 82","Ultrafiltration was left on because the chart always has a fluid loss. He was not overloaded.","What now?",[
+       C("Stop ultrafiltration. This session is for solute. A small bolus is reasonable. Keep the clearance", true, "You prescribed a fluid loss he did not have.", {map:98, line:"UF off. Clearance continues."}),
+       C("Stop dialysis entirely", false, "The poison is still the indication. The ultrafiltration was the mistake."),
+       C("Speed ultrafiltration. Cramps mean he needs more flow", false, "Cramps during ultrafiltration are volume.")
+     ]),
+     S("The next gas is 7.36 and the level is low","He can see shapes again. The osmolar gap has closed.","What do you watch?",[
+       C("A repeat level and a repeat gas. Rebound happens. Keep fomepizole until you know the methanol is staying down", true, "One good hour is not a discharge.", {line:"Observed for rebound."}),
+       C("Discharge from the unit door", false, "Methanol leaves tissues slowly. The gap can reopen."),
+       C("A second poison antidote, charcoal, as the main follow-up", false, "Charcoal does not bind methanol well. You already have the treatment.")
+     ])
+   ]}
+];
+
+const FULL = [
+  {id:"full-sepsis", group:"full", title:"Septic shock and anuria", blurb:"Indication, continuous modality, dose, citrate, and a pressure alarm.",
+   who:"72-year-old woman, pneumonia, six hours of noradrenaline",
+   history:["Norepinephrine 0.35 micrograms/kg/min. Lactate 6.","Potassium 6.5. pH 7.12. Anuric. Weight 70 kg.","No chronic liver disease. A femoral line is in. She bled from the nose during insertion."],
+   open:{map:66, hr:128, k:6.5, ph:7.12, spo2:93, line:"Shocked, anuric, bleeding from the nose."},
+   stages:[
+     S("Indication","Creatinine is only 2.4 mg/dL. A colleague says it is too early.","Is it?",[
+       C("No. The potassium, the pH and the absent urine are the indication. The creatinine has not caught up", true, "Waiting for a prettier number is how the ECG changes.", {line:"Indication made."}),
+       C("Yes. Nothing until creatinine is 6", false, "That threshold is not a physiology.", null, true),
+       C("Give a litre an hour until urine appears", false, "She is in septic shock with wet risks and a high potassium. A blind fluid flood is not a kidney.")
+     ]),
+     S("Modality","Continuous machine free. She is on a high-dose vasopressor.","What do you start?",[
+       C("CVVHDF or CVVHD. Not a hard intermittent session", true, "Clearance yes. A litre an hour off, no.", {line:"Continuous therapy."}),
+       C("SLED only because you dislike continuous machines, run with aggressive ultrafiltration", false, "SLED is allowed when continuous therapy is a bad fit or unavailable. It is not an excuse for a hard fluid pull."),
+       C("Peritoneal dialysis first, with a fresh laparotomy scar from last night", false, "The scar is a reason to avoid the peritoneum. You also have a blood therapy.")
+     ]),
+     S("Dose and anticoagulant","70 kg. Nose still oozing. Liver is fine.","Prescription?",[
+       C("About 20 to 25 mL/kg/h delivered, and regional citrate or a no-heparin plan. Not a heparin bolus", true, "1500 to 1750 mL/h effluent. Systemic heparin is a poor match for a bleeding nose.", {line:"Dose set. No systemic heparin."}),
+       C("Heparin bolus and 40 mL/kg/h", false, "The wrong anticoagulant and an unneeded dose."),
+       C("SCUF at 200 mL/h", false, "No solute dose at all.")
+     ]),
+     S("The arterial alarm","Arterial pressure is very negative. Effluent has slowed.","Next?",[
+       C("Access first. Unkink, reposition, lower the blood flow. Do not override the alarm", true, "A continuous dose of zero is what an ignored arterial alarm becomes.", {line:"Line repositioned. Effluent returns."}),
+       C("Raise the blood flow to clear the alarm", false, "You will worsen the negative pressure."),
+       C("Prescribe more effluent on paper", false, "Paper does not pass a kink.")
+     ]),
+     S("She improves","Norepinephrine is 0.08. pH 7.33. Potassium 4.8. Urine 15 mL/h.","Tomorrow?",[
+       C("Keep a delivered dose while she is still shocked and oliguric. Reassess the modality as the pressure comes off", true, "Stopping the hour the pH looks kind is how 4.8 becomes 6.2 by evening.", {line:"Circuit continued. Daily reassessment."}),
+       C("Stop tonight and book intermittent dialysis in three days", false, "Three days is a guess. The urine is 15 mL/h."),
+       C("Switch to peritoneal dialysis now that she is slightly better", false, "You have a working blood therapy. Do not change for novelty.")
+     ])
+   ]},
+  {id:"full-lung", group:"full", title:"Pulmonary oedema after missed dialysis", blurb:"A session, a bath, and the moment it stops being isolated ultrafiltration.",
+   who:"61-year-old man, missed two sessions",
+   history:["Oxygen 88 percent sitting up. Weight up 5 kg.","Potassium 6.7. Bicarbonate 16. Peaked T waves.","Blood pressure 160/90. No vasopressor. Fistula present."],
+   open:{map:112, hr:104, k:6.7, ph:7.24, spo2:88, line:"Peaked T waves. Cannot lie flat."},
+   stages:[
+     S("First act","The fistula is ready and so is the machine.","What happens before the pump?",[
+       C("Calcium for the peaked T waves, then dialysis with a real bath. Not isolated ultrafiltration", true, "He needs both water and potassium. Calcium first, clearance second. IUF would ignore the ECG.", {line:"Calcium in. Dialysis, not IUF.", k:6.7}),
+       C("Isolated ultrafiltration, because the chest is the photograph", false, "The ECG is the other photograph.", null, true),
+       C("A nitrate and no dialysis", false, "He has no kidney to finish the job. Nitrate can buy minutes, not a potassium of 4.")
+     ]),
+     S("Prescription","Pressure is generous. He needs several litres off, and a potassium gradient.","A safe shape?",[
+       C("Intermittent haemodialysis, blood flow about 300, dialysate on, ultrafiltration with a stop rule, low-but-not-zero potassium bath", true, "He can tolerate a session. The stop rule is for when the generous pressure stops being generous.", {line:"IHD with a stop rule."}),
+       C("Two litres off in the first thirty minutes", false, "That is a syncopal episode with a fistula."),
+       C("Potassium bath of 5 so the ECG is 'left alone'", false, "There is no gradient from 6.7 worth the name.")
+     ]),
+     S("Halfway","Potassium 5.1. Systolic pressure 92. One litre off. Still breathless.","The lever?",[
+       C("Slow the ultrafiltration. Keep the clearance. He is not finished", true, "Solute removal can continue while fluid removal rests.", {map:104, line:"UF reduced. Clearance on.", spo2:92}),
+       C("Abandon the session", false, "The potassium is safer and not yet done, and the lungs still need a careful plan."),
+       C("Saline litre, full ultrafiltration back on", false, "You are undoing the only litres you have removed.")
+     ]),
+     S("The end","Potassium 4.4. Oxygen 95 percent on 2 litres. Two litres off, not five.","Is that a failure?",[
+       C("No. A tolerated session that moved potassium and some fluid is a success. The rest can be tomorrow if he is safer", true, "Chasing five litres today is how you lose the potassium win.", {line:"Session ended on purpose.", k:4.4, spo2:95}),
+       C("Yes. Put the five litres through before you disconnect", false, "The blood pressure already voted."),
+       C("Discharge home from the chair", false, "He missed dialysis and was in oedema this morning. He needs a bed and a next session.")
+     ])
+   ]},
+  {id:"full-brain", group:"full", title:"Acute brain injury and kidney failure", blurb:"Do not buy a urea of 15 with a swollen brain.",
+   who:"38-year-old woman, traumatic intracranial haemorrhage, day 2",
+   history:["Creatinine rising. Urine 10 mL/h. Urea 48 mmol/L.","Potassium 6.3. pH 7.22.","Intracranial pressure has been high. She is intubated. Vasopressors are low."],
+   open:{map:84, hr:92, k:6.3, ph:7.22, spo2:98, line:"Sedated. ICP has been 26."},
+   stages:[
+     S("Modality","A continuous machine is free. So is the haemodialysis room.","What do you book?",[
+       C("Continuous therapy, modest first-day effluent, sodium not allowed to fall quickly", true, "A hard intermittent urea drop lowers osmolality and the brain swells. Continuous is the point.", {line:"CVVHDF. Gentle first day."}),
+       C("Short intermittent haemodialysis at the highest dialysate flow", false, "That is the disequilibrium recipe.", null, true),
+       C("No renal replacement until the urea is 60, whatever the potassium does", false, "The potassium and the pH are already indications. Choose a gentle modality, do not choose nothing.")
+     ]),
+     S("The first prescription","70 kg. Someone wants 40 mL/kg/h 'to get the urea down by tonight'.","Your dose?",[
+       C("20 to 25 mL/kg/h delivered, and accept a slow urea fall", true, "Tonight's triumph on the urea is tomorrow's herniation. The trial dose is enough.", {line:"Effluent about 1.5 to 1.8 L/h."}),
+       C("40 mL/kg/h for the first six hours", false, "You turned continuous therapy into a fast osmotic drop."),
+       C("Isolated ultrafiltration only", false, "The urea and the potassium will not move.")
+     ]),
+     S("Sodium","Serum sodium is 148, partly from hypertonic saline for the brain. The dialysis sodium is 136 on the default bag.","What happens if you ignore it?",[
+       C("The sodium will be dragged down and brain water will rise. Match the replacement and the bath close to the patient, then ease", true, "A 12 mmol fall in a day is a prescription for oedema.", {line:"Bath sodium matched to the patient."}),
+       C("Default bags are always safe", false, "Default is for a sodium of 140, not 148."),
+       C("Lower the sodium as fast as possible. 148 is always bad", false, "In this skull, 148 may be deliberate. Do not 'correct' it in one session.")
+     ]),
+     S("Hypotension","Mean pressure falls to 62 when you remove 200 mL/h. ICP rises.","What do you change?",[
+       C("Stop net removal. Restore the pressure. A low cerebral perfusion pressure is the emergency, not the fluid balance chart", true, "The brain is downstream of the blood pressure. Fluid can wait an hour.", {map:80, line:"UF stopped. Pressure restored."}),
+       C("Keep the 200 mL/h. The chart was signed", false, "The chart is not an ICP monitor.", null, true),
+       C("Hyperventilate for an hour as the only response", false, "You caused a perfusion problem. Fix the perfusion.")
+     ])
+   ]}
+];
+
+let mode = new URLSearchParams(location.search).get("mode") === "full" ? "full" : "module";
+let item = null, index = 0, selected = null, log = [], live = null, started = 0, phase = "catalog";
+
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"\u0026amp;","<":"\u0026lt;",">":"\u0026gt;","\"":"\u0026quot;","'":"\u0026#39;"}[c];});}
+function list(){return (mode==="full"?FULL:MODULES);}
+function clock(){
+  const el = document.getElementById("clock");
+  if(phase==="catalog" || !started){el.textContent=""; return;}
+  const m = Math.round((Date.now()-started)/60000);
+  el.textContent = m+" min";
+}
+setInterval(clock, 5000);
+
+function vitals(){
+  if(!live) return "";
+  const rows = [["Mean pressure", live.map, live.map<70],["Heart rate", live.hr, false],["Potassium", live.k, live.k>=6],["pH", live.ph, live.ph<7.2],["Saturation", live.spo2+"%", live.spo2<92]];
+  return '<dl class="vit">'+rows.map(function(r){
+    return '<div><dt>'+r[0]+'</dt><dd class="'+(r[2]?"warn":"")+'">'+r[1]+'</dd></div>';
+  }).join("")+'</dl><p class="fine">'+esc(live.line)+'</p>';
+}
+function apply(set){
+  if(!set) return;
+  Object.keys(set).forEach(function(k){live[k]=set[k];});
+}
+function score(){
+  const pts = log.reduce(function(s,r){return s+r.points;},0);
+  return log.length? Math.round(pts/(log.length*100)*100) : 0;
+}
+function showBar(buttons){
+  const bar = document.getElementById("bar");
+  if(!buttons.length){bar.hidden=true; bar.innerHTML=""; return;}
+  bar.hidden=false;
+  bar.innerHTML = buttons.map(function(b,i){return '<button type="button" id="b'+i+'" class="'+(b.ghost?"ghost":"")+'" '+(b.disabled?"disabled":"")+">"+esc(b.label)+"</button>";}).join("");
+  buttons.forEach(function(b,i){document.getElementById("b"+i).onclick=b.on;});
+}
+function render(){
+  clock();
+  const app = document.getElementById("app");
+  const crumb = document.getElementById("crumb");
+  if(phase==="catalog"){
+    crumb.textContent = mode==="full" ? "Full clinical cases" : "Practice by module";
+    app.innerHTML = '<section class="hero"><h1>Dialysis practice</h1><p>One skill, or a whole session. The pressure and the potassium move when you do.</p></section>'+
+      '<div class="switch"><button type="button" id="m1" class="'+(mode==="module"?"on":"")+'"><b>Practice by module</b><span>Indication, modality, prescription, machine, alarms.</span></button>'+
+      '<button type="button" id="m2" class="'+(mode==="full"?"on":"")+'"><b>Full clinical cases</b><span>Shock, oedema, and a swollen brain. The whole session.</span></button></div>'+
+      list().map(function(c){return '<button class="card" type="button" data-open="'+c.id+'"><span class="kicker">'+(c.group==="full"?"Full case":"Module")+'</span><b>'+esc(c.title)+'</b><span>'+esc(c.blurb)+'</span></button>';}).join("")+
+      '<p class="fine">Teaching cases. Not a prescription. SLED is one form of prolonged intermittent therapy, not a rival technique.</p>';
+    document.getElementById("m1").onclick=function(){mode="module"; render();};
+    document.getElementById("m2").onclick=function(){mode="full"; render();};
+    document.querySelectorAll("[data-open]").forEach(function(b){b.onclick=function(){open(b.getAttribute("data-open"));};});
+    showBar([]);
+    return;
+  }
+  crumb.textContent = item.title;
+  if(phase==="debrief"){
+    const crit = log.filter(function(r){return r.critical;}).length;
+    const mins = Math.max(1, Math.round((Date.now()-started)/60000));
+    app.innerHTML = '<p class="kicker">Debrief</p><h2>'+esc(item.title)+'</h2>'+vitals()+
+      '<div class="switch"><div class="panel"><span class="kicker">Score</span><b>'+score()+'%</b></div><div class="panel"><span class="kicker">Critical misses</span><b>'+crit+'</b></div><div class="panel"><span class="kicker">Time</span><b>'+mins+' min</b></div></div>'+
+      log.map(function(r,i){
+        return '<section class="panel"><b>'+(i+1)+'. '+esc(r.title)+'</b><p class="fine">You: '+esc(r.you)+'</p><p>'+esc(r.why)+'</p><p class="fine">'+(r.ok==="part"?"Partial":r.ok?"Correct":"Missed")+(r.critical?" · safety":"")+'</p></section>';
+      }).join("");
+    showBar([{label:"Run it again", on:function(){open(item.id);}},{label:"All cases", ghost:true, on:function(){phase="catalog"; item=null; render();}}]);
+    return;
+  }
+  const stage = item.stages[index];
+  document.getElementById("clock").textContent = (index+1)+"/"+item.stages.length;
+  let extra = "";
+  if(stage.kind==="dials"){
+    extra = stage.dials.map(function(d){
+      return '<label class="slide">'+esc(d.label)+' <span id="v-'+d.id+'">'+d.start+" "+esc(d.unit)+'</span><input id="d-'+d.id+'" type="range" min="'+d.min+'" max="'+d.max+'" value="'+d.start+'"></label>';
+    }).join("");
+  } else {
+    extra = stage.choices.map(function(c,i){
+      return '<button type="button" class="choice'+(selected===i?" on":"")+'" data-i="'+i+'">'+esc(c.t)+"</button>";
+    }).join("");
+  }
+  const fb = phase==="feedback" ? '<div class="fb '+(log[log.length-1].ok?"good":"bad")+'">'+esc(log[log.length-1].why)+"</div>" : "";
+  app.innerHTML = vitals()+'<section class="panel"><p class="kicker">'+esc(item.who)+'</p><ul>'+item.history.map(function(h){return "<li>"+esc(h)+"</li>";}).join("")+"</ul></section>"+
+    '<p class="kicker">History</p><h2>'+esc(stage.title)+'</h2><p>'+esc(stage.lead)+'</p><p><b>'+esc(stage.prompt)+'</b></p>'+extra+fb+
+    '<details class="panel"><summary><b>Case summary till now</b></summary><p>'+esc(live.line)+'</p></details>';
+  if(stage.kind==="dials"){
+    stage.dials.forEach(function(d){
+      const input=document.getElementById("d-"+d.id);
+      input.oninput=function(){document.getElementById("v-"+d.id).textContent=input.value+" "+d.unit;};
+    });
+  } else {
+    document.querySelectorAll("[data-i]").forEach(function(b){
+      b.onclick=function(){if(phase!=="ask")return; selected=Number(b.getAttribute("data-i")); render();};
+    });
+  }
+  if(phase==="ask"){
+    showBar([{label:"Submit decision", disabled:stage.kind!=="dials" && selected==null, on:submit}]);
+  } else {
+    showBar([{label:index+1>=item.stages.length?"See the debrief":"Continue", on:next}]);
+  }
+}
+function open(id){
+  item = MODULES.concat(FULL).find(function(c){return c.id===id;});
+  index=0; selected=null; log=[]; phase="ask";
+  live=Object.assign({}, item.open);
+  started=Date.now();
+  render();
+}
+function submit(){
+  const stage=item.stages[index];
+  let result;
+  if(stage.kind==="dials"){
+    const vals={};
+    stage.dials.forEach(function(d){vals[d.id]=Number(document.getElementById("d-"+d.id).value);});
+    result=stage.judge(vals);
+    result.you = stage.dials.map(function(d){return d.label+" "+vals[d.id]+" "+d.unit;}).join(", ");
+  } else {
+    const choice=stage.choices[selected];
+    result={ok:choice.ok, why:choice.why, set:choice.set, critical:!!choice.critical, you:choice.t};
+  }
+  apply(result.set);
+  log.push({title:stage.title, you:result.you, why:result.why, ok:result.ok, critical:!!result.critical && !result.ok, points:result.ok===true?100:result.ok==="part"?60:0});
+  phase="feedback";
+  render();
+}
+function next(){
+  if(index+1>=item.stages.length){phase="debrief"; render(); return;}
+  index++; selected=null; phase="ask"; render();
+}
+document.getElementById("home").onclick=function(){phase="catalog"; item=null; render();};
+render();
+</script>
+</body>
+</html>

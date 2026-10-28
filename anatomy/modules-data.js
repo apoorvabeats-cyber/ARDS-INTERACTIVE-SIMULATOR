@@ -121,10 +121,12 @@ export const ROOMS = {
     name: 'Kidneys', room: 'Nephrology',
     line: 'Sodium, potassium, calcium, magnesium and phosphate.',
     learn: [
-      ['Electrolytes', 'The number chooses the algorithm. Calcium starts from serum calcium and albumin.', 'Electrolyte_Disorders_Interactive_Simulator.html?v=20261014d']
+      ['Electrolytes', 'The number chooses the algorithm. Calcium starts from serum calcium and albumin.', 'Electrolyte_Disorders_Interactive_Simulator.html?v=20261014d'],
+      ['Dialysis Learning Lab', 'Ten modalities. The circuit, the dose, and why SLED sits inside prolonged intermittent therapy.', 'Dialysis_Learning_Lab.html?v=20261028k']
     ],
     practice: [
-      ['Renal Practice Simulator', 'Hyperkalemia, obstructed acute kidney injury, and missed dialysis.', 'Practice_Simulator.html?focus=kidney&v=20261028j']
+      ['Renal Practice Simulator', 'Hyperkalemia, obstructed acute kidney injury, and missed dialysis.', 'Practice_Simulator.html?focus=kidney&v=20261028j'],
+      ['Dialysis practice', 'Indication, modality, prescription, and a whole session.', 'Dialysis_Practice_Simulator.html?v=20261028k']
     ],
     soon: ''
   }

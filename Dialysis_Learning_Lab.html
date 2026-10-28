@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#071b3a">
+<title>Dialysis Learning Lab</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#f4f7fb;color:#14213d}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;line-height:1.45}
+button,a{font:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+.top{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;padding:12px 14px;background:#071b3a;color:#fff}
+.top button{background:none;border:0;color:#dbe9ff;font-weight:800;min-height:44px;padding:8px 0}
+.top b{flex:1;text-align:center}
+.wrap{max-width:880px;margin:0 auto;padding:16px 14px 48px}
+.hero{background:linear-gradient(135deg,#071b3a,#1457a6);color:#fff;border-radius:22px;padding:22px 18px;margin-bottom:12px}
+.hero h1{font-size:clamp(28px,7vw,40px);line-height:1.05;margin:0 0 8px}
+.hero p{margin:0;color:#dbe9ff}
+.note{background:#fff;border:1px solid #d7e0ec;border-left:4px solid #1457a6;border-radius:14px;padding:12px 14px;margin:12px 0}
+.grid{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:720px){.grid{grid-template-columns:1fr 1fr}}
+.card{text-align:left;background:#fff;border:1px solid #d7e0ec;border-radius:16px;padding:14px;min-height:44px}
+.card b{display:block;font-size:18px}
+.card span{display:block;color:#5f6f86;margin-top:4px}
+.kicker{color:#1457a6;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.tabs{display:flex;gap:6px;overflow:auto;padding-bottom:4px}
+.tabs button{border:1px solid #d7e0ec;background:#fff;border-radius:999px;padding:8px 12px;min-height:40px;white-space:nowrap}
+.tabs button.on{background:#1457a6;color:#fff;border-color:#1457a6}
+.panel{background:#fff;border:1px solid #d7e0ec;border-radius:16px;padding:14px;margin-top:12px}
+h2{margin:0 0 8px;font-size:22px}
+ul{margin:8px 0 0;padding-left:18px}
+.figure{background:#07111f;border-radius:16px;padding:8px;margin-top:8px}
+svg{width:100%;height:auto;display:block}
+.flow{stroke-dasharray:7 9;animation:run 1.1s linear infinite}
+@keyframes run{to{stroke-dashoffset:-32}}
+@media(prefers-reduced-motion:reduce){.flow{animation:none}}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.legend i{display:inline-block;width:14px;height:4px;margin-right:6px;vertical-align:middle}
+.hit{cursor:pointer}
+.part{margin-top:8px;color:#3d4d63}
+.sliders label{display:block;margin:10px 0;font-weight:700}
+.sliders input{width:100%;accent-color:#1457a6}
+.sliders label.dead{opacity:.4}
+.read{background:#f4f7fb;border-radius:12px;padding:10px 12px;margin-top:8px}
+.choice{display:block;width:100%;text-align:left;background:#fff;border:1px solid #d7e0ec;border-radius:12px;padding:12px;margin:8px 0;min-height:48px}
+.choice.good{border-color:#0f7a4a;background:#f3fbf6}
+.choice.bad{border-color:#b42318;background:#fdf4f4}
+.fb{margin-top:8px}
+.fine{color:#5f6f86;font-size:13px}
+</style>
+</head>
+<body>
+<div class="top"><button type="button" id="back" hidden>Modalities</button><b id="crumb">Dialysis Learning Lab</b></div>
+<main class="wrap" id="app"></main>
+<script>
+const MODS = [
+  {id:"ihd", name:"Intermittent haemodialysis", short:"IHD", tag:"Diffusion · 3 to 5 hours",
+   principle:"Solutes leave the blood down a concentration gradient, across a high-flux membrane, into fast dialysate. That is diffusion. Fluid is pulled at the same time by ultrafiltration. Convection is minor unless the ultrafiltration rate is high. Clearance of urea is high because dialysate flow is usually faster than blood flow.",
+   indications:["A patient who can tolerate a few hours of fluid removal and a rapid fall in urea.","Life-threatening hyperkalaemia once the membrane has been stabilised, if the blood pressure will hold.","A dialysable poison, such as methanol or lithium, when a high clearance is the point.","The usual session for a person who already lives on an intermittent schedule."],
+   notFor:["Shock on a rising vasopressor. The same ultrafiltration that a well person tolerates will drop the pressure.","Acute brain injury or a very high urea. A fast fall in osmolality can swell the brain.","A need for fluid removal only, with normal solutes. That is isolated ultrafiltration, not a full dialysis."],
+   flows:{blood:true,dialysate:true,replacement:false,uf:true,pd:false},
+   parts:{access:"A wide-bore venous dialysis catheter, or a fistula, gives the blood pump a low-resistance draw and a free return.",filter:"The hollow-fibre dialyser. Blood is inside the fibres. Dialysate is outside, running the other way.",dialysate:"Usually 500 to 800 mL/min. The bath potassium, bicarbonate and calcium are the prescription, not decorations.",effluent:"Spent dialysate plus the ultrafiltrate. Blood must not appear here. If it does, the fibres have ruptured.",pump:"Blood flow is typically 250 to 400 mL/min for a few hours, then the machine is free."},
+   rx:[{k:"qb",l:"Blood flow",u:"mL/min",min:150,max:450,v:300,on:true},{k:"qd",l:"Dialysate flow",u:"mL/min",min:200,max:800,v:500,on:true},{k:"qr",l:"Replacement fluid",u:"mL/h",min:0,max:0,v:0,on:false},{k:"uf",l:"Ultrafiltration",u:"mL/h",min:0,max:1500,v:500,on:true},{k:"hrs",l:"Duration",u:"h",min:2,max:6,v:4,on:true}],
+   pros:["The highest small-solute clearance per hour of any modality here.","The machine and the nurse are occupied for a session, not for a day.","Familiar bath composition. Potassium and bicarbonate can be set precisely."],
+   cons:["Rapid ultrafiltration is a common cause of intradialytic hypotension.","A steep urea drop risks dialysis disequilibrium, especially if the urea is very high or the brain is already swollen.","Anticoagulation, or a careful heparin-free session, is still required for the circuit."],
+   cases:[
+     {q:"Anuric man. Potassium 6.9 mmol/L. Peaked T waves, already given calcium. Blood pressure 146/80, no vasopressor. Lungs are wet.",
+      options:[
+        {t:"Intermittent haemodialysis", ok:true, why:"He needs clearance and fluid removal, and the pressure can stand a session. Calcium has already protected the membrane."},
+        {t:"Slow continuous ultrafiltration only", ok:false, why:"Ultrafiltration removes water, not potassium. The ECG has already changed."},
+        {t:"Nothing until the creatinine is over 8", ok:false, why:"The indication is the potassium and the lungs, not a creatinine threshold."}
+      ]},
+     {q:"The same potassium, but he is on norepinephrine 0.45 micrograms/kg/min and the lactate is 6.",
+      options:[
+        {t:"A standard four-hour intermittent session with a litre an hour off", ok:false, why:"That ultrafiltration rate will deepen the shock."},
+        {t:"Continuous therapy, or a slow prolonged session, and only the fluid he can spare", ok:true, why:"He still needs clearance. He cannot donate a litre an hour. Slow the therapy down."},
+        {t:"Isolated ultrafiltration at a litre an hour", ok:false, why:"Wrong clearance, and the rate is still too fast for this pressure."}
+      ]}
+   ]},
+  {id:"sled", name:"Sustained low-efficiency dialysis", short:"SLED", tag:"A form of prolonged intermittent therapy",
+   principle:"Same physics as intermittent haemodialysis: diffusion across a dialyser, plus ultrafiltration. The blood flow, the dialysate flow and the ultrafiltration rate are turned down, and the session is stretched to about 6 to 12 hours. A lower efficiency per minute is exchanged for a clearance the blood pressure can tolerate. SLED is one way of delivering prolonged intermittent kidney replacement. It is not a different law from PIKRT.",
+   indications:["Shock that is improving, or a low-dose vasopressor, when a continuous machine is not free.","A need for real solute clearance overnight, with the conventional haemodialysis machine you already have.","A bridge between a full intermittent session, which he will not tolerate, and a day of continuous therapy, which you cannot staff."],
+   notFor:["Calling it a separate technique from prolonged intermittent therapy. The name SLED sits inside that umbrella.","A patient with acutely swollen brain, if a truly continuous therapy is available. Eight hours is gentler than four. It is not as gentle as twenty-four.","Fluid removal only. Do not run dialysate if the solutes are already normal and you only need water off."],
+   flows:{blood:true,dialysate:true,replacement:false,uf:true,pd:false},
+   parts:{access:"The same dialysis catheter as intermittent therapy. Lower blood flow is kinder to a mediocre line, but a truly obstructed line still fails.",filter:"A standard dialyser, run longer. Clotting risk rises with time, so anticoagulation or a flush plan still matters.",dialysate:"Often 100 to 300 mL/min, not 500 to 800. Slow dialysate is the 'low efficiency'.",effluent:"Dialysate plus ultrafiltrate, over many hours. The hourly fluid removal is what the pressure feels.",pump:"Blood flow often 100 to 200 mL/min. The pump runs for a shift, then stops. The patient is not tied to it all night and all day."},
+   rx:[{k:"qb",l:"Blood flow",u:"mL/min",min:80,max:250,v:150,on:true},{k:"qd",l:"Dialysate flow",u:"mL/min",min:50,max:400,v:200,on:true},{k:"qr",l:"Replacement fluid",u:"mL/h",min:0,max:0,v:0,on:false},{k:"uf",l:"Ultrafiltration",u:"mL/h",min:0,max:500,v:150,on:true},{k:"hrs",l:"Duration",u:"h",min:6,max:12,v:8,on:true}],
+   pros:["Uses the intermittent machine and, often, the intermittent nursing pattern.","Better blood-pressure tolerance than a hard four-hour session, because the same fluid comes off more slowly.","Real small-solute clearance, unlike isolated ultrafiltration."],
+   cons:["Still an intermittent therapy. Clearance stops when the session stops.","Less gentle than continuous therapy for intracranial pressure.","A long session still clots if anticoagulation is forgotten."],
+   cases:[
+     {q:"Norepinephrine is down to 0.08 micrograms/kg/min. Potassium is 6.3. The continuous machine is already in use on another bed. You have a haemodialysis machine overnight.",
+      options:[
+        {t:"Sustained low-efficiency dialysis for about eight hours", ok:true, why:"He needs clearance, the pressure is only just supported, and SLED is prolonged intermittent therapy delivered on the machine you have."},
+        {t:"A four-hour session with aggressive ultrafiltration", ok:false, why:"He is still on a vasopressor. Do not pretend he is a stable outpatient."},
+        {t:"Wait until a continuous machine is free tomorrow", ok:false, why:"The potassium is 6.3 tonight. A safe machine is already in the room."}
+      ]},
+     {q:"A colleague says SLED and prolonged intermittent therapy are unrelated techniques and must never be mentioned together.",
+      options:[
+        {t:"Agree. They use different membranes and different physics", ok:false, why:"Both are diffusion on a dialyser, run longer and slower than a standard session."},
+        {t:"SLED is one form of prolonged intermittent kidney replacement. The umbrella is wider than the one name", ok:true, why:"PIKRT names the schedule. SLED names a common way of filling that schedule."},
+        {t:"SLED is peritoneal dialysis with a different spelling", ok:false, why:"There is no peritoneal fill. There is a blood circuit and a dialyser."}
+      ]}
+   ]},
+  {id:"pikrt", name:"Prolonged intermittent kidney replacement", short:"PIKRT", tag:"The umbrella, not a rival of SLED",
+   principle:"PIKRT means a blood-based therapy that lasts longer than a standard intermittent session and shorter than a continuous day. Solute removal is still mostly diffusion if dialysate is running, and fluid removal is still ultrafiltration. SLED, extended daily dialysis and several local names all sit under this umbrella. Teaching them as unrelated machines is the mistake.",
+   indications:["The same patient who needs SLED: too unstable for a hard intermittent session, not necessarily in need of a twenty-four hour circuit.","A unit that can staff a long session on a conventional machine and then use that machine for someone else.","A planned middle path, written down, so the night team does not invent a four-hour session at 2 a.m."],
+   notFor:["A claim that PIKRT clears middle molecules like haemofiltration. Unless you add convection, it is still a dialysis.","Acute brain oedema if continuous therapy is available. Prolonged is not continuous.","Any prescription that forgets to say whether dialysate is running. A long session with no dialysate is isolated ultrafiltration, not PIKRT dialysis."],
+   flows:{blood:true,dialysate:true,replacement:false,uf:true,pd:false},
+   parts:{access:"Same vascular access as haemodialysis. The umbrella is a schedule, not a new catheter.",filter:"A dialyser. If someone adds replacement fluid and calls it haemodiafiltration, say so. Do not hide convection inside the name PIKRT.",dialysate:"On, but slower than intermittent haemodialysis, for most of a shift.",effluent:"The long, slow version of a dialysis effluent.",pump:"On for the session. Off afterwards. Write the hours on the chart so the next shift does not restart it by surprise."},
+   rx:[{k:"qb",l:"Blood flow",u:"mL/min",min:80,max:250,v:160,on:true},{k:"qd",l:"Dialysate flow",u:"mL/min",min:50,max:400,v:250,on:true},{k:"qr",l:"Replacement fluid",u:"mL/h",min:0,max:0,v:0,on:false},{k:"uf",l:"Ultrafiltration",u:"mL/h",min:0,max:500,v:120,on:true},{k:"hrs",l:"Duration",u:"h",min:6,max:16,v:8,on:true}],
+   pros:["One name for a family of schedules, so the team stops arguing about brands.","Haemodynamic tolerance better than short, hard ultrafiltration.","The circuit does not run for twenty-four hours, so clotting and nursing load sit between intermittent and continuous therapy."],
+   cons:["The word is easy to misuse. It does not, by itself, tell you the blood flow or whether dialysate is on.","Clearance is zero between sessions. Potassium can rebound.","It is still too fast for some injured brains."],
+   cases:[
+     {q:"Which sentence is the one you want on the teaching round?",
+      options:[
+        {t:"PIKRT is the family. SLED is a member of it. Both are slower, longer dialysis", ok:true, why:"Overlap is the lesson. The physics is diffusion plus ultrafiltration, stretched over hours."},
+        {t:"PIKRT uses the peritoneum and SLED uses a dialyser", ok:false, why:"Both of these names, as used here, are blood therapies."},
+        {t:"They must be prescribed as if they shared no settings", ok:false, why:"Blood flow, dialysate flow, hours and fluid removal are the same four questions."}
+      ]},
+     {q:"Intracerebral haemorrhage, urea 45 mmol/L, sodium falling, blood pressure labile. Continuous therapy is free.",
+      options:[
+        {t:"A prolonged intermittent session tonight, as hard as the nurse can run it", ok:false, why:"A big urea drop in a swollen brain is disequilibrium waiting to happen."},
+        {t:"Continuous therapy, with a modest first-day solute target", ok:true, why:"The umbrella is not gentle enough when the brain is the organ you are protecting and a continuous machine is free."},
+        {t:"Isolated ultrafiltration, because fluid is always the problem", ok:false, why:"Urea of 45 with a brain injury is a solute problem."}
+      ]}
+   ]},
+  {id:"cvvhd", name:"Continuous venovenous haemodialysis", short:"CVVHD", tag:"Continuous diffusion",
+   principle:"Blood runs continuously past a membrane. Dialysate runs the other way, slowly, usually on the order of 20 to 25 mL per kilogram per hour rather than hundreds of millilitres per minute. Small solutes diffuse. Ultrafiltration removes fluid. There is no replacement fluid, so convection is only whatever fluid you remove. The delivered effluent, not the number written in the morning, is the dose.",
+   indications:["Haemodynamic instability with a need for ongoing small-solute control: potassium, acid, urea.","A brain that will not tolerate a steep osmotic drop.","A unit that can run a continuous circuit, with anticoagulation or a no-heparin plan."],
+   notFor:["A belief that more than 25 mL/kg/h of effluent improves survival. The large trials did not show that.","Middle-molecule clearance as the main aim. That is convection, which this modality barely uses.","A patient stable enough for a short session, if what you need is the machine back by evening. Continuous is a choice, not a reflex."],
+   flows:{blood:true,dialysate:true,replacement:false,uf:true,pd:false},
+   parts:{access:"A dialysis catheter. Continuous therapy punishes a positional line for many hours.",filter:"Blood inside, dialysate outside. No replacement port is required for pure CVVHD.",dialysate:"The dose. About 20 to 25 mL/kg/h delivered, not a heroic 40, is the range the trials support.",effluent:"Dialysate out plus net ultrafiltrate. If the effluent is less than you prescribed, the dose is the effluent.",pump:"Often 100 to 200 mL/min, all day. Stopping the pump for hours is an unplanned gap in clearance."},
+   rx:[{k:"qb",l:"Blood flow",u:"mL/min",min:80,max:250,v:150,on:true},{k:"qd",l:"Dialysate",u:"mL/h",min:500,max:4000,v:1600,on:true},{k:"qr",l:"Replacement fluid",u:"mL/h",min:0,max:0,v:0,on:false},{k:"uf",l:"Net fluid removal",u:"mL/h",min:0,max:300,v:100,on:true},{k:"hrs",l:"Planned run",u:"h",min:12,max:24,v:24,on:true}],
+   pros:["Gentle solute fall and gentle fluid removal.","Excellent small-solute control if the circuit actually runs.","No replacement-fluid bags to hang, so the nursing task is simpler than haemofiltration."],
+   cons:["Circuit clotting stops the dose. Down-time is lost clearance.","Little convection, so middle molecules are not the point of this mode.","Immobilises the patient and consumes anticoagulant or a careful rinse plan."],
+   cases:[
+     {q:"Septic shock, potassium 6.4, pH 7.12, anuric, a swollen brain is not the issue. You want continuous small-solute clearance and few bags.",
+      options:[
+        {t:"CVVHD, effluent about 25 mL/kg/h, and a record of what was actually delivered", ok:true, why:"Diffusion, continuous, dosed on delivered effluent. Replacement fluid is not required."},
+        {t:"CVVH with the replacement rate set to zero", ok:false, why:"Haemofiltration without replacement and without meaningful ultrafiltration is not a dose. Zero replacement is not CVVHD either."},
+        {t:"Dialysate at 40 mL/kg/h because more clearance must be better", ok:false, why:"Trials of a higher effluent dose did not reduce mortality. They did increase cost and the chance of error."}
+      ]},
+     {q:"The night effluent is half of what you prescribed, because the filter clotted at 03:00 and was not replaced until morning.",
+      options:[
+        {t:"The dose is the prescribed number. The gap does not count", ok:false, why:"Clearance happened only while fluid left the filter."},
+        {t:"The dose is what reached the effluent bag. The gap has to be written down", ok:true, why:"Delivered dose is the therapy. A clotted filter is a silent stop."},
+        {t:"Double tomorrow to punish the gap, indefinitely", ok:false, why:"Make up a real gap if the patient needs it. Do not invent a new standard of 50 mL/kg/h."}
+      ]}
+   ]},
+  {id:"cvvh", name:"Continuous venovenous haemofiltration", short:"CVVH", tag:"Continuous convection",
+   principle:"Plasma water is forced across the membrane. Solutes come with the water. That is convection. The volume you remove is larger than the volume you want the patient to lose, so replacement fluid is given back, either before the filter or after it. There is no dialysate. Small solutes are cleared, and middle molecules are cleared better than by diffusion alone, because they ride with the water rather than waiting to diffuse.",
+   indications:["Continuous therapy when you specifically want convection.","A patient who needs a large exchange of plasma water and can be given sterile replacement at the right rate.","Situations where the team is practised at watching the filtration fraction so the filter does not clot."],
+   notFor:["Replacement set to zero. That is slow ultrafiltration, and the patient will empty.","Ignoring filtration fraction. Post-dilution is more efficient and clots sooner. Pre-dilution protects the filter and dilutes the clearance.","A dose argument that 35 to 40 mL/kg/h is the ethical minimum. It is not."],
+   flows:{blood:true,dialysate:false,replacement:true,uf:true,pd:false},
+   parts:{access:"Needs a reliable line. High filtration with a poor arterial draw collapses the circuit.",filter:"The convective surface. Watch the transmembrane pressure. A rising pressure with a dark filter is clot.",dialysate:"Off. If you turn dialysate on, you have left pure haemofiltration and you should say haemodiafiltration.",effluent:"Ultrafiltrate. Most of it is replaced. Only the net removal is the patient's fluid loss.",pump:"Blood flow high enough to keep the filtration fraction under about 25 percent, especially in post-dilution."},
+   rx:[{k:"qb",l:"Blood flow",u:"mL/min",min:100,max:300,v:200,on:true},{k:"qd",l:"Dialysate",u:"mL/h",min:0,max:0,v:0,on:false},{k:"qr",l:"Replacement",u:"mL/h",min:200,max:4000,v:1600,on:true},{k:"uf",l:"Net fluid removal",u:"mL/h",min:0,max:300,v:80,on:true},{k:"hrs",l:"Planned run",u:"h",min:12,max:24,v:24,on:true}],
+   pros:["Convection, so middle-molecule clearance is better than pure dialysis at a similar effluent.","Continuous and usually well tolerated if net ultrafiltration is modest.","The replacement fluid is a controlled electrolyte bath you can see."],
+   cons:["Bags, pumps and a filtration fraction to police.","Post-dilution haemoconcentrates the filter. Pre-dilution wastes some clearance.","Delivered dose still falls every hour the circuit is down."],
+   cases:[
+     {q:"You prescribe CVVH. Where does the replacement fluid go, and what do you watch?",
+      options:[
+        {t:"Before or after the filter, and you watch the filtration fraction. Post-dilution clears more and clots more", ok:true, why:"That is the real choice inside CVVH. Net fluid removal is not the replacement rate."},
+        {t:"Into the dialysate port. Replacement and dialysate are the same liquid", ok:false, why:"Dialysate stays outside the fibres. Replacement joins the blood."},
+        {t:"Nowhere. CVVH does not need replacement if you want convection", ok:false, why:"Without replacement, convection large enough to be a dose empties the patient."}
+      ]},
+     {q:"Blood flow 150 mL/min, haematocrit 30 percent, post-filter replacement and ultrafiltration totalling 2.5 litres an hour.",
+      options:[
+        {t:"Filtration fraction is high. Lower the filtration or raise the blood flow, or move some replacement pre-filter", ok:true, why:"Plasma flow is only about 100 mL/min. Taking 2.5 L/h from it is a filtration fraction around 40 percent. Filters clot."},
+        {t:"This is ideal. Higher fraction means better care", ok:false, why:"Past about 25 percent the filter, not the patient, is what you are treating."},
+        {t:"Add dialysate and keep the same filtration. The fraction does not change", ok:false, why:"You may add dialysate, but the fraction is about ultrafiltration, not about dialysate flow."}
+      ]}
+   ]},
+  {id:"cvvhdf", name:"Continuous venovenous haemodiafiltration", short:"CVVHDF", tag:"Diffusion and convection together",
+   principle:"Dialysate runs outside the fibres and replacement fluid joins the blood. Small solutes diffuse. Middle molecules follow the ultrafiltrate. The effluent dose is the sum of dialysate, replacement and net fluid removal, measured in the bag, not added up twice on the chart. The same 20 to 25 mL/kg/h target applies. Splitting it between diffusion and convection is a style, not a reason to double the dose.",
+   indications:["A continuous prescription when you want both mechanisms and the machine can run both pumps.","A practical way to reach a dose without an extreme filtration fraction: some of the effluent is dialysate, which does not haemoconcentrate the filter.","Unstable patients who need predictable small-solute control and some convective clearance."],
+   notFor:["Adding the dose twice, once as dialysate and again as 'extra convection', until the effluent is 50 mL/kg/h.","A patient who only needs fluid off. Both pumps are unnecessary.","Assuming the charted sum is the delivered dose after a clotted night."],
+   flows:{blood:true,dialysate:true,replacement:true,uf:true,pd:false},
+   parts:{access:"Same continuous catheter. Two fluid pumps do not forgive a kink.",filter:"Sees both a concentration gradient and a pressure gradient. Transmembrane pressure still means clot or too much ultrafiltration.",dialysate:"One half of a typical split. It clears urea without raising filtration fraction.",effluent:"Dialysate plus ultrafiltrate. This single number is the dose.",pump:"Blood flow enough for the convective share. Replacement pre or post filter, stated out loud."},
+   rx:[{k:"qb",l:"Blood flow",u:"mL/min",min:100,max:300,v:180,on:true},{k:"qd",l:"Dialysate",u:"mL/h",min:0,max:3000,v:1000,on:true},{k:"qr",l:"Replacement",u:"mL/h",min:0,max:3000,v:800,on:true},{k:"uf",l:"Net fluid removal",u:"mL/h",min:0,max:300,v:100,on:true},{k:"hrs",l:"Planned run",u:"h",min:12,max:24,v:24,on:true}],
+   pros:["The most flexible continuous mode.","You can keep filtration fraction sane by letting dialysate do some of the work.","One effluent target, whether the solute moved by diffusion or convection."],
+   cons:["More pumps, more bags, more ways to chart the dose wrongly.","Still loses the dose whenever the circuit stops.","Does not outperform a simpler mode just because both words are on the screen."],
+   cases:[
+     {q:"80 kg. You want 25 mL/kg/h. Which prescription matches?",
+      options:[
+        {t:"Dialysate 1000 mL/h plus replacement 800 mL/h plus net removal 200 mL/h. Effluent 2000 mL/h", ok:true, why:"25 mL/kg/h times 80 kg is 2000 mL/h. The effluent is the sum, once."},
+        {t:"Dialysate 2000 and replacement 2000, because each should be 25 mL/kg/h", ok:false, why:"That is 50 mL/kg/h. The trials do not ask for it."},
+        {t:"Net removal 2000 mL/h and no dialysate or replacement", ok:false, why:"That is two litres of blood volume an hour. It is not a dose."}
+      ]},
+     {q:"The filter pressure is climbing. Filtration fraction is 30 percent. Dialysate is only 300 mL/h and replacement is doing almost all the work.",
+      options:[
+        {t:"Move effluent from replacement toward dialysate, or lower the filtration", ok:true, why:"Dialysate clears urea without concentrating the blood in the fibres."},
+        {t:"Raise replacement further so the dose looks serious", ok:false, why:"You will clot the filter and then deliver nothing."},
+        {t:"Ignore transmembrane pressure. It always rises", ok:false, why:"A rising pressure is the filter telling you it is filling with clot."}
+      ]}
+   ]},
+  {id:"scuf", name:"Slow continuous ultrafiltration", short:"SCUF", tag:"Water only, all day",
+   principle:"A continuous circuit pulls plasma water and does not replace it, and does not run dialysate. Solute clearance is negligible. The only prescription that matters is the ultrafiltration rate, usually a few hundred millilitres an hour at most. Use it when the blood chemistry is acceptable and the lungs or the tissues are not.",
+   indications:["Diuretic-refractory fluid overload with a safe potassium, a safe pH and a urea you can live with.","A bridge while the heart or the lungs recover, if a blood circuit is acceptable.","The continuous cousin of isolated ultrafiltration. Same idea, different clock."],
+   notFor:["Hyperkalaemia, acidaemia, or a poison. There is no bath and no meaningful convection.","A large hourly ultrafiltration just because the machine can. Slow is the name.","Adding replacement 'to be kind' and still calling it SCUF. Kind replacement turns it into haemofiltration, and the net removal must be rewritten."],
+   flows:{blood:true,dialysate:false,replacement:false,uf:true,pd:false},
+   parts:{access:"A dialysis catheter, committed for many hours, for fluid only. Be sure the indication deserves a line.",filter:"Used as a water filter. A rising pressure still means clot or too much pull.",dialysate:"Off. On would make this haemodialysis.",effluent:"Equals the patient's fluid loss. Weigh the bag. Do not guess.",pump:"Low to moderate blood flow. The ultrafiltration rate is a few millilitres a minute, not a litre an hour."},
+   rx:[{k:"qb",l:"Blood flow",u:"mL/min",min:50,max:200,v:120,on:true},{k:"qd",l:"Dialysate",u:"mL/h",min:0,max:0,v:0,on:false},{k:"qr",l:"Replacement",u:"mL/h",min:0,max:0,v:0,on:false},{k:"uf",l:"Ultrafiltration",u:"mL/h",min:50,max:400,v:150,on:true},{k:"hrs",l:"Planned run",u:"h",min:8,max:24,v:16,on:true}],
+   pros:["Fluid leaves without a deliberate solute sweep, so osmolality is steadier than during dialysis.","The rate can be set to what the blood pressure tolerates, and left there.","No replacement bags."],
+   cons:["No treatment of potassium, acid or toxins.","Still a blood circuit: access, clotting, alarms.","Easy to leave running after the lungs are dry."],
+   cases:[
+     {q:"Pulmonary oedema. Potassium 4.1. pH 7.39. Bicarbonate 24. He has not responded to a loop diuretic. Blood pressure 100 systolic, warm.",
+      options:[
+        {t:"Slow continuous ultrafiltration, modest hourly rate, and stop when the oxygen allows", ok:true, why:"The solutes are acceptable. He needs water off, slowly."},
+        {t:"Intermittent haemodialysis with a low-potassium bath", ok:false, why:"You would be dialysing a normal potassium. Fluid removal can be done without that."},
+        {t:"A litre of saline, then another diuretic", ok:false, why:"The lungs are the problem. Do not add the fluid you are trying to remove."}
+      ]},
+     {q:"The same lungs, but the potassium is 7.0 and the T waves are peaked.",
+      options:[
+        {t:"SCUF, because the chest radiograph is the main finding", ok:false, why:"SCUF will not move that potassium. Calcium first if the ECG has changed, then a therapy with clearance."},
+        {t:"Calcium if the ECG has changed, then dialysis or continuous therapy with a bath or a real effluent dose", ok:true, why:"Two problems. Ultrafiltration solves only one of them."},
+        {t:"Exchange resin and SCUF", ok:false, why:"Resin is slow, and SCUF still does not clear potassium in time."}
+      ]}
+   ]},
+  {id:"pd", name:"Peritoneal dialysis", short:"PD", tag:"The peritoneum is the membrane",
+   principle:"Sterile fluid is run into the abdomen, left to dwell, and drained. Solutes diffuse between peritoneal capillaries and the dwell. Water follows the glucose osmotic gradient. There is no blood pump and no extracorporeal circuit. Clearance depends on dwell time, fill volume, membrane transport and how many exchanges you do. It is slower than blood-based dialysis for potassium and for poisons.",
+   indications:["Haemodynamic instability when a blood circuit is undesirable or unavailable.","A patient who cannot be anticoagulated and has no safe heparin-free blood therapy.","Someone who already has a working peritoneal catheter and a team that knows the exits and the dwells.","Heart failure fluid overload in selected patients, with the glucose doing the ultrafiltration."],
+   notFor:["A recent laparotomy, an open abdomen, a known peritoneal leak, or unaddressed sepsis of the abdominal wall.","Life-threatening hyperkalaemia when intermittent haemodialysis is in the building. The peritoneum is too slow for that hour.","A poison whose treatment is a high clearance now. Methanol and lithium do not wait for dwells if a dialyser is free."],
+   flows:{blood:false,dialysate:false,replacement:false,uf:false,pd:true},
+   parts:{access:"A peritoneal catheter, not a venous dialysis line. The exit site is a source of peritonitis if it is soaked or pulled.",filter:"The peritoneal membrane. It is not visible on a machine. Transport speed varies between people.",dialysate:"The dwell. Glucose 1.5 percent removes less water than 4.25 percent. Higher glucose is not a daily habit.","effluent":"The drain bag. A cloudy bag is peritonitis until proved otherwise. Weigh it. The difference from the fill is the ultrafiltration.",pump:"Gravity or a cycler. There is no blood pump to alarm. The alarms are clinical: pain, cloudiness, a drain that will not run."},
+   rx:[{k:"qb",l:"Fill volume",u:"mL",min:500,max:2500,v:2000,on:true},{k:"qd",l:"Dwell",u:"min",min:30,max:360,v:120,on:true},{k:"qr",l:"Exchanges in 24 h",u:"",min:4,max:24,v:8,on:true},{k:"uf",l:"Glucose",u:"percent x10",min:15,max:42,v:15,on:true},{k:"hrs",l:"Hours observed",u:"h",min:12,max:24,v:24,on:true}],
+   pros:["No extracorporeal blood, so no disequilibrium from a violent urea drop and no air embolism from a venous return.","Often kind to the blood pressure.","No systemic heparin."],
+   cons:["Peritonitis, leaks, and a membrane that may simply be too slow.","Glucose load. A 4.25 percent dwell is a drug, not a comfort.","Inadequate in a hypercatabolic patient if you needed a dialyser and did not say so."],
+   cases:[
+     {q:"No anticoagulant is safe. The dialysis catheter insertion failed. Blood pressure is 85 systolic. Potassium is 5.6 and rising slowly. A surgeon can place a peritoneal catheter.",
+      options:[
+        {t:"Peritoneal dialysis, with a plan to measure the drains and the potassium", ok:true, why:"Blood therapy is not available and the potassium is not yet an ECG emergency. The peritoneum is a real membrane."},
+        {t:"Force a femoral line and a hard intermittent session", ok:false, why:"You already failed the access, and the pressure will not take a hard session."},
+        {t:"Resin and observation", ok:false, why:"You have a way to dialyse. Use it, and watch the number."}
+      ]},
+     {q:"Potassium 7.4, sine-wave ECG, calcium already given. The haemodialysis machine is primed.",
+      options:[
+        {t:"Start intermittent haemodialysis. Do not wait for a peritoneal catheter", ok:true, why:"This potassium needs a dialyser in the next minutes, not a dwell."},
+        {t:"Acute peritoneal dialysis as the only plan", ok:false, why:"Too slow for a sine wave when a blood circuit is ready."},
+        {t:"A second dose of calcium and no removal", ok:false, why:"Calcium stabilises. It does not lower the potassium."}
+      ]}
+   ]},
+  {id:"apd", name:"Acute peritoneal dialysis", short:"Acute PD", tag:"Shorter dwells, more exchanges",
+   principle:"The membrane is the same. The prescription is not the outpatient one. In acute kidney injury the fills may be smaller at first, the dwells shorter, and the exchanges more frequent, so that potassium and fluid move in hours rather than in a lazy daytime schedule. A cycler or a trained nurse can do this. It remains peritoneal dialysis: no blood pump, slower than a dialyser, and dependent on a drain that actually drains.",
+   indications:["Acute kidney injury where blood-based therapy is unavailable, unsafe, or refused by the physiology.","Children and small adults, in programmes that use acute peritoneal dialysis as a standard.","A first day after catheter placement, with smaller fills, watching for leak, then an increase if the wound is dry."],
+   notFor:["Pretending a four-hour dwell four times a day is an acute prescription for a potassium of 7.","A leak at a fresh catheter site. More volume makes the leak worse.","Measuring success by the number of bags hung rather than by potassium, bicarbonate and the drain volumes."],
+   flows:{blood:false,dialysate:false,replacement:false,uf:false,pd:true},
+   parts:{access:"Often a freshly placed catheter. First fills are smaller because the tunnel and the wound are new.",filter:"Same peritoneum. Shorter dwells favour ultrafiltration and a quicker potassium drop, at the cost of more nursing.",dialysate:"More exchanges. Glucose chosen for the fluid you need to remove, not by habit.",effluent:"Every drain is a measurement. A falling potassium with a positive ultrafiltration is the dose happening.",pump:"Manual exchanges or a cycler. Write the dwell so the night shift does not leave a bag in for eight hours by accident."},
+   rx:[{k:"qb",l:"Fill volume",u:"mL",min:500,max:2000,v:1500,on:true},{k:"qd",l:"Dwell",u:"min",min:20,max:180,v:60,on:true},{k:"qr",l:"Exchanges in 24 h",u:"",min:6,max:24,v:12,on:true},{k:"uf",l:"Glucose",u:"percent x10",min:15,max:42,v:25,on:true},{k:"hrs",l:"Hours observed",u:"h",min:12,max:48,v:24,on:true}],
+   pros:["Can be started in places that will never own a continuous machine.","Kind to the circulation.","The prescription can be intensified by shortening the dwell, which is a real lever."],
+   cons:["Still too slow for the worst hyperkalaemia if haemodialysis exists.","Fresh catheters leak.","Peritonitis in acute kidney injury is a serious second illness."],
+   cases:[
+     {q:"A hospital with no haemodialysis. Potassium 6.2, no ECG changes, fluid overload, a peritoneal catheter in place.",
+      options:[
+        {t:"Acute peritoneal dialysis with frequent exchanges, and a potassium check after several drains", ok:true, why:"This is the modality the building can deliver. Make the dwells earn their keep, and measure the result."},
+        {t:"Four dwells of six hours, because that is the home schedule you remember", ok:false, why:"A home schedule is not an acute prescription for overload and a rising potassium."},
+        {t:"SCUF, although there is no machine", ok:false, why:"Naming a blood therapy you cannot start is not a plan."}
+      ]},
+     {q:"The new catheter leaks clear fluid from the wound during a 2 litre fill.",
+      options:[
+        {t:"Stop, smaller fill or a pause, surgical review. Do not keep forcing volume", ok:true, why:"A leak will not seal under a larger fill. Peritonitis starts in wet dressings."},
+        {t:"Use 4.25 percent glucose so the leak is 'useful ultrafiltration'", ok:false, why:"The fluid is in the abdominal wall, not in a drain bag."},
+        {t:"Ignore it. All new catheters leak", ok:false, why:"Some ooze. A running leak is a failed dwell."}
+      ]}
+   ]},
+  {id:"iuf", name:"Isolated ultrafiltration", short:"IUF", tag:"Water only, for a session",
+   principle:"An intermittent session on a haemodialysis machine with the dialysate flow off, or with the machine set to ultrafiltration only. Plasma water is removed for a few hours. Solutes are not deliberately cleared. Because osmolality does not collapse the way it does during dialysis, the blood pressure often tolerates the same fluid removal better than it would during a full haemodialysis. It is the short, sessional form of what SCUF does continuously.",
+   indications:["Fluid overload, diuretic failure, acceptable potassium and acid-base, and a patient who can sit a session.","Pulmonary oedema when you want water off more than you want urea down.","A person who becomes hypotensive whenever dialysis and ultrafiltration are combined, yet still needs volume off."],
+   notFor:["Hyperkalaemia, severe acidosis, uraemic pericarditis, or a poison. Turn the dialysate on, or use a continuous dose.","A daily habit in place of looking at why the sodium and the heart are failing.","Confusing it with SLED. SLED runs dialysate. Isolated ultrafiltration does not."],
+   flows:{blood:true,dialysate:false,replacement:false,uf:true,pd:false},
+   parts:{access:"Fistula or dialysis catheter, for a session of a few hours.",filter:"Dialyser used only as an ultrafilter.",dialysate:"Off. This is the entire distinction from haemodialysis.",effluent:"The ultrafiltrate. The session total is the fluid balance you ordered.",pump:"Ordinary blood flow. The ultrafiltration rate is the prescription, and it is still limited by the blood pressure."},
+   rx:[{k:"qb",l:"Blood flow",u:"mL/min",min:150,max:400,v:250,on:true},{k:"qd",l:"Dialysate",u:"mL/min",min:0,max:0,v:0,on:false},{k:"qr",l:"Replacement",u:"mL/h",min:0,max:0,v:0,on:false},{k:"uf",l:"Ultrafiltration",u:"mL/h",min:100,max:1000,v:400,on:true},{k:"hrs",l:"Duration",u:"h",min:2,max:5,v:3,on:true}],
+   pros:["Fluid removal with less osmotic shift than haemodialysis.","A defined session. The patient is not attached all day.","Uses a machine the haemodialysis unit already knows."],
+   cons:["No solute clearance.","Hypotension if you still set an aggressive hourly rate.","Does not treat the reason the patient keeps flooding, after the session ends."],
+   cases:[
+     {q:"Missed diuretics, oxygen on a mask, potassium 4.4, bicarbonate 26, blood pressure falls every time a full dialysis with fluid removal is attempted.",
+      options:[
+        {t:"Isolated ultrafiltration, at a rate the pressure tolerated last time", ok:true, why:"Solutes are fine. Separate the fluid removal from the dialysis that was dropping the pressure."},
+        {t:"SLED with a hard ultrafiltration, because longer is always safer", ok:false, why:"He does not need dialysate. Adding it recreates the osmotic drop you are trying to avoid."},
+        {t:"A 2 litre saline challenge to 'prove' he is overloaded", ok:false, why:"The mask has already proved it."}
+      ]},
+     {q:"During the session the potassium comes back at 6.6 and the monitor shows new peaked T waves.",
+      options:[
+        {t:"Stop pretending this is isolated ultrafiltration. Give calcium if the ECG warrants it, and turn on a dialysis bath", ok:true, why:"The indication changed while you were watching. Clearance is now required."},
+        {t:"Finish the ultrafiltration. The potassium can wait until tomorrow's clinic", ok:false, why:"Peaked T waves do not wait for a clinic."},
+        {t:"Speed the ultrafiltration. Concentrating the blood will lower the potassium", ok:false, why:"Removing water concentrates potassium. It does not clear it."}
+      ]}
+   ]}
+];
+
+const SECTIONS = ["Principle","Indications","Circuit","Prescription","Limits","Cases"];
+let current = null;
+let tab = 0;
+let picked = {};
+
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"\u0026amp;","<":"\u0026lt;",">":"\u0026gt;","\"":"\u0026quot;","'":"\u0026#39;"}[c];});}
+
+function circuit(mod){
+  const f = mod.flows;
+  const blood = f.blood ? "#e11d48" : "#334155";
+  const dial = f.dialysate ? "#38bdf8" : "#334155";
+  const rep = f.replacement ? "#a3e635" : "#334155";
+  const uf = f.uf ? "#fbbf24" : "#334155";
+  const dash = function(on){return on ? "flow" : "";};
+  if(f.pd){
+    return '<div class="figure"><svg viewBox="0 0 360 220" role="img" aria-label="Peritoneal dwell. Fluid enters the abdomen, dwells, and drains.">'+
+      '<rect x="110" y="40" width="140" height="150" rx="70" fill="#0f2744" stroke="#93c5fd" stroke-width="2"/>'+
+      '<text x="180" y="110" text-anchor="middle" fill="#dbeafe" font-size="14">Peritoneum</text>'+
+      '<path class="flow" d="M180 20 C180 40 180 50 180 70" stroke="#38bdf8" stroke-width="4" fill="none"/>'+
+      '<path class="flow" d="M180 150 C180 175 180 190 180 210" stroke="#fbbf24" stroke-width="4" fill="none"/>'+
+      '<text x="180" y="16" text-anchor="middle" fill="#7dd3fc" font-size="11">Fill</text>'+
+      '<text x="180" y="218" text-anchor="middle" fill="#fcd34d" font-size="11">Drain</text>'+
+      '</svg></div><p class="part">No blood leaves the body. The dwell is the dialysate. A cloudy drain is peritonitis until you have looked at it.</p>';
+  }
+  return '<div class="figure"><svg viewBox="0 0 360 230" role="img" aria-label="Blood circuit through a filter, with the flows this modality actually uses.">'+
+    '<rect x="150" y="70" width="64" height="100" rx="8" fill="#102033" stroke="#e2e8f0"/>'+
+    '<text x="182" y="124" text-anchor="middle" fill="#e2e8f0" font-size="12">Filter</text>'+
+    '<path class="'+dash(f.blood)+'" d="M30 90 H150" stroke="'+blood+'" stroke-width="5" fill="none"/>'+
+    '<path class="'+dash(f.blood)+'" d="M214 150 H330" stroke="'+blood+'" stroke-width="5" fill="none"/>'+
+    '<circle cx="30" cy="90" r="8" fill="'+blood+'" class="hit" data-part="access"/>'+
+    '<text x="30" y="78" text-anchor="middle" fill="#fecdd3" font-size="11">Access</text>'+
+    '<text x="330" y="142" text-anchor="middle" fill="#fecdd3" font-size="11">Return</text>'+
+    '<path class="'+dash(f.dialysate)+'" d="M250 190 H182 V170" stroke="'+dial+'" stroke-width="4" fill="none"/>'+
+    '<path class="'+dash(f.dialysate)+'" d="M182 70 V50 H250" stroke="'+dial+'" stroke-width="4" fill="none"/>'+
+    '<text x="268" y="44" fill="#7dd3fc" font-size="11">Dialysate in</text>'+
+    '<path class="'+dash(f.replacement)+'" d="M120 40 V70 H150" stroke="'+rep+'" stroke-width="4" fill="none"/>'+
+    '<text x="70" y="36" fill="#d9f99d" font-size="11">Replacement</text>'+
+    '<path class="'+dash(f.uf)+'" d="M182 170 V210" stroke="'+uf+'" stroke-width="4" fill="none"/>'+
+    '<text x="182" y="224" text-anchor="middle" fill="#fcd34d" font-size="11">Effluent</text>'+
+    '<circle cx="100" cy="90" r="14" fill="none" stroke="#94a3b8" class="hit" data-part="pump"/>'+
+    '<text x="100" y="94" text-anchor="middle" fill="#e2e8f0" font-size="9">Pump</text>'+
+    '</svg></div><div class="legend"><span><i style="background:#e11d48"></i>Blood</span><span><i style="background:#38bdf8"></i>Dialysate</span><span><i style="background:#a3e635"></i>Replacement</span><span><i style="background:#fbbf24"></i>Effluent</span></div>'+
+    '<p class="part" id="part">Blood stays inside the fibres. Dialysate stays outside. They meet only if the membrane breaks, and that is a blood-leak alarm. Tap the access or the pump.</p>';
+}
+
+function readout(mod){
+  const g = {};
+  mod.rx.forEach(function(r){
+    const el = document.getElementById("rx-"+r.k);
+    g[r.k] = el ? Number(el.value) : r.v;
+  });
+  const bits = [];
+  if(mod.flows.pd){
+    const glu = (g.uf/10).toFixed(2);
+    bits.push("Fill "+g.qb+" mL, dwell "+g.qd+" min, "+g.qr+" exchanges, glucose about "+glu+" percent.");
+    bits.push(g.qd < 90 ? "Short dwells move potassium and water faster. They also cost more nursing and more glucose." : "A long dwell is closer to a home schedule than to acute rescue.");
+  } else {
+    if(mod.flows.dialysate) bits.push(mod.id==="ihd" || mod.id==="sled" || mod.id==="pikrt" ? "Dialysate "+g.qd+" mL/min. Diffusion is on." : "Dialysate "+g.qd+" mL/h.");
+    else bits.push("Dialysate is off. Do not expect a diffusion clearance.");
+    if(mod.flows.replacement) bits.push("Replacement "+g.qr+" mL/h. Convection is on. Net removal is separate, at "+g.uf+" mL/h.");
+    else bits.push(mod.flows.uf ? "No replacement. Net ultrafiltration is "+g.uf+" mL/h." : "No ultrafiltration path.");
+    if(mod.id==="cvvh" || mod.id==="cvvhdf" || mod.id==="cvvhd"){
+      const eff = (mod.flows.dialysate?g.qd:0) + (mod.flows.replacement?g.qr:0) + g.uf;
+      bits.push("For an 80 kg patient, 25 mL/kg/h is 2000 mL/h of effluent. This prescription's effluent is about "+eff+" mL/h.");
+    }
+    if(mod.id==="ihd" && g.uf > 700) bits.push("That ultrafiltration rate is a common cause of hypotension in a four-hour session. Slower, or less total fluid.");
+    if(mod.id==="cvvh"){
+      const plasma = g.qb * 0.7;
+      const ff = plasma ? Math.round((g.qr+g.uf)/60/plasma*100) : 0;
+      bits.push("Rough post-dilution filtration fraction about "+ff+" percent. Keep it nearer 25 than 40.");
+    }
+  }
+  return bits.join(" ");
+}
+
+function render(){
+  const back = document.getElementById("back");
+  const crumb = document.getElementById("crumb");
+  if(!current){
+    back.hidden = true;
+    crumb.textContent = "Dialysis Learning Lab";
+    document.getElementById("app").innerHTML =
+      '<section class="hero"><h1>Dialysis Learning Lab</h1><p>Ten modalities. The mechanism first, then the circuit, then the hour you would actually choose it.</p></section>'+
+      '<div class="note"><b>SLED sits inside PIKRT.</b> Sustained low-efficiency dialysis is one way of doing prolonged intermittent kidney replacement. PIKRT is the umbrella. They are not two membranes and not two laws of diffusion.</div>'+
+      '<div class="grid">'+MODS.map(function(m){
+        return '<button class="card" type="button" data-id="'+m.id+'"><span class="kicker">'+esc(m.short)+'</span><b>'+esc(m.name)+'</b><span>'+esc(m.tag)+'</span></button>';
+      }).join("")+'</div>'+
+      '<p class="fine">Teaching page. Ranges are for learning the levers, not a prescription for a named patient.</p>';
+    document.querySelectorAll("[data-id]").forEach(function(b){b.onclick=function(){current=MODS.find(function(m){return m.id===b.getAttribute("data-id");}); tab=0; picked={}; render();};});
+    return;
+  }
+  back.hidden = false;
+  crumb.textContent = current.short;
+  const m = current;
+  let body = "";
+  if(tab===0) body = '<p>'+esc(m.principle)+'</p>';
+  if(tab===1) body = '<h2>When it fits</h2><ul>'+m.indications.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul><h2>When it does not</h2><ul>'+m.notFor.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul>';
+  if(tab===2) body = circuit(m);
+  if(tab===3){
+    body = '<div class="sliders">'+m.rx.map(function(r){
+      return '<label class="'+(r.on?'':'dead')+'">'+esc(r.l)+' <span id="lab-'+r.k+'">'+r.v+' '+esc(r.u)+'</span><input id="rx-'+r.k+'" type="range" min="'+r.min+'" max="'+r.max+'" value="'+r.v+'" '+(r.on?'':'disabled')+'></label>';
+    }).join("")+'</div><div class="read" id="read"></div><p class="fine">Grey levers are off for this modality. Turning them on would make it a different therapy. Say the new name if you do.</p>';
+  }
+  if(tab===4) body = '<h2>What it does well</h2><ul>'+m.pros.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul><h2>What it will not do</h2><ul>'+m.cons.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul>';
+  if(tab===5){
+    body = m.cases.map(function(c,i){
+      return '<p><b>'+(i+1)+'.</b> '+esc(c.q)+'</p>'+c.options.map(function(o,j){
+        const mark = picked[i]===j ? (o.ok?' good':' bad') : '';
+        return '<button type="button" class="choice'+mark+'" data-c="'+i+'" data-o="'+j+'">'+esc(o.t)+'</button>';
+      }).join("")+(picked[i]!=null ? '<p class="fb">'+(c.options[picked[i]].ok?'Right. ':'Not that. ')+esc(c.options[picked[i]].why)+'</p>' : '');
+    }).join("");
+  }
+  document.getElementById("app").innerHTML =
+    '<p class="kicker">'+esc(m.name)+'</p><div class="tabs">'+SECTIONS.map(function(name,i){
+      return '<button type="button" class="'+(i===tab?'on':'')+'" data-tab="'+i+'">'+name+'</button>';
+    }).join("")+'</div><section class="panel">'+body+'</section>';
+  document.querySelectorAll("[data-tab]").forEach(function(b){b.onclick=function(){tab=Number(b.getAttribute("data-tab")); render();};});
+  if(tab===2){
+    document.querySelectorAll("[data-part]").forEach(function(el){
+      el.onclick=function(){
+        const key = el.getAttribute("data-part");
+        const p = document.getElementById("part");
+        if(p) p.textContent = m.parts[key] || m.parts.access;
+      };
+    });
+  }
+  if(tab===3){
+    const paint=function(){
+      m.rx.forEach(function(r){
+        const el=document.getElementById("rx-"+r.k);
+        const lab=document.getElementById("lab-"+r.k);
+        if(el&&lab) lab.textContent = el.value+" "+r.u;
+      });
+      const box=document.getElementById("read");
+      if(box) box.textContent = readout(m);
+    };
+    document.querySelectorAll(".sliders input").forEach(function(el){el.oninput=paint;});
+    paint();
+  }
+  if(tab===5){
+    document.querySelectorAll("[data-c]").forEach(function(b){
+      b.onclick=function(){
+        picked[b.getAttribute("data-c")] = Number(b.getAttribute("data-o"));
+        render();
+      };
+    });
+  }
+}
+document.getElementById("back").onclick=function(){current=null; render();};
+render();
+</script>
+</body>
+</html>

@@ -262,18 +262,27 @@
   function quietLine(){
     if(typeof window.stopSpoken === "function") window.stopSpoken();
   }
-  function openEmptyBay(title){
+  function openDialysis(){
     quietLine();
     const room = document.getElementById("room");
     document.body.classList.add("in", "enter");
     room.innerHTML =
       '<button type="button" class="back" id="back">Back to ICU</button>'+
-      '<h2>'+title+'</h2>'+
-      '<p class="lede">This section is empty.</p>';
+      '<h2>Dialysis</h2>'+
+      '<p class="lede">The machine is on. The learning lab is the circuit and the ten modalities. Practice is one skill, or a whole session.</p>'+
+      '<a class="card" data-mod="Dialysis_Learning_Lab.html?v=20261028k"><b>Dialysis Learning Lab</b><span>IHD, SLED, PIKRT, the continuous modes, ultrafiltration and the peritoneum. SLED sits inside prolonged intermittent therapy.</span></a>'+
+      '<a class="card" data-mod="Dialysis_Practice_Simulator.html?v=20261028k"><b>Practice by module</b><span>Indication, modality, prescription, the machine, alarms, fluids and anticoagulation.</span></a>'+
+      '<a class="card" data-mod="Dialysis_Practice_Simulator.html?mode=full&v=20261028k"><b>Full clinical cases</b><span>Shock, missed dialysis with wet lungs, and an injured brain. The whole session.</span></a>';
     document.getElementById("back").onclick = function(){
       document.body.classList.remove("in", "enter");
       room.innerHTML = "";
     };
+    room.querySelectorAll("[data-mod]").forEach(function(card){
+      card.onclick = function(event){
+        event.preventDefault();
+        openModule(card.getAttribute("data-mod"), card.querySelector("b").textContent);
+      };
+    });
   }
   function openModule(url, title){
     quietLine();
@@ -334,7 +343,7 @@
     else if(go === "defib") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261025c", "Defibrillator");
     else if(go === "vent") openModule("Ventilator_Waveform_Troubleshooting.html?v=20261025a", "Ventilator");
     else if(go === "monitor") openShock();
-    else if(go === "dialysis") openEmptyBay("Dialysis");
+    else if(go === "dialysis") openDialysis();
     else if(go === "patient") leaveForBody();
   });
   document.getElementById("icu-audio").addEventListener("click", function(event){
