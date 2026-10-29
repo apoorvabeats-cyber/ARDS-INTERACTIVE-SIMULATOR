@@ -25,25 +25,28 @@ header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;marg
 #status{margin:6px 12px 0;color:var(--warm);font-size:14px;line-height:1.35;min-height:1.35em}
 .bar{display:flex;gap:8px;overflow:auto;padding:8px 12px;-webkit-overflow-scrolling:touch}
 .bar button{flex:none;font-size:14px}
-.stage{display:flex;flex-direction:column;gap:8px;padding:0 12px 8px}
+
+.stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:8px;padding:0 8px 8px}
 .panel{background:#0c1822;border:1px solid var(--line);border-radius:16px;overflow:hidden;position:relative;min-width:0}
 .panel h2{margin:0;padding:8px 10px 0;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--warm);font-weight:650}
-#heart{width:100%;height:34dvh;min-height:220px;display:block;touch-action:none}
+#heart{width:100%;height:42dvh;min-height:200px;display:block;touch-action:none}
 #heartmsg{position:absolute;inset:36px 12px auto;color:var(--muted);font-size:14px}
-.chest-box{width:min(100%,440px);aspect-ratio:1;margin:0 auto;position:relative;touch-action:none}
-.chest-box svg{width:100%;height:100%;display:block}
+.tag{position:absolute;left:8px;right:8px;bottom:8px;margin:0;background:rgba(7,17,26,.88);border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:13px;line-height:1.3;pointer-events:none}
+.chest-box{position:relative;height:42dvh;min-height:200px;touch-action:none;background:#14202c}
+.chest-box > svg{width:100%;height:100%;display:block}
+#probe svg{width:40px;height:64px;display:block}
+#hint{position:absolute;left:8px;right:8px;top:8px;margin:0;padding:6px 8px;border-radius:10px;background:rgba(7,17,26,.78);color:var(--paper);font-size:13px;line-height:1.3;pointer-events:none}
+#hint.hide{opacity:0}
 #contact,#probe{position:absolute;pointer-events:none}
-#contact{width:22px;height:22px;border-radius:50%;border:2px solid var(--warm);left:calc(var(--x) * 1%);top:calc(var(--y) * 1%);transform:translate(-50%,-50%);opacity:0}
-#contact.on{opacity:.9}
-#probe{width:28px;height:42px;left:calc(var(--x) * 1%);top:calc(var(--y) * 1%);transform:translate(-50%,calc(-78% - var(--lift)*34px)) rotate(calc(var(--rot)*1deg));transition:transform .08s linear}
-.probe-foot{width:28px;height:16px;border-radius:6px 6px 4px 4px;background:#d9c7a6;border:1px solid #8c7352}
-.probe-neck{width:10px;height:26px;margin:-2px auto 0;border-radius:3px;background:#8aa4b0}
-.dials{display:flex;gap:10px;padding:0 12px 10px}
+#contact{width:28px;height:28px;border-radius:50%;border:2px solid #9fd4ff;box-shadow:0 0 12px rgba(120,190,255,.8);left:calc(var(--x) * 1%);top:calc(var(--y) * 1%);transform:translate(-50%,-50%);opacity:0}
+#contact.on{opacity:1}
+#probe{width:40px;height:64px;left:calc(var(--x) * 1%);top:calc(var(--y) * 1%);transform-origin:50% 88%;transform:translate(-50%,calc(-88% - var(--lift) * 36px)) rotate(calc(var(--spin) * 1deg));transition:transform .06s linear}
+.dials{display:flex;gap:10px;padding:0 10px 8px}
 .dials label{flex:1;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
 .dials input{width:100%}
-.scan{display:flex;flex-direction:column;background:#02060a}
-#echo{width:100%;height:30dvh;min-height:200px;display:block}
-#ecg{width:100%;height:132px;display:block;background:#06140c;border-top:1px solid rgba(127,212,150,.25)}
+.scan{grid-column:1 / -1;display:flex;flex-direction:column;background:#02060a}
+#echo{width:100%;height:26dvh;min-height:160px;display:block}
+#ecg{width:100%;height:120px;display:block;background:#06140c;border-top:1px solid rgba(127,212,150,.25)}
 .caption{margin:0;padding:6px 10px 8px;color:var(--muted);font-size:13px}
 .sheet{padding:4px 14px calc(18px + env(safe-area-inset-bottom))}
 .sheet h3{font-family:Figtree,sans-serif;font-weight:650;font-size:18px;margin:8px 0}
@@ -57,10 +60,10 @@ header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;marg
 #bull path,#bull circle{cursor:pointer;stroke:#07111a;stroke-width:.6}
 .ef{width:100%}
 @media(min-width:980px){
-  .stage{flex-direction:row;align-items:stretch}
-  .panel{flex:1}
-  #heart{height:46dvh}
-  #echo{height:34dvh}
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1.05fr) minmax(0,.95fr)}
+  .scan{grid-column:auto;grid-row:1}
+  #heart,.chest-box{height:64dvh}
+  #echo{height:46dvh}
 }
 </style>
 </head>
@@ -78,31 +81,44 @@ header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;marg
     <h2>Heart</h2>
     <canvas id="heart"></canvas>
     <p id="heartmsg">Opening the heart…</p>
+    <p id="tag" class="tag">No coronary blockade</p>
   </section>
-  <section class="panel" aria-label="Chest and probe">
-    <h2>Chest</h2>
+  <section class="panel" aria-label="Patient and probe">
+    <h2>Patient</h2>
     <div class="chest-box" id="torso">
-      <svg viewBox="0 0 100 100" role="img" aria-label="Supine chest. Drag a finger to place the probe.">
-        <path d="M6 34 C16 16 30 18 38 24 L38 10 H62 V24 C70 18 84 16 94 34 L90 78 C72 94 28 94 10 78 Z" fill="#cbbba6" stroke="#8d7b68"/>
-        <path d="M18 32 C30 26 40 30 46 36 M82 32 C70 26 60 30 54 36" fill="none" stroke="#a89480" stroke-width="1.2"/>
-        <path d="M22 46 C34 40 42 44 48 50 M78 46 C66 40 58 44 52 50 M24 58 C36 52 44 56 49 62 M76 58 C64 52 56 56 51 62" fill="none" stroke="#b5a28e" stroke-width=".8"/>
-        <line x1="50" y1="28" x2="50" y2="70" stroke="#8d7b68" stroke-width="1.4"/>
-        <circle cx="50" cy="70" r="1.3" fill="#6e5c4a"/>
-        <ellipse id="z-para" cx="63" cy="43" rx="12" ry="9" fill="none" stroke="#8d7b68" stroke-dasharray="1.5 1.2"/>
-        <ellipse id="z-apex" cx="76" cy="58" rx="11" ry="9" fill="none" stroke="#8d7b68" stroke-dasharray="1.5 1.2"/>
-        <ellipse id="z-sub" cx="50" cy="76" rx="9" ry="6" fill="none" stroke="#8d7b68" stroke-dasharray="1.5 1.2"/>
-        <ellipse id="z-ivc" cx="37" cy="78" rx="8" ry="6" fill="none" stroke="#8d7b68" stroke-dasharray="1.5 1.2"/>
-        <text x="63" y="40" text-anchor="middle" font-size="3.2" fill="#3c3228">Parasternal</text>
-        <text x="76" y="56" text-anchor="middle" font-size="3.2" fill="#3c3228">Apex</text>
-        <text x="50" y="74" text-anchor="middle" font-size="3.2" fill="#3c3228">Subcostal</text>
-        <text x="37" y="80" text-anchor="middle" font-size="3.1" fill="#3c3228">IVC</text>
+      <svg class="patient" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Patient lying supine. A finger on the chest is the echo probe.">
+        <rect width="100" height="100" fill="#14202c"/>
+        <ellipse cx="50" cy="18" rx="10" ry="8.2" fill="#c4a48c"/>
+        <path d="M43.2 17 q2.2 1.1 3.6 0 M53.2 17 q2.2 1.1 3.6 0" fill="none" stroke="#5c4638" stroke-width=".7" stroke-linecap="round"/>
+        <path d="M49.2 19.4 v2" stroke="#5c4638" stroke-width=".55"/>
+        <path d="M47.2 22.6 q2.8 1.2 5.6 0" fill="none" stroke="#8d6b58" stroke-width=".45"/>
+        <path d="M44 23 h12 v7 h-12 z" fill="#c4a48c"/>
+        <path d="M6 34 C16 22 30 24 38 28 L40 21 h20 l2 7 C70 24 84 22 94 34 L90 80 C72 94 28 94 10 80 Z" fill="#cbb59e"/>
+        <path d="M18 31 C30 26 40 30 46 34 M82 31 C70 26 60 30 54 34" fill="none" stroke="#a8927c" stroke-width="1"/>
+        <line x1="50" y1="27" x2="50" y2="68" stroke="#8d7b68" stroke-width="1.2"/>
+        <circle cx="50" cy="69" r="1.2" fill="#6a5848"/>
+        <ellipse cx="38" cy="40" rx="1.5" ry="1.1" fill="#b08978"/>
+        <ellipse cx="62" cy="40" rx="1.5" ry="1.1" fill="#b08978"/>
+        <path d="M22 48 C34 42 44 46 49 52 M78 48 C66 42 56 46 51 52" fill="none" stroke="#b39d88" stroke-width=".7"/>
+        <ellipse id="z-para" cx="63" cy="43" rx="11" ry="8" fill="none" stroke="rgba(80,60,40,.45)" stroke-dasharray="1.4 1.1"/>
+        <ellipse id="z-apex" cx="76" cy="58" rx="10" ry="8" fill="none" stroke="rgba(80,60,40,.45)" stroke-dasharray="1.4 1.1"/>
+        <ellipse id="z-sub" cx="50" cy="76" rx="8" ry="5.5" fill="none" stroke="rgba(80,60,40,.45)" stroke-dasharray="1.4 1.1"/>
+        <ellipse id="z-ivc" cx="37" cy="78" rx="7" ry="5" fill="none" stroke="rgba(80,60,40,.45)" stroke-dasharray="1.4 1.1"/>
       </svg>
+      <p id="hint">Put a finger on the chest. The finger is the probe. Twist the finger and the probe turns on its axis.</p>
       <div id="contact"></div>
-      <div id="probe" aria-hidden="true"><div class="probe-foot"></div><div class="probe-neck"></div></div>
+      <div id="probe" aria-hidden="true">
+        <svg viewBox="0 0 40 64" width="40" height="64">
+          <rect x="11" y="2" width="18" height="34" rx="6" fill="#e6edf2" stroke="#7e8c99"/>
+          <rect x="16" y="7" width="8" height="7" rx="1.5" fill="#9aabba"/>
+          <path d="M7 36 h26 l-5 16 h-16 z" fill="#d5dee6" stroke="#7e8c99"/>
+          <rect x="9" y="50" width="22" height="10" rx="3" fill="#b9c9d6" stroke="#6e7e8e"/>
+        </svg>
+      </div>
     </div>
     <div class="dials">
-      <label>Rotate <input id="rot" type="range" min="0" max="120" value="18"></label>
-      <label>Tilt <input id="tilt" type="range" min="0" max="100" value="40"></label>
+      <label>Turn <input id="rot" type="range" min="0" max="120" value="18"></label>
+      <label>Rock <input id="tilt" type="range" min="0" max="100" value="40"></label>
     </div>
   </section>
   <section class="panel scan" aria-label="Simulated echo and ECG">
@@ -122,8 +138,8 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 const LV = ["bA","bAS","bIS","bI","bIL","bAL","mA","mAS","mIS","mI","mIL","mAL","aA","aS","aI","aL","apex"];
 const LEADS = ["I","II","III","aVR","aVL","aVF","V1","V2","V3","V4","V5","V6","V4R"];
 const TABS = [
-  ["anatomy","Anatomy"],["coronary","Coronary supply"],["chambers","Chambers"],["valves","Valves"],
-  ["global","Global hypokinesia"],["rwma","RWMA"],["probe","Echo"],["ecg","ECG"],["cases","Cases"]
+  ["anatomy","Heart"],["coronary","Supply"],["chambers","Chambers"],["valves","Valves"],
+  ["global","Global hypokinesia"],["rwma","RWMA"],["cases","Practice"]
 ];
 const LESIONS = [
   ["none","No lesion"],["ladP","LAD proximal"],["ladM","LAD mid"],["ladD","LAD distal"],
@@ -178,10 +194,10 @@ const INFO = {
 };
 
 const state = {
-  tab:"probe", lesion:"none", phase:"normal", dominance:"right", custom:false, globalOn:false, ef:55,
+  tab:"anatomy", lesion:"none", phase:"normal", dominance:"right", custom:false, globalOn:false, ef:55,
   wall:Object.fromEntries(LV.map(function(id){ return [id,"normal"]; })),
   rv:false, effusion:false, alternans:false, lowQrs:false,
-  probe:{down:false,x:63,y:43,rot:18,tilt:40,lift:1},
+  probe:{down:false,x:63,y:43,rot:18,tilt:40,lift:1,spin:18,twistBase:null},
   view:"plax", score:0, asked:0, caseId:null, qIx:0, locked:false
 };
 
@@ -301,6 +317,28 @@ function windowFrom(){
 function lesionName(){
   const row = LESIONS.find(function(row){ return row[0]===state.lesion; });
   return row ? row[1] : "No lesion";
+}
+function territoryPhrase(){
+  const id = state.lesion;
+  const dom = state.dominance==="left";
+  const map = {
+    ladP:"anterior wall, septum and apex",
+    ladM:"mid and apical anterior wall and septum",
+    ladD:"apex",
+    lcxP: dom ? "lateral and inferior walls" : "lateral wall",
+    lcxD:"apical lateral wall",
+    rcaP: dom ? "right ventricle" : "inferior wall and right ventricle",
+    rcaD: dom ? "a small right-sided territory" : "inferior wall",
+    lm:"anterior and lateral walls",
+    multi:"more than one wall"
+  };
+  return map[id] || "";
+}
+function arteryColour(){
+  if(state.lesion.indexOf("lcx")===0) return 0xf0b429;
+  if(state.lesion.indexOf("rca")===0) return 0x4c8dff;
+  if(state.lesion==="multi") return 0xff7a45;
+  return 0xff4d3a;
 }
 function phaseName(){
   const row = PHASES.find(function(row){ return row[0]===state.phase; });
@@ -678,7 +716,7 @@ let selected = null;
 ["anterior","septal","inferior","lateral","apex","rv"].forEach(function(id){
   const mesh = new THREE.Mesh(
     new THREE.SphereGeometry(1, 18, 14),
-    new THREE.MeshStandardMaterial({color:0xff5a3c, emissive:0xff5a3c, emissiveIntensity:1.15, transparent:true, opacity:0.95})
+    new THREE.MeshBasicMaterial({color:0xffe14a, transparent:true, opacity:0.9, depthTest:true})
   );
   mesh.visible = false;
   mesh.userData.id = id;
@@ -699,30 +737,36 @@ function worldCenter(name){
 }
 function paintHeart(){
   const culprit = CULPRIT[state.lesion] || [];
-  const dim = state.lesion!=="none" && state.phase!=="normal";
+  const dim = state.lesion!=="none";
+  const glow = arteryColour();
   meshes.forEach(function(mesh){
     const hot = culprit.indexOf(mesh.name)!==-1 || mesh===selected;
-    mesh.material.color.set(colourOf(mesh.name));
-    mesh.material.emissive.set(hot ? 0xe2b48a : 0x140804);
-    mesh.material.emissiveIntensity = hot ? 0.7 : 0.04;
-    mesh.material.opacity = !dim || hot || mesh===selected ? 1 : 0.55;
+    mesh.material.color.set(hot && /artery|interventricular|circumflex|coronary/i.test(mesh.name) ? glow : colourOf(mesh.name));
+    mesh.material.emissive.set(hot ? 0xfff3c4 : 0x140804);
+    mesh.material.emissiveIntensity = hot ? 2.4 : 0.04;
+    mesh.material.opacity = !dim || hot || mesh===selected ? 1 : 0.45;
   });
   const worst = {anterior:1,septal:1,inferior:1,lateral:1,apex:1};
   Object.keys(ZONE_OF).forEach(function(zone){
     worst[zone] = mean(ZONE_OF[zone]);
   });
+  const fed = state.custom
+    ? LV.filter(function(seg){ return state.wall[seg]!=="normal"; })
+    : (state.lesion==="none" ? [] : segmentsFor(state.lesion));
+  function zoneOn(id){
+    return (ZONE_OF[id]||[]).some(function(seg){ return fed.indexOf(seg)!==-1; });
+  }
   Object.keys(markers).forEach(function(id){
     const mesh = markers[id];
     if(id==="rv"){
-      mesh.visible = state.rv;
-      mesh.material.color.set(0xc45b4a);
+      mesh.visible = state.rv || (state.lesion==="rcaP" && state.dominance==="right" && state.phase!=="normal");
+      mesh.material.color.set(0x7eb6ff);
       return;
     }
-    const m = worst[id];
-    mesh.visible = m<0.85 && state.phase!=="normal";
-    const aki = m<0.2;
-    mesh.material.color.set(aki ? 0xc45b4a : 0xd7a15a);
-    mesh.material.emissive.set(aki ? 0xc45b4a : 0xd7a15a);
+    const on = zoneOn(id);
+    mesh.visible = on;
+    mesh.material.color.set(state.phase==="ischaemia" ? 0xf0b429 : 0xffe14a);
+    mesh.scale.setScalar(modelRadius * 0.12);
   });
 }
 function placeMarkers(){
@@ -751,7 +795,7 @@ function placeMarkers(){
   anterior.normalize();
   if(anterior.z<0) anterior.negate();
   const down = new THREE.Vector3(0,-1,0);
-  const R = modelRadius * 0.62;
+  const R = modelRadius * 0.38;
   const spot = {
     anterior: lv.clone().addScaledVector(anterior, R),
     lateral: lv.clone().addScaledVector(lateral, R),
@@ -760,12 +804,11 @@ function placeMarkers(){
     apex: apex,
     rv: rv ? rv.clone() : lv.clone()
   };
-  const scale = modelRadius * 0.16;
   Object.keys(spot).forEach(function(id){
-    const local = modelWrap.worldToLocal(spot[id].clone());
-    markers[id].position.copy(local);
-    markers[id].scale.setScalar(scale);
-    modelWrap.add(markers[id]);
+    markers[id].position.copy(spot[id]);
+    markers[id].scale.setScalar(modelRadius * 0.12);
+    markers[id].renderOrder = 20;
+    scene.add(markers[id]);
   });
 }
 function fit(object){
@@ -813,6 +856,7 @@ new GLTFLoader().load("cardiac/heart.glb?v=20261029c", function(gltf){
   modelWrap = gltf.scene;
   gltf.scene.traverse(function(obj){
     if(!obj.isMesh) return;
+    obj.name = obj.name.replace(/_/g, " ");
     obj.material = new THREE.MeshStandardMaterial({
       color: colourOf(obj.name), roughness:0.62, metalness:0.04, side:THREE.DoubleSide, transparent:true
     });
@@ -832,27 +876,69 @@ new GLTFLoader().load("cardiac/heart.glb?v=20261029c", function(gltf){
 const torso = document.getElementById("torso");
 const probeEl = document.getElementById("probe");
 const contactEl = document.getElementById("contact");
+function viewMetrics(){
+  const rect = torso.getBoundingClientRect();
+  const scale = Math.min(rect.width/100, rect.height/100) || 1;
+  const ox = (rect.width - 100*scale)/2;
+  const oy = (rect.height - 100*scale)/2;
+  return {scale:scale, ox:ox, oy:oy};
+}
 function paintProbe(){
   const p = state.probe;
-  const style = "--x:"+p.x+";--y:"+p.y+";--rot:"+p.rot+";--lift:"+p.lift;
-  probeEl.style.cssText = style;
-  contactEl.style.cssText = style;
+  const m = viewMetrics();
+  const left = m.ox + p.x * m.scale;
+  const top = m.oy + p.y * m.scale;
+  const lift = p.lift * 36;
+  const transform = "translate(-50%, calc(-88% - "+lift+"px)) rotate("+p.spin+"deg)";
+  probeEl.style.left = left+"px";
+  probeEl.style.top = top+"px";
+  probeEl.style.transform = transform;
+  contactEl.style.left = left+"px";
+  contactEl.style.top = top+"px";
+  contactEl.style.transform = "translate(-50%,-50%)";
   contactEl.classList.toggle("on", p.down);
-  document.getElementById("rot").value = String(Math.round(p.rot));
+  const hint = document.getElementById("hint");
+  if(hint) hint.classList.toggle("hide", p.down);
+  document.getElementById("rot").value = String(Math.round(Math.max(0, Math.min(120, p.rot))));
   document.getElementById("tilt").value = String(Math.round(p.tilt));
   const meta = VIEW[state.view] || VIEW.off;
   document.getElementById("viewtitle").textContent = meta.name;
   ["z-para","z-apex","z-sub","z-ivc"].forEach(function(id){
-    document.getElementById(id).setAttribute("stroke", "#8d7b68");
+    const node = document.getElementById(id);
+    if(node) node.setAttribute("stroke", "rgba(80,60,40,.45)");
   });
   const map = {plax:"z-para","psax-av":"z-para","psax-mv":"z-para","psax-pap":"z-para",a4c:"z-apex",a2c:"z-apex",a3c:"z-apex",a5c:"z-apex",sc4:"z-sub",ivc:"z-ivc"};
   const zone = document.getElementById(map[state.view] || "");
-  if(zone && p.down) zone.setAttribute("stroke", "#e2b48a");
+  if(zone && p.down) zone.setAttribute("stroke", "#9fd4ff");
+}
+const pointers = new Map();
+function angleDelta(a, b){
+  let d = b - a;
+  while(d > 180) d -= 360;
+  while(d < -180) d += 360;
+  return d;
+}
+function foldSpin(){
+  let s = state.probe.spin % 180;
+  if(s < 0) s += 180;
+  state.probe.rot = s * (120/180);
+}
+function primaryPoint(){
+  return pointers.values().next().value || null;
+}
+function applyTwist(){
+  if(pointers.size < 2) return;
+  const pts = Array.from(pointers.values());
+  const ang = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * 180 / Math.PI;
+  if(state.probe.twistBase == null) state.probe.twistBase = ang - state.probe.spin;
+  state.probe.spin = ang - state.probe.twistBase;
+  foldSpin();
 }
 function moveProbe(clientX, clientY, down){
   const rect = torso.getBoundingClientRect();
-  state.probe.x = clamp((clientX-rect.left)/rect.width*100, 3, 97);
-  state.probe.y = clamp((clientY-rect.top)/rect.height*100, 6, 96);
+  const m = viewMetrics();
+  state.probe.x = clamp((clientX-rect.left-m.ox)/m.scale, 3, 97);
+  state.probe.y = clamp((clientY-rect.top-m.oy)/m.scale, 6, 96);
   state.probe.down = down;
   state.probe.lift = down ? 0 : 1;
   if(down) state.view = windowFrom();
@@ -861,25 +947,63 @@ function moveProbe(clientX, clientY, down){
   syncProbeCopy();
 }
 torso.addEventListener("pointerdown", function(e){
-  torso.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, {x:e.clientX, y:e.clientY, heading:null});
+  try{ torso.setPointerCapture(e.pointerId); }catch(err){}
   e.preventDefault();
-  moveProbe(e.clientX, e.clientY, true);
+  if(pointers.size >= 2) state.probe.twistBase = null;
+  applyTwist();
+  const point = primaryPoint();
+  moveProbe(point.x, point.y, true);
 });
 torso.addEventListener("pointermove", function(e){
-  if(!state.probe.down) return;
+  const prev = pointers.get(e.pointerId);
+  if(!prev || !state.probe.down) return;
   e.preventDefault();
-  moveProbe(e.clientX, e.clientY, true);
+  const dx = e.clientX - prev.x;
+  const dy = e.clientY - prev.y;
+  const dist = Math.hypot(dx, dy);
+  if(pointers.size >= 2){
+    prev.x = e.clientX;
+    prev.y = e.clientY;
+    applyTwist();
+  } else if(dist > 6){
+    const head = Math.atan2(dy, dx) * 180 / Math.PI;
+    if(prev.heading != null){
+      const turn = angleDelta(prev.heading, head);
+      if(Math.abs(turn) > 7 && Math.abs(turn) < 140) state.probe.spin += turn;
+    }
+    prev.heading = head;
+    prev.x = e.clientX;
+    prev.y = e.clientY;
+    foldSpin();
+  } else {
+    prev.x = e.clientX;
+    prev.y = e.clientY;
+  }
+  const point = primaryPoint();
+  moveProbe(point.x, point.y, true);
 });
 function liftProbe(){
   state.probe.down = false;
   state.probe.lift = 1;
+  state.probe.twistBase = null;
   paintProbe();
   paintStatus();
 }
-torso.addEventListener("pointerup", liftProbe);
-torso.addEventListener("pointercancel", liftProbe);
+function endPointer(e){
+  pointers.delete(e.pointerId);
+  state.probe.twistBase = null;
+  if(!pointers.size) liftProbe();
+  else {
+    const point = primaryPoint();
+    moveProbe(point.x, point.y, true);
+  }
+}
+torso.addEventListener("pointerup", endPointer);
+torso.addEventListener("pointercancel", endPointer);
 document.getElementById("rot").addEventListener("input", function(){
   state.probe.rot = Number(this.value);
+  state.probe.spin = Number(this.value);
   if(state.probe.down) state.view = windowFrom();
   paintProbe(); paintStatus(); syncProbeCopy();
 });
@@ -891,7 +1015,7 @@ document.getElementById("tilt").addEventListener("input", function(){
 function jump(view){
   const p = PRESET[view];
   if(!p) return;
-  state.probe.x = p.x; state.probe.y = p.y; state.probe.rot = p.rot; state.probe.tilt = p.tilt;
+  state.probe.x = p.x; state.probe.y = p.y; state.probe.rot = p.rot; state.probe.tilt = p.tilt; state.probe.spin = p.rot;
   state.probe.down = true; state.probe.lift = 0;
   state.view = windowFrom();
   paintProbe(); paintStatus(); syncProbeCopy();
@@ -900,9 +1024,15 @@ function jump(view){
 
 function paintStatus(){
   const meta = VIEW[state.view] || VIEW.off;
-  const touch = state.probe.down ? "Probe on the chest" : "Probe lifted";
-  const extra = state.globalOn ? "Global systolic dysfunction" : lesionName();
+  const touch = state.probe.down ? "Finger is the probe" : "Probe lifted";
+  const extra = state.globalOn ? "Global hypokinesia" : (state.lesion==="none" ? "No blockade" : lesionName()+" — "+territoryPhrase());
   document.getElementById("status").textContent = touch+" · "+meta.name+" · "+extra+" · "+phaseName()+(state.dominance==="left"?" · Left dominant":"");
+  const tag = document.getElementById("tag");
+  if(tag){
+    if(state.globalOn) tag.textContent = "Global hypokinesia — the whole left ventricle";
+    else if(state.lesion==="none") tag.textContent = "No coronary blockade";
+    else tag.textContent = lesionName()+" — "+territoryPhrase();
+  }
 }
 function paintTabs(){
   document.querySelectorAll("#tabs button").forEach(function(btn){
@@ -920,6 +1050,8 @@ function setLesion(id){
   state.custom = false;
   state.globalOn = false;
   if(state.caseId!=="tamp"){ state.effusion=false; state.alternans=false; state.lowQrs=false; }
+  if(id==="none") state.phase = "normal";
+  else if(state.phase==="normal") state.phase = "infarct";
   applyWalls();
   paintHeart();
   paintTabs();
