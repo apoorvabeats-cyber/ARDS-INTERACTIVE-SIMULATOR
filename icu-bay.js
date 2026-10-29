@@ -262,12 +262,12 @@
   function quietLine(){
     if(typeof window.stopSpoken === "function") window.stopSpoken();
   }
-  function bindModules(room){
+  function bindModules(room, back){
     room.querySelectorAll("[data-mod]").forEach(function(card){
       card.onclick = function(event){
         event.preventDefault();
         event.stopPropagation();
-        openModule(card.getAttribute("data-mod"), card.querySelector("b").textContent);
+        openModule(card.getAttribute("data-mod"), card.querySelector("b").textContent, back);
       };
     });
   }
@@ -283,25 +283,28 @@
       '<button type="button" class="back" id="back">Back to ICU</button>'+
       '<h2>Dialysis</h2>'+
       '<p class="lede">The machine is on. The learning lab is the circuit and the ten modalities. Practice is one skill, or a whole session.</p>'+
-      '<button type="button" class="card" data-mod="Dialysis_Learning_Lab.html?v=20261028m"><b>Dialysis Learning Lab</b><span>IHD, SLED, PIKRT, the continuous modes, ultrafiltration and the peritoneum. SLED sits inside prolonged intermittent therapy.</span></button>'+
-      '<button type="button" class="card" data-mod="Dialysis_Practice_Simulator.html?v=20261028m"><b>Practice by module</b><span>Indication, modality, prescription, the machine, alarms, fluids and anticoagulation.</span></button>'+
-      '<button type="button" class="card" data-mod="Dialysis_Practice_Simulator.html?mode=full&v=20261028m"><b>Full clinical cases</b><span>Shock, missed dialysis with wet lungs, and an injured brain. The whole session.</span></button>';
+      '<button type="button" class="card" data-mod="Dialysis_Learning_Lab.html?v=20261029a"><b>Dialysis Learning Lab</b><span>IHD, SLED, PIKRT, the continuous modes, ultrafiltration and the peritoneum. SLED sits inside prolonged intermittent therapy.</span></button>'+
+      '<button type="button" class="card" data-mod="Dialysis_Practice_Simulator.html?v=20261029a"><b>Practice by module</b><span>Indication, modality, prescription, the machine, alarms, fluids and anticoagulation.</span></button>'+
+      '<button type="button" class="card" data-mod="Dialysis_Practice_Simulator.html?mode=full&v=20261029a"><b>Full clinical cases</b><span>Shock, missed dialysis with wet lungs, and an injured brain. The whole session.</span></button>';
     document.getElementById("back").onclick = function(){
       document.body.classList.remove("in", "enter");
       room.innerHTML = "";
     };
-    bindModules(room);
+    bindModules(room, {label:"Dialysis index", fn: openDialysis});
     holdRoom(room);
   }
-  function openModule(url, title){
+  function openModule(url, title, back){
     quietLine();
     const room = document.getElementById("room");
     document.body.classList.add("in", "enter");
+    const dialysis = /Dialysis_/.test(url || "");
+    const label = back && back.label ? back.label : "Back to ICU";
     room.innerHTML =
-      '<button type="button" class="back" id="back">Back to ICU</button>'+
-      '<h2>'+title+'</h2>'+
+      '<button type="button" class="back" id="back">'+label+'</button>'+
+      (dialysis ? "" : '<h2>'+title+'</h2>')+
       '<iframe class="abg-frame" title="'+title+'" src="'+url+'"></iframe>';
     document.getElementById("back").onclick = function(){
+      if(back && back.fn){ back.fn(); return; }
       document.body.classList.remove("in", "enter", "inside", "lab", "arena", "osce", "reference");
       room.innerHTML = "";
     };

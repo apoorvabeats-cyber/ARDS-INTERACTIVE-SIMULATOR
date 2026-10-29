@@ -76,7 +76,7 @@ svg.ecg{display:block;background:#fff;max-width:none}
   </div>
 </header>
 <main id="app"></main>
-<script src="osce-data.js?v=20261028e"></script>
+<script src="osce-data.js?v=20261029a"></script>
 <script src="osce-stations.js?v=20261028d"></script>
 <script>
 const app = document.getElementById("app");
@@ -272,7 +272,7 @@ function home(){
   stopClock();
   app.innerHTML =
     "<h1>Choose the station</h1>"+
-    "<p class='lede'>One station at a time. Twenty seconds for each answer. The voice reads the question, then the answer after you choose. Teaching doses, not a prescription.</p>"+
+    "<p class='lede'>One station at a time. Twenty seconds for each answer. The voice reads the question, says whether the answer is correct, and reads the explanation.</p>"+
     "<div class='modes'>"+
       "<button class='mode' data-go='abg'><b>ABG</b><span>25 gases. Name the disorder, then the cause. "+esc(scoreLine("abg"))+"</span></button>"+
       "<button class='mode' data-go='drug'><b>ICU drugs</b><span>Pick from the checklist. The questions walk the monograph. "+esc(scoreLine("drug"))+"</span></button>"+
@@ -322,7 +322,7 @@ function renderAbg(){
     "<p class='prompt'>"+esc(step.prompt)+"</p>"+
     step.options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
     "<p class='fb' id='fb' hidden></p><button class='next' id='next' hidden>Continue</button>"+
-    "<p class='fine'>Teaching case. Not a patient result.</p>";
+    "<p class='fine'></p>";
   say(abgStep==="id" ? "What is the main acid-base disorder?" : "What is the most likely cause?");
   armClock(function(){ timeUp("abg", step.answer, step.options[step.answer] + ". " + step.say, function(){ advanceAbg(false); }); });
   app.querySelectorAll(".choice").forEach(function(btn){
@@ -346,7 +346,7 @@ function answerAbg(item, step, i){
   mark("abg", ok);
   const fb = document.getElementById("fb");
   fb.hidden = false;
-  fb.textContent = (ok ? "Correct. " : "Not that. The answer is " + step.options[step.answer] + ". ") + step.say;
+  fb.textContent = (ok ? "Correct. " : "That is incorrect. The correct answer is " + step.options[step.answer] + ". ") + step.say;
   say(fb.textContent);
   const next = document.getElementById("next");
   next.hidden = false;
@@ -395,7 +395,7 @@ function renderDrugList(){
       return "<button type='button' class='tablet"+(on?" on":"")+"' data-d='"+id+"'><b>"+esc(drug.name)+"</b></button>";
     }).join("")+"</div>"+
     "<button class='next' id='begin'>Ask these drugs</button>"+
-    "<p class='fine'>If you select none, this whole group is used. Doses are published teaching doses. Confirm them before you give a drug.</p>";
+    "<p class='fine'>If you select none, this whole group is used.</p>";
   say(group.name+". Select the drugs.");
   document.getElementById("drugBack").onclick = function(){ renderDrugGroups(); };
   app.querySelectorAll("[data-d]").forEach(function(btn){
@@ -452,7 +452,7 @@ function renderDrugQ(){
       mark("drug", ok);
       const fb = document.getElementById("fb");
       fb.hidden = false;
-      fb.textContent = (ok ? "Correct. " : "Not that. The answer is ") + correct;
+      fb.textContent = (ok ? "Correct. " : "That is incorrect. The correct answer is ") + correct;
       say(fb.textContent);
       if(field==="infusion" && drug.calc){
         document.getElementById("calc").innerHTML = calculator(drug);
@@ -509,7 +509,7 @@ function renderEcg(){
     "<p class='prompt'>"+esc(step.prompt)+"</p>"+
     step.options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
     "<p class='fb' id='fb' hidden></p><button class='next' id='next' hidden>Continue</button>"+
-    "<p class='fine'>One small square is 0.04 seconds. The block on the left is 1 millivolt. The paper is long. Swipe sideways. Teaching strip, not a patient recording.</p>";
+    "<p class='fine'>One small square is 0.04 seconds. The block on the left is 1 millivolt. The paper is long. Swipe sideways. </p>";
   say(item.lead+". "+step.prompt);
   armClock(function(){ timeUp("ecg", step.answer, step.options[step.answer] + ". " + step.say, function(){ advanceEcg(false); }); });
   app.querySelectorAll(".choice").forEach(function(btn){
@@ -523,7 +523,7 @@ function renderEcg(){
       mark("ecg", ok);
       const fb = document.getElementById("fb");
       fb.hidden = false;
-      fb.textContent = (ok ? "Correct. " : "Not that. The answer is " + step.options[step.answer] + ". ") + step.say;
+      fb.textContent = (ok ? "Correct. " : "That is incorrect. The correct answer is " + step.options[step.answer] + ". ") + step.say;
       say(fb.textContent);
       const next = document.getElementById("next");
       next.hidden = false;
@@ -934,7 +934,7 @@ function renderKitList(){
       return "<button type='button' class='tablet"+(on?" on":"")+"' data-d='"+item.id+"'><b>"+esc(item.name)+"</b></button>";
     }).join("")+"</div>"+
     "<button class='next' id='begin'>Ask the use</button>"+
-    "<p class='fine'>If you select none, this whole heading is used. Teaching use, not a local checklist.</p>";
+    "<p class='fine'>If you select none, this whole heading is used.</p>";
   say(group.name+". Select the instruments.");
   document.getElementById("kitBack").onclick = function(){ renderKitGroups(); };
   app.querySelectorAll("[data-d]").forEach(function(btn){
@@ -980,7 +980,7 @@ function renderKitQ(){
       mark("kit", ok);
       const fb = document.getElementById("fb");
       fb.hidden = false;
-      fb.textContent = (ok ? "Correct. " : "Not that. The answer is ") + correct;
+      fb.textContent = (ok ? "Correct. " : "That is incorrect. The correct answer is ") + correct;
       say(fb.textContent);
       const next = document.getElementById("next");
       next.hidden = false;
@@ -1041,7 +1041,7 @@ function renderFilmList(){
       ? "Not listed, because no separate open-licence CT was available: aspiration pneumonitis and hemoperitoneum."
       : filmMod==="mri"
       ? "Not listed, because no separate open-licence MRI was available: hypoxic-ischemic brain injury, cerebral edema with herniation, and cerebellar arterial infarction."
-      : "Teaching films, not patient studies.")+"</p>";
+      : "")+"</p>";
   say((names[filmMod] || "This heading")+". Choose a film.");
   document.getElementById("filmBack").onclick = function(){ renderFilmGroups(); };
   app.querySelectorAll("[data-f]").forEach(function(btn){
@@ -1074,7 +1074,7 @@ function renderFilm(id, stepName){
       const fb = document.getElementById("fb");
       fb.hidden = false;
       const lead = filmLead;
-      fb.textContent = (ok ? "Correct. " : "Not that. The answer is " + step.options[step.answer] + ". ") + lead + step.say;
+      fb.textContent = (ok ? "Correct. " : "That is incorrect. The correct answer is " + step.options[step.answer] + ". ") + lead + step.say;
       say(fb.textContent);
       const next = document.getElementById("next");
       next.hidden = false;
@@ -1098,5 +1098,6 @@ function start(){
 }
 start();
 </script>
+<script src="bed-bridge.js?v=20261029a"></script>
 </body>
 </html>

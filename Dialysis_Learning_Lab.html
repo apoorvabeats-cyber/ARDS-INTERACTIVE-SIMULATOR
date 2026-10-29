@@ -45,7 +45,7 @@ svg{width:100%;height:auto;display:block}
 .sliders input{width:100%;accent-color:#1457a6}
 .sliders label.dead{opacity:.4}
 .read{background:#f4f7fb;border-radius:12px;padding:10px 12px;margin-top:8px}
-.choice{display:block;width:100%;text-align:left;background:#fff;color:#14213d;border:1px solid #d7e0ec;border-radius:12px;padding:12px;margin:8px 0;min-height:48px;-webkit-appearance:none;appearance:none}
+.choice{display:block;width:100%;text-align:left;background:#fff;color:#14213d;border:1px solid #d7e0ec;border-radius:12px;padding:12px;margin:8px 0;min-height:52px;font-size:17px;line-height:1.35;-webkit-appearance:none;appearance:none}
 .choice.good{border-color:#0f7a4a;background:#f3fbf6}
 .choice.bad{border-color:#b42318;background:#fdf4f4}
 .fb{margin-top:8px}
@@ -400,12 +400,11 @@ function render(){
     back.hidden = true;
     crumb.textContent = "Dialysis Learning Lab";
     document.getElementById("app").innerHTML =
-      '<section class="hero"><h1>Dialysis Learning Lab</h1><p>Ten modalities. The mechanism first, then the circuit, then the hour you would actually choose it.</p></section>'+
+      '<section class="hero"><p>Ten modalities. The mechanism first, then the circuit, then the hour you would actually choose it.</p></section>'+
       '<div class="note"><b>SLED sits inside PIKRT.</b> Sustained low-efficiency dialysis is one way of doing prolonged intermittent kidney replacement. PIKRT is the umbrella. They are not two membranes and not two laws of diffusion.</div>'+
       '<div class="grid">'+MODS.map(function(m){
         return '<button class="card" type="button" data-id="'+m.id+'"><span class="kicker">'+esc(m.short)+'</span><b>'+esc(m.name)+'</b><span>'+esc(m.tag)+'</span></button>';
-      }).join("")+'</div>'+
-      '<p class="fine">Teaching page. Ranges are for learning the levers, not a prescription for a named patient.</p>';
+      }).join("")+'</div>';
     document.querySelectorAll("[data-id]").forEach(function(b){b.onclick=function(){current=MODS.find(function(m){return m.id===b.getAttribute("data-id");}); tab=0; picked={}; render();};});
     return;
   }
@@ -427,14 +426,24 @@ function render(){
       return '<p><b>'+(i+1)+'.</b> '+esc(c.q)+'</p>'+c.options.map(function(o,j){
         const mark = picked[i]===j ? (o.ok?' good':' bad') : (picked[i]!=null && o.ok ? ' good' : '');
         return '<button type="button" class="choice'+mark+'" data-c="'+i+'" data-o="'+j+'">'+esc(o.t)+'</button>';
-      }).join("")+(picked[i]!=null ? '<p class="fb">'+(c.options[picked[i]].ok?'Right. ':'Not that. ')+esc(c.options[picked[i]].why)+'</p>' : '');
+      }).join("")+(picked[i]!=null ? '<p class="fb">'+(function(){
+        var right = c.options.filter(function(o){ return o.ok; })[0];
+        return (c.options[picked[i]].ok ? "Correct. " : "That is incorrect. The correct answer is "+(right?right.t:"")+". ") + esc(c.options[picked[i]].why);
+      })()+'</p>' : '');
     }).join("");
   }
   document.getElementById("app").innerHTML =
     '<p class="kicker">'+esc(m.name)+'</p><div class="tabs">'+SECTIONS.map(function(name,i){
       return '<button type="button" class="'+(i===tab?'on':'')+'" data-tab="'+i+'">'+name+'</button>';
     }).join("")+'</div><section class="panel">'+body+'</section>';
-  document.querySelectorAll("[data-tab]").forEach(function(b){b.onclick=function(){tab=Number(b.getAttribute("data-tab")); render();};});
+  document.querySelectorAll("[data-tab]").forEach(function(b){b.onclick=function(){
+    tab=Number(b.getAttribute("data-tab"));
+    render();
+    if(tab===5){
+      const idx = m.cases.findIndex(function(c,i){ return picked[i]==null; });
+      if(idx>=0) speakLine(m.cases[idx].q);
+    }
+  };});
   if(tab===2){
     document.querySelectorAll("[data-part]").forEach(function(el){
       el.onclick=function(){
@@ -464,7 +473,9 @@ function render(){
         const item = m.cases[Number(b.getAttribute("data-c"))];
         const opt = item.options[picked[b.getAttribute("data-c")]];
         const right = item.options.find(function(o){ return o.ok; });
-        speakLine(opt.ok ? "Correct. "+opt.why : "Not that. The answer is "+(right?right.t:"")+". "+opt.why);
+        const nextIdx = m.cases.findIndex(function(c,i){ return picked[i]==null; });
+        const nextQ = nextIdx>=0 ? " Next. "+m.cases[nextIdx].q : "";
+        speakLine((opt.ok ? "Correct. "+opt.why : "That is incorrect. The correct answer is "+(right?right.t:"")+". "+opt.why)+nextQ);
         render();
       };
     });
@@ -473,5 +484,6 @@ function render(){
 document.getElementById("back").onclick=function(){current=null; render();};
 render();
 </script>
+<script src="bed-bridge.js?v=20261029a"></script>
 </body>
 </html>

@@ -30,11 +30,11 @@ a.back{position:fixed;top:10px;left:10px;z-index:5;color:var(--muted);text-decor
 .sheet.open{transform:none}
 .sheet h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:28px;margin:0 0 4px;letter-spacing:-.03em}
 .kicker{margin:0;color:var(--cyan);letter-spacing:.14em;text-transform:uppercase;font-size:11px}
-.sheet p{margin:8px 0;line-height:1.45;color:#d5e3ea}
+.sheet p{margin:8px 0;line-height:1.45;color:#d5e3ea;font-size:17px}
 .sheet h3{margin:14px 0 4px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm)}
 .close{position:absolute;top:8px;right:8px;border:0;background:transparent;color:var(--muted);min-width:44px;min-height:44px}
 .choices{display:flex;flex-direction:column;gap:8px;margin:10px 0}
-.choices button{text-align:left;border:1px solid var(--line);background:#0c1a24;color:#e7f1f4;border-radius:12px;padding:10px 12px;min-height:44px}
+.choices button{text-align:left;border:1px solid var(--line);background:#0c1a24;color:#e7f1f4;border-radius:12px;padding:12px;min-height:48px;font-size:17px;line-height:1.35}
 .choices button.good{border-color:var(--green);color:var(--green)}
 .choices button.bad{border-color:#e07a7a;color:#e07a7a}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
@@ -42,7 +42,7 @@ a.back{position:fixed;top:10px;left:10px;z-index:5;color:var(--muted);text-decor
 .load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:7;background:var(--bg);text-align:center;padding:24px}
 .load.gone{display:none}
 .note{color:var(--muted);font-size:13px}
-.list button{display:block;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid rgba(127,212,230,.12);padding:10px 0;min-height:44px}
+.list button{display:block;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid rgba(127,212,230,.12);padding:12px 0;min-height:48px;font-size:17px}
 input.find{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);padding:8px 0;margin:8px 0}
 
 .score{font-variant-numeric:tabular-nums;color:var(--green)}
@@ -515,11 +515,11 @@ function boot(){
 }
 const scene = new THREE.Scene();
 function sceneAdd(){
-  scene.add(new THREE.HemisphereLight(0xd7e8f2, 0x0b1218, 0.85));
-  const key = new THREE.DirectionalLight(0xffffff, 1.35);
+  scene.add(new THREE.HemisphereLight(0xf3efe6, 0x1c1612, 0.9));
+  const key = new THREE.DirectionalLight(0xfff8f0, 1.45);
   key.position.set(2, 3, 4);
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0x7fd4e6, 0.7);
+  const rim = new THREE.DirectionalLight(0xffe2c4, 0.28);
   rim.position.set(-3, 1, -2);
   scene.add(rim);
   camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 50);
@@ -598,19 +598,24 @@ function frame(now){
   const dt = Math.min(0.05, frameLast ? (now - frameLast) / 1000 : 0.016);
   frameLast = now;
   if(fly){
-    fly.t = Math.min(1, fly.t + dt / 0.95);
+    fly.t = Math.min(1, fly.t + dt / 0.85);
     const k = fly.t * fly.t * (3 - 2 * fly.t);
-    const target = fly.tFrom.clone().lerp(fly.tTo, k);
-    const dirA = fly.from.clone().sub(fly.tFrom);
-    const dirB = fly.to.clone().sub(fly.tTo);
-    const len = dirA.length() * (1 - k) + dirB.length() * k;
-    const up = new THREE.Vector3(0, 1, 0);
-    const qa = new THREE.Quaternion().setFromUnitVectors(up, dirA.clone().normalize());
-    const qb = new THREE.Quaternion().setFromUnitVectors(up, dirB.clone().normalize());
-    qa.slerp(qb, k);
-    camera.position.copy(target).add(up.applyQuaternion(qa).multiplyScalar(Math.max(len, 0.05)));
-    controls.target.copy(target);
-    if(fly.t >= 1) fly = null;
+    const focus = fly.tFrom.clone().lerp(fly.tTo, k);
+    const offA = fly.from.clone().sub(fly.tFrom);
+    const offB = fly.to.clone().sub(fly.tTo);
+    const lenA = Math.max(offA.length(), 0.05);
+    const lenB = Math.max(offB.length(), 0.05);
+    const dirA = offA.clone().normalize();
+    const dirB = offB.clone().normalize();
+    const turn = new THREE.Quaternion().setFromUnitVectors(dirA, dirB);
+    const spin = new THREE.Quaternion().slerp(turn, k);
+    const dir = dirA.clone().applyQuaternion(spin);
+    camera.position.copy(focus).add(dir.multiplyScalar(lenA * (1 - k) + lenB * k));
+    controls.target.copy(focus);
+    if(fly.t >= 1){
+      fly = null;
+      controls.enableDamping = true;
+    }
   }
   if(controls) controls.update();
   if(lesson && !reduced){
@@ -770,6 +775,7 @@ function openMesh(mesh){
   document.getElementById("shut").onclick = function(){ sheet.classList.remove("open"); };
   const jump = document.getElementById("jump");
   if(jump) jump.onclick = function(){ moduleId = "cases"; caseId = card.case; casePicked = null; caseHints = 0; caseOpen = true; paint(); renderCase(); };
+  if(card && card.quiz) speakLine(card.quiz.q);
   const ask = document.getElementById("ask");
   if(ask){
     ask.onclick = function(){
@@ -777,7 +783,8 @@ function openMesh(mesh){
       const out = document.getElementById("qout");
       if(!picked){ out.textContent = "Choose one first."; return; }
       const right = String(card.quiz.answer) === picked.value;
-      out.textContent = (right ? "Correct. " : "Not that one. ") + card.quiz.why;
+      out.textContent = (right ? "Correct. " : "That is incorrect. The correct answer is "+card.quiz.choices[card.quiz.answer]+". ") + card.quiz.why;
+      speakLine(out.textContent);
     };
   }
 }
@@ -1206,22 +1213,27 @@ function frameLabels(labels, view){
   if(!hit || box.isEmpty()) return;
   const center = box.getCenter(new THREE.Vector3());
   const size = box.getSize(new THREE.Vector3());
-  const radius = Math.max(size.length() * 0.42, (extent || 1) * 0.2);
-  const dist = radius / Math.sin((camera.fov * Math.PI / 180) / 2) * 0.85;
-  const dirs = {
-    base: new THREE.Vector3(0.15, -0.45, 1),
-    top: new THREE.Vector3(0.05, 1, 0.2),
-    side: new THREE.Vector3(1, 0.12, 0.45),
-    sideL: new THREE.Vector3(-1, 0.16, 0.35),
-    sideR: new THREE.Vector3(1, 0.16, 0.35),
-    front: new THREE.Vector3(0, 0.08, 1)
-  };
-  const dir = (dirs[view] || dirs.base).clone().normalize();
-  const to = center.clone().add(dir.multiplyScalar(dist));
-  const tTo = center.clone();
-  if(view !== "top") tTo.y -= radius * 0.15;
-  fly = {from: camera.position.clone(), to: to, tFrom: controls.target.clone(), tTo: tTo, t: 0};
+  const radius = Math.max(size.length() * 0.62, (extent || 1) * 0.28);
+  const dist = Math.max(radius * 2.8, (extent || 1) * 0.9);
+  const yawMap = {base:0.55, front:0.2, side:1.25, sideL:-1.25, sideR:1.25, top:0.35};
+  let yaw = yawMap[view] != null ? yawMap[view] : 1.05;
+  const current = camera.position.clone().sub(controls.target);
+  if(current.length() > 0.01){
+    const nowYaw = Math.atan2(current.x, current.z);
+    let gap = yaw - nowYaw;
+    while(gap > Math.PI) gap -= Math.PI * 2;
+    while(gap < -Math.PI) gap += Math.PI * 2;
+    if(Math.abs(gap) < 0.7) yaw = nowYaw + (gap < 0 ? -1.15 : 1.15);
+  }
+  const pitch = view === "top" ? 1.05 : 0.34;
+  const to = new THREE.Vector3(
+    center.x + Math.sin(yaw) * Math.cos(pitch) * dist,
+    center.y + Math.sin(pitch) * dist * 0.55,
+    center.z + Math.cos(yaw) * Math.cos(pitch) * dist
+  );
+  fly = {from: camera.position.clone(), to: to, tFrom: controls.target.clone(), tTo: center.clone(), t: 0};
   controls.autoRotate = false;
+  controls.enableDamping = false;
 }
 function pulseFocus(){
   if(!lesson) return;
@@ -1491,6 +1503,7 @@ function renderCase(){
   sheet.classList.add("open");
   document.getElementById("shut").onclick = function(){ sheet.classList.remove("open"); };
   if(open) markChoices(item);
+  else speakLine(item.stem);
   sheet.querySelectorAll("[data-choice]").forEach(function(btn){
     btn.onclick = function(){
       if(revealed[item.id]) return;
@@ -1513,7 +1526,7 @@ function renderCase(){
     sessionStorage.setItem("neuro-score", JSON.stringify(points));
     markChoices(item);
     const named = item.choices.find(function(choice){ return choice.id===item.answer; });
-    speakLine(right ? "Correct. "+item.why : "Not that one. The answer is "+(named?named.label:"")+". "+item.why);
+    speakLine(right ? "Correct. "+item.why : "That is incorrect. The correct answer is "+(named?named.label:"")+". "+item.why);
     showLabels(item.meshes);
     paintDock();
   };
@@ -1570,5 +1583,6 @@ function openSheet(msg){
 paint();
 boot();
 </script>
+<script src="bed-bridge.js?v=20261029a"></script>
 </body>
 </html>

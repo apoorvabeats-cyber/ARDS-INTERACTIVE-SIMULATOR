@@ -34,7 +34,7 @@ button:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 .vit dt{font-size:12px;color:#5f6f86}
 .vit dd{margin:0;font-weight:800;font-variant-numeric:tabular-nums}
 .vit dd.warn{color:#b42318}
-.choice{display:block;width:100%;text-align:left;background:#fff;color:#14213d;border:1px solid #d7e0ec;border-radius:12px;padding:12px;margin:8px 0;min-height:48px;-webkit-appearance:none;appearance:none}
+.choice{display:block;width:100%;text-align:left;background:#fff;color:#14213d;border:1px solid #d7e0ec;border-radius:12px;padding:12px;margin:8px 0;min-height:52px;font-size:17px;line-height:1.35;-webkit-appearance:none;appearance:none}
 .choice.on{border-color:#1457a6;background:#f3f8ff}
 .choice.good{border-color:#0f7a4a;background:#f3fbf6}
 .choice.bad{border-color:#b42318;background:#fdf4f4}
@@ -48,11 +48,11 @@ button:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 label.slide{display:block;font-weight:700;margin:10px 0}
 label.slide input{width:100%;accent-color:#1457a6}
 .fine{color:#5f6f86;font-size:13px}
-h2{margin:4px 0 8px}
+h2{margin:4px 0 8px;font-size:26px;line-height:1.2}
 </style>
 </head>
 <body>
-<div class="top"><button type="button" id="home">Modules</button><b id="crumb">Dialysis practice</b><span id="clock"></span></div>
+<div class="top"><button type="button" id="home">Modules</button><b id="crumb">Dialysis</b><span id="clock"></span></div>
 <main class="wrap" id="app"></main>
 <div class="bar" id="bar" hidden></div>
 <script>
@@ -490,12 +490,11 @@ function render(){
   const app = document.getElementById("app");
   const crumb = document.getElementById("crumb");
   if(phase==="catalog"){
-    crumb.textContent = mode==="full" ? "Full clinical cases" : "Practice by module";
-    app.innerHTML = '<section class="hero"><h1>Dialysis practice</h1><p>One skill, or a whole session. The pressure and the potassium move when you do.</p></section>'+
+    crumb.textContent = "Dialysis";
+    app.innerHTML = '<section class="hero"><p>One skill, or a whole session. The pressure and the potassium move when you do.</p></section>'+
       '<div class="switch"><button type="button" id="m1" class="'+(mode==="module"?"on":"")+'"><b>Practice by module</b><span>Indication, modality, prescription, machine, alarms.</span></button>'+
       '<button type="button" id="m2" class="'+(mode==="full"?"on":"")+'"><b>Full clinical cases</b><span>Shock, oedema, and a swollen brain. The whole session.</span></button></div>'+
-      list().map(function(c){return '<button class="card" type="button" data-open="'+c.id+'"><span class="kicker">'+(c.group==="full"?"Full case":"Module")+'</span><b>'+esc(c.title)+'</b><span>'+esc(c.blurb)+'</span></button>';}).join("")+
-      '<p class="fine">Teaching cases. Not a prescription. SLED is one form of prolonged intermittent therapy, not a rival technique.</p>';
+      list().map(function(c){return '<button class="card" type="button" data-open="'+c.id+'"><span class="kicker">'+(c.group==="full"?"Full case":"Module")+'</span><b>'+esc(c.title)+'</b><span>'+esc(c.blurb)+'</span></button>';}).join("");
     document.getElementById("m1").onclick=function(){mode="module"; render();};
     document.getElementById("m2").onclick=function(){mode="full"; render();};
     document.querySelectorAll("[data-open]").forEach(function(b){b.onclick=function(){open(b.getAttribute("data-open"));};});
@@ -547,6 +546,11 @@ function render(){
   }
   if(phase==="ask"){
     showBar([{label:"Submit decision", disabled:stage.kind!=="dials" && selected==null, on:submit}]);
+    const askKey = item.id+":"+index;
+    if(window.__dialAsk !== askKey){
+      window.__dialAsk = askKey;
+      speakLine(stage.title+". "+stage.prompt);
+    }
   } else {
     showBar([{label:index+1>=item.stages.length?"See the debrief":"Continue", on:next}]);
   }
@@ -570,9 +574,9 @@ function submit(){
     const choice=stage.choices[selected];
     result={ok:choice.ok, why:choice.why, set:choice.set, critical:!!choice.critical, you:choice.t};
     const right = stage.choices.find(function(c){ return c.ok===true; });
-    speakLine(choice.ok===true ? "Correct. "+choice.why : "Not that. The answer is "+(right?right.t:"")+". "+choice.why);
+    speakLine(choice.ok===true ? "Correct. "+choice.why : "That is incorrect. The correct answer is "+(right?right.t:"")+". "+choice.why);
   }
-  if(stage.kind==="dials") speakLine((result.ok===true ? "Correct. " : "Not that. ") + result.why);
+  if(stage.kind==="dials") speakLine((result.ok===true ? "Correct. " : "That is incorrect. ") + result.why);
   apply(result.set);
   log.push({title:stage.title, you:result.you, why:result.why, ok:result.ok, critical:!!result.critical && !result.ok, points:result.ok===true?100:result.ok==="part"?60:0});
   phase="feedback";
@@ -585,5 +589,6 @@ function next(){
 document.getElementById("home").onclick=function(){phase="catalog"; item=null; render();};
 render();
 </script>
+<script src="bed-bridge.js?v=20261029a"></script>
 </body>
 </html>
