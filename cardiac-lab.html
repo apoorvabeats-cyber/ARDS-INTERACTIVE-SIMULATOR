@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111a">
+<title>Cardiac Anatomy Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520&family=Figtree:wght@460;650&display=swap" rel="stylesheet">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+<style>
+:root{--bg:#07111a;--fg:#e7f1f4;--muted:#93a8b3;--line:rgba(226,180,138,.35);--warm:#e2b48a;--paper:#f3efe6}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:Figtree,sans-serif}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-appearance:none;appearance:none;background:#102028;color:var(--paper);border:1px solid var(--line);border-radius:999px;min-height:44px;padding:0 14px}
+button:focus-visible,input:focus-visible{outline:2px solid var(--warm);outline-offset:2px}
+button.on{border-color:var(--warm);color:#fff8ee;background:#2a2118}
+header{display:flex;gap:8px;align-items:center;padding:10px 12px 0}
+header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:0;letter-spacing:-.03em}
+.find{flex:1;min-width:0;background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:8px 0;font-size:16px;color:var(--paper)}
+.bar{display:flex;gap:8px;overflow:auto;padding:8px 12px;-webkit-overflow-scrolling:touch}
+.bar button{flex:none;font-size:15px}
+.tools{display:flex;gap:8px;overflow:auto;padding:0 12px 8px}
+.tools button{flex:none;font-size:14px}
+#view{position:fixed;inset:0;width:100%;height:100%;touch-action:none;z-index:0}
+.hud{position:relative;z-index:2;pointer-events:none}
+.hud header,.hud .bar,.hud .tools,.hud .sheet{pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:3;max-height:46dvh;overflow:auto;background:rgba(7,17,26,.94);border-top:1px solid var(--line);padding:12px 14px calc(14px + env(safe-area-inset-bottom));border-radius:18px 18px 0 0}
+.sheet h2{font-family:Figtree,sans-serif;font-weight:650;font-size:18px;margin:0 0 6px;letter-spacing:0}
+.sheet h3{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm);margin:12px 0 4px}
+.sheet p,.choice{font-size:16px;line-height:1.4;margin:0 0 8px}
+.kicker{margin:0 0 4px;color:var(--warm);letter-spacing:.14em;text-transform:uppercase;font-size:11px}
+.choice{display:block;width:100%;text-align:left;border-radius:12px;margin:0 0 8px}
+.choice.right{border-color:#7dcea0;background:#10241c}
+.choice.wrong{border-color:#c46a6a;background:#241416}
+.list button{display:block;width:100%;text-align:left;border-radius:12px;margin:0 0 8px;font-size:16px}
+.load{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:#07111a}
+.load.hide{display:none}
+.note{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="Three dimensional heart. Drag to turn. Tap a structure."></canvas>
+<div class="hud">
+<header>
+  <h1>Heart</h1>
+  <input class="find" id="find" placeholder="Search a structure" aria-label="Search a structure">
+</header>
+<div class="bar" id="mods" role="tablist" aria-label="Cardiac modules"></div>
+<div class="bar" id="layers" aria-label="Layers"></div>
+<div class="tools">
+  <button type="button" id="reset">Reset</button>
+  <button type="button" id="isolate">Isolate</button>
+  <button type="button" id="beat">Beat</button>
+  <button type="button" id="flow">Flow</button>
+  <button type="button" id="spark">Conduction</button>
+  <button type="button" id="cut">Cut</button>
+  <button type="button" id="ask">Question</button>
+</div>
+<section class="sheet" id="sheet" aria-live="polite"></section>
+</div>
+<div class="load" id="load"><p>Opening the heart atlas…</p></div>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const GROUP = {
+  "Left atrium":"myocardium","Right atrium":"myocardium","Left ventricle":"myocardium","Right ventricle":"myocardium",
+  "Anterior semilunar leaflet of pulmonary valve":"valves","Left semilunar leaflet of pulmonary valve":"valves","Right semilunar leaflet of pulmonary valve":"valves",
+  "Left coronary leaflet":"valves","Right coronary leaflet":"valves","Non-coronary leaflet":"valves",
+  "Posterior leaflet of left atrioventricular valve":"valves","Inferior leaflet of right atrioventricular valve":"valves","Septal leaflet of right atrioventricular valve":"valves",
+  "Anterior papillary muscle of right ventricle":"subvalvular","Inferior papillary muscle of right ventricle":"subvalvular","Septal papillary muscle of right ventricle":"subvalvular","Inferior papillary muscle of left ventricle":"subvalvular",
+  "Left coronary artery":"coronaries","Anterior interventricular artery":"coronaries","Septal branches of anterior interventricular artery":"coronaries","Circumflex artery of heart":"coronaries","Right coronary artery":"coronaries","Right inferolateral branch of right coronary artery":"coronaries",
+  "Great cardiac vein":"veins","Middle cardiac vein":"veins","Coronary sinus":"veins"
+};
+const COLOUR = {myocardium:0x8d3b3b,valves:0xd7b48a,subvalvular:0xc4896a,coronaries:0xc4513c,veins:0x6e8f9c,vessels:0xb86458};
+const LAYER_NAME = {myocardium:"Chambers",valves:"Valves",subvalvular:"Papillary",coronaries:"Coronaries",veins:"Cardiac veins",vessels:"Great vessels"};
+const MODULES = [
+  {id:"explore", title:"Explorer", groups:["myocardium","valves","subvalvular","coronaries","veins","vessels"], text:"Drag to turn the heart. Tap a chamber, valve, artery or vein. Each mesh is from the atlas."},
+  {id:"chambers", title:"Chambers", groups:["myocardium"], focus:["Right atrium","Right ventricle","Left atrium","Left ventricle"], text:"Right atrium, right ventricle, left atrium and left ventricle. Septa are the shared walls, not separate meshes."},
+  {id:"valves", title:"Valves", groups:["valves","subvalvular"], focus:["Left coronary leaflet","Posterior leaflet of left atrioventricular valve","Septal leaflet of right atrioventricular valve","Anterior semilunar leaflet of pulmonary valve"], text:"Aortic, pulmonary, mitral and tricuspid leaflets that the atlas segmented, with the papillary muscles. The anterior mitral leaflet and some tricuspid leaflets are not in the model."},
+  {id:"coronary", title:"Coronaries", groups:["coronaries","veins"], focus:["Left coronary artery","Anterior interventricular artery","Circumflex artery of heart","Right coronary artery","Coronary sinus"], text:"Left coronary artery, anterior interventricular artery (the left anterior descending), circumflex, right coronary artery, and the cardiac veins that drain to the coronary sinus."},
+  {id:"conduction", title:"Conduction", groups:["myocardium","vessels"], focus:["Right atrium","Right ventricle","Left ventricle","Superior vena cava"], text:"The atlas has no sinus node, atrioventricular node or bundle mesh. The spark is a drawing placed on the chambers.", spark:true},
+  {id:"flow", title:"Blood flow", groups:["myocardium","vessels","valves"], focus:["Superior vena cava","Right ventricle","Pulmonary trunk","Left ventricle","Ascending aorta"], text:"Particles move through the venous return, the right heart, the lungs, the left heart and the aorta. This is a teaching path, not a Doppler trace.", flow:true},
+  {id:"imaging", title:"Imaging", groups:["myocardium","valves","vessels"], focus:["Left ventricle","Ascending aorta","Right ventricle","Left atrium"], text:"No echo, CT or angiogram loop is bundled. The windows below name which chamber you are looking at."},
+  {id:"care", title:"Critical care", groups:["myocardium","coronaries","vessels"], focus:["Right ventricle","Anterior interventricular artery","Superior vena cava","Thoracic aorta","Left ventricle"], text:"Right-heart failure, coronary territory, a central line, a balloon pump and a temporary left-sided pump, taught on the meshes that exist."}
+];
+const INFO = {
+  "Right atrium":{anatomy:"Receives the superior vena cava, the inferior vena cava and the coronary sinus.",fn:"The reservoir and pump for venous return into the right ventricle.",image:"Seen in the apical four-chamber and subcostal views, beside the right ventricle.",clinical:"Central-line tips, pacing leads and venous cannulas sit in or just above this chamber.",q:"Where does a dialysis catheter in the internal jugular vein aim to finish?",options:["In a hepatic vein","At the cavoatrial junction","In the left ventricle","In a pulmonary vein"],answer:1,why:"The tip belongs at the junction of the superior vena cava and the right atrium, not in the heart muscle and not in the arterial tree."},
+  "Right ventricle":{anatomy:"A thin-walled crescent against the sternum, with inlet, trabecular apex and outflow to the pulmonary valve.",fn:"Pumps the venous return into the pulmonary trunk.",image:"Apical four-chamber and parasternal short-axis. A pressure-loaded ventricle flattens the septum.",clinical:"Acute pulmonary embolism and right ventricular infarction both present as a failing right ventricle.",q:"A short-axis view shows a D-shaped left ventricle in systole. What does that mean?",options:["Isolated aortic stenosis","Right ventricular pressure overload","A pericardial cyst","Mitral stenosis only"],answer:1,why:"The septum is pushed left when right-sided pressure is high. Look for embolism, pulmonary hypertension or a right ventricular infarct."},
+  "Left atrium":{anatomy:"The posterior chamber. Four pulmonary veins enter it. The interatrial septum faces the right atrium.",fn:"Receives oxygenated blood and fills the left ventricle.",image:"Behind the aortic root in the parasternal long axis, and at the far side of the apical four-chamber view.",clinical:"Thrombus forms in the appendage in atrial fibrillation. The appendage is not a separate mesh here.",q:"Which vessels enter the left atrium?",options:["The venae cavae","The coronary arteries","The pulmonary veins","The pulmonary arteries"],answer:2,why:"Pulmonary veins return oxygenated blood to the left atrium. The venae cavae enter the right atrium."},
+  "Left ventricle":{anatomy:"The thick-walled systemic pump. Inlet is the mitral valve. Outlet is the aortic valve.",fn:"Ejects the stroke volume into the aorta.",image:"Parasternal long axis, short axis and the apical views. Wall thickness and ejection are echo measurements, not this mesh.",clinical:"Anterior infarction, cardiogenic shock and a temporary left-sided pump all concern this chamber.",q:"A pump that crosses the aortic valve and sits in the left ventricle is supporting which side?",options:["The right ventricle only","The left ventricle","The pulmonary arteries only","The coronary sinus"],answer:1,why:"That temporary device takes blood from the left ventricle and ejects it above the aortic valve."},
+  "Left coronary artery":{anatomy:"Arises from the left coronary sinus and divides into the anterior interventricular and circumflex arteries.",fn:"The short left main supplies most of the left ventricle.",image:"The left main is the first branch seen on a coronary angiogram in the right anterior oblique caudal view.",clinical:"Left-main occlusion threatens a large share of the left ventricle.",q:"The left coronary artery divides into which two vessels?",options:["Right coronary and posterior descending","Anterior interventricular and circumflex","Aorta and pulmonary trunk","Great cardiac vein and coronary sinus"],answer:1,why:"The left main splits into the anterior interventricular artery, also called the left anterior descending, and the circumflex."},
+  "Anterior interventricular artery":{anatomy:"Runs in the anterior interventricular groove. Also called the left anterior descending artery. Septal branches are a separate mesh.",fn:"Supplies the anterior wall and the anterior two thirds of the septum.",image:"ST elevation in V1 to V4 points here. Angiography shows it running to the apex.",clinical:"Occlusion is an anterior infarct. Shock follows when the territory is large.",q:"ST elevation across V1 to V4 most often means occlusion of which artery?",options:["The circumflex artery alone","The anterior interventricular artery","The right coronary artery in a dominant left system only","The coronary sinus"],answer:1,why:"The anterior interventricular artery, the left anterior descending, supplies the anterior wall and the anterior septum."},
+  "Circumflex artery of heart":{anatomy:"Runs in the left atrioventricular groove.",fn:"Supplies the lateral left ventricle. In a left-dominant circulation it also reaches the inferior wall.",image:"Lateral ST elevation, and often a silent or posterior territory, points to the circumflex.",clinical:"A lateral infarct can be easy to miss on a standard trace.",q:"Which wall does the circumflex artery supply?",options:["The right ventricular free wall only","The lateral wall of the left ventricle","The anterior septum only","The moderator band"],answer:1,why:"The circumflex runs around the left atrioventricular groove to the lateral wall."},
+  "Right coronary artery":{anatomy:"Arises from the right coronary sinus and runs in the right atrioventricular groove.",fn:"Supplies the right ventricle and, in a right-dominant heart, the inferior wall and the atrioventricular node.",image:"Inferior ST elevation in II, III and aVF. A right-sided trace looks for right ventricular infarction.",clinical:"Inferior infarction with clear lungs and hypotension is the right ventricle until proved otherwise.",q:"Hypotension and clear lungs in an inferior infarct make you protect which chamber?",options:["The left atrium","The right ventricle","The aortic arch","The coronary sinus"],answer:1,why:"The right coronary artery usually supplies the inferior wall and the right ventricle. Preload, not a fluid purge, keeps the pressure up."},
+  "Superior vena cava":{anatomy:"The thoracic vein entering the roof of the right atrium.",fn:"Returns blood from the upper body.",image:"On a chest radiograph a central line should point at the cavoatrial junction, not curl into the neck.",clinical:"The target for internal jugular and subclavian lines.",q:"A central venous catheter from the neck should end where?",options:["In the right ventricle","At the cavoatrial junction","In the ascending aorta","In a pulmonary vein"],answer:1,why:"The tip sits at the lower superior vena cava where it meets the right atrium."},
+  "Thoracic aorta":{anatomy:"The descending thoracic aorta beyond the arch. Head-and-neck branches are not separate meshes.",fn:"Carries systemic flow down through the chest.",image:"A transoesophageal view and CT show the descending aorta beside the left atrium.",clinical:"An intra-aortic balloon sits in the descending aorta, with the tip distal to the left subclavian artery.",q:"An intra-aortic balloon pump lies in which vessel?",options:["The pulmonary trunk","The descending thoracic aorta","The coronary sinus","The superior vena cava"],answer:1,why:"The balloon inflates in the descending aorta, timed to diastole, and must not cover the arch branches."},
+  "Pulmonary trunk":{anatomy:"Leaves the right ventricle and splits into the right and left pulmonary arteries.",fn:"Carries venous blood to the lungs.",image:"The parasternal short-axis at the base shows the pulmonary valve and trunk anterior to the aorta.",clinical:"A large embolus lodges in the trunk or the bifurcation.",q:"Blood in the pulmonary trunk has come from which chamber?",options:["The left ventricle","The right ventricle","The left atrium","The coronary sinus only"],answer:1,why:"The right ventricle ejects across the pulmonary valve into the trunk."},
+  "Ascending aorta":{anatomy:"From the aortic valve to the arch. The coronary ostia arise just above the leaflets.",fn:"Receives the left ventricular stroke volume.",image:"Parasternal long axis shows the aortic root continuous with the septum and the mitral valve.",clinical:"Dissection, a wide root, and any device that crosses the aortic valve are read here.",q:"The coronary arteries arise from which part of the aorta?",options:["The descending aorta below the diaphragm","The sinuses just above the aortic valve","The pulmonary trunk","The coronary sinus"],answer:1,why:"The left and right coronary ostia sit in the aortic sinuses, just above the leaflets."},
+  "Coronary sinus":{anatomy:"The vein in the posterior atrioventricular groove, opening into the right atrium.",fn:"Collects most of the cardiac venous blood.",image:"Not seen on a standard angiogram of the arteries. A venous phase or a CT shows it.",clinical:"Some pacing leads are placed in a tributary of the sinus to pace the left ventricle.",q:"The coronary sinus empties into which chamber?",options:["The left ventricle","The right atrium","The pulmonary trunk","The left atrium"],answer:1,why:"Cardiac venous blood returns through the coronary sinus to the right atrium."}
+};
+const FALLBACK = {
+  myocardium:{anatomy:"A chamber wall from the atlas.",fn:"Moves blood onward.",image:"Named on echo by the window, not by this file.",clinical:"Chamber size and function are measured on a study, not on the mesh."},
+  valves:{anatomy:"A leaflet the atlas segmented. The full set of leaflets is not all present.",fn:"Opens and closes with the pressure difference across it.",image:"Seen on the parasternal windows and on a short-axis aortic view.",clinical:"Stenosis, regurgitation and infection are read on Doppler and the leaflets, not on this still mesh."},
+  subvalvular:{anatomy:"A papillary muscle. Chordae are not separate meshes.",fn:"Tethers the atrioventricular valve so it does not prolapse.",image:"Seen inside the ventricle on echo.",clinical:"Rupture of a papillary muscle is an acute cause of severe mitral regurgitation."},
+  coronaries:{anatomy:"A coronary artery from the atlas.",fn:"Perfuses a named territory of myocardium.",image:"Mapped on the electrocardiogram and on an angiogram.",clinical:"Occlusion of the artery infarcts its territory."},
+  veins:{anatomy:"A cardiac vein.",fn:"Drains myocardium toward the coronary sinus.",image:"Not the arterial angiogram.",clinical:"A left ventricular pacing lead uses a tributary."},
+  vessels:{anatomy:"A great vessel or pulmonary vein from the atlas.",fn:"Connects a chamber to the lungs or the systemic circulation.",image:"CT, echo and a plain radiograph each show a different part of it.",clinical:"Lines, cannulas and emboli are described against these vessels."}
+};
+
+const canvas = document.getElementById("view");
+const sheet = document.getElementById("sheet");
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:"high-performance"});
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+renderer.setClearColor(0x07111a, 1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.localClippingEnabled = true;
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xf3efe6, 0x1c1612, 0.95));
+const key = new THREE.DirectionalLight(0xfff6ea, 1.35);
+key.position.set(2.2, 3.2, 4);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xffe2c4, 0.22);
+rim.position.set(-3, 1.2, -2);
+scene.add(rim);
+const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.autoRotate = false;
+const root = new THREE.Group();
+scene.add(root);
+const clip = new THREE.Plane(new THREE.Vector3(0, 0, -1), 1e6);
+const byName = {};
+const meshes = [];
+let selected = null;
+let isolate = false;
+let beatOn = false;
+let flowOn = false;
+let sparkOn = false;
+let cutOn = false;
+let moduleId = "explore";
+let fly = null;
+let baseScale = 1;
+const layerOn = {myocardium:true,valves:true,subvalvular:true,coronaries:true,veins:true,vessels:true};
+const flowDots = [];
+const sparkGroup = new THREE.Group();
+scene.add(sparkGroup);
+
+function groupOf(name){ return GROUP[name] || "vessels"; }
+function colourOf(name){ return COLOUR[groupOf(name)]; }
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return "&#"+c.charCodeAt(0)+";"; }); }
+function centerOf(name){
+  const mesh = byName[name];
+  if(!mesh) return null;
+  return new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
+}
+function infoFor(name){
+  return INFO[name] || FALLBACK[groupOf(name)];
+}
+function femaleVoice(){
+  if(!window.speechSynthesis) return null;
+  const voices = speechSynthesis.getVoices() || [];
+  const named = /female|samantha|victoria|karen|moira|fiona|tessa|serena|zira|susan|veena|heera|sonia|catherine|allison|ava|nicky|libby/i;
+  const en = voices.filter(function(v){ return /^en/i.test(v.lang || ""); });
+  return en.find(function(v){ return named.test((v.name||"")+" "+(v.voiceURI||"")); })
+    || en.find(function(v){ return /en-GB|en-IN|en-AU/i.test(v.lang) && !/male/i.test(v.name||""); })
+    || null;
+}
+function speakLine(text){
+  if(!text || !window.speechSynthesis) return;
+  const say = function(){
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const voice = femaleVoice();
+    u.lang = voice && voice.lang ? voice.lang : "en-GB";
+    u.rate = 0.92;
+    u.pitch = 1.06;
+    if(voice) u.voice = voice;
+    speechSynthesis.speak(u);
+  };
+  if(!speechSynthesis.getVoices().length){
+    const once = function(){ speechSynthesis.removeEventListener("voiceschanged", once); say(); };
+    speechSynthesis.addEventListener("voiceschanged", once);
+    speechSynthesis.getVoices();
+    return;
+  }
+  say();
+}
+function visibleMeshes(){
+  const mod = MODULES.find(function(m){ return m.id===moduleId; });
+  const allow = {};
+  (mod.groups||[]).forEach(function(g){ allow[g]=true; });
+  return meshes.filter(function(mesh){
+    return allow[groupOf(mesh.name)] && layerOn[groupOf(mesh.name)];
+  });
+}
+function paint(){
+  const show = {};
+  visibleMeshes().forEach(function(mesh){ show[mesh.uuid]=true; });
+  meshes.forEach(function(mesh){
+    const hot = mesh===selected;
+    const inLayer = !!show[mesh.uuid];
+    mesh.visible = isolate ? hot : inLayer;
+    if(isolate && !selected) mesh.visible = inLayer;
+    const mat = mesh.material;
+    mat.color.set(colourOf(mesh.name));
+    mat.emissive.set(hot ? 0xe2b48a : 0x140804);
+    mat.emissiveIntensity = hot ? 0.45 : 0.04;
+    mat.opacity = (!selected || hot || isolate) ? 1 : 0.34;
+  });
+}
+function frameNames(names){
+  const box = new THREE.Box3();
+  let hit = 0;
+  (names||[]).forEach(function(name){
+    if(!byName[name]) return;
+    box.expandByObject(byName[name]);
+    hit += 1;
+  });
+  if(!hit) box.setFromObject(root);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3()).length();
+  const dist = Math.max(size * 1.35, 0.2);
+  const current = camera.position.clone().sub(controls.target);
+  let yaw = Math.atan2(current.x, current.z);
+  if(!isFinite(yaw)) yaw = 0.9;
+  const destYaw = yaw + 0.9;
+  const pitch = 0.28;
+  const to = new THREE.Vector3(
+    center.x + Math.sin(destYaw) * Math.cos(pitch) * dist,
+    center.y + Math.sin(pitch) * dist * 0.45,
+    center.z + Math.cos(destYaw) * Math.cos(pitch) * dist
+  );
+  fly = {from:camera.position.clone(), to:to, tFrom:controls.target.clone(), tTo:center, t:0};
+  controls.autoRotate = false;
+  controls.enableDamping = false;
+}
+function showSheet(html){ sheet.innerHTML = html; }
+function listSheet(query){
+  const words = (query||"").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const rows = visibleMeshes().filter(function(mesh){
+    const hay = mesh.name.toLowerCase();
+    return words.every(function(w){ return hay.indexOf(w)!==-1; });
+  });
+  const mod = MODULES.find(function(m){ return m.id===moduleId; });
+  showSheet(
+    '<p class="kicker">'+esc(mod.title)+'</p><h2>'+esc(mod.title)+'</h2><p>'+esc(mod.text)+'</p>'+
+    rows.map(function(mesh){ return '<div class="list"><button type="button" data-name="'+esc(mesh.name)+'">'+esc(mesh.name)+'</button></div>'; }).join("")+
+    '<p class="note">Z-Anatomy and BodyParts3D, CC BY-SA. Conduction sparks and flow particles are drawings on the model.</p>'
+  );
+  sheet.querySelectorAll("[data-name]").forEach(function(btn){
+    btn.onclick = function(){ openMesh(btn.getAttribute("data-name")); };
+  });
+}
+function openMesh(name){
+  const mesh = byName[name];
+  if(!mesh) return;
+  selected = mesh;
+  paint();
+  frameNames([name]);
+  const card = infoFor(name);
+  showSheet(
+    '<p class="kicker">'+esc(LAYER_NAME[groupOf(name)]||"Structure")+'</p><h2>'+esc(name)+'</h2>'+
+    '<h3>Anatomy</h3><p>'+esc(card.anatomy)+'</p>'+
+    '<h3>Function</h3><p>'+esc(card.fn)+'</p>'+
+    '<h3>Imaging</h3><p>'+esc(card.image)+'</p>'+
+    '<h3>Critical care</h3><p>'+esc(card.clinical)+'</p>'+
+    (card.q ? '<button type="button" id="quiz">Ask a question</button>' : '<p class="note">No question is attached to this mesh.</p>')
+  );
+  speakLine(name+". "+card.fn);
+  const quiz = document.getElementById("quiz");
+  if(quiz) quiz.onclick = function(){ ask(name); };
+}
+function ask(name){
+  const card = infoFor(name);
+  if(!card.q) return;
+  showSheet(
+    '<p class="kicker">Question</p><h2>'+esc(card.q)+'</h2>'+
+    card.options.map(function(opt,i){ return '<button type="button" class="choice" data-i="'+i+'">'+esc(opt)+'</button>'; }).join("")+
+    '<p id="why"></p>'
+  );
+  speakLine(card.q);
+  let locked = false;
+  sheet.querySelectorAll(".choice").forEach(function(btn){
+    btn.onclick = function(){
+      if(locked) return;
+      locked = true;
+      const i = Number(btn.getAttribute("data-i"));
+      const right = i===card.answer;
+      sheet.querySelectorAll(".choice").forEach(function(b, n){
+        b.disabled = true;
+        if(n===card.answer) b.classList.add("right");
+        else if(n===i) b.classList.add("wrong");
+      });
+      const answer = card.options[card.answer];
+      const line = right ? "Correct. "+card.why : "That is incorrect. The correct answer is "+answer+". "+card.why;
+      document.getElementById("why").textContent = line;
+      speakLine(line);
+    };
+  });
+}
+function applyModule(id){
+  moduleId = id;
+  const mod = MODULES.find(function(m){ return m.id===id; });
+  Object.keys(layerOn).forEach(function(g){ layerOn[g] = mod.groups.indexOf(g)!==-1; });
+  isolate = false;
+  selected = null;
+  document.getElementById("isolate").classList.remove("on");
+  flowOn = !!mod.flow;
+  sparkOn = !!mod.spark;
+  document.getElementById("flow").classList.toggle("on", flowOn);
+  document.getElementById("spark").classList.toggle("on", sparkOn);
+  sparkGroup.visible = sparkOn;
+  paintLayers();
+  paintMods();
+  paint();
+  frameNames(mod.focus || []);
+  listSheet(document.getElementById("find").value);
+}
+function paintMods(){
+  document.getElementById("mods").querySelectorAll("button").forEach(function(btn){
+    btn.classList.toggle("on", btn.getAttribute("data-mod")===moduleId);
+  });
+}
+function paintLayers(){
+  document.getElementById("layers").querySelectorAll("button").forEach(function(btn){
+    btn.classList.toggle("on", layerOn[btn.getAttribute("data-layer")]);
+  });
+}
+function buildPaths(){
+  function chain(names){
+    return names.map(centerOf).filter(Boolean);
+  }
+  return [
+    {pts:chain(["Superior vena cava","Right atrium","Right ventricle","Pulmonary trunk","Bifurcation of pulmonary trunk"]), color:0x7f97a4},
+    {pts:chain(["Left superior pulmonary vein","Left atrium","Left ventricle","Ascending aorta","Aortic arch"]), color:0xd07a68}
+  ].filter(function(path){ return path.pts.length>1; });
+}
+let paths = [];
+function makeDot(color){
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.004, 10, 8), new THREE.MeshBasicMaterial({color:color}));
+  mesh.visible = false;
+  scene.add(mesh);
+  return mesh;
+}
+function buildSpark(){
+  while(sparkGroup.children.length) sparkGroup.remove(sparkGroup.children[0]);
+  const ra = centerOf("Right atrium");
+  const rv = centerOf("Right ventricle");
+  const lv = centerOf("Left ventricle");
+  const svc = centerOf("Superior vena cava");
+  if(!ra || !rv || !lv) return;
+  const sa = svc ? ra.clone().lerp(svc, 0.72) : ra.clone();
+  const av = ra.clone().lerp(rv, 0.55).lerp(lv, 0.25);
+  const his = av.clone().lerp(rv, 0.35);
+  const rbb = rv.clone();
+  const lbb = lv.clone();
+  const pts = [sa, av, his, rbb];
+  const left = [his.clone(), lbb];
+  const mat = new THREE.MeshBasicMaterial({color:0xe2b48a});
+  [sa,av,his,rbb,lbb].forEach(function(p){
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.006, 12, 8), mat);
+    dot.position.copy(p);
+    sparkGroup.add(dot);
+  });
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({color:0xe2b48a}));
+  const line2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints(left), new THREE.LineBasicMaterial({color:0xe2b48a}));
+  sparkGroup.add(line); sparkGroup.add(line2);
+  sparkGroup.visible = sparkOn;
+}
+function fit(object){
+  const box = new THREE.Box3().setFromObject(object);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  object.position.sub(center);
+  const radius = size.length() * 0.5 || 1;
+  const dist = radius * 2.6;
+  camera.position.set(dist * 0.35, dist * 0.2, dist);
+  controls.target.set(0,0,0);
+  controls.update();
+  camera.near = radius / 50;
+  camera.far = radius * 40;
+  camera.updateProjectionMatrix();
+}
+function resize(){
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / Math.max(1, h);
+  camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize);
+resize();
+
+document.getElementById("mods").innerHTML = MODULES.map(function(mod){
+  return '<button type="button" data-mod="'+mod.id+'">'+esc(mod.title)+'</button>';
+}).join("");
+document.getElementById("mods").onclick = function(event){
+  const btn = event.target.closest("[data-mod]");
+  if(!btn) return;
+  applyModule(btn.getAttribute("data-mod"));
+};
+document.getElementById("layers").innerHTML = Object.keys(LAYER_NAME).map(function(id){
+  return '<button type="button" data-layer="'+id+'">'+esc(LAYER_NAME[id])+'</button>';
+}).join("");
+document.getElementById("layers").onclick = function(event){
+  const btn = event.target.closest("[data-layer]");
+  if(!btn) return;
+  const id = btn.getAttribute("data-layer");
+  layerOn[id] = !layerOn[id];
+  paintLayers();
+  paint();
+};
+document.getElementById("find").addEventListener("input", function(){ listSheet(this.value); });
+document.getElementById("reset").onclick = function(){ applyModule(moduleId); beatOn=false; cutOn=false; clip.constant=1e6; document.getElementById("beat").classList.remove("on"); document.getElementById("cut").classList.remove("on"); root.scale.setScalar(baseScale); };
+document.getElementById("isolate").onclick = function(){
+  if(!selected) return;
+  isolate = !isolate;
+  this.classList.toggle("on", isolate);
+  paint();
+};
+document.getElementById("beat").onclick = function(){ beatOn=!beatOn; this.classList.toggle("on", beatOn); };
+document.getElementById("flow").onclick = function(){ flowOn=!flowOn; this.classList.toggle("on", flowOn); flowDots.forEach(function(d){ d.mesh.visible=flowOn; }); };
+document.getElementById("spark").onclick = function(){ sparkOn=!sparkOn; sparkGroup.visible=sparkOn; this.classList.toggle("on", sparkOn); };
+document.getElementById("cut").onclick = function(){
+  cutOn = !cutOn;
+  this.classList.toggle("on", cutOn);
+  if(!cutOn){ clip.constant = 1e6; return; }
+  const box = new THREE.Box3().setFromObject(root);
+  clip.constant = box.getCenter(new THREE.Vector3()).z;
+};
+document.getElementById("ask").onclick = function(){
+  if(selected && infoFor(selected.name).q) ask(selected.name);
+};
+
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+function pick(event){
+  const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) / rect.width;
+  const y = (event.clientY - rect.top) / rect.height;
+  ndc.set(x*2-1, -(y*2-1));
+  ray.setFromCamera(ndc, camera);
+  const hits = ray.intersectObjects(meshes.filter(function(m){ return m.visible; }), false);
+  if(hits[0]) openMesh(hits[0].object.name);
+}
+canvas.addEventListener("pointerup", function(event){
+  if(event.target!==canvas) return;
+  if(Math.abs(event.clientX-downX)+Math.abs(event.clientY-downY) > 8) return;
+  pick(event);
+});
+let downX=0, downY=0;
+canvas.addEventListener("pointerdown", function(event){ downX=event.clientX; downY=event.clientY; });
+
+let clock = 0;
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, clock ? (now-clock)/1000 : 0.016);
+  clock = now;
+  if(fly){
+    fly.t = Math.min(1, fly.t + dt / 0.85);
+    const k = fly.t * fly.t * (3 - 2 * fly.t);
+    const focus = fly.tFrom.clone().lerp(fly.tTo, k);
+    const offA = fly.from.clone().sub(fly.tFrom);
+    const offB = fly.to.clone().sub(fly.tTo);
+    const dirA = offA.clone().normalize();
+    const dirB = offB.clone().normalize();
+    const turn = new THREE.Quaternion().setFromUnitVectors(dirA, dirB);
+    const spin = new THREE.Quaternion().slerp(turn, k);
+    const dir = dirA.clone().applyQuaternion(spin);
+    const len = offA.length() * (1-k) + offB.length() * k;
+    camera.position.copy(focus).add(dir.multiplyScalar(len));
+    controls.target.copy(focus);
+    if(fly.t>=1){ fly=null; controls.enableDamping=true; }
+  }
+  if(beatOn){
+    const s = baseScale * (1 + 0.03 * Math.sin(now * 0.008));
+    root.scale.setScalar(s);
+  } else root.scale.setScalar(baseScale);
+  if(flowOn && paths.length){
+    paths.forEach(function(path, pi){
+      const dots = flowDots.filter(function(d){ return d.path===pi; });
+      dots.forEach(function(dot){
+        dot.t += dt * 0.18;
+        if(dot.t>1) dot.t -= 1;
+        const f = dot.t * (path.pts.length-1);
+        const i = Math.min(path.pts.length-2, Math.floor(f));
+        const k = f - i;
+        dot.mesh.position.copy(path.pts[i]).lerp(path.pts[i+1], k);
+        dot.mesh.visible = true;
+      });
+    });
+  } else flowDots.forEach(function(d){ d.mesh.visible=false; });
+  controls.update();
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(frame);
+
+new GLTFLoader().load("cardiac/heart.glb?v=20261029c", function(gltf){
+  gltf.scene.traverse(function(obj){
+    if(!obj.isMesh) return;
+    const mat = new THREE.MeshStandardMaterial({
+      color: colourOf(obj.name),
+      roughness: 0.62,
+      metalness: 0.04,
+      side: THREE.DoubleSide,
+      transparent: true,
+      clippingPlanes: [clip]
+    });
+    obj.material = mat;
+    obj.userData.group = groupOf(obj.name);
+    byName[obj.name] = obj;
+    meshes.push(obj);
+  });
+  root.add(gltf.scene);
+  fit(root);
+  baseScale = root.scale.x || 1;
+  paths = buildPaths();
+  paths.forEach(function(path, pi){
+    for(let n=0;n<6;n++){
+      const mesh = makeDot(path.color);
+      flowDots.push({mesh:mesh, path:pi, t:n/6});
+    }
+  });
+  buildSpark();
+  document.getElementById("load").classList.add("hide");
+  applyModule("explore");
+}, undefined, function(){
+  document.getElementById("load").textContent = "The heart model did not load.";
+});
+</script>
+<script src="bed-bridge.js?v=20261029c"></script>
+</body>
+</html>

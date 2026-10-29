@@ -58,6 +58,7 @@ export const ROOMS = {
     name: 'Heart', room: 'Cardiac',
     line: 'Rhythm, pressure and the failing pump.',
     learn: [
+      ['Cardiac Anatomy Lab', 'A real heart model. Chambers, valves, coronaries, flow and the conduction drawing.', 'cardiac-lab.html?v=20261029c'],
       ['ACLS, 2025 AHA', 'Arrest, tachycardia and bradycardia, with the current doses.', 'ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20260925s'],
       ['Shock identification', 'MAP, cardiac index and the phenotype.', 'Shock_Identification_Management_Simulator.html?v=20260925s'],
       ['Shock and POCUS', 'RUSH exam, ScvO2 and lactate.', 'Shock_POCUS_RUSH_Simulator.html?v=20260925l'],

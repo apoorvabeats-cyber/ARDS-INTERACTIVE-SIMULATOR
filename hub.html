@@ -584,6 +584,7 @@ const ORGANS = [
     spots:[{x:55,y:29.5}],
     plate:"plates/heart.jpg",
     learn:[
+      ["Cardiac Anatomy Lab","A real heart model. Chambers, valves, coronaries, flow and the conduction drawing.","cardiac-lab.html?v=20261029c"],
       ["ACLS, 2025 AHA","Arrest, tachycardia and bradycardia, with the current doses.","ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20260925s"],
       ["Shock identification","MAP, cardiac index and the phenotype.","Shock_Identification_Management_Simulator.html?v=20260925s"],
       ["Shock and POCUS","RUSH exam, ScvO2 and lactate.","Shock_POCUS_RUSH_Simulator.html?v=20260925l"],
@@ -1255,11 +1256,17 @@ function openTitle(card){
   if(current && href.indexOf("Practice_Simulator.html")!==-1 && href.indexOf("from=")===-1){
     href += (href.indexOf("?")===-1 ? "?" : "&") + "from=" + encodeURIComponent(current);
   }
-  const backLabel = inside==="lab" ? "Learning lab" : inside==="arena" ? "Practice arena" : "Back";
+  const toIcu = /(?:^|\/)osce\.html/.test(href);
+  const backLabel = toIcu ? "Back to ICU" : (inside==="lab" ? "Learning lab" : inside==="arena" ? "Practice arena" : "Back");
   room.innerHTML =
     '<button type="button" class="back" id="back">'+esc(backLabel)+'</button>'+
     '<iframe class="abg-frame" title="'+esc(title)+'" src="'+esc(href)+'"></iframe>';
-  document.getElementById("back").onclick = function(){ stopSpoken(); renderRoom(); };
+  document.getElementById("back").onclick = function(){
+    stopSpoken();
+    if(toIcu){ returnToIcu(); return; }
+    if(!organById(current)){ closePage(); return; }
+    renderRoom();
+  };
   room.scrollTop = 0;
 }
 function placeBrain(spot){
@@ -1857,6 +1864,16 @@ function closePage(){
   if(window.resetAtlas) window.resetAtlas();
   window.scrollTo(0,0);
 }
+function returnToIcu(){
+  stopSpoken();
+  const btn = document.getElementById("icu-return");
+  if(btn){ btn.click(); return; }
+  document.body.classList.add("icu-open");
+  document.body.classList.remove("icu-gate","in","enter","inside","lab","arena","osce","reference","picking","body-only");
+  const room = document.getElementById("room");
+  if(room) room.innerHTML = "";
+}
+window.returnToIcu = returnToIcu;
 function showOrganTabs(){
   const nav = document.getElementById("organ-bubbles");
   const buttons = ORGANS.filter(function(organ){
@@ -2020,12 +2037,13 @@ function openRail(which){
     lede = "The calculations the simulators assume.";
     bodyHtml = formulaBlock();
   }
+  const toIcu = which==="osce";
   room.innerHTML =
-    '<button type="button" class="back" id="back">Back to the body</button>'+
+    '<button type="button" class="back" id="back">'+(toIcu?"Back to ICU":"Back to the body")+'</button>'+
     '<h2>'+esc(title)+'</h2>'+
     '<p class="lede">'+esc(lede)+'</p>'+bodyHtml;
   room.scrollTop = 0;
-  document.getElementById("back").onclick = closePage;
+  document.getElementById("back").onclick = toIcu ? returnToIcu : closePage;
 }
 document.getElementById("rail-tabs").addEventListener("click", function(event){
   const btn = event.target.closest("[data-tab]");
