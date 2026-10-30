@@ -606,10 +606,53 @@ function echoKind(){
   if(v.indexOf("psax")===0) return "psax";
   return v;
 }
+
+const STILLS = {
+  plax:{src:"echo/plax.jpg",labels:[["RV",48,32],["IVS",44,42],["LV",38,52],["PW",28,66],["MV",54,58],["AV",64,48],["Ao",70,38],["LA",60,72],["DAo",52,78]]},
+  "psax-pap":{src:"echo/psax.jpg",labels:[["RV",48,24],["IVS",46,34],["LV",48,45],["AL",36,52],["PM",60,56]]},
+  a4c:{src:"echo/a4c.jpg",labels:[["Apex",50,16],["RV",32,44],["LV",64,44],["IVS",46,40],["TV",34,54],["MV",60,56],["RA",32,68],["LA",64,72],["IAS",48,64]]},
+  a2c:{src:"echo/a2c.jpg",labels:[["Apex",50,18],["Inf",30,44],["Ant",68,40],["LV",44,38],["MV",50,54],["LA",48,68]]},
+  sc4:{src:"echo/sub4.jpg",labels:[["Liver",48,20],["RV",38,36],["RA",62,40],["LV",34,54],["LA",62,64],["IVS",44,48],["IAS",54,46],["TV",48,42],["MV",46,58]]},
+  ivc:{src:"echo/ivc.jpg",labels:[["Liver",32,42],["HV",42,36],["IVC",50,52],["RA",60,24]]}
+};
+const stillImg = {};
+Object.keys(STILLS).forEach(function(k){
+  const im = new Image();
+  im.src = STILLS[k].src;
+  stillImg[k] = im;
+});
+function drawStill(ctx, w, h, img, labels){
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, w, h);
+  const ir = img.naturalWidth / img.naturalHeight;
+  const cr = w / h;
+  let dw, dh, ox, oy;
+  if(cr > ir){ dh = h; dw = h * ir; ox = (w - dw) / 2; oy = 0; }
+  else { dw = w; dh = w / ir; ox = 0; oy = (h - dh) / 2; }
+  ctx.drawImage(img, ox, oy, dw, dh);
+  ctx.font = "600 13px Figtree, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  labels.forEach(function(lb){
+    const x = ox + (lb[1] / 100) * dw;
+    const y = oy + (lb[2] / 100) * dh;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(0,0,0,.88)";
+    ctx.strokeText(lb[0], x, y);
+    ctx.fillStyle = "#f3efe6";
+    ctx.fillText(lb[0], x, y);
+  });
+}
 function drawEcho(){
   if(mode!=="sim") return;
   const box = fitCanvas(echo, ectx);
   const ctx = ectx, w = box.w, h = box.h;
+  const still = STILLS[state.view];
+  const photo = still && stillImg[state.view];
+  if(photo && photo.complete && photo.naturalWidth){
+    drawStill(ctx, w, h, photo, still.labels);
+    return;
+  }
   ctx.fillStyle = "#000";
   ctx.fillRect(0,0,w,h);
   const cx = w*0.5, top = h*0.04;
