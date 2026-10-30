@@ -3,21 +3,2111 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1a2420">
+<meta name="theme-color" content="#05070c">
 <title>Critical Care Human Atlas</title>
+<script type="importmap">
+{"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}
+</script>
 <style>
-html,body{margin:0;height:100%;background:#1a2420;color:#f3efe6;font-family:Georgia,serif}
-.card{position:fixed;left:16px;right:16px;bottom:max(24px,env(safe-area-inset-bottom));z-index:1;padding:18px 16px 16px;border-radius:18px;background:rgba(8,12,16,.88);border:1px solid rgba(231,225,214,.4);text-align:center}
-p{margin:0 0 6px;letter-spacing:.18em;text-transform:uppercase;font-size:12px;font-family:system-ui,sans-serif}
-h1{font-weight:500;font-size:44px;letter-spacing:-.04em;margin:0 0 14px;line-height:.95}
-a.go{appearance:none;display:flex;align-items:center;justify-content:center;min-height:56px;padding:0 22px;border-radius:999px;border:0;background:#f3efe6;color:#05070c;font:600 18px/1 system-ui,sans-serif;text-decoration:none}
+:root{
+  --bg:#071018; --fg:#f3efe6; --muted:#b7b1a4; --faint:#8a8478;
+  --line:rgba(243,239,230,.18); --cool:#7fd4e6; --warm:#e2b48a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#05070c;color:var(--fg)}
+body{font-family:Figtree,ui-sans-serif,sans-serif;min-height:100dvh;display:flex;flex-direction:column}
+button,a,input{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:14px 118px 0 16px}
+.brand{margin:0;font-family:Figtree,sans-serif;font-weight:600;font-size:13px;letter-spacing:.18em;text-transform:uppercase;line-height:1.15;color:#d9ffe8}
+.figure{position:relative;z-index:1;width:100%;height:min(78dvh,820px);transform-style:preserve-3d;transition:opacity .45s ease}
+.figure canvas{width:100%;height:100%;display:block;touch-action:none}
+body.live3d .figure img,body.live3d .hot{display:none}
+.dock{position:absolute;left:8px;right:8px;bottom:112px;z-index:4;display:flex;gap:6px;overflow:auto;padding-bottom:4px}
+.dock button{flex:0 0 auto;min-height:40px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:rgba(7,16,24,.72);color:var(--fg)}
+.dock button.on{border-color:var(--cool);color:var(--cool)}
+.pickname{position:absolute;left:0;right:0;top:8px;z-index:4;text-align:center;margin:0;font-family:Fraunces,Georgia,serif;font-size:22px;letter-spacing:-.03em;pointer-events:none}
+.load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);pointer-events:none}
+.brand small{display:block;margin-top:4px;font-family:Figtree,sans-serif;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:600}
+header input,.seek input{width:100%;max-width:none;background:transparent;border:0;border-bottom:1px solid var(--line);padding:8px 0;font-size:16px}
+header input::placeholder{color:var(--faint)}
+.seek{display:flex;flex-direction:column;align-items:stretch;width:46%;max-width:220px}
+.touch{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.atlas{position:relative;flex:1;min-height:0;background:radial-gradient(ellipse at 50% 46%,#102033 0%,#05070c 62%)}
+.hud-header{position:absolute;top:10px;right:10px;z-index:8;display:flex;gap:8px;padding:0}
+.hud-header input{position:absolute;width:1px;height:1px;opacity:0}
+.hud-center{position:absolute;inset:0}
+.veil{position:absolute;inset:0;pointer-events:none;z-index:4}
+.bracket{position:absolute;width:54px;height:54px;border:1px solid rgba(170,230,255,.55)}
+.bracket.tl{top:14px;left:14px;border-right:0;border-bottom:0}
+.bracket.tr{top:14px;right:14px;border-left:0;border-bottom:0}
+.bracket.bl{bottom:14px;left:14px;border-right:0;border-top:0}
+.bracket.br{bottom:14px;right:14px;border-left:0;border-top:0}
+.diag{position:absolute;top:12%;bottom:12%;width:64px;display:flex;flex-direction:column;justify-content:space-between}
+.diag.left{left:10px}
+.diag.right{right:10px}
+.pane{height:22%;border:1px solid rgba(150,220,255,.28);background:
+  linear-gradient(rgba(150,220,255,.16) 1px,transparent 1px) 0 0 / 100% 7px,
+  linear-gradient(90deg,rgba(150,220,255,.12) 1px,transparent 1px) 0 0 / 8px 100%;
+  position:relative;overflow:hidden}
+.pane i{position:absolute;left:-20%;width:140%;height:46%;top:30%;
+  background:radial-gradient(closest-side,rgba(190,245,255,.9),transparent 70%) 0 50% / 14px 100% repeat-x;
+  filter:drop-shadow(0 0 4px #9fe);
+  animation:trace 2.8s linear infinite}
+.pane.alt i{animation-duration:3.6s;animation-direction:reverse;top:48%}
+.bars{height:18%;display:flex;align-items:flex-end;gap:3px;padding:4px;border:1px solid rgba(150,220,255,.28)}
+.bars b{flex:1;background:#8fd8ff;opacity:.7;transform-origin:bottom;animation:bar 1.6s ease-in-out infinite}
+.bars b:nth-child(2){animation-delay:.15s;height:70%}
+.bars b:nth-child(3){animation-delay:.3s;height:40%}
+.bars b:nth-child(4){animation-delay:.45s;height:85%}
+.bars b:nth-child(5){animation-delay:.1s;height:55%}
+.bars b:nth-child(1){height:60%}
+@keyframes bar{50%{transform:scaleY(.35);opacity:.35}}
+@keyframes trace{to{transform:translateX(18%)}}
+.ringset{position:absolute;left:50%;top:52%;width:min(78vw,520px);aspect-ratio:1;transform:translate(-50%,-50%);border:1px solid rgba(160,225,255,.28);border-radius:50%}
+.ringset::before,.ringset::after{content:"";position:absolute;inset:8%;border-radius:50%;border:1px dashed rgba(160,225,255,.45);animation:spin 22s linear infinite}
+.ringset::after{inset:18%;border-style:solid;border-color:transparent rgba(210,245,255,.7);animation-duration:9s;animation-direction:reverse}
+.beam{position:absolute;left:22%;right:22%;height:2px;background:linear-gradient(90deg,transparent,#dff,#fff,#dff,transparent);box-shadow:0 0 16px #9fe7ff;animation:sweep 3.4s ease-in-out infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes sweep{0%{top:82%;opacity:.2}50%{opacity:1}100%{top:10%;opacity:.2}}
+.pickname,.invite,.load{color:transparent;font-size:0}
+.atlas .well,.atlas .figure{width:100%;height:100%}
+.atlas .figure{min-height:100%}
+@media(max-width:720px){
+  .diag{width:42px;top:16%;bottom:10%}
+  .bracket{width:28px;height:28px}
+}
+.atlas::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(127,212,230,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(127,212,230,.06) 1px,transparent 1px);
+  background-size:42px 42px;
+  mask-image:radial-gradient(circle at 50% 42%,#000 10%,transparent 68%);
+}
+.dust{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.glow{position:fixed;left:50%;top:42%;width:280px;height:280px;transform:translate(-50%,-50%);pointer-events:none;border-radius:50%;background:radial-gradient(circle,rgba(127,212,230,.28),transparent 68%);opacity:0}
+body.opening .glow{animation:glow 2s ease forwards}
+@keyframes glow{0%{opacity:0}40%{opacity:1}100%{opacity:.35}}
+.sound,.skip{width:36px;height:36px;min-height:36px;padding:0;border-radius:50%;border:1px solid rgba(170,230,255,.55);background:transparent;color:transparent;font-size:0}
+.replay{margin:0}
+.skip{top:12px;left:12px;display:none}
+body.opening .skip{display:block}
+body.blocked .figure{opacity:0}
+body.blocked header{visibility:hidden}
+body.blocked .invite{opacity:1}
+body.begun .touch{display:none}
+.invite{display:none}
+body.titled .invite,body.ready .invite{opacity:1;transition:opacity .8s ease}
+body.settled .invite,body.in .invite{opacity:0}
+.invite p{margin:0;letter-spacing:.16em;text-transform:uppercase;font-size:11px;color:#8dceb0}
+.invite h2{font-family:Figtree,sans-serif;font-weight:600;font-size:13px;letter-spacing:.14em;text-transform:uppercase;margin:6px 0;line-height:1.3;color:#d9ffe8}
+.invite .quiet{letter-spacing:.04em;text-transform:uppercase;font-size:11px;color:#8dceb0;margin-top:4px}
+.well{perspective:1200px;width:min(100% - 168px, 520px);position:relative;z-index:1}
+.halo{position:absolute;left:22%;right:22%;bottom:16%;height:18px;border-radius:50%;border:1px solid rgba(127,212,230,.55);box-shadow:0 0 22px rgba(127,212,230,.35);opacity:0;pointer-events:none}
+body.titled .halo,body.ready .halo{opacity:1;transition:opacity .6s ease}
+.glimpses{display:none}
+.trace{position:absolute;width:76px;height:34px;opacity:0;pointer-events:none;z-index:2}
+body.ready .trace{opacity:.72;transition:opacity .6s ease}
+.trace.ct{left:0;top:7%}
+.trace.ecg{right:0;top:36%}
+.trace.vent{left:0;top:50%}
+.trace.line{right:0;top:64%}
+.trace img,.trace svg{width:100%;height:100%;display:block;object-fit:cover;background:transparent}
+.well::before{content:"";position:absolute;left:18%;right:18%;top:6%;bottom:12%;background:radial-gradient(circle,rgba(127,212,230,.14),transparent 68%);pointer-events:none;z-index:0}
+.scan{position:absolute;left:22%;right:22%;height:10%;top:-14%;pointer-events:none;opacity:0;background:linear-gradient(transparent,rgba(160,230,245,.7),transparent);mix-blend-mode:screen}
+body.scanning .scan{animation:scan 2.7s ease-in-out forwards}
+@keyframes scan{0%{top:-8%;opacity:.15}12%{opacity:1}100%{top:88%;opacity:0}}
+body.opening .figure{opacity:0}
+body.opening .figure.materialise{animation:materialise 2s ease forwards}
+@keyframes materialise{
+  0%{opacity:0;clip-path:inset(0 0 100% 0);filter:brightness(2.6) saturate(.15)}
+  20%{opacity:1}
+  100%{opacity:1;clip-path:inset(0);filter:none}
+}
+.figure::after{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:0;
+  background:radial-gradient(circle at var(--hx,50%) var(--hy,40%),transparent 0 22%,rgba(7,16,24,.4) 60%);
+}
+.figure.focus::after{opacity:1;transition:opacity .25s ease}
+.well{perspective:1400px;transform-style:preserve-3d}
+.figure img{width:100%;height:100%;display:block;object-fit:fill;pointer-events:none;user-select:none;backface-visibility:hidden}
+.figure img.back{position:absolute;inset:0;transform:rotateY(180deg)}
+body.spinning .hot{pointer-events:none}
+.hot{position:absolute;transform:translate(-50%,-50%);width:92px;height:92px;border:0;border-radius:999px;background:transparent;padding:0;backface-visibility:hidden}
+.hot[data-id="brain"]{width:120px;height:100px}
+.hot i{position:absolute;inset:16px;border:0;border-radius:inherit;background:transparent;box-shadow:none}
+.hot.lit i{inset:0;background:radial-gradient(circle,rgba(127,212,230,.62),rgba(127,212,230,0) 72%);box-shadow:0 0 26px rgba(127,212,230,.35)}
+.hot[data-id="brain"].lit i{animation:breathe 2.8s ease-in-out infinite}
+@keyframes breathe{50%{transform:scale(1.1);opacity:.72}}
+.hot b{display:none}
+.figure.filming{transition:opacity .25s ease;transform:none}
+body.filming header,body.filming .trace,body.filming .halo,body.filming .invite,body.filming .hot b{opacity:0}
+.room{display:none;min-height:100dvh;padding:14px 14px 22px}
+body.in .atlas,body.in header,body.in .approach{display:none}
+body.in .room{display:flex;flex-direction:column}
+body.hud3d.in .atlas,body.hud3d.in header,body.hud3d.in .approach{display:none !important}
+body.hud3d.in .room{display:flex;position:fixed;inset:0;z-index:40;height:100dvh;min-height:100dvh;overflow:auto;background:#071018}
+.back{align-self:flex-start;text-align:left;background:rgba(12,24,34,.92);border:1px solid rgba(127,212,230,.55);color:#e7f6fb;padding:0 16px;min-height:44px;border-radius:999px;margin:0 0 10px}
+.room h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:42px;letter-spacing:-.035em;margin:6px 0 8px;line-height:.95}
+.lede{margin:0;max-width:38rem;color:var(--muted);line-height:1.45}
+.parts{display:flex;flex-direction:column;align-items:stretch;gap:8px;margin:14px 0 0}
+.parts button{width:100%;text-align:left;background:transparent;border:1px solid var(--line);border-radius:14px;padding:10px 14px;min-height:48px;color:var(--fg);font-size:17px}
+.parts button.on{color:var(--fg);border-color:var(--fg)}
+.portals{flex:none;display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.portal{
+  position:relative;border:0;border-radius:18px;min-height:92px;width:100%;text-align:left;padding:16px 42px 16px 16px;
+  overflow:hidden;color:var(--fg);
+}
+.portal .go{position:absolute;right:18px;top:50%;width:9px;height:9px;border-right:2px solid currentColor;border-top:2px solid currentColor;transform:translateY(-50%) rotate(45deg);opacity:.7;pointer-events:none}
+.portal.lab{background:
+  radial-gradient(80% 50% at 50% 100%,rgba(127,212,230,.16),transparent 70%),
+  radial-gradient(120% 80% at 50% 0%,#12343f 0%,#0c1418 58%,#071018 100%);
+  transform:none;box-shadow:inset 0 0 0 1px rgba(127,212,230,.4)}
+.portal.arena{background:
+  radial-gradient(80% 46% at 50% 100%,rgba(226,180,138,.18),transparent 70%),
+  radial-gradient(120% 80% at 50% 0%,#3a2a1c 0%,#16110e 55%,#071018 100%);
+  transform:none;box-shadow:inset 0 0 0 1px rgba(226,180,138,.45)}
+.portal.osce{background:
+  radial-gradient(80% 50% at 50% 100%,rgba(170,196,168,.18),transparent 70%),
+  radial-gradient(120% 80% at 50% 0%,#1c3324 0%,#101612 55%,#071018 100%);
+  box-shadow:inset 0 0 0 1px rgba(170,196,168,.45)}
+.portal.reference{background:
+  radial-gradient(80% 50% at 50% 100%,rgba(214,198,150,.16),transparent 70%),
+  radial-gradient(120% 80% at 50% 0%,#2c2818 0%,#14140f 55%,#071018 100%);
+  box-shadow:inset 0 0 0 1px rgba(214,198,150,.4)}
+.portal.on{box-shadow:inset 0 0 0 2px #f3efe6}
+body.inside.lab{background:#07161c}
+body.inside.arena{background:#140e0b}
+body.inside.osce{background:#0d1610}
+body.inside.reference{background:#14140f}
+.portal span{display:block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+.portal.lab span{color:var(--cool)}
+.portal.arena span{color:var(--warm)}
+.portal.osce span{color:#b7d2b8}
+.portal.reference span{color:#e2d2a2}
+.portal strong{display:block;margin-top:6px;font-family:Fraunces,Georgia,serif;font-size:28px;font-weight:520;letter-spacing:-.03em;line-height:1.05}
+.room h2.mcq-stem{font-family:Figtree,sans-serif;font-weight:650;font-size:16px;line-height:1.45;letter-spacing:0;margin:8px 0 12px}
+.mcq-stem{font-family:Figtree,sans-serif;font-weight:650;font-size:16px;line-height:1.45;letter-spacing:0;margin:8px 0 12px}
+.mcq-opt{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;min-height:52px;padding:12px;margin:0 0 8px;border-radius:14px;border:1px solid var(--line);background:#0c1822;color:#f3efe6;font-size:16px;line-height:1.4;-webkit-appearance:none;appearance:none}
+.mcq-opt b{font-family:Fraunces,Georgia,serif;color:#7fd4e6;min-width:1.2em;font-weight:520}
+.mcq-opt.right{border-color:#7dcea0;background:#10241c}
+.mcq-opt.wrong{border-color:#c46a6a;background:#241416}
+.mcq-opt:disabled{cursor:default}
+.mcq-note{margin-top:8px}
+body.enter .portal.lab{animation:fromLeft .75s cubic-bezier(.22,.7,.2,1) both}
+body.enter .portal.arena{animation:fromRight .75s cubic-bezier(.22,.7,.2,1) both}
+@keyframes fromLeft{from{opacity:0;transform:translateX(-36px)}to{opacity:1;transform:none}}
+@keyframes fromRight{from{opacity:0;transform:translateX(36px)}to{opacity:1;transform:none}}
+.shelf{display:none;margin-top:8px}
+body.inside .portals{flex:none;flex-direction:column;gap:8px;overflow:visible;margin-top:10px}
+body.inside .portal{min-height:52px;width:100%;flex:none;padding:12px 16px;border-radius:16px}
+body.inside .portal em,body.inside .portal::before,body.inside .portal::after,body.inside .portal .go,body.inside .portal span{display:none}
+body.inside .portal strong{margin:0;font-family:Figtree,sans-serif;font-size:18px;font-weight:650;letter-spacing:0;line-height:1.25}
+body.inside .shelf{display:block}
+.refhead{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:16px 0 6px}
+.tasks{margin:10px 0;padding-left:18px;color:var(--muted)}
+.tick{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.tick input{width:22px;height:22px;margin-top:2px;flex:none}
+.mark{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:14px}
+.card{display:block;text-decoration:none;padding:14px 0;border-top:1px solid var(--line);min-height:44px}
+button.card{width:100%;font:inherit;color:inherit;text-align:left;background:transparent;border:0;border-radius:0;cursor:pointer}
+.card b{display:block;font-size:17px;font-weight:600}
+.card span{display:block;margin-top:4px;color:var(--muted);line-height:1.4}
+.empty{color:var(--muted);line-height:1.45}
+.results{display:none;padding:8px 16px 24px}
+.veil{position:fixed;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;text-align:center;padding:28px;color:var(--fg);transform-origin:var(--ox,50%) var(--oy,50%);transform:scale(var(--from,.42));transition:transform .9s cubic-bezier(.22,.61,.2,1),opacity .5s ease}
+.veil.full{transform:scale(1)}
+.veil.away{opacity:0}
+.veil.lab{background:radial-gradient(120% 90% at 50% 0%,#12343f,#071018 72%)}
+.veil.arena{background:radial-gradient(120% 90% at 50% 0%,#3a2a1c,#140e0b 72%)}
+.veil.osce{background:radial-gradient(120% 90% at 50% 0%,#1c3324,#071018 72%)}
+.veil.reference{background:radial-gradient(120% 90% at 50% 0%,#2c2818,#14140f 72%)}
+.veil.title{background:#071018}
+.veil strong{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:40px;letter-spacing:-.03em;line-height:1}
+body.inside .shelf .card{animation:titleIn 1.15s ease both}
+@keyframes titleIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.credit{display:none}
+.approach{position:fixed;inset:0;z-index:7;display:flex;align-items:center;justify-content:center;background:#071018;visibility:hidden;pointer-events:none}
+.approach.rise{visibility:visible}
+.approach img{width:100vw;height:100dvh;object-fit:contain;background:#071018;border-radius:0;box-shadow:none;transform:translate(var(--sx,0),var(--sy,-18vh)) scale(.2);opacity:0}
+.approach.rise img{opacity:1;transform:translate(0,0) scale(1);transition:transform 1.7s cubic-bezier(.22,.61,.2,1),opacity .7s ease}
+.approach.leave img{opacity:0;transform:translate(0,-3vh) scale(1.08);transition:transform .85s ease,opacity .85s ease}
+.approach p{display:none}
+body.searching header{display:flex}
+body.searching .atlas,body.searching .room{display:none}
+body.searching .results{display:block}
+.group{margin-top:18px}
+.group h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:26px;margin:0}
+@media(max-width:380px){
+  .portal strong{font-size:26px}
+  .room h2{font-size:36px}
+  .room h2.mcq-stem,.mcq-stem{font-size:16px}
+}
+@media(prefers-reduced-motion:reduce){
+  .figure.sway,.hot i,body.enter .portals,.dust,.scan,.glow{animation:none}
+  .figure{transition:none}
+  .portal.lab,.portal.arena{transform:none}
+  body.opening .figure{opacity:1;animation:none}
+}
+
+/* Opening atlas: keep the body and its controls visible at every screen size. */
+body{height:auto;min-height:100dvh}
+.atlas{flex:none;height:100dvh;min-height:620px;overflow:hidden}
+.atlas-heading{position:absolute;left:32px;top:28px;z-index:5;pointer-events:none}
+.atlas-heading p{margin:0 0 8px;color:var(--cool);font-size:11px;letter-spacing:.18em;text-transform:uppercase}
+.atlas-heading h1{font:520 32px/1.1 Fraunces,Georgia,serif;margin:0 0 10px;letter-spacing:-.03em}
+.atlas-heading span{color:var(--muted);font-size:13px}
+.hud-header{position:absolute;z-index:8;top:24px;right:28px;gap:8px}
+.sound{width:auto;padding:0 13px;color:var(--fg);font-size:12px;background:#0c1823;min-height:38px;border-color:var(--line);border-radius:20px}
+#sound::before{content:"Sound on"}#sound[aria-pressed="false"]::before{content:"Sound off"}
+.skip{color:var(--fg);font-size:12px;width:auto;padding:0 12px;z-index:9;position:absolute;top:130px;left:32px}
+.skip::before{content:"Skip intro"}
+.atlas .hud-center{left:0;right:230px;top:94px;bottom:100px;display:flex;align-items:stretch;justify-content:center}
+.atlas .well{width:auto;max-width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+.figure img{position:absolute;inset:0;object-fit:fill}
+.figure canvas{position:relative;z-index:1}
+body:not(.live3d) .figure canvas{display:none}
+.atlas .figure{height:100%;width:auto;max-width:100%;aspect-ratio:1008/1792;min-height:0}
+body.flat .figure canvas{display:none}
+body.flat .figure .back{display:none}
+.load{font-size:12px;color:var(--muted);inset:auto 20px 8px;z-index:3;text-align:center}
+.pickname{top:auto;bottom:0;font:12px Figtree,sans-serif;color:var(--muted);transform:translateY(26px)}
+.organ-nav{position:absolute;z-index:5;right:32px;top:120px;bottom:100px;width:190px;display:flex;flex-direction:column;justify-content:center;gap:6px}
+.organ-nav h2{font:600 10px Figtree,sans-serif;text-transform:uppercase;letter-spacing:.16em;color:var(--faint);margin:0 0 12px}
+.organ-nav button{display:flex;align-items:center;gap:10px;text-align:left;min-height:36px;padding:8px 12px;background:rgba(9,21,31,.8);border:1px solid var(--line);border-radius:8px;font-size:13px;color:var(--muted)}
+.organ-nav button::before{content:"";width:6px;height:6px;flex:none;border-radius:50%;background:var(--dot,var(--cool))}
+.organ-nav button:hover,.organ-nav button.on,.organ-nav button:focus-visible{color:var(--fg);border-color:var(--cool);background:#112b37}
+.viewer-controls{position:absolute;left:24px;right:254px;bottom:26px;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;z-index:5}
+.viewer-controls button{min-height:40px;padding:8px 16px;border:1px solid var(--line);border-radius:22px;background:#0c1823;font-size:12px}
+.viewer-controls button[aria-pressed="true"]{border-color:#7fd4e680;color:var(--cool)}
+.viewer-controls button:disabled{opacity:.4;cursor:default}
+.atlas .ringset,.atlas .beam,.atlas .diag{display:none}
+.atlas .bracket{opacity:.2}
+body.in .organ-nav,body.in .viewer-controls{display:none}
+@media(max-width:720px){
+ .atlas{height:100dvh;min-height:700px}
+ .atlas-heading{top:22px;left:20px}.atlas-heading h1{font-size:25px}.atlas-heading span{font-size:12px}
+ .hud-header{top:20px;right:16px;gap:5px}.sound{padding:0 9px;min-height:32px;font-size:10px}
+ .atlas-heading{right:150px}.atlas-heading p{font-size:9px}.atlas-heading span{display:none}
+ .atlas .hud-center{top:94px;left:0;right:0;bottom:230px}
+ .organ-nav{top:auto;bottom:78px;left:16px;right:16px;width:auto;display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;justify-content:center}
+ .organ-nav h2{width:100%;text-align:center;margin:0 0 3px}
+ .organ-nav button{min-height:32px;padding:6px 9px;font-size:11px;gap:6px}
+ .viewer-controls{left:12px;right:12px;bottom:16px;gap:6px}.viewer-controls button{padding:7px 12px;min-height:36px;font-size:11px}
+ .pickname{font-size:11px;transform:translateY(20px)}
+ .skip{top:104px;left:20px}
+}
+@media(prefers-reduced-motion:reduce){.pane i,.bars b,.ringset::before,.ringset::after,.beam{animation:none}}
+
+body.hud3d{background:#05070c}
+body.hud3d .atlas{display:block;height:100dvh;min-height:100dvh;overflow:hidden}
+body.hud3d .stage-shell{position:relative;height:100%}
+body.hud3d .stage-col{position:absolute;inset:0}
+body.hud3d .rail{position:absolute;z-index:6;left:12px;top:58px;bottom:18px;width:min(168px,46vw);overflow-x:clip;overflow-y:auto;padding:0;border:0;background:transparent;pointer-events:none}
+body.hud3d .rail-kicker,body.hud3d .rail-tabs,body.hud3d .bubbles{pointer-events:auto}
+body.hud3d .rail-kicker{margin:0 0 10px;color:#7fd4e6;font-size:10px;letter-spacing:.18em;text-transform:uppercase;text-shadow:0 0 8px rgba(127,212,230,.45)}
+body.hud3d .rail-tabs{display:flex;flex-direction:column;justify-content:flex-start;gap:8px;overflow:hidden}
+body.hud3d .rail-tabs button{text-align:left;min-height:54px;padding:10px 12px;border-radius:12px;border:1px solid rgba(127,212,230,.45);background:rgba(6,14,22,.42);backdrop-filter:blur(8px);font-family:Fraunces,Georgia,serif;font-weight:520;font-size:16px;line-height:1.15;letter-spacing:-.02em;box-shadow:0 0 18px rgba(127,212,230,.08);animation:railIn .6s cubic-bezier(.22,1,.36,1) both}
+body.hud3d .rail-tabs button:nth-child(1){animation-delay:0s}
+body.hud3d .rail-tabs button:nth-child(2){animation-delay:.2s}
+body.hud3d .rail-tabs button:nth-child(3){animation-delay:.4s}
+body.hud3d .rail-tabs button:nth-child(4){animation-delay:.6s}
+body.hud3d .rail-tabs button:nth-child(5){animation-delay:.8s}
+body.hud3d .rail-tabs button:nth-child(6){animation-delay:1s}
+body.tabs-in .rail-tabs button{animation:none}
+@keyframes railIn{from{opacity:0;transform:translateX(-60px)}to{opacity:1;transform:translateX(0)}}
+@media(prefers-reduced-motion:reduce){body.hud3d .rail-tabs button{animation:none;opacity:1;transform:none}}
+body.hud3d .rail-tabs button:hover,body.hud3d .rail-tabs button:focus-visible{border-color:#dff6ff;background:rgba(10,28,38,.62)}
+body.hud3d .stage-col .figure,body.hud3d .atlas .figure{position:absolute;inset:0;width:100%;height:100%;max-width:none;aspect-ratio:auto;min-height:0}
+body.hud3d .figure canvas{display:block !important;width:100%;height:100%;touch-action:none;position:relative;z-index:1}
+body.hud3d .holo{position:absolute;left:50%;top:48%;width:min(42vw,340px);height:min(78vh,720px);transform:translate(-50%,-50%);border:1px solid rgba(160,230,255,.28);border-radius:50%;pointer-events:none;box-shadow:inset 0 0 40px rgba(127,212,230,.08),0 0 30px rgba(127,212,230,.08)}
+body.hud3d .holo i{position:absolute;width:46px;height:46px;border:1px solid rgba(170,230,255,.55)}
+body.hud3d .holo i.tl{top:8%;left:6%;border-right:0;border-bottom:0}
+body.hud3d .holo i.tr{top:8%;right:6%;border-left:0;border-bottom:0}
+body.hud3d .holo i.bl{bottom:10%;left:6%;border-right:0;border-top:0}
+body.hud3d .holo i.br{bottom:10%;right:6%;border-left:0;border-top:0}
+body.hud3d .rings,body.hud3d .rings::before,body.hud3d .rings::after{display:none !important}
+body.hud3d .scan-line{position:absolute;left:28%;right:28%;height:2px;top:14%;pointer-events:none;background:linear-gradient(90deg,transparent,#dff,#fff,#dff,transparent);box-shadow:0 0 14px #7fd4e6;animation:sweep 4.8s ease-in-out infinite;opacity:.7}
+body.hud3d .model-note{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:min(520px,70vw);z-index:4;margin:0;text-align:center;font-size:10px;line-height:1.35;color:#8a8478;pointer-events:none}
+body.hud3d .load{font-size:13px;color:#b7b1a4;z-index:5}
+body.hud3d.opening .figure{opacity:1 !important;animation:none !important}
+body.hud3d .invite,body.hud3d .skip,body.hud3d .atlas-heading,body.hud3d .organ-nav{display:none !important}
+body.hud3d .bubbles{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%}
+body.hud3d .bubbles[hidden],body.hud3d .rail-tabs[hidden]{display:none !important}
+body.hud3d .backbub{align-self:stretch;min-height:40px;border:0;background:none;color:#d5eef6;text-align:left;padding:0 2px 6px;font-size:13px}
+body.hud3d .bubble-btn{display:flex;flex-direction:column;align-items:center;gap:5px;width:128px;padding:0;border:0;background:transparent;color:#e7e1d6;font-size:13px;line-height:1.15;text-align:center}
+body.hud3d .bubble-btn img{width:100px;height:100px;border-radius:50%;object-fit:cover;object-position:center;border:2px solid rgba(198,236,255,.9);box-shadow:0 0 0 7px rgba(127,212,230,.14),0 0 22px rgba(127,212,230,.42);background:#071018}
+body.hud3d .bubble-btn:hover img,body.hud3d .bubble-btn:focus-visible img{box-shadow:0 0 0 7px rgba(127,212,230,.32),0 0 28px rgba(223,246,255,.7)}
+body.hud3d.picking .rail{width:min(150px,46vw)}
+body.hud3d.in.doors .room{overflow:hidden}
+.abg-frame{flex:1;width:100%;min-height:70dvh;border:0;border-radius:12px;background:#07131b}
+.portals.doors{flex:1 1 auto;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(280px,1fr);gap:12px;margin-top:12px;perspective:900px;min-height:0;overflow:hidden}
+.portals.doors .portal{min-height:280px;height:100%;width:auto;padding:18px 16px;border-radius:18px}
+.portals.doors .portal .go{display:none}
+.portals.doors .portal strong{margin-top:16px;font-size:clamp(22px,4.6vw,34px)}
+.portals.doors .portal em{display:block;margin-top:8px;font-style:normal;color:var(--muted);line-height:1.35;font-size:13px}
+.portals.doors .portal.lab::after,.portals.doors .portal.arena::after{content:"";position:absolute;left:12%;right:12%;bottom:16px;height:42px;border:1px solid rgba(127,212,230,.28);border-radius:50%;transform:rotateX(68deg);pointer-events:none}
+.portals.doors .portal.arena::after{border-color:rgba(226,180,138,.35)}
+.portals.doors .portal.arena::before{content:"";position:absolute;top:16px;right:14px;width:42%;height:22px;opacity:.75;pointer-events:none;background:linear-gradient(#e2b48a,#e2b48a) 0 10px/100% 1px no-repeat,repeating-linear-gradient(90deg,transparent 0 7px,rgba(226,180,138,.85) 7px 8px)}
+body.doors .portals.doors .portal.lab{animation:doorLeft 1.05s cubic-bezier(.22,.61,.2,1) both}
+body.doors .portals.doors .portal.arena{animation:doorRight 1.05s cubic-bezier(.22,.61,.2,1) both}
+@keyframes doorLeft{from{opacity:0;transform:translateX(-120%)}to{opacity:1;transform:none}}
+@keyframes doorRight{from{opacity:0;transform:translateX(120%)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){
+  body.doors .portals.doors .portal.lab,body.doors .portals.doors .portal.arena{animation:none;transform:none;opacity:1}
+}
+@media(max-width:720px){
+  body.hud3d .rail{top:52px;left:8px;width:min(142px,44vw)}
+  body.hud3d .rail-tabs button{min-height:48px;font-size:14px;padding:8px 10px}
+  body.hud3d .holo{width:min(70vw,280px)}
+  body.hud3d .model-note{display:none}
+}
+body.icu-open.in .room{visibility:visible}
+body.icu-open .atlas{visibility:hidden}
+body.icu-open .rail,body.icu-open .hud-header{visibility:visible}
+body.hud3d:not(.icu-open) .rail,
+body.hud3d:not(.icu-open) .holo,
+body.hud3d:not(.icu-open) .rings,
+body.hud3d:not(.icu-open) .scan-line,
+body.hud3d:not(.icu-open) .dust,
+body.hud3d:not(.icu-open) .glow,
+body.hud3d:not(.icu-open) .model-note{display:none !important}
+body.icu-open{overflow:hidden}
+body.icu-open .rail{position:fixed;z-index:8;left:50%;top:50%;right:auto;bottom:auto;width:min(100vw,calc(100dvh * 1500 / 819));height:min(100dvh,calc(100vw * 819 / 1500));transform:translate(-50%,-50%);max-height:none;background:transparent;pointer-events:none;overflow:hidden}
+body.icu-open .rail-kicker{display:none}
+body.icu-open .rail-tabs{position:absolute;inset:0;display:block;overflow:hidden;pointer-events:none}
+body.hud3d.icu-open .rail-tabs button{position:absolute;pointer-events:auto;width:16.5%;min-width:0;max-width:none;min-height:0;height:7.2%;padding:0 12px 0 16px;font-size:clamp(9px,1.15vw,13px);line-height:1.05;text-align:left;color:#f4fbff;background:linear-gradient(90deg,rgba(8,22,32,.78),rgba(8,22,32,.55));border:0;border-radius:0;box-shadow:none;clip-path:polygon(10px 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,10px 100%,0 50%);animation:tabSlide .6s cubic-bezier(.22,1,.36,1) both}
+body.hud3d.icu-open .rail-tabs button:nth-child(1){top:12%;left:1.2%;animation-delay:0s}
+body.hud3d.icu-open .rail-tabs button:nth-child(2){top:23%;left:3.6%;animation-delay:.09s}
+body.hud3d.icu-open .rail-tabs button:nth-child(3){top:34%;left:6%;animation-delay:.18s}
+body.hud3d.icu-open .rail-tabs button:nth-child(4){top:45%;left:8.4%;animation-delay:.27s}
+body.hud3d.icu-open .rail-tabs button:nth-child(5){top:56%;left:10.8%;animation-delay:.36s}
+body.hud3d.icu-open .rail-tabs button:nth-child(6){top:67%;left:13.2%;animation-delay:.45s}
+body.hud3d.icu-open.tabs-in .rail-tabs button{animation:none;opacity:1;transform:none}
+@keyframes tabSlide{from{opacity:0;transform:translateX(-60px)}to{opacity:1;transform:translateX(0)}}
+.icu{display:none}
+body.icu-open .icu{display:flex;align-items:center;justify-content:center;position:fixed;inset:0;z-index:5;background:#6d746c}
+.icu-stage{position:relative;width:min(100vw,calc(100dvh * 1500 / 819));height:min(100dvh,calc(100vw * 819 / 1500));padding:0}
+.icu-frame{position:absolute;inset:0;width:100%;height:100%;max-height:none;aspect-ratio:auto;overflow:hidden;border-radius:0}
+.icu-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;user-select:none}
+#icu-monitor,#icu-vent{position:absolute;border-radius:1px;pointer-events:none;z-index:2;background:transparent}
+#icu-monitor{left:55%;top:11.5%;width:11.7%;height:14%}
+#icu-vent{left:27.9%;top:33.6%;width:6.1%;height:7.9%}
+.bay-hit{position:absolute;z-index:4;margin:0;padding:0;border:0;background:transparent;color:transparent}
+.bay-hit::before{content:"";position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;animation:glowWash 3.2s ease-in-out infinite}
+.bay-hit::after{content:none}
+.bay-hit.mon{left:53%;top:10%;width:20%;height:21%;border-radius:4px}
+.bay-hit.mon::before{background:radial-gradient(ellipse at 50% 48%,rgba(80,240,130,.58),rgba(80,240,130,0) 72%);animation-delay:0s}
+.bay-hit.ven{left:24.5%;top:30.8%;width:14.7%;height:64.5%;border-radius:18px 18px 10px 10px}
+.bay-hit.ven::before{background:radial-gradient(ellipse at 50% 22%,rgba(110,220,255,.55),rgba(110,220,255,0) 70%);animation-delay:.5s}
+.bay-hit.pat{left:46.7%;top:33%;width:18%;height:35.4%;border-radius:46% 46% 18% 18%}
+.bay-hit.pat::before{background:radial-gradient(ellipse at 50% 28%,rgba(255,196,120,.55),rgba(255,196,120,0) 72%);animation-delay:1s}
+.bay-hit.dial{left:66%;top:29.9%;width:11.7%;height:33%;border-radius:6px}
+.bay-hit.dial::before{background:radial-gradient(ellipse at 50% 42%,rgba(255,70,90,.55),rgba(255,70,90,0) 70%);animation-delay:1.4s}
+.bay-hit.defib{left:84.3%;top:36.6%;width:14%;height:14.7%;border-radius:12px}
+.bay-hit.defib::before{background:radial-gradient(ellipse at 50% 48%,rgba(255,214,70,.62),rgba(255,214,70,0) 70%);animation-delay:1.8s}
+.bay-hit.cart{left:82.3%;top:49.5%;width:17%;height:33%;border-radius:8px}
+.bay-hit.cart::before{background:radial-gradient(ellipse at 50% 42%,rgba(255,120,30,.58),rgba(255,120,30,0) 72%);animation-delay:2.2s}
+@keyframes glowWash{0%,100%{opacity:.55}50%{opacity:1}}
+.icu-audio{display:none}
+@media(max-width:820px) and (max-aspect-ratio:4/5){
+  body.icu-open .icu{align-items:flex-start;padding-top:54px}
+  .icu-stage{width:100vw;height:calc(100vw * 819 / 1500)}
+  body.icu-open .rail{left:0;top:auto;bottom:0;transform:none;width:100%;height:calc(100dvh - 54px - (100vw * 819 / 1500))}
+  body.hud3d.icu-open .rail-tabs button{width:min(230px,64vw);height:36px;font-size:13px;padding:0 16px 0 18px}
+  body.hud3d.icu-open .rail-tabs button:nth-child(1){top:8px;left:8px}
+  body.hud3d.icu-open .rail-tabs button:nth-child(2){top:48px;left:22px}
+  body.hud3d.icu-open .rail-tabs button:nth-child(3){top:88px;left:36px}
+  body.hud3d.icu-open .rail-tabs button:nth-child(4){top:128px;left:50px}
+  body.hud3d.icu-open .rail-tabs button:nth-child(5){top:168px;left:64px}
+  body.hud3d.icu-open .rail-tabs button:nth-child(6){top:208px;left:78px}
+}
+@media(prefers-reduced-motion:reduce){
+  .bay-hit::before,body.hud3d.icu-open .rail-tabs button{animation:none;opacity:1;transform:none}
+}
+#icu-return{display:none}
+body.body-only:not(.in) #icu-return{display:inline-flex !important;position:fixed;z-index:80;top:max(14px, env(safe-area-inset-top));left:14px;min-height:48px;padding:0 16px;border-radius:999px;border:1px solid rgba(127,212,230,.55);background:rgba(6,14,22,.92);color:#e7f6fb;font-size:16px;letter-spacing:0;text-transform:none}
+#icu-gate{display:none}
+body.icu-gate .atlas,body.icu-gate .approach,body.icu-gate .hud-header{visibility:hidden !important;pointer-events:none !important}
+body.icu-gate #view{display:none !important}
+body.icu-gate #icu-gate{display:flex !important;position:fixed;inset:0;z-index:200;flex-direction:column;align-items:center;justify-content:flex-end;padding:20px 16px calc(24px + env(safe-area-inset-bottom));background:#1a2420;color:#f3efe6;transform:translate3d(0,0,0)}
+body.icu-gate #icu-gate .gate-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center}
+body.icu-gate #icu-gate .gate-card{position:relative;z-index:1;width:min(100%,440px);margin:0;padding:18px 16px 16px;border-radius:18px;background:rgba(8,12,16,.88);border:1px solid rgba(231,225,214,.4);text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.45)}
+body.icu-gate #icu-gate p{margin:0 0 6px;letter-spacing:.18em;text-transform:uppercase;font-size:12px;color:#d9d0c3}
+body.icu-gate #icu-gate h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:clamp(36px,9vw,56px);letter-spacing:-.04em;margin:0 0 14px;line-height:.95;color:#f4efe6}
+body.icu-gate #icu-gate button{appearance:none;-webkit-appearance:none;min-height:56px;width:100%;padding:0 28px;border-radius:999px;border:0;background:#e7e1d6;color:#14181c;font-size:18px;font-weight:650}
+.organ-find{width:100%;min-height:36px;margin:0 0 8px;border:0;border-bottom:1px solid rgba(127,212,230,.35);background:transparent;color:#e7e1d6;font-size:14px}
 </style>
 </head>
-<body>
-<div class="card">
-<p>Critical care</p>
-<h1>Enter the ICU</h1>
-<a class="go" href="hub.html?open=1">Enter the ICU</a>
+<body class="hud3d icu-gate">
+<script>window.anatomyManaged=true;if(location.search.indexOf("open=1")!==-1){document.body.classList.remove("icu-gate");document.body.classList.add("icu-open");}</script>
+<canvas class="dust" id="dust" aria-hidden="true"></canvas>
+<audio id="bed" loop preload="none" playsinline></audio>
+<audio id="line" preload="none"></audio>
+<div class="glow" aria-hidden="true"></div>
+<button type="button" class="skip" id="skip" aria-label="Skip" hidden></button>
+<header class="hud-header">
+  <input id="find" type="search" hidden tabindex="-1" enterkeyhint="search" placeholder="" aria-label="Search simulators">
+  <button type="button" class="sound" id="sound" aria-pressed="true" aria-label="Sound"></button>
+</header>
+<button type="button" id="icu-return">Back to ICU</button>
+<p class="touch" id="touch"></p>
+<div class="invite" id="invite">
+  <p>Critical care • body scan</p>
+  <h2>Turn the body.</h2>
 </div>
+<div class="approach" id="approach">
+  <img id="plate" alt="" loading="lazy">
+  <p>Cortex and cerebral vessels</p>
+</div>
+<div class="icu" id="icu">
+  <div class="icu-stage">
+    <div class="icu-frame" id="icu-frame">
+      <img class="icu-photo" src="icu-room.jpg?v=20261030f" alt="Simulated intensive care room">
+      <canvas id="icu-monitor" width="240" height="160" aria-hidden="true"></canvas>
+      <canvas id="icu-vent" width="160" height="90" aria-hidden="true"></canvas>
+      <button type="button" class="bay-hit mon" data-go="monitor" aria-label="Monitor"></button>
+      <button type="button" class="bay-hit pat" data-go="patient" aria-label="Patient"></button>
+      <button type="button" class="bay-hit ven" data-go="vent" aria-label="Ventilator"></button>
+      <button type="button" class="bay-hit dial" data-go="dialysis" aria-label="Dialysis machine"></button>
+      <button type="button" class="bay-hit defib" data-go="defib" aria-label="Defibrillator"></button>
+      <button type="button" class="bay-hit cart" data-go="cart" aria-label="Crash cart"></button>
+    </div>
+  </div>
+  <div class="icu-audio" id="icu-audio">
+    <button type="button" data-audio="pulse" aria-pressed="true">Monitor sound</button>
+    <button type="button" data-audio="vent" aria-pressed="true">Ventilator</button>
+    <button type="button" data-audio="room" aria-pressed="false">Room</button>
+  </div>
+</div>
+<main class="atlas" id="atlas">
+  <div class="stage-shell">
+    <aside class="rail" aria-label="Sections">
+      <p class="rail-kicker">Critical care</p>
+      <nav class="rail-tabs" id="rail-tabs">
+        <button type="button" data-tab="train">Train your brain</button>
+        <button type="button" data-tab="osce">OSCE World</button>
+        <button type="button" data-tab="drugs">Drugs and doses</button>
+        <button type="button" data-tab="formulas">Formulas</button>
+        <button type="button" data-tab="test">Test the brain</button>
+        <button type="button" data-tab="abg">ABG photo</button>
+      </nav>
+      <nav class="bubbles" id="organ-bubbles" hidden></nav>
+    </aside>
+    <section class="stage-col" aria-label="Rotating anatomical model">
+      <div class="holo" aria-hidden="true"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i></div>
+      <div class="rings" aria-hidden="true"></div>
+      <div class="scan-line" aria-hidden="true"></div>
+      <div class="figure" id="figure">
+        <canvas id="view" tabindex="0" aria-label="Three dimensional human body. Drag to turn. Pinch to zoom."></canvas>
+        <p class="load" id="load">Loading the anatomical model…</p>
+      </div>
+      <p class="model-note">Human Reference Atlas, adult male, simplified for the browser. Drag to turn.</p>
+    </section>
+  </div>
+</main>
+
+<section class="room" id="room"></section>
+<section class="results" id="results"></section>
+<div class="icu-gate" id="icu-gate">
+  <img class="gate-photo" src="icu-room.jpg?v=20261030f" alt="">
+  <div class="gate-card">
+    <p>Critical care</p>
+    <h1>Enter the ICU</h1>
+    <button type="button" id="icu-enter">Enter the ICU</button>
+  </div>
+</div>
+<script>
+const ORGANS = [
+  {
+    id:"brain", name:"Brain", room:"Neurology",
+    line:"The room for consciousness, vessels and seizure. The scan is part of the case, not a slide.",
+    spots:[{x:50,y:13.2}],
+    plate:"brain-close.jpg",
+    learn:[
+      ["hemi circ stem","Brain disease lab","Fifteen chapters for each emergency. A procedure or a mechanism plays in 3D on the real brain.","brain-disease-lab.html?v=20261029a"],
+      ["hemi circ stem","Neuroanatomy Learning Lab","Turn a real brain model, open a structure, trace a pathway and sit a scored localization case.","neuro-lab.html?v=20261029a"],
+      ["hemi circ stem","Neuroimaging workstation","Click the scan. Site, volume, shift, territories, and an eight-stage stroke pathway.","neuro-workstation.html?v=20261029a"],
+      ["hemi circ","Acute ischemic stroke","Assessment, NIHSS, imaging, thrombolysis and EVT.","Acute_Ischemic_Stroke_Simulator_V6_FINAL.html?v=20260925s"],
+      ["hemi","Intracerebral hemorrhage","Blood pressure, reversal and the ICP pathway.","Intracerebral_Hemorrhage_Interactive_Simulator_v1.html?v=20260925s"],
+      ["circ","Subarachnoid hemorrhage","Grading, the aneurysm and the day-one bundle.","Subarachnoid_Hemorrhage_Interactive_Simulator_v1.html?v=20260925s"],
+      ["hemi stem","Status epilepticus","Benzodiazepine, second-line drug, then refractory care.","Status_Epilepticus_Interactive_Simulator_v2_EDITABLE.html?v=20260925s"],
+      ["stem","Traumatic brain injury","GCS, CT, reversal, ICP tiers and surgery.","TBI_Interactive_Simulator_v5_ICP_Anisocoria.html?v=20260925s"],
+      ["stem","CNS infection","Meningitis, encephalitis, abscess and the ICU complications.","CNS_Infection_Interactive_Algorithm_v7.html?v=20260925s"]
+    ],
+    practice:[
+      ["Unknown head CT","No label on the film. Find the lesion, name the mechanism, and choose the next step.","neuro-workstation.html?v=20261029a#challenge"],
+      ["Neurology Practice Simulator","Stroke, hemorrhage, extradural blood, and spike-and-wave status. Choose the study, click the finding, then decide.","Practice_Simulator.html?focus=neuro&v=20261029a"]
+    ],
+    soon:""
+  },
+  {
+    id:"thyroid", name:"Thyroid", room:"Endocrine",
+    line:"Neck and endocrine crises. Glucose, potassium and the insulin that must not stop too early.",
+    spots:[{x:50,y:20}],
+    plate:"plates/thyroid.jpg",
+    learn:[
+      ["DKA","Fluids, potassium, insulin and dextrose across four bedside cases.","DKA_Interactive_Simulator.html?v=20260925s"],
+      ["DKA and HHS","Holds insulin when potassium is under 3.3, and does not stop it when the glucose falls.","DKA_HHS_Resuscitation_Engine.html?v=20260925n"]
+    ],
+    practice:[
+      ["Endocrine Practice Simulator","Diabetic ketoacidosis. The ketones, the potassium, then the insulin.","Practice_Simulator.html?focus=endo&v=20261029a"]
+    ],
+    soon:""
+  },
+  {
+    id:"lungs", name:"Lungs", room:"Respiratory",
+    line:"Gas exchange, the ventilator and the film. Failure has a pattern before it has a machine.",
+    spots:[{x:40,y:29.4},{x:60,y:29.6}],
+    plate:"plates/lungs.jpg",
+    learn:[
+      ["Hypoxic patient","Oxygen, HFNC, NIV and the reason for the failure.","Hypoxic_Patient_Respiratory_Critical_Care_Simulator_v22.html?v=20260925s"],
+      ["ARDS ventilator","PEEP, prone position, driving pressure and rescue.","ARDS_Active_Simulator.html?v=20260925s"],
+      ["COPD and asthma","Bronchodilator, the ventilator and the ICU pathway.","COPD_Asthma_V11_CASE_DRIVEN_CHECKED.html?v=20260925s"],
+      ["COPD versus ARDS","An atlas of the two patterns.","COPD_vs_ARDS_Interactive_Atlas_NATIVE.html?v=20260925s"],
+      ["ABG photo","Photograph a report. The six-step reading is done for you.","ABG_Photo_Interpreter_Simulator.html?v=20260925s"]
+    ],
+    practice:[
+      ["Mechanical ventilation","Pressure, flow and volume. Name the pattern.","Ventilator_Waveform_Troubleshooting.html?v=20260925s"],
+      ["Respiratory Practice Simulator","ARDS, tension pneumothorax, pulmonary embolism, severe asthma, and pulmonary edema.","Practice_Simulator.html?focus=lungs&v=20261029a"]
+    ],
+    soon:""
+  },
+  {
+    id:"heart", name:"Heart", room:"Cardiac",
+    line:"Rhythm, pressure and the failing pump. The trace moves before you commit.",
+    spots:[{x:55,y:29.5}],
+    plate:"plates/heart.jpg",
+    learn:[
+      ["Cardiac Anatomy Lab","A real heart model. Chambers, valves, coronaries, flow and the conduction drawing.","cardiac-lab.html?v=20261030a"],
+      ["Echo bay","Finger on the chest. The probe, the coronary territory, the wall motion and the trace move together.","echo-lab.html?v=20261030a"],
+      ["ACLS, 2025 AHA","Arrest, tachycardia and bradycardia, with the current doses.","ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20260925s"],
+      ["Shock identification","MAP, cardiac index and the phenotype.","Shock_Identification_Management_Simulator.html?v=20260925s"],
+      ["Shock and POCUS","RUSH exam, ScvO2 and lactate.","Shock_POCUS_RUSH_Simulator.html?v=20260925l"],
+      ["Shock telemetry","Arterial line, IVC, PPV and the vasopressor.","Shock_Telemetry_POCUS_Simulator.html?v=20261001a"]
+    ],
+    practice:[
+      ["Cardiac rhythm","A moving ECG, the arrest and the reversible causes.","Cardiac_Rhythm_Decision_Simulator_V29_FINAL_AUDITED.html?v=20260925t"],
+      ["Shock Practice Simulator","Septic shock. The small ventricle, the full IVC, then norepinephrine.","Practice_Simulator.html?focus=circulation&v=20261029a"],
+      ["Cardiac Practice Simulator","Infarction, heart block, cardiogenic shock, ventricular fibrillation, and tamponade.","Practice_Simulator.html?focus=heart&v=20261029a"]
+    ],
+    soon:""
+  },
+  {
+    id:"liver", name:"Liver", room:"Hepatic",
+    line:"Failure, cirrhosis, infected ascites, a blocked duct, and the kidney that follows.",
+    spots:[{x:44,y:36}],
+    plate:"plates/liver.jpg",
+    learn:[],
+    practice:[
+      ["Liver Practice Simulator","Acute liver failure, decompensated cirrhosis, infected ascites, hepatorenal syndrome, and cholangitis.","Practice_Simulator.html?focus=liver&v=20261029a"]
+    ],
+    soon:""
+  },
+  {
+    id:"stomach", name:"Stomach", room:"Gastrointestinal",
+    line:"Upper gastrointestinal bleeding. Variceal and non-variceal.",
+    spots:[{x:51,y:38}],
+    plate:"plates/stomach.jpg",
+    learn:[],
+    practice:[
+      ["Upper gastrointestinal bleeding","Variceal and non-variceal. The endoscope, then the bundle that matches the lesion.","Practice_Simulator.html?focus=bleed&v=20261029a"]
+    ],
+    soon:""
+  },
+  {
+    id:"bowel", name:"Gastrointestinal", room:"Gastrointestinal",
+    line:"Pancreatitis, bleeding, and a blocked bile duct. Liver failure stays in the liver room.",
+    spots:[{x:50,y:44}],
+    plate:"plates/gi.jpg",
+    learn:[
+      ["Acute pancreatitis","Diagnosis, fluids, cause, and the step-up approach.","Acute_Pancreatitis_Simulator.html?v=20260926s"]
+    ],
+    practice:[
+      ["GI Practice Simulator","Pancreatitis, variceal bleeding, a duodenal ulcer, and cholangitis.","Practice_Simulator.html?focus=gi&v=20261029a"]
+    ],
+    soon:""
+  },
+  {
+    id:"multi", name:"Whole patient", room:"Multiorgan",
+    line:"Sepsis, shock and more than one failing organ. Infection sits with the spleen; the integrated cases sit in the arena.",
+    spots:[{x:50,y:54,name:"Whole patient"}],
+    plate:"plates/spleen.jpg",
+    learn:[
+      ["Shock bay","Phenotypes of shock, and a ventilator you control.","Shock_Bay.html?v=20260925s"],
+      ["Antibiotics","The culture, the resistance, and the toxicity that changes the choice.","Antibiotic_Simulator.html?v=20260928e"],
+      ["IDSA selection","KPC, OXA-48, NDM, and the dose that follows the 2026 guidance.","IDSA_Antibiotic_Selection_Simulator.html?v=20261029a"],
+      ["Antifungal resistance","C. auris, Mucorales, and the site the drug does not reach.","Antifungal_Resistance_Simulator.html?v=20260925s"]
+    ],
+    practice:[
+      ["Integrated ICU cases","Every practice case, from the brain to the blood film.","Practice_Simulator.html?v=20261029a"],
+      ["Infection Practice Simulator","Septic shock, severe malaria, and dengue shock.","Practice_Simulator.html?focus=id&v=20261029a"],
+      ["Hematology Practice Simulator","Thrombotic thrombocytopenic purpura. The film, then plasma exchange.","Practice_Simulator.html?focus=heme&v=20261029a"],
+      ["Trauma Practice Simulator","Rib fractures after a crash, and an open pelvic ring. Blood and a binder, not a litre of saline.","Practice_Simulator.html?focus=trauma&v=20261029a"],
+      ["Toxicology Practice Simulator","Organophosphate poisoning. Atropine until the chest is dry.","Practice_Simulator.html?focus=tox&v=20261029a"]
+    ],
+    soon:""
+  },
+  {
+    id:"kidneys", name:"Kidneys", room:"Nephrology",
+    line:"Sodium, potassium, calcium, magnesium and phosphate. Calcium is calculated from the serum value and the albumin.",
+    spots:[{x:46,y:41},{x:57,y:41}],
+    plate:"plates/kidneys.jpg",
+    learn:[
+      ["Electrolytes","The number chooses the algorithm. Calcium starts from serum calcium and albumin.","Electrolyte_Disorders_Interactive_Simulator.html?v=20261014d"],
+      ["Dialysis Learning Lab","Ten modalities. The circuit, the dose, and why SLED sits inside prolonged intermittent therapy.","Dialysis_Learning_Lab.html?v=20261029a"]
+    ],
+    practice:[
+      ["Renal Practice Simulator","Hyperkalemia, obstructed acute kidney injury, and missed dialysis.","Practice_Simulator.html?focus=kidney&v=20261029a"],
+      ["Dialysis practice","Indication, modality, prescription, and a whole session. Also on the dialysis machine in the ICU.","Dialysis_Practice_Simulator.html?v=20261029a"]
+    ],
+    soon:""
+  }
+];
+// The spleen shares the existing infection and integrated ICU modules.
+ORGANS.push({
+  ...ORGANS.find(function(organ){ return organ.id === "multi"; }),
+  id:"spleen", name:"Spleen", room:"Infection and immunity",
+  line:"The spleen filters blood and supports immune defense. Explore the infection, sepsis and shock modules here.",
+  spots:[{x:63,y:36,name:"Spleen"}]
+});
+ORGANS[ORGANS.length - 1].line = "Infection and the blood filter. Septic shock, severe malaria, and dengue shock sit in this room.";
+ORGANS[ORGANS.length - 1].practice = [
+  ["Infection Practice Simulator","Septic shock, severe malaria, and dengue shock.","Practice_Simulator.html?focus=id&v=20261029a"]
+];
+
+const figure = document.getElementById("figure");
+const room = document.getElementById("room");
+const results = document.getElementById("results");
+const find = document.getElementById("find");
+const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let current = null;
+let part = "all";
+let inside = null;
+let held = null;
+let fine = false;
+let arm = 0;
+let timer = 0;
+let drag = null;
+let downY = 0;
+let pick = null;
+let angle = 0;
+let spinning = false;
+let catchTap = false;
+let dragged = false;
+let grip = 0;
+let lastTick = 0;
+function applyTurn(){
+  if(current) return;
+  figure.style.transform = "rotateY("+angle+"deg)";
+}
+function setSpin(on){
+  spinning = false; // The 3D viewer owns rotation; a flat image must stay readable.
+  document.body.classList.toggle("spinning", spinning);
+}
+function tick(now){
+  if(!lastTick) lastTick = now;
+  const dt = Math.min(0.05, (now-lastTick)/1000);
+  lastTick = now;
+  if(window.anatomyManaged) return;
+  if(spinning && !current){
+    angle = (angle + dt * 28) % 360;
+    applyTurn();
+  }
+  requestAnimationFrame(tick);
+}
+if(!reduced) requestAnimationFrame(tick);
+
+function esc(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {"&":"&"+"amp;","<":"&"+"lt;",">":"&"+"gt;",'"':"&"+"quot;","'":"&"+"#39;"}[c];
+  });
+}
+for (const extra of [
+  {id:"spinal",name:"Spinal cord",room:"Neurology",line:"Examine spinal-cord anatomy. Dedicated spinal-cord cases are not available yet.",plate:"plates/spinal.svg",learn:[],practice:[],soon:"A dedicated spinal-cord simulator is not available yet."},
+  {id:"pancreas",name:"Pancreas",room:"Gastrointestinal",line:"Pancreatic anatomy and acute pancreatitis.",plate:"plates/pancreas.jpg",learn:ORGANS.find(o=>o.id==="bowel").learn,practice:[["Acute pancreatitis","The lipase, the fluid, then click the necrosis.","Practice_Simulator.html?focus=gi&v=20261029a"]],soon:""},
+  {id:"bladder",name:"Bladder",room:"Urinary",line:"Urinary bladder anatomy.",plate:"plates/bladder.svg",learn:[],practice:[],soon:"A dedicated bladder simulator is not available yet."},
+  {id:"adrenal",name:"Adrenal",room:"Endocrine",line:"Adrenal anatomy. Endocrine crises that are ready sit with the thyroid room.",plate:"plates/adrenal.svg",learn:[],practice:[],soon:"A dedicated adrenal simulator is not available yet. Diabetic crises are in the thyroid room."},
+  {id:"vessels",name:"Major blood vessels",room:"Cardiovascular",line:"Systemic circulation and hemodynamic assessment.",plate:"plates/vessels.jpg",learn:ORGANS.find(o=>o.id==="heart").learn,practice:ORGANS.find(o=>o.id==="heart").practice}
+]) ORGANS.push({...extra,spots:[{x:50,y:50}]});
+function organById(id){ return ORGANS.find(function(item){ return item.id===id; }); }
+function rowsOf(list){
+  return list.map(function(row){
+    const tagged = row.length===4;
+    return { part: tagged?row[0]:"", title: row[tagged?1:0], meta: row[tagged?2:1], href: row[tagged?3:2] };
+  });
+}
+function cards(list){
+  if(!list.length) return "";
+  return list.map(function(row){
+    return '<a class="card" href="'+esc(row.href)+'"><b>'+esc(row.title)+'</b><span>'+esc(row.meta)+'</span></a>';
+  }).join("");
+}
+function learnRows(organ){
+  const rows = rowsOf(organ.learn);
+  if(!organ.parts || part==="all") return rows;
+  return rows.filter(function(row){ return row.part.split(" ").indexOf(part)!==-1; });
+}
+function light(id, spot){
+  figure.querySelectorAll(".hot").forEach(function(btn){
+    btn.classList.toggle("lit", btn.getAttribute("data-id")===id);
+  });
+  if(!id){ figure.classList.remove("focus"); return; }
+  const organ = organById(id);
+  const use = spot || (organ && organ.spots[0]);
+  if(!use) return;
+  figure.style.setProperty("--hx", use.x+"%");
+  figure.style.setProperty("--hy", use.y+"%");
+  figure.classList.add("focus");
+}
+function paint(){
+  const html = [];
+  ORGANS.forEach(function(organ){
+    organ.spots.forEach(function(spot){
+      const label = spot.name || organ.name;
+      html.push('<button type="button" class="hot" data-id="'+organ.id+'" data-x="'+spot.x+'" data-y="'+spot.y+'" style="left:'+spot.x+'%;top:'+spot.y+'%" aria-label="'+esc(label)+'"><i></i><b>'+esc(label)+'</b></button>');
+    });
+  });
+  figure.insertAdjacentHTML("beforeend", html.join(""));
+}
+let osceSection = "procedural";
+let refSection = null;
+let osceStation = null;
+let mockCircuit = null;
+const OSCE_SECTIONS = [
+  ["procedural","Procedural OSCE"],
+  ["investigation","Investigation OSCE"],
+  ["emergency","Emergency OSCE"],
+  ["viva","Viva & Communication"],
+  ["mock","Mock Examinations"],
+  ["analytics","Performance Analytics"]
+];
+const REF_SECTIONS = [
+  ["guidelines","Latest guidelines"],
+  ["formulas","Scoring checklists and formulas"],
+  ["materials","Clinical reference materials"]
+];
+const OSCE = [
+  {id:"ett", section:"procedural", title:"Endotracheal intubation", minutes:"8 min",
+    stem:"A 67-year-old woman with a left-hemisphere stroke is vomiting and tiring. The neck has not been cleared. Intubate her.",
+    tasks:["State the risks to the brain.","Name the holds, the drugs, and the check that the tube is tracheal."],
+    items:[
+      ["Roles, suction, and a difficult-airway plan are spoken before any drug.","critical"],
+      ["Inline stabilization is asked for. The neck is not extended."],
+      ["She is preoxygenated."],
+      ["The plan avoids a long apnoea and a crash in blood pressure.","critical"],
+      ["The tube is seen through the cords, not assumed."],
+      ["Sustained exhaled carbon dioxide confirms the trachea.","critical"],
+      ["Carbon dioxide and blood pressure are then controlled. Routine hyperventilation is refused."]
+    ],
+    link:["Open the intubation film","brain-disease-lab.html?v=20261029a#tbi/procedures/ett"]},
+  {id:"art", section:"procedural", title:"Arterial catheter", minutes:"8 min",
+    stem:"Beat-to-beat pressure is required. The right radial artery is chosen. Explain and perform the insertion on the model.",
+    tasks:["Consent, position, and a sterile field.","Say what you do if the hand becomes pale."],
+    items:[
+      ["Allen or ultrasound assessment is mentioned, and consent covers pain, bleeding, and ischemia."],
+      ["The wrist is extended on a firm support. The field is sterile.","critical"],
+      ["Ultrasound or palpation identifies the artery before the needle."],
+      ["The catheter is advanced only when pulsatile blood is seen.","critical"],
+      ["It is secured, zeroed at the phlebostatic axis, and a square wave is checked."],
+      ["A pale, cold hand means the catheter comes out and the hand is reassessed.","critical"]
+    ]},
+  {id:"abg", section:"investigation", title:"Arterial blood gas", minutes:"8 min",
+    stem:"pH 7.22, PaCO2 28 mmHg, PaO2 68 mmHg on 60 percent oxygen, HCO3 14 mmol/L, lactate 5.8 mmol/L, sodium 138, chloride 102.",
+    tasks:["Name the primary disorder and the compensation.","Say what you would do next, not only the label."],
+    items:[
+      ["Metabolic acidosis is the primary disorder.","critical"],
+      ["The carbon dioxide is low, so there is respiratory compensation."],
+      ["The anion gap is raised. Lactate accounts for much of it.","critical"],
+      ["PaO2 is low for 60 percent oxygen. An A–a gradient is mentioned."],
+      ["The next act is resuscitation and a search for shock or sepsis, not bicarbonate as a routine.","critical"]
+    ]},
+  {id:"ct", section:"investigation", title:"Non-contrast head CT", minutes:"8 min",
+    stem:"Sudden aphasia and right hemiparesis. Last known well 80 minutes ago. The non-contrast CT is on the screen.",
+    tasks:["Say what the scan must exclude.","Say what it cannot, by itself, decide."],
+    items:[
+      ["Hemorrhage is excluded before any thrombolytic.","critical"],
+      ["A hyperdense artery is looked for and, if seen, tied to the syndrome."],
+      ["Early hypodensity is described without calling a faint blur a completed infarct."],
+      ["The scan does not replace a look at the vessels when thrombectomy may help.","critical"],
+      ["The decision is timed against last known well, not against when the scan finished."]
+    ],
+    link:["Open the stroke practice case","Practice_Simulator.html?focus=neuro&v=20261029a"]},
+  {id:"stroke", section:"investigation", title:"Acute ischemic stroke", minutes:"8 min",
+    stem:"Aphasia and right hemiparesis. Last known well 78 minutes ago. Glucose 126 mg/dL. Blood pressure 198/112. No anticoagulant.",
+    tasks:["Choose the first image.","Say what has to happen to the blood pressure before a thrombolytic."],
+    items:[
+      ["Non-contrast CT is the first study, not MRI and not angiography alone.","critical"],
+      ["The syndrome is a left hemisphere, so a left vessel is the one that matters."],
+      ["Blood pressure is lowered below 185/110 before alteplase.","critical"],
+      ["The dose is named by weight, and the 4.5-hour window is checked against the clock."],
+      ["A sudden worsening after treatment is bleeding until a repeat CT says otherwise.","critical"]
+    ],
+    link:["Open the stroke practice case","Practice_Simulator.html?focus=neuro&v=20261029a"]},
+  {id:"pancreatitis", section:"emergency", title:"Acute pancreatitis", minutes:"8 min",
+    stem:"Eight hours of epigastric pain to the back. Gallstones. Heart rate 118, blood pressure 92/58. Lipase is still pending.",
+    tasks:["The first hour.","What you do with necrosis that has no gas."],
+    items:[
+      ["Lipase is sent and lactated Ringer is started. Contrast CT is not the first act.","critical"],
+      ["The fluid rate is moderate, and it stops if the lungs get wet. A day-long aggressive infusion is refused.","critical"],
+      ["Ultrasound looks for stones. Urgent ERCP is not for every gallstone."],
+      ["Necrosis without gas gets no prophylactic antibiotic and no open operation.","critical"],
+      ["If he cannot eat, the gut is fed. The gallbladder is planned, not forgotten."]
+    ],
+    link:["Open the pancreatitis practice case","Practice_Simulator.html?focus=gi&v=20261029a"]},
+  {id:"alf", section:"emergency", title:"Paracetamol acute liver failure", minutes:"8 min",
+    stem:"Sixteen hours after a large paracetamol ingestion. She is drowsy. Glucose 58 mg/dL. The level is not back.",
+    tasks:["The antidote and the glucose.","When King's College criteria send her to a transplant center."],
+    items:[
+      ["Intravenous N-acetylcysteine is started now. The level is not waited for.","critical"],
+      ["Hypoglycemia is treated and rechecked.","critical"],
+      ["Grade III or IV encephalopathy is intubated. Lactulose is not the treatment."],
+      ["King's College for paracetamol is used: pH under 7.30 after fluid, or the triad of grade, INR, and creatinine.","critical"],
+      ["The INR is not corrected with plasma just to make the number look better, and the antidote is not stopped at 21 hours."]
+    ],
+    link:["Open the liver practice cases","Practice_Simulator.html?focus=liver&v=20261029a"]},
+  {id:"alf-drug", section:"emergency", title:"Non-paracetamol acute liver failure", minutes:"8 min",
+    stem:"Age 46. Jaundiced for twelve days on isoniazid, rifampicin, and pyrazinamide. Now confused. Bilirubin 22 mg/dL. INR 5.2. pH 7.38. No paracetamol.",
+    tasks:["What you stop.","Which King's College list you use."],
+    items:[
+      ["Isoniazid, rifampicin, and pyrazinamide are stopped now.","critical"],
+      ["This is not scored with the paracetamol pH rule.","critical"],
+      ["Hepatitis A, B, and E are sent without delaying the drug stop."],
+      ["Any three non-paracetamol factors are enough. An INR of 5.2 does not make you wait for 6.5.","critical"],
+      ["A 21-hour antidote course, or a steroid trial, does not delay the referral."]
+    ],
+    link:["Open the liver practice cases","Practice_Simulator.html?focus=liver&v=20261029a"]},
+  {id:"sepsis", section:"emergency", title:"Septic shock", minutes:"8 min",
+    stem:"Pneumonia. Mean arterial pressure 58 after one litre of crystalloid. Lactate 4.6 mmol/L. He is confused.",
+    tasks:["Cultures and the first antibiotic.","The vasopressor, and where it may run."],
+    items:[
+      ["Blood cultures are taken without delaying the antibiotic if the delay would be long.","critical"],
+      ["A suitable antibiotic is named for the likely source and given now."],
+      ["Further fluid is judged by the circulation, not by a fixed large quota."],
+      ["Norepinephrine is the first vasopressor.","critical"],
+      ["A peripheral start is accepted if a central vein would delay the drug, and the site is watched."],
+      ["The source is named. A plan for the airway is included because he is confused."]
+    ],
+    link:["Open the shock practice case","Practice_Simulator.html?focus=circulation&v=20261029a"]},
+  {id:"seizure", section:"emergency", title:"Status epilepticus", minutes:"8 min",
+    stem:"A tonic-clonic seizure has already lasted six minutes. There is intravenous access. Glucose is 96 mg/dL.",
+    tasks:["First drug and the clock.","What you do if the seizure is still going at 15 minutes."],
+    items:[
+      ["Airway, oxygen, and glucose are checked while the drug is drawn.","critical"],
+      ["A benzodiazepine is given at once, not after a long observation.","critical"],
+      ["The time of onset and the time of the dose are spoken."],
+      ["A second-line agent is named if seizures continue: levetiracetam, valproate, or fosphenytoin."],
+      ["Refractory status goes to anesthesia and the intensive-care unit, not to repeated small benzodiazepine doses.","critical"]
+    ]},
+  {id:"family", section:"viva", title:"Explain the breathing tube", minutes:"8 min",
+    stem:"Her daughter is outside. The patient cannot protect her airway. You have recommended intubation. Speak to the daughter.",
+    tasks:["Plain words.","What the tube does, and what it does not promise."],
+    items:[
+      ["You introduce yourself and ask what she already understands."],
+      ["You say her mother is not protecting her airway, in words a relative can use again.","critical"],
+      ["You explain the tube, the ventilator, and the need for sedation."],
+      ["You do not promise survival or a full recovery.","critical"],
+      ["You invite questions and say when you will come back."]
+    ]},
+  {id:"lytic", section:"viva", title:"Explain thrombolysis", minutes:"8 min",
+    stem:"The deficit is disabling. There is no hemorrhage. Last known well is inside 4.5 hours. Speak to the patient about alteplase.",
+    tasks:["Benefit, bleeding, and the alternative of not treating.","A recommendation, not a menu with no opinion."],
+    items:[
+      ["You state the diagnosis and why time matters.","critical"],
+      ["You explain the chance of a better recovery and the risk of serious bleeding, including in the brain."],
+      ["You give a recommendation."],
+      ["You check understanding rather than only asking for a signature.","critical"],
+      ["You say what happens next, minute by minute."]
+    ]}
+];
+const REFERENCE = [
+  {section:"guidelines", title:"Reperfusion in ischemic stroke",
+    body:["Non-contrast CT comes first, to exclude hemorrhage.","Alteplase is 0.9 mg/kg, maximum 90 mg, ten percent as a bolus and the rest over one hour, inside 4.5 hours of last known well in an eligible patient. Blood pressure is brought below 185/110 before the drug.","A large-vessel occlusion can still go to thrombectomy, including selected patients up to 24 hours. The drug and the procedure are not rivals."],
+    link:["Open the stroke practice case","Practice_Simulator.html?focus=neuro&v=20261029a"]},
+  {section:"guidelines", title:"Septic shock",
+    body:["Take cultures and give an antibiotic that covers the likely source. Do not let the culture ritual delay the drug.","Give crystalloid for hypoperfusion, then reassess. A large fixed volume is not a target.","Norepinephrine is the first vasopressor. It may start in a watched peripheral vein if a central catheter would delay it.","Lactate is a marker of trouble. Chasing it to normal is not the treatment."],
+    link:["Open the shock practice case","Practice_Simulator.html?focus=circulation&v=20261029a"]},
+  {section:"guidelines", title:"ARDS ventilation",
+    body:["Predicted body weight, not actual weight, sets the tidal volume. Six millilitres per kilogram is the usual target.","Keep plateau pressure at or under 30 cm H2O. Driving pressure is watched.","Prone positioning is for moderate to severe ARDS, often when the ratio of arterial oxygen to inspired oxygen is under about 150 despite a proper PEEP."],
+    link:["Open the ARDS practice case","Practice_Simulator.html?focus=lungs&v=20261029a"]},
+  {section:"guidelines", title:"Acute pancreatitis",
+    body:["Diagnose with typical pain plus a lipase at least three times the upper limit. Contrast CT is not required on the first day when those two are clear.","Lactated Ringer at a moderate rate is preferred to a prolonged high-rate infusion. The WATERFALL trial is why the aggressive arm is not the default.","Do not give antibiotics for necrosis alone. Feed the gut. Infected necrosis, shown by gas or by sepsis, is drained. It is not opened first.","Gallstones are removed later. Urgent ERCP is for cholangitis or a stone still blocking the duct."],
+    link:["Open the pancreatitis practice case","Practice_Simulator.html?focus=gi&v=20261029a"]},
+  {section:"guidelines", title:"Acute liver failure",
+    body:["Definition: encephalopathy and an INR of at least 1.5 from an acute injury, without cirrhosis, inside 26 weeks.","Paracetamol: start intravenous N-acetylcysteine immediately. A common course is 150 mg/kg over one hour, then 50 mg/kg over four hours, then 100 mg/kg over 16 hours, and it continues if the liver is failing.","Paracetamol King's College: arterial pH under 7.30 after resuscitation, or all three of grade III–IV encephalopathy, INR above 6.5, and creatinine above 3.4 mg/dL.","Other causes: INR above 6.5, or any three of age under 10 or over 40, an unfavorable cause such as a drug reaction, jaundice more than seven days before encephalopathy, INR above 3.5, and bilirubin above 17.5 mg/dL.","Stop the causative drug. Do not paint over the INR with plasma unless there is bleeding or a procedure."],
+    link:["Open the liver practice cases","Practice_Simulator.html?focus=liver&v=20261029a"]},
+  {section:"formulas", title:"Perfusion and the ventilator",
+    body:["Mean arterial pressure = diastolic + (systolic − diastolic) / 3.","Cerebral perfusion pressure = mean arterial pressure − intracranial pressure.","Predicted body weight, men: 50 + 0.91 × (height in centimetres − 152.4). Women: 45.5 + 0.91 × (height in centimetres − 152.4).","Tidal volume target in ARDS is about 6 mL for each kilogram of that weight."]},
+  {section:"formulas", title:"Gas and the anion gap",
+    body:["Alveolar oxygen is approximated by 150 − (PaCO2 / 0.8) while breathing room air at sea level. The A–a gradient is that number minus PaO2.","Anion gap = sodium − (chloride + bicarbonate). A raised gap with a low pH is a high-gap metabolic acidosis until proved otherwise.","Winter's formula estimates the carbon dioxide that should accompany a metabolic acidosis: 1.5 × bicarbonate + 8, give or take 2."]},
+  {section:"formulas", title:"Corrected laboratories",
+    body:["Sodium falls about 1.6 mmol/L for every 100 mg/dL the glucose sits above 100. Add that back when you judge the tonicity.","Corrected calcium = measured calcium + 0.8 × (4 − albumin in g/dL). Use the ionized calcium when the decision is close.","Osmol gap = measured osmolality − (2 × sodium + glucose/18 + urea/6), with glucose and urea in mg/dL."]},
+  {section:"formulas", title:"How the OSCE simulators keep score",
+    body:["Each correct choice adds one. On a film, the finding is asked first and the treatment second. On an instrument, the use is asked first and the check second.","The running score stays on this device."]},
+  {section:"materials", title:"Hyperkalemia",
+    body:["If the ECG is changing or the potassium is dangerously high, give intravenous calcium to stabilize the membrane.","Shift potassium with insulin and glucose. A beta agonist can be added. Recheck the glucose.","Remove potassium with a kaliuresis if the kidneys can answer, or with dialysis if they cannot. A resin is slow and is not the emergency.","Stop the cause: the drug, the missed dialysis, the dying muscle."]},
+  {section:"materials", title:"Status epilepticus, the order",
+    body:["Benzodiazepine immediately once a convulsion is prolonged. Check glucose.","If it continues, one adequate dose of levetiracetam, valproate, or fosphenytoin. Under-dosing is a common fail.","Still seizing: anesthesia, a secured airway, and continuous EEG. Repeating tiny doses of benzodiazepine is not a plan."]},
+  {section:"materials", title:"Intracranial pressure, the bedside",
+    body:["Raise the head, keep the neck straight, treat fever, and do not let carbon dioxide drift.","A new anisocoria is a herniation until proved otherwise. Osmotic therapy is for that moment, not a standing order to hyperventilate for hours.","An external ventricular drain can measure and remove cerebrospinal fluid. A parenchymal monitor measures only. Neither replaces the reason the pressure rose."],
+    link:["Open the disease learning lab","brain-disease-lab.html?v=20261029a"]}
+];
+function osceRecord(){
+  try { return JSON.parse(localStorage.getItem("osce-world-v1") || "{}"); }
+  catch(e){ return {}; }
+}
+function saveOsce(id, percent, pass, missed){
+  const all = osceRecord();
+  const prev = all[id] || {attempts:0, best:0, passes:0, misses:{}};
+  prev.attempts += 1;
+  prev.best = Math.max(prev.best || 0, percent);
+  if(pass) prev.passes += 1;
+  prev.lastPass = pass;
+  prev.misses = prev.misses || {};
+  (missed || []).forEach(function(text){ prev.misses[text] = (prev.misses[text] || 0) + 1; });
+  all[id] = prev;
+  localStorage.setItem("osce-world-v1", JSON.stringify(all));
+}
+function stationById(id){ return OSCE.find(function(item){ return item.id===id; }); }
+function portalBar(){
+  const tab = function(id, cls, kicker, title, em){
+    return '<button type="button" class="portal '+cls+(inside===cls?" on":"")+'" id="'+id+'"><span>'+kicker+'</span><strong>'+title+'</strong><em>'+em+'</em><i class="go" aria-hidden="true"></i></button>';
+  };
+  return '<div class="portals doors">'+
+    tab("openLab","lab","01","Learning Lab","Open the anatomy, the films, and the pathways.")+
+    tab("openArena","arena","02","Practice Arena","Take one case. The numbers move after you decide.")+
+    "</div>";
+}
+function bindPortals(){
+  document.getElementById("openLab").onclick = function(){ fillPortal("lab", this); };
+  document.getElementById("openArena").onclick = function(){ fillPortal("arena", this); };
+  document.getElementById("openOsce").onclick = function(){ fillPortal("osce", this); };
+  document.getElementById("openReference").onclick = function(){ fillPortal("reference", this); };
+}
+function chipRow(list, currentId, attr){
+  return '<div class="parts">'+list.map(function(item){
+    return '<button type="button" data-'+attr+'="'+item[0]+'"'+(currentId===item[0]?' class="on"':'')+'>'+esc(item[1])+'</button>';
+  }).join("")+"</div>";
+}
+function practiceScores(){
+  try { return JSON.parse(localStorage.getItem("practice-simulator-scores") || "{}"); }
+  catch(e){ return {}; }
+}
+function weakestCritical(osce){
+  let text = "";
+  let n = 0;
+  Object.keys(osce).forEach(function(id){
+    const misses = osce[id].misses || {};
+    Object.keys(misses).forEach(function(item){
+      if(misses[item] > n){ n = misses[item]; text = item; }
+    });
+  });
+  return n ? {text:text, n:n} : null;
+}
+function analyticsHtml(){
+  const names = [
+    ["stroke","Acute ischemic stroke"],
+    ["sah","Subarachnoid hemorrhage"],
+    ["ards","ARDS"],
+    ["shock","Septic shock"],
+    ["pancreatitis","Acute pancreatitis"],
+    ["alf","Acute liver failure, paracetamol"],
+    ["alf-drug","Acute liver failure, not paracetamol"]
+  ];
+  const practice = practiceScores();
+  const osce = osceRecord();
+  const weak = weakestCritical(osce);
+  const practiceRows = names.map(function(row){
+    const best = practice[row[0]] && practice[row[0]].best;
+    return "<div class='station'><b>"+esc(row[1])+"</b><span>"+(best?"Best "+best+"%":"Not sat")+"</span></div>";
+  }).join("");
+  const osceRows = OSCE.map(function(station){
+    const rec = osce[station.id];
+    let line = "Not sat";
+    if(rec){
+      line = rec.attempts+" sat · best "+rec.best+"%"+(rec.passes?" · passed "+rec.passes:"");
+      const misses = rec.misses || {};
+      let top = "";
+      let topN = 0;
+      Object.keys(misses).forEach(function(item){ if(misses[item] > topN){ topN = misses[item]; top = item; } });
+      if(top) line += " · keeps missing: "+top;
+    }
+    return "<div class='station'><b>"+esc(station.title)+"</b><span>"+esc(line)+"</span></div>";
+  }).join("");
+  const mock = osce["mock-circuit"];
+  const weakLine = weak ? "You keep missing: "+weak.text+"." : "No critical item missed yet.";
+  return "<p class='lede'>"+esc(weakLine)+" A station passes at 70 percent, with every critical item done. Marks stay on this device.</p>"+
+    "<h3 class='refhead'>Practice arena</h3>"+practiceRows+
+    "<h3 class='refhead'>OSCE stations</h3>"+osceRows+
+    "<h3 class='refhead'>Last mock circuit</h3><p class='lede'>"+(mock?esc(mock.best+"% · "+(mock.lastPass?"passed":"not passed")):"Not sat")+"</p>";
+}
+function stationList(section){
+  return OSCE.filter(function(item){ return item.section===section; }).map(function(item){
+    const rec = osceRecord()[item.id];
+    const badge = rec ? "Best "+rec.best+"%" : item.minutes;
+    return '<button type="button" class="card station" data-station="'+item.id+'"><b>'+esc(item.title)+'</b><span>'+esc(badge)+'</span></button>';
+  }).join("");
+}
+function mockIntro(){
+  return "<p class='lede'>Four stations, in order: intubation, the blood gas, septic shock, and the conversation with a daughter. Submit each sheet. The circuit score is the mean. One missed critical item fails that station.</p>"+
+    '<button type="button" class="portal osce" id="startMock" style="min-height:0;margin-top:12px"><span>Circuit</span><strong>Start the mock</strong><em>About half an hour.</em></button>';
+}
+function sheetHtml(station){
+  const ticks = station.items.map(function(item, index){
+    const critical = item[1]==="critical";
+    return '<label class="tick"><input type="checkbox" data-tick="'+index+'"'+(critical?' data-critical="1"':'')+'><span>'+esc(item[0])+(critical?' <b>Critical</b>':'')+'</span></label>';
+  }).join("");
+  const link = station.link ? '<a class="card" href="'+esc(station.link[1])+'"><b>'+esc(station.link[0])+'</b><span>Leaves this sheet for the atlas case.</span></a>' : "";
+  return "<p class='lede' style='letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--faint)'>"+esc(station.minutes)+(mockCircuit?" · Mock":"")+"</p>"+
+    "<h2>"+esc(station.title)+"</h2>"+
+    "<p class='lede'>"+esc(station.stem)+"</p>"+
+    "<ul class='tasks'>"+station.tasks.map(function(line){ return "<li>"+esc(line)+"</li>"; }).join("")+"</ul>"+
+    ticks+
+    '<button type="button" class="portal osce" id="markSheet" style="min-height:0;margin-top:12px"><span>Examiner</span><strong>Mark this station</strong><em>70 percent, and every critical item.</em></button>'+
+    '<p class="mark" id="markResult" hidden></p>'+link;
+}
+function osceShelf(){
+  let rec = {};
+  try { rec = JSON.parse(localStorage.getItem("osce-sim-v1") || "{}"); }
+  catch(e){ rec = {}; }
+  function line(key){
+    const row = rec[key];
+    if(!row || !row.asked) return "Not started";
+    return row.correct+" of "+row.asked+" correct";
+  }
+  const stations = [
+    ["abg","Arterial blood gas","Twenty-five gases. Name the disorder. If that is right, name the cause.", line("abg")],
+    ["drug","ICU drug checklist","Choose the drugs. The station asks the monograph, one answer at a time.", line("drug")],
+    ["ecg","Electrocardiogram","Fifty teaching traces. Name the pattern, then the treatment.", line("ecg")],
+    ["kit","Instruments","Choose from the bay. The station asks the use, then the check that matters.", line("kit")],
+    ["film","Radiology","X-ray, CT, or MRI. The film, the finding, then the treatment.", line("film")]
+  ];
+  return stations.map(function(row){
+    return '<a class="card" href="osce.html?mode='+row[0]+'&v=20261029a"><b>'+esc(row[1])+'</b><span>'+esc(row[2])+" "+esc(row[3])+'</span></a>';
+  }).join("")+"<p class='lede'>The voice reads the question, then says whether the answer is correct and reads the explanation.</p>";
+}
+function referenceShelf(){
+  if(!refSection){
+    return '<div class="parts">'+REF_SECTIONS.map(function(item){
+      return '<button type="button" data-ref="'+item[0]+'">'+esc(item[1])+'</button>';
+    }).join("")+"</div>";
+  }
+  const articles = REFERENCE.filter(function(item){ return item.section===refSection; }).map(function(item){
+    const link = item.link ? '<a class="card" href="'+esc(item.link[1])+'"><b>'+esc(item.link[0])+'</b><span>Opens in the atlas.</span></a>' : "";
+    return "<article class='station'><h3 class='refhead'>"+esc(item.title)+"</h3>"+item.body.map(function(line){ return "<p class='lede'>"+esc(line)+"</p>"; }).join("")+link+"</article>";
+  }).join("");
+  return '<button type="button" class="back" id="ref-back">All sections</button>'+articles;
+}
+function markStation(station){
+  const boxes = Array.prototype.slice.call(document.querySelectorAll("[data-tick]"));
+  const done = boxes.filter(function(box){ return box.checked; }).length;
+  const missed = boxes.filter(function(box){ return box.getAttribute("data-critical") && !box.checked; }).map(function(box){
+    return station.items[Number(box.getAttribute("data-tick"))][0];
+  });
+  const percent = boxes.length ? Math.round(done / boxes.length * 100) : 0;
+  const pass = percent >= 70 && !missed.length;
+  const result = document.getElementById("markResult");
+  result.hidden = false;
+  result.textContent = percent+"%. "+(missed.length?"A critical item was missed. ":"")+(pass?"Station passed.":"Station not passed.");
+  saveOsce(station.id, percent, pass, missed);
+  if(mockCircuit){
+    mockCircuit.marks.push({id:station.id, percent:percent, pass:pass});
+    const next = mockCircuit.ids[mockCircuit.marks.length];
+    if(next){
+      osceStation = next;
+      renderRoom();
+      return;
+    }
+    const mean = Math.round(mockCircuit.marks.reduce(function(sum, item){ return sum+item.percent; }, 0) / mockCircuit.marks.length);
+    const circuitPass = mockCircuit.marks.every(function(item){ return item.pass; });
+    saveOsce("mock-circuit", mean, circuitPass, []);
+    mockCircuit = null;
+    osceStation = null;
+    osceSection = "analytics";
+    renderRoom();
+  }
+}
+
+function renderRoom(){
+  const organ = organById(current);
+  if(!organ) return;
+  const learn = learnRows(organ);
+  const practice = rowsOf(organ.practice);
+  const showParts = organ.parts && (inside==="lab" || !inside);
+  const parts = showParts ? '<div class="parts"><button type="button" data-part="all"'+(part==="all"?' class="on"':"")+'>Whole organ</button>'+organ.parts.map(function(item){
+    return '<button type="button" data-part="'+item.id+'"'+(part===item.id?' class="on"':"")+'>'+esc(item.name)+'</button>';
+  }).join("")+"</div>" : "";
+  let shelfTitle = "Choose a door";
+  let shelfBody = "";
+  if(inside==="lab"){
+    shelfTitle = "Learning Lab";
+    shelfBody = learn.length?cards(learn):'<p class="empty">'+esc(organ.soon || "Nothing in the learning lab yet.")+'</p>';
+  } else if(inside==="arena"){
+    shelfTitle = "Practice Arena";
+    shelfBody = practice.length?cards(practice):'<p class="empty">'+esc(organ.soon || "Nothing in the practice arena yet.")+'</p>';
+  } else if(inside==="osce"){
+    shelfTitle = "OSCE World";
+    shelfBody = osceShelf();
+  } else if(inside==="reference"){
+    shelfTitle = "Reference Centre";
+    shelfBody = referenceShelf();
+  }
+  document.body.classList.toggle("doors", !inside);
+  room.innerHTML =
+    '<button type="button" class="back" id="back">'+(inside?"Back to the doors":"Back to the body")+'</button>'+
+    '<p class="lede" style="letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--faint)">'+esc(organ.room)+'</p>'+
+    '<h2>'+esc(inside==="lab"?"Learning Lab":inside==="arena"?"Practice Arena":organ.name)+'</h2>'+
+    (inside
+      ? ('<p class="lede">'+esc(organ.name+". "+organ.line)+'</p><div class="shelf"><p class="lede" style="letter-spacing:.14em;text-transform:uppercase;font-size:12px">'+shelfTitle+'</p>'+shelfBody+'</div>')
+      : portalBar());
+  room.scrollTop = 0;
+  document.getElementById("back").onclick = function(){
+    stopSpoken();
+    if(inside){
+      inside = null;
+      document.body.classList.remove("inside","lab","arena","osce","reference");
+      renderRoom();
+      return;
+    }
+    leave();
+  };
+  if(!inside){
+    const lab = document.getElementById("openLab");
+    const arena = document.getElementById("openArena");
+    if(lab) lab.onclick = function(){ fillPortal("lab", this); };
+    if(arena) arena.onclick = function(){ fillPortal("arena", this); };
+  }
+  const closeSheet = document.getElementById("closeSheet");
+  if(closeSheet) closeSheet.onclick = function(){ osceStation=null; if(mockCircuit){ mockCircuit=null; } renderRoom(); };
+  const markSheet = document.getElementById("markSheet");
+  if(markSheet) markSheet.onclick = function(){ markStation(stationById(osceStation)); };
+  const startMock = document.getElementById("startMock");
+  if(startMock) startMock.onclick = function(){
+    mockCircuit = {ids:["ett","abg","sepsis","family"], marks:[]};
+    osceStation = "ett";
+    renderRoom();
+  };
+  room.querySelectorAll("[data-part]").forEach(function(btn){
+    btn.onclick = function(){ stopSpoken(); part=btn.getAttribute("data-part"); renderRoom(); };
+  });
+  room.querySelectorAll("[data-osce]").forEach(function(btn){
+    btn.onclick = function(){ stopSpoken(); osceSection=btn.getAttribute("data-osce"); osceStation=null; renderRoom(); };
+  });
+  room.querySelectorAll("[data-ref]").forEach(function(btn){
+    btn.onclick = function(){ stopSpoken(); refSection=btn.getAttribute("data-ref"); renderRoom(); };
+  });
+  const refBack = document.getElementById("ref-back");
+  if(refBack) refBack.onclick = function(){ stopSpoken(); refSection=null; renderRoom(); };
+  room.querySelectorAll("[data-station]").forEach(function(btn){
+    btn.onclick = function(){ stopSpoken(); osceStation=btn.getAttribute("data-station"); renderRoom(); };
+  });
+}
+function openPath(which){
+  if(inside!==which){ osceStation=null; mockCircuit=null; }
+  inside = which;
+  document.body.classList.add("inside");
+  document.body.classList.remove("lab","arena","osce","reference");
+  document.body.classList.add(which);
+  renderRoom();
+}
+let traveling = false;
+function grow(el, kind, end){
+  if(traveling) return;
+  if(reduced){ if(end) end(); return; }
+  traveling = true;
+  const rect = el.getBoundingClientRect();
+  const veil = document.createElement("div");
+  const label = el.querySelector("strong, b");
+  veil.className = "veil "+kind;
+  veil.innerHTML = "<strong>"+esc(label ? label.textContent : "")+"</strong>";
+  veil.style.setProperty("--ox", (rect.left+rect.width/2)+"px");
+  veil.style.setProperty("--oy", (rect.top+rect.height/2)+"px");
+  veil.style.setProperty("--from", String(Math.max(0.34, rect.width/window.innerWidth)));
+  document.body.appendChild(veil);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ veil.classList.add("full"); }); });
+  setTimeout(function(){
+    if(end) end();
+    requestAnimationFrame(function(){ veil.classList.add("away"); });
+    setTimeout(function(){
+      veil.remove();
+      traveling = false;
+    }, 520);
+  }, kind==="title" ? 980 : 860);
+}
+function fillPortal(which, el){
+  if(inside && inside!==which){ openPath(which); return; }
+  if(inside===which){ return; }
+  const welcome = {lab:"Welcome to Learning Lab.", arena:"Welcome to Practice Arena.", osce:"Welcome to OSCE World.", reference:"Welcome to the Reference Centre."};
+  speak(welcome[which] || "");
+  surge(0.35);
+  grow(el, which, function(){ openPath(which); });
+}
+function openTitle(card){
+  stopSpoken();
+  if(card.hasAttribute("data-mod")) return;
+  const titleEl = card.querySelector("b, strong");
+  const title = titleEl ? titleEl.textContent : "Module";
+  let href = card.getAttribute("href") || "";
+  if(!href) return;
+  if(current && href.indexOf("Practice_Simulator.html")!==-1 && href.indexOf("from=")===-1){
+    href += (href.indexOf("?")===-1 ? "?" : "&") + "from=" + encodeURIComponent(current);
+  }
+  const toIcu = /(?:^|\/)osce\.html/.test(href);
+  const backLabel = toIcu ? "Back to ICU" : (inside==="lab" ? "Learning lab" : inside==="arena" ? "Practice arena" : "Back");
+  room.innerHTML =
+    '<button type="button" class="back" id="back">'+esc(backLabel)+'</button>'+
+    '<iframe class="abg-frame" title="'+esc(title)+'" src="'+esc(href)+'"></iframe>';
+  document.getElementById("back").onclick = function(){
+    stopSpoken();
+    if(toIcu){ returnToIcu(); return; }
+    if(!organById(current)){ closePage(); return; }
+    renderRoom();
+  };
+  room.scrollTop = 0;
+}
+function placeBrain(spot){
+  const layer = document.getElementById("approach");
+  const rect = figure.getBoundingClientRect();
+  const px = rect.left + rect.width * spot.x / 100;
+  const py = rect.top + rect.height * spot.y / 100;
+  layer.style.setProperty("--sx", (px - window.innerWidth/2) + "px");
+  layer.style.setProperty("--sy", (py - window.innerHeight/2) + "px");
+  return layer;
+}
+function showRooms(){
+  document.getElementById("approach").classList.remove("rise","leave");
+  document.body.classList.remove("filming");
+  document.body.classList.add("in","enter");
+  renderRoom();
+  document.getElementById("back").focus({preventScroll:true});
+}
+function enter(id, spot){
+  const organ = organById(id);
+  if(!organ || current) return;
+  spot = spot || (organ.spots && organ.spots[0]) || {x:50, y:42, name:organ.name};
+  current = id;
+  part = "all";
+  inside = null;
+  document.body.classList.remove("inside","lab","arena","osce","reference");
+  bootSound();
+  speak(organ.name);
+  finishIntro();
+  setSpin(false);
+  figure.classList.remove("sway");
+  blip((spot.x||50)/100*2-1);
+  if(window.zoomIntoAnatomy) window.zoomIntoAnatomy(id);
+  if(organ.plate && !reduced){
+    const layer = placeBrain(spot);
+    const plate = document.getElementById("plate");
+    layer.classList.remove("rise","leave");
+    const go = function(){
+      requestAnimationFrame(function(){ layer.classList.add("rise"); });
+      arm = setTimeout(function(){ layer.classList.add("leave"); }, 1750);
+      timer = setTimeout(showRooms, 2550);
+    };
+    plate.alt = organ.name;
+    plate.onload = null;
+    plate.onerror = function(){ plate.onload = null; plate.onerror = null; showRooms(); };
+    if(plate.getAttribute("src")===organ.plate && plate.complete && plate.naturalWidth){
+      go();
+    } else {
+      plate.onload = function(){ plate.onload = null; go(); };
+      plate.src = organ.plate;
+    }
+    return;
+  }
+  if(reduced) showRooms();
+  else timer = setTimeout(showRooms, 1900);
+}
+function leave(){
+  clearTimeout(timer);
+  clearTimeout(arm);
+  inside = null;
+  current = null;
+  held = null;
+  document.body.classList.remove("in","enter","inside","lab","arena","filming","doors");
+  document.getElementById("approach").classList.remove("show","rise","leave");
+  figure.classList.remove("zoom","filming");
+  figure.style.opacity = "";
+  angle = 0;
+  setSpin(!reduced);
+  light("");
+  if(window.resetAtlas) window.resetAtlas();
+  document.getElementById("view").focus({preventScroll:true});
+  if(!reduced) requestAnimationFrame(drawDust);
+}
+function search(){
+  const words = find.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  document.body.classList.toggle("searching", words.length>0);
+  if(!words.length){ results.innerHTML=""; return; }
+  results.innerHTML = ORGANS.map(function(organ){
+    const rows = rowsOf(organ.learn).concat(rowsOf(organ.practice)).filter(function(row){
+      const hay = (organ.name+" "+organ.room+" "+row.title+" "+row.meta).toLowerCase();
+      return words.every(function(word){ return hay.indexOf(word)!==-1; });
+    });
+    if(!rows.length) return "";
+    return '<div class="group"><h2>'+esc(organ.name)+'</h2>'+cards(rows)+'</div>';
+  }).join("") || '<p class="empty">No simulator matches that.</p>';
+}
+function chooseOrgan(target){
+  if(current || spinning || !target || !target.closest) return;
+  const btn = target.closest(".hot");
+  if(!btn) return;
+  const id = btn.getAttribute("data-id");
+  const spot = {x:+btn.getAttribute("data-x"), y:+btn.getAttribute("data-y"), name: btn.querySelector("b").textContent};
+  light(id, spot);
+  enter(id, spot);
+}
+function faceFront(){
+  setSpin(false);
+  figure.style.transition = "transform .55s cubic-bezier(.22,.7,.2,1), opacity .45s ease";
+  angle = 0;
+  applyTurn();
+  setTimeout(function(){ figure.style.transition = "opacity .45s ease"; }, 600);
+}
+figure.addEventListener("click", function(event){
+  event.preventDefault();
+  if(!window.anatomyManaged) chooseOrgan(event.target);
+});
+document.querySelector(".atlas").addEventListener("pointerdown", function(event){
+  if(window.anatomyManaged || document.body.classList.contains("live3d")) return;
+  if(current || event.target.closest("input, a, button")) return;
+  if(spinning){ faceFront(); return; }
+  drag = event.clientX;
+  downY = event.clientY;
+  pick = event.target;
+  grip = angle;
+  dragged = false;
+});
+window.addEventListener("pointermove", function(event){
+  if(drag==null || current) return;
+  const delta = event.clientX - drag;
+  const rise = event.clientY - downY;
+  if(Math.abs(delta) < 26 && Math.abs(rise) < 26) return;
+  dragged = true;
+  whoosh(delta);
+  angle = grip + delta * 0.55;
+  applyTurn();
+});
+window.addEventListener("pointerup", function(){
+  const target = pick;
+  const moved = dragged;
+  drag = null;
+  pick = null;
+  dragged = false;
+  catchTap = false;
+  if(!moved) chooseOrgan(target);
+});
+find.addEventListener("input", search);
+let audioCtx = null;
+let ambient = [];
+let soundOn = true;
+window.soundOn = true;
+let welcomed = false;
+function ensureAudio(){
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if(!Ctx) return null;
+  if(!audioCtx) audioCtx = new Ctx();
+  if(audioCtx.state==="suspended") audioCtx.resume();
+  return audioCtx;
+}
+let scoreNodes = [];
+let pulseTimer = 0;
+let lastWhoosh = 0;
+function bus(ctx){
+  const master = ctx.createGain();
+  master.gain.value = 0.55;
+  master.connect(ctx.destination);
+  return master;
+}
+function tone(ctx, dest, opts){
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = opts.type || "sine";
+  osc.frequency.setValueAtTime(Math.max(1, opts.f0), opts.t);
+  if(opts.f1) osc.frequency.exponentialRampToValueAtTime(Math.max(1, opts.f1), opts.t+opts.dur);
+  gain.gain.setValueAtTime(0.0001, opts.t);
+  gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, opts.vol), opts.t+(opts.atk||0.02));
+  gain.gain.exponentialRampToValueAtTime(0.0001, opts.t+opts.dur);
+  osc.connect(gain);
+  gain.connect(dest);
+  osc.start(opts.t);
+  osc.stop(opts.t+opts.dur+0.05);
+  if(opts.keep===false) waveNodes.push(osc);
+  else scoreNodes.push(osc);
+}
+function noiseHit(ctx, dest, t, dur, vol, cut, keep){
+  const len = Math.floor(ctx.sampleRate * dur);
+  const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for(let i=0;i<len;i++) data[i] = (Math.random()*2-1) * (1-i/len);
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = cut;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(vol, t);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  src.connect(filter);
+  filter.connect(gain);
+  gain.connect(dest);
+  src.start(t);
+  src.stop(t+dur+0.02);
+  if(keep===false) waveNodes.push(src);
+  else scoreNodes.push(src);
+}
+function playScore(){
+  if(!soundOn || document.hidden) return;
+  stopAmbient();
+  const ctx = ensureAudio();
+  if(!ctx) return;
+  const dest = bus(ctx);
+  const t = ctx.currentTime + 0.03;
+  noiseHit(ctx, dest, t, 0.45, 0.55, 180);
+  tone(ctx, dest, {t:t, dur:0.8, f0:58, f1:40, vol:0.4, type:"sine", atk:0.012});
+  tone(ctx, dest, {t:t+0.2, dur:1.4, f0:110, f1:440, vol:0.08, type:"sawtooth", atk:0.08});
+  clearTimeout(pulseTimer);
+  startWave();
+}
+function startPulse(){
+  startWave();
+}
+let waveOn = false;
+let waveTimer = 0;
+let waveStep = 0;
+let waveAt = 0;
+let waveNodes = [];
+function startWave(){
+  if(!soundOn || document.hidden) return;
+  const bed = document.getElementById("bed");
+  if(!bed || !bed.getAttribute("src")) return;
+  bed.muted = false;
+  bed.volume = document.body.classList.contains("icu-open") ? 0.24 : 0.42;
+  if(!bed.paused) return;
+  const pending = bed.play();
+  if(pending) pending.catch(function(){});
+  waveOn = true;
+}
+function stopWave(){
+  waveOn = false;
+  clearTimeout(waveTimer);
+  const bed = document.getElementById("bed");
+  if(!bed) return;
+  bed.pause();
+  bed.muted = true;
+}
+function whoosh(delta){
+  if(!soundOn || document.hidden) return;
+  const now = performance.now();
+  if(now-lastWhoosh < 110) return;
+  lastWhoosh = now;
+  const ctx = ensureAudio();
+  if(!ctx) return;
+  const dest = bus(ctx);
+  const t = ctx.currentTime;
+  const pan = Math.max(-1, Math.min(1, delta/180));
+  const node = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  const target = node || dest;
+  if(node){ node.pan.value = pan; node.connect(dest); }
+  noiseHit(ctx, target, t, 0.09, Math.min(0.18, Math.abs(delta)/900), 1400);
+}
+function blip(pan){
+  if(!soundOn || document.hidden) return;
+  const ctx = ensureAudio();
+  if(!ctx) return;
+  const dest = bus(ctx);
+  const node = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  const target = node || dest;
+  if(node){ node.pan.value = Math.max(-1, Math.min(1, pan||0)); node.connect(dest); }
+  tone(ctx, target, {t:ctx.currentTime, dur:0.18, f0:520, f1:760, vol:0.12, type:"sine", atk:0.01});
+}
+function surge(power){
+  if(!soundOn || document.hidden) return;
+  const ctx = ensureAudio();
+  if(!ctx) return;
+  const dest = bus(ctx);
+  const t = ctx.currentTime;
+  noiseHit(ctx, dest, t, 0.28, 0.35*power, 240);
+  tone(ctx, dest, {t:t, dur:0.42, f0:70, f1:180, vol:0.22*power, type:"sine", atk:0.01});
+}
+function stopScore(){
+  scoreNodes.forEach(function(node){ try{ node.stop(); }catch(err){} });
+  scoreNodes = [];
+  clearTimeout(pulseTimer);
+  stopWave();
+}
+function startAmbient(){
+  if(!soundOn || ambient.length) return;
+  const ctx = ensureAudio();
+  if(!ctx) return;
+  const master = ctx.createGain();
+  master.gain.value = 0.45;
+  master.connect(ctx.destination);
+  [98,146,196].forEach(function(freq, index){
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const lfo = ctx.createOscillator();
+    const depth = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    gain.gain.value = index===0 ? 0.03 : 0.012;
+    lfo.frequency.value = 0.05 + index*0.02;
+    depth.gain.value = 0.008;
+    lfo.connect(depth);
+    depth.connect(gain.gain);
+    osc.connect(gain);
+    gain.connect(master);
+    osc.start();
+    lfo.start();
+    ambient.push({osc:osc, gain:gain, lfo:lfo});
+  });
+  const len = ctx.sampleRate * 2;
+  const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for(let i=0;i<len;i++) data[i] = Math.random()*2-1;
+  const noise = ctx.createBufferSource();
+  noise.buffer = buffer;
+  noise.loop = true;
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = 420;
+  const ng = ctx.createGain();
+  ng.gain.value = 0.012;
+  noise.connect(filter);
+  filter.connect(ng);
+  ng.connect(master);
+  noise.start();
+  ambient.push({osc:noise, gain:ng, lfo:{stop:function(){ noise.stop(); }}});
+}
+function stopAmbient(){
+  if(!audioCtx || !ambient.length){ ambient = []; return; }
+  const ctx = audioCtx;
+  ambient.forEach(function(node){
+    try{
+      node.gain.gain.cancelScheduledValues(ctx.currentTime);
+      node.gain.gain.setValueAtTime(Math.max(0.0001, node.gain.gain.value), ctx.currentTime);
+      node.gain.gain.linearRampToValueAtTime(0.0001, ctx.currentTime+0.4);
+      node.osc.stop(ctx.currentTime+0.45);
+      node.lfo.stop(ctx.currentTime+0.45);
+    }catch(err){}
+  });
+  ambient = [];
+}
+function femaleVoice(){
+  if(!window.speechSynthesis) return null;
+  const voices = speechSynthesis.getVoices() || [];
+  const named = /female|samantha|victoria|karen|moira|fiona|tessa|serena|zira|susan|veena|heera|sonia|catherine|allison|ava|nicky|libby/i;
+  const en = voices.filter(function(voice){ return /^en/i.test(voice.lang || ""); });
+  return en.find(function(voice){ return named.test((voice.name || "") + " " + (voice.voiceURI || "")); })
+    || voices.find(function(voice){ return named.test((voice.name || "") + " " + (voice.voiceURI || "")); })
+    || en.find(function(voice){ return /en-GB|en-IN|en-AU/i.test(voice.lang) && !/male/i.test(voice.name || ""); })
+    || null;
+}
+function stopSpoken(){
+  if(window.speechSynthesis) speechSynthesis.cancel();
+  const line = document.getElementById("line");
+  if(line){
+    line.onended = null;
+    line.pause();
+  }
+  if(window.releaseBedVoice) window.releaseBedVoice();
+}
+function speakMcq(text){
+  if(!soundOn || !text || !window.speechSynthesis) return;
+  const say = function(){
+    speechSynthesis.cancel();
+    const line = document.getElementById("line");
+    if(line) line.pause();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voice = femaleVoice();
+    utterance.lang = voice && voice.lang ? voice.lang : "en-IN";
+    utterance.rate = 0.92;
+    utterance.pitch = 1.06;
+    if(voice) utterance.voice = voice;
+    speechSynthesis.speak(utterance);
+  };
+  if(!speechSynthesis.getVoices().length){
+    const once = function(){
+      speechSynthesis.removeEventListener("voiceschanged", once);
+      say();
+    };
+    speechSynthesis.addEventListener("voiceschanged", once);
+    speechSynthesis.getVoices();
+    return;
+  }
+  say();
+}
+function shellHold(){
+  const body = document.body.classList;
+  return body.contains("icu-open") || body.contains("icu-gate");
+}
+function speak(text){
+  if(!soundOn || !text) return;
+  stopSpoken();
+  const onBody = document.body.classList.contains("body-only");
+  if(!onBody){
+    const file = {
+      "Brain":"voice/brain.mp3",
+      "Thyroid":"voice/thyroid.mp3",
+      "Lungs":"voice/lungs.mp3",
+      "Heart":"voice/heart.mp3",
+      "Liver":"voice/liver.mp3",
+      "Stomach":"voice/stomach.mp3",
+      "Gastrointestinal":"voice/gastrointestinal.mp3",
+      "Spleen":"voice/spleen.mp3",
+      "Whole patient":"voice/whole.mp3",
+      "Kidneys":"voice/kidneys.mp3",
+      "Welcome to Learning Lab.":"voice/lab.mp3",
+      "Welcome to Practice Arena.":"voice/arena.mp3"
+    }[text];
+    if(file){ playLine(file); return; }
+  }
+  if(!window.speechSynthesis) return;
+  const say = function(){
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voice = onBody ? femaleVoice() : null;
+    utterance.lang = voice && voice.lang ? voice.lang : "en-IN";
+    utterance.rate = onBody ? 0.68 : 0.96;
+    utterance.pitch = onBody ? 1.14 : 1;
+    if(voice) utterance.voice = voice;
+    speechSynthesis.speak(utterance);
+  };
+  say();
+}
+function startBed(){}
+window.keepScore = function(){ if(soundOn) startWave(); };
+function hush(){
+  const line = document.getElementById("line");
+  line.pause();
+  line.muted = true;
+  stopScore();
+  stopAmbient();
+}
+function playLine(src){
+  if(!soundOn || document.hidden) return;
+  const line = document.getElementById("line");
+  line.onended = function(){ if(window.resumeBed) window.resumeBed(); };
+  if(window.pauseBedForVoice) window.pauseBedForVoice();
+  line.muted = false;
+  line.volume = 0.95;
+  line.src = src;
+  const pending = line.play();
+  if(pending && pending.catch) pending.catch(function(){ if(window.resumeBed) window.resumeBed(); });
+}
+function playWelcome(){
+  if(shellHold()) return;
+  if(!soundOn || welcomed) return;
+  const line = document.getElementById("line");
+  line.muted = false;
+  line.volume = 0.95;
+  line.src = "welcome.mp3";
+  const pending = line.play();
+  if(pending && pending.then) pending.then(function(){ welcomed = true; }).catch(function(){});
+  else welcomed = true;
+}
+function bootSound(){}
+function setSound(on){
+  soundOn = on;
+  window.soundOn = on;
+  const button = document.getElementById("sound");
+  button.setAttribute("aria-pressed", on ? "true" : "false");
+  button.textContent = "";
+  button.setAttribute("aria-label", on ? "Sound on" : "Sound off");
+  const line = document.getElementById("line");
+  if(!on){ line.pause(); stopScore(); stopAmbient(); }
+  else startWave();
+}
+document.getElementById("sound").onclick = function(){
+  setSound(!soundOn);
+};
+let begun = false;
+function beginShow(){
+  if(begun) return;
+  begun = true;
+  document.body.classList.remove("blocked");
+  document.body.classList.add("begun");
+  playIntro();
+}
+let gateSaid = false;
+document.addEventListener("pointerdown", function(){
+  if(!begun) beginShow();
+  const ctx = ensureAudio();
+  if(ctx && ctx.state==="suspended") ctx.resume();
+  if(document.body.classList.contains("icu-gate") && !gateSaid){
+    gateSaid = true;
+    if(soundOn) startWave();
+    if(!event.target.closest || !event.target.closest("#icu-enter")) speakMcq("Enter the ICU.");
+    return;
+  }
+  if(!welcomed) playWelcome();
+  if(soundOn) startWave();
+}, true);
+let introTimers = [];
+function finishIntro(){
+  introTimers.forEach(clearTimeout);
+  introTimers = [];
+  document.body.classList.remove("opening","scanning","titled");
+  document.body.classList.add("ready");
+  figure.classList.add("materialise");
+  if(!current){ figure.style.opacity = "1"; light(""); }
+}
+function later(ms, fn){ introTimers.push(setTimeout(fn, ms)); }
+function playIntro(){
+  if(shellHold()) return;
+  if(reduced){ playScore(); playWelcome(); finishIntro(); return; }
+  document.body.classList.add("opening");
+  later(180, function(){ figure.classList.add("materialise"); setSpin(true); });
+  later(2000, function(){ document.body.classList.add("scanning"); });
+  later(2200, function(){ if(!current) light("brain"); });
+  later(2800, function(){ if(!current) light("heart"); });
+  later(3300, function(){ if(!current) light("lungs"); });
+  later(3900, function(){ if(!current) light("kidneys"); });
+  later(5000, function(){
+    document.body.classList.add("titled");
+    if(!current) light("");
+    if(!current) playWelcome();
+  });
+  later(8000, finishIntro);
+  later(14000, function(){ document.body.classList.add("settled"); });
+}
+document.getElementById("skip").onclick = function(){ playWelcome(); finishIntro(); };
+document.addEventListener("visibilitychange", function(){
+  const node = document.getElementById("bed");
+  if(document.hidden){
+    if(node && !node.paused) node.pause();
+  } else if(soundOn && !window.voiceHold) startWave();
+});
+window.addEventListener("pagehide", function(){
+  const node = document.getElementById("bed");
+  if(node) node.pause();
+});
+room.addEventListener("click", function(event){
+  const card = event.target.closest("a.card");
+  if(!card) return;
+  event.preventDefault();
+  openTitle(card);
+});
+const dust = document.getElementById("dust");
+const pen = dust.getContext("2d");
+const specks = [];
+for(let n=0;n<36;n++) specks.push({x:Math.random(), y:Math.random(), v:0.15+Math.random()*0.35, s:0.6+Math.random()*1.4});
+function drawDust(){
+  if(window.anatomyManaged || reduced || document.body.classList.contains("in")) return;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  if(dust.width!==w || dust.height!==h){ dust.width = w; dust.height = h; }
+  pen.clearRect(0,0,dust.width,dust.height);
+  pen.fillStyle = "rgba(127,212,230,.4)";
+  specks.forEach(function(speck){
+    speck.y -= 0.00045*speck.v;
+    if(speck.y<0) speck.y = 1;
+    pen.beginPath();
+    pen.arc(speck.x*dust.width, speck.y*dust.height, speck.s, 0, 6.28);
+    pen.fill();
+  });
+  requestAnimationFrame(drawDust);
+}
+document.querySelector(".atlas").addEventListener("pointermove", function(){});
+if(!window.anatomyManaged) paint();
+figure.addEventListener("pointerover", function(event){
+  if(event.pointerType==="touch" || current) return;
+  const btn = event.target.closest(".hot");
+  if(!btn) return;
+  fine = true;
+  light(btn.getAttribute("data-id"), {x:+btn.getAttribute("data-x"), y:+btn.getAttribute("data-y")});
+});
+function startShow(){}
+window.enterOrgan = enter;
+window.openAnatomyPortal = function(id, which){
+  if(current || !organById(id) || !["lab","arena"].includes(which)) return;
+  current = id; part = "all"; inside = which;
+  finishIntro(); setSpin(false); bootSound();
+  speak(which==="lab" ? "Welcome to Learning Lab." : "Welcome to Practice Arena.");
+  surge(0.35);
+  document.body.classList.add("in","enter","inside",which);
+  renderRoom();
+  document.getElementById("back").focus({preventScroll:true});
+};
+document.querySelectorAll("[data-organ]").forEach(function(button){
+  button.addEventListener("pointerenter", function(){
+    if(window.hoverOrgan) window.hoverOrgan(button.getAttribute("data-organ"));
+  });
+  button.addEventListener("click", function(){
+    const id = button.getAttribute("data-organ");
+    if(window.selectAtlasOrgan) window.selectAtlasOrgan(id);
+    else enter(id);
+  });
+});
+function formulaBlock(){
+  return REFERENCE.filter(function(item){ return item.section==="formulas"; }).map(function(item){
+    return "<article class='station'><h3 class='refhead'>"+esc(item.title)+"</h3>"+item.body.map(function(line){ return "<p class='lede'>"+esc(line)+"</p>"; }).join("")+"</article>";
+  }).join("");
+}
+function closePage(){
+  stopSpoken();
+  document.body.classList.remove("in","enter","inside","lab","arena","osce","reference");
+  if(window.resetAtlas) window.resetAtlas();
+  window.scrollTo(0,0);
+}
+function returnToIcu(){
+  stopSpoken();
+  const btn = document.getElementById("icu-return");
+  if(btn){ btn.click(); return; }
+  document.body.classList.add("icu-open");
+  document.body.classList.remove("icu-gate","in","enter","inside","lab","arena","osce","reference","picking","body-only");
+  const room = document.getElementById("room");
+  if(room) room.innerHTML = "";
+}
+window.returnToIcu = returnToIcu;
+function showOrganTabs(){
+  const nav = document.getElementById("organ-bubbles");
+  const buttons = ORGANS.filter(function(organ){
+    return organ.id!=="multi" && organ.plate;
+  }).map(function(organ){
+    return '<button type="button" class="bubble-btn" data-organ="'+organ.id+'"><img src="'+esc(organ.plate)+'" alt=""><span>'+esc(organ.name)+'</span></button>';
+  }).join("");
+  nav.innerHTML = '<button type="button" class="backbub" id="organs-back">Sections</button><input class="organ-find" id="organ-find" type="search" placeholder="Find an organ" aria-label="Find an organ">'+buttons;
+  document.getElementById("rail-tabs").hidden = true;
+  nav.hidden = false;
+  document.body.classList.add("picking");
+  document.getElementById("organs-back").onclick = function(){
+    nav.hidden = true;
+    document.getElementById("rail-tabs").hidden = false;
+    document.body.classList.remove("picking");
+  };
+  document.getElementById("organ-find").addEventListener("input", function(event){
+    const query = event.target.value.trim().toLowerCase();
+    nav.querySelectorAll(".bubble-btn").forEach(function(btn){
+      const name = btn.querySelector("span").textContent.toLowerCase();
+      btn.hidden = query && name.indexOf(query) === -1;
+    });
+  });
+}
+let mcqSystem = null;
+let mcqIndex = 0;
+let mcqPicked = null;
+let mcqScore = 0;
+function mcqPool(){
+  if(!window.MCQ_BANK) return [];
+  if(mcqSystem==="all") return MCQ_BANK.items;
+  return MCQ_BANK.items.filter(function(item){ return item.system===mcqSystem; });
+}
+function renderTest(){
+  if(!window.MCQ_BANK){
+    room.innerHTML = '<button type="button" class="back" id="back">Back to the body</button><h2>Test the brain</h2><p class="empty">Loading the questions…</p>';
+    document.getElementById("back").onclick = closePage;
+    if(!window.__mcqLoading){
+      window.__mcqLoading = true;
+      const s = document.createElement("script");
+      s.src = "mcq-bank.js?v=20261029b";
+      s.onload = function(){ window.__mcqLoading = false; renderTest(); };
+      s.onerror = function(){
+        window.__mcqLoading = false;
+        room.innerHTML = '<button type="button" class="back" id="back">Back to the body</button><h2>Test the brain</h2><p class="empty">The questions did not load. Reload the page.</p>';
+        document.getElementById("back").onclick = closePage;
+      };
+      document.body.appendChild(s);
+    }
+    return;
+  }
+  stopSpoken();
+  finishIntro();
+  setSpin(false);
+  current = null;
+  inside = null;
+  document.body.classList.add("in","enter");
+  document.body.classList.remove("inside","lab","arena","osce","reference","opening","scanning","doors");
+  if(!mcqSystem){
+    const total = MCQ_BANK.items.length;
+    const systems = MCQ_BANK.systems.map(function(name){
+      const count = MCQ_BANK.items.filter(function(item){ return item.system===name; }).length;
+      return '<button type="button" class="portal lab" data-mcq-system="'+esc(name)+'"><span>'+count+' questions</span><strong>'+esc(name)+'</strong><em>Commit to one answer. Then read why.</em><i class="go" aria-hidden="true"></i></button>';
+    }).join("");
+    room.innerHTML =
+      '<button type="button" class="back" id="back">Back to the body</button>'+
+      '<p class="lede" style="letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--faint)">Critical care</p>'+
+      '<h2>Test the brain</h2>'+
+      '<p class="lede">'+total+' single-best-answer questions. Choose before the explanation.</p>'+
+      '<div class="portals">'+systems+
+      '<button type="button" class="portal arena" data-mcq-system="all"><span>'+total+' questions</span><strong>All systems</strong><em>The full bank, in order.</em><i class="go" aria-hidden="true"></i></button></div>';
+    document.getElementById("back").onclick = closePage;
+    room.querySelectorAll("[data-mcq-system]").forEach(function(btn){
+      btn.onclick = function(){
+        mcqSystem = btn.getAttribute("data-mcq-system");
+        mcqIndex = 0;
+        mcqPicked = null;
+        mcqScore = 0;
+        renderTest();
+      };
+    });
+    room.scrollTop = 0;
+    return;
+  }
+  const pool = mcqPool();
+  if(!pool.length || mcqIndex>=pool.length){
+    room.innerHTML =
+      '<button type="button" class="back" id="back">Back to the systems</button>'+
+      '<h2>Test the brain</h2>'+
+      '<p class="lede">'+mcqScore+' of '+(pool.length||0)+' correct.</p>'+
+      '<button type="button" class="portal lab" id="mcq-systems"><strong>Choose another system</strong></button>';
+    document.getElementById("back").onclick = function(){ mcqSystem=null; renderTest(); };
+    document.getElementById("mcq-systems").onclick = function(){ mcqSystem=null; renderTest(); };
+    room.scrollTop = 0;
+    return;
+  }
+  const q = pool[mcqIndex];
+  const letters = ["A","B","C","D","E"];
+  const opts = q.options.map(function(text, index){
+    const letter = letters[index];
+    let cls = "mcq-opt";
+    if(mcqPicked){
+      if(letter===q.answer) cls += " right";
+      else if(letter===mcqPicked) cls += " wrong";
+    }
+    return '<button type="button" class="'+cls+'" data-letter="'+letter+'"'+(mcqPicked?" disabled":"")+'><b>'+letter+'</b><span>'+esc(text)+'</span></button>';
+  }).join("");
+  const note = mcqPicked
+    ? '<div class="mcq-note"><p class="lede"><b>'+(mcqPicked===q.answer?"Correct. ":"That is incorrect. The correct answer is "+esc(q.options[letters.indexOf(q.answer)] || q.answer)+". ")+'</b>'+esc(q.explain)+'</p><button type="button" class="portal lab" id="mcq-next"><strong>'+(mcqIndex+1===pool.length?"See the score":"Next question")+'</strong></button></div>'
+    : "";
+  room.innerHTML =
+    '<button type="button" class="back" id="back">Back to the systems</button>'+
+    '<p class="lede" style="letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--faint)">'+esc(q.system)+' · '+(mcqIndex+1)+' of '+pool.length+'</p>'+
+    '<h2 class="mcq-stem">'+esc(q.stem)+'</h2>'+
+    '<div class="mcq-opts">'+opts+'</div>'+note;
+  document.getElementById("back").onclick = function(){ mcqSystem=null; mcqPicked=null; renderTest(); };
+  room.querySelectorAll("[data-letter]").forEach(function(btn){
+    btn.onclick = function(){
+      if(mcqPicked) return;
+      mcqPicked = btn.getAttribute("data-letter");
+      if(mcqPicked===q.answer) mcqScore += 1;
+      renderTest();
+    };
+  });
+  const next = document.getElementById("mcq-next");
+  if(next) next.onclick = function(){
+    mcqPicked = null;
+    mcqIndex += 1;
+    renderTest();
+  };
+  room.scrollTop = 0;
+  if(mcqPicked){
+    const letters = ["A","B","C","D","E"];
+    const answerText = q.options[letters.indexOf(q.answer)] || "";
+    speakMcq((mcqPicked===q.answer ? "Correct. " : "That is incorrect. The correct answer is "+answerText+". ") + q.explain);
+  } else speakMcq(q.stem);
+}
+function renderAbg(){
+  stopSpoken();
+  finishIntro();
+  setSpin(false);
+  current = null;
+  inside = null;
+  document.body.classList.add("in","enter");
+  document.body.classList.remove("inside","lab","arena","osce","reference","opening","scanning","doors");
+  room.innerHTML =
+    '<button type="button" class="back" id="back">Back to the body</button>'+
+    '<iframe class="abg-frame" title="ABG photo interpreter" src="ABG_Photo_Interpreter_Simulator.html?embed=1&v=20261023g" allow="camera"></iframe>';
+  document.getElementById("back").onclick = closePage;
+  room.scrollTop = 0;
+}
+function openRail(which){
+  stopSpoken();
+  finishIntro();
+  setSpin(false);
+  current = null;
+  inside = null;
+  document.body.classList.add("in","enter");
+  document.body.classList.remove("inside","lab","arena","osce","reference","opening","scanning","doors");
+  let title = "";
+  let lede = "";
+  let bodyHtml = "";
+  if(which==="osce"){
+    title = "OSCE World";
+    lede = "Five spoken stations. The voice asks the question. You choose.";
+    bodyHtml = osceShelf();
+  }else if(which==="drugs"){
+    title = "Drugs and doses";
+    lede = "Adult doses used in critical care.";
+    bodyHtml = '<a class="card" href="antibiotics.html?v=20261029a"><b>Drug monographs</b><span>Headings in alphabetical order. Antimicrobials opens class by class, with the full monograph on every drug. The other headings are unchanged.</span></a>';
+  }else if(which==="formulas"){
+    title = "Formulas";
+    lede = "The calculations the simulators assume.";
+    bodyHtml = formulaBlock();
+  }
+  const toIcu = which==="osce";
+  room.innerHTML =
+    '<button type="button" class="back" id="back">'+(toIcu?"Back to ICU":"Back to the body")+'</button>'+
+    '<h2>'+esc(title)+'</h2>'+
+    '<p class="lede">'+esc(lede)+'</p>'+bodyHtml;
+  room.scrollTop = 0;
+  document.getElementById("back").onclick = toIcu ? returnToIcu : closePage;
+}
+document.getElementById("rail-tabs").addEventListener("click", function(event){
+  const btn = event.target.closest("[data-tab]");
+  if(!btn) return;
+  stopSpoken();
+  const tab = btn.getAttribute("data-tab");
+  if(tab==="train"){ if(window.openBody) window.openBody(); return; }
+  if(tab==="test"){ mcqSystem=null; mcqPicked=null; renderTest(); return; }
+  if(tab==="abg"){ renderAbg(); return; }
+  openRail(tab);
+});
+document.getElementById("organ-bubbles").addEventListener("click", function(event){
+  const btn = event.target.closest("[data-organ]");
+  if(!btn) return;
+  enter(btn.getAttribute("data-organ"));
+});
+startShow();
+beginShow();
+if(!shellHold()){
+  playScore();
+  playWelcome();
+  startWave();
+}
+(function openSavedLab(){
+  const id = new URLSearchParams(location.search).get("lab");
+  if(!id || !organById(id)) return;
+  document.body.classList.remove("icu-open","icu-gate");
+  document.body.classList.add("body-only");
+  current = id;
+  part = "all";
+  inside = "lab";
+  finishIntro();
+  setSpin(false);
+  document.body.classList.add("in","enter","inside","lab");
+  renderRoom();
+  if(window.keepScore) window.keepScore();
+})();
+(function openSavedDoors(){
+  const id = new URLSearchParams(location.search).get("doors");
+  if(!id || !organById(id)) return;
+  document.body.classList.remove("icu-open","icu-gate");
+  current = id;
+  part = "all";
+  inside = null;
+  finishIntro();
+  setSpin(false);
+  document.body.classList.add("in","enter");
+  document.body.classList.remove("inside","lab","arena","osce","reference","opening","scanning","doors");
+  renderRoom();
+})();
+document.getElementById("icu-enter").onclick = function(){
+  stopSpoken();
+  if(window.speechSynthesis) speechSynthesis.getVoices();
+  document.body.classList.remove("icu-gate");
+  document.body.classList.add("icu-open");
+  if(soundOn) startWave();
+};
+if(location.search.indexOf("open=1") !== -1){
+  document.getElementById("icu-enter").click();
+}
+if(!reduced) requestAnimationFrame(drawDust);
+</script>
+<!-- pages-build 20261029a -->
+<script src="bed-bridge.js?v=20261029a"></script>
+<script src="icu-bay.js?v=20261030e"></script>
+<script type="module" src="body-boot.js?v=20261030e"></script>
 </body>
 </html>
