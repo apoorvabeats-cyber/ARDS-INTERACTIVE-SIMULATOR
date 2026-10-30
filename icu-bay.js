@@ -335,6 +335,7 @@
   }
   function loadBody(){}
   function leaveForBody(){
+    if(typeof window.releaseOrgan === "function") window.releaseOrgan();
     document.body.classList.remove("icu-gate", "icu-open", "in", "enter", "inside", "lab", "arena", "osce", "reference", "picking");
     const room = document.getElementById("room");
     if(room) room.innerHTML = "";
@@ -391,6 +392,7 @@
   });
   document.getElementById("icu-return").onclick = function(){
     quietLine();
+    if(typeof window.releaseOrgan === "function") window.releaseOrgan();
     document.body.classList.add("icu-open");
     document.body.classList.remove("in", "enter", "inside", "lab", "arena", "osce", "reference", "picking", "body-only");
     const bubbles = document.getElementById("organ-bubbles");

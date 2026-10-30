@@ -33,6 +33,9 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 
 const scene = new THREE.Scene();
+const labBg = new THREE.TextureLoader().load("lab-bg.jpg?v=20261030k");
+labBg.colorSpace = THREE.SRGBColorSpace;
+scene.background = labBg;
 scene.add(new THREE.AmbientLight(0xfff4ea, 0.38));
 const camera = new THREE.PerspectiveCamera(28, 1, 0.02, 40);
 scene.add(new THREE.HemisphereLight(0xfff1e6, 0x163044, 0.72));
