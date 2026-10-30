@@ -26,6 +26,8 @@ header a{text-decoration:none;min-height:44px;display:inline-flex;align-items:ce
 .col button small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
 .stage{position:relative;min-width:0;background:radial-gradient(ellipse at 50% 42%, #1a242e 0%, #101418 68%);border:1px solid var(--line);border-radius:16px;overflow:hidden}
 .stage canvas{width:100%;height:100%;display:block;touch-action:none}
+#ett-status{position:absolute;left:16px;right:16px;top:42%;margin:0;text-align:center;line-height:1.45;z-index:2;color:var(--fg)}
+#ett-status.bad{color:var(--warm)}
 .dock{grid-column:2;display:flex;gap:8px;overflow:auto;padding:0 2px 6px}
 .dock button{flex:none;min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#102028}
 .dock button.on{border-color:var(--warm);color:#fff8ee}
@@ -50,13 +52,14 @@ header a{text-decoration:none;min-height:44px;display:inline-flex;align-items:ce
 </header>
 <div class="lab">
   <nav class="col cats" id="cats" aria-label="Instruments"></nav>
-  <div class="stage"><canvas id="view" aria-label="Rotatable 3D instrument. Drag to turn. Pinch to zoom. Tap a part."></canvas></div>
+  <div class="stage"><canvas id="view" aria-label="Rotatable 3D instrument. Drag to turn. Pinch to zoom. Tap a part."></canvas><p id="ett-status" hidden></p></div>
   <aside class="col parts" id="parts" aria-label="Components"></aside>
   <div class="dock" id="dock"></div>
 </div>
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 
 const CATS = [["airway","Airway"],["oxygen","Oxygen"],["access","Access"],["support","Support"]];
@@ -90,11 +93,14 @@ renderer.setPixelRatio(Math.min(devicePixelRatio||1, 1.75));
 renderer.setClearColor(0x101418, 1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+renderer.toneMappingExposure = 1.15;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.add(new THREE.HemisphereLight(0xf7f1e6, 0x1b140f, 0.85));
 const key = new THREE.DirectionalLight(0xfff8ee, 2.4);
 key.position.set(4, 6, 5);
+key.castShadow = true;
 scene.add(key);
 const rim = new THREE.DirectionalLight(0xb7e4f2, 1.1);
 rim.position.set(-5, 2, -4);
@@ -114,6 +120,9 @@ scene.add(root);
 const ray = new THREE.Raycaster();
 const parts = [];
 let currentId = "ett";
+let realEtt = false;
+let ettToken = 0;
+const ETT_URL = "assets/models/ETT.glb";
 let selected = null;
 let exploded = false;
 let turning = false;
@@ -798,11 +807,73 @@ function applyFlags(){
     }
   });
 }
+function setEttStatus(text, bad){
+  const el = document.getElementById("ett-status");
+  if(!el) return;
+  if(!text){ el.hidden = true; el.textContent = ""; el.className = ""; return; }
+  el.hidden = false;
+  el.className = bad ? "bad" : "";
+  el.textContent = text;
+}
+function loadRealEtt(){
+  const token = ++ettToken;
+  realEtt = false;
+  setEttStatus("Loading the endotracheal tube…", false);
+  const loader = new GLTFLoader();
+  loader.load(ETT_URL, function(gltf){
+    if(token !== ettToken || currentId !== "ett") return;
+    const model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const centre = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDimension = Math.max(size.x, size.y, size.z);
+    if(!Number.isFinite(maxDimension) || maxDimension <= 0){
+      setEttStatus("The file at assets/models/ETT.glb opened, but it is not a usable 3D model. No substitute is shown.", true);
+      paintLists();
+      return;
+    }
+    const scale = 2.5 / maxDimension;
+    model.scale.setScalar(scale);
+    model.position.copy(centre).multiplyScalar(-scale);
+    model.traverse(function(object){
+      if(!object.isMesh) return;
+      object.castShadow = true;
+      object.receiveShadow = true;
+      const title = object.name && object.name !== "Mesh" ? object.name : "Endotracheal tube";
+      object.userData.id = object.name || object.uuid;
+      object.userData.title = title;
+      object.userData.text = "Part of the endotracheal tube.";
+      object.userData.ex = [0,0,0];
+      parts.push(object);
+    });
+    root.add(model);
+    parts.forEach(function(mesh){ mesh.userData.home = mesh.position.clone(); });
+    realEtt = true;
+    setEttStatus("", false);
+    fit();
+    paintLists();
+    select(null);
+  }, undefined, function(){
+    if(token !== ettToken || currentId !== "ett") return;
+    realEtt = false;
+    setEttStatus("The endotracheal tube file is not in the project yet. Place the complete GLB at assets/models/ETT.glb. No substitute model is shown.", true);
+    paintLists();
+  });
+}
 function showItem(id){
   currentId = id;
   clearRoot();
+  ettToken += 1;
+  realEtt = false;
+  setEttStatus("", false);
   flags.cuff = true; flags.blade = true; flags.vented = true; flags.reservoir = true; flags.flow = false; flags.bubble = false;
-  (BUILD[id]||buildEtt)();
+  if(id === "ett"){
+    loadRealEtt();
+    paintLists();
+    select(null);
+    return;
+  }
+  (BUILD[id]||function(){})();
   parts.forEach(function(mesh){ mesh.userData.home = mesh.position.clone(); });
   applyFlags();
   fit();
@@ -837,7 +908,9 @@ function paintLists(keepCats){
   }).join("");
   aside.innerHTML = "<h2>"+item.name+"</h2>"+toggles+"<h2>Parts</h2>"+rows+
     "<div id='readout'><b>"+(selected?selected.userData.title:"Touch a part")+"</b><p>"+(selected?selected.userData.text:"It lights, and the voice names it and says what it is for.")+"</p></div>"+
-    "<p class='fine'>Real-time 3D teaching model with separate parts. Drag to turn. Pinch or use Zoom. Not a manufacturer scan.</p>";
+    "<p class='fine'>"+(currentId==="ett"
+      ? (realEtt ? "Your endotracheal tube. Drag to turn. Pinch to zoom." : "Waiting for assets/models/ETT.glb. No drawn tube is shown.")
+      : "Real-time 3D teaching model with separate parts. Drag to turn. Pinch or use Zoom. Not a manufacturer scan.")+"</p>";
   aside.scrollTop = asideTop;
   aside.querySelectorAll("[data-part]").forEach(function(btn){
     btn.onclick = function(){
