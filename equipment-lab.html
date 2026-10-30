@@ -60,6 +60,7 @@ header a{text-decoration:none;min-height:44px;display:inline-flex;align-items:ce
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 
 const CATS = [["airway","Airway"],["oxygen","Oxygen"],["access","Access"],["gi","Gastrointestinal"],["support","Support"]];
@@ -839,7 +840,11 @@ function loadReal(id){
   realModel = false;
   setEttStatus("Loading the "+spec.label.toLowerCase()+"…", false);
   const loader = new GLTFLoader();
-  loader.load(spec.url, function(gltf){
+  loader.setMeshoptDecoder(MeshoptDecoder);
+  const fileLoader = new THREE.FileLoader();
+  fileLoader.setResponseType("arraybuffer");
+  fileLoader.load(spec.url+"?v=20261030w", function(buf){
+    loader.parse(buf, "", function(gltf){
     if(token !== modelToken || currentId !== id) return;
     const model = gltf.scene;
     const box = new THREE.Box3().setFromObject(model);
@@ -872,7 +877,16 @@ function loadReal(id){
     fit();
     paintLists();
     select(null);
-  }, undefined, function(){
+    }, function(){
+      if(token !== modelToken || currentId !== id) return;
+      realModel = false;
+      setEttStatus(spec.label+" could not be read. No substitute is shown.", true);
+      paintLists();
+    });
+  }, function(ev){
+    if(token !== modelToken || currentId !== id || !ev.lengthComputable) return;
+    setEttStatus("Loading the "+spec.label.toLowerCase()+"… "+Math.round(ev.loaded / ev.total * 100)+"%", false);
+  }, function(){
     if(token !== modelToken || currentId !== id) return;
     realModel = false;
     setEttStatus(spec.label+" could not be loaded. No substitute is shown.", true);
