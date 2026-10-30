@@ -342,15 +342,18 @@ body.hud3d.picking .rail{width:min(150px,46vw)}
 body.hud3d.in.doors .room{overflow:hidden}
 .abg-frame{flex:1;width:100%;min-height:70dvh;border:0;border-radius:12px;background:#07131b}
 .portals.doors{flex:1 1 auto;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(280px,1fr);gap:12px;margin-top:12px;perspective:900px;min-height:0;overflow:hidden}
-.portals.doors .portal{min-height:280px;height:100%;width:auto;padding:22px 18px;border-radius:18px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;color:#f4fbff;background:
-  linear-gradient(180deg, rgba(6,16,28,.18), rgba(4,10,18,.55)),
-  url("lab-bg.jpg?v=20261030k") center/cover no-repeat;
-  box-shadow:inset 0 0 0 1px rgba(160,220,255,.55), inset 0 0 42px rgba(80,190,230,.28)}
+.portals.doors .portal{min-height:280px;height:100%;width:auto;padding:22px 18px;border-radius:18px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;color:#f4fbff}
+.portals.doors .portal.lab{background:
+  radial-gradient(80% 50% at 50% 100%,rgba(127,212,230,.16),transparent 70%),
+  radial-gradient(120% 80% at 50% 0%,#12343f 0%,#0c1418 58%,#071018 100%);
+  box-shadow:inset 0 0 0 1px rgba(127,212,230,.4)}
+.portals.doors .portal.arena{background:
+  radial-gradient(80% 46% at 50% 100%,rgba(226,180,138,.18),transparent 70%),
+  radial-gradient(120% 80% at 50% 0%,#3a2a1c 0%,#16110e 55%,#071018 100%);
+  box-shadow:inset 0 0 0 1px rgba(226,180,138,.45)}
 .portals.doors .portal .go{display:none}
 .portals.doors .portal strong{margin-top:10px;font-size:clamp(22px,4.6vw,34px)}
 .portals.doors .portal em{display:block;margin-top:8px;font-style:normal;color:#e7f6fb;line-height:1.35;font-size:14px;max-width:16rem}
-.portals.doors .portal.lab{background-position:20% center}
-.portals.doors .portal.arena{background-position:80% center}
 .portals.doors .portal.lab::after,.portals.doors .portal.arena::after{content:"";position:absolute;left:12%;right:12%;bottom:16px;height:42px;border:1px solid rgba(127,212,230,.28);border-radius:50%;transform:rotateX(68deg);pointer-events:none}
 .portals.doors .portal.arena::after{border-color:rgba(226,180,138,.35)}
 .portals.doors .portal.arena::before{content:"";position:absolute;top:16px;right:14px;width:42%;height:22px;opacity:.75;pointer-events:none;background:linear-gradient(#e2b48a,#e2b48a) 0 10px/100% 1px no-repeat,repeating-linear-gradient(90deg,transparent 0 7px,rgba(226,180,138,.85) 7px 8px)}
@@ -1595,12 +1598,40 @@ function stopAmbient(){
 function femaleVoice(){
   if(!window.speechSynthesis) return null;
   const voices = speechSynthesis.getVoices() || [];
-  const named = /female|samantha|victoria|karen|moira|fiona|tessa|serena|zira|susan|veena|heera|sonia|catherine|allison|ava|nicky|libby/i;
-  const en = voices.filter(function(voice){ return /^en/i.test(voice.lang || ""); });
-  return en.find(function(voice){ return named.test((voice.name || "") + " " + (voice.voiceURI || "")); })
-    || voices.find(function(voice){ return named.test((voice.name || "") + " " + (voice.voiceURI || "")); })
-    || en.find(function(voice){ return /en-GB|en-IN|en-AU/i.test(voice.lang) && !/male/i.test(voice.name || ""); })
+  const soft = /samantha|karen|moira|fiona|tessa|serena|victoria|allison|ava|nicky|veena|heera|sonia|catherine|libby|susan|siri|google uk english female|female/i;
+  const male = /\bmale\b|alex|daniel|fred|rishi|aaron|arthur|gordon|oliver|ralph|reed|rocko|\btom\b|david|james|albert|bruce|junior|nathan|lee|ravi/i;
+  function label(voice){ return (voice.name || "") + " " + (voice.voiceURI || ""); }
+  const en = voices.filter(function(voice){ return /^en/i.test(voice.lang || "") && !male.test(label(voice)); });
+  return en.find(function(voice){ return soft.test(label(voice)); })
+    || voices.find(function(voice){ return soft.test(label(voice)) && !male.test(label(voice)); })
+    || en[0]
     || null;
+}
+if(window.speechSynthesis){
+  speechSynthesis.getVoices();
+  speechSynthesis.addEventListener("voiceschanged", function(){ speechSynthesis.getVoices(); });
+}
+function speakSoft(text){
+  if(!soundOn || !text || !window.speechSynthesis) return;
+  const line = document.getElementById("line");
+  if(line) line.pause();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 0.82;
+  utterance.pitch = 1.2;
+  utterance.volume = 0.88;
+  const go = function(){
+    const voice = femaleVoice();
+    if(voice){
+      utterance.voice = voice;
+      utterance.lang = voice.lang || "en-GB";
+    } else utterance.lang = "en-GB";
+    speechSynthesis.resume();
+    speechSynthesis.speak(utterance);
+  };
+  if(speechSynthesis.speaking || speechSynthesis.pending){
+    speechSynthesis.cancel();
+    setTimeout(go, 80);
+  } else go();
 }
 function stopSpoken(){
   if(window.speechSynthesis) speechSynthesis.cancel();
@@ -1734,7 +1765,7 @@ document.addEventListener("pointerdown", function(){
   if(document.body.classList.contains("icu-gate") && !gateSaid){
     gateSaid = true;
     if(soundOn) startWave();
-    if(!event.target.closest || !event.target.closest("#icu-enter")) speakMcq("Enter the ICU.");
+    if(!event.target.closest || !event.target.closest("#icu-enter")) speakSoft("Enter the ICU.");
     return;
   }
   if(!welcomed) playWelcome();
@@ -2098,7 +2129,7 @@ document.getElementById("icu-enter").onclick = function(){
   document.body.classList.remove("icu-gate");
   document.body.classList.add("icu-open");
   if(soundOn) startWave();
-  speakMcq("Welcome to Critical Care Hub. The screen panel is interactive, or press the tabs.");
+  speakSoft("Welcome to Critical Care Hub. The screen panel is interactive, or press the tabs.");
 };
 if(location.search.indexOf("open=1") !== -1){
   document.getElementById("icu-enter").click();
@@ -2108,6 +2139,6 @@ if(!reduced) requestAnimationFrame(drawDust);
 <!-- pages-build 20261029a -->
 <script src="bed-bridge.js?v=20261029a"></script>
 <script src="icu-bay.js?v=20261030k"></script>
-<script type="module" src="hud-body.js?v=20261030k"></script>
+<script type="module" src="hud-body.js?v=20261030p"></script>
 </body>
 </html>

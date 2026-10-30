@@ -239,12 +239,12 @@ loader.load("models/anatomy/human-reference.glb", function(gltf){
       mat.side = THREE.FrontSide;
       if(part === "body"){
         mat.transparent = true;
-        mat.opacity = 0.38;
+        mat.opacity = 0.88;
         mat.depthWrite = false;
-        mat.roughness = 0.48;
-        mat.color.setHex(0xe7c2ae);
-        mat.emissive = new THREE.Color(0x5c3428);
-        mat.emissiveIntensity = 0.16;
+        mat.roughness = 0.42;
+        mat.color.setHex(0xf0cbb8);
+        mat.emissive = new THREE.Color(0x4a2c22);
+        mat.emissiveIntensity = 0.08;
       }else if(!SKIN[part]){
         const tint = ORGAN_COLOR[part];
         if(tint != null) mat.color.setHex(tint);
