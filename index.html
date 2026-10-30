@@ -1306,7 +1306,28 @@ function enter(id, spot){
   figure.classList.remove("sway");
   blip((spot.x||50)/100*2-1);
   if(window.zoomIntoAnatomy) window.zoomIntoAnatomy(id);
-  showRooms();
+  if(organ.plate && !reduced){
+    const layer = placeBrain(spot);
+    const plate = document.getElementById("plate");
+    layer.classList.remove("rise","leave");
+    const go = function(){
+      requestAnimationFrame(function(){ layer.classList.add("rise"); });
+      arm = setTimeout(function(){ layer.classList.add("leave"); }, 1750);
+      timer = setTimeout(showRooms, 2550);
+    };
+    plate.alt = organ.name;
+    plate.onload = null;
+    plate.onerror = function(){ plate.onload = null; plate.onerror = null; showRooms(); };
+    if(plate.getAttribute("src")===organ.plate && plate.complete && plate.naturalWidth){
+      go();
+    } else {
+      plate.onload = function(){ plate.onload = null; go(); };
+      plate.src = organ.plate;
+    }
+    return;
+  }
+  if(reduced) showRooms();
+  else timer = setTimeout(showRooms, 1900);
 }
 function leave(){
   clearTimeout(timer);
