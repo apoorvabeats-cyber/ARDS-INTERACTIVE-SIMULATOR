@@ -333,13 +333,7 @@
     bindModules(room);
     holdRoom(room);
   }
-  function loadBody(){
-    if(typeof window.startAnatomy === "function"){
-      window.startAnatomy();
-      return;
-    }
-    window.__bodyWanted = true;
-  }
+  function loadBody(){}
   function leaveForBody(){
     document.body.classList.remove("icu-gate", "icu-open", "in", "enter", "inside", "lab", "arena", "osce", "reference", "picking");
     const room = document.getElementById("room");
