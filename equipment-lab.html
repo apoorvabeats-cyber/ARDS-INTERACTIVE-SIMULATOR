@@ -62,29 +62,27 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 
-const CATS = [["airway","Airway"],["oxygen","Oxygen"],["access","Access"],["support","Support"]];
+const CATS = [["airway","Airway"],["oxygen","Oxygen"],["access","Access"],["gi","Gastrointestinal"],["support","Support"]];
 const ITEMS = [
   {id:"ett", cat:"airway", name:"Endotracheal tube", note:"Cuffed adult tube"},
-  {id:"lma", cat:"airway", name:"Laryngeal mask airway", note:"Second-generation supraglottic airway"},
-  {id:"bvm", cat:"airway", name:"Bag-valve mask", note:"Adult self-inflating resuscitator"},
-  {id:"dl", cat:"airway", name:"Direct laryngoscope", note:"Handle and Macintosh blade"},
-  {id:"vl", cat:"airway", name:"Video laryngoscope", note:"Screen, camera and two blades"},
-  {id:"hfnc", cat:"oxygen", name:"High-flow nasal cannula", note:"Heated humidified system"},
-  {id:"niv", cat:"oxygen", name:"NIV oronasal mask", note:"Vented and non-vented"},
-  {id:"venturi", cat:"oxygen", name:"Venturi mask", note:"Colour-coded jet adapters"},
-  {id:"cannula", cat:"oxygen", name:"Nasal cannula", note:"Low-flow prongs"},
-  {id:"simple", cat:"oxygen", name:"Simple face mask", note:"No reservoir"},
-  {id:"nrb", cat:"oxygen", name:"Non-rebreather mask", note:"Reservoir and one-way valves"},
+  {id:"lma", cat:"airway", name:"Laryngeal mask airway", note:"Supraglottic airway"},
+  {id:"bvm", cat:"airway", name:"Bag-valve mask", note:"Self-inflating resuscitator"},
+  {id:"dl", cat:"airway", name:"Direct laryngoscope", note:"Handle and blade"},
+  {id:"vl", cat:"airway", name:"Video laryngoscope", note:"Screen and blade"},
+  {id:"hfnc", cat:"oxygen", name:"High-flow nasal cannula", note:"Heated humidified oxygen"},
+  {id:"niv", cat:"oxygen", name:"NIV full-face mask", note:"CPAP or non-invasive ventilation"},
+  {id:"nrb", cat:"oxygen", name:"Non-rebreather mask", note:"Reservoir bag"},
+  {id:"omask", cat:"oxygen", name:"Oxygen mask", note:"Face mask"},
+  {id:"o2kit", cat:"oxygen", name:"Oxygen therapy kit", note:"Oxygen delivery set"},
+  {id:"o2tube", cat:"oxygen", name:"Oxygen tubing", note:"Flowmeter to the mask"},
   {id:"cvc", cat:"access", name:"Central venous catheter", note:"Triple lumen"},
-  {id:"art", cat:"access", name:"Arterial line", note:"Cannula and transducer"},
-  {id:"pac", cat:"access", name:"Pulmonary artery catheter", note:"Balloon, ports and thermistor"},
-  {id:"io", cat:"access", name:"Intraosseous set", note:"Driver, needle and stylet"},
-  {id:"dialysis", cat:"access", name:"Dialysis catheter", note:"Temporary double lumen"},
-  {id:"ng", cat:"access", name:"Nasogastric tube", note:"Tip, side holes and marks"},
-  {id:"chest", cat:"support", name:"Chest drainage system", note:"Three chambers"},
-  {id:"syringe", cat:"support", name:"Syringe pump", note:"Driver and syringe"},
-  {id:"infusion", cat:"support", name:"Infusion pump", note:"Volumetric channel"},
-  {id:"defib", cat:"support", name:"Defibrillator paddles and pads", note:"External electrodes"}
+  {id:"dialysis", cat:"access", name:"Dialysis catheter", note:"Access for renal replacement"},
+  {id:"needles", cat:"access", name:"Needles", note:"Vascular access needles"},
+  {id:"epidural", cat:"access", name:"Epidural catheter", note:"Epidural space"},
+  {id:"suction", cat:"access", name:"Suction catheter", note:"Clears the airway"},
+  {id:"sb", cat:"gi", name:"Sengstaken-Blakemore tube", note:"Balloon tamponade"},
+  {id:"chest", cat:"support", name:"Chest drainage system", note:"Underwater seal"},
+  {id:"defib", cat:"support", name:"Defibrillator", note:"Pads and setup"}
 ];
 
 const canvas = document.getElementById("view");
@@ -123,12 +121,25 @@ let currentId = "ett";
 let realModel = false;
 let modelToken = 0;
 const REAL = {
-  ett: {url:"assets/models/ETT.glb", label:"Endotracheal tube", text:"Cuffed adult tracheal tube. Inspect the shaft, cuff, and connector."},
-  lma: {url:"assets/models/LMA.glb", label:"Laryngeal mask airway", text:"Supraglottic airway. The mask sits over the larynx and the tube joins the breathing circuit."},
-  dl: {url:"assets/models/Laryngoscope.glb", label:"Laryngoscope", text:"Handle and blade used to lift the tongue and see the vocal cords."},
-  vl: {url:"assets/models/VL.glb", label:"Video laryngoscope", text:"Screen and blade. The camera shows the glottis without a direct line of sight."},
-  bvm: {url:"assets/models/BVM.glb", label:"Bag-valve mask", text:"Self-inflating bag, valve, and mask used to ventilate a patient."},
-  nrb: {url:"assets/models/NRBM.glb", label:"Non-rebreather mask", text:"Face mask with a reservoir bag, used to give a high concentration of oxygen."}
+  ett: {url:"assets/models/ETT.glb", label:"Endotracheal tube", text:"A cuffed tube placed through the vocal cords into the trachea, to protect the airway and ventilate the patient."},
+  lma: {url:"assets/models/LMA.glb", label:"Laryngeal mask airway", text:"A supraglottic airway. The mask sits over the larynx, and the tube joins the breathing circuit."},
+  bvm: {url:"assets/models/BVM.glb", label:"Bag-valve mask", text:"A self-inflating bag, a valve, and a mask, used to ventilate a patient by hand."},
+  dl: {url:"assets/models/Laryngoscope.glb", label:"Direct laryngoscope", text:"A handle and blade used to lift the tongue and see the vocal cords."},
+  vl: {url:"assets/models/VL.glb", label:"Video laryngoscope", text:"A blade with a camera and a screen, used to see the glottis without a direct line of sight."},
+  hfnc: {url:"assets/models/HFNC.glb", label:"High-flow nasal cannula", text:"Soft nasal prongs that deliver heated, humidified oxygen at a high flow."},
+  niv: {url:"assets/models/NIV.glb", label:"NIV full-face mask", text:"A mask that seals over the nose and mouth for CPAP or non-invasive ventilation."},
+  nrb: {url:"assets/models/NRBM.glb", label:"Non-rebreather mask", text:"A face mask with a reservoir bag, used to give a high concentration of oxygen."},
+  omask: {url:"assets/models/OMASK.glb", label:"Oxygen mask", text:"A mask over the nose and mouth that raises the oxygen the patient breathes."},
+  o2kit: {url:"assets/models/O2KIT.glb", label:"Oxygen therapy kit", text:"The set of pieces used to give controlled oxygen."},
+  o2tube: {url:"assets/models/O2TUBE.glb", label:"Oxygen tubing", text:"The tube that carries oxygen from the flowmeter to the mask or cannula."},
+  cvc: {url:"assets/models/CVC.glb", label:"Central venous catheter", text:"A triple-lumen catheter placed in a large vein for drugs, fluids, and central venous pressure."},
+  dialysis: {url:"assets/models/DIALYSIS.glb", label:"Dialysis catheter", text:"A wide double-lumen catheter used for renal replacement therapy."},
+  needles: {url:"assets/models/NEEDLES.glb", label:"Needles", text:"Needles used to enter a vessel. The gauge and length depend on the vessel and the task."},
+  epidural: {url:"assets/models/EPIDURAL.glb", label:"Epidural catheter", text:"A fine catheter left in the epidural space to give local anaesthetic."},
+  suction: {url:"assets/models/SUCTION.glb", label:"Suction catheter", text:"A catheter passed into the airway to clear secretions."},
+  sb: {url:"assets/models/SBTUBE.glb", label:"Sengstaken-Blakemore tube", text:"A tube with a gastric balloon and an oesophageal balloon, used to compress bleeding varices. Inflate the gastric balloon only after the position is confirmed."},
+  chest: {url:"assets/models/CHEST.glb", label:"Chest drainage system", text:"An underwater seal that drains air or fluid from the pleural space."},
+  defib: {url:"assets/models/DEFIB.glb", label:"Defibrillator", text:"Pads placed on the chest to read the rhythm and deliver a shock."}
 };
 let selected = null;
 let exploded = false;
@@ -896,6 +907,7 @@ function paintLists(keepCats){
       const buttons = ITEMS.filter(function(item){ return item.cat===cat[0]; }).map(function(item){
         return "<button type='button' data-id='"+item.id+"'"+(item.id===currentId?" class='on'":"")+">"+item.name+"<small>"+item.note+"</small></button>";
       }).join("");
+      if(!buttons) return "";
       return "<h2>"+cat[1]+"</h2>"+buttons;
     }).join("");
     cats.scrollLeft = scroll;
@@ -956,33 +968,59 @@ function zoom(k){
   if(len < controls.minDistance || len > controls.maxDistance) return;
   camera.position.copy(controls.target).add(offset);
 }
+function matsOf(mesh){
+  if(!mesh || !mesh.material) return [];
+  return Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+}
+function clearHighlight(mesh){
+  matsOf(mesh).forEach(function(m){
+    if(!m.emissive || !mesh.userData.hadEmissive) return;
+    m.emissive.copy(mesh.userData.baseEmissive);
+    m.emissiveIntensity = mesh.userData.baseIntensity;
+  });
+}
 function select(mesh){
-  if(selected && selected.material && selected.material.emissive){
-    if(!selected.userData.keep){
-      selected.material.emissive.setHex(0);
-      selected.material.emissiveIntensity = 0;
-    }
-  }
+  if(selected) clearHighlight(selected);
   selected = mesh;
-  if(mesh && mesh.material && mesh.material.emissive){
-    mesh.material.emissive.setHex(0xe2b48a);
-    mesh.material.emissiveIntensity = 0.65;
+  if(mesh){
+    matsOf(mesh).forEach(function(m){
+      if(!m.emissive) return;
+      if(!mesh.userData.hadEmissive){
+        mesh.userData.hadEmissive = true;
+        mesh.userData.baseEmissive = m.emissive.clone();
+        mesh.userData.baseIntensity = m.emissiveIntensity || 0;
+      }
+      m.emissive.setHex(0xe2b48a);
+      m.emissiveIntensity = 0.85;
+    });
     speak(mesh.userData.title+". "+mesh.userData.text);
   }
   paintLists(true);
 }
+function femaleVoice(){
+  const voices = window.speechSynthesis ? speechSynthesis.getVoices() || [] : [];
+  const en = voices.filter(function(v){ return /^en/i.test(v.lang || ""); });
+  const male = /rishi|daniel|alex|aaron|fred|arthur|gordon|david|tom|lee|ravi|veer|male|daniel|junior/i;
+  const female = /female|samantha|victoria|karen|moira|fiona|serena|zira|veena|allison|ava|susan|kate|nicky|martha|libby|amy|joanna|ivy|salli|kimberly|emma|alice|catherine|fiona|google uk english female/i;
+  return en.find(function(v){ return female.test((v.name||"")+" "+(v.voiceURI||"")) && !male.test(v.name||""); })
+    || en.find(function(v){ return !male.test((v.name||"")+" "+(v.voiceURI||"")) && /en-GB|en-IN|en-AU/i.test(v.lang||""); })
+    || null;
+}
 function speak(text){
   if(!window.speechSynthesis || !text) return;
   const say = function(){
-    speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    const voices = speechSynthesis.getVoices() || [];
-    const en = voices.filter(function(v){ return /^en/i.test(v.lang||""); });
-    const voice = en.find(function(v){ return /female|samantha|victoria|karen|moira|fiona|serena|zira|veena|allison|ava/i.test((v.name||"")+" "+(v.voiceURI||"")); }) || en[0] || null;
+    const voice = femaleVoice();
     u.lang = voice && voice.lang ? voice.lang : "en-GB";
-    u.rate = 0.94;
+    u.rate = 0.88;
+    u.pitch = 1.16;
+    u.volume = 1;
     if(voice) u.voice = voice;
-    setTimeout(function(){ speechSynthesis.speak(u); }, 60);
+    const go = function(){ speechSynthesis.resume(); speechSynthesis.speak(u); };
+    if(speechSynthesis.speaking || speechSynthesis.pending){
+      speechSynthesis.cancel();
+      setTimeout(go, 80);
+    } else go();
   };
   if(!speechSynthesis.getVoices().length){
     const once = function(){ speechSynthesis.removeEventListener("voiceschanged", once); say(); };
