@@ -27,15 +27,15 @@ try{
   throw err;
 }
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-renderer.setClearColor(0x000000, 0);
+renderer.setClearColor(0x163044, 1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.12;
+renderer.toneMappingExposure = 1.05;
 
 const scene = new THREE.Scene();
-scene.add(new THREE.AmbientLight(0xfff4ea, 0.55));
+scene.add(new THREE.AmbientLight(0xfff4ea, 0.38));
 const camera = new THREE.PerspectiveCamera(28, 1, 0.02, 40);
-scene.add(new THREE.HemisphereLight(0xfff1e6, 0x1a1612, 0.85));
+scene.add(new THREE.HemisphereLight(0xfff1e6, 0x163044, 0.72));
 const key = new THREE.DirectionalLight(0xfff6ee, 1.55);
 key.position.set(0.8, 2.4, 2.2);
 scene.add(key);
@@ -236,12 +236,12 @@ loader.load("models/anatomy/human-reference.glb", function(gltf){
       mat.side = THREE.FrontSide;
       if(part === "body"){
         mat.transparent = true;
-        mat.opacity = 0.94;
+        mat.opacity = 0.38;
         mat.depthWrite = false;
-        mat.roughness = 0.5;
-        mat.color.setHex(0xf3cbb6);
-        mat.emissive = new THREE.Color(0x2a1612);
-        mat.emissiveIntensity = 0.04;
+        mat.roughness = 0.48;
+        mat.color.setHex(0xe7c2ae);
+        mat.emissive = new THREE.Color(0x5c3428);
+        mat.emissiveIntensity = 0.16;
       }else if(!SKIN[part]){
         const tint = ORGAN_COLOR[part];
         if(tint != null) mat.color.setHex(tint);
