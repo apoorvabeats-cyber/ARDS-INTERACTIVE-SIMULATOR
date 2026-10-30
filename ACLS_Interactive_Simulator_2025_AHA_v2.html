@@ -346,6 +346,34 @@ let raf = 0;
 
 const app = document.getElementById("app");
 function cur() { return CASES.find((c) => c.id === caseId); }
+function speakWhy(text){
+  if(!text || !window.speechSynthesis) return;
+  const say = function(){
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const voices = speechSynthesis.getVoices() || [];
+    const named = /female|fiona|karen|susan|libby|serena|moira|samantha|veena/i;
+    const en = voices.filter(function(v){ return /^en/i.test(v.lang || ""); });
+    const voice = en.find(function(v){ return named.test(v.name || ""); }) || en.find(function(v){ return /en-GB|en-IN|en-AU/i.test(v.lang); }) || null;
+    u.lang = voice && voice.lang ? voice.lang : "en-GB";
+    u.rate = 0.92;
+    if(voice) u.voice = voice;
+    speechSynthesis.speak(u);
+  };
+  if(!speechSynthesis.getVoices().length){
+    const once = function(){ speechSynthesis.removeEventListener("voiceschanged", once); say(); };
+    speechSynthesis.addEventListener("voiceschanged", once);
+    speechSynthesis.getVoices();
+    return;
+  }
+  say();
+}
+function holdAnswer(line){
+  cancelAnimationFrame(raf);
+  const fb = document.getElementById("fb");
+  if(fb) fb.textContent = line;
+  speakWhy(line);
+}
 
 function draw() {
   cancelAnimationFrame(raf);
@@ -407,25 +435,34 @@ function play() {
       used = true;
       b.className = "on";
       fb.className = "fb good";
-      fb.textContent = o.why;
       if (o.rhythm) rhythm = o.rhythm;
       if (s.rhythm) rhythm = s.rhythm;
       if (s.pulse) pulse = s.pulse;
-      setTimeout(() => {
+      document.querySelectorAll("#opts button").forEach(function(btn){ btn.disabled = true; });
+      holdAnswer("Correct. " + o.why);
+      const next = document.createElement("button");
+      next.type = "button";
+      next.textContent = "Continue";
+      next.style.marginTop = "10px";
+      next.onclick = function(){
+        if(window.speechSynthesis) speechSynthesis.cancel();
         step++;
         used = false;
         if (step >= c.steps.length) { screen = "done"; draw(); }
         else draw();
-      }, 700);
+      };
+      fb.after(next);
     } else {
       s.missed = true;
       misses++;
       b.className = "bad";
+      b.disabled = true;
       fb.className = "fb bad";
-      fb.textContent = o.why;
+      holdAnswer("Incorrect. " + o.why);
     }
   };
   startWave();
+  speakWhy(s.q);
 }
 function done() {
   const c = cur();

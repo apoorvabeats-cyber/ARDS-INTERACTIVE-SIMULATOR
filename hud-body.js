@@ -12,6 +12,12 @@ const TO_ORGAN = {
   arteries: "vessels", veins: "vessels"
 };
 const SKIN = { body: 1, eyes: 1, irises: 1, pupils: 1 };
+const ORGAN_COLOR = {
+  brain: 0xd98480, spinal: 0xe4d09a, lungs: 0xf0a8b4, heart: 0xc43145,
+  liver: 0x8a3a2a, pancreas: 0xe2c15e, spleen: 0x7a3554, kidneys: 0xb24d40,
+  bowel: 0xe6aa7e, bladder: 0xe3d39a, stomach: 0xd48472,
+  arteries: 0xd22734, veins: 0x3a6cb5
+};
 
 let renderer;
 try{
@@ -24,13 +30,13 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 renderer.setClearColor(0x163044, 1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.45;
+renderer.toneMappingExposure = 1.05;
 
 const scene = new THREE.Scene();
-scene.add(new THREE.AmbientLight(0xfff6ee, 0.7));
+scene.add(new THREE.AmbientLight(0xfff4ea, 0.38));
 const camera = new THREE.PerspectiveCamera(28, 1, 0.02, 40);
-scene.add(new THREE.HemisphereLight(0xfff4ea, 0x1a3348, 1.15));
-const key = new THREE.DirectionalLight(0xfff7f0, 2.6);
+scene.add(new THREE.HemisphereLight(0xfff1e6, 0x163044, 0.72));
+const key = new THREE.DirectionalLight(0xfff6ee, 1.55);
 key.position.set(0.8, 2.4, 2.2);
 scene.add(key);
 const fill = new THREE.DirectionalLight(0x9ec4ea, 0.45);
@@ -221,16 +227,20 @@ loader.load("models/anatomy/human-reference.glb", function(gltf){
       mat.side = THREE.FrontSide;
       if(part === "body"){
         mat.transparent = true;
-        mat.opacity = 0.5;
+        mat.opacity = 0.38;
         mat.depthWrite = false;
-        mat.roughness = 0.42;
-        mat.color.setHex(0xf0cbb8);
-        mat.emissive = new THREE.Color(0x4a2c22);
-        mat.emissiveIntensity = 0.35;
+        mat.roughness = 0.48;
+        mat.color.setHex(0xe7c2ae);
+        mat.emissive = new THREE.Color(0x5c3428);
+        mat.emissiveIntensity = 0.16;
       }else if(!SKIN[part]){
+        const tint = ORGAN_COLOR[part];
+        if(tint != null) mat.color.setHex(tint);
+        mat.roughness = 0.48;
+        mat.metalness = 0.04;
         mat.emissive = mat.color.clone();
-        mat.emissiveIntensity = 0.28;
-        obj.userData.baseEmissive = 0.28;
+        mat.emissiveIntensity = 0.16;
+        obj.userData.baseEmissive = 0.16;
         organMeshes.push(obj);
         const organ = TO_ORGAN[part];
         if(organ){

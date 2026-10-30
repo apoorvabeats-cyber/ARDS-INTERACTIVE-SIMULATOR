@@ -361,8 +361,8 @@
     if(!hit || !live) return;
     unlock();
     const go = hit.getAttribute("data-go");
-    if(go === "cart") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261025c", "Crash cart");
-    else if(go === "defib") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261025c", "Defibrillator");
+    if(go === "cart") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261030b", "Crash cart");
+    else if(go === "defib") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261030b", "Defibrillator");
     else if(go === "vent") openModule("Ventilator_Waveform_Troubleshooting.html?v=20261025a", "Ventilator");
     else if(go === "monitor") openShock();
     else if(go === "dialysis") openDialysis();

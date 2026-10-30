@@ -605,12 +605,15 @@ function echoKind(){
 }
 
 const STILLS = {
-  plax:{src:"echo/plax.jpg",labels:[["RV",48,32],["IVS",44,42],["LV",38,52],["PW",28,66],["MV",54,58],["AV",64,48],["Ao",70,38],["LA",60,72],["DAo",52,78]]},
-  "psax-pap":{src:"echo/psax.jpg",labels:[["RV",48,24],["IVS",46,34],["LV",48,45],["AL",36,52],["PM",60,56]]},
-  a4c:{src:"echo/a4c.jpg",labels:[["Apex",50,16],["RV",32,44],["LV",64,44],["IVS",46,40],["TV",34,54],["MV",60,56],["RA",32,68],["LA",64,72],["IAS",48,64]]},
-  a2c:{src:"echo/a2c.jpg",labels:[["Apex",50,18],["Inf",30,44],["Ant",68,40],["LV",44,38],["MV",50,54],["LA",48,68]]},
-  sc4:{src:"echo/sub4.jpg",labels:[["Liver",48,20],["RV",38,36],["RA",62,40],["LV",34,54],["LA",62,64],["IVS",44,48],["IAS",54,46],["TV",48,42],["MV",46,58]]},
-  ivc:{src:"echo/ivc.jpg",labels:[["Liver",32,42],["HV",42,36],["IVC",50,52],["RA",60,24]]}
+  plax:{src:"echo/plax.jpg",labels:[["RV",48,32,18,28],["IVS",44,42,16,44],["LV",38,52,14,58],["PW",28,66,12,74],["MV",54,58,78,62],["AV",64,48,86,42],["Ao",70,38,88,24],["LA",60,72,84,78],["DAo",52,78,50,90]]},
+  "psax-pap":{src:"echo/psax.jpg",labels:[["RV",50,22,16,16],["IVS",48,34,16,34],["LV",50,48,84,40],["AL",36,52,12,56],["PM",60,56,86,64]]},
+  "psax-mv":{src:"echo/psax-mv.jpg",labels:[["RV",50,24,14,16],["Ant",50,36,50,10],["Sept",34,48,10,46],["Lat",68,50,90,46],["Inf",50,66,50,88],["MV",50,54,86,62]]},
+  "psax-av":{src:"echo/psax.jpg",labels:[["RVOT",50,22,16,14],["AV",50,46,84,40],["LA",50,68,50,86],["RA",30,48,10,52],["TV",36,40,14,36]]},
+  a4c:{src:"echo/a4c.jpg",labels:[["Apex",50,16,50,8],["RV",32,44,10,38],["LV",64,44,90,38],["IVS",46,40,50,28],["TV",34,54,12,56],["MV",60,56,88,58],["RA",32,68,10,74],["LA",64,72,90,76],["IAS",48,64,50,64]]},
+  a2c:{src:"echo/a2c.jpg",labels:[["Apex",50,18,50,8],["Inf",30,44,10,40],["Ant",68,40,90,36],["LV",44,38,14,28],["MV",50,54,86,54],["LA",48,68,50,86]]},
+  a3c:{src:"echo/a3c.jpg",labels:[["LV",42,38,12,32],["Sept",28,42,10,48],["MV",48,56,14,62],["LA",40,70,14,82],["AV",62,48,88,40],["Ao",74,34,90,22],["IL",56,64,88,72]]},
+  sc4:{src:"echo/sub4.jpg",labels:[["Liver",50,16,50,6],["RV",32,38,8,30],["RA",68,38,92,30],["TV",44,46,10,48],["MV",50,56,10,66],["IVS",48,48,50,28],["IAS",58,50,90,50],["LV",32,62,8,70],["LA",70,64,92,72]]},
+  ivc:{src:"echo/ivc.jpg",labels:[["Liver",32,42,12,42],["HV",42,36,42,18],["IVC",50,52,86,56],["RA",60,24,88,20]]}
 };
 const stillImg = {};
 Object.keys(STILLS).forEach(function(k){
@@ -630,14 +633,29 @@ function drawStill(ctx, w, h, img, labels){
   ctx.font = "600 13px Figtree, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
   labels.forEach(function(lb){
-    const x = ox + (lb[1] / 100) * dw;
-    const y = oy + (lb[2] / 100) * dh;
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "rgba(0,0,0,.88)";
-    ctx.strokeText(lb[0], x, y);
+    const ax = ox + (lb[1] / 100) * dw;
+    const ay = oy + (lb[2] / 100) * dh;
+    const lx = lb.length > 3 ? ox + (lb[3] / 100) * dw : ax;
+    const ly = lb.length > 4 ? oy + (lb[4] / 100) * dh : ay;
+    if(lb.length > 3){
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(lx, ly);
+      ctx.strokeStyle = "rgba(243,239,230,.85)";
+      ctx.lineWidth = 1.25;
+      ctx.stroke();
+      ctx.fillStyle = "#f3efe6";
+      ctx.beginPath();
+      ctx.arc(ax, ay, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(0,0,0,.92)";
+    ctx.strokeText(lb[0], lx, ly);
     ctx.fillStyle = "#f3efe6";
-    ctx.fillText(lb[0], x, y);
+    ctx.fillText(lb[0], lx, ly);
   });
 }
 function drawEcho(){
@@ -691,8 +709,61 @@ function drawEcho(){
     ctx.stroke();
   }
   if(kind==="psax"){
-    const r = R*0.34*(1-0.08*S);
-    cavity(cx, top+R*0.55, r*(0.9+0.15*(1-ant)), r*(0.9+0.15*(1-inf)), Math.min(ant, inf, lat, septal));
+    const cy = top+R*0.55;
+    const r = R*0.30*(1-0.06*S);
+    ctx.fillStyle = "rgba(168,168,168,.72)";
+    ctx.beginPath(); ctx.arc(cx, cy, r*1.42, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#050505";
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = "rgba(230,230,230,.85)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = "#080808";
+    ctx.beginPath(); ctx.ellipse(cx, cy-r*1.05, r*0.85, r*0.32, 0, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = "rgba(245,245,245,.95)";
+    ctx.lineWidth = 2.2;
+    if(state.view==="psax-av"){
+      ctx.beginPath(); ctx.arc(cx, cy, r*0.42, 0, Math.PI*2); ctx.stroke();
+      for(let i=0;i<3;i++){
+        const a = -Math.PI/2 + i*Math.PI*2/3;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx+Math.cos(a)*r*0.4, cy+Math.sin(a)*r*0.4);
+        ctx.stroke();
+      }
+    } else {
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, r*0.34, r*(0.16+0.18*(1-S)), 0.2, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx-r*0.34, cy);
+      ctx.lineTo(cx+r*0.34, cy);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#f3efe6";
+    ctx.font = "600 13px Figtree, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(state.view==="psax-av" ? "AV" : "MV", cx, cy-6);
+    ctx.fillText("RV", cx, cy-r*1.55);
+  } else if(kind==="a3c"){
+    const y = top + R*0.40;
+    cavity(cx-R*0.02, y, R*0.16, R*0.22, septal);
+    cavity(cx-R*0.02, y+R*0.28, R*0.14, R*0.12, 1);
+    ctx.strokeStyle = "rgba(245,245,245,.95)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx+R*0.08, y-R*0.02);
+    ctx.lineTo(cx+R*0.28, y-R*0.08);
+    ctx.moveTo(cx+R*0.08, y+R*0.08);
+    ctx.lineTo(cx+R*0.28, y+R*0.02);
+    ctx.stroke();
+    ctx.fillStyle = "#f3efe6";
+    ctx.font = "600 13px Figtree, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("LV", cx-R*0.02, y);
+    ctx.fillText("LA", cx-R*0.02, y+R*0.30);
+    ctx.fillText("Ao", cx+R*0.30, y-R*0.02);
+    ctx.fillText("MV", cx, y+R*0.16);
   } else if(kind==="ivc"){
     cavity(cx, top+R*0.48, R*0.08, R*0.28*(1-0.05*S), 1);
   } else {

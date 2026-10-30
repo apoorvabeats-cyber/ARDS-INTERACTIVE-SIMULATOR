@@ -42,8 +42,8 @@ h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:34px;letter-spac
 .fb{border-radius:12px;padding:12px;margin-top:8px;background:#10161c}
 .next{margin-top:12px;min-height:48px;border:0;border-radius:12px;padding:12px 16px;background:#7fd4e6;color:#071018;font-weight:650}
 .score{color:#8a8478;font-variant-numeric:tabular-nums}
-svg.ecg{display:block;background:#fff;max-width:none}
-.ecgwrap{overflow-x:auto;border-radius:12px;background:#fbf6f4;margin:8px 0;-webkit-overflow-scrolling:touch}
+svg.ecg{display:block;background:#fff;width:100%;height:auto;max-width:100%}
+.ecgwrap{overflow:hidden;border-radius:12px;background:#fbf6f4;margin:8px 0}
 .tablets{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .tablet{display:block;width:100%;text-align:left;border:0;border-radius:16px;padding:14px 16px;min-height:64px;background:#102028;box-shadow:inset 0 0 0 1px rgba(243,239,230,.18)}
 .tablet b{display:block;font-family:Fraunces,Georgia,serif;font-size:20px;font-weight:520;line-height:1.15}
@@ -517,7 +517,7 @@ function renderEcg(){
     "<p class='prompt'>"+esc(step.prompt)+"</p>"+
     step.options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
     "<p class='fb' id='fb' hidden></p><button class='next' id='next' hidden>Continue</button>"+
-    "<p class='fine'>One small square is 0.04 seconds. The block on the left is 1 millivolt. The paper is long. Swipe sideways. </p>";
+    "<p class='fine'>One small square is 0.04 seconds. The block on the left is 1 millivolt. At least two QRS complexes are on the paper.</p>";
   say(item.lead+". "+step.prompt);
   armClock(function(){ timeUp("ecg", step.answer, step.options[step.answer] + ". " + step.say, function(){ advanceEcg(false); }); });
   app.querySelectorAll(".choice").forEach(function(btn){
@@ -547,8 +547,11 @@ function advanceEcg(ok){
   renderEcg();
 }
 function ecgSvg(item){
+  const spec = item.draw || {};
+  const rate = spec.rate || 72;
+  const rr = 60 / Math.max(rate, 30);
   const sr = 250;
-  const seconds = 32;
+  const seconds = Math.min(7.2, Math.max(3.1, rr * 2 + 1.25));
   const n = sr * seconds;
   const y = new Float32Array(n);
   traceInto(y, sr, seconds, item.draw || {});
@@ -1060,6 +1063,7 @@ function renderFilm(id, stepName){
   const film = OSCE_STATIONS.films.find(function(item){ return item.id===id; });
   const step = shuffled(film[stepName]);
   app.innerHTML =
+    "<button type='button' class='backrow' id='radBack'>Radiology</button>"+
     "<p class='score'>"+esc(film.modLabel)+" · "+esc(scoreLine("film"))+"</p>"+
     "<p class='mod'>"+esc(film.modLabel)+"</p>"+
     "<div class='lightbox'><img src='"+esc(film.src)+"?v=20261028d' alt='"+esc(film.modLabel)+" for this station'></div>"+
@@ -1067,6 +1071,7 @@ function renderFilm(id, stepName){
     "<p class='prompt'>"+esc(step.prompt)+"</p>"+
     step.options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
     "<p class='fb' id='fb' hidden></p><button class='next' id='next' hidden>Continue</button>";
+  document.getElementById("radBack").onclick = function(){ stopClock(); renderFilmGroups(); };
   say(film.stem+" "+step.prompt);
   const filmLead = stepName==="finding" ? film.title+". " : "";
   armClock(function(){ timeUp("film", step.answer, step.options[step.answer] + ". " + filmLead + step.say, function(){ advanceFilm(id, stepName); }); });
