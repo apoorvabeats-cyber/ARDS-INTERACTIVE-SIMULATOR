@@ -342,9 +342,11 @@
     document.body.classList.remove("flat");
     quietLine();
     if(typeof window.keepScore === "function") window.keepScore();
+    const bubbles = document.getElementById("organ-bubbles");
+    if(bubbles){ bubbles.hidden = true; bubbles.innerHTML = ""; }
     const tabs = document.getElementById("rail-tabs");
-    if(tabs) tabs.hidden = true;
-    if(typeof window.showOrganTabs === "function") window.showOrganTabs();
+    if(tabs) tabs.hidden = false;
+    document.body.classList.remove("picking");
     if(typeof finishIntro === "function") finishIntro();
     if(typeof window.resetAtlas === "function") window.resetAtlas();
     const view = document.getElementById("view");
