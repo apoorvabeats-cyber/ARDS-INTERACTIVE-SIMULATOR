@@ -21,15 +21,16 @@ try{
   throw err;
 }
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-renderer.setClearColor(0x000000, 0);
+renderer.setClearColor(0x163044, 1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.45;
 
 const scene = new THREE.Scene();
+scene.add(new THREE.AmbientLight(0xfff6ee, 0.7));
 const camera = new THREE.PerspectiveCamera(28, 1, 0.02, 40);
-scene.add(new THREE.HemisphereLight(0xfff4ea, 0x0c1824, 0.85));
-const key = new THREE.DirectionalLight(0xfff7f0, 1.55);
+scene.add(new THREE.HemisphereLight(0xfff4ea, 0x1a3348, 1.15));
+const key = new THREE.DirectionalLight(0xfff7f0, 2.6);
 key.position.set(0.8, 2.4, 2.2);
 scene.add(key);
 const fill = new THREE.DirectionalLight(0x9ec4ea, 0.45);

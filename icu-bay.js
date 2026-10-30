@@ -330,7 +330,9 @@
   }
   function leaveForBody(){
     quietLine();
-    document.body.classList.remove("icu-open");
+    document.body.classList.remove("icu-open", "in", "enter", "inside", "lab", "arena", "osce", "reference", "picking");
+    const room = document.getElementById("room");
+    if(room) room.innerHTML = "";
     document.body.classList.add("body-only");
     if(typeof window.keepScore === "function") window.keepScore();
     const tabs = document.getElementById("rail-tabs");
