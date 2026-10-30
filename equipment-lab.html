@@ -1,0 +1,969 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101418">
+<title>ICU equipment lab</title>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+<style>
+:root{--bg:#101418;--fg:#f3efe6;--muted:#b7b1a4;--line:rgba(243,239,230,.16);--cool:#7fd4e6;--warm:#e2b48a}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:Figtree,ui-sans-serif,sans-serif;height:100%}
+button,a{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-appearance:none;appearance:none}
+button:focus-visible,a:focus-visible{outline:2px solid var(--warm);outline-offset:2px}
+header{display:flex;align-items:center;gap:10px;padding:10px 12px 0}
+header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:0;letter-spacing:-.03em}
+header a{text-decoration:none;min-height:44px;display:inline-flex;align-items:center;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:#102028}
+.lab{display:grid;grid-template-columns:minmax(180px,230px) minmax(0,1fr) minmax(190px,260px);grid-template-rows:minmax(0,1fr) auto;height:calc(100dvh - 58px);gap:8px;padding:8px}
+.col{overflow:auto;background:#0c1218;border:1px solid var(--line);border-radius:16px;padding:8px}
+.col h2{margin:8px 8px 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--warm);font-weight:650}
+.col button{display:block;width:100%;text-align:left;border:0;border-radius:12px;background:transparent;min-height:42px;padding:8px 10px;color:var(--fg)}
+.col button.on{background:#1a2430;box-shadow:inset 0 0 0 1px var(--warm)}
+.col button small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.stage{position:relative;min-width:0;background:radial-gradient(ellipse at 50% 42%, #1a242e 0%, #101418 68%);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.stage canvas{width:100%;height:100%;display:block;touch-action:none}
+.dock{grid-column:2;display:flex;gap:8px;overflow:auto;padding:0 2px 6px}
+.dock button{flex:none;min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#102028}
+.dock button.on{border-color:var(--warm);color:#fff8ee}
+#readout b{display:block;font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;letter-spacing:-.03em;margin:8px}
+#readout p{margin:0 8px 10px;line-height:1.4;color:#d9d3c8}
+.fine{margin:8px;color:var(--muted);font-size:12px;line-height:1.4}
+@media(max-width:800px){
+  .lab{grid-template-columns:1fr;grid-template-rows:auto minmax(48dvh,56dvh) auto auto;height:auto}
+  .cats{display:flex;gap:6px;overflow:auto;max-height:none}
+  .cats h2,.parts h2{flex:none}
+  .cats button,.parts button{flex:none;width:auto;white-space:nowrap}
+  .stage{height:52dvh}
+  .dock{grid-column:1}
+  .parts{max-height:24dvh}
+}
+</style>
+</head>
+<body>
+<header>
+  <a href="osce.html?mode=kit&v=20261030d">Instruments</a>
+  <h1>ICU equipment lab</h1>
+</header>
+<div class="lab">
+  <nav class="col cats" id="cats" aria-label="Instruments"></nav>
+  <div class="stage"><canvas id="view" aria-label="Rotatable 3D instrument. Drag to turn. Pinch to zoom. Tap a part."></canvas></div>
+  <aside class="col parts" id="parts" aria-label="Components"></aside>
+  <div class="dock" id="dock"></div>
+</div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+const CATS = [["airway","Airway"],["oxygen","Oxygen"],["access","Access"],["support","Support"]];
+const ITEMS = [
+  {id:"ett", cat:"airway", name:"Endotracheal tube", note:"Cuffed adult tube"},
+  {id:"lma", cat:"airway", name:"Laryngeal mask airway", note:"Second-generation supraglottic airway"},
+  {id:"bvm", cat:"airway", name:"Bag-valve mask", note:"Adult self-inflating resuscitator"},
+  {id:"dl", cat:"airway", name:"Direct laryngoscope", note:"Handle and Macintosh blade"},
+  {id:"vl", cat:"airway", name:"Video laryngoscope", note:"Screen, camera and two blades"},
+  {id:"hfnc", cat:"oxygen", name:"High-flow nasal cannula", note:"Heated humidified system"},
+  {id:"niv", cat:"oxygen", name:"NIV oronasal mask", note:"Vented and non-vented"},
+  {id:"venturi", cat:"oxygen", name:"Venturi mask", note:"Colour-coded jet adapters"},
+  {id:"cannula", cat:"oxygen", name:"Nasal cannula", note:"Low-flow prongs"},
+  {id:"simple", cat:"oxygen", name:"Simple face mask", note:"No reservoir"},
+  {id:"nrb", cat:"oxygen", name:"Non-rebreather mask", note:"Reservoir and one-way valves"},
+  {id:"cvc", cat:"access", name:"Central venous catheter", note:"Triple lumen"},
+  {id:"art", cat:"access", name:"Arterial line", note:"Cannula and transducer"},
+  {id:"pac", cat:"access", name:"Pulmonary artery catheter", note:"Balloon, ports and thermistor"},
+  {id:"io", cat:"access", name:"Intraosseous set", note:"Driver, needle and stylet"},
+  {id:"dialysis", cat:"access", name:"Dialysis catheter", note:"Temporary double lumen"},
+  {id:"ng", cat:"access", name:"Nasogastric tube", note:"Tip, side holes and marks"},
+  {id:"chest", cat:"support", name:"Chest drainage system", note:"Three chambers"},
+  {id:"syringe", cat:"support", name:"Syringe pump", note:"Driver and syringe"},
+  {id:"infusion", cat:"support", name:"Infusion pump", note:"Volumetric channel"},
+  {id:"defib", cat:"support", name:"Defibrillator paddles and pads", note:"External electrodes"}
+];
+
+const canvas = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:"high-performance"});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1, 1.75));
+renderer.setClearColor(0x101418, 1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xf7f1e6, 0x1b140f, 0.85));
+const key = new THREE.DirectionalLight(0xfff8ee, 2.4);
+key.position.set(4, 6, 5);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xb7e4f2, 1.1);
+rim.position.set(-5, 2, -4);
+scene.add(rim);
+const fill = new THREE.DirectionalLight(0xf3efe6, 0.45);
+fill.position.set(0, 2, -5);
+scene.add(fill);
+const camera = new THREE.PerspectiveCamera(35, 1, 0.02, 80);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.autoRotate = false;
+controls.autoRotateSpeed = 1.15;
+controls.minDistance = 0.45;
+controls.maxDistance = 14;
+const root = new THREE.Group();
+scene.add(root);
+const ray = new THREE.Raycaster();
+const parts = [];
+let currentId = "ett";
+let selected = null;
+let exploded = false;
+let turning = false;
+let cuffOn = true;
+let bladeOn = true;
+let vented = true;
+let reservoirOn = true;
+let flowOn = false;
+let bubbling = false;
+const flags = {cuff:true, blade:true, vented:true, reservoir:true, flow:false, bubble:false};
+
+function pvc(){ return new THREE.MeshPhysicalMaterial({color:0xd5e4ec, roughness:0.12, metalness:0, transmission:0.55, thickness:0.25, transparent:true, opacity:0.92, emissive:new THREE.Color(0)}); }
+function soft(hex){ return new THREE.MeshStandardMaterial({color:hex, roughness:0.62, metalness:0.02, emissive:new THREE.Color(0)}); }
+function hard(hex){ return new THREE.MeshStandardMaterial({color:hex, roughness:0.38, metalness:0.08, emissive:new THREE.Color(0)}); }
+function metal(hex){ return new THREE.MeshStandardMaterial({color:hex, roughness:0.28, metalness:0.82, emissive:new THREE.Color(0)}); }
+function glass(hex, op){ return new THREE.MeshPhysicalMaterial({color:hex, roughness:0.08, transmission:0.65, thickness:0.2, transparent:true, opacity:op||0.55, emissive:new THREE.Color(0)}); }
+function screenTex(lines){
+  const c = document.createElement("canvas");
+  c.width = 512; c.height = 320;
+  const g = c.getContext("2d");
+  g.fillStyle = "#071018";
+  g.fillRect(0,0,512,320);
+  g.strokeStyle = "#7fd4e6";
+  g.lineWidth = 3;
+  g.strokeRect(16,16,480,288);
+  g.fillStyle = "#d7f6fb";
+  g.font = "600 42px sans-serif";
+  lines.forEach(function(line, i){ g.fillText(line, 36, 78+i*52); });
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function V(x,y,z){ return new THREE.Vector3(x,y,z); }
+function hose(pts, r, mat, n){
+  return new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n||48, r, 12, false), mat);
+}
+function pointAt(pts, t){
+  return new THREE.CatmullRomCurve3(pts).getPointAt(Math.max(0, Math.min(1, t)));
+}
+function tangentAt(pts, t){
+  const c = new THREE.CatmullRomCurve3(pts);
+  return c.getTangentAt(Math.max(0.02, Math.min(0.98, t))).normalize();
+}
+function aim(mesh, dir, axis){
+  mesh.quaternion.setFromUnitVectors(axis || new THREE.Vector3(0,1,0), dir.clone().normalize());
+}
+function P(mesh, id, title, text, ex){
+  mesh.name = id;
+  mesh.userData.id = id;
+  mesh.userData.title = title;
+  mesh.userData.text = text;
+  mesh.userData.ex = ex || [0,0,0];
+  mesh.userData.home = mesh.position.clone();
+  mesh.userData.base = mesh.scale.clone();
+  parts.push(mesh);
+  root.add(mesh);
+  return mesh;
+}
+function cyl(rTop, rBot, h, mat){ return new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, 28), mat); }
+function box(w,h,d, mat){ return new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat); }
+function sph(r, mat){ return new THREE.Mesh(new THREE.SphereGeometry(r, 28, 18), mat); }
+function clearRoot(){
+  while(root.children.length){
+    const o = root.children.pop();
+    o.traverse(function(n){
+      if(n.geometry) n.geometry.dispose();
+      if(n.material){
+        const list = Array.isArray(n.material) ? n.material : [n.material];
+        list.forEach(function(m){ if(m.map) m.map.dispose(); m.dispose(); });
+      }
+    });
+  }
+  parts.length = 0;
+  selected = null;
+}
+
+function ettCurve(){
+  const pts = [];
+  for(let i=0;i<=16;i++){
+    const t = i/16;
+    pts.push(V(-1.45+t*2.9, Math.sin(t*1.05)*0.62-0.15, 0));
+  }
+  return pts;
+}
+function buildEtt(){
+  const pts = ettCurve();
+  P(hose(pts, 0.06, pvc(), 70), "shaft", "Tube", "Transparent curved shaft of an adult cuffed tracheal tube. Size is the internal diameter. The radiopaque line and the depth marks travel with the shaft.", [0,0.15,0]);
+  const line = pts.map(function(p){ return p.clone().add(new THREE.Vector3(0,0,0.045)); });
+  P(hose(line, 0.012, hard(0x243038), 70), "radio", "Radiopaque line", "A dense line in the wall. On a chest film it shows the course of the tube so the tip can be seen above the carina.", [0,0.15,0.12]);
+  for(let i=1;i<=5;i++){
+    const t = 0.18+i*0.1;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.068, 0.008, 8, 18), hard(0x1c2830));
+    ring.position.copy(pointAt(pts, t));
+    aim(ring, tangentAt(pts, t), new THREE.Vector3(0,0,1));
+    P(ring, "mark"+i, "Depth marking", "Centimetre marks along the tube. Read them at the teeth or the lip, then confirm position. A usual oral depth in adults is about 21 cm in women and 23 cm in men, and that is only a start.", [0,0.28,0]);
+  }
+  const tipP = pointAt(pts, 0.98);
+  const bevel = cyl(0.02, 0.06, 0.18, pvc());
+  bevel.position.copy(tipP);
+  aim(bevel, tangentAt(pts, 0.98));
+  P(bevel, "bevel", "Bevelled tip", "The distal opening is cut at an angle so it can pass the vocal cords and face down the trachea.", [0.25,0,0]);
+  const eye = sph(0.035, hard(0x152026));
+  eye.position.copy(pointAt(pts, 0.9)).add(new THREE.Vector3(0,0.07,0));
+  P(eye, "murphy", "Murphy eye", "A side hole just above the tip. Ventilation can continue if the bevel rests against the tracheal wall.", [0,0.25,0.1]);
+  const cuffT = 0.78;
+  const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.045, 16, 28), soft(0xf0d2c4));
+  cuff.position.copy(pointAt(pts, cuffT));
+  aim(cuff, tangentAt(pts, cuffT), new THREE.Vector3(0,0,1));
+  cuff.userData.role = "cuff";
+  P(cuff, "cuff", "Cuff", "A high-volume, low-pressure balloon that seals the trachea for ventilation and reduces gross aspiration. It does not fix the tube. Sealing pressure is usually kept near 20 to 30 cm of water.", [0,-0.05,0.2]);
+  const cuffPos = pointAt(pts, cuffT);
+  const pilotPts = [cuffPos.clone().add(new THREE.Vector3(0,0.08,0.05)), cuffPos.clone().add(new THREE.Vector3(0.15,0.35,0.35)), V(0.55,0.85,0.55)];
+  P(hose(pilotPts, 0.012, soft(0xf0d2c4), 24), "line", "Inflation line", "The fine tube from the cuff to the pilot balloon. Do not cut it.", [0.1,0.15,0.15]);
+  const balloon = sph(0.09, soft(0xf3c9b4));
+  balloon.position.set(0.55,0.98,0.55);
+  balloon.userData.role = "cuff";
+  P(balloon, "pilot", "Pilot balloon", "The small balloon outside the patient. If it is flat, the cuff is empty. It does not, by itself, tell you the pressure on the tracheal wall.", [0.15,0.2,0.2]);
+  const valve = cyl(0.03, 0.03, 0.08, hard(0x2a6f86));
+  valve.position.set(0.55,1.12,0.55);
+  P(valve, "valve", "One-way valve", "Air goes in and stays until a syringe or a cuff manometer opens the valve. Measure cuff pressure. Do not keep inflating until the pilot feels hard.", [0.15,0.28,0.2]);
+  const conn = cyl(0.09, 0.075, 0.22, hard(0xd7dee6));
+  conn.position.copy(pointAt(pts, 0.02)).add(new THREE.Vector3(-0.12,0.02,0));
+  aim(conn, tangentAt(pts, 0.04));
+  P(conn, "conn", "15 mm connector", "The standard connector. It fits a catheter mount, a bag-valve mask, or the ventilator circuit. Do not jam a smaller tube inside it.", [-0.28,0.1,0]);
+}
+function buildLma(){
+  const pts = [V(-0.2,1.1,0), V(-0.15,0.4,0), V(0, -0.15, 0.05)];
+  P(hose(pts, 0.11, pvc(), 28), "airway", "Airway tube", "The tube from the connector down to the mask bowl. Ventilation passes through it, not through the gastric channel.", [-0.2,0.2,0]);
+  const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.42, 32, 20, 0, Math.PI*2, 0, Math.PI*0.62), soft(0xf0cbb8));
+  bowl.position.set(0.15,-0.55,0);
+  bowl.rotation.x = 0.5;
+  bowl.userData.role = "cuff";
+  P(bowl, "cuff", "Cuff", "The inflatable rim that sits over the laryngeal inlet. Inflated and deflated are both teaching states. A second-generation device still needs a seal, a bite block, and confirmation of ventilation.", [0.15,-0.15,0.25]);
+  const hole = sph(0.12, hard(0x1a242c));
+  hole.position.set(0.05,-0.42,0.12);
+  P(hole, "aperture", "Mask aperture", "The opening that faces the glottis. Bars or a reinforced inlet keep the epiglottis from blocking it. If you cannot ventilate, remove it and use a different airway.", [0,0.2,0.2]);
+  const gastric = hose([V(0.35,-0.7,0.05), V(0.55,-0.1,0.15), V(0.7,0.9,0.2)], 0.045, pvc(), 32);
+  P(gastric, "gastric", "Gastric channel", "A separate tube that opens at the tip of the bowl, for a gastric tube. It is not a ventilation lumen and it does not make aspiration impossible.", [0.35,0,0.15]);
+  const pilot = sph(0.08, soft(0xf3c9b4));
+  pilot.position.set(-0.55,0.7,0.3);
+  pilot.userData.role = "cuff";
+  P(pilot, "pilot", "Pilot balloon", "Shows that the cuff has been inflated. Follow the volume printed on the device. More air is not a better seal.", [-0.15,0.15,0.2]);
+  P(hose([V(-0.15,-0.2,0.15), V(-0.4,0.3,0.28), V(-0.55,0.6,0.3)], 0.014, soft(0xf0d2c4), 16), "iline", "Inflation line", "Carries air to the cuff. Keep it outside the teeth.", [-0.1,0.1,0.15]);
+  const conn = cyl(0.12, 0.1, 0.2, hard(0xe6edf2));
+  conn.position.set(-0.2,1.28,0);
+  P(conn, "conn", "Connector", "15 mm connector for the breathing circuit. Cap the gastric port when a gastric tube is not in place, as the manufacturer shows.", [-0.15,0.25,0]);
+}
+function buildBvm(){
+  const bag = sph(0.55, soft(0x2f6f4e));
+  bag.scale.set(0.85,1,0.7);
+  bag.position.set(-0.15,0,0);
+  P(bag, "bag", "Self-inflating bag", "The bag refills from air, or from oxygen if a reservoir is attached. Squeezing it is the breath. A self-inflating bag works without a gas supply. Watch the chest, not the bag.", [0,0.15,0]);
+  const valve = cyl(0.16, 0.16, 0.28, hard(0xf3efe6));
+  valve.rotation.z = Math.PI/2;
+  valve.position.set(0.85,0.05,0);
+  P(valve, "valve", "Non-rebreathing valve", "Directs the squeeze to the patient and exhaled gas away from the bag. If it is assembled backwards, the bag will not ventilate.", [0.2,0.1,0]);
+  const mask = new THREE.Mesh(new THREE.SphereGeometry(0.38, 28, 18, 0, Math.PI*2, 0, Math.PI*0.55), pvc());
+  mask.position.set(1.45,0.05,0);
+  mask.rotation.z = -Math.PI/2;
+  P(mask, "mask", "Face mask", "Clear mask over the nose and mouth. A seal needs a jaw thrust and the right size. Two hands on the mask are often better than one.", [0.35,0,0]);
+  const inlet = cyl(0.05, 0.05, 0.16, hard(0x2a6f86));
+  inlet.position.set(-0.15,-0.15,0.45);
+  inlet.rotation.x = Math.PI/2;
+  P(inlet, "inlet", "Oxygen inlet", "A nipple for oxygen tubing. Oxygen alone does not fill a self-inflating bag unless the reservoir and the flow are connected.", [0,-0.1,0.25]);
+  const res = sph(0.42, soft(0xd7e6c8));
+  res.scale.set(0.7,1.1,0.7);
+  res.position.set(-1.15,0.15,0);
+  res.userData.role = "reservoir";
+  P(res, "reservoir", "Oxygen reservoir", "A bag on the inlet side. With a reservoir and enough oxygen flow, the inspired oxygen is much higher than with the inlet alone.", [-0.35,0.1,0]);
+  P(hose([V(-0.75,0.05,0), V(-0.95,0.1,0)], 0.06, pvc(), 8), "rtube", "Reservoir tubing", "Joins the reservoir to the bag inlet. Keep it unkinked.", [-0.15,0.15,0]);
+  const relief = cyl(0.06, 0.04, 0.1, hard(0xc45b4a));
+  relief.position.set(0.15,0.55,0);
+  P(relief, "relief", "Pressure relief valve", "Opens if the squeeze pressure is high, on bags that have one. It can also leak the breath. Know whether this bag has one before you rely on it.", [0,0.25,0]);
+  const arrow = cyl(0.0, 0.08, 0.16, hard(0xe2b48a));
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.16, 12), hard(0xe2b48a));
+  cone.position.set(1.15,0.42,0);
+  cone.rotation.z = -Math.PI/2;
+  cone.userData.role = "flow";
+  P(cone, "flow", "Airflow", "Teaching arrow only. The squeeze goes to the patient. Exhaled gas leaves at the valve and is not meant to return to the bag.", [0.2,0.35,0]);
+  arrow.visible = false;
+}
+function buildDl(){
+  const handle = cyl(0.16, 0.16, 1.35, hard(0x2c343c));
+  handle.position.set(-0.35,0.1,0);
+  P(handle, "handle", "Handle", "The barrel that holds the batteries and locks the blade. A knurled finish is for the hand, not a measuring scale.", [-0.25,0,0]);
+  const cap = cyl(0.17, 0.17, 0.12, metal(0xb7b1a4));
+  cap.position.set(-0.35,-0.64,0);
+  P(cap, "battery", "Battery compartment", "The base unscrews. If the light is dim, the cells are the first check, then the contacts.", [-0.2,-0.25,0]);
+  const hook = box(0.22, 0.16, 0.16, metal(0xd9dee4));
+  hook.position.set(-0.35,0.82,0);
+  P(hook, "lock", "Locking bar", "The blade hooks onto this bar and clicks into the working position. A loose blade flickers the light and rocks on the teeth.", [0,0.28,0]);
+  const contact = sph(0.045, metal(0xe2b48a));
+  contact.position.set(-0.18,0.78,0.02);
+  P(contact, "contact", "Electrical contact", "A small metal point. It meets the blade contact only when the blade is locked open, which turns the lamp on.", [0.12,0.2,0.12]);
+  const bladePts = [V(-0.05,0.75,0), V(0.55,0.55,0), V(1.15,0.15,0), V(1.45,-0.15,0)];
+  const blade = hose(bladePts, 0.07, metal(0xd5dbe2), 28);
+  blade.userData.role = "blade";
+  P(blade, "blade", "Macintosh blade", "A curved blade. The tip sits in the vallecula and lifts the epiglottis indirectly. It is not a Miller straight blade.", [0.35,0.05,0]);
+  const lamp = sph(0.05, hard(0xfff4d2));
+  lamp.material.emissive.setHex(0xf0d48a);
+  lamp.material.emissiveIntensity = 0.35;
+  lamp.position.set(1.28,-0.02,0.08);
+  lamp.userData.role = "blade";
+  lamp.userData.keep = true;
+  P(lamp, "light", "Light", "The lamp near the tip. A dim light is a failed laryngoscope, not a difficult airway.", [0.25,0.12,0.12]);
+}
+function buildVl(){
+  const handle = box(0.38, 1.15, 0.28, hard(0x20282e));
+  handle.position.set(-0.2,0,0);
+  P(handle, "handle", "Handle", "Held in the left hand in the usual laryngoscopy grip. The screen may be on the handle or on a separate arm.", [-0.3,0,0]);
+  const screen = box(0.7, 0.48, 0.06, hard(0x101418));
+  screen.material = new THREE.MeshStandardMaterial({map:screenTex(["VIDEO","glottic view"]), roughness:0.4, metalness:0.1, emissive:new THREE.Color(0)});
+  screen.position.set(0.15,0.85,0);
+  P(screen, "screen", "Display", "Shows the camera view. Look at the screen once the blade is in, not only down the mouth. A fogged camera is a failed view.", [0,0.35,0]);
+  const mac = hose([V(0.05,0.45,0.15), V(0.7,0.25,0.15), V(1.25,-0.15,0.15)], 0.06, metal(0xd5dbe2), 24);
+  mac.userData.role = "blade";
+  P(mac, "mac", "Macintosh blade", "A curved video blade. The camera looks along it. Hyperangulated blades are a different shape and need a different path.", [0.3,0,0.15]);
+  const hyper = hose([V(0.05,0.4,-0.28), V(0.45,0.15,-0.28), V(0.7,-0.35,-0.28)], 0.055, metal(0xc5ced6), 20);
+  hyper.userData.role = "hyper";
+  P(hyper, "hyper", "Hyperangulated blade", "A sharper curve. It can see around the tongue, but the tube will not follow your eye. A stylet shaped to the blade is usual.", [0.15,-0.15,-0.25]);
+  const cam = sph(0.045, hard(0x11181c));
+  cam.position.set(1.05,-0.02,0.2);
+  cam.userData.role = "blade";
+  P(cam, "camera", "Camera", "Sits on the distal blade, not at the handle. Blood or mist on this lens is why the screen goes red or white.", [0.2,0.1,0.15]);
+  const led = sph(0.03, hard(0xfff6d8));
+  led.material.emissive.setHex(0xf0e2a8);
+  led.material.emissiveIntensity = 0.5;
+  led.position.set(1.12,0.02,0.16);
+  led.userData.role = "blade";
+  led.userData.keep = true;
+  P(led, "led", "LED", "The light beside the camera. It is not a diagnostic lamp and it can heat the blade if left on the skin.", [0.18,0.16,0.12]);
+  const port = cyl(0.04, 0.04, 0.08, metal(0xb7b1a4));
+  port.rotation.x = Math.PI/2;
+  port.position.set(-0.2,-0.62,0);
+  P(port, "charge", "Charging port", "On the handle of many units. A dead battery in a resuscitation is an equipment failure, so check it before the shift.", [0,-0.25,0]);
+}
+function buildHfnc(){
+  const base = box(0.7, 0.55, 0.5, hard(0xe6e1d6));
+  base.position.set(-1.15,-0.35,0);
+  P(base, "humidifier", "Heated humidifier", "Warms and wets the gas. High flow without heat dries the airway and is poorly tolerated.", [-0.35,0,0]);
+  const pot = cyl(0.18, 0.18, 0.32, glass(0xd7eef6, 0.45));
+  pot.position.set(-1.15,-0.05,0);
+  P(pot, "chamber", "Water chamber", "The water reservoir on the humidifier. If it runs dry, the heat continues and the gas is no longer humidified. Use sterile water, not saline.", [-0.1,0.25,0]);
+  P(hose([V(-0.7,-0.05,0), V(0.1,0.15,0), V(0.9,0.05,0)], 0.07, soft(0xf0d8c8), 28), "circuit", "Heated circuit", "A wide heated limb from the chamber to the patient. Rainout in the tube means the temperature gradient is wrong, and water must not be tipped into the airway.", [0,0.2,0]);
+  const sensor = box(0.12, 0.08, 0.08, hard(0x2a6f86));
+  sensor.position.set(0.55,0.16,0.08);
+  P(sensor, "sensor", "Temperature probe", "Senses gas temperature near the patient end. The set temperature is not the same number as the flow.", [0.1,0.2,0.12]);
+  const blender = box(0.45, 0.7, 0.35, hard(0x314048));
+  blender.position.set(-1.2,0.7,0);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.32,0.22), new THREE.MeshStandardMaterial({map:screenTex(["FLOW","40 L"] ), roughness:0.45, emissive:new THREE.Color(0)}));
+  face.position.set(0,0.08,0.18);
+  blender.add(face);
+  P(blender, "blender", "Air–oxygen blender", "Mixes air and oxygen to a set fraction, then delivers a set flow. The fraction and the flow are two different controls.", [-0.2,0.25,0]);
+  const knob = cyl(0.08, 0.08, 0.06, hard(0xe2b48a));
+  knob.rotation.x = Math.PI/2;
+  knob.position.set(-1.2,0.35,0.2);
+  P(knob, "flow", "Flow control", "Adult high-flow treatment commonly uses flows well above a standard nasal cannula, often 30 to 60 litres a minute. The interface and the device, not a wall flowmeter alone, set that.", [0,-0.1,0.2]);
+  const prongs = hose([V(1.05,0.02,0.12), V(1.25,0.12,0.18), V(1.25,0.12,-0.18), V(1.05,0.02,-0.12)], 0.035, soft(0xf0d2c4), 20);
+  P(prongs, "prongs", "Nasal prongs", "Wide soft prongs that sit in the nostrils and must not fill them completely. A seal like a ventilator mask is not the aim. Leave a path for expiratory leak.", [0.3,0.12,0]);
+  P(hose([V(0.9,0.05,0), V(1.05,0.02,0)], 0.05, pvc(), 8), "join", "Connection tubing", "Joins the heated limb to the cannula. Do not replace it with narrow oxygen tubing.", [0.15,0.1,0]);
+}
+function buildNiv(){
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 20, 0, Math.PI*2, 0.2, 1.3), pvc());
+  shell.position.set(0,0,0);
+  P(shell, "shell", "Mask shell", "A clear oronasal shell over the nose and the mouth. The patient must be able to protect the airway. This is not a treatment for coma.", [0,0.15,0]);
+  const cushion = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.08, 12, 28), soft(0xf0cbb8));
+  cushion.position.set(0,0,0.05);
+  P(cushion, "cushion", "Silicone cushion", "The soft seal on the face. A leak at the bridge or the cheek is felt and heard. Tightening until the skin blanches causes injury.", [0,-0.05,0.2]);
+  const bridge = box(0.18, 0.12, 0.28, soft(0xe7d3c4));
+  bridge.position.set(0,0.48,0.12);
+  P(bridge, "bridge", "Nasal bridge", "Where pressure sores start. A protective dressing and the right size matter more than another tug on the straps.", [0,0.25,0.1]);
+  const brow = box(0.28, 0.08, 0.12, hard(0xd7dee4));
+  brow.position.set(0,0.72,0.05);
+  P(brow, "brow", "Forehead support", "Rests on the forehead on many masks and takes some of the load off the bridge.", [0,0.28,0]);
+  [-0.55,0.55].forEach(function(x, i){
+    const strap = box(0.5, 0.06, 0.04, hard(0x2c343c));
+    strap.position.set(x*1.15, 0.15-i*0.1, -0.05);
+    strap.rotation.z = x>0 ? -0.4 : 0.4;
+    P(strap, "strap"+i, "Headgear strap", "Holds the mask. Two fingers should slide under a strap. If the patient is vomiting or deteriorating, take the mask off and support the airway another way.", [x*0.2,0,0]);
+  });
+  const port = cyl(0.08, 0.08, 0.12, hard(0xc45b4a));
+  port.position.set(0.42,0.15,0.25);
+  port.userData.role = "vent";
+  P(port, "exhale", "Exhalation port", "On a vented mask, exhaled gas leaves here. A non-vented mask has no such port and needs an exhalation valve in the circuit. Mixing them up rebreaths carbon dioxide.", [0.25,0.1,0.15]);
+  const elbow = cyl(0.1, 0.1, 0.28, pvc());
+  elbow.rotation.x = 1.1;
+  elbow.position.set(0,-0.15,0.4);
+  P(elbow, "elbow", "Circuit connector", "Where the ventilator tubing joins. Support the tube so it does not drag the mask off the face.", [0,-0.15,0.25]);
+  const anti = sph(0.06, hard(0xe2b48a));
+  anti.position.set(-0.35,-0.2,0.28);
+  P(anti, "anti", "Anti-asphyxia valve", "Opens to room air if the ventilator fails, on masks that have one. Do not tape over it. Confirm it is the valve your circuit expects.", [-0.15,-0.1,0.15]);
+}
+function buildVenturi(){
+  const mask = new THREE.Mesh(new THREE.SphereGeometry(0.5, 28, 18, 0, Math.PI*2, 0.15, 1.25), pvc());
+  P(mask, "mask", "Face mask", "Sits over the nose and mouth. The oxygen fraction is set by the jet adapter, not by how tightly the mask is held.", [0,0.1,0]);
+  const strap = box(1.3, 0.05, 0.03, hard(0x2c343c));
+  strap.position.set(0,0.15,-0.15);
+  P(strap, "strap", "Elastic strap", "Holds the mask. A seal is less critical than with a non-rebreather, because room air is meant to be entrained.", [0,0.2,-0.1]);
+  P(hose([V(0,-0.35,0.2), V(0,-0.7,0.45)], 0.045, soft(0xf0d2c4), 10), "tube", "Oxygen tubing", "From the flowmeter to the jet. The flow printed on the adapter is the oxygen flow, not the total flow the patient inspires.", [0,-0.25,0.15]);
+  const barrel = cyl(0.1, 0.14, 0.28, pvc());
+  barrel.position.set(0,-0.28,0.25);
+  barrel.rotation.x = 0.6;
+  P(barrel, "barrel", "Venturi barrel", "Oxygen jets through a narrow orifice and drags room air in through the ports. Blocking those ports with a hand or a sheet raises the oxygen fraction and drops the total flow.", [0,-0.1,0.2]);
+  const colors = [[0x2a6fbf,"Blue 24%"],[0xf3efe6,"White 28%"],[0xe07a3a,"Orange 31%"],[0xe2c15a,"Yellow 35%"],[0xc45b4a,"Red 40%"],[0x3d8a62,"Green 60%"]];
+  colors.forEach(function(row, i){
+    const jet = cyl(0.05, 0.07, 0.1, hard(row[0]));
+    jet.position.set(-0.7+i*0.28, -0.85, 0.15);
+    P(jet, "jet"+i, row[1]+" adapter", "A colour-coded jet. Read the percent and the litres printed on it. Colours are not the same from every maker. Do not choose by colour memory alone.", [0,-0.15,0.1]);
+  });
+  const hole = sph(0.04, hard(0x152026));
+  hole.position.set(0.12,-0.22,0.32);
+  P(hole, "port", "Entrainment port", "Room air enters here. If the patient breathes harder than the total flow, they pull extra room air from around the mask and the oxygen fraction falls.", [0.15,0.1,0.15]);
+}
+function buildCannula(){
+  const prongs = hose([V(0,0.15,0.12), V(0,0.32,0.12), V(0,0.32,-0.12), V(0,0.15,-0.12)], 0.03, soft(0xf0d2c4), 16);
+  P(prongs, "prongs", "Nasal prongs", "Two short prongs in the nostrils, curved down. They should not fill the nose. Flow is usually 1 to 4 litres, sometimes up to 6, and the nose dries above that.", [0,0.2,0]);
+  P(hose([V(-0.2,0,0), V(-0.8,-0.2,0), V(-1.3,-0.55,0)], 0.025, soft(0xf0d2c4), 20), "tubeL", "Tubing", "Runs behind the ears. A standard cannula is not a high-flow circuit and must not be attached to a heated high-flow driver.", [-0.3,0,0]);
+  P(hose([V(0.2,0,0), V(0.8,-0.2,0), V(1.2,-0.45,0)], 0.025, soft(0xf0d2c4), 18), "tubeR", "Tubing", "The other limb. Keep it off the neck so it does not choke.", [0.3,0,0]);
+  const slider = cyl(0.06, 0.06, 0.08, hard(0x2c343c));
+  slider.rotation.z = Math.PI/2;
+  slider.position.set(0,-0.55,0);
+  P(slider, "slider", "Slider", "A plastic ring that tightens the loop under the chin. It is a fit, not a tourniquet.", [0,-0.2,0]);
+  const loop = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.02, 8, 20, Math.PI), soft(0xf0d2c4));
+  loop.position.set(-1.05,0.15,0);
+  loop.rotation.y = Math.PI/2;
+  P(loop, "ear", "Ear loop", "Rests on the ear. Pressure here ulcerates. Pad it if the cannula will stay on.", [-0.2,0.15,0]);
+}
+function buildSimple(){
+  const mask = new THREE.Mesh(new THREE.SphereGeometry(0.55, 28, 18, 0, Math.PI*2, 0.2, 1.2), pvc());
+  P(mask, "body", "Mask body", "Covers the nose and mouth. Exhaled gas leaves through open side ports. There is no reservoir and no one-way valve, so this is not a non-rebreather.", [0,0.1,0]);
+  const inlet = cyl(0.06, 0.05, 0.16, soft(0xf0d2c4));
+  inlet.position.set(0,-0.42,0.15);
+  inlet.rotation.x = 0.4;
+  P(inlet, "inlet", "Oxygen inlet", "Connects to green or clear oxygen tubing and a flowmeter. Typical flows are about 5 to 10 litres so the mask is not rebreathing.", [0,-0.2,0.1]);
+  const strap = box(1.35, 0.05, 0.03, hard(0x2c343c));
+  strap.position.set(0,0.1,-0.2);
+  P(strap, "strap", "Elastic strap", "Around the head. The mask should sit, not dig.", [0,0.15,-0.15]);
+  [-0.42,0.42].forEach(function(x){
+    const hole = cyl(0.07, 0.07, 0.04, hard(0x1a242c));
+    hole.rotation.z = Math.PI/2;
+    hole.position.set(x, -0.05, 0.15);
+    P(hole, "port"+(x<0?"L":"R"), "Exhalation opening", "Open holes at the sides. Do not tape them. This mask cannot reliably give a very high oxygen fraction.", [x*0.15,0,0.1]);
+  });
+}
+function buildNrb(){
+  const mask = new THREE.Mesh(new THREE.SphereGeometry(0.52, 28, 18, 0, Math.PI*2, 0.2, 1.2), pvc());
+  mask.position.set(0.2,0.2,0);
+  P(mask, "mask", "Face mask", "Covers nose and mouth. For a high inspired oxygen in a patient who is still breathing. It is not a ventilator and it is not for a patient who has stopped breathing.", [0.1,0.15,0]);
+  const bag = sph(0.38, soft(0xd5e6c4));
+  bag.scale.set(0.8,1.15,0.75);
+  bag.position.set(-0.55,-0.15,0);
+  bag.userData.role = "reservoir";
+  P(bag, "bag", "Reservoir bag", "Must be inflated before the mask goes on the face. If it collapses completely each breath, the oxygen flow is too low or the seal is gone.", [-0.3,0,0]);
+  P(hose([V(-0.15,0.05,0.05), V(0.05,0.05,0.08)], 0.06, pvc(), 8), "neck", "Bag inlet", "Between the reservoir and the mask. A one-way valve here should let oxygen in and stop exhaled gas filling the bag.", [0,0.1,0.1]);
+  const flap = box(0.1, 0.08, 0.02, soft(0xf0d2c4));
+  flap.position.set(0.12,0.08,0.22);
+  P(flap, "valve", "One-way valve", "Between the bag and the mask. Inspiration opens it. Expiration should close it so the reservoir stays oxygen-rich.", [0.1,0.15,0.12]);
+  [-0.15,0.45].forEach(function(x, i){
+    const port = cyl(0.06, 0.06, 0.03, hard(0xc45b4a));
+    port.position.set(0.2+x*0.15, 0.05, 0.28);
+    P(port, "ex"+i, "Exhalation port", "Side ports with flaps so exhaled gas leaves and room air is not the main inspired gas. Many masks ask you to leave one port without a flap as a safety. Read that mask.", [0,0,0.15]);
+  });
+  const strap = box(1.2, 0.045, 0.03, hard(0x2c343c));
+  strap.position.set(0.2,0.35,-0.15);
+  P(strap, "strap", "Mask strap", "Holds the mask. A non-rebreather on a vomiting patient is removed.", [0,0.2,-0.1]);
+  P(hose([V(-0.85,-0.35,0), V(-1.3,-0.7,0)], 0.03, soft(0xf0d2c4), 10), "o2", "Oxygen tubing", "To the flowmeter. Flows of 10 to 15 litres are the usual teaching range so the bag stays up.", [-0.25,-0.15,0]);
+}
+function buildCvc(){
+  const shaft = cyl(0.045, 0.03, 1.7, pvc());
+  shaft.position.set(0.15,-0.35,0);
+  shaft.rotation.z = 0.15;
+  P(shaft, "shaft", "Catheter shaft", "The part that lies in the vein. A triple-lumen adult catheter is one shaft with three channels. The outside is not three separate tubes.", [0.15,0,0]);
+  [[0.02,0xc45b4a],[ -0.01,0x2a6fbf],[0,0xf3efe6]].forEach(function(row, i){
+    const lumen = cyl(0.012, 0.01, 1.45, hard(row[1]));
+    lumen.position.set(0.15+row[0], -0.28, (i-1)*0.015);
+    lumen.rotation.z = 0.15;
+    const names = ["Distal lumen","Middle lumen","Proximal lumen"];
+    const texts = [
+      "Opens at the tip. Often the largest channel, used for blood and for measuring central venous pressure. Colours differ by maker. Read the hub.",
+      "Opens a little back from the tip. A separate infusion channel. Do not assume a drug in one lumen mixes before the blood.",
+      "Opens furthest from the tip. Still inside the vein when the catheter is correctly placed. Not a peripheral cannula."
+    ];
+    P(lumen, "lum"+i, names[i], texts[i], [0.12*(i-1), 0.05, (i-1)*0.12]);
+  });
+  const tip = sph(0.04, pvc());
+  tip.position.set(0.28,-1.15,0);
+  P(tip, "tip", "Distal tip", "The end that should sit in the lower superior vena cava on a chest film, not in the right atrium as a routine. Confirm before a vasoactive infusion.", [0.2,-0.15,0]);
+  const wings = box(0.35, 0.06, 0.12, soft(0xf0d2c4));
+  wings.position.set(-0.15,0.55,0);
+  P(wings, "wings", "Suture wings", "Where the catheter is stitched to the skin. A stitch is not a sterile field. Dress it.", [0,0.2,0]);
+  [[-0.55,0x8a5a32,"Brown"],[-0.15,0x2a6fbf,"Blue"],[0.25,0xf3efe6,"White"]].forEach(function(row, i){
+    const ext = hose([V(-0.1,0.6,0), V(row[0],0.85,0), V(row[0],1.15,0)], 0.03, hard(row[1]), 12);
+    P(ext, "ext"+i, row[2]+" extension", "One lumen, one extension. Clamp it before you open the hub, or the vein can bleed and air can enter.", [0,0.15,0]);
+    const clamp = box(0.08, 0.05, 0.06, hard(0x2c343c));
+    clamp.position.set(row[0], 0.95, 0);
+    P(clamp, "clamp"+i, "Clamp", "Occludes that lumen. Leave a lumen clamped when it is not running, unless a monitoring line must stay open.", [0,0.12,0.08]);
+    const hub = cyl(0.04, 0.04, 0.1, hard(row[1]));
+    hub.position.set(row[0], 1.25, 0);
+    P(hub, "hub"+i, "Needle-free hub", "The cap you scrub and inject through. It is not sterile just because it has a cap. A central line infection is a bloodstream infection.", [0,0.18,0]);
+  });
+}
+function buildArt(){
+  const can = hose([V(1.1,-0.2,0), V(1.35,-0.05,0)], 0.03, pvc(), 8);
+  P(can, "cannula", "Arterial cannula", "A short cannula in an artery, usually the radial artery after a check that the hand can tolerate it. It is not a venous drip. Nothing but saline flush is injected.", [0.3,0,0]);
+  P(hose([V(0.2,0,0), V(0.7,-0.1,0), V(1.1,-0.2,0)], 0.035, hard(0xf3efe6), 16), "tubing", "Pressure tubing", "A stiff tube from the cannula to the transducer. A soft infusion set damps the wave and lies. Keep it short.", [0.1,0.1,0]);
+  const flush = cyl(0.07, 0.07, 0.16, hard(0x2a6f86));
+  flush.rotation.z = Math.PI/2;
+  flush.position.set(0.15,0.12,0);
+  P(flush, "flush", "Flush device", "A fast flush to clear the line. A continuous slow flush from the pressurised bag keeps the cannula patent. A fast flush is not a blood sample.", [0,0.2,0]);
+  const bag = box(0.45, 0.7, 0.18, glass(0xd7eef6, 0.4));
+  bag.position.set(-1.2,0.45,0);
+  P(bag, "bag", "Pressurised saline", "A bag of saline squeezed by a pressure cuff, usually to 300 mmHg, so flush runs toward the artery and blood does not run back.", [-0.3,0.1,0]);
+  const cuff = box(0.55, 0.8, 0.28, soft(0x2c343c));
+  cuff.position.set(-1.2,0.45,-0.02);
+  P(cuff, "pcuff", "Pressure cuff", "The sleeve around the saline bag. If the pressure falls, the line dams off and the trace goes flat.", [-0.25,0, -0.1]);
+  const trans = box(0.28, 0.18, 0.16, hard(0xe6e1d6));
+  trans.position.set(-0.25,0.05,0);
+  P(trans, "transducer", "Transducer", "Turns pressure into an electrical signal. It must be level with the right atrium, and zeroed to air, or the number is wrong by the height error.", [0,0.15,0.12]);
+  const stop = cyl(0.06, 0.06, 0.08, hard(0xc45b4a));
+  stop.position.set(-0.25,0.22,0.08);
+  P(stop, "stopcock", "Three-way stopcock", "Opens the transducer to air for zeroing, or to the patient for the trace. The wrong turn zeros the patient or opens the artery to air.", [0,0.2,0.1]);
+  const cable = hose([V(-0.25,-0.05,0), V(-0.25,-0.45,0), V(0.2,-0.7,0)], 0.025, hard(0x243038), 12);
+  P(cable, "cable", "Monitor cable", "From the transducer to the bedside monitor. The wave on the screen is this signal. A damped wave is often clot, air, or a lose connection, not a sudden change in blood pressure.", [0.1,-0.2,0]);
+}
+function buildPac(){
+  const pts = [];
+  for(let i=0;i<=14;i++){
+    const t=i/14;
+    pts.push(V(-1.2+t*2.6, Math.sin(t*0.9)*0.25, 0));
+  }
+  P(hose(pts, 0.045, hard(0xf3efe6), 40), "shaft", "Catheter body", "A long flotation catheter. It is advanced through a central vein, the right heart, and into a pulmonary artery. It is not a central line for ordinary infusions.", [0,0.15,0]);
+  const balloon = sph(0.12, soft(0xf0d2c4));
+  balloon.position.copy(pointAt(pts, 0.98));
+  balloon.userData.role = "cuff";
+  P(balloon, "balloon", "Distal balloon", "Inflated only while floating the catheter forward, then deflated. A balloon left up in a pulmonary artery can infarct the lung downstream.", [0.25,0.05,0]);
+  const therm = box(0.08, 0.04, 0.04, metal(0xb7b1a4));
+  therm.position.copy(pointAt(pts, 0.82));
+  P(therm, "therm", "Thermistor", "A temperature sensor a few centimetres back from the tip. Cold injectate upstream lets it compute cardiac output. It is not a core-temperature probe you can trust for every decision.", [0,0.2,0.1]);
+  for(let i=2;i<=5;i++){
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.006, 6, 14), hard(0x1c2830));
+    ring.position.copy(pointAt(pts, i/8));
+    aim(ring, tangentAt(pts, i/8), new THREE.Vector3(0,0,1));
+    P(ring, "mk"+i, "Length marking", "Marks distance from the tip, often every 10 cm. Knowing the depth tells you whether the tip should still be in the right ventricle or already in the pulmonary artery.", [0,0.18,0]);
+  }
+  const ports = [[-1.15,0.55,0xc45b4a,"Distal port"],[-0.75,0.7,0x2a6fbf,"Proximal port"],[-0.35,0.55,0xe2b48a,"Inflation lumen"],[0.05,0.7,0x3d8a62,"Injectate port"]];
+  const texts = [
+    "Opens at the tip. When the balloon is down and the tip is in a pulmonary artery, this transduces pulmonary artery pressure. Wedged, with the balloon up, it estimates left atrial pressure, and the balloon then comes straight down.",
+    "Opens in the right atrium when the catheter is in a usual position. Used for the injectate and for a right atrial pressure. Not a free infusion lumen for every drug.",
+    "The lock for the balloon syringe. Only the syringe supplied, and only the volume printed. Do not use a large air-filled syringe.",
+    "The port through which a known volume of cold saline is injected for a thermodilution output. The timing and the volume are the measurement."
+  ];
+  ports.forEach(function(row, i){
+    const hub = cyl(0.05, 0.05, 0.16, hard(row[2]));
+    hub.position.set(row[0], row[1], 0);
+    P(hub, "port"+i, row[3], texts[i], [0,0.2,0]);
+  });
+}
+function buildIo(){
+  const driver = box(0.38, 1.1, 0.28, hard(0x2c343c));
+  driver.position.set(-0.7,0.1,0);
+  P(driver, "driver", "Powered driver", "A drill-shaped driver. It spins the needle set into the bone. It is not a biopsy drill and it does not choose the site. The proximal tibia and the proximal humerus are the usual adult sites.", [-0.3,0,0]);
+  const needle = cyl(0.03, 0.015, 0.7, metal(0xd5dbe2));
+  needle.position.set(0.25,-0.15,0);
+  P(needle, "needle", "IO needle", "A hollow needle that stays in the marrow when the stylet is removed. Flush it. An infusion that does not flow, or swelling of the soft tissue, means it is not in the marrow.", [0.2,0,0]);
+  const stylet = cyl(0.012, 0.008, 0.78, metal(0xb7b1a4));
+  stylet.position.set(0.25,-0.12,0.05);
+  stylet.userData.role = "blade";
+  P(stylet, "stylet", "Stylet", "Fills the needle during insertion so bone does not core it. It comes out before you infuse. Do not infuse with the stylet still in.", [0.15,0.1,0.12]);
+  const hub = cyl(0.08, 0.08, 0.12, hard(0xe2b48a));
+  hub.position.set(0.25,0.28,0);
+  P(hub, "hub", "Hub", "Where the extension set connects after the stylet is removed. Secure it. A needle that stands proud will be knocked out.", [0,0.22,0]);
+  const stab = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.03, 8, 18), soft(0xf0d2c4));
+  stab.position.set(0.25,-0.42,0);
+  stab.rotation.x = Math.PI/2;
+  P(stab, "stab", "Stabilizer", "A dressing that holds the hub against the skin. The needle is in the bone, but the hub still needs this or it levers out.", [0,-0.15,0.12]);
+  P(hose([V(0.25,0.36,0), V(0.7,0.55,0), V(1.1,0.4,0)], 0.03, pvc(), 12), "ext", "Extension tubing", "A short primed line. Marrow infusions hurt. Flush, then run fluid or drugs as you would a desperate intravenous line. Confirm placement first.", [0.25,0.15,0]);
+  const tip = cyl(0.02, 0.004, 0.12, metal(0xe6edf2));
+  tip.position.set(0.25,-0.52,0);
+  P(tip, "tipt", "Needle tip", "The cutting tip that crosses the cortex. A close look shows why it must be aimed away from the joint and the growth plate in a child.", [0.1,-0.2,0]);
+}
+function buildDialysis(){
+  const shaft = cyl(0.05, 0.035, 1.5, pvc());
+  shaft.position.set(0.2,-0.2,0);
+  P(shaft, "shaft", "Catheter shaft", "A temporary double-lumen dialysis catheter. Both lumens are large, because blood must flow to the machine and back. This is not a triple-lumen infusion catheter.", [0.15,0,0]);
+  const red = cyl(0.018, 0.016, 1.2, hard(0xc45b4a));
+  red.position.set(0.2,-0.15,0.015);
+  P(red, "art", "Arterial lumen", "Usually the red hub. It draws blood from the patient to the dialyser. 'Arterial' here is the machine's name for the outflow, not a statement that the tip is in an artery.", [0.12,0,0.08]);
+  const blue = cyl(0.018, 0.016, 1.05, hard(0x2a6fbf));
+  blue.position.set(0.2,-0.1,-0.015);
+  P(blue, "ven", "Venous lumen", "Usually the blue hub. It returns blood from the machine. The openings are staggered so cleaned blood is not immediately redrawn.", [-0.05,0,-0.08]);
+  const side = sph(0.03, hard(0x152026));
+  side.position.set(0.28,-0.85,0.04);
+  P(side, "side", "Distal openings", "Side holes and an end hole. Clot or a kink here stops the machine with an access-pressure alarm. Forcing a flush is not the treatment of a malposition.", [0.15,-0.1,0.08]);
+  [[-0.45,0xc45b4a,"Red hub"],[0.15,0x2a6fbf,"Blue hub"]].forEach(function(row, i){
+    P(hose([V(0,0.6,0), V(row[0],0.9,0), V(row[0],1.2,0)], 0.04, hard(row[1]), 10), "limb"+i, i?"Venous extension":"Arterial extension", "Colour-coded limb. Clamps live on these limbs. The caps are locked connectors for the dialysis lines, scrubbed before connection.", [0,0.12,0]);
+    const clamp = box(0.1, 0.05, 0.07, hard(0x2c343c));
+    clamp.position.set(row[0], 1.0, 0);
+    P(clamp, "cl"+i, "Clamp", "Closed when the limb is not on the machine, so the patient does not bleed back and air does not enter.", [0,0.12,0.06]);
+    const hub = cyl(0.055, 0.055, 0.12, hard(row[1]));
+    hub.position.set(row[0], 1.32, 0);
+    P(hub, "hub"+i, row[2], "A locking connector. Do not use it as a routine injection port for drugs.", [0,0.18,0]);
+  });
+}
+function buildNg(){
+  const pts = [];
+  for(let i=0;i<=16;i++){
+    const t=i/16;
+    pts.push(V(-1.4+t*2.8, Math.sin(t*0.7)*0.2-0.1, 0));
+  }
+  P(hose(pts, 0.045, soft(0xf0d2c4), 48), "tube", "Tube", "A nasogastric tube for the stomach. It is not an airway. Confirm where the tip is before a feed or a drug. A chest film is the reliable check.", [0,0.12,0]);
+  const radio = pts.map(function(p){ return p.clone().add(new THREE.Vector3(0,0,0.03)); });
+  P(hose(radio, 0.01, hard(0x243038), 48), "radio", "Radiopaque line", "Shows on a radiograph. Follow it to the tip. A tube in the airway can still sit 'midline' on a quick look.", [0,0.12,0.08]);
+  const tip = sph(0.05, soft(0xe7c4b4));
+  tip.position.copy(pointAt(pts, 1));
+  P(tip, "tip", "Distal tip", "Rounded, with side holes just behind it. The tip should be in the stomach, well below the diaphragm on the film.", [0.22,0,0]);
+  [0.9,0.84].forEach(function(t, i){
+    const hole = sph(0.03, hard(0x1a242c));
+    hole.position.copy(pointAt(pts, t)).add(new THREE.Vector3(0, i?0.05:-0.05, 0));
+    P(hole, "hole"+i, "Side hole", "Where feed and aspirate pass. One hole against the wall is why a second hole exists. Neither hole makes a lung placement safe.", [0,0.12,0.08]);
+  });
+  for(let i=1;i<=4;i++){
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.006, 6, 14), hard(0x1c2830));
+    ring.position.copy(pointAt(pts, 0.2+i*0.12));
+    aim(ring, tangentAt(pts, 0.2+i*0.12), new THREE.Vector3(0,0,1));
+    P(ring, "cm"+i, "Centimetre marking", "Used to note the length at the nose. A tube that has moved out has changed this number. Do not start a feed because the number looks familiar.", [0,0.16,0]);
+  }
+  const conn = cyl(0.07, 0.06, 0.16, hard(0xe6edf2));
+  conn.position.copy(pointAt(pts, 0.02)).add(new THREE.Vector3(-0.1,0,0));
+  P(conn, "conn", "Proximal connector", "Fits a feeding syringe or a giving set. It must not fit a Luer intravenous syringe. If it does, that is the wrong tube.", [-0.2,0.08,0]);
+  const cap = sph(0.06, hard(0x2a6f86));
+  cap.position.set(-1.55,0.15,0);
+  P(cap, "cap", "Cap", "Closes the tube between uses. An open nasogastric tube is a route for aspiration the other way as well.", [-0.15,0.15,0]);
+}
+function buildChest(){
+  const body = box(1.8, 1.15, 0.35, hard(0xe6e1d6));
+  P(body, "box", "Drainage unit", "A three-chamber underwater seal in one box. It must stay below the patient. Lifting it to the bed empties fluid back toward the chest.", [0,0,0]);
+  const specs = [
+    [-0.55, "Collection chamber", "The first chamber. Fluid and blood from the chest collect here. The volume scale is how you measure the loss. Sudden bleeding is a clinical event, not only a number."],
+    [0.05, "Water seal", "The middle chamber. A column of water is the one-way valve. Bubbling means air is still leaking from the lung. Swinging with breathing means the tube is patent."],
+    [0.62, "Suction control", "The third chamber, if suction is used. The depth of water, or the dial on a dry unit, sets the suction, not how hard the wall suction sounds."]
+  ];
+  specs.forEach(function(row){
+    const ch = box(0.48, 0.9, 0.08, glass(0xd7eef6, 0.35));
+    ch.position.set(row[0], 0.02, 0.16);
+    P(ch, row[1].split(" ")[0].toLowerCase(), row[1], row[2], [0,0,0.12]);
+    const water = box(0.4, 0.28, 0.04, glass(0x7fd4e6, 0.55));
+    water.position.set(row[0], -0.22, 0.2);
+    P(water, row[1].split(" ")[0].toLowerCase()+"w", "Fluid level", "Teaching fluid level inside that chamber. In the water seal, the level is the valve. Top it up if it evaporates, with the tube clamped only for that moment and then released.", [0,-0.05,0.14]);
+  });
+  for(let i=0;i<4;i++){
+    const b = sph(0.025, glass(0xf3efe6, 0.8));
+    b.position.set(0.05, -0.05+i*0.06, 0.24);
+    b.userData.role = "bubble";
+    b.userData.phase = i;
+    P(b, "bub"+i, "Bubbling", "Air passing through the water seal. Continuous bubbling is an air leak. No bubbling can mean the lung is up, or that the tube is blocked. Look at the patient.", [0,0.1,0.16]);
+  }
+  P(hose([V(-0.9,0.45,0.1), V(-1.3,0.7,0.1), V(-1.6,0.9,0)], 0.045, pvc(), 12), "tube", "Patient tubing", "From the chest drain to the collection chamber. Keep it free of dependent loops full of fluid, which stop drainage.", [-0.3,0.2,0]);
+  const conn = cyl(0.06, 0.05, 0.12, hard(0xe6edf2));
+  conn.position.set(-1.72,0.95,0);
+  conn.rotation.z = 0.6;
+  P(conn, "conn", "Patient connector", "Joins the unit to the chest tube. A taped join that cannot be seen is where disconnection hides. Clamp only for a change of bottle or a break in the circuit, then unclamp.", [-0.2,0.15,0]);
+}
+function buildSyringe(){
+  const housing = box(1.5, 0.7, 0.55, hard(0xd7dee4));
+  P(housing, "body", "Pump body", "The chassis. It drives a syringe plunger at a set rate. A syringe pump is for concentrated drugs. The syringe size and the brand must match the program.", [0,0,0]);
+  const screen = box(0.55, 0.32, 0.04, hard(0x101418));
+  screen.material = new THREE.MeshStandardMaterial({map:screenTex(["5 mL/h","syringe 50"]), roughness:0.4, emissive:new THREE.Color(0)});
+  screen.position.set(-0.35,0.08,0.28);
+  P(screen, "screen", "Display", "Shows the rate and the volume infused. Read it before you walk away. An occlusion alarm means pressure in the line, not that the drug has been given.", [0,0.2,0.12]);
+  [[-0.7,0.22],[ -0.55,0.22],[-0.7,0],[ -0.55,0]].forEach(function(p, i){
+    const btn = cyl(0.05, 0.05, 0.04, hard(i%2?0xe2b48a:0x2c343c));
+    btn.rotation.x = Math.PI/2;
+    btn.position.set(p[0], p[1], 0.3);
+    P(btn, "btn"+i, "Control button", "Starts, stops, or silences. Silencing an alarm without looking at the line leaves the drug stopped.", [0,0.12,0.1]);
+  });
+  const barrel = cyl(0.1, 0.1, 0.9, glass(0xf3efe6, 0.4));
+  barrel.rotation.z = Math.PI/2;
+  barrel.position.set(0.35,0.05,0);
+  P(barrel, "barrel", "Syringe barrel", "The drug is in here. Label it with the name and the concentration. The pump does not know what you drew up.", [0.15,0.12,0]);
+  const plunger = cyl(0.04, 0.04, 0.7, hard(0xe6edf2));
+  plunger.rotation.z = Math.PI/2;
+  plunger.position.set(0.15,0.05,0);
+  plunger.userData.role = "reservoir";
+  P(plunger, "plunger", "Plunger driver", "The arm that pushes the plunger. If the syringe is not clipped, the arm pushes air and the syringe creeps. Load it until it clicks.", [0,0.1,0.1]);
+  const clamp = box(0.16, 0.12, 0.12, hard(0x2a6f86));
+  clamp.position.set(0.72,0.16,0);
+  P(clamp, "clamp", "Syringe clamp", "Grips the barrel flange. The wrong syringe brand can sit loosely and siphon, or occlude.", [0.12,0.12,0]);
+  P(hose([V(0.85,0.05,0), V(1.15,0.05,0), V(1.35,-0.2,0)], 0.025, pvc(), 10), "line", "Infusion line", "From the syringe to the patient. A high-pressure alarm is this line, a closed tap, or a tissued cannula.", [0.25,0,0]);
+}
+function buildInfusion(){
+  const housing = box(1.2, 1.35, 0.5, hard(0xd7dee4));
+  P(housing, "body", "Pump body", "A volumetric pump. It pushes a set volume from a bag, using a dedicated giving set. It is not a syringe pump and the sets are not interchangeable.", [0,0,0]);
+  const screen = box(0.7, 0.36, 0.04, hard(0x101418));
+  screen.material = new THREE.MeshStandardMaterial({map:screenTex(["125 mL/h","VTBI 500"]), roughness:0.4, emissive:new THREE.Color(0)});
+  screen.position.set(0,0.38,0.26);
+  P(screen, "screen", "Display", "Rate and volume to be infused. Free-flow is possible if the set is taken out and the clamp is open. Use the set clamp.", [0,0.2,0.1]);
+  const door = box(0.85, 0.7, 0.06, glass(0xd7eef6, 0.35));
+  door.position.set(0,-0.15,0.26);
+  door.userData.role = "blade";
+  P(door, "door", "Door", "Closes on the tubing. The pump should not run with the door open. Loading the set in the wrong direction infuses backward or alarms at once.", [0.2,0,0.12]);
+  const channel = hose([V(0,0.15,0.2), V(0,-0.15,0.22), V(0,-0.45,0.2)], 0.04, pvc(), 12);
+  P(channel, "channel", "Tubing channel", "The path the giving set must follow, past the air detector and the occlusion sensor. A set forced in beside the channel is not loaded.", [0.15,0,0.12]);
+  const air = box(0.16, 0.1, 0.08, hard(0x2a6f86));
+  air.position.set(0,0.12,0.22);
+  P(air, "air", "Air detector", "Ultrasound or optical sensing for bubbles. An alarm stops the pump. It does not remove the need to prime the line.", [0,0.18,0.1]);
+  const occ = box(0.16, 0.1, 0.08, hard(0xc45b4a));
+  occ.position.set(0,-0.35,0.22);
+  P(occ, "occ", "Occlusion sensor", "Feels downstream pressure. A closed tap, a kink, or a cannula out of the vein all feel the same to the pump. Look at the patient.", [0,-0.1,0.1]);
+  [[-0.35,-0.55],[0,-0.55],[0.35,-0.55]].forEach(function(p, i){
+    const b = cyl(0.07, 0.07, 0.05, hard(0x2c343c));
+    b.rotation.x = Math.PI/2;
+    b.position.set(p[0], p[1], 0.28);
+    P(b, "key"+i, "Control key", "Start, stop, and bolus or silence, depending on the key. Do not bolus a vasoactive drug because the key is the large one.", [0,-0.08,0.08]);
+  });
+}
+function buildDefib(){
+  const paddleL = box(0.55, 0.28, 0.12, hard(0xe6edf2));
+  paddleL.position.set(-0.7,0.15,0);
+  P(paddleL, "paddleL", "Sternum paddle", "A handheld electrode. The metal face goes on the chest with gel or a pad. Bare metal burns. Paddles are held firmly, and nobody else touches the patient when you charge and shock.", [-0.25,0.1,0]);
+  const handleL = cyl(0.06, 0.06, 0.55, hard(0x2c343c));
+  handleL.position.set(-0.7,0.55,0);
+  P(handleL, "handleL", "Paddle handle", "Where the operator's hands stay. Discharge buttons are on the handles. Charge, look, then shock.", [-0.1,0.3,0]);
+  const face = box(0.4, 0.2, 0.02, metal(0xb7b1a4));
+  face.position.set(-0.7,0.15,0.07);
+  P(face, "plate", "Electrode face", "The metal that must meet skin through conductive gel. Poor contact arcs and burns and delivers less current to the heart.", [0,0,0.15]);
+  const paddleR = box(0.55, 0.28, 0.12, hard(0xe6edf2));
+  paddleR.position.set(0.15,-0.45,0);
+  P(paddleR, "paddleR", "Apex paddle", "The second paddle, at the cardiac apex. Energy crosses the chest between the two paddles. The positions matter more than which hand holds which handle.", [0.2,-0.1,0]);
+  const pad = box(0.7, 0.45, 0.04, soft(0xf0d2c4));
+  pad.position.set(0.85,0.35,0);
+  P(pad, "padA", "Adhesive pad", "A self-adhesive electrode used with hands-free cables. One on the right chest below the clavicle, one at the apex, or anteroposterior if the chest is in the way. Do not place a pad over a drug patch or a generator.", [0.25,0.1,0]);
+  const pad2 = box(0.7, 0.45, 0.04, soft(0xf0d2c4));
+  pad2.position.set(0.85,-0.35,0);
+  P(pad2, "padB", "Second pad", "The return electrode. Current will not cross the heart if both pads are on the same small patch of chest. Dry the skin. Shave only if hair stops the pad sticking.", [0.25,-0.15,0]);
+  P(hose([V(0.85,0.55,0), V(1.3,0.7,0)], 0.03, hard(0x243038), 8), "cable", "Cable and connector", "From the pad to the defibrillator. The connector is keyed. A paddle cable and a pad cable are not the same lead on every machine.", [0.3,0.2,0]);
+}
+
+const BUILD = {ett:buildEtt, lma:buildLma, bvm:buildBvm, dl:buildDl, vl:buildVl, hfnc:buildHfnc, niv:buildNiv, venturi:buildVenturi, cannula:buildCannula, simple:buildSimple, nrb:buildNrb, cvc:buildCvc, art:buildArt, pac:buildPac, io:buildIo, dialysis:buildDialysis, ng:buildNg, chest:buildChest, syringe:buildSyringe, infusion:buildInfusion, defib:buildDefib};
+const TOGGLES = {
+  ett:[["cuff","Cuff inflated"]],
+  lma:[["cuff","Cuff inflated"]],
+  bvm:[["reservoir","Reservoir full"],["flow","Airflow arrows"]],
+  dl:[["blade","Blade attached"]],
+  vl:[["blade","Macintosh blade forward"]],
+  niv:[["vented","Vented mask"]],
+  nrb:[["reservoir","Reservoir full"]],
+  chest:[["bubble","Bubbling"]],
+  syringe:[["reservoir","Plunger in"]]
+};
+
+function fit(){
+  const box = new THREE.Box3().setFromObject(root);
+  if(box.isEmpty()) return;
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3()).length();
+  controls.target.copy(center);
+  camera.position.copy(center).add(new THREE.Vector3(size*0.55, size*0.28, size*0.72));
+  camera.near = Math.max(0.01, size/200);
+  camera.far = size*20;
+  camera.updateProjectionMatrix();
+  controls.update();
+}
+function applyFlags(){
+  parts.forEach(function(mesh){
+    const role = mesh.userData.role;
+    if(role==="cuff"){
+      const s = flags.cuff ? 1.45 : 0.62;
+      mesh.scale.set(s, s, s);
+    }else if(role==="reservoir"){
+      const s = flags.reservoir ? 1 : 0.4;
+      mesh.scale.set(s, s, s);
+    }else if(role==="flow"){
+      mesh.visible = flags.flow;
+    }else if(role==="vent"){
+      mesh.visible = flags.vented;
+    }else if(role==="bubble"){
+      mesh.visible = flags.bubble;
+    }else if(role==="blade"){
+      mesh.visible = flags.blade || mesh.userData.keep;
+    }else if(role==="hyper"){
+      mesh.visible = !flags.blade;
+    }
+  });
+}
+function showItem(id){
+  currentId = id;
+  clearRoot();
+  flags.cuff = true; flags.blade = true; flags.vented = true; flags.reservoir = true; flags.flow = false; flags.bubble = false;
+  (BUILD[id]||buildEtt)();
+  parts.forEach(function(mesh){ mesh.userData.home = mesh.position.clone(); });
+  applyFlags();
+  fit();
+  paintLists();
+  select(null);
+}
+function paintLists(keepCats){
+  if(!keepCats){
+    const cats = document.getElementById("cats");
+    const scroll = cats.scrollLeft;
+    cats.innerHTML = CATS.map(function(cat){
+      const buttons = ITEMS.filter(function(item){ return item.cat===cat[0]; }).map(function(item){
+        return "<button type='button' data-id='"+item.id+"'"+(item.id===currentId?" class='on'":"")+">"+item.name+"<small>"+item.note+"</small></button>";
+      }).join("");
+      return "<h2>"+cat[1]+"</h2>"+buttons;
+    }).join("");
+    cats.scrollLeft = scroll;
+    cats.querySelectorAll("[data-id]").forEach(function(btn){
+      btn.onclick = function(){ showItem(btn.getAttribute("data-id")); };
+    });
+  }
+  const aside = document.getElementById("parts");
+  const asideTop = aside.scrollTop;
+  const item = ITEMS.filter(function(row){ return row.id===currentId; })[0];
+  const toggles = (TOGGLES[currentId]||[]).map(function(row){
+    const on = flags[row[0]] ? " on" : "";
+    return "<button type='button' data-flag='"+row[0]+"' class='"+on.trim()+"'>"+row[1]+"</button>";
+  }).join("");
+  const rows = parts.map(function(mesh){
+    const on = selected===mesh ? " class='on'" : "";
+    return "<button type='button' data-part='"+mesh.userData.id+"'"+on+">"+mesh.userData.title+"</button>";
+  }).join("");
+  aside.innerHTML = "<h2>"+item.name+"</h2>"+toggles+"<h2>Parts</h2>"+rows+
+    "<div id='readout'><b>"+(selected?selected.userData.title:"Touch a part")+"</b><p>"+(selected?selected.userData.text:"It lights, and the voice names it and says what it is for.")+"</p></div>"+
+    "<p class='fine'>Real-time 3D teaching model with separate parts. Drag to turn. Pinch or use Zoom. Not a manufacturer scan.</p>";
+  aside.scrollTop = asideTop;
+  aside.querySelectorAll("[data-part]").forEach(function(btn){
+    btn.onclick = function(){
+      const mesh = parts.filter(function(m){ return m.userData.id===btn.getAttribute("data-part"); })[0];
+      if(mesh) select(mesh);
+    };
+  });
+  aside.querySelectorAll("[data-flag]").forEach(function(btn){
+    btn.onclick = function(){
+      const key = btn.getAttribute("data-flag");
+      flags[key] = !flags[key];
+      applyFlags();
+      paintLists(true);
+    };
+  });
+  const dock = document.getElementById("dock");
+  dock.innerHTML =
+    "<button type='button' id='turn'"+(turning?" class='on'":"")+">Turn</button>"+
+    "<button type='button' id='zin'>Zoom in</button>"+
+    "<button type='button' id='zout'>Zoom out</button>"+
+    "<button type='button' id='reset'>Reset</button>"+
+    "<button type='button' id='explode'"+(exploded?" class='on'":"")+">Exploded</button>"+
+    "<button type='button' id='save'>Download GLB</button>";
+  document.getElementById("turn").onclick = function(){ turning = !turning; controls.autoRotate = turning; paintLists(true); };
+  document.getElementById("zin").onclick = function(){ zoom(0.82); };
+  document.getElementById("zout").onclick = function(){ zoom(1.22); };
+  document.getElementById("reset").onclick = function(){ exploded = false; turning = false; controls.autoRotate = false; flags.cuff=true; flags.blade=true; flags.vented=true; flags.reservoir=true; flags.flow=false; flags.bubble=false; applyFlags(); fit(); paintLists(); };
+  document.getElementById("explode").onclick = function(){ exploded = !exploded; paintLists(true); };
+  document.getElementById("save").onclick = exportGlb;
+}
+function zoom(k){
+  const offset = camera.position.clone().sub(controls.target);
+  offset.multiplyScalar(k);
+  const len = offset.length();
+  if(len < controls.minDistance || len > controls.maxDistance) return;
+  camera.position.copy(controls.target).add(offset);
+}
+function select(mesh){
+  if(selected && selected.material && selected.material.emissive){
+    if(!selected.userData.keep){
+      selected.material.emissive.setHex(0);
+      selected.material.emissiveIntensity = 0;
+    }
+  }
+  selected = mesh;
+  if(mesh && mesh.material && mesh.material.emissive){
+    mesh.material.emissive.setHex(0xe2b48a);
+    mesh.material.emissiveIntensity = 0.65;
+    speak(mesh.userData.title+". "+mesh.userData.text);
+  }
+  paintLists(true);
+}
+function speak(text){
+  if(!window.speechSynthesis || !text) return;
+  const say = function(){
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const voices = speechSynthesis.getVoices() || [];
+    const en = voices.filter(function(v){ return /^en/i.test(v.lang||""); });
+    const voice = en.find(function(v){ return /female|samantha|victoria|karen|moira|fiona|serena|zira|veena|allison|ava/i.test((v.name||"")+" "+(v.voiceURI||"")); }) || en[0] || null;
+    u.lang = voice && voice.lang ? voice.lang : "en-GB";
+    u.rate = 0.94;
+    if(voice) u.voice = voice;
+    setTimeout(function(){ speechSynthesis.speak(u); }, 60);
+  };
+  if(!speechSynthesis.getVoices().length){
+    const once = function(){ speechSynthesis.removeEventListener("voiceschanged", once); say(); };
+    speechSynthesis.addEventListener("voiceschanged", once);
+    speechSynthesis.getVoices();
+    return;
+  }
+  say();
+}
+function exportGlb(){
+  const exporter = new GLTFExporter();
+  exporter.parse(root, function(bin){
+    const blob = new Blob([bin], {type:"model/gltf-binary"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = currentId+"-teaching.glb";
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+  }, function(err){ console.error(err); }, {binary:true});
+}
+function resize(){
+  const r = canvas.getBoundingClientRect();
+  if(!r.width || !r.height) return;
+  camera.aspect = r.width / r.height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(r.width, r.height, false);
+}
+const clock = new THREE.Clock();
+function frame(){
+  requestAnimationFrame(frame);
+  const dt = clock.getDelta();
+  parts.forEach(function(mesh){
+    const home = mesh.userData.home;
+    if(!home) return;
+    const ex = exploded ? mesh.userData.ex : [0,0,0];
+    mesh.position.x += (home.x + ex[0] - mesh.position.x) * Math.min(1, dt*6);
+    mesh.position.y += (home.y + ex[1] - mesh.position.y) * Math.min(1, dt*6);
+    mesh.position.z += (home.z + ex[2] - mesh.position.z) * Math.min(1, dt*6);
+    if(mesh.userData.role==="bubble" && flags.bubble){
+      mesh.position.y = home.y + Math.sin(performance.now()/300 + mesh.userData.phase)*0.05;
+    }
+    if(mesh.userData.role==="flow" && flags.flow){
+      mesh.position.x = home.x + Math.sin(performance.now()/250)*0.06;
+    }
+  });
+  controls.update();
+  renderer.render(scene, camera);
+}
+canvas.addEventListener("pointerdown", function(e){ canvas._x = e.clientX; canvas._y = e.clientY; });
+canvas.addEventListener("pointerup", function(e){
+  if(Math.hypot(e.clientX-canvas._x, e.clientY-canvas._y) > 8) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = ((e.clientX-rect.left)/rect.width)*2-1;
+  const y = -((e.clientY-rect.top)/rect.height)*2+1;
+  ray.setFromCamera(new THREE.Vector2(x,y), camera);
+  const hit = ray.intersectObjects(parts, false)[0];
+  if(hit) select(hit.object);
+});
+window.addEventListener("resize", resize);
+resize();
+showItem("ett");
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
