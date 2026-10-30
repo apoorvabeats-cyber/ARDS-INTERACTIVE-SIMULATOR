@@ -193,6 +193,14 @@ function span(){
   return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
 }
 
+canvas.addEventListener("webglcontextlost", function(event){
+  event.preventDefault();
+});
+canvas.addEventListener("webglcontextrestored", function(){
+  document.body.classList.add("live3d");
+  document.body.classList.remove("flat");
+  resetView();
+});
 sayLoad("Loading the anatomical model…");
 const loader = new GLTFLoader();
 loader.load("models/anatomy/human-reference.glb", function(gltf){
@@ -239,6 +247,8 @@ loader.load("models/anatomy/human-reference.glb", function(gltf){
   window.__hraBox = { y: +size.y.toFixed(3), dist: +homeDist.toFixed(3), minY: +box.min.y.toFixed(3), maxY: +box.max.y.toFixed(3) };
   ready = true;
   window.__hraReady = true;
+  document.body.classList.add("live3d");
+  document.body.classList.remove("flat");
   sayLoad("");
 }, function(event){
   if(!event.total) return;

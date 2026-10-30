@@ -41,7 +41,9 @@ header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;marg
 .list button{display:block;width:100%;text-align:left;border-radius:12px;margin:0 0 8px;font-size:16px}
 .load{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:#07111a}
 .load.hide{display:none}
-.note{color:var(--muted);font-size:13px}
+.sheet.shut{display:none}
+#layers{display:none}
+#sheetx{display:block;width:100%;margin-top:8px}
 </style>
 </head>
 <body>
@@ -60,8 +62,6 @@ header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;marg
   <button type="button" id="flow">Flow</button>
   <button type="button" id="spark">Conduction</button>
   <button type="button" id="cut">Cut</button>
-  <button type="button" id="ask">Question</button>
-  <a class="go" href="echo-lab.html?v=20261029e">Echo bay</a>
 </div>
 <section class="sheet" id="sheet" aria-live="polite"></section>
 </div>
@@ -89,8 +89,7 @@ const MODULES = [
   {id:"coronary", title:"Coronaries", groups:["coronaries","veins"], focus:["Left coronary artery","Anterior interventricular artery","Circumflex artery of heart","Right coronary artery","Coronary sinus"], text:"Left coronary artery, anterior interventricular artery (the left anterior descending), circumflex, right coronary artery, and the cardiac veins that drain to the coronary sinus."},
   {id:"conduction", title:"Conduction", groups:["myocardium","vessels"], focus:["Right atrium","Right ventricle","Left ventricle","Superior vena cava"], text:"The atlas has no sinus node, atrioventricular node or bundle mesh. The spark is a drawing placed on the chambers.", spark:true},
   {id:"flow", title:"Blood flow", groups:["myocardium","vessels","valves"], focus:["Superior vena cava","Right ventricle","Pulmonary trunk","Left ventricle","Ascending aorta"], text:"Particles move through the venous return, the right heart, the lungs, the left heart and the aorta. This is a teaching path, not a Doppler trace.", flow:true},
-  {id:"imaging", title:"Imaging", groups:["myocardium","valves","vessels"], focus:["Left ventricle","Ascending aorta","Right ventricle","Left atrium"], text:"No echo, CT or angiogram loop is bundled. The windows below name which chamber you are looking at."},
-  {id:"care", title:"Critical care", groups:["myocardium","coronaries","vessels"], focus:["Right ventricle","Anterior interventricular artery","Superior vena cava","Thoracic aorta","Left ventricle"], text:"Right-heart failure, coronary territory, a central line, a balloon pump and a temporary left-sided pump, taught on the meshes that exist."}
+  {id:"imaging", title:"Imaging", groups:["myocardium","valves","vessels"], focus:["Left ventricle","Ascending aorta","Right ventricle","Left atrium"], text:"No echo, CT or angiogram loop is bundled. The windows below name which chamber you are looking at."}
 ];
 const INFO = {
   "Right atrium":{anatomy:"Receives the superior vena cava, the inferior vena cava and the coronary sinus.",fn:"The reservoir and pump for venous return into the right ventricle.",image:"Seen in the apical four-chamber and subcostal views, beside the right ventricle.",clinical:"Central-line tips, pacing leads and venous cannulas sit in or just above this chamber.",q:"Where does a dialysis catheter in the internal jugular vein aim to finish?",options:["In a hepatic vein","At the cavoatrial junction","In the left ventricle","In a pulmonary vein"],answer:1,why:"The tip belongs at the junction of the superior vena cava and the right atrium, not in the heart muscle and not in the arterial tree."},
@@ -243,7 +242,12 @@ function frameNames(names){
   controls.autoRotate = false;
   controls.enableDamping = false;
 }
-function showSheet(html){ sheet.innerHTML = html; }
+function showSheet(html){
+  sheet.classList.remove("shut");
+  sheet.innerHTML = html + '<button type="button" id="sheetx">Close</button>';
+  const closer = document.getElementById("sheetx");
+  if(closer) closer.onclick = function(){ sheet.classList.add("shut"); };
+}
 function listSheet(query){
   const words = (query||"").trim().toLowerCase().split(/\s+/).filter(Boolean);
   const rows = visibleMeshes().filter(function(mesh){
@@ -436,7 +440,8 @@ document.getElementById("cut").onclick = function(){
   const box = new THREE.Box3().setFromObject(root);
   clip.constant = box.getCenter(new THREE.Vector3()).z;
 };
-document.getElementById("ask").onclick = function(){
+const askBtn = document.getElementById("ask");
+if(askBtn) askBtn.onclick = function(){
   if(selected && infoFor(selected.name).q) ask(selected.name);
 };
 

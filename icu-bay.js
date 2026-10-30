@@ -338,6 +338,11 @@
     if(tabs) tabs.hidden = true;
     if(bubbles) bubbles.hidden = true;
     if(typeof finishIntro === "function") finishIntro();
+    if(typeof window.resetAtlas === "function") window.resetAtlas();
+    document.body.classList.add("live3d");
+    document.body.classList.remove("flat");
+    const view = document.getElementById("view");
+    if(view) view.style.display = "block";
     const figure = document.getElementById("figure");
     if(figure) figure.style.opacity = "1";
   }

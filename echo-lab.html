@@ -65,6 +65,26 @@ header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;marg
   #heart,.chest-box{height:64dvh}
   #echo{height:46dvh}
 }
+#doors{display:none}
+body.doors #doors{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px}
+body.doors #doors button{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;min-height:46dvh;border-radius:18px;text-align:left;padding:16px}
+body.doors #doors b{font-family:Fraunces,Georgia,serif;font-size:28px;font-weight:520}
+body.doors #doors span{margin-top:8px;color:var(--muted);font-size:14px;line-height:1.35}
+body.doors .stage,body.doors #tabs,body.doors #lesions,body.doors #phases,body.doors #status,body.doors .sheet{display:none}
+body.sim #tabs,body.sim #lesions,body.sim #phases,body.sim .sheet,body.sim .caption,body.sim #ecg,body.supply #echo,body.supply [aria-label="Patient and probe"]{display:none}
+body.sim .stage{grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr)}
+body.sim .scan{grid-column:1;grid-row:1}
+body.sim .panel:first-child{display:none}
+body.sim #echo,body.sim .chest-box{height:72dvh}
+body.supply .stage{display:block}
+body.supply #heart{height:46dvh}
+body.supply #ecg{height:240px}
+@media(max-width:700px){
+  body.doors #doors{grid-template-columns:1fr 1fr}
+  body.doors #doors button{min-height:42dvh;padding:12px}
+  body.doors #doors b{font-size:22px}
+  body.sim .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+}
 </style>
 </head>
 <body>
@@ -72,6 +92,10 @@ header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;marg
   <button type="button" id="back">Back to ICU</button>
   <h1>Echo bay</h1>
 </header>
+<section id="doors" aria-label="Echo bay doors">
+  <button type="button" data-door="supply"><b>Heart and supply</b><span>Four vessels, the lesion, and the trace.</span></button>
+  <button type="button" data-door="sim"><b>Echo simulator</b><span>The finger is the probe. The sector follows it.</span></button>
+</section>
 <p id="status"></p>
 <div class="bar" id="tabs" role="tablist"></div>
 <div class="bar" id="lesions" aria-label="Coronary lesion"></div>
@@ -138,13 +162,10 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 const LV = ["bA","bAS","bIS","bI","bIL","bAL","mA","mAS","mIS","mI","mIL","mAL","aA","aS","aI","aL","apex"];
 const LEADS = ["I","II","III","aVR","aVL","aVF","V1","V2","V3","V4","V5","V6","V4R"];
 const TABS = [
-  ["anatomy","Heart"],["coronary","Supply"],["chambers","Chambers"],["valves","Valves"],
-  ["global","Global hypokinesia"],["rwma","RWMA"],["cases","Practice"]
+  ["anatomy","Heart"],["coronary","Supply"]
 ];
 const LESIONS = [
-  ["none","No lesion"],["ladP","LAD proximal"],["ladM","LAD mid"],["ladD","LAD distal"],
-  ["lcxP","LCx proximal"],["lcxD","LCx distal"],["rcaP","RCA proximal"],["rcaD","RCA distal"],
-  ["lm","Left main"],["multi","Multivessel"]
+  ["none","No lesion"],["ladP","LAD"],["lcxP","LCx"],["rcaP","RCA"],["lm","Left main"]
 ];
 const PHASES = [["normal","Normal"],["ischaemia","Ischaemia"],["infarct","Infarction"],["recovery","Recovery"]];
 const CULPRIT = {
@@ -200,6 +221,17 @@ const state = {
   probe:{down:false,x:63,y:43,rot:18,tilt:40,lift:1,spin:18,twistBase:null},
   view:"plax", score:0, asked:0, caseId:null, qIx:0, locked:false
 };
+const mode = new URLSearchParams(location.search).get("mode") || "";
+document.body.classList.add(mode==="sim" ? "sim" : mode==="supply" ? "supply" : "doors");
+try{
+  const saved = JSON.parse(sessionStorage.getItem("echoState") || "null");
+  if(saved && saved.lesion) state.lesion = saved.lesion;
+  if(saved && saved.phase) state.phase = saved.phase;
+  if(saved && saved.dominance) state.dominance = saved.dominance;
+}catch(err){}
+function saveEcho(){
+  try{ sessionStorage.setItem("echoState", JSON.stringify({lesion:state.lesion, phase:state.phase, dominance:state.dominance})); }catch(err){}
+}
 
 function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return "&#"+c.charCodeAt(0)+";"; }); }
 function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
@@ -575,11 +607,77 @@ function echoKind(){
   return v;
 }
 function drawEcho(){
+  if(mode!=="sim") return;
   const box = fitCanvas(echo, ectx);
-  const beat = (performance.now()/1000) * (state.effusion ? 1.5 : 1);
+  const ctx = ectx, w = box.w, h = box.h;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0,0,w,h);
+  const cx = w*0.5, top = h*0.04;
+  const R = Math.min(w*0.86, h*0.98);
+  const a0 = 0.38, a1 = Math.PI-0.38;
+  const beat = performance.now()/1000;
   const phase = beat % 1;
-  const sys = phase < 0.36 ? Math.sin(phase/0.36*Math.PI) : 0;
-  drawChambers(ectx, box.w, box.h, echoKind(), sys);
+  const S = phase<0.34 ? Math.sin(phase/0.34*Math.PI) : 0;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(cx, top);
+  ctx.arc(cx, top, R, a0, a1);
+  ctx.closePath();
+  ctx.clip();
+  ctx.fillStyle = "#141414";
+  ctx.fillRect(0,0,w,h);
+  for(let i=0;i<900;i++){
+    const ang = a0 + ((i*37)%1000)/1000*(a1-a0);
+    const rad = ((i*91)%1000)/1000*R;
+    const x = cx + Math.cos(ang)*rad;
+    const y = top + Math.sin(ang)*rad;
+    const flick = Math.sin(beat*8 + i)*0.5+0.5;
+    const g = 22 + (i%48) + flick*36;
+    ctx.fillStyle = "rgba("+g+","+g+","+g+","+(0.18+flick*0.4)+")";
+    ctx.fillRect(x, y, 1.6, 1.6);
+  }
+  const kind = echoKind();
+  const septal = wallShift(mean(["bAS","mAS","aS"]), S);
+  const lat = wallShift(mean(["bAL","mAL","aL"]), S);
+  const ant = wallShift(mean(["bA","mA","aA"]), S);
+  const inf = wallShift(mean(["bI","mI","aI"]), S);
+  function cavity(x, y, rx, ry, still){
+    ctx.fillStyle = still<0.35 ? "#2a2a2a" : "#050505";
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(230,230,230,.8)";
+    ctx.lineWidth = still<0.35 ? 3.2 : 1.6;
+    ctx.stroke();
+  }
+  if(kind==="psax"){
+    const r = R*0.34*(1-0.08*S);
+    cavity(cx, top+R*0.55, r*(0.9+0.15*(1-ant)), r*(0.9+0.15*(1-inf)), Math.min(ant, inf, lat, septal));
+  } else if(kind==="ivc"){
+    cavity(cx, top+R*0.48, R*0.08, R*0.28*(1-0.05*S), 1);
+  } else {
+    const y = top + R*0.42;
+    const spread = R*0.16;
+    cavity(cx-spread*septal, y, R*0.11, R*0.2, septal);
+    cavity(cx+spread*0.2, y+R*0.02, R*0.16*(1-0.08*lat), R*0.24, lat);
+    if(kind==="a4c" || kind==="a5c" || kind==="sc4"){
+      cavity(cx-spread*1.5, y, R*0.1, R*0.16, state.rv ? 0.2 : 1);
+    }
+  }
+  ctx.restore();
+  ctx.strokeStyle = "rgba(210,210,210,.45)";
+  ctx.beginPath();
+  ctx.moveTo(cx, top);
+  ctx.arc(cx, top, R, a0, a1);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(210,210,210,.75)";
+  ctx.font = "11px Figtree, sans-serif";
+  [0,4,8,12,16].forEach(function(cm){
+    ctx.fillText(String(cm), 6, top + (cm/16)*R*0.9);
+  });
+  ctx.font = "14px Figtree, sans-serif";
+  ctx.fillText((VIEW[state.view]||VIEW.off).name, 36, h-12);
 }
 
 function ecgSpec(){
@@ -599,9 +697,9 @@ function ecgSpec(){
   const lesion = state.lesion;
   const inf = state.phase==="infarct";
   const rec = state.phase==="recovery";
-  const st = inf ? 1.35 : rec ? 0.25 : -0.7;
-  const t = inf ? 1 : -1;
-  const q = rec || inf ? 1 : 0;
+  const st = inf ? 1.45 : rec ? 0.05 : -0.9;
+  const t = inf ? 1 : rec ? -1.7 : -1;
+  const q = rec ? 1.7 : inf ? 1.15 : 0;
   function hit(ids, spec){
     ids.forEach(function(id){ if(o[id]) Object.assign(o[id], spec); });
   }
@@ -664,7 +762,7 @@ function drawECG(){
   });
   ctx.fillStyle = "#8fbf9a";
   ctx.font = "12px Figtree, sans-serif";
-  ctx.fillText("Teaching trace  ·  illustrative EF "+illustrativeEf()+"%", 8, h-4);
+  ctx.fillText((state.phase==="recovery" ? "Recovery: deep Q waves, inverted T waves, ST settled. " : "")+"Teaching trace  ·  illustrative EF "+illustrativeEf()+"%", 8, h-4);
 }
 function drawLead(ctx, x, y, w, h, id, spec, alt){
   const base = y + h*0.72;
@@ -679,7 +777,7 @@ function drawLead(ctx, x, y, w, h, id, spec, alt){
   ctx.lineWidth = 1.6;
   const st = (spec.st||0) * h * 0.28;
   const pts = [
-    [0,0],[0.14,0],[0.20,-0.15],[0.26,0],[0.34, spec.q ? 0.7 : 0],
+    [0,0],[0.14,0],[0.20,-0.15],[0.26,0],[0.34, spec.q ? Math.min(1.5, 0.4+spec.q*0.5) : 0],
     [0.44, spec.q ? -0.45 : -1],[0.52,0.4],[0.58, -st/(amp||1)],
     [0.78, -st/(amp||1)],[0.88, -st/(amp||1) - 0.22*(spec.t||1)],[1, -st/(amp||1)]
   ];
@@ -692,21 +790,27 @@ function drawLead(ctx, x, y, w, h, id, spec, alt){
 }
 
 const heartCanvas = document.getElementById("heart");
-const renderer = new THREE.WebGLRenderer({canvas:heartCanvas, antialias:true, alpha:false, powerPreference:"high-performance"});
+let renderer = null;
+let scene = null;
+let camera = null;
+let controls = null;
+const root = new THREE.Group();
+if(mode==="supply"){
+renderer = new THREE.WebGLRenderer({canvas:heartCanvas, antialias:true, alpha:false, powerPreference:"high-performance"});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1, 1.5));
 renderer.setClearColor(0x07111a, 1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-const scene = new THREE.Scene();
+scene = new THREE.Scene();
 scene.add(new THREE.HemisphereLight(0xf3efe6, 0x1c1612, 0.95));
 const key = new THREE.DirectionalLight(0xfff6ea, 1.35);
 key.position.set(2.2, 3.2, 4);
 scene.add(key);
-const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50);
-const controls = new OrbitControls(camera, heartCanvas);
+camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50);
+controls = new OrbitControls(camera, heartCanvas);
 controls.enableDamping = true;
 controls.enablePan = false;
-const root = new THREE.Group();
 scene.add(root);
+}
 const byName = {};
 const meshes = [];
 const markers = {};
@@ -736,6 +840,7 @@ function worldCenter(name){
   return new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
 }
 function paintHeart(){
+  if(!renderer) return;
   const culprit = CULPRIT[state.lesion] || [];
   const dim = state.lesion!=="none";
   const glow = arteryColour();
@@ -828,17 +933,19 @@ function fit(object){
   controls.update();
 }
 function resizeHeart(){
+  if(!renderer || !camera) return;
   const r = heartCanvas.getBoundingClientRect();
   renderer.setSize(Math.max(2,r.width), Math.max(2,r.height), false);
   camera.aspect = r.width / Math.max(1, r.height);
   camera.updateProjectionMatrix();
 }
-new ResizeObserver(resizeHeart).observe(heartCanvas);
+if(mode==="supply") new ResizeObserver(resizeHeart).observe(heartCanvas);
 const ray = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
 let downX=0, downY=0;
 heartCanvas.addEventListener("pointerdown", function(e){ downX=e.clientX; downY=e.clientY; });
 heartCanvas.addEventListener("pointerup", function(e){
+  if(!camera) return;
   if(Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY)>8) return;
   const rect = heartCanvas.getBoundingClientRect();
   ndc.set(((e.clientX-rect.left)/rect.width)*2-1, -((e.clientY-rect.top)/rect.height)*2+1);
@@ -852,7 +959,7 @@ heartCanvas.addEventListener("pointerup", function(e){
   renderSheet();
   speakLine(selected.name+". "+(INFO[selected.name] || "A structure on the heart atlas."));
 });
-new GLTFLoader().load("cardiac/heart.glb?v=20261029c", function(gltf){
+if(mode==="supply") new GLTFLoader().load("cardiac/heart.glb?v=20261029c", function(gltf){
   modelWrap = gltf.scene;
   gltf.scene.traverse(function(obj){
     if(!obj.isMesh) return;
@@ -888,10 +995,13 @@ function paintProbe(){
   const m = viewMetrics();
   const left = m.ox + p.x * m.scale;
   const top = m.oy + p.y * m.scale;
+  const rad = p.spin * Math.PI / 180;
+  const px = left + Math.sin(rad) * 42;
+  const py = top - Math.cos(rad) * 46;
   const lift = p.lift * 36;
   const transform = "translate(-50%, calc(-88% - "+lift+"px)) rotate("+p.spin+"deg)";
-  probeEl.style.left = left+"px";
-  probeEl.style.top = top+"px";
+  probeEl.style.left = px+"px";
+  probeEl.style.top = py+"px";
   probeEl.style.transform = transform;
   contactEl.style.left = left+"px";
   contactEl.style.top = top+"px";
@@ -966,12 +1076,12 @@ torso.addEventListener("pointermove", function(e){
     prev.x = e.clientX;
     prev.y = e.clientY;
     applyTwist();
-  } else if(dist > 6){
+  } else if(dist > 2){
     const head = Math.atan2(dy, dx) * 180 / Math.PI;
     if(prev.heading != null){
       const turn = angleDelta(prev.heading, head);
-      if(Math.abs(turn) > 7 && Math.abs(turn) < 140) state.probe.spin += turn;
-    }
+      if(Math.abs(turn) > 1.2 && Math.abs(turn) < 150) state.probe.spin += turn;
+    } else state.probe.spin = head + 90;
     prev.heading = head;
     prev.x = e.clientX;
     prev.y = e.clientY;
@@ -1052,6 +1162,7 @@ function setLesion(id){
   if(state.caseId!=="tamp"){ state.effusion=false; state.alternans=false; state.lowQrs=false; }
   if(id==="none") state.phase = "normal";
   else if(state.phase==="normal") state.phase = "infarct";
+  saveEcho();
   applyWalls();
   paintHeart();
   paintTabs();
@@ -1060,6 +1171,7 @@ function setLesion(id){
 }
 function setPhase(id){
   state.phase = id;
+  saveEcho();
   if(!state.custom) applyWalls();
   paintHeart();
   paintTabs();
@@ -1326,6 +1438,7 @@ function answerCase(i){
   setTimeout(function(){ state.qIx += 1; state.locked=false; renderSheet(); }, 1600);
 }
 document.getElementById("back").onclick = function(){
+  if(mode){ location.href = "echo-lab.html?v=20261030a"; return; }
   try{
     if(window.parent && window.parent!==window && typeof window.parent.returnToIcu==="function"){
       window.parent.returnToIcu();
@@ -1333,6 +1446,11 @@ document.getElementById("back").onclick = function(){
     }
   }catch(err){}
   location.href = "index.html";
+};
+document.getElementById("doors").onclick = function(event){
+  const btn = event.target.closest("[data-door]");
+  if(!btn) return;
+  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261030a";
 };
 document.getElementById("tabs").innerHTML = TABS.map(function(tab){
   return "<button type='button' data-tab='"+tab[0]+"'>"+tab[1]+"</button>";
@@ -1361,18 +1479,21 @@ document.getElementById("phases").onclick = function(event){
   if(!btn) return;
   setPhase(btn.getAttribute("data-phase"));
 };
+applyWalls();
 paintProbe();
 paintTabs();
 paintStatus();
-renderSheet();
+if(mode) renderSheet();
 function loop(){
-  controls.update();
-  renderer.render(scene, camera);
-  drawEcho();
-  drawECG();
-  requestAnimationFrame(loop);
+  if(renderer && controls){
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  if(mode==="sim") drawEcho();
+  if(mode==="supply") drawECG();
+  if(mode) requestAnimationFrame(loop);
 }
-requestAnimationFrame(loop);
+if(mode) requestAnimationFrame(loop);
 </script>
 </body>
 </html>
