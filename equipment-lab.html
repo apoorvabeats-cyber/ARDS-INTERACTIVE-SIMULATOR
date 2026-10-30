@@ -77,9 +77,9 @@ const ITEMS = [
   {id:"o2tube", cat:"oxygen", name:"Oxygen tubing", note:"Flowmeter to the mask"},
   {id:"cvc", cat:"access", name:"Central venous catheter", note:"Triple lumen"},
   {id:"dialysis", cat:"access", name:"Dialysis catheter", note:"Access for renal replacement"},
-  {id:"needles", cat:"access", name:"Needles", note:"Vascular access needles"},
-  {id:"epidural", cat:"access", name:"Epidural catheter", note:"Epidural space"},
-  {id:"suction", cat:"access", name:"Suction catheter", note:"Clears the airway"},
+  {id:"needles", cat:"access", name:"Arterial line", note:"Continuous blood pressure"},
+  {id:"epidural", cat:"access", name:"Swan-Ganz catheter", note:"Pulmonary artery catheter"},
+  {id:"suction", cat:"access", name:"Nasogastric tube", note:"Nose to the stomach"},
   {id:"sb", cat:"gi", name:"Sengstaken-Blakemore tube", note:"Balloon tamponade"},
   {id:"chest", cat:"support", name:"Chest drainage system", note:"Underwater seal"},
   {id:"defib", cat:"support", name:"Defibrillator", note:"Pads and setup"}
@@ -131,9 +131,9 @@ const REAL = {
   o2tube: {url:"assets/models/O2TUBE.glb", label:"Oxygen tubing", text:"The tube that carries oxygen from the flowmeter to the mask or cannula."},
   cvc: {url:"assets/models/CVC.glb", label:"Central venous catheter", text:"A triple-lumen catheter placed in a large vein for drugs, fluids, and central venous pressure."},
   dialysis: {url:"assets/models/DIALYSIS.glb", label:"Dialysis catheter", text:"A wide double-lumen catheter used for renal replacement therapy."},
-  needles: {url:"assets/models/NEEDLES.glb", label:"Needles", text:"Needles used to enter a vessel. The gauge and length depend on the vessel and the task."},
-  epidural: {url:"assets/models/EPIDURAL.glb", label:"Epidural catheter", text:"A fine catheter left in the epidural space to give local anaesthetic."},
-  suction: {url:"assets/models/SUCTION.glb", label:"Suction catheter", text:"A catheter passed into the airway to clear secretions."},
+  needles: {url:"assets/models/NEEDLES.glb", label:"Arterial line", text:"A cannula placed in an artery, usually the radial artery, for continuous blood pressure and arterial blood samples."},
+  epidural: {url:"assets/models/EPIDURAL.glb", label:"Swan-Ganz catheter", text:"A pulmonary artery catheter. The balloon is floated through the right heart into the pulmonary artery to measure pressures and cardiac output."},
+  suction: {url:"assets/models/SUCTION.glb", label:"Nasogastric tube", text:"A tube passed through the nose into the stomach, to drain the stomach or to give feed and medicine."},
   sb: {url:"assets/models/SBTUBE.glb", label:"Sengstaken-Blakemore tube", text:"A tube with a gastric balloon and an oesophageal balloon, used to compress bleeding varices. Inflate the gastric balloon only after the position is confirmed."},
   chest: {url:"assets/models/CHEST.glb", label:"Chest drainage system", text:"An underwater seal that drains air or fluid from the pleural space."},
   defib: {url:"assets/models/DEFIB.glb", label:"Defibrillator", text:"Pads placed on the chest to read the rhythm and deliver a shock."}
@@ -856,11 +856,12 @@ function loadReal(id){
     model.position.copy(centre).multiplyScalar(-scale);
     model.traverse(function(object){
       if(!object.isMesh) return;
-      const title = object.name && object.name !== "Mesh" ? object.name : spec.label;
-      object.userData.id = object.name || object.uuid;
+      const title = partTitle(object.name, spec.label);
+      object.userData.id = object.uuid;
       object.userData.title = title;
       object.userData.text = spec.text;
       object.userData.ex = [0,0,0];
+      object.userData.span = 2.5;
       parts.push(object);
     });
     root.add(model);
@@ -889,6 +890,7 @@ function loadReal(id){
 function showItem(id){
   currentId = id;
   clearRoot();
+  clearTouch();
   modelToken += 1;
   realModel = false;
   setEttStatus("", false);
@@ -964,7 +966,7 @@ function paintLists(keepCats){
   document.getElementById("turn").onclick = function(){ turning = !turning; controls.autoRotate = turning; paintLists(true); };
   document.getElementById("zin").onclick = function(){ zoom(0.82); };
   document.getElementById("zout").onclick = function(){ zoom(1.22); };
-  document.getElementById("reset").onclick = function(){ exploded = false; turning = false; controls.autoRotate = false; flags.cuff=true; flags.blade=true; flags.vented=true; flags.reservoir=true; flags.flow=false; flags.bubble=false; applyFlags(); fit(); paintLists(); };
+  document.getElementById("reset").onclick = function(){ exploded = false; turning = false; controls.autoRotate = false; clearTouch(); flags.cuff=true; flags.blade=true; flags.vented=true; flags.reservoir=true; flags.flow=false; flags.bubble=false; applyFlags(); fit(); paintLists(); };
   document.getElementById("explode").onclick = function(){ exploded = !exploded; paintLists(true); };
   document.getElementById("save").onclick = exportGlb;
 }
@@ -986,22 +988,61 @@ function clearHighlight(mesh){
     m.emissiveIntensity = mesh.userData.baseIntensity;
   });
 }
+function partTitle(name, fallback){
+  if(!name || /^mesh([._\-\s]|\d|$)/i.test(name)) return fallback;
+  return name;
+}
+let touchMark = null;
+function clearTouch(){
+  if(!touchMark) return;
+  scene.remove(touchMark);
+  touchMark.geometry.dispose();
+  touchMark.material.dispose();
+  touchMark = null;
+}
+function markTouch(hit){
+  clearTouch();
+  const mesh = hit.object;
+  const geo = mesh.geometry;
+  if(!geo || !geo.attributes.position) return;
+  const pos = geo.attributes.position;
+  const index = geo.index;
+  mesh.updateWorldMatrix(true, false);
+  const world = mesh.matrixWorld;
+  const point = new THREE.Vector3();
+  const span = mesh.userData.span || 2.5;
+  const reach = span * 0.1;
+  const reach2 = reach * reach;
+  const center = hit.point;
+  const keep = [];
+  const tris = index ? index.count / 3 : pos.count / 3;
+  for(let i=0;i<tris;i++){
+    const a = index ? index.getX(i*3) : i*3;
+    const b = index ? index.getX(i*3+1) : i*3+1;
+    const c = index ? index.getX(i*3+2) : i*3+2;
+    point.fromBufferAttribute(pos, a).applyMatrix4(world);
+    const ax = point.x, ay = point.y, az = point.z;
+    point.fromBufferAttribute(pos, b).applyMatrix4(world);
+    const bx = point.x, by = point.y, bz = point.z;
+    point.fromBufferAttribute(pos, c).applyMatrix4(world);
+    const mx = (ax+bx+point.x)/3, my = (ay+by+point.y)/3, mz = (az+bz+point.z)/3;
+    const dx = mx-center.x, dy = my-center.y, dz = mz-center.z;
+    if(dx*dx+dy*dy+dz*dz > reach2) continue;
+    keep.push(ax,ay,az, bx,by,bz, point.x,point.y,point.z);
+  }
+  if(!keep.length) return;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(keep, 3));
+  touchMark = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+    color: 0xe2b48a, transparent: true, opacity: 0.92, depthTest: true,
+    side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
+  }));
+  scene.add(touchMark);
+}
 function select(mesh){
   if(selected) clearHighlight(selected);
   selected = mesh;
-  if(mesh){
-    matsOf(mesh).forEach(function(m){
-      if(!m.emissive) return;
-      if(!mesh.userData.hadEmissive){
-        mesh.userData.hadEmissive = true;
-        mesh.userData.baseEmissive = m.emissive.clone();
-        mesh.userData.baseIntensity = m.emissiveIntensity || 0;
-      }
-      m.emissive.setHex(0xe2b48a);
-      m.emissiveIntensity = 0.85;
-    });
-    speak(mesh.userData.title+". "+mesh.userData.text);
-  }
+  if(mesh) speak(mesh.userData.title+". "+mesh.userData.text);
   paintLists(true);
 }
 function femaleVoice(){
@@ -1084,7 +1125,10 @@ canvas.addEventListener("pointerup", function(e){
   const y = -((e.clientY-rect.top)/rect.height)*2+1;
   ray.setFromCamera(new THREE.Vector2(x,y), camera);
   const hit = ray.intersectObjects(parts, false)[0];
-  if(hit) select(hit.object);
+  if(hit){
+    markTouch(hit);
+    select(hit.object);
+  }
 });
 window.addEventListener("resize", resize);
 resize();
