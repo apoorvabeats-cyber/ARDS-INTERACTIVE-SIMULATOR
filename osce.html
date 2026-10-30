@@ -60,6 +60,9 @@ svg.ecg{display:block;background:#fff;width:100%;height:auto;max-width:100%}
 .fine{color:#8a8478;font-size:13px}
 .lightbox{background:#05070c;border-radius:12px;padding:8px;margin:10px 0}
 .lightbox img{width:100%;max-height:58dvh;object-fit:contain;display:block;background:#000;border-radius:8px}
+.filmshot{position:relative}
+.spot{position:absolute;border:2px solid #e2b48a;border-radius:12px;box-shadow:0 0 0 2px rgba(7,17,26,.75);pointer-events:none}
+.spot b{position:absolute;left:0;bottom:calc(100% + 4px);background:#07111a;color:#f3efe6;font-size:12px;font-weight:650;line-height:1.3;padding:3px 7px;border-radius:8px;white-space:nowrap;max-width:72vw}
 .mod{margin:0 0 6px;color:#8a8478;letter-spacing:.14em;text-transform:uppercase;font-size:12px}
 </style>
 </head>
@@ -234,6 +237,7 @@ function timeUp(markMode, answerIndex, spoken, go){
   const line = "Time is up. The answer is " + spoken;
   const fb = document.getElementById("fb");
   if(fb){ fb.hidden = false; fb.textContent = line; }
+  if(typeof showFilmMark === "function") showFilmMark();
   afterSpeech(line, go);
 }
 function esc(s){
@@ -1015,6 +1019,39 @@ function startFilm(){
   filmMod = "";
   renderFilmGroups();
 }
+let filmMark = null;
+const FILM_SPOT = {
+  ptx:{l:56,t:14,w:32,h:46}, tension:{l:50,t:12,w:40,h:58}, ards:{l:16,t:24,w:68,h:46},
+  edema:{l:16,t:24,w:68,h:46}, pneumonia:{l:8,t:34,w:32,h:26}, aspiration:{l:16,t:22,w:68,h:48},
+  effusion:{l:54,t:26,w:36,h:52}, collapse:{l:52,t:16,w:38,h:48}, ett:{l:40,t:36,w:22,h:26},
+  cvc:{l:36,t:8,w:30,h:22}, congestion:{l:10,t:46,w:80,h:28}, heart:{l:28,t:28,w:44,h:40},
+  contusion:{l:8,t:24,w:36,h:40}, ribs:{l:8,t:18,w:30,h:34}, subq:{l:4,t:18,w:22,h:48},
+  mediastinum:{l:36,t:6,w:28,h:28}, pneumoperitoneum:{l:16,t:8,w:32,h:18}, hyperinflation:{l:12,t:14,w:76,h:56},
+  widening:{l:34,t:16,w:32,h:34}, bilateral:{l:16,t:22,w:68,h:48}, sbo:{l:22,t:16,w:56,h:56},
+  ctstroke:{l:48,t:26,w:32,h:34}, ich:{l:16,t:28,w:30,h:30}, sah:{l:26,t:40,w:48,h:22},
+  edh:{l:62,t:26,w:24,h:36}, brainedema:{l:46,t:20,w:38,h:42}, braincontusion:{l:20,t:16,w:30,h:26},
+  hydro:{l:28,t:26,w:44,h:32}, pe:{l:34,t:30,w:30,h:26}, ctptx:{l:8,t:16,w:28,h:48},
+  covidct:{l:62,t:20,w:26,h:36}, ctpneumonia:{l:12,t:26,w:30,h:32}, lungedema:{l:20,t:16,w:60,h:52},
+  empyema:{l:56,t:18,w:34,h:52}, ctcollapse:{l:38,t:14,w:30,h:42}, aaa:{l:36,t:38,w:28,h:28},
+  lungcontusion:{l:12,t:22,w:76,h:42}, ischemia:{l:26,t:30,w:48,h:36}, ctfreeair:{l:38,t:10,w:26,h:18},
+  ctsbo:{l:22,t:20,w:56,h:50}, pancreas:{l:34,t:34,w:32,h:24}, liverlac:{l:12,t:26,w:32,h:28},
+  abscess:{l:14,t:30,w:28,h:24}, hydronephrosis:{l:16,t:32,w:26,h:26}, pvt:{l:38,t:36,w:24,h:20},
+  mristroke:{l:6,t:20,w:30,h:38}, dai:{l:34,t:26,w:32,h:26}, mriich:{l:38,t:30,w:24,h:24},
+  mrisah:{l:30,t:26,w:40,h:26}, mripres:{l:16,t:52,w:68,h:28}, cvt:{l:34,t:16,w:32,h:26},
+  meningitis:{l:18,t:14,w:64,h:18}, hsv:{l:6,t:34,w:30,h:28}, mriabscess:{l:50,t:28,w:24,h:24},
+  ods:{l:42,t:34,w:16,h:18}, wernicke:{l:40,t:38,w:20,h:18}, cord:{l:42,t:16,w:16,h:50}
+};
+function showFilmMark(){
+  const spot = document.getElementById("spot");
+  if(!spot || !filmMark) return;
+  spot.hidden = false;
+  spot.style.left = filmMark.l+"%";
+  spot.style.top = filmMark.t+"%";
+  spot.style.width = filmMark.w+"%";
+  spot.style.height = filmMark.h+"%";
+  const label = spot.querySelector("b");
+  if(label) label.textContent = filmMark.name;
+}
 function renderFilmGroups(){
   stopClock();
   const mods = [["xray","X-ray","Chest and abdominal films"],["ct","CT","Computed tomography"],["mri","MRI","Magnetic resonance films"]];
@@ -1062,11 +1099,14 @@ function renderFilmList(){
 function renderFilm(id, stepName){
   const film = OSCE_STATIONS.films.find(function(item){ return item.id===id; });
   const step = shuffled(film[stepName]);
+  const box = (window.FILM_SPOT && FILM_SPOT[film.id]) || {l:30,t:26,w:40,h:36};
+  filmMark = {l:box.l,t:box.t,w:box.w,h:box.h,name:film.title};
   app.innerHTML =
     "<button type='button' class='backrow' id='radBack'>Radiology</button>"+
     "<p class='score'>"+esc(film.modLabel)+" · "+esc(scoreLine("film"))+"</p>"+
     "<p class='mod'>"+esc(film.modLabel)+"</p>"+
-    "<div class='lightbox'><img src='"+esc(film.src)+"?v=20261028d' alt='"+esc(film.modLabel)+" for this station'></div>"+
+    "<div class='lightbox'><div class='filmshot'><img src='"+esc(film.src)+"?v=20261028d' alt='"+esc(film.modLabel)+" for this station'>"+
+    "<div id='spot' class='spot' hidden style='left:"+box.l+"%;top:"+box.t+"%;width:"+box.w+"%;height:"+box.h+"%'><b>"+esc(film.title)+"</b></div></div></div>"+
     "<p class='lede'>"+esc(film.stem)+"</p>"+
     "<p class='prompt'>"+esc(step.prompt)+"</p>"+
     step.options.map(function(opt, i){ return "<button class='choice' data-i='"+i+"'>"+esc(opt)+"</button>"; }).join("")+
@@ -1088,6 +1128,7 @@ function renderFilm(id, stepName){
       fb.hidden = false;
       const lead = filmLead;
       fb.textContent = (ok ? "Correct. " : "That is incorrect. The correct answer is " + step.options[step.answer] + ". ") + lead + step.say;
+      showFilmMark();
       say(fb.textContent);
       const next = document.getElementById("next");
       next.hidden = false;

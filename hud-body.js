@@ -137,10 +137,13 @@ window.zoomIntoAnatomy = function(id, done){
 
 function frame(){
   requestAnimationFrame(frame);
+  var gl = null;
+  try{ gl = renderer && renderer.getContext && renderer.getContext(); }catch(err){ gl = null; }
+  if(!gl || gl.isContextLost()) return;
   if(auto && !dragging && ready) yawTo += 0.004;
   placeCamera();
   resize();
-  renderer.render(scene, camera);
+  try{ renderer.render(scene, camera); }catch(err){}
 }
 requestAnimationFrame(frame);
 new ResizeObserver(resize).observe(canvas);
@@ -208,6 +211,12 @@ function span(){
 
 canvas.addEventListener("webglcontextlost", function(event){
   event.preventDefault();
+  setTimeout(function(){
+    if(!renderer || !renderer.getContext || renderer.getContext().isContextLost()) location.reload();
+  }, 700);
+});
+window.addEventListener("pageshow", function(event){
+  if(event.persisted) location.reload();
 });
 canvas.addEventListener("webglcontextrestored", function(){
   document.body.classList.add("live3d");
@@ -264,6 +273,7 @@ loader.load("models/anatomy/human-reference.glb", function(gltf){
   window.__hraBox = { y: +size.y.toFixed(3), dist: +homeDist.toFixed(3), minY: +box.min.y.toFixed(3), maxY: +box.max.y.toFixed(3) };
   ready = true;
   window.__hraReady = true;
+  try{ sessionStorage.removeItem("hra-retry"); }catch(err){}
   document.body.classList.add("live3d");
   document.body.classList.remove("flat");
   sayLoad("");
@@ -272,5 +282,13 @@ loader.load("models/anatomy/human-reference.glb", function(gltf){
   if(event.total) sayLoad("Loading the 3D body… " + Math.round(event.loaded / event.total * 100) + "%");
   else if(event.loaded) sayLoad("Loading the 3D body… " + mb + " MB");
 }, function(){
+  try{
+    if(!sessionStorage.getItem("hra-retry")){
+      sessionStorage.setItem("hra-retry", "1");
+      location.reload();
+      return;
+    }
+    sessionStorage.removeItem("hra-retry");
+  }catch(err){}
   sayLoad("The 3D body did not finish. Stay on this page and open the patient again.");
 });

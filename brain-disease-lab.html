@@ -33,8 +33,11 @@ h3{margin:14px 0 6px;font-size:16px;letter-spacing:.02em;text-transform:none;col
 #diseases,#sections{flex-direction:column;overflow:visible;align-items:stretch}
 #diseases[hidden],#sections[hidden]{display:none !important}
 #diseases button,#sections button{width:100%;max-width:32rem;border-radius:14px;text-align:left;white-space:normal;min-height:48px;flex:none}
-#diseases button b{display:block;font-weight:600}
-#diseases button span{display:block;margin-top:3px;color:var(--muted);font-size:13px;font-weight:460}
+#diseases button{display:flex;gap:10px;align-items:center}
+#diseases button img{width:64px;height:64px;object-fit:cover;border-radius:10px;flex:none;background:#05080c}
+.inset{width:88px;height:88px;object-fit:cover;border-radius:12px;border:1px solid var(--line);float:left;margin:2px 12px 8px 0;background:#05080c}
+#diseases button b{display:block;color:var(--fg);font-weight:600}
+#diseases button span span{display:block;margin-top:3px;color:var(--muted);font-size:13px;font-weight:460}
 body.list-mode .layout{display:none !important}
 .layout{display:block}
 main{padding:4px 14px 40px}
@@ -172,7 +175,7 @@ function speakLine(text){
     utterance.rate = 0.92;
     utterance.pitch = 1.06;
     if(voice) utterance.voice = voice;
-    speechSynthesis.speak(utterance);
+    setTimeout(function(){ speechSynthesis.speak(utterance); }, 80);
   };
   if(!speechSynthesis.getVoices().length){
     const once = function(){
@@ -181,6 +184,7 @@ function speakLine(text){
     };
     speechSynthesis.addEventListener("voiceschanged", once);
     speechSynthesis.getVoices();
+    setTimeout(function(){ if(speechSynthesis.getVoices().length) say(); }, 300);
     return;
   }
   say();
@@ -189,6 +193,29 @@ function clamp(k){ return Math.max(0, Math.min(1, k)); }
 function mix(a,b,k){ return a+(b-a)*k; }
 function phase(t,a,b){ return clamp((t-a)/(b-a)); }
 function disease(){ return DISEASES.find(function(d){ return d.id===diseaseId; }) || DISEASES[0]; }
+const INSET = {
+  tbi:{src:"scans/edh.jpg", alt:"Extradural blood on a head CT"},
+  sah:{src:"cts/sah.jpg", alt:"Subarachnoid blood on a head CT"},
+  stroke:{src:"scans/early.png", alt:"Early ischemic change on a head CT"},
+  ich:{src:"scans/ich-bg.png", alt:"Deep hemorrhage on a head CT"},
+  se:{src:"scans/dwi.png", alt:"Cortical signal on diffusion MRI"},
+  icp:{src:"scans/ich-shift.png", alt:"Mass effect and midline shift"},
+  hydro:{src:"scans/hydro.png", alt:"Enlarged ventricles"},
+  cns:{src:"mris/meningitis.jpg", alt:"Meningeal signal on MRI"},
+  cvt:{src:"mris/cvt.jpg", alt:"Cerebral venous thrombosis imaging"},
+  hie:{src:"scans/dwi.png", alt:"Restricted diffusion after hypoxia"},
+  death:{src:"scans/normal.jpg", alt:"Non-contrast head CT"}
+};
+function insetHtml(d){
+  const im = INSET[d.id];
+  if(!im) return "";
+  return '<img class="inset" src="'+esc(im.src)+'" alt="'+esc(im.alt)+'">';
+}
+function thumbHtml(d){
+  const im = INSET[d.id];
+  if(!im) return "";
+  return '<img src="'+esc(im.src)+'" alt="'+esc(im.alt)+'">';
+}
 function showDef(id){ return SHOWS[id]; }
 
 const CT_SPOTS = [
@@ -957,7 +984,7 @@ function paintChrome(){
     sections.innerHTML = "";
     context.textContent = "Choose a disease. The next screen is overview, anatomy, and the other chapters.";
     diseases.innerHTML = DISEASES.map(function(d){
-      return '<button type="button" data-d="'+d.id+'"><b>'+esc(d.name)+'</b><span>'+esc(d.full)+'</span></button>';
+      return '<button type="button" data-d="'+d.id+'">'+thumbHtml(d)+'<span><b>'+esc(d.name)+'</b><span>'+esc(d.full)+'</span></span></button>';
     }).join("") + '<button type="button" data-d="scans"><b>Unknown scans</b><span>Ten films, different from each other. The options are shuffled each time you open the set.</span></button>';
     diseases.querySelectorAll("[data-d]").forEach(function(btn){
       btn.onclick = function(){
@@ -1055,7 +1082,7 @@ function render(){
     return;
   }
   const d = disease();
-  const head = '<div class="backrow"><button type="button" id="to-chapters">Chapters</button></div><p class="kicker">'+esc(d.full)+'</p><h2>'+esc(sectionTitle())+'</h2>';
+  const head = '<div class="backrow"><button type="button" id="to-chapters">Chapters</button></div>'+insetHtml(d)+'<p class="kicker">'+esc(d.full)+'</p><h2>'+esc(sectionTitle())+'</h2>';
   if(sectionId==="overview") renderOverview(d, head);
   else if(sectionId==="anatomy") renderAnatomy(d, head);
   else if(sectionId==="etiology") renderList(d, head, "Causes and risks", d.etiology);

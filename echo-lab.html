@@ -37,7 +37,8 @@ header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;marg
 #contact,#probe{position:absolute;pointer-events:none}
 #contact{width:28px;height:28px;border-radius:50%;border:2px solid #9fd4ff;box-shadow:0 0 12px rgba(120,190,255,.8);left:calc(var(--x) * 1%);top:calc(var(--y) * 1%);transform:translate(-50%,-50%);opacity:0}
 #contact.on{opacity:1}
-#probe{width:40px;height:64px;left:calc(var(--x) * 1%);top:calc(var(--y) * 1%);transform-origin:50% 88%;transform:translate(-50%,calc(-88% - var(--lift) * 36px)) rotate(calc(var(--spin) * 1deg));transition:transform .06s linear}
+#probe{width:40px;height:64px;left:calc(var(--x) * 1%);top:calc(var(--y) * 1%);transform-origin:50% 88%;transform:translate(-50%,calc(-88% - var(--lift) * 36px)) rotate(calc(var(--spin) * 1deg));transition:transform .06s linear;overflow:visible}
+#probe .nib{position:absolute;left:50%;top:-12px;width:0;height:0;transform:translateX(-50%);border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #e2b48a;filter:drop-shadow(0 0 3px rgba(0,0,0,.65))}
 .dials{display:flex;gap:10px;padding:0 10px 8px}
 .dials label{flex:1;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
 .dials input{width:100%}
@@ -63,10 +64,17 @@ header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;marg
   #echo{height:46dvh}
 }
 #doors{display:none}
-body.doors #doors{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px}
-body.doors #doors button{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;min-height:46dvh;border-radius:18px;text-align:left;padding:16px}
-body.doors #doors b{font-family:Fraunces,Georgia,serif;font-size:28px;font-weight:520}
+body.doors #doors{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;min-height:calc(100dvh - 72px);perspective:900px}
+body.doors #doors button{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;min-height:calc(100dvh - 96px);border-radius:18px;text-align:left;padding:18px 16px}
+body.doors #doors button[data-door="supply"]{animation:doorLeft 1.05s cubic-bezier(.22,.61,.2,1) both}
+body.doors #doors button[data-door="sim"]{animation:doorRight 1.05s cubic-bezier(.22,.61,.2,1) both}
+body.doors #doors b{font-family:Fraunces,Georgia,serif;font-size:clamp(26px,5vw,40px);font-weight:520}
 body.doors #doors span{margin-top:8px;color:var(--muted);font-size:14px;line-height:1.35}
+@keyframes doorLeft{from{opacity:0;transform:translateX(-120%)}to{opacity:1;transform:none}}
+@keyframes doorRight{from{opacity:0;transform:translateX(120%)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){
+  body.doors #doors button[data-door="supply"],body.doors #doors button[data-door="sim"]{animation:none}
+}
 body.doors .stage,body.doors #tabs,body.doors #lesions,body.doors #phases,body.doors #status,body.doors .sheet{display:none}
 body.sim #tabs,body.sim #lesions,body.sim #phases,body.sim .sheet,body.sim .caption,body.sim #ecg,body.supply #echo,body.supply [aria-label="Patient and probe"]{display:none}
 body.sim .stage{grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr)}
@@ -78,8 +86,8 @@ body.supply #heart{height:46dvh}
 body.supply #ecg{height:240px}
 @media(max-width:700px){
   body.doors #doors{grid-template-columns:1fr 1fr}
-  body.doors #doors button{min-height:42dvh;padding:12px}
-  body.doors #doors b{font-size:22px}
+  body.doors #doors button{min-height:calc(100dvh - 96px);padding:14px}
+  body.doors #doors b{font-size:clamp(22px,6vw,30px)}
   body.sim .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 }
 </style>
@@ -102,7 +110,6 @@ body.supply #ecg{height:240px}
     <h2>Heart</h2>
     <canvas id="heart"></canvas>
     <p id="heartmsg">Opening the heart…</p>
-    <p id="tag" class="tag">No coronary blockade</p>
   </section>
   <section class="panel" aria-label="Patient and probe">
     <h2>Patient</h2>
@@ -129,6 +136,7 @@ body.supply #ecg{height:240px}
       <p id="hint">Put a finger on the chest. The finger is the probe. Twist the finger and the probe turns on its axis.</p>
       <div id="contact"></div>
       <div id="probe" aria-hidden="true">
+        <span class="nib" title="Probe pointer"></span>
         <svg viewBox="0 0 40 64" width="40" height="64">
           <rect x="11" y="2" width="18" height="34" rx="6" fill="#e6edf2" stroke="#7e8c99"/>
           <rect x="16" y="7" width="8" height="7" rx="1.5" fill="#9aabba"/>
@@ -139,7 +147,6 @@ body.supply #ecg{height:240px}
     </div>
     <div class="dials">
       <label>Turn <input id="rot" type="range" min="0" max="120" value="18"></label>
-      <label>Rock <input id="tilt" type="range" min="0" max="100" value="40"></label>
     </div>
   </section>
   <section class="panel scan" aria-label="Simulated echo and ECG">
@@ -162,9 +169,9 @@ const TABS = [
   ["anatomy","Heart"],["coronary","Supply"]
 ];
 const LESIONS = [
-  ["none","No lesion"],["ladP","LAD"],["lcxP","LCx"],["rcaP","RCA"],["lm","Left main"]
+  ["ladP","LAD"],["lcxP","LCx"],["rcaP","RCA"],["lm","Left main"]
 ];
-const PHASES = [["normal","Normal"],["ischaemia","Ischaemia"],["infarct","Infarction"],["recovery","Recovery"]];
+const PHASES = [["ischaemia","Ischaemia"],["infarct","Infarction"],["recovery","Recovery"]];
 const CULPRIT = {
   ladP:["Left coronary artery","Anterior interventricular artery","Septal branches of anterior interventricular artery"],
   ladM:["Anterior interventricular artery","Septal branches of anterior interventricular artery"],
@@ -181,17 +188,17 @@ const ZONE_OF = {
   lateral:["bAL","bIL","mAL","mIL","aL"], apex:["apex"]
 };
 const VIEW = {
-  off:{name:"Off the window", note:"The footprint is not on a standard window.", see:[]},
-  plax:{name:"Parasternal long axis", note:"Marker toward the right shoulder. Right ventricle nearest the probe, then septum, left ventricle and inferolateral wall. Aortic valve and left atrium sit at the base.", see:["Right ventricle","Septum","Left ventricle","Mitral valve","Aortic valve","Left atrium"]},
-  "psax-av":{name:"Parasternal short axis, aortic valve", note:"Marker toward the left shoulder, shallow tilt. The aortic valve is the Mercedes-Benz in the centre, with the tricuspid and right ventricular outflow beside it.", see:["Aortic valve","Left atrium","Right atrium","Right ventricular outflow","Tricuspid valve"]},
-  "psax-mv":{name:"Parasternal short axis, mitral valve", note:"Same window, steeper tilt. The mitral orifice is a fish-mouth. Basal segments ring the ventricle.", see:["Mitral valve","Basal left ventricle","Septum"]},
-  "psax-pap":{name:"Parasternal short axis, papillary muscles", note:"Mid-ventricular ring. Anterior is at the top of a usual display, inferior at the bottom, lateral to one side and the septum to the other.", see:["Mid anterior","Mid anterolateral","Mid inferolateral","Mid inferior","Mid inferoseptal","Mid anteroseptal"]},
-  a4c:{name:"Apical four-chamber", note:"Probe on the apex, marker to the patient’s left. Apex is near the probe. The septum and lateral wall face each other.", see:["Left ventricle","Left atrium","Right ventricle","Right atrium","Mitral valve","Tricuspid valve"]},
-  a2c:{name:"Apical two-chamber", note:"Rotate about 60° from the four-chamber. Anterior and inferior walls, no right ventricle.", see:["Left ventricle","Left atrium","Anterior wall","Inferior wall","Mitral valve"]},
-  a3c:{name:"Apical three-chamber", note:"Further rotation brings in the aortic valve. Anteroseptal and inferolateral walls.", see:["Left ventricle","Left atrium","Aortic valve","Anteroseptal wall","Inferolateral wall"]},
-  a5c:{name:"Apical five-chamber", note:"From the four-chamber, tilt anteriorly. The left ventricular outflow and aortic valve appear.", see:["Left ventricle","Left atrium","Aortic valve","Left ventricular outflow","Septum"]},
-  sc4:{name:"Subcostal four-chamber", note:"Probe under the xiphoid, aimed up toward the left shoulder. Liver is near the probe. Useful when the parasternal window is poor, and for pericardial fluid.", see:["Liver","Right ventricle","Left ventricle","Both atria"]},
-  ivc:{name:"Inferior vena cava", note:"From the subcostal window, aim toward the patient’s right. A long tube entering the right atrium.", see:["Inferior vena cava","Right atrium","Liver"]}
+  off:{name:"Off the window", mark:"", note:"The footprint is not on a standard window.", see:[]},
+  plax:{name:"Parasternal long axis", mark:"pointer to the right shoulder", note:"Pointer to the right shoulder. Right ventricle nearest the probe, then septum, left ventricle and inferolateral wall. Aortic valve and left atrium sit at the base.", see:["Right ventricle","Septum","Left ventricle","Mitral valve","Aortic valve","Left atrium"]},
+  "psax-av":{name:"Parasternal short axis, aortic valve", mark:"pointer to the left shoulder", note:"Pointer to the left shoulder, shallow rock. The aortic valve is the Mercedes-Benz in the centre, with the tricuspid and right ventricular outflow beside it.", see:["Aortic valve","Left atrium","Right atrium","Right ventricular outflow","Tricuspid valve"]},
+  "psax-mv":{name:"Parasternal short axis, mitral valve", mark:"pointer to the left shoulder", note:"Pointer to the left shoulder, steeper rock. The mitral orifice is a fish-mouth. Basal segments ring the ventricle.", see:["Mitral valve","Basal left ventricle","Septum"]},
+  "psax-pap":{name:"Parasternal short axis, papillary muscles", mark:"pointer to the left shoulder", note:"Pointer to the left shoulder. Mid-ventricular ring. Anterior is at the top of a usual display, inferior at the bottom, lateral to one side and the septum to the other.", see:["Mid anterior","Mid anterolateral","Mid inferolateral","Mid inferior","Mid inferoseptal","Mid anteroseptal"]},
+  a4c:{name:"Apical four-chamber", mark:"pointer to the patient’s left", note:"Probe on the apex, pointer to the patient’s left. Apex is near the probe. The septum and lateral wall face each other.", see:["Left ventricle","Left atrium","Right ventricle","Right atrium","Mitral valve","Tricuspid valve"]},
+  a2c:{name:"Apical two-chamber", mark:"pointer rotated about 60° from the four-chamber", note:"Pointer rotated about 60° from the four-chamber. Anterior and inferior walls, no right ventricle.", see:["Left ventricle","Left atrium","Anterior wall","Inferior wall","Mitral valve"]},
+  a3c:{name:"Apical three-chamber", mark:"pointer further round, toward the right shoulder", note:"Pointer further round, toward the right shoulder. The aortic valve comes in. Anteroseptal and inferolateral walls.", see:["Left ventricle","Left atrium","Aortic valve","Anteroseptal wall","Inferolateral wall"]},
+  a5c:{name:"Apical five-chamber", mark:"pointer to the patient’s left, rocked anteriorly", note:"Pointer to the patient’s left, rocked anteriorly from the four-chamber. The left ventricular outflow and aortic valve appear.", see:["Left ventricle","Left atrium","Aortic valve","Left ventricular outflow","Septum"]},
+  sc4:{name:"Subcostal four-chamber", mark:"pointer toward the left shoulder", note:"Probe under the xiphoid, pointer toward the left shoulder. Liver is near the probe. Useful when the parasternal window is poor, and for pericardial fluid.", see:["Liver","Right ventricle","Left ventricle","Both atria"]},
+  ivc:{name:"Inferior vena cava", mark:"pointer toward the patient’s right", note:"From the subcostal window, pointer toward the patient’s right. A long tube entering the right atrium.", see:["Inferior vena cava","Right atrium","Liver"]}
 };
 const PRESET = {
   plax:{x:63,y:43,rot:18,tilt:40}, "psax-av":{x:63,y:41,rot:82,tilt:16}, "psax-mv":{x:63,y:43,rot:82,tilt:46},
@@ -1120,9 +1127,8 @@ function paintProbe(){
   const hint = document.getElementById("hint");
   if(hint) hint.classList.toggle("hide", p.down);
   document.getElementById("rot").value = String(Math.round(Math.max(0, Math.min(120, p.rot))));
-  document.getElementById("tilt").value = String(Math.round(p.tilt));
   const meta = VIEW[state.view] || VIEW.off;
-  document.getElementById("viewtitle").textContent = meta.name;
+  document.getElementById("viewtitle").textContent = meta.mark ? meta.name+" · "+meta.mark : meta.name;
   ["z-para","z-apex","z-sub","z-ivc"].forEach(function(id){
     const node = document.getElementById(id);
     if(node) node.setAttribute("stroke", "rgba(80,60,40,.45)");
@@ -1161,6 +1167,7 @@ function moveProbe(clientX, clientY, down){
   state.probe.y = clamp((clientY-rect.top-m.oy)/m.scale, 6, 96);
   state.probe.down = down;
   state.probe.lift = down ? 0 : 1;
+  if(down && Math.hypot(state.probe.x-63, state.probe.y-43) < 14) state.probe.tilt = clamp((state.probe.y - 34) * 7.2, 8, 96);
   if(down) state.view = windowFrom();
   paintProbe();
   paintStatus();
@@ -1227,11 +1234,6 @@ document.getElementById("rot").addEventListener("input", function(){
   if(state.probe.down) state.view = windowFrom();
   paintProbe(); paintStatus(); syncProbeCopy();
 });
-document.getElementById("tilt").addEventListener("input", function(){
-  state.probe.tilt = Number(this.value);
-  if(state.probe.down) state.view = windowFrom();
-  paintProbe(); paintStatus(); syncProbeCopy();
-});
 function jump(view){
   const p = PRESET[view];
   if(!p) return;
@@ -1245,14 +1247,12 @@ function jump(view){
 function paintStatus(){
   const meta = VIEW[state.view] || VIEW.off;
   const touch = state.probe.down ? "Finger is the probe" : "Probe lifted";
-  const extra = state.globalOn ? "Global hypokinesia" : (state.lesion==="none" ? "No blockade" : lesionName()+" — "+territoryPhrase());
-  document.getElementById("status").textContent = touch+" · "+meta.name+" · "+extra+" · "+phaseName()+(state.dominance==="left"?" · Left dominant":"");
-  const tag = document.getElementById("tag");
-  if(tag){
-    if(state.globalOn) tag.textContent = "Global hypokinesia — the whole left ventricle";
-    else if(state.lesion==="none") tag.textContent = "No coronary blockade";
-    else tag.textContent = lesionName()+" — "+territoryPhrase();
-  }
+  const bits = [touch, meta.mark ? meta.name+" · "+meta.mark : meta.name];
+  if(state.globalOn) bits.push("Global hypokinesia");
+  else if(state.lesion!=="none") bits.push(lesionName()+" — "+territoryPhrase());
+  if(state.phase!=="normal") bits.push(phaseName());
+  if(state.dominance==="left") bits.push("Left dominant");
+  document.getElementById("status").textContent = bits.join(" · ");
 }
 function paintTabs(){
   document.querySelectorAll("#tabs button").forEach(function(btn){
@@ -1471,7 +1471,7 @@ function caseSheet(){
 function syncProbeCopy(){
   const meta = VIEW[state.view] || VIEW.off;
   const name = document.getElementById("probe-name");
-  if(name) name.textContent = meta.name;
+  if(name) name.textContent = meta.mark ? meta.name+" · "+meta.mark : meta.name;
   const note = document.getElementById("probe-note");
   if(note){
     const see = meta.see.length ? " Visible structures: "+meta.see.join(", ")+"." : "";
@@ -1547,8 +1547,18 @@ function answerCase(i){
   speakLine(line);
   setTimeout(function(){ state.qIx += 1; state.locked=false; renderSheet(); }, 1600);
 }
+let echoFrame = 0;
+function releaseGraphics(){
+  if(echoFrame) cancelAnimationFrame(echoFrame);
+  echoFrame = 0;
+  if(renderer){
+    try{ renderer.dispose(); renderer.forceContextLoss(); }catch(err){}
+    renderer = null;
+  }
+}
 document.getElementById("back").onclick = function(){
-  if(mode){ location.href = "echo-lab.html?v=20261030a"; return; }
+  releaseGraphics();
+  if(mode){ location.href = "echo-lab.html?v=20261030c"; return; }
   try{
     if(window.parent && window.parent!==window && typeof window.parent.returnToIcu==="function"){
       window.parent.returnToIcu();
@@ -1560,7 +1570,7 @@ document.getElementById("back").onclick = function(){
 document.getElementById("doors").onclick = function(event){
   const btn = event.target.closest("[data-door]");
   if(!btn) return;
-  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261030a";
+  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261030c";
 };
 document.getElementById("tabs").innerHTML = TABS.map(function(tab){
   return "<button type='button' data-tab='"+tab[0]+"'>"+tab[1]+"</button>";
@@ -1601,9 +1611,10 @@ function loop(){
   }
   if(mode==="sim") drawEcho();
   if(mode==="supply") drawECG();
-  if(mode) requestAnimationFrame(loop);
+  if(mode) echoFrame = requestAnimationFrame(loop);
 }
-if(mode) requestAnimationFrame(loop);
+if(mode) echoFrame = requestAnimationFrame(loop);
+window.addEventListener("pagehide", releaseGraphics);
 </script>
 </body>
 </html>
