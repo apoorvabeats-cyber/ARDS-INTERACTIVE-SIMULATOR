@@ -120,9 +120,14 @@ scene.add(root);
 const ray = new THREE.Raycaster();
 const parts = [];
 let currentId = "ett";
-let realEtt = false;
-let ettToken = 0;
-const ETT_URL = "assets/models/ETT.glb";
+let realModel = false;
+let modelToken = 0;
+const REAL = {
+  ett: {url:"assets/models/ETT.glb", label:"Endotracheal tube", text:"Cuffed adult tracheal tube. Inspect the shaft, cuff, and connector."},
+  lma: {url:"assets/models/LMA.glb", label:"Laryngeal mask airway", text:"Supraglottic airway. The mask sits over the larynx and the tube joins the breathing circuit."},
+  dl: {url:"assets/models/Laryngoscope.glb", label:"Laryngoscope", text:"Handle and blade used to lift the tongue and see the vocal cords."},
+  nrb: {url:"assets/models/NRBM.glb", label:"Non-rebreather mask", text:"Face mask with a reservoir bag, used to give a high concentration of oxygen."}
+};
 let selected = null;
 let exploded = false;
 let turning = false;
@@ -815,20 +820,21 @@ function setEttStatus(text, bad){
   el.className = bad ? "bad" : "";
   el.textContent = text;
 }
-function loadRealEtt(){
-  const token = ++ettToken;
-  realEtt = false;
-  setEttStatus("Loading the endotracheal tube…", false);
+function loadReal(id){
+  const spec = REAL[id];
+  const token = ++modelToken;
+  realModel = false;
+  setEttStatus("Loading the "+spec.label.toLowerCase()+"…", false);
   const loader = new GLTFLoader();
-  loader.load(ETT_URL, function(gltf){
-    if(token !== ettToken || currentId !== "ett") return;
+  loader.load(spec.url, function(gltf){
+    if(token !== modelToken || currentId !== id) return;
     const model = gltf.scene;
     const box = new THREE.Box3().setFromObject(model);
     const centre = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const maxDimension = Math.max(size.x, size.y, size.z);
     if(!Number.isFinite(maxDimension) || maxDimension <= 0){
-      setEttStatus("The file at assets/models/ETT.glb opened, but it is not a usable 3D model. No substitute is shown.", true);
+      setEttStatus(spec.label+" opened, but it is not a usable 3D model. No substitute is shown.", true);
       paintLists();
       return;
     }
@@ -839,36 +845,36 @@ function loadRealEtt(){
       if(!object.isMesh) return;
       object.castShadow = true;
       object.receiveShadow = true;
-      const title = object.name && object.name !== "Mesh" ? object.name : "Endotracheal tube";
+      const title = object.name && object.name !== "Mesh" ? object.name : spec.label;
       object.userData.id = object.name || object.uuid;
       object.userData.title = title;
-      object.userData.text = "Part of the endotracheal tube.";
+      object.userData.text = spec.text;
       object.userData.ex = [0,0,0];
       parts.push(object);
     });
     root.add(model);
     parts.forEach(function(mesh){ mesh.userData.home = mesh.position.clone(); });
-    realEtt = true;
+    realModel = true;
     setEttStatus("", false);
     fit();
     paintLists();
     select(null);
   }, undefined, function(){
-    if(token !== ettToken || currentId !== "ett") return;
-    realEtt = false;
-    setEttStatus("The endotracheal tube file is not in the project yet. Place the complete GLB at assets/models/ETT.glb. No substitute model is shown.", true);
+    if(token !== modelToken || currentId !== id) return;
+    realModel = false;
+    setEttStatus(spec.label+" could not be loaded. No substitute is shown.", true);
     paintLists();
   });
 }
 function showItem(id){
   currentId = id;
   clearRoot();
-  ettToken += 1;
-  realEtt = false;
+  modelToken += 1;
+  realModel = false;
   setEttStatus("", false);
   flags.cuff = true; flags.blade = true; flags.vented = true; flags.reservoir = true; flags.flow = false; flags.bubble = false;
-  if(id === "ett"){
-    loadRealEtt();
+  if(REAL[id]){
+    loadReal(id);
     paintLists();
     select(null);
     return;
@@ -908,8 +914,8 @@ function paintLists(keepCats){
   }).join("");
   aside.innerHTML = "<h2>"+item.name+"</h2>"+toggles+"<h2>Parts</h2>"+rows+
     "<div id='readout'><b>"+(selected?selected.userData.title:"Touch a part")+"</b><p>"+(selected?selected.userData.text:"It lights, and the voice names it and says what it is for.")+"</p></div>"+
-    "<p class='fine'>"+(currentId==="ett"
-      ? (realEtt ? "Your endotracheal tube. Drag to turn. Pinch to zoom." : "Waiting for assets/models/ETT.glb. No drawn tube is shown.")
+    "<p class='fine'>"+(REAL[currentId]
+      ? (realModel ? REAL[currentId].label+". Drag to turn. Pinch to zoom." : "Loading "+REAL[currentId].label+".")
       : "Real-time 3D teaching model with separate parts. Drag to turn. Pinch or use Zoom. Not a manufacturer scan.")+"</p>";
   aside.scrollTop = asideTop;
   aside.querySelectorAll("[data-part]").forEach(function(btn){
