@@ -61,7 +61,13 @@ let hot = "";
 const ray = new THREE.Raycaster();
 
 function sayLoad(text){
-  if(loadEl) loadEl.textContent = text;
+  if(!loadEl) return;
+  loadEl.textContent = text || "";
+  if(!text){
+    loadEl.style.display = "none";
+    return;
+  }
+  loadEl.style.cssText = "position:fixed;left:16px;right:16px;bottom:max(18px,env(safe-area-inset-bottom));z-index:90;margin:0;padding:14px 16px;border-radius:14px;background:rgba(8,12,16,.92);border:1px solid rgba(243,239,230,.35);color:#f3efe6;font:600 16px/1.35 system-ui,sans-serif;text-align:center;display:block;pointer-events:none;";
 }
 function resize(){
   const w = canvas.clientWidth || 300;
@@ -202,7 +208,7 @@ canvas.addEventListener("webglcontextrestored", function(){
   document.body.classList.remove("flat");
   resetView();
 });
-sayLoad("Loading the anatomical model…");
+sayLoad("Loading the 3D body…");
 const loader = new GLTFLoader();
 loader.load("models/anatomy/human-reference.glb", function(gltf){
   const model = gltf.scene;
@@ -252,8 +258,9 @@ loader.load("models/anatomy/human-reference.glb", function(gltf){
   document.body.classList.remove("flat");
   sayLoad("");
 }, function(event){
-  if(!event.total) return;
-  sayLoad("Loading the anatomical model… " + Math.round(event.loaded / event.total * 100) + "%");
+  const mb = (event.loaded / 1048576).toFixed(1);
+  if(event.total) sayLoad("Loading the 3D body… " + Math.round(event.loaded / event.total * 100) + "%");
+  else if(event.loaded) sayLoad("Loading the 3D body… " + mb + " MB");
 }, function(){
-  sayLoad("The 3D model could not load. Reload this page. The file is models/anatomy/human-reference.glb (Human Reference Atlas, adult male, simplified for the web).");
+  sayLoad("The 3D body did not finish. Stay on this page and open the patient again.");
 });

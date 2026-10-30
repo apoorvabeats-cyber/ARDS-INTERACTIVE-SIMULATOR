@@ -25,7 +25,7 @@
   let nextBeat = 0;
   let goTimer = 0;
   let synced = false;
-  const flags = { pulse: true, vent: true, room: true };
+  const flags = { pulse: true, vent: true, room: false };
 
   function pip(){
     const flow = (sim.vt / 1000) / ((60 / sim.rr) * tiFrac);
@@ -168,6 +168,11 @@
   function syncBed(){
     const bed = document.getElementById("bed");
     if(!bed || !document.body.classList.contains("icu-open")) return;
+    if(!flags.room){
+      if(!bed.paused) bed.pause();
+      return;
+    }
+    if(!bed.getAttribute("src")) bed.src = "scan-bed.mp3";
     bed.muted = false;
     bed.volume = 0.24;
     if(!bed.paused) return;
@@ -329,20 +334,19 @@
     holdRoom(room);
   }
   function loadBody(){
-    if(window.__bodyBoot) return;
-    window.__bodyBoot = true;
-    const s = document.createElement("script");
-    s.type = "module";
-    s.src = "hud-body.js?v=20261030c";
-    document.body.appendChild(s);
+    if(typeof window.startAnatomy === "function"){
+      window.startAnatomy();
+      return;
+    }
+    window.__bodyWanted = true;
   }
   function leaveForBody(){
-    loadBody();
-    quietLine();
-    document.body.classList.remove("icu-open", "in", "enter", "inside", "lab", "arena", "osce", "reference", "picking");
+    document.body.classList.remove("icu-gate", "icu-open", "in", "enter", "inside", "lab", "arena", "osce", "reference", "picking");
     const room = document.getElementById("room");
     if(room) room.innerHTML = "";
-    document.body.classList.add("body-only");
+    document.body.classList.add("body-only", "live3d");
+    document.body.classList.remove("flat");
+    quietLine();
     if(typeof window.keepScore === "function") window.keepScore();
     const tabs = document.getElementById("rail-tabs");
     const bubbles = document.getElementById("organ-bubbles");
@@ -350,12 +354,11 @@
     if(bubbles) bubbles.hidden = true;
     if(typeof finishIntro === "function") finishIntro();
     if(typeof window.resetAtlas === "function") window.resetAtlas();
-    document.body.classList.add("live3d");
-    document.body.classList.remove("flat");
     const view = document.getElementById("view");
     if(view) view.style.display = "block";
     const figure = document.getElementById("figure");
     if(figure) figure.style.opacity = "1";
+    loadBody();
   }
   window.openBody = leaveForBody;
   frame.addEventListener("click", function(event){
