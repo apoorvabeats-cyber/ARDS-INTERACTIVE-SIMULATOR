@@ -60,7 +60,6 @@ header a{text-decoration:none;min-height:44px;display:inline-flex;align-items:ce
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 
 const CATS = [["airway","Airway"],["oxygen","Oxygen"],["access","Access"],["gi","Gastrointestinal"],["support","Support"]];
@@ -93,13 +92,10 @@ renderer.setClearColor(0x101418, 1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.add(new THREE.HemisphereLight(0xf7f1e6, 0x1b140f, 0.85));
 const key = new THREE.DirectionalLight(0xfff8ee, 2.4);
 key.position.set(4, 6, 5);
-key.castShadow = true;
 scene.add(key);
 const rim = new THREE.DirectionalLight(0xb7e4f2, 1.1);
 rim.position.set(-5, 2, -4);
@@ -840,10 +836,9 @@ function loadReal(id){
   realModel = false;
   setEttStatus("Loading the "+spec.label.toLowerCase()+"…", false);
   const loader = new GLTFLoader();
-  loader.setMeshoptDecoder(MeshoptDecoder);
   const fileLoader = new THREE.FileLoader();
   fileLoader.setResponseType("arraybuffer");
-  fileLoader.load(spec.url+"?v=20261030w", function(buf){
+  fileLoader.load(spec.url+"?v=20261030x", function(buf){
     loader.parse(buf, "", function(gltf){
     if(token !== modelToken || currentId !== id) return;
     const model = gltf.scene;
@@ -861,8 +856,6 @@ function loadReal(id){
     model.position.copy(centre).multiplyScalar(-scale);
     model.traverse(function(object){
       if(!object.isMesh) return;
-      object.castShadow = true;
-      object.receiveShadow = true;
       const title = object.name && object.name !== "Mesh" ? object.name : spec.label;
       object.userData.id = object.name || object.uuid;
       object.userData.title = title;
