@@ -328,7 +328,16 @@
     bindModules(room);
     holdRoom(room);
   }
+  function loadBody(){
+    if(window.__bodyBoot) return;
+    window.__bodyBoot = true;
+    const s = document.createElement("script");
+    s.type = "module";
+    s.src = "hud-body.js?v=20261030c";
+    document.body.appendChild(s);
+  }
   function leaveForBody(){
+    loadBody();
     quietLine();
     document.body.classList.remove("icu-open", "in", "enter", "inside", "lab", "arena", "osce", "reference", "picking");
     const room = document.getElementById("room");

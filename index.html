@@ -8,7 +8,8 @@
 <!-- pages-build 20261021r -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520;9..144,640&family=Figtree:wght@460;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520;9..144,640&family=Figtree:wght@460;600&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520;9..144,640&family=Figtree:wght@460;600&display=swap"></noscript>
 <script type="importmap">
 {"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}
 </script>
@@ -446,8 +447,8 @@ body.icu-gate #icu-gate button{appearance:none;-webkit-appearance:none;min-heigh
 <body class="hud3d icu-gate">
 <script>window.anatomyManaged = true;</script>
 <canvas class="dust" id="dust" aria-hidden="true"></canvas>
-<audio id="bed" src="scan-bed.mp3" loop preload="auto" playsinline></audio>
-<audio id="line" preload="auto"></audio>
+<audio id="bed" src="scan-bed.mp3" loop preload="none" playsinline></audio>
+<audio id="line" preload="none"></audio>
 <div class="glow" aria-hidden="true"></div>
 <button type="button" class="skip" id="skip" aria-label="Skip" hidden></button>
 <header class="hud-header">
@@ -461,7 +462,7 @@ body.icu-gate #icu-gate button{appearance:none;-webkit-appearance:none;min-heigh
   <h2>Turn the body.</h2>
 </div>
 <div class="approach" id="approach">
-  <img id="plate" src="brain-close.jpg" alt="">
+  <img id="plate" src="brain-close.jpg" alt="" loading="lazy">
   <p>Cortex and cerebral vessels</p>
 </div>
 <div class="icu" id="icu">
@@ -521,7 +522,6 @@ body.icu-gate #icu-gate button{appearance:none;-webkit-appearance:none;min-heigh
     <button type="button" id="icu-enter">Enter the ICU</button>
   </div>
 </div>
-<script src="mcq-bank.js?v=20261029b"></script>
 <script>
 const ORGANS = [
   {
@@ -1900,6 +1900,23 @@ function mcqPool(){
   return MCQ_BANK.items.filter(function(item){ return item.system===mcqSystem; });
 }
 function renderTest(){
+  if(!window.MCQ_BANK){
+    room.innerHTML = '<button type="button" class="back" id="back">Back to the body</button><h2>Test the brain</h2><p class="empty">Loading the questions…</p>';
+    document.getElementById("back").onclick = closePage;
+    if(!window.__mcqLoading){
+      window.__mcqLoading = true;
+      const s = document.createElement("script");
+      s.src = "mcq-bank.js?v=20261029b";
+      s.onload = function(){ window.__mcqLoading = false; renderTest(); };
+      s.onerror = function(){
+        window.__mcqLoading = false;
+        room.innerHTML = '<button type="button" class="back" id="back">Back to the body</button><h2>Test the brain</h2><p class="empty">The questions did not load. Reload the page.</p>';
+        document.getElementById("back").onclick = closePage;
+      };
+      document.body.appendChild(s);
+    }
+    return;
+  }
   stopSpoken();
   finishIntro();
   setSpin(false);
@@ -1907,11 +1924,6 @@ function renderTest(){
   inside = null;
   document.body.classList.add("in","enter");
   document.body.classList.remove("inside","lab","arena","osce","reference","opening","scanning","doors");
-  if(!window.MCQ_BANK){
-    room.innerHTML = '<button type="button" class="back" id="back">Back to the body</button><h2>Test the brain</h2><p class="empty">The questions did not load. Reload the page.</p>';
-    document.getElementById("back").onclick = closePage;
-    return;
-  }
   if(!mcqSystem){
     const total = MCQ_BANK.items.length;
     const systems = MCQ_BANK.systems.map(function(name){
@@ -2097,7 +2109,6 @@ if(!reduced) requestAnimationFrame(drawDust);
 </script>
 <!-- pages-build 20261029a -->
 <script src="bed-bridge.js?v=20261029a"></script>
-<script src="icu-bay.js?v=20261030b"></script>
-<script type="module" src="hud-body.js?v=20261030b"></script>
+<script src="icu-bay.js?v=20261030c"></script>
 </body>
 </html>
