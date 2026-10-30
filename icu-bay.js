@@ -25,7 +25,7 @@
   let nextBeat = 0;
   let goTimer = 0;
   let synced = false;
-  const flags = { pulse: true, vent: true, room: false };
+  const flags = { pulse: true, vent: true, room: true };
 
   function pip(){
     const flow = (sim.vt / 1000) / ((60 / sim.rr) * tiFrac);
@@ -349,9 +349,8 @@
     quietLine();
     if(typeof window.keepScore === "function") window.keepScore();
     const tabs = document.getElementById("rail-tabs");
-    const bubbles = document.getElementById("organ-bubbles");
     if(tabs) tabs.hidden = true;
-    if(bubbles) bubbles.hidden = true;
+    if(typeof window.showOrganTabs === "function") window.showOrganTabs();
     if(typeof finishIntro === "function") finishIntro();
     if(typeof window.resetAtlas === "function") window.resetAtlas();
     const view = document.getElementById("view");
