@@ -866,7 +866,7 @@ function loadReal(id){
     });
     root.add(model);
     parts.forEach(function(mesh){ mesh.userData.home = mesh.position.clone(); });
-    try { if(id==="ett" || id==="lma" || id==="bvm" || id==="dl" || id==="vl" || id==="defib" || id==="o2tube" || id==="omask" || id==="suction" || id==="sb" || id==="niv" || id==="o2kit") buildEttGuides(model); } catch (err) {}
+    try { if(id==="ett" || id==="lma" || id==="bvm" || id==="dl" || id==="vl" || id==="defib" || id==="o2tube" || id==="omask" || id==="suction" || id==="sb" || id==="niv" || id==="o2kit" || id==="needles" || id==="dialysis" || id==="cvc" || id==="epidural") buildEttGuides(model); } catch (err) {}
     realModel = true;
     setEttStatus("", false);
     fit();
@@ -1040,6 +1040,10 @@ function activeParts(){
   if(currentId==="sb") return SB_PARTS;
   if(currentId==="niv") return NIV_PARTS;
   if(currentId==="o2kit") return KIT_PARTS;
+  if(currentId==="needles") return ART_PARTS;
+  if(currentId==="dialysis") return DIA_PARTS;
+  if(currentId==="cvc") return CVC_PARTS;
+  if(currentId==="epidural") return PAC_PARTS;
   if(currentId==="ett") return ETT_PARTS;
   return null;
 }
@@ -1055,6 +1059,10 @@ function activePartId(x, y, z){
   if(currentId==="sb") return sbPartId(x, y, z);
   if(currentId==="niv") return nivPartId(x, y, z);
   if(currentId==="o2kit") return kitPartId(x, y, z);
+  if(currentId==="needles") return artPartId(x, y, z);
+  if(currentId==="dialysis") return diaPartId(x, y, z);
+  if(currentId==="cvc") return cvcPartId(x, y, z);
+  if(currentId==="epidural") return pacPartId(x, y, z);
   return ettPartId(x, y, z);
 }
 function vlPartId(x, y, z){
@@ -1125,6 +1133,40 @@ function kitPartId(x, y, z){
   if(x > -0.85 && x < -0.45 && z > -0.12 && z < 0.38) return "mask";
   if(x > -0.55 && x < -0.08 && z > -0.12 && z < 0.48) return "corrugated";
   return "tubing";
+}
+function artPartId(x, y, z){
+  if(z > -0.02){
+    if(x > 0.80) return "tip";
+    if(x < -0.42) return "hub";
+    return "body";
+  }
+  return "needle";
+}
+function diaPartId(x, y, z){
+  if(x > -0.22) return "kit";
+  if(y < -0.84 && x < -0.55) return "tip";
+  if(y > -0.08 && y < 0.22 && x < -0.55) return "wing";
+  if(y > 0.74 && x < -0.40) return "hub";
+  if(y > 0.28 && y < 0.74 && x < -0.40) return "clamp";
+  if(x < -0.50) return "body";
+  return "kit";
+}
+function cvcPartId(x, y, z){
+  if(x < -0.72 && y > 0.32) return "tip";
+  if(x > -0.22 && x < 0.22 && y < -0.70) return "exit";
+  if(y > 0.55 && x > -0.05) return "luer";
+  if(y > -0.05 && y < 0.58 && x > 0.0) return "clamp";
+  if(x > -0.15 && y > -0.72) return "line";
+  return "body";
+}
+function pacPartId(x, y, z){
+  if(x > -0.08 && x < 0.08 && z > -0.45 && z < 0.12) return "balloonport";
+  if(x > 0.48 && z > 0.28 && z < 0.52) return "thermistor";
+  if(x > 0.22 && x < 0.45 && z > 0.18 && z < 0.36) return "lumens";
+  if(x > 0.06 && x < 0.22 && z > -0.38 && z < -0.20) return "lumens";
+  if(z < -0.86 && x < 0.1) return "distal";
+  if(x > -0.30 && x < -0.12 && z > -0.82 && z < -0.70) return "balloon";
+  return "catheter";
 }
 function scopePartId(x, y, z){
   if(x > 0.68 && y < 0.36) return "handle";
@@ -1275,6 +1317,36 @@ const KIT_PARTS = [
   {id:"cup", title:"Humidification cup", text:"Water can be added here so the oxygen is less dry."},
   {id:"mask", title:"Mask", text:"The mask that sits over the nose and mouth."},
   {id:"tubing", title:"Oxygen tubing", text:"It carries oxygen from the flowmeter to the Venturi valve."}
+];
+const ART_PARTS = [
+  {id:"tip", title:"Catheter tip", text:"The soft end of the catheter. It follows the needle smoothly into the vessel."},
+  {id:"body", title:"Catheter", text:"The pressure-resistant shaft. It carries the arterial pressure wave without damping it."},
+  {id:"hub", title:"Hub and wings", text:"Hold the wings to steady the catheter while it is placed."},
+  {id:"needle", title:"Echogenic needle", text:"The needle with a triangular point. It is seen on ultrasound and enters the vessel."}
+];
+const DIA_PARTS = [
+  {id:"tip", title:"Soft tip", text:"The soft visible tip. It reduces the chance of tearing the vessel."},
+  {id:"body", title:"Catheter body", text:"The dual-lumen shaft. It is hydrophilic, and it softens at body temperature. The side holes just above the tip allow high flow."},
+  {id:"wing", title:"Suture wing", text:"The wing used to stitch the catheter to the skin."},
+  {id:"hub", title:"Lumen hubs", text:"The two colour-coded hubs. One lumen draws blood and the other returns it."},
+  {id:"clamp", title:"Clamp", text:"The clamp on each extension. Close it when that lumen is not in use."},
+  {id:"kit", title:"Insertion kit", text:"The guidewire and the other pieces used to place the catheter."}
+];
+const CVC_PARTS = [
+  {id:"tip", title:"Flexible tip", text:"The soft contoured tip. It enters the vein with less risk of injury."},
+  {id:"body", title:"Catheter", text:"The non-tapered shaft. A uniform diameter reduces the risk of catheter thrombosis."},
+  {id:"exit", title:"Exit port", text:"Where the separate lumens leave the catheter. The size is marked here, so the wrong size is less likely."},
+  {id:"line", title:"Extension line", text:"Each line leads to one lumen."},
+  {id:"clamp", title:"Clamp", text:"Close the clamp to stop that lumen."},
+  {id:"luer", title:"Luer connector", text:"The connector at the end of each lumen. A syringe or an infusion line fits here."}
+];
+const PAC_PARTS = [
+  {id:"distal", title:"Distal port", text:"The opening at the tip. It measures the pressure at the tip of the catheter."},
+  {id:"balloon", title:"Balloon", text:"The balloon just behind the tip. Inflate it only to float the catheter through the right heart."},
+  {id:"balloonport", title:"Balloon inflation port", text:"The syringe fits here to inflate and deflate the balloon."},
+  {id:"thermistor", title:"Thermistor connector", text:"The thermistor lead. It is used to measure cardiac output."},
+  {id:"lumens", title:"Proximal and distal ports", text:"One port opens 30 cm from the tip, in the right atrium. The other opens at the tip."},
+  {id:"catheter", title:"Catheter", text:"The shaft that is floated through the right heart into the pulmonary artery."}
 ];
 function clearGuides(){
   if(!partGuides) return;
