@@ -45,7 +45,7 @@ header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;marg
 .scan{grid-column:1 / -1;display:flex;flex-direction:column;background:#02060a}
 #echo{width:100%;height:26dvh;min-height:160px;display:block}
 #ecg{width:100%;height:120px;display:block;background:#06140c;border-top:1px solid rgba(127,212,150,.25)}
-.caption{margin:0;padding:6px 10px 8px;color:var(--muted);font-size:13px}
+.legend{margin:0;padding:6px 10px 8px;color:var(--paper);font-size:13px;line-height:1.45}
 .sheet{padding:4px 14px calc(18px + env(safe-area-inset-bottom))}
 .sheet h3{font-family:Figtree,sans-serif;font-weight:650;font-size:18px;margin:8px 0}
 .sheet p{margin:0 0 8px;line-height:1.4}
@@ -79,7 +79,7 @@ body.doors #doors span{margin-top:8px;color:var(--muted);font-size:14px;line-hei
   body.doors #doors button[data-door="supply"],body.doors #doors button[data-door="sim"]{animation:none}
 }
 body.doors .stage,body.doors #tabs,body.doors #lesions,body.doors #phases,body.doors #status,body.doors .sheet{display:none}
-body.doors #views,body.supply #views{display:none}
+body.supply #legend,body.doors #legend,body.doors #views,body.supply #views{display:none}
 #views{padding-top:0}
 #views button{font-size:13px}
 body.sim #tabs,body.sim #lesions,body.sim #phases,body.sim .sheet,body.sim .caption,body.sim #ecg,body.supply #echo,body.supply [aria-label="Patient and probe"]{display:none}
@@ -165,6 +165,7 @@ body.supply #ecg{height:240px}
     <h2 id="viewtitle">Window</h2>
     <div class="bar" id="views" aria-label="Echo windows"></div>
     <canvas id="echo"></canvas>
+    <p class="legend" id="legend"></p>
     <canvas id="ecg"></canvas>
     <p class="caption" id="caption"></p>
   </section>
@@ -701,6 +702,75 @@ const STILLS = {
   sc4:{src:"echo/sub4.jpg",labels:[["Liver",50,16,50,6],["RV",32,38,8,30],["RA",68,38,92,30],["TV",44,46,10,48],["MV",50,56,10,66],["IVS",48,48,50,28],["IAS",58,50,90,50],["LV",32,62,8,70],["LA",70,64,92,72]]},
   ivc:{src:"echo/ivc.jpg",labels:[["Liver",32,42,12,42],["HV",42,36,42,18],["IVC",50,52,86,56],["RA",60,24,88,20]]}
 };
+const FULL = {
+  PLAX:"parasternal long axis",
+  PSAX:"parasternal short axis",
+  A4C:"apical four-chamber",
+  A5C:"apical five-chamber",
+  A2C:"apical two-chamber",
+  A3C:"apical three-chamber",
+  IVC:"inferior vena cava",
+  RV:"right ventricle",
+  LV:"left ventricle",
+  LA:"left atrium",
+  RA:"right atrium",
+  IVS:"interventricular septum",
+  IAS:"interatrial septum",
+  MV:"mitral valve",
+  TV:"tricuspid valve",
+  AV:"aortic valve",
+  Ao:"aorta",
+  DAo:"descending aorta",
+  PW:"posterior wall",
+  RVOT:"right ventricular outflow tract",
+  RCC:"right coronary cusp",
+  NCC:"non-coronary cusp",
+  LCC:"left coronary cusp",
+  AL:"anterolateral papillary muscle",
+  PM:"posteromedial papillary muscle",
+  Ant:"anterior wall",
+  Sept:"interventricular septum",
+  Lat:"lateral wall",
+  Inf:"inferior wall",
+  IL:"inferolateral wall",
+  HV:"hepatic vein",
+  LVOT:"left ventricular outflow tract",
+  Asc:"ascending aorta",
+  Desc:"descending aorta"
+};
+const LEGEND_LABELS = {
+  "psax-apex":["LV","RV"],
+  a5c:["Apex","RV","LV","IVS","TV","MV","RA","LA","IAS","LVOT","AV"],
+  ssn:["Asc","Desc"]
+};
+function legendText(){
+  const names = {
+    plax:["PLAX","parasternal long axis"],
+    "psax-av":["PSAX AV","parasternal short axis, aortic valve"],
+    "psax-mv":["PSAX MV","parasternal short axis, mitral valve"],
+    "psax-pap":["PSAX","parasternal short axis, papillary muscles"],
+    "psax-apex":["PSAX","parasternal short axis, apex"],
+    a4c:["A4C","apical four-chamber"],
+    a5c:["A5C","apical five-chamber"],
+    a2c:["A2C","apical two-chamber"],
+    a3c:["A3C","apical three-chamber"],
+    sc4:["SC4","subcostal four-chamber"],
+    ivc:["IVC","subcostal inferior vena cava"],
+    ssn:["SSN","suprasternal long axis"]
+  };
+  const head = names[state.view];
+  if(!head) return "";
+  const still = STILLS[state.view];
+  const labels = still ? still.labels.map(function(lb){ return lb[0]; }) : (LEGEND_LABELS[state.view] || []);
+  const bits = [head[0]+" — "+head[1]];
+  const seen = {};
+  labels.forEach(function(ab){
+    if(seen[ab]) return;
+    seen[ab] = true;
+    if(FULL[ab]) bits.push(ab+" — "+FULL[ab]);
+  });
+  return bits.join(". ")+".";
+}
 const stillImg = {};
 Object.keys(STILLS).forEach(function(k){
   const im = new Image();
@@ -1091,6 +1161,8 @@ function paintProbe(){
   document.getElementById("rot").value = String(Math.round(normDeg(p.spin)));
   const meta = VIEW[state.view] || VIEW.off;
   document.getElementById("viewtitle").textContent = meta.mark ? meta.name+" · "+meta.mark : meta.name;
+  const legend = document.getElementById("legend");
+  if(legend) legend.textContent = legendText();
   document.querySelectorAll("#views button").forEach(function(btn){
     btn.classList.toggle("on", btn.getAttribute("data-view")===state.view);
   });
@@ -1545,7 +1617,7 @@ function releaseGraphics(){
 }
 document.getElementById("back").onclick = function(){
   releaseGraphics();
-  if(mode){ location.href = "echo-lab.html?v=20261031t"; return; }
+  if(mode){ location.href = "echo-lab.html?v=20261031u"; return; }
   try{
     if(window.parent && window.parent!==window && typeof window.parent.returnToIcu==="function"){
       window.parent.returnToIcu();
@@ -1557,7 +1629,7 @@ document.getElementById("back").onclick = function(){
 document.getElementById("doors").onclick = function(event){
   const btn = event.target.closest("[data-door]");
   if(!btn) return;
-  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261031t";
+  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261031u";
 };
 document.getElementById("tabs").innerHTML = TABS.map(function(tab){
   return "<button type='button' data-tab='"+tab[0]+"'>"+tab[1]+"</button>";
