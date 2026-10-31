@@ -866,7 +866,7 @@ function loadReal(id){
     });
     root.add(model);
     parts.forEach(function(mesh){ mesh.userData.home = mesh.position.clone(); });
-    if(id==="ett") buildEttGuides(model);
+    if(id==="ett" || id==="lma") buildEttGuides(model);
     realModel = true;
     setEttStatus("", false);
     fit();
@@ -933,11 +933,11 @@ function paintLists(keepCats){
     const on = flags[row[0]] ? " on" : "";
     return "<button type='button' data-flag='"+row[0]+"' class='"+on.trim()+"'>"+row[1]+"</button>";
   }).join("");
-  const info = currentId==="ett" && shownPart ? ETT_PARTS.filter(function(row){ return row.id===shownPart; })[0] : selected;
-  const rows = (currentId==="ett" && partGuides ? ETT_PARTS : parts.map(function(mesh){
+  const info = activeParts() && shownPart ? activeParts().filter(function(row){ return row.id===shownPart; })[0] : selected;
+  const rows = (activeParts() && partGuides ? activeParts() : parts.map(function(mesh){
     return {id: mesh.userData.id, title: mesh.userData.title};
   })).map(function(part){
-    const on = (currentId==="ett" ? shownPart===part.id : selected && selected.userData && selected.userData.id===part.id) ? " class='on'" : "";
+    const on = (activeParts() ? shownPart===part.id : selected && selected.userData && selected.userData.id===part.id) ? " class='on'" : "";
     return "<button type='button' data-part='"+part.id+"'"+on+">"+part.title+"</button>";
   }).join("");
   aside.innerHTML = "<h2>"+item.name+"</h2>"+toggles+"<h2>Parts</h2>"+rows+
@@ -949,7 +949,7 @@ function paintLists(keepCats){
   aside.querySelectorAll("[data-part]").forEach(function(btn){
     btn.onclick = function(){
       const id = btn.getAttribute("data-part");
-      if(currentId==="ett" && partGuides){ showPart(id); return; }
+      if(activeParts() && partGuides){ showPart(id); return; }
       const mesh = parts.filter(function(m){ return m.userData.id===id; })[0];
       if(mesh) select(mesh);
     };
@@ -1018,6 +1018,23 @@ function authoredVertex(mesh, index, target){
   }
   return target;
 }
+function lmaPartId(x, y, z){
+  if(x < -0.70 && z > -0.02 && z < 0.22) return "valve";
+  if(x > -0.73 && x < -0.52 && z > 0.17 && z < 0.40) return "pilot";
+  if(z > -0.02 && x < 0.55) return "line";
+  if(x < -0.72 && z < -0.15) return "connector";
+  if(x > 0.40 && x < 0.53 && z > -0.39 && z < -0.21) return "bars";
+  if(x > 0.50 && z < -0.08 && z > -0.52) return "cuff";
+  return "tube";
+}
+function activeParts(){
+  if(currentId==="lma") return LMA_PARTS;
+  if(currentId==="ett") return ETT_PARTS;
+  return null;
+}
+function activePartId(x, y, z){
+  return currentId==="lma" ? lmaPartId(x, y, z) : ettPartId(x, y, z);
+}
 function ettPartId(x, y, z){
   if(x < -0.86) return "tip";
   if(x < -0.78) return "murphy";
@@ -1030,6 +1047,15 @@ function ettPartId(x, y, z){
   if(y > 0.12 && Math.abs(z) < 0.02 && x > 0.70) return "pilot";
   return "body";
 }
+const LMA_PARTS = [
+  {id:"cuff", title:"Cuff", text:"The inflatable mask that sits over the larynx and seals around it."},
+  {id:"bars", title:"Aperture bars", text:"Bars across the opening of the mask. They keep the epiglottis from blocking the tube."},
+  {id:"tube", title:"Airway tube", text:"The curved tube that carries the breath from the connector to the mask."},
+  {id:"connector", title:"15 mm connector", text:"The connector at the near end. It joins the laryngeal mask to the breathing circuit."},
+  {id:"line", title:"Inflation line", text:"The fine tube that carries air from the valve to the cuff."},
+  {id:"pilot", title:"Pilot balloon", text:"The small balloon on the inflation line. It shows whether the cuff is inflated."},
+  {id:"valve", title:"Valve", text:"A syringe fits here to inflate or deflate the cuff."}
+];
 function clearGuides(){
   if(!partGuides) return;
   Object.keys(partGuides).forEach(function(id){
@@ -1044,7 +1070,7 @@ function clearGuides(){
 function buildEttGuides(model){
   clearGuides();
   const buckets = {};
-  ETT_PARTS.forEach(function(part){ buckets[part.id] = []; });
+  activeParts().forEach(function(part){ buckets[part.id] = []; });
   const tmp = new THREE.Vector3();
   const sum = new THREE.Vector3();
   model.updateMatrixWorld(true);
@@ -1063,8 +1089,9 @@ function buildEttGuides(model){
       authoredVertex(mesh, ib, tmp); sum.add(tmp);
       authoredVertex(mesh, ic, tmp); sum.add(tmp);
       sum.multiplyScalar(1/3);
-      const part = ettPartId(sum.x, sum.y, sum.z);
+      const part = activePartId(sum.x, sum.y, sum.z);
       const bag = buckets[part];
+      if(!bag) continue;
       tmp.fromBufferAttribute(pos, ia).applyMatrix4(mesh.matrixWorld);
       bag.push(tmp.x, tmp.y, tmp.z);
       tmp.fromBufferAttribute(pos, ib).applyMatrix4(mesh.matrixWorld);
@@ -1074,7 +1101,7 @@ function buildEttGuides(model){
     }
   });
   partGuides = {};
-  ETT_PARTS.forEach(function(part){
+  activeParts().forEach(function(part){
     const arr = buckets[part.id];
     if(!arr.length) return;
     const geo = new THREE.BufferGeometry();
@@ -1092,7 +1119,7 @@ function showPart(id){
   if(!partGuides || !partGuides[id]) return;
   Object.keys(partGuides).forEach(function(key){ partGuides[key].visible = key===id; });
   shownPart = id;
-  const part = ETT_PARTS.filter(function(row){ return row.id===id; })[0];
+  const part = activeParts().filter(function(row){ return row.id===id; })[0];
   clearTouch();
   if(part) speak(part.title+". "+part.text);
   paintLists(true);
@@ -1113,7 +1140,7 @@ function partFromHit(hit){
   authoredVertex(mesh, ib, tmp); sum.add(tmp);
   authoredVertex(mesh, ic, tmp); sum.add(tmp);
   sum.multiplyScalar(1/3);
-  return ettPartId(sum.x, sum.y, sum.z);
+  return activePartId(sum.x, sum.y, sum.z);
 }
 function clearTouch(){
   if(!touchMark) return;
@@ -1248,7 +1275,7 @@ canvas.addEventListener("pointerup", function(e){
   ray.setFromCamera(new THREE.Vector2(x,y), camera);
   const hit = ray.intersectObjects(parts, false)[0];
   if(!hit) return;
-  if(currentId==="ett" && partGuides){
+  if(activeParts() && partGuides){
     showPart(partFromHit(hit));
     return;
   }
