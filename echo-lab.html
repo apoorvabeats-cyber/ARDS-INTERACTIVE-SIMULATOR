@@ -19,7 +19,20 @@ button.on{border-color:var(--warm);color:#fff8ee;background:#2a2118}
 a.go{color:var(--warm)}
 header{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px 0}
 header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:0;letter-spacing:-.03em}
-#hint{flex:1 1 180px;margin:0;color:var(--muted);font-size:13px;line-height:1.3}
+#hint{margin:0;padding:2px 12px 6px;color:var(--muted);font-size:13px;line-height:1.3}
+body.doors #hint,body.supply #hint,body.doors #views{display:none}
+body.sim{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+body.sim header,#views,#hint,#status{flex:none}
+body.sim #views{flex-wrap:nowrap;overflow-x:auto;padding:6px 10px 0}
+body.sim #views button{flex:none;min-height:34px;padding:0 10px;font-size:13px}
+body.sim #status{margin:0 12px 4px}
+body.sim .stage{flex:1;min-height:0;height:auto;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:stretch}
+body.sim .panel{display:flex;flex-direction:column;min-height:0}
+body.sim .panel h2{display:none}
+body.sim .scan{grid-column:1;grid-row:1}
+body.sim #echo,body.sim .chest-box{height:auto;flex:1;min-height:0}
+body.sim #legend{flex:none;max-height:3.6em;overflow:auto}
+body.sim .dials{flex:none;padding-bottom:6px}
 #status{margin:6px 12px 0;color:var(--warm);font-size:14px;line-height:1.35;min-height:1.35em}
 .bar{display:flex;gap:8px;overflow:auto;padding:8px 12px;-webkit-overflow-scrolling:touch}
 .bar button{flex:none;font-size:14px}
@@ -84,13 +97,8 @@ body.doors #doors span{margin-top:8px;color:var(--muted);font-size:14px;line-hei
 }
 body.doors .stage,body.doors #tabs,body.doors #lesions,body.doors #phases,body.doors #status,body.doors .sheet{display:none}
 body.supply #legend,body.doors #legend,body.doors #views,body.supply #views{display:none}
-body.sim #views{flex-wrap:wrap;overflow:visible}
-body.sim #views button{min-height:36px;padding:0 8px}
 body.sim #tabs,body.sim #lesions,body.sim #phases,body.sim .sheet,body.sim .caption,body.sim #ecg,body.supply #echo,body.supply [aria-label="Patient and probe"]{display:none}
-body.sim .stage{grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr)}
-body.sim .scan{grid-column:1;grid-row:1}
 body.sim .panel:first-child{display:none}
-body.sim #echo,body.sim .chest-box{height:72dvh}
 body.supply .stage{display:block}
 body.supply #heart{height:46dvh}
 body.supply #ecg{height:240px}
@@ -100,14 +108,18 @@ body.supply #ecg{height:240px}
   body.doors #doors b{font-size:clamp(22px,6vw,30px)}
   body.sim .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 }
+body.sim .scan{grid-column:1;grid-row:1}
+body.sim .panel[aria-label="Patient and probe"]{grid-column:2;grid-row:1}
+body.sim #echo,body.sim .chest-box{height:auto;min-height:0;flex:1}
 </style>
 </head>
 <body>
 <header>
   <button type="button" id="back">Back to ICU</button>
   <h1>Echo bay</h1>
-  <p id="hint">The finger is the probe. Circle without lifting and it turns. Lift off the body and it comes away.</p>
 </header>
+<div class="bar" id="views" aria-label="Echo windows"></div>
+<p id="hint">The finger is the probe. Circle without lifting and it turns. Lift off the body and it comes away.</p>
 <section id="doors" aria-label="Echo bay doors">
   <button type="button" data-door="supply"><b>Heart and supply</b><span>Four vessels, the lesion, and the trace.</span></button>
   <button type="button" data-door="sim"><b>Echo simulator</b><span>The finger is the probe. The sector follows it.</span></button>
@@ -170,7 +182,6 @@ body.supply #ecg{height:240px}
   </section>
   <section class="panel scan" aria-label="Simulated echo and ECG">
     <h2 id="viewtitle">Window</h2>
-    <div class="bar" id="views" aria-label="Echo windows"></div>
     <canvas id="echo"></canvas>
     <p class="legend" id="legend"></p>
     <canvas id="ecg"></canvas>
@@ -791,7 +802,7 @@ function drawStill(ctx, w, h, img, labels){
   const cr = w / h;
   let dw, dh, ox, oy;
   if(cr > ir){ dh = h; dw = h * ir; ox = (w - dw) / 2; oy = 0; }
-  else { dw = w; dh = w / ir; ox = 0; oy = (h - dh) / 2; }
+  else { dw = w; dh = w / ir; ox = 0; oy = Math.min(8, Math.max(0, (h - dh) / 2)); }
   ctx.drawImage(img, ox, oy, dw, dh);
   ctx.font = "600 13px Figtree, sans-serif";
   ctx.textAlign = "center";
@@ -1761,7 +1772,7 @@ function releaseGraphics(){
 }
 document.getElementById("back").onclick = function(){
   releaseGraphics();
-  if(mode){ location.href = "echo-lab.html?v=20261101e"; return; }
+  if(mode){ location.href = "echo-lab.html?v=20261101f"; return; }
   try{
     if(window.parent && window.parent!==window && typeof window.parent.returnToIcu==="function"){
       window.parent.returnToIcu();
@@ -1773,7 +1784,7 @@ document.getElementById("back").onclick = function(){
 document.getElementById("doors").onclick = function(event){
   const btn = event.target.closest("[data-door]");
   if(!btn) return;
-  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261101e";
+  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261101f";
 };
 document.getElementById("tabs").innerHTML = TABS.map(function(tab){
   return "<button type='button' data-tab='"+tab[0]+"'>"+tab[1]+"</button>";
