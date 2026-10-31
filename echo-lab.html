@@ -79,6 +79,9 @@ body.doors #doors span{margin-top:8px;color:var(--muted);font-size:14px;line-hei
   body.doors #doors button[data-door="supply"],body.doors #doors button[data-door="sim"]{animation:none}
 }
 body.doors .stage,body.doors #tabs,body.doors #lesions,body.doors #phases,body.doors #status,body.doors .sheet{display:none}
+body.doors #views,body.supply #views{display:none}
+#views{padding-top:0}
+#views button{font-size:13px}
 body.sim #tabs,body.sim #lesions,body.sim #phases,body.sim .sheet,body.sim .caption,body.sim #ecg,body.supply #echo,body.supply [aria-label="Patient and probe"]{display:none}
 body.sim .stage{grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr)}
 body.sim .scan{grid-column:1;grid-row:1}
@@ -160,6 +163,7 @@ body.supply #ecg{height:240px}
   </section>
   <section class="panel scan" aria-label="Simulated echo and ECG">
     <h2 id="viewtitle">Window</h2>
+    <div class="bar" id="views" aria-label="Echo windows"></div>
     <canvas id="echo"></canvas>
     <canvas id="ecg"></canvas>
     <p class="caption" id="caption"></p>
@@ -213,10 +217,10 @@ const VIEW = {
 };
 const PRESET = {
   plax:{x:63,y:43,spin:300},
-  "psax-av":{x:63,y:40,spin:45},
-  "psax-mv":{x:63,y:45,spin:45},
-  "psax-pap":{x:64,y:49,spin:45},
-  "psax-apex":{x:66,y:53,spin:45},
+  "psax-av":{x:63,y:43,spin:45},
+  "psax-mv":{x:63,y:50,spin:45},
+  "psax-pap":{x:64,y:54,spin:45},
+  "psax-apex":{x:63,y:57,spin:45},
   a4c:{x:76,y:58,spin:90},
   a5c:{x:76,y:53,spin:90},
   a2c:{x:76,y:58,spin:0},
@@ -391,9 +395,9 @@ function windowFrom(){
     return opts[0][1];
   }
   if(angDist(s, 300) <= angDist(s, 45)) return "plax";
-  if(p.y < 42.5) return "psax-av";
-  if(p.y < 47) return "psax-mv";
-  if(p.y < 52) return "psax-pap";
+  if(p.y < 49) return "psax-av";
+  if(p.y < 53) return "psax-mv";
+  if(p.y < 56) return "psax-pap";
   return "psax-apex";
 }
 function shoulderAim(){
@@ -1087,6 +1091,9 @@ function paintProbe(){
   document.getElementById("rot").value = String(Math.round(normDeg(p.spin)));
   const meta = VIEW[state.view] || VIEW.off;
   document.getElementById("viewtitle").textContent = meta.mark ? meta.name+" · "+meta.mark : meta.name;
+  document.querySelectorAll("#views button").forEach(function(btn){
+    btn.classList.toggle("on", btn.getAttribute("data-view")===state.view);
+  });
   ["z-ssn","z-para","z-apex","z-sub","z-ivc"].forEach(function(id){
     const node = document.getElementById(id);
     if(node) node.setAttribute("stroke", "rgba(80,60,40,.45)");
@@ -1538,7 +1545,7 @@ function releaseGraphics(){
 }
 document.getElementById("back").onclick = function(){
   releaseGraphics();
-  if(mode){ location.href = "echo-lab.html?v=20261031s"; return; }
+  if(mode){ location.href = "echo-lab.html?v=20261031t"; return; }
   try{
     if(window.parent && window.parent!==window && typeof window.parent.returnToIcu==="function"){
       window.parent.returnToIcu();
@@ -1550,7 +1557,7 @@ document.getElementById("back").onclick = function(){
 document.getElementById("doors").onclick = function(event){
   const btn = event.target.closest("[data-door]");
   if(!btn) return;
-  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261031s";
+  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261031t";
 };
 document.getElementById("tabs").innerHTML = TABS.map(function(tab){
   return "<button type='button' data-tab='"+tab[0]+"'>"+tab[1]+"</button>";
@@ -1580,6 +1587,16 @@ document.getElementById("phases").onclick = function(event){
   setPhase(btn.getAttribute("data-phase"));
 };
 applyWalls();
+const VIEW_ORDER = ["plax","psax-av","psax-mv","psax-pap","psax-apex","a4c","a5c","a2c","a3c","sc4","ivc","ssn"];
+const VIEW_SHORT = {plax:"PLAX", "psax-av":"PSAX aortic", "psax-mv":"PSAX mitral", "psax-pap":"PSAX papillary", "psax-apex":"PSAX apex", a4c:"A4C", a5c:"A5C", a2c:"A2C", a3c:"A3C", sc4:"Subcostal", ivc:"IVC", ssn:"Suprasternal"};
+document.getElementById("views").innerHTML = VIEW_ORDER.map(function(id){
+  return "<button type='button' data-view='"+id+"'>"+VIEW_SHORT[id]+"</button>";
+}).join("");
+document.getElementById("views").onclick = function(event){
+  const btn = event.target.closest("[data-view]");
+  if(!btn) return;
+  jump(btn.getAttribute("data-view"));
+};
 paintProbe();
 paintTabs();
 paintStatus();
