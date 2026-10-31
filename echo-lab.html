@@ -31,8 +31,8 @@ header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;marg
 .tag{position:absolute;left:8px;right:8px;bottom:8px;margin:0;background:rgba(7,17,26,.88);border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:13px;line-height:1.3;pointer-events:none}
 .chest-box{position:relative;height:42dvh;min-height:200px;touch-action:none;background:#14202c}
 .chest-box > svg{width:100%;height:100%;display:block}
-#bust{position:absolute;inset:0;width:100%;height:100%;display:none;touch-action:none;z-index:1}
-body.bust3d #bust{display:block}
+#bust{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;z-index:0}
+body.bust3d #bust{z-index:2}
 body.bust3d .patient{visibility:hidden}
 .shlab{display:none;position:absolute;z-index:2;margin:0;color:#e7f6fb;font-size:11px;pointer-events:none;transform:translate(-50%,-130%)}
 body.bust3d .shlab{display:block}
@@ -1153,9 +1153,9 @@ let bodyMesh = null;
 let bustCam = null;
 const bust = document.getElementById("bust");
 const raycaster = new THREE.Raycaster();
-const ndc = new THREE.Vector2();
 if(mode==="sim" && bust){
-  const bustRenderer = new THREE.WebGLRenderer({ canvas: bust, antialias: true, alpha: false, powerPreference: "high-performance" });
+  try{
+  const bustRenderer = new THREE.WebGLRenderer({ canvas: bust, antialias: true, alpha: true, powerPreference: "high-performance" });
   bustRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   bustRenderer.setClearColor(0x14202c, 1);
   bustRenderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -1202,15 +1202,20 @@ if(mode==="sim" && bust){
   });
   function drawBust(){
     const w = bust.clientWidth, h = bust.clientHeight;
-    if(w && h){
-      bustRenderer.setSize(w, h, false);
-      bustCam.aspect = w / Math.max(1, h);
-      bustCam.updateProjectionMatrix();
+    if(w > 2 && h > 2){
+      if(bust.width !== Math.floor(w * bustRenderer.getPixelRatio()) || bust.height !== Math.floor(h * bustRenderer.getPixelRatio())){
+        bustRenderer.setSize(w, h, false);
+        bustCam.aspect = w / h;
+        bustCam.updateProjectionMatrix();
+      }
+      bustRenderer.render(bustScene, bustCam);
     }
-    bustRenderer.render(bustScene, bustCam);
     requestAnimationFrame(drawBust);
   }
   drawBust();
+  }catch(err){
+    bust.style.display = "none";
+  }
 }
 function paintProbe(){
   const p = state.probe;
@@ -1747,7 +1752,7 @@ function releaseGraphics(){
 }
 document.getElementById("back").onclick = function(){
   releaseGraphics();
-  if(mode){ location.href = "echo-lab.html?v=20261101c"; return; }
+  if(mode){ location.href = "echo-lab.html?v=20261101d"; return; }
   try{
     if(window.parent && window.parent!==window && typeof window.parent.returnToIcu==="function"){
       window.parent.returnToIcu();
@@ -1759,7 +1764,7 @@ document.getElementById("back").onclick = function(){
 document.getElementById("doors").onclick = function(event){
   const btn = event.target.closest("[data-door]");
   if(!btn) return;
-  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261101c";
+  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261101d";
 };
 document.getElementById("tabs").innerHTML = TABS.map(function(tab){
   return "<button type='button' data-tab='"+tab[0]+"'>"+tab[1]+"</button>";
