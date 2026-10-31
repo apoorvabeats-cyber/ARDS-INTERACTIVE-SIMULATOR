@@ -866,7 +866,7 @@ function loadReal(id){
     });
     root.add(model);
     parts.forEach(function(mesh){ mesh.userData.home = mesh.position.clone(); });
-    try { if(id==="ett" || id==="lma" || id==="bvm" || id==="dl" || id==="vl" || id==="defib" || id==="o2tube" || id==="omask" || id==="suction") buildEttGuides(model); } catch (err) {}
+    try { if(id==="ett" || id==="lma" || id==="bvm" || id==="dl" || id==="vl" || id==="defib" || id==="o2tube" || id==="omask" || id==="suction" || id==="sb" || id==="niv" || id==="o2kit") buildEttGuides(model); } catch (err) {}
     realModel = true;
     setEttStatus("", false);
     fit();
@@ -1037,6 +1037,9 @@ function activeParts(){
   if(currentId==="o2tube") return CANNULA_PARTS;
   if(currentId==="omask") return MASK_PARTS;
   if(currentId==="suction") return NG_PARTS;
+  if(currentId==="sb") return SB_PARTS;
+  if(currentId==="niv") return NIV_PARTS;
+  if(currentId==="o2kit") return KIT_PARTS;
   if(currentId==="ett") return ETT_PARTS;
   return null;
 }
@@ -1049,6 +1052,9 @@ function activePartId(x, y, z){
   if(currentId==="o2tube") return cannulaPartId(x, y, z);
   if(currentId==="omask") return maskPartId(x, y, z);
   if(currentId==="suction") return ngPartId(x, y, z);
+  if(currentId==="sb") return sbPartId(x, y, z);
+  if(currentId==="niv") return nivPartId(x, y, z);
+  if(currentId==="o2kit") return kitPartId(x, y, z);
   return ettPartId(x, y, z);
 }
 function vlPartId(x, y, z){
@@ -1095,6 +1101,30 @@ function ngPartId(x, y, z){
   if(x > 0.50 && z > 0.68 && z < 0.80) return "port";
   if(x > 0.28 && z > 0.58) return "colour";
   return "tube";
+}
+function sbPartId(x, y, z){
+  if(x > 0.38 && z > 0.36 && z < 0.95) return "gastric";
+  if(z > 0.72 && x < 0.30) return "oesophageal";
+  if(x > 0.55 && x < 0.76 && z > -0.08 && z < 0.08) return "gopen";
+  if(x > 0.48 && x < 0.74 && z > -0.55 && z < -0.36) return "gopen";
+  if(x < -0.55 && z > 0.50 && z < 0.64) return "eopen";
+  if(x > -0.05 && x < 0.40 && z > 0.02 && z < 0.50) return "ports";
+  return "tube";
+}
+function nivPartId(x, y, z){
+  if(Math.abs(x) > 0.28 && y > -0.16 && y < 0.18) return "clip";
+  if(Math.abs(x) < 0.16 && y > -0.14 && y < 0.18) return "elbow";
+  if(y > 0.55 && y < 0.80) return "strap";
+  if(y < -0.22) return "head";
+  if(y > 0.0 && y < 0.48 && Math.abs(x) > 0.10 && Math.abs(x) < 0.36) return "cushion";
+  return "frame";
+}
+function kitPartId(x, y, z){
+  if(x > -0.15 && x < 0.62 && z > -0.50 && z < 0.75) return "venturi";
+  if(x > -0.38 && x < -0.12 && z > -0.08 && z < 0.18) return "cup";
+  if(x > -0.85 && x < -0.45 && z > -0.12 && z < 0.38) return "mask";
+  if(x > -0.55 && x < -0.08 && z > -0.12 && z < 0.48) return "corrugated";
+  return "tubing";
 }
 function scopePartId(x, y, z){
   if(x > 0.68 && y < 0.36) return "handle";
@@ -1222,6 +1252,29 @@ const NG_PARTS = [
   {id:"port", title:"Drainage port with lock", text:"Open it to drain the stomach, or to give feed or medicine. Close the lock when it is not in use."},
   {id:"colour", title:"Colour-coded connector", text:"The colour shows the size of the tube."},
   {id:"tube", title:"PVC tubing", text:"Soft tubing that resists kinking. A radiopaque line runs in the wall, and length marks show how far the tube has been passed."}
+];
+const SB_PARTS = [
+  {id:"gastric", title:"Gastric balloon", text:"The round balloon near the tip. Inflate it in the stomach, and only after the position is confirmed."},
+  {id:"oesophageal", title:"Oesophageal balloon", text:"The long balloon. It compresses bleeding varices in the oesophagus."},
+  {id:"gopen", title:"Gastric aspiration openings", text:"The holes beyond the gastric balloon. The stomach is drained through these."},
+  {id:"eopen", title:"Oesophageal openings", text:"The holes just above the oesophageal balloon. They drain the oesophagus."},
+  {id:"ports", title:"Proximal ports", text:"Four ports. Two inflate the gastric and oesophageal balloons. Two are for gastric and oesophageal aspiration."},
+  {id:"tube", title:"Tube", text:"The shaft. The length marks show how far the tube has been passed."}
+];
+const NIV_PARTS = [
+  {id:"frame", title:"Frame", text:"The rigid shell of the mask. It holds the cushion and the elbow."},
+  {id:"cushion", title:"Cushion", text:"The soft seal against the face. It reduces leaks."},
+  {id:"elbow", title:"Rotating elbow", text:"The swivel at the front. It turns so the circuit does not pull the mask. The exhalation port on it lets gas out."},
+  {id:"clip", title:"Clip", text:"The clip that attaches and releases the headgear."},
+  {id:"strap", title:"Headgear", text:"The straps that hold the mask on the face."},
+  {id:"head", title:"Demonstration head", text:"The head the mask is shown on. It is not part of the mask."}
+];
+const KIT_PARTS = [
+  {id:"venturi", title:"Venturi valve", text:"The colour sets the oxygen percentage. Blue is 24, yellow 28, white 31, green 35, pink 40, orange 50, and red 60."},
+  {id:"corrugated", title:"Corrugated tube", text:"The ribbed tube between the Venturi valve and the mask."},
+  {id:"cup", title:"Humidification cup", text:"Water can be added here so the oxygen is less dry."},
+  {id:"mask", title:"Mask", text:"The mask that sits over the nose and mouth."},
+  {id:"tubing", title:"Oxygen tubing", text:"It carries oxygen from the flowmeter to the Venturi valve."}
 ];
 function clearGuides(){
   if(!partGuides) return;
