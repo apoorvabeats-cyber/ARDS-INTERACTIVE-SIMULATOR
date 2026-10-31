@@ -830,6 +830,39 @@ function setEttStatus(text, bad){
   el.className = bad ? "bad" : "";
   el.textContent = text;
 }
+function stripRoundShell(model){
+  model.traverse(function(mesh){
+    if(!mesh.isMesh || !mesh.geometry || !mesh.geometry.index) return;
+    const geo = mesh.geometry;
+    const pos = geo.attributes.position;
+    const index = geo.index;
+    let maxAbs = 0;
+    for(let i = 0; i < Math.min(pos.count, 40); i++) maxAbs = Math.max(maxAbs, Math.abs(pos.getX(i)), Math.abs(pos.getY(i)), Math.abs(pos.getZ(i)));
+    const limit = maxAbs > 100 ? 2500 : 0.000034;
+    const kept = [];
+    const va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3();
+    for(let i = 0; i < index.count; i += 3){
+      const a = index.getX(i), b = index.getX(i + 1), c = index.getX(i + 2);
+      va.fromBufferAttribute(pos, a);
+      vb.fromBufferAttribute(pos, b);
+      vc.fromBufferAttribute(pos, c);
+      vb.sub(va);
+      vc.sub(va);
+      if(vb.cross(vc).length() * 0.5 < limit) kept.push(a, b, c);
+    }
+    if(kept.length < 90 || kept.length === index.count) return;
+    const used = new Uint8Array(pos.count);
+    kept.forEach(function(i){ used[i] = 1; });
+    const ax = pos.getX(kept[0]), ay = pos.getY(kept[0]), az = pos.getZ(kept[0]);
+    for(let i = 0; i < pos.count; i++){
+      if(!used[i]) pos.setXYZ(i, ax, ay, az);
+    }
+    pos.needsUpdate = true;
+    geo.setIndex(kept);
+    geo.computeBoundingBox();
+    geo.computeBoundingSphere();
+  });
+}
 function loadReal(id){
   const spec = REAL[id];
   const token = ++modelToken;
@@ -842,6 +875,7 @@ function loadReal(id){
     loader.parse(buf, "", function(gltf){
     if(token !== modelToken || currentId !== id) return;
     const model = gltf.scene;
+    if(id === "omask") stripRoundShell(model);
     const box = new THREE.Box3().setFromObject(model);
     const centre = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
@@ -866,7 +900,7 @@ function loadReal(id){
     });
     root.add(model);
     parts.forEach(function(mesh){ mesh.userData.home = mesh.position.clone(); });
-    try { if(id==="ett" || id==="lma" || id==="bvm" || id==="dl" || id==="vl" || id==="defib" || id==="o2tube" || id==="omask" || id==="suction" || id==="sb" || id==="niv" || id==="o2kit" || id==="needles" || id==="dialysis" || id==="cvc" || id==="epidural") buildEttGuides(model); } catch (err) {}
+    try { if(id==="ett" || id==="lma" || id==="bvm" || id==="dl" || id==="vl" || id==="defib" || id==="o2tube" || id==="omask" || id==="suction" || id==="sb" || id==="niv" || id==="o2kit" || id==="needles" || id==="dialysis" || id==="cvc" || id==="epidural" || id==="hfnc" || id==="nrb" || id==="chest") buildEttGuides(model); } catch (err) {}
     realModel = true;
     setEttStatus("", false);
     fit();
@@ -889,6 +923,7 @@ function loadReal(id){
   });
 }
 function showItem(id){
+  stopSpeak();
   currentId = id;
   clearRoot();
   clearTouch();
@@ -1044,6 +1079,9 @@ function activeParts(){
   if(currentId==="dialysis") return DIA_PARTS;
   if(currentId==="cvc") return CVC_PARTS;
   if(currentId==="epidural") return PAC_PARTS;
+  if(currentId==="hfnc") return HFNC_PARTS;
+  if(currentId==="nrb") return NRB_PARTS;
+  if(currentId==="chest") return CHEST_PARTS;
   if(currentId==="ett") return ETT_PARTS;
   return null;
 }
@@ -1063,6 +1101,9 @@ function activePartId(x, y, z){
   if(currentId==="dialysis") return diaPartId(x, y, z);
   if(currentId==="cvc") return cvcPartId(x, y, z);
   if(currentId==="epidural") return pacPartId(x, y, z);
+  if(currentId==="hfnc") return hfncPartId(x, y, z);
+  if(currentId==="nrb") return nrbPartId(x, y, z);
+  if(currentId==="chest") return chestPartId(x, y, z);
   return ettPartId(x, y, z);
 }
 function vlPartId(x, y, z){
@@ -1166,6 +1207,29 @@ function pacPartId(x, y, z){
   if(z < -0.86 && x < 0.1) return "distal";
   if(x > -0.30 && x < -0.12 && z > -0.82 && z < -0.70) return "balloon";
   return "catheter";
+}
+function hfncPartId(x, y, z){
+  if(z < -0.32 && x < 0.25) return "prongs";
+  if(x > 0.0 && z < 0.2 && z > -0.48) return "connector";
+  return "circuit";
+}
+function nrbPartId(x, y, z){
+  if(z > -0.05 && x > -0.08) return "bag";
+  if(z < -0.38 && x > 0.0 && x < 0.62) return "mask";
+  if(z > -0.42 && z < -0.12 && x > 0.0 && x < 0.5) return "valve";
+  if(x > 0.5 && z < -0.45) return "strap";
+  return "tubing";
+}
+function chestPartId(x, y, z){
+  if(y > 0.84) return "top";
+  if(x < -0.50 && y > 0.52 && y < 0.82) return "regulator";
+  if(x > -0.52 && x < -0.34 && y > 0.52 && y < 0.74) return "bellows";
+  if(x > -0.36 && x < -0.14 && y < -0.74) return "float";
+  if(x > -0.36 && x < -0.14) return "waterseal";
+  if(x < -0.36 && y < -0.42) return "leak";
+  if(y < -0.88) return "stand";
+  if(x > -0.12) return "collection";
+  return "case";
 }
 function scopePartId(x, y, z){
   if(x > 0.68 && y < 0.36) return "handle";
@@ -1346,6 +1410,29 @@ const PAC_PARTS = [
   {id:"lumens", title:"Proximal and distal ports", text:"One port opens 30 cm from the tip, in the right atrium. The other opens at the tip."},
   {id:"catheter", title:"Catheter", text:"The shaft that is floated through the right heart into the pulmonary artery."}
 ];
+const HFNC_PARTS = [
+  {id:"prongs", title:"Nasal prongs", text:"The soft prongs that sit in the nostrils. They must not fill the nose completely."},
+  {id:"circuit", title:"Heated circuit", text:"The wide corrugated tube. It carries heated, humidified oxygen from the machine."},
+  {id:"connector", title:"Circuit connector", text:"Where the heated tube joins the cannula."}
+];
+const NRB_PARTS = [
+  {id:"mask", title:"Face mask", text:"The mask over the nose and mouth."},
+  {id:"bag", title:"Reservoir bag", text:"The bag fills with oxygen. It should stay inflated while the patient breathes."},
+  {id:"valve", title:"One-way valve", text:"It lets oxygen in from the bag and stops exhaled gas going back into the bag."},
+  {id:"strap", title:"Head strap", text:"It holds the mask on the face."},
+  {id:"tubing", title:"Oxygen tubing", text:"It carries oxygen from the flowmeter to the reservoir."}
+];
+const CHEST_PARTS = [
+  {id:"regulator", title:"Dry suction regulator", text:"Turn this to set the suction. The usual setting for an adult is minus 20 centimetres of water."},
+  {id:"bellows", title:"Suction monitor bellows", text:"The bellows expands when suction is reaching the unit."},
+  {id:"waterseal", title:"Water seal chamber", text:"The water seal lets air leave the chest and stops it going back in."},
+  {id:"float", title:"Patient pressure float ball", text:"The ball shows the pressure in the chest tube."},
+  {id:"leak", title:"Air leak monitor", text:"Bubbling here means air is still leaking from the lung."},
+  {id:"collection", title:"Collection chamber", text:"Blood and fluid from the chest collect here. Read the volume on the scale."},
+  {id:"stand", title:"Floor stand", text:"The stand swings out so the unit does not tip."},
+  {id:"top", title:"Suction port and hangers", text:"The suction tubing, the high-negativity vent, and the hangers are along the top."},
+  {id:"case", title:"Drainage unit", text:"The chest drainage unit. Keep it upright and below the level of the chest."}
+];
 function clearGuides(){
   if(!partGuides) return;
   Object.keys(partGuides).forEach(function(id){
@@ -1496,9 +1583,16 @@ function femaleVoice(){
     || en.find(function(v){ return !male.test((v.name||"")+" "+(v.voiceURI||"")) && /en-GB|en-IN|en-AU/i.test(v.lang||""); })
     || null;
 }
+let speakToken = 0;
+function stopSpeak(){
+  speakToken += 1;
+  try { if(window.speechSynthesis) speechSynthesis.cancel(); } catch (err) {}
+}
 function speak(text){
   if(!window.speechSynthesis || !text) return;
+  const token = ++speakToken;
   const say = function(){
+    if(token !== speakToken) return;
     const u = new SpeechSynthesisUtterance(text);
     const voice = femaleVoice();
     u.lang = voice && voice.lang ? voice.lang : "en-GB";
@@ -1506,10 +1600,15 @@ function speak(text){
     u.pitch = 1.16;
     u.volume = 1;
     if(voice) u.voice = voice;
-    const go = function(){ speechSynthesis.resume(); speechSynthesis.speak(u); };
+    const go = function(){
+      if(token !== speakToken) return;
+      try { speechSynthesis.cancel(); } catch (err) {}
+      speechSynthesis.resume();
+      speechSynthesis.speak(u);
+    };
     if(speechSynthesis.speaking || speechSynthesis.pending){
-      speechSynthesis.cancel();
-      setTimeout(go, 80);
+      try { speechSynthesis.cancel(); } catch (err) {}
+      setTimeout(go, 60);
     } else go();
   };
   if(!speechSynthesis.getVoices().length){
