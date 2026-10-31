@@ -3,458 +3,374 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#07111a">
-<title>POCUS lab</title>
+<meta name="theme-color" content="#101820">
+<title>POCUS</title>
+<script type="importmap">
+{"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}
+</script>
 <style>
-:root{--bg:#07111a;--fg:#e7f1f4;--muted:#93a8b3;--line:rgba(226,180,138,.35);--warm:#e2b48a;--paper:#f3efe6}
+:root{--fg:#f3efe6;--muted:#b7b1a4;--line:rgba(226,180,138,.4);--warm:#e2b48a}
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--fg);font-family:Figtree,sans-serif}
-button,input{font:inherit;color:inherit}
-button{cursor:pointer;background:#102028;border:1px solid var(--line);border-radius:999px;min-height:40px;padding:0 12px}
-button.on{border-color:var(--warm);background:#2a2118;color:#fff8ee}
-header{display:flex;gap:10px;align-items:center;padding:10px 12px 0}
-h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:0}
-#status{margin:6px 12px 0;color:var(--warm);font-size:14px;min-height:1.3em}
-.bar{display:flex;gap:8px;overflow:auto;padding:8px 12px}
-.bar button{flex:none;font-size:14px}
-#doors{display:none}
-body.doors #doors{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;min-height:calc(100dvh - 72px)}
-body.doors #doors button{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:calc(100dvh - 96px);border-radius:18px;padding:18px;color:#f4fbff;background:
-  linear-gradient(180deg,rgba(6,16,28,.25),rgba(4,10,18,.62)),url("lab-bg.jpg?v=20261030k") center/cover}
-body.doors #doors button[data-door="lab"]{animation:doorLeft 1s cubic-bezier(.22,.61,.2,1) both}
-body.doors #doors button[data-door="arena"]{animation:doorRight 1s cubic-bezier(.22,.61,.2,1) both}
-body.doors #doors b{font-family:Fraunces,Georgia,serif;font-size:clamp(22px,5vw,36px);font-weight:520}
-body.doors #doors span{margin-top:8px;color:var(--muted);font-size:14px;line-height:1.35}
-@keyframes doorLeft{from{opacity:0;transform:translateX(-110%)}to{opacity:1;transform:none}}
-@keyframes doorRight{from{opacity:0;transform:translateX(110%)}to{opacity:1;transform:none}}
-body.doors #app,body.doors #status{display:none}
-.stage{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:8px;padding:0 8px 12px}
-.panel{background:#0c1822;border:1px solid var(--line);border-radius:16px;overflow:hidden;min-width:0}
-.panel h2{margin:0;padding:8px 10px 0;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--warm)}
-.chest{position:relative;height:52dvh;min-height:240px;touch-action:none;background:#14202c}
-.chest svg{width:100%;height:100%;display:block}
-#probe{position:absolute;width:34px;height:54px;pointer-events:none;transform:translate(-50%,-90%)}
-#echo{width:100%;height:42dvh;min-height:220px;display:block;background:#000}
-.legend,.note{margin:0;padding:8px 10px;font-size:14px;line-height:1.4}
-.legend{color:var(--paper)}
+html,body{margin:0;height:100%;background:#101820;color:var(--fg);font-family:Figtree,ui-sans-serif,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+header{display:flex;gap:10px;align-items:center;padding:8px 10px 0}
+h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:20px;margin:0}
+#back{background:#102028;border:1px solid var(--line);border-radius:999px;min-height:36px;padding:0 12px}
+.bar{display:flex;gap:6px;overflow:auto;padding:8px 8px 0}
+.bar button{flex:none;background:#102028;border:1px solid var(--line);border-radius:999px;min-height:36px;padding:0 10px;font-size:13px}
+.bar button.on{background:#2a2118;border-color:var(--warm);color:#fff8ee}
+.stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;height:calc(100dvh - 118px);padding:6px}
+.panel{min-width:0;min-height:0;display:flex;flex-direction:column;background:#0c141c;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.panel h2{margin:0;padding:6px 8px 0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm)}
+#echo{flex:1;width:100%;min-height:0;display:block;background:#000;touch-action:none}
+#body{width:100%;height:100%;display:block;touch-action:none}
+.legend,.note{margin:0;padding:6px 8px;font-size:13px;line-height:1.35}
+.legend{color:var(--fg)}
 .note{color:var(--muted)}
-.q{padding:0 10px 12px}
-.q button{display:block;width:100%;text-align:left;border-radius:12px;margin:0 0 8px}
-.q button.right{border-color:#7dcea0}
-.q button.wrong{border-color:#c46a6a}
-@media(max-width:800px){.stage{grid-template-columns:1fr}}
+#load{margin:0;padding:8px;color:var(--warm);font-size:14px}
 </style>
 </head>
 <body>
 <header>
   <button type="button" id="back">Back to ICU</button>
-  <h1>Critical care ultrasound</h1>
+  <h1>POCUS</h1>
 </header>
-<p id="status"></p>
-<section id="doors">
-  <button type="button" data-door="lab"><b>Learning lab</b><span>Place the probe. The still, the marks and the full names follow.</span></button>
-  <button type="button" data-door="arena"><b>Practice arena</b><span>Choose the probe, the site, the finding, then the decision.</span></button>
-</section>
-<div id="app">
-  <div class="bar" id="mods"></div>
-  <div class="bar" id="finds"></div>
-  <div class="stage">
-    <section class="panel">
-      <h2>Patient</h2>
-      <div class="chest" id="torso">
-        <svg viewBox="0 0 100 100">
-          <rect width="100" height="100" fill="#14202c"/>
-          <ellipse cx="50" cy="16" rx="9" ry="7" fill="#c4a48c"/>
-          <path d="M8 32 C20 22 34 26 42 30 L44 22 h12 l2 8 C66 26 80 22 92 32 L88 78 C70 92 30 92 12 78 Z" fill="#cbb59e"/>
-          <line x1="50" y1="24" x2="50" y2="70" stroke="#8d7b68" stroke-width="1"/>
-          <ellipse id="z-ant" cx="62" cy="36" rx="8" ry="6" fill="none" stroke="rgba(80,60,40,.55)" stroke-dasharray="1.4 1"/>
-          <ellipse id="z-lat" cx="78" cy="44" rx="6" ry="7" fill="none" stroke="rgba(80,60,40,.55)" stroke-dasharray="1.4 1"/>
-          <ellipse id="z-base" cx="68" cy="54" rx="8" ry="6" fill="none" stroke="rgba(80,60,40,.55)" stroke-dasharray="1.4 1"/>
-          <ellipse id="z-ruq" cx="38" cy="46" rx="8" ry="6" fill="none" stroke="rgba(80,60,40,.55)" stroke-dasharray="1.4 1"/>
-          <ellipse id="z-pelvis" cx="50" cy="68" rx="8" ry="5" fill="none" stroke="rgba(80,60,40,.55)" stroke-dasharray="1.4 1"/>
-          <ellipse id="z-groin" cx="62" cy="80" rx="7" ry="4" fill="none" stroke="rgba(80,60,40,.55)" stroke-dasharray="1.4 1"/>
-          <ellipse id="z-eye" cx="44" cy="15" rx="3" ry="2" fill="none" stroke="rgba(80,60,40,.55)"/>
-          <ellipse id="z-sub" cx="50" cy="58" rx="7" ry="4" fill="none" stroke="rgba(80,60,40,.55)" stroke-dasharray="1.4 1"/>
-        </svg>
-        <div id="probe" aria-hidden="true">
-          <svg viewBox="0 0 34 54" width="34" height="54">
-            <polygon points="17,1 24,12 20,12 20,18 14,18 14,12 10,12" fill="#e2b48a"/>
-            <rect x="10" y="18" width="14" height="20" rx="4" fill="#e6edf2" stroke="#7e8c99"/>
-            <path d="M7 38 h20 l-3 10 h-14 z" fill="#d5dee6" stroke="#7e8c99"/>
-          </svg>
-        </div>
-      </div>
-    </section>
-    <section class="panel">
-      <h2 id="viewtitle">Window</h2>
-      <canvas id="echo"></canvas>
-      <p class="legend" id="legend"></p>
-      <p class="note" id="note"></p>
-      <div class="q" id="extra"></div>
-    </section>
-  </div>
+<div class="bar" id="modes">
+  <button type="button" data-chest="normal">Normal lung</button>
+  <button type="button" data-chest="effusion">Pleural effusion</button>
+  <button type="button" data-chest="ptx">Pneumothorax</button>
+  <button type="button" data-chest="consol">Consolidation</button>
+  <button type="button" data-abd="fluid">Free fluid</button>
+  <button type="button" data-abd="bladder">Bladder</button>
 </div>
-<script>
+<p class="note" id="hint">One finger is the probe. Two fingers turn the body. On a leg, slide the finger down to compress and up to release. As you look at the front, the leg on your left is the patient's right, and it is normal. The leg on your right is the patient's left, and it has thrombus at the groin, the knee and the calf.</p>
+<div class="stage">
+  <section class="panel">
+    <h2 id="title">Ultrasound</h2>
+    <canvas id="echo"></canvas>
+    <p class="legend" id="legend"></p>
+    <p class="note" id="note"></p>
+  </section>
+  <section class="panel">
+    <h2>Patient</h2>
+    <canvas id="body"></canvas>
+    <p id="load">Loading the body…</p>
+  </section>
+</div>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
 const FULL = {
-  A:"A-lines, reverberation from a normally aerated lung",
   PL:"Pleural line",
-  B:"B-lines, vertical artefacts of interstitial syndrome",
-  "Air":"Air bronchograms",
-  Lung:"Consolidated or collapsed lung",
+  A:"A-lines, reverberation from aerated lung",
   Fluid:"Pleural fluid",
   Dia:"Diaphragm",
-  Spine:"Spine, visible behind fluid",
-  Sea:"Seashore sign, M-mode of lung sliding",
-  Sand:"Sandy pattern below the pleural line",
-  Bar:"Barcode, or stratosphere, sign",
+  Spine:"Spine, seen behind fluid",
+  Bar:"Barcode sign, no lung sliding on M-mode",
+  Lung:"Consolidated lung",
+  Air:"Air bronchograms",
   Liver:"Liver",
+  FF:"Free fluid in Morrison's pouch",
   Kid:"Kidney",
-  FF:"Free fluid",
-  Pelvis:"Dilated renal pelvis",
   Bladder:"Urinary bladder",
   Balloon:"Catheter balloon",
-  GB:"Gallbladder",
-  Stone:"Gallstone",
-  Wall:"Gallbladder wall",
-  Ao:"Abdominal aorta",
-  Vert:"Vertebral body",
   CFA:"Common femoral artery",
   CFV:"Common femoral vein",
-  Thr:"Intraluminal thrombus",
-  Globe:"Eyeball",
-  ON:"Optic nerve",
-  Sheath:"Optic nerve sheath",
-  IVC:"Inferior vena cava",
-  RA:"Right atrium",
-  "3mm":"Measure 3 mm behind the globe"
+  Thr:"Thrombus",
+  PA:"Popliteal artery",
+  PV:"Popliteal vein",
+  Art:"Artery",
+  V1:"Calf vein",
+  V2:"Paired calf vein",
+  Closed:"Vein walls apposed"
 };
-const FINDINGS = [
-  {id:"alines", mod:"chest", zone:"z-ant", x:62, y:36, name:"A-lines", src:"pocus/alines.jpg",
-    labels:[["PL",50,28,18,22],["A",50,48,82,55]],
-    note:"Horizontal A-lines with lung sliding mean the lung under the probe is aerated. They do not rule out disease elsewhere. A bilateral A-line pattern in respiratory failure points away from oedema and towards airway disease, embolism or a problem outside the lung.",
-    decision:"Do not treat dry lungs as pulmonary oedema."},
-  {id:"seashore", mod:"chest", zone:"z-ant", x:62, y:36, name:"Lung sliding, seashore", src:"pocus/seashore.jpg",
-    labels:[["Sea",40,30,16,22],["Sand",50,68,82,74]],
-    note:"M-mode. The near field is still, like the sea. The far field is sandy because the lung is sliding. Sliding argues against pneumothorax at that exact rib space. It can be absent in a main bronchus intubation, apnea, or dense pleurodesis without air in the pleura.",
-    decision:"Absent sliding is not enough. Look for a lung point before calling pneumothorax."},
-  {id:"blines", mod:"chest", zone:"z-lat", x:78, y:44, name:"B-lines", src:"pocus/blines.jpg",
-    labels:[["PL",50,22,16,16],["B",48,55,82,48]],
-    note:"B-lines are vertical, laser-like, and erase A-lines. Three or more in one view is a positive region. Diffuse bilateral B-lines with a thin smooth pleural line fit hydrostatic oedema. Focal or patchy B-lines, a thick irregular pleural line, and spared areas fit ARDS or pneumonia.",
-    decision:"Count regions. Diffuse is not the same decision as focal."},
-  {id:"consol", mod:"chest", zone:"z-base", x:68, y:54, name:"Consolidation", src:"pocus/consol.jpg",
-    labels:[["Lung",48,48,16,40],["Air",58,55,84,62]],
-    note:"The lung looks like tissue. Bright branching air that moves with respiration is a dynamic air bronchogram and favours pneumonia. Air that does not move is static and favours resorption atelectasis. A shred sign is the irregular border with aerated lung.",
-    decision:"Tissue-like lung is not an indication for a chest drain."},
-  {id:"effusion", mod:"chest", zone:"z-base", x:68, y:54, name:"Pleural effusion", src:"pocus/effusion.jpg",
-    labels:[["Fluid",58,36,84,28],["Dia",46,52,16,48],["Spine",52,74,82,82]],
-    note:"Anechoic fluid sits above the diaphragm. The spine is seen behind the fluid, the spine sign, which separates fluid from a mirror-image artefact. A sampling decision depends on whether the fluid is new, infected, or causing failure. Not every effusion is drained.",
-    decision:"See the diaphragm. Fluid above it is the chest. Fluid below it is the abdomen."},
-  {id:"ptx", mod:"chest", zone:"z-ant", x:62, y:36, name:"Pneumothorax, barcode", src:"pocus/barcode.jpg",
-    labels:[["Bar",50,62,18,70]],
-    note:"No lung sliding, and M-mode shows only horizontal lines, the barcode or stratosphere sign. The lung point, where sliding reappears, confirms pneumothorax and marks its edge. A sick patient with no sliding, no lung pulse and signs of tension is not a waiting game.",
-    decision:"Tension physiology is decompressed. A stable pneumothorax is confirmed, not guessed from one still."},
-  {id:"diaphragm", mod:"chest", zone:"z-base", x:68, y:54, name:"Diaphragm", src:"pocus/diaphragm.jpg",
-    labels:[["Dia",50,48,18,40],["Liver",50,70,82,74]],
-    note:"Excursion is the distance the diaphragm moves in a deep breath or a tidal breath. Thickening fraction is (end-inspiration thickness minus end-expiration thickness) divided by end-expiration thickness. Low excursion and a low thickening fraction are associated with difficult weaning. One still cannot measure either number.",
-    decision:"Use it with the breathing trial, not instead of it."},
-  {id:"morrison", mod:"abdomen", zone:"z-ruq", x:38, y:46, name:"Free fluid, Morrison pouch", src:"pocus/morrison.jpg",
-    labels:[["Liver",40,38,16,30],["FF",52,52,84,46],["Kid",62,64,84,72]],
-    note:"A black stripe between the liver and the right kidney is free fluid. Also look in the splenorenal recess and the pelvis. In trauma this is part of eFAST. In the ICU it may be ascites. A focused scan does not exclude significant liver disease, and a normal-looking liver does not clear the biliary tree.",
-    decision:"Name the fluid, then decide if it needs sampling. Do not call every stripe infected ascites."},
-  {id:"hydro", mod:"abdomen", zone:"z-ruq", x:36, y:52, name:"Hydronephrosis", src:"pocus/hydro.jpg",
-    labels:[["Pelvis",48,48,16,42],["Kid",62,62,84,70]],
-    note:"A dilated black renal pelvis, and often dilated calyces, in acute kidney injury suggests obstruction until a cause is found. A full bladder can dilate the pelvis, so empty the bladder and look again. A focused scan misses stones that are not casting a shadow and misses most medical renal disease.",
-    decision:"Relieve obstruction. Do not give more fluid for a postrenal kidney."},
-  {id:"bladder", mod:"abdomen", zone:"z-pelvis", x:50, y:68, name:"Bladder and catheter", src:"pocus/bladder.jpg",
-    labels:[["Bladder",48,48,16,40],["Balloon",55,58,84,66]],
-    note:"Volume is approximated as length times width times height times 0.52, in centimetres, giving millilitres. A round bright structure inside is the catheter balloon. A large bladder after a catheter is placed means the catheter is blocked, misplaced, or the balloon is not in the bladder.",
-    decision:"Retention is drained. A blocked catheter is flushed or replaced, not ignored."},
-  {id:"gb", mod:"abdomen", zone:"z-ruq", x:38, y:44, name:"Gallbladder", src:"pocus/gb.jpg",
-    labels:[["GB",48,42,16,34],["Wall",40,55,14,62],["Stone",58,60,84,68]],
-    note:"Distension, wall thickening, a stone with a shadow, and pericholecystic fluid support cholecystitis when the patient is tender under the probe. A focused view that looks normal does not exclude biliary disease. Acalculous cholecystitis in the ICU may have no stone.",
-    decision:"This is not a full hepatobiliary study. Act on the clinical picture plus the signs you actually see."},
-  {id:"aorta", mod:"abdomen", zone:"z-sub", x:52, y:55, name:"Abdominal aorta", src:"pocus/aorta.jpg",
-    labels:[["Ao",48,46,16,40],["Vert",58,68,84,74]],
-    note:"Measure the outer wall to the outer wall, anteroposterior, and do not use a single view. A diameter of 3 cm or more is aneurysmal. A focused scan can miss a leak, because retroperitoneal blood is often invisible. Absence of an aneurysm on a limited view does not exclude rupture if the windows were poor.",
-    decision:"A ruptured aneurysm is a surgical emergency. Ultrasound does not clear a shocked patient with a poor window."},
-  {id:"vein", mod:"dvt", zone:"z-groin", x:62, y:80, name:"Compressible vein", src:"pocus/vein.jpg", compress:"pocus/veinshut.jpg",
-    labels:[["CFA",38,52,14,44],["CFV",62,52,86,44]],
-    labels2:[["CFA",42,50,16,42],["CFV",62,48,84,40]],
-    note:"The artery is round and thick-walled. The vein is larger and oval until you compress. In a normal study the vein walls meet and the lumen disappears. The artery stays open. Start with two or three points: the common femoral vein including the saphenofemoral junction, and the popliteal vein. Colour Doppler does not replace compression.",
-    decision:"A vein that fully compresses at those points makes proximal deep-vein thrombosis unlikely."},
-  {id:"dvt", mod:"dvt", zone:"z-groin", x:62, y:80, name:"Non-compressible vein", src:"pocus/dvt.jpg",
-    labels:[["CFA",36,50,14,42],["CFV",64,50,86,42],["Thr",64,50,86,64]],
-    note:"The vein on the right of this still is filled and does not collapse. Loss of compressibility is the finding that matters. Acute thrombus may be soft. Chronic scar may be echogenic, with a thick wall and collateral veins. Partial occlusion still counts. Colour flow, phasicity and augmentation are extra, not a substitute.",
-    decision:"Proximal deep-vein thrombosis is treated if bleeding risk allows. Do not press harder to make the vein collapse."},
-  {id:"onsd", mod:"eye", zone:"z-eye", x:44, y:15, name:"Optic nerve sheath", src:"pocus/onsd.jpg",
-    labels:[["Globe",32,48,14,36],["ON",68,46,86,38],["Sheath",62,40,84,28],["3mm",58,50,16,62]],
-    note:"High-frequency linear probe, transverse, on a closed eyelid with plenty of gel and no pressure on the globe. The nerve is the dark tube behind the eye. Measure 3 mm behind the globe, outer border to outer border. Below about 5 mm is reassuring in many adult protocols. Above about 5–5.7 mm raises suspicion of raised intracranial pressure. There is no single cutoff for every adult. This is an adjunct. It is not a measured ICP, and it must not be the only reason to treat or to withhold imaging. Do not scan if the globe may be ruptured.",
-    decision:"Do not start or stop ICP treatment on the sheath diameter alone."},
-  {id:"ivc", mod:"ivc", zone:"z-sub", x:50, y:58, name:"Inferior vena cava", src:"pocus/ivc.jpg",
-    labels:[["Liver",28,48,12,40],["IVC",55,46,84,38],["RA",72,36,88,24]],
-    note:"Measure about 2 cm from the right atrium, or just beyond the hepatic vein inlet, in long axis. A small collapsing cava supports a low right atrial pressure. A plethoric cava that hardly varies supports a high pressure, as in obstruction, right-heart failure, or tamponade. Variation is read with a spontaneous breath or a controlled sniff, and it is unreliable in high positive pressure. VExUS adds hepatic, portal and renal venous Doppler when the cava is at least 2 cm. This still is the cava only. It is not a Doppler study.",
-    decision:"A full cava is not an order for fluid, and a small cava is not an order for a fluid bolus by itself."}
-];
-const MODS = [["chest","Chest"],["abdomen","Abdomen"],["dvt","Deep-vein thrombosis"],["eye","Optic nerve"],["ivc","IVC and VExUS"]];
-const CASES = [
-  {stem:"Sudden breathlessness. Bilateral crackles. A known weak left ventricle. The pleural line is smooth.", probes:["linear","phased"], site:"chest", find:"blines",
-    q:"Which pattern is this?", opts:["Diffuse interstitial syndrome, most often oedema here","Pneumothorax","A dry A-line lung","Hydronephrosis"], a:0,
-    why:"Bilateral B-lines and a smooth pleural line fit hydrostatic oedema. Focal B-lines would be a different pattern.",
-    q2:"What follows?", opts:["Treat pulmonary oedema and reassess. This is not a chest drain.","Immediate intercostal drain","Anticoagulate for a calf vein you have not seen","Lower intracranial pressure"], a2:0,
-    why2:"The scan supports oedema. Treatment follows the cause. A drain treats neither oedema nor B-lines."},
-  {stem:"After a subclavian line the patient is hypotensive, the trachea is pushed, and the same side has no sliding and a barcode sign.", probes:["linear","phased"], site:"chest", find:"ptx",
-    q:"What sign is the barcode?", opts:["No lung sliding, as in pneumothorax","Normal sliding","Pleural effusion","Consolidation"], a:0,
-    why:"Horizontal lines only, the stratosphere or barcode sign, mean the lung is not sliding under the probe.",
-    q2:"What is the next action if he is in tension physiology?", opts:["Decompress the pneumothorax","A fluid bolus for a small cava","Diuretics","Antibiotics alone"], a2:0,
-    why2:"Tension physiology is decompressed. Confirmation can follow. A stable patient can wait for a definitive image."},
-  {stem:"Fever, a one-sided crackle, and a tissue-like lobe with branching air.", probes:["linear","phased","curved"], site:"chest", find:"consol",
-    q:"Dynamic air bronchograms favour which process?", opts:["Pneumonia","Pneumothorax","An empty bladder","A compressible vein"], a:0,
-    why:"Air that moves with the breath inside consolidated lung favours pneumonia. Static air favours atelectasis.",
-    q2:"What should you not do on this image alone?", opts:["Insert a chest drain into the tissue-like lung","Treat the infection and support breathing","Look for a parapneumonic effusion","Reassess after treatment"], a2:0,
-    why2:"Consolidated lung is not fluid. A drain belongs in a collection, not in the lung."},
-  {stem:"Creatinine has doubled. The bladder is empty. The renal pelvis is a black branching space.", probes:["curved"], site:"abdomen", find:"hydro",
-    q:"What is the finding?", opts:["Hydronephrosis","A-lines","A compressible femoral vein","A normal optic nerve"], a:0,
-    why:"A dilated pelvis and calyces in acute kidney injury are obstruction until proved otherwise.",
-    q2:"What decision follows?", opts:["Relieve the obstruction. Do not flood a postrenal kidney.","More fluid because the kidney looks black","Thrombolysis","A chest drain"], a2:0,
-    why2:"Postrenal kidney injury is treated by relieving the block, not by a fluid bolus."},
-  {stem:"No urine for six hours after a catheter was inserted. The bladder is large and a round balloon sits in it.", probes:["curved"], site:"abdomen", find:"bladder",
-    q:"Where is the catheter balloon?", opts:["Inside a distended bladder","In the femoral vein","Behind the globe","Above the diaphragm"], a:0,
-    why:"The balloon is in the bladder, and the bladder is still full, so the catheter is not draining.",
-    q2:"What do you do?", opts:["Unblock or replace the catheter","Anticoagulate","Measure the optic nerve","Start a vasopressor for the bladder"], a2:0,
-    why2:"Retention behind a failed catheter is a drainage problem."},
-  {stem:"A swollen leg after femoral venous access. You compress. The artery stays round. The vein beside it does not close, and the lumen is filled.", probes:["linear"], site:"dvt", find:"dvt",
-    q:"Which vessel fails the test?", opts:["The common femoral vein","The artery, because it stayed open","The optic nerve","The aorta"], a:0,
-    why:"The vein should collapse. Failure to compress is the sign of thrombus. The artery is supposed to stay open.",
-    q2:"Colour Doppler instead of compression is enough.", opts:["False. Compression is the test.","True. Colour replaces compression."], a2:0,
-    why2:"Colour, phasicity and augmentation add information. They do not replace compression."},
-  {stem:"You compress the common femoral vein of the other leg. The lumen disappears. The artery remains round.", probes:["linear"], site:"dvt", find:"vein",
-    q:"What does a vein that fully collapses mean at this point?", opts:["No thrombus at the point you compressed","A complete iliofemoral thrombosis","A pneumothorax","Raised intracranial pressure"], a:0,
-    why:"Full compression excludes thrombus at that point. It does not examine the calf, and it does not examine a segment you skipped.",
-    q2:"Which points are the minimum?", opts:["Common femoral vein, including the saphenofemoral junction, and the popliteal vein","Only the great saphenous vein in the calf","The optic nerve of both eyes","The gallbladder"], a2:0,
-    why2:"A two- or three-point study is the basic ICU examination. A fuller scan comes after."},
-  {stem:"Traumatic brain injury. The sheath, measured 3 mm behind the globe from outer border to outer border, is 6.2 mm. The globe is intact.", probes:["linear"], site:"eye", find:"onsd",
-    q:"How is the sheath measured?", opts:["3 mm behind the globe, outer border to outer border, with no pressure on the eye","Across the middle of the globe","1 cm in front of the lens","From the artery to the vein"], a:0,
-    why:"That is the standard site. Pressure on the globe is avoided, and a possibly ruptured globe is not scanned.",
-    q2:"The diameter is 6.2 mm. What follows?", opts:["It raises suspicion. It does not replace clinical examination, imaging, or an ICP monitor.","Start osmotherapy on this number alone","Ignore it because the cutoff is universal and this is normal","Drain the optic nerve"], a2:0,
-    why2:"Above about 5–5.7 mm is a concerning adjunct in many adult protocols. There is no cutoff that replaces intracranial pressure or a scan."}
-];
-const mode = new URLSearchParams(location.search).get("mode") || "";
-document.body.classList.add(mode==="lab"||mode==="arena" ? mode : "doors");
-let mod = "chest";
-let current = "alines";
+const SHOTS = {
+  normal:{title:"Normal lung", src:"pocus/alines.jpg", labels:[["PL",50,28,18,22],["A",50,48,82,55]], note:"A-lines under a bright pleural line. This is aerated lung. Sliding is a movement, so a still cannot prove it."},
+  effusion:{title:"Pleural effusion", src:"pocus/effusion.jpg", labels:[["Fluid",58,36,84,28],["Dia",46,52,16,48],["Spine",52,74,82,82]], note:"Black fluid above the diaphragm. The spine shows through behind it."},
+  ptx:{title:"Pneumothorax", src:"pocus/barcode.jpg", labels:[["Bar",50,62,18,70]], note:"M-mode barcode, or stratosphere, sign. The lung is not sliding at this rib space."},
+  consol:{title:"Consolidation", src:"pocus/consol.jpg", labels:[["Lung",48,48,16,40],["Air",58,55,84,62]], note:"The lung looks like tissue. Bright branches are air bronchograms."},
+  fluid:{title:"Free fluid, Morrison's pouch", src:"pocus/morrison.jpg", labels:[["Liver",40,38,16,30],["FF",52,52,84,46],["Kid",62,64,84,72]], note:"The black stripe between liver and kidney is free fluid. A normal liver on this view does not clear the rest of the abdomen."},
+  bladder:{title:"Bladder", src:"pocus/bladder.jpg", labels:[["Bladder",48,48,16,40],["Balloon",55,58,84,66]], note:"Anechoic bladder. The round bright structure is the catheter balloon."},
+  inguinal:{title:"Right groin, before compression", src:"pocus/vein.jpg", labels:[["CFA",38,52,14,44],["CFV",64,54,88,46]], note:"The artery is round. The vein is the larger oval lumen. Slide down to compress."},
+  inguinalClot:{title:"Left groin, thrombus", src:"pocus/dvt.jpg", labels:[["CFA",36,50,14,42],["CFV",64,50,88,40],["Thr",64,50,88,66]], note:"The vein on the right of the image is filled. Sliding down does not close it."},
+  pop:{title:"Right knee, before compression", src:"pocus/pop.jpg", labels:[["PA",42,46,16,36],["PV",60,64,86,72]], note:"Behind the knee. The round vessel is the artery. The larger oval is the popliteal vein. Slide down to compress."},
+  popClot:{title:"Left knee, thrombus", src:"pocus/popclot.jpg", labels:[["PA",36,54,14,44],["PV",62,54,88,44],["Thr",62,54,88,68]], note:"The popliteal vein is filled. It does not collapse."},
+  calf:{title:"Right calf, before compression", src:"pocus/calf.jpg", labels:[["Art",50,40,50,28],["V1",42,56,16,62],["V2",58,56,86,62]], note:"The artery is the upper lumen. The two below are paired calf veins. Slide down to compress."},
+  calfClot:{title:"Left calf, thrombus", src:"pocus/calfclot.jpg", labels:[["Art",50,38,50,26],["V1",42,54,16,64],["V2",58,54,86,64],["Thr",50,54,84,74]], note:"The paired calf veins are filled. They do not collapse."},
+  shut:{title:"Compressed, vein closed", src:"pocus/veinshut.jpg", labels:[["Art",36,52,14,42],["Closed",70,48,88,40]], note:"The round lumen is the artery. The vein is the flat line: the walls have met."}
+};
+
+let chestMode = "";
+let abdMode = "";
 let compressed = false;
-let caseIx = 0;
-let step = 0;
-let score = 0;
-let asked = 0;
-const echo = document.getElementById("echo");
-const ctx = echo.getContext("2d");
+let zoneKey = "";
 const images = {};
 function load(src){
-  if(images[src]) return images[src];
+  if(!src || images[src]) return;
   const im = new Image();
   im.src = src;
   images[src] = im;
-  im.onload = draw;
-  return im;
+  im.onload = drawEcho;
 }
-FINDINGS.forEach(function(f){ load(f.src); if(f.compress) load(f.compress); });
-function item(){ return FINDINGS.find(function(f){ return f.id===current; }); }
-function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return "&#"+c.charCodeAt(0)+";"; }); }
-function paintMods(){
-  document.getElementById("mods").innerHTML = MODS.map(function(m){
-    return "<button type='button' data-mod='"+m[0]+"'"+(m[0]===mod?" class='on'":"")+">"+m[1]+"</button>";
-  }).join("");
-  const rows = FINDINGS.filter(function(f){ return f.mod===mod; });
-  document.getElementById("finds").innerHTML = rows.map(function(f){
-    return "<button type='button' data-id='"+f.id+"'"+(f.id===current?" class='on'":"")+">"+f.name+"</button>";
-  }).join("");
+Object.keys(SHOTS).forEach(function(k){ load(SHOTS[k].src); });
+
+const echo = document.getElementById("echo");
+const ectx = echo.getContext("2d");
+function drawEcho(){
+  const r = echo.getBoundingClientRect();
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const w = Math.max(2, Math.floor(r.width * dpr));
+  const h = Math.max(2, Math.floor(r.height * dpr));
+  if(echo.width !== w || echo.height !== h){ echo.width = w; echo.height = h; }
+  ectx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = r.width, H = r.height;
+  ectx.fillStyle = "#000";
+  ectx.fillRect(0, 0, W, H);
+  const shot = activeShot;
+  if(!shot || !shot.src) return;
+  const im = images[shot.src];
+  if(!(im && im.complete && im.naturalWidth)) return;
+  const ir = im.naturalWidth / im.naturalHeight, cr = W / H;
+  let dw, dh, ox, oy;
+  if(cr > ir){ dh = H; dw = H * ir; ox = (W - dw) / 2; oy = 0; }
+  else { dw = W; dh = W / ir; ox = 0; oy = (H - dh) / 2; }
+  ectx.drawImage(im, ox, oy, dw, dh);
+  ectx.font = "600 12px Figtree, sans-serif";
+  ectx.textAlign = "center";
+  ectx.textBaseline = "middle";
+  (shot.labels || []).forEach(function(lb){
+    const ax = ox + lb[1] / 100 * dw, ay = oy + lb[2] / 100 * dh;
+    const lx = ox + lb[3] / 100 * dw, ly = oy + lb[4] / 100 * dh;
+    ectx.beginPath(); ectx.moveTo(ax, ay); ectx.lineTo(lx, ly);
+    ectx.strokeStyle = "rgba(243,239,230,.92)"; ectx.lineWidth = 1.2; ectx.stroke();
+    ectx.fillStyle = "#f3efe6"; ectx.beginPath(); ectx.arc(ax, ay, 2.2, 0, 6.3); ectx.fill();
+    ectx.lineWidth = 3.5; ectx.strokeStyle = "rgba(0,0,0,.9)"; ectx.strokeText(lb[0], lx, ly);
+    ectx.fillStyle = "#f3efe6"; ectx.fillText(lb[0], lx, ly);
+  });
 }
-function legend(f){
-  const labels = (compressed && f.labels2) ? f.labels2 : f.labels;
+function legend(shot){
   const seen = {};
-  const bits = labels.map(function(lb){
+  return (shot.labels || []).map(function(lb){
     if(seen[lb[0]]) return "";
     seen[lb[0]] = 1;
-    return lb[0]+" — "+(FULL[lb[0]] || lb[0]);
-  }).filter(Boolean);
-  return bits.join(". ")+".";
+    return lb[0] + " — " + (FULL[lb[0]] || lb[0]);
+  }).filter(Boolean).join(". ") + ".";
 }
-function draw(){
-  if(mode!=="lab" && mode!=="arena") return;
-  const f = item();
-  const src = (compressed && f.compress) ? f.compress : f.src;
-  const im = images[src];
-  const r = echo.getBoundingClientRect();
-  const dpr = Math.min(devicePixelRatio||1, 2);
-  const w = Math.max(2, Math.floor(r.width*dpr));
-  const h = Math.max(2, Math.floor(r.height*dpr));
-  if(echo.width!==w || echo.height!==h){ echo.width=w; echo.height=h; }
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  const W = r.width, H = r.height;
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0,0,W,H);
-  if(!(im && im.complete && im.naturalWidth)) return;
-  const ir = im.naturalWidth/im.naturalHeight, cr = W/H;
-  let dw, dh, ox, oy;
-  if(cr>ir){ dh=H; dw=H*ir; ox=(W-dw)/2; oy=0; }
-  else { dw=W; dh=W/ir; ox=0; oy=(H-dh)/2; }
-  ctx.drawImage(im, ox, oy, dw, dh);
-  const labels = (compressed && f.labels2) ? f.labels2 : f.labels;
-  ctx.font = "600 13px Figtree, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
-  labels.forEach(function(lb){
-    const ax = ox + lb[1]/100*dw, ay = oy + lb[2]/100*dh;
-    const lx = ox + (lb[3]||lb[1])/100*dw, ly = oy + (lb[4]||lb[2])/100*dh;
-    ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(lx,ly);
-    ctx.strokeStyle = "rgba(243,239,230,.9)"; ctx.lineWidth = 1.2; ctx.stroke();
-    ctx.fillStyle = "#f3efe6"; ctx.beginPath(); ctx.arc(ax,ay,2.2,0,6.3); ctx.fill();
-    ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,.9)"; ctx.strokeText(lb[0], lx, ly);
-    ctx.fillStyle = "#f3efe6"; ctx.fillText(lb[0], lx, ly);
-  });
+
+const body = document.getElementById("body");
+const renderer = new THREE.WebGLRenderer({ canvas: body, antialias: true, alpha: false, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+renderer.setClearColor(0x101820, 1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+scene.add(new THREE.AmbientLight(0xfff4ea, 0.55));
+scene.add(new THREE.HemisphereLight(0xfff1e6, 0x1a2836, 0.8));
+const key = new THREE.DirectionalLight(0xfff6ee, 1.35);
+key.position.set(0.6, 1.8, 2.2);
+scene.add(key);
+const camera = new THREE.PerspectiveCamera(28, 1, 0.02, 40);
+let yaw = 0, yawTo = 0, dist = 4, distTo = 4;
+const target = new THREE.Vector3(0, 0.9, 0);
+let bodyMesh = null;
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const probe = new THREE.Group();
+const tip = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.055, 14), new THREE.MeshStandardMaterial({ color: 0xe2b48a, roughness: 0.45 }));
+tip.geometry.translate(0, 0.03, 0);
+const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.012, 0.05, 12), new THREE.MeshStandardMaterial({ color: 0xd5dee6, roughness: 0.4 }));
+handle.position.y = 0.07;
+probe.add(tip); probe.add(handle);
+probe.visible = false;
+scene.add(probe);
+const up = new THREE.Vector3(0, 1, 0);
+const skin = { body: 1, eyes: 1, irises: 1, pupils: 1 };
+
+function resize(){
+  const w = body.clientWidth || 300, h = body.clientHeight || 400;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / Math.max(1, h);
+  camera.updateProjectionMatrix();
 }
-function placeProbe(f){
-  const torso = document.getElementById("torso");
-  const rect = torso.getBoundingClientRect();
-  const scale = Math.min(rect.width/100, rect.height/100);
-  const ox = (rect.width-100*scale)/2, oy = (rect.height-100*scale)/2;
-  const probe = document.getElementById("probe");
-  probe.style.left = (ox + f.x*scale)+"px";
-  probe.style.top = (oy + f.y*scale)+"px";
-  ["z-ant","z-lat","z-base","z-ruq","z-pelvis","z-groin","z-eye","z-sub"].forEach(function(id){
-    const n = document.getElementById(id);
-    if(n) n.setAttribute("stroke", id===f.zone ? "#9fd4ff" : "rgba(80,60,40,.55)");
-  });
+function frameCamera(){
+  yaw += (yawTo - yaw) * 0.15;
+  dist += (distTo - dist) * 0.15;
+  camera.position.set(Math.sin(yaw) * dist, target.y + dist * 0.02, Math.cos(yaw) * dist);
+  camera.lookAt(target);
 }
-function showFinding(){
-  const f = item();
-  document.getElementById("viewtitle").textContent = f.name;
-  document.getElementById("legend").textContent = legend(f);
-  document.getElementById("note").textContent = f.note+" "+f.decision;
-  if(mode!=="arena") document.getElementById("status").textContent = "Learning lab · "+f.name;
-  const extra = document.getElementById("extra");
-  if(mode==="lab" && (f.id==="vein" || f.id==="dvt")){
-    extra.innerHTML = "<button type='button' id='compress'>"+(compressed?"Release":"Compress the vein")+"</button>";
-    document.getElementById("compress").onclick = function(){
-      compressed = !compressed;
-      if(f.id==="dvt") compressed = true;
-      showFinding();
-    };
-    if(f.id==="dvt"){
-      extra.innerHTML = "<p class='note'>Compression does not close this vein. That is the finding.</p>";
-    }
-  } else if(mode==="lab") extra.innerHTML = "";
-  placeProbe(f);
-  paintMods();
-  draw();
+let activeShot = null;
+function classify(p){
+  const side = p.x >= 0 ? "left" : "right";
+  if(p.y >= 0.14 && p.y < 0.46 && Math.abs(p.x) > 0.05) return { zone: "calf", side: side };
+  if(p.y >= 0.46 && p.y < 0.72 && Math.abs(p.x) > 0.06) return { zone: "knee", side: side };
+  if(p.y >= 0.78 && p.y < 1.02 && Math.abs(p.x) >= 0.11 && Math.abs(p.x) < 0.42) return { zone: "groin", side: side };
+  if(p.y >= 0.90 && p.y < 1.08 && Math.abs(p.x) < 0.11 && p.z > -0.02) return { zone: "bladder" };
+  if(p.y >= 1.12 && p.y < 1.32 && p.x < -0.02 && p.z > -0.06) return { zone: "ruq" };
+  if(p.y >= 1.30 && p.y < 1.64 && Math.abs(p.x) < 0.32 && p.z > -0.08) return { zone: "chest" };
+  return { zone: "off" };
 }
-function openCase(){
-  const c = CASES[caseIx];
-  compressed = false;
-  current = c.find;
-  mod = item().mod;
-  step = 0;
-  document.getElementById("status").textContent = "Case "+(caseIx+1)+" of "+CASES.length+" · score "+score+" / "+asked;
-  document.getElementById("note").textContent = c.stem;
-  document.getElementById("legend").textContent = "";
-  document.getElementById("viewtitle").textContent = "Choose the probe";
-  document.getElementById("extra").innerHTML =
-    "<p class='note'>"+esc(c.stem)+"</p>"+
-    ["linear","phased","curved"].map(function(p){
-      const name = p==="linear"?"Linear, high frequency":p==="phased"?"Phased array":"Curvilinear";
-      return "<button type='button' data-probe='"+p+"'>"+name+"</button>";
-    }).join("");
-  ctx.setTransform(1,0,0,1,0,0);
-  ctx.fillStyle="#000"; ctx.fillRect(0,0,echo.width,echo.height);
-  placeProbe(item());
+function shotFor(info){
+  if(!info || info.zone === "off") return { wait: "Move the probe onto the chest, the right upper abdomen, the bladder, or either leg." };
+  if(info.zone === "chest"){
+    if(!chestMode) return { wait: "Choose normal lung, pleural effusion, pneumothorax, or consolidation. Then keep the probe on the chest." };
+    return SHOTS[chestMode];
+  }
+  if(info.zone === "ruq"){
+    if(abdMode !== "fluid") return { wait: "This is Morrison's pouch, on the patient's right. Choose Free fluid." };
+    return SHOTS.fluid;
+  }
+  if(info.zone === "bladder"){
+    if(abdMode !== "bladder") return { wait: "This is the bladder, low in the midline. Choose Bladder." };
+    return SHOTS.bladder;
+  }
+  const clot = info.side === "left";
+  const key = info.zone === "groin" ? "inguinal" : info.zone === "knee" ? "pop" : "calf";
+  if(!clot && compressed){
+    const shut = Object.assign({}, SHOTS.shut);
+    shut.title = "Patient's right " + (info.zone === "groin" ? "groin" : info.zone === "knee" ? "knee" : "calf") + ", compressed";
+    return shut;
+  }
+  return SHOTS[clot ? key + "Clot" : key];
 }
-function ask(which){
-  const c = CASES[caseIx];
-  const q = which===1 ? c.q : c.q2;
-  const opts = which===1 ? c.opts : c.opts2;
-  const ans = which===1 ? c.a : c.a2;
-  const why = which===1 ? c.why : c.why2;
-  document.getElementById("viewtitle").textContent = which===1 ? "Name the finding" : "What follows";
-  document.getElementById("extra").innerHTML = "<p class='note'>"+esc(q)+"</p>"+opts.map(function(o,i){
-    return "<button type='button' data-i='"+i+"'>"+esc(o)+"</button>";
-  }).join("");
-  document.getElementById("extra").onclick = function(e){
-    const btn = e.target.closest("[data-i]");
-    if(!btn || step!==which) return;
-    const i = Number(btn.getAttribute("data-i"));
-    asked += 1;
-    const ok = i===ans;
-    if(ok) score += 1;
-    document.getElementById("extra").querySelectorAll("button").forEach(function(b){
-      const n = Number(b.getAttribute("data-i"));
-      if(n===ans) b.classList.add("right");
-      else if(n===i) b.classList.add("wrong");
-      b.disabled = true;
-    });
-    document.getElementById("legend").textContent = (ok?"Correct. ":"Not that one. ")+why;
-    document.getElementById("status").textContent = "Case "+(caseIx+1)+" of "+CASES.length+" · score "+score+" / "+asked;
-    step = which===1 ? 2 : 3;
-    if(which===2){
-      const next = document.createElement("button");
-      next.textContent = caseIx<CASES.length-1 ? "Next case" : "Done";
-      next.onclick = function(){
-        if(caseIx<CASES.length-1){ caseIx += 1; openCase(); }
-        else document.getElementById("note").textContent = "Finished. "+score+" of "+asked+".";
-      };
-      document.getElementById("extra").appendChild(next);
-    } else setTimeout(function(){ ask(2); }, 700);
-  };
+let hitPoint = null;
+function placeProbe(clientX, clientY){
+  if(!bodyMesh) return;
+  const rect = body.getBoundingClientRect();
+  pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObject(bodyMesh, false);
+  if(!hits.length){
+    probe.visible = false;
+    hitPoint = null;
+    return;
+  }
+  const hit = hits[0];
+  hitPoint = hit.point.clone();
+  const n = hit.face.normal.clone().transformDirection(bodyMesh.matrixWorld).normalize();
+  probe.visible = true;
+  probe.position.copy(hit.point);
+  probe.quaternion.setFromUnitVectors(up, n);
 }
-document.getElementById("mods").onclick = function(e){
-  const b = e.target.closest("[data-mod]");
-  if(!b || mode!=="lab") return;
-  mod = b.getAttribute("data-mod");
-  current = FINDINGS.find(function(f){ return f.mod===mod; }).id;
-  compressed = false;
-  showFinding();
-};
-document.getElementById("finds").onclick = function(e){
-  const b = e.target.closest("[data-id]");
-  if(!b || mode!=="lab") return;
-  current = b.getAttribute("data-id");
-  compressed = false;
-  showFinding();
-};
-document.getElementById("extra").addEventListener("click", function(e){
-  const b = e.target.closest("[data-probe]");
-  if(!b || mode!=="arena" || step!==0) return;
-  const c = CASES[caseIx];
-  const pick = b.getAttribute("data-probe");
-  const ok = c.probes.indexOf(pick)!==-1;
-  showFinding();
-  document.getElementById("note").textContent = c.stem+" "+(ok ? "That probe can make this window." : "Another probe is the better first choice. The image is still shown so you can read it.");
-  step = 1;
-  setTimeout(function(){ ask(1); }, 600);
+function show(){
+  const info = hitPoint ? classify(hitPoint) : { zone: "off" };
+  const key = info.zone + (info.side || "");
+  if(key !== zoneKey){ zoneKey = key; compressed = false; }
+  activeShot = hitPoint ? shotFor(info) : null;
+  const title = document.getElementById("title");
+  const legendEl = document.getElementById("legend");
+  const noteEl = document.getElementById("note");
+  if(!hitPoint){
+    title.textContent = "Ultrasound";
+    legendEl.textContent = "";
+    noteEl.textContent = "Put a finger on the body. The probe sits where the finger is.";
+  }else if(activeShot && activeShot.wait){
+    title.textContent = "Move the probe";
+    legendEl.textContent = "";
+    noteEl.textContent = activeShot.wait;
+  }else if(activeShot){
+    title.textContent = activeShot.title;
+    legendEl.textContent = legend(activeShot);
+    noteEl.textContent = activeShot.note;
+  }
+  drawEcho();
+}
+const pointers = new Map();
+let lastSpan = 0;
+let pressY = 0;
+body.addEventListener("pointerdown", function(e){
+  body.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  pressY = e.clientY;
+  if(pointers.size === 1){ placeProbe(e.clientX, e.clientY); show(); }
 });
-document.getElementById("torso").addEventListener("pointerdown", function(e){
-  if(mode!=="lab") return;
-  const rect = document.getElementById("torso").getBoundingClientRect();
-  const scale = Math.min(rect.width/100, rect.height/100) || 1;
-  const ox = (rect.width-100*scale)/2, oy = (rect.height-100*scale)/2;
-  const x = (e.clientX-rect.left-ox)/scale, y = (e.clientY-rect.top-oy)/scale;
-  let best = null, bd = 1e9;
-  FINDINGS.filter(function(f){ return f.mod===mod; }).forEach(function(f){
-    const d = Math.hypot(f.x-x, f.y-y);
-    if(d<bd){ bd=d; best=f; }
-  });
-  if(best && bd<18){ current = best.id; compressed = false; showFinding(); }
+body.addEventListener("pointermove", function(e){
+  if(!pointers.has(e.pointerId)) return;
+  const prev = pointers.get(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if(pointers.size >= 2){
+    const pts = Array.from(pointers.values());
+    const span = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    yawTo -= (e.clientX - prev.x) * 0.008;
+    if(lastSpan) distTo = Math.min(7, Math.max(1.2, distTo * (lastSpan / span)));
+    lastSpan = span;
+    return;
+  }
+  lastSpan = 0;
+  placeProbe(e.clientX, e.clientY);
+  const info = hitPoint ? classify(hitPoint) : null;
+  if(info && (info.zone === "groin" || info.zone === "knee" || info.zone === "calf")){
+    const dy = e.clientY - pressY;
+    if(dy > 28) compressed = true;
+    if(dy < -28) compressed = false;
+  }
+  show();
 });
-document.getElementById("back").onclick = function(){ location.href = "index.html"; };
-document.getElementById("doors").onclick = function(e){
-  const b = e.target.closest("[data-door]");
+function endPointer(e){
+  pointers.delete(e.pointerId);
+  if(!pointers.size) lastSpan = 0;
+}
+body.addEventListener("pointerup", endPointer);
+body.addEventListener("pointercancel", endPointer);
+
+document.getElementById("modes").onclick = function(e){
+  const b = e.target.closest("button");
   if(!b) return;
-  location.href = "pocus-lab.html?mode="+b.getAttribute("data-door")+"&v=20261101a";
+  if(b.dataset.chest){ chestMode = b.dataset.chest; abdMode = ""; }
+  if(b.dataset.abd){ abdMode = b.dataset.abd; chestMode = ""; }
+  document.querySelectorAll("#modes button").forEach(function(btn){
+    btn.classList.toggle("on", btn === b);
+  });
+  show();
 };
-if(mode==="lab"){ paintMods(); showFinding(); }
-if(mode==="arena"){ document.getElementById("finds").hidden = true; openCase(); }
-window.addEventListener("resize", draw);
+document.getElementById("back").onclick = function(){ location.href = "index.html"; };
+
+new GLTFLoader().load("models/anatomy/human-reference.glb", function(gltf){
+  const model = gltf.scene;
+  model.traverse(function(obj){
+    if(!obj.isMesh) return;
+    const part = obj.name || "";
+    if(!skin[part]){ obj.visible = false; return; }
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    mats.forEach(function(mat){
+      if(!mat) return;
+      mat.side = THREE.FrontSide;
+      if(part === "body"){
+        mat.transparent = false;
+        mat.opacity = 1;
+        mat.depthWrite = true;
+        mat.roughness = 0.62;
+        mat.metalness = 0;
+        mat.color.setHex(0xd7b09a);
+        if(mat.emissive) mat.emissive.setHex(0x3a241c);
+        mat.emissiveIntensity = 0.08;
+      }
+    });
+    if(part === "body") bodyMesh = obj;
+  });
+  scene.add(model);
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  target.copy(center);
+  const vFov = THREE.MathUtils.degToRad(camera.fov);
+  dist = distTo = (size.y * 0.55) / Math.tan(vFov / 2);
+  document.getElementById("load").textContent = "";
+}, undefined, function(){
+  document.getElementById("load").textContent = "The body did not load. Stay on this page and open POCUS again.";
+});
+
+function loop(){
+  resize();
+  frameCamera();
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+loop();
+window.addEventListener("resize", function(){ resize(); drawEcho(); });
+window.addEventListener("pagehide", function(){
+  renderer.dispose();
+});
 </script>
 </body>
 </html>
