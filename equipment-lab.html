@@ -866,7 +866,7 @@ function loadReal(id){
     });
     root.add(model);
     parts.forEach(function(mesh){ mesh.userData.home = mesh.position.clone(); });
-    try { if(id==="ett" || id==="lma" || id==="bvm") buildEttGuides(model); } catch (err) {}
+    try { if(id==="ett" || id==="lma" || id==="bvm" || id==="dl") buildEttGuides(model); } catch (err) {}
     realModel = true;
     setEttStatus("", false);
     fit();
@@ -1031,13 +1031,47 @@ function lmaPartId(x, y, z){
 function activeParts(){
   if(currentId==="lma") return LMA_PARTS;
   if(currentId==="bvm") return BVM_PARTS;
+  if(currentId==="dl") return DL_PARTS;
   if(currentId==="ett") return ETT_PARTS;
   return null;
 }
 function activePartId(x, y, z){
   if(currentId==="lma") return lmaPartId(x, y, z);
   if(currentId==="bvm") return bvmPartId(x, y, z);
+  if(currentId==="dl") return scopePartId(x, y, z);
   return ettPartId(x, y, z);
+}
+function scopePartId(x, y, z){
+  if(x > 0.68 && y < 0.36) return "handle";
+  if(x > 0.66 && y >= 0.36 && y < 0.63) return "base";
+  if(x > 0.52 && x < 0.72 && y > 0.60 && y < 0.76) return "web";
+  if(y > 0.80 && x > -0.20 && x < 0.18) return x < -0.04 ? "lamp" : "socket";
+  if(x < -0.62 && y > 0.52 && y < 0.66) return "tip";
+  if(y > -0.02 && y < 0.50 && x < 0.45){
+    if(x < -0.78 && y < 0.08) return "tip";
+    if(x > -0.76 && x < -0.62 && y > 0.22 && y < 0.35) return "lamp";
+    if(x > -0.64 && x < -0.50 && y > 0.27 && y < 0.39) return "socket";
+    if(x > 0.10 && y < 0.23) return "base";
+    if(x > 0.02 && x <= 0.12 && y > 0.15 && y < 0.24) return "web";
+    return "tongue";
+  }
+  if(y > -0.50 && y <= -0.02 && x < 0.45){
+    if(x < -0.74 && y < -0.36) return "tip";
+    if(x > -0.58 && x < -0.46 && y > -0.24 && y < -0.12) return "lamp";
+    if(x > -0.48 && x < -0.34 && y > -0.22 && y < -0.10) return "socket";
+    if(x > 0.08 && y < -0.22) return "base";
+    if(x > 0.00 && x <= 0.10 && y > -0.30 && y < -0.20) return "web";
+    return "tongue";
+  }
+  if(y <= -0.50 && x < 0.45){
+    if(x < -0.62 && y < -0.74) return "tip";
+    if(x > -0.46 && x < -0.32 && y > -0.66 && y < -0.54) return "lamp";
+    if(x > -0.34 && x < -0.20 && y > -0.64 && y < -0.52) return "socket";
+    if(x > 0.04 && y < -0.66) return "base";
+    if(x > -0.02 && x <= 0.08 && y > -0.74 && y < -0.64) return "web";
+    return "tongue";
+  }
+  return "tongue";
 }
 function bvmPartId(x, y, z){
   if(z > -0.02 && x > -0.50 && x < 0.38) return "o2tube";
@@ -1083,6 +1117,15 @@ const BVM_PARTS = [
   {id:"release", title:"Air-inlet and pressure release valves", text:"These sit by the reservoir. They let air in and let excess oxygen out."},
   {id:"o2tube", title:"Oxygen tubing", text:"Carries oxygen from the flowmeter to the reservoir."},
   {id:"reservoir", title:"Reservoir bag", text:"Stores oxygen so the breath you give is richer in oxygen."}
+];
+const DL_PARTS = [
+  {id:"tip", title:"Tip", text:"The rounded end of the curved blade. It sits in the vallecula and lifts the epiglottis."},
+  {id:"tongue", title:"Tongue", text:"The curved spatula of the blade. It pushes the tongue aside so you can see the larynx."},
+  {id:"lamp", title:"Lamp", text:"The bulb on the blade. It lights the airway."},
+  {id:"socket", title:"Lamp socket", text:"The socket the bulb sits in."},
+  {id:"web", title:"Web", text:"The upright heel of the blade. It joins the tongue of the blade to the base."},
+  {id:"base", title:"Base", text:"The block that hooks the blade onto the handle."},
+  {id:"handle", title:"Handle", text:"The grip. It holds the batteries that power the lamp."}
 ];
 function clearGuides(){
   if(!partGuides) return;
