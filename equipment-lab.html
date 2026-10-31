@@ -866,7 +866,7 @@ function loadReal(id){
     });
     root.add(model);
     parts.forEach(function(mesh){ mesh.userData.home = mesh.position.clone(); });
-    if(id==="ett" || id==="lma" || id==="bvm") buildEttGuides(model);
+    try { if(id==="ett" || id==="lma" || id==="bvm") buildEttGuides(model); } catch (err) {}
     realModel = true;
     setEttStatus("", false);
     fit();
@@ -933,11 +933,12 @@ function paintLists(keepCats){
     const on = flags[row[0]] ? " on" : "";
     return "<button type='button' data-flag='"+row[0]+"' class='"+on.trim()+"'>"+row[1]+"</button>";
   }).join("");
-  const info = activeParts() && shownPart ? activeParts().filter(function(row){ return row.id===shownPart; })[0] : selected;
-  const rows = (activeParts() && partGuides ? activeParts() : parts.map(function(mesh){
+  const catalogue = activeParts();
+  const info = catalogue && shownPart ? catalogue.filter(function(row){ return row.id===shownPart; })[0] : selected;
+  const rows = (catalogue ? catalogue : parts.map(function(mesh){
     return {id: mesh.userData.id, title: mesh.userData.title};
   })).map(function(part){
-    const on = (activeParts() ? shownPart===part.id : selected && selected.userData && selected.userData.id===part.id) ? " class='on'" : "";
+    const on = (catalogue ? shownPart===part.id : selected && selected.userData && selected.userData.id===part.id) ? " class='on'" : "";
     return "<button type='button' data-part='"+part.id+"'"+on+">"+part.title+"</button>";
   }).join("");
   aside.innerHTML = "<h2>"+item.name+"</h2>"+toggles+"<h2>Parts</h2>"+rows+
@@ -949,7 +950,7 @@ function paintLists(keepCats){
   aside.querySelectorAll("[data-part]").forEach(function(btn){
     btn.onclick = function(){
       const id = btn.getAttribute("data-part");
-      if(activeParts() && partGuides){ showPart(id); return; }
+      if(activeParts()){ showPart(id); return; }
       const mesh = parts.filter(function(m){ return m.userData.id===id; })[0];
       if(mesh) select(mesh);
     };
@@ -1143,12 +1144,15 @@ function buildEttGuides(model){
   });
 }
 function showPart(id){
-  if(!partGuides || !partGuides[id]) return;
-  Object.keys(partGuides).forEach(function(key){ partGuides[key].visible = key===id; });
+  const list = activeParts();
+  const part = list ? list.filter(function(row){ return row.id===id; })[0] : null;
+  if(!part) return;
   shownPart = id;
-  const part = activeParts().filter(function(row){ return row.id===id; })[0];
+  if(partGuides){
+    Object.keys(partGuides).forEach(function(key){ partGuides[key].visible = key===id; });
+  }
   clearTouch();
-  if(part) speak(part.title+". "+part.text);
+  speak(part.title+". "+part.text);
   paintLists(true);
 }
 function partFromHit(hit){
@@ -1302,7 +1306,7 @@ canvas.addEventListener("pointerup", function(e){
   ray.setFromCamera(new THREE.Vector2(x,y), camera);
   const hit = ray.intersectObjects(parts, false)[0];
   if(!hit) return;
-  if(activeParts() && partGuides){
+  if(activeParts()){
     showPart(partFromHit(hit));
     return;
   }
