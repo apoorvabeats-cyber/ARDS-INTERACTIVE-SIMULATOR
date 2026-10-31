@@ -141,7 +141,7 @@ body.supply #ecg{height:240px}
         <ellipse id="z-ssn" cx="50" cy="29" rx="6.5" ry="4.2" fill="none" stroke="rgba(80,60,40,.45)" stroke-dasharray="1.4 1.1"/>
         <ellipse id="z-ivc" cx="37" cy="78" rx="7" ry="5" fill="none" stroke="rgba(80,60,40,.45)" stroke-dasharray="1.4 1.1"/>
       </svg>
-      <p id="hint">Put a finger on a window. The probe follows it. Circle the finger without lifting and the probe turns with it. Lift on a marker and it stays. Drag it off the body and it lifts away.</p>
+      <p id="hint">Tap a window and the probe sits there. Circle the finger without lifting and the probe turns with it. It does not slide. Lift on the marker and it stays. Drag far off the body and it lifts away.</p>
       <div id="contact"></div>
       <div id="probe" aria-hidden="true">
         <span class="nib" title="Probe pointer"></span>
@@ -688,6 +688,7 @@ function echoKind(){
 
 const STILLS = {
   plax:{src:"echo/plax.jpg",labels:[["RV",48,32,18,28],["IVS",44,42,16,44],["LV",38,52,14,58],["PW",28,66,12,74],["MV",54,58,78,62],["AV",64,48,86,42],["Ao",70,38,88,24],["LA",60,72,84,78],["DAo",52,78,50,90]]},
+  "psax-av":{src:"echo/psax-av.jpg?v=20261031s",labels:[["RVOT",50,28,16,20],["RCC",50,44,82,36],["NCC",42,54,14,62],["LCC",58,54,86,62],["LA",50,70,82,82]]},
   "psax-pap":{src:"echo/psax.jpg",labels:[["RV",50,22,16,16],["IVS",48,34,16,34],["LV",50,48,84,40],["AL",36,52,12,56],["PM",60,56,86,64]]},
   "psax-mv":{src:"echo/psax-mv.jpg",labels:[["RV",50,24,14,16],["Ant",50,36,50,10],["Sept",34,48,10,46],["Lat",68,50,90,46],["Inf",50,66,50,88],["MV",50,54,86,62]]},
   a4c:{src:"echo/a4c.jpg",labels:[["Apex",50,16,50,8],["RV",32,44,10,38],["LV",64,44,90,38],["IVS",46,40,50,28],["TV",34,54,12,56],["MV",60,56,88,58],["RA",32,68,10,74],["LA",64,72,90,76],["IAS",48,64,50,64]]},
@@ -1165,24 +1166,19 @@ torso.addEventListener("pointermove", function(e){
   const dx = e.clientX - plant.x;
   const dy = e.clientY - plant.y;
   const dist = Math.hypot(dx, dy);
-  if(dist >= 8){
-    const want = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+  if(dist > 150){
+    state.probe.x = c.x;
+    state.probe.y = c.y;
+    plant = {x:e.clientX, y:e.clientY, ang:null, base:state.probe.spin, unwrapped:null};
+  } else if(dist >= 6){
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
     if(plant.ang == null){
-      plant.ang = want;
+      plant.ang = ang;
       plant.base = state.probe.spin;
-      plant.unwrapped = want;
-      plant.rad = dist;
+      plant.unwrapped = ang;
     } else {
-      plant.unwrapped += angleDelta(plant.unwrapped, want);
-      const turned = Math.abs(plant.unwrapped - plant.ang);
-      const radial = Math.abs(dist - plant.rad);
-      if(turned > 12 && radial < 30 && dist < 96){
-        state.probe.spin = plant.base + (plant.unwrapped - plant.ang);
-      } else if(dist > 22){
-        state.probe.x = c.x;
-        state.probe.y = c.y;
-        plant = {x:e.clientX, y:e.clientY, ang:null, base:state.probe.spin, unwrapped:null};
-      }
+      plant.unwrapped += angleDelta(plant.unwrapped, ang);
+      state.probe.spin = plant.base + (plant.unwrapped - plant.ang);
     }
   }
   state.probe.down = true;
@@ -1542,7 +1538,7 @@ function releaseGraphics(){
 }
 document.getElementById("back").onclick = function(){
   releaseGraphics();
-  if(mode){ location.href = "echo-lab.html?v=20261031r"; return; }
+  if(mode){ location.href = "echo-lab.html?v=20261031s"; return; }
   try{
     if(window.parent && window.parent!==window && typeof window.parent.returnToIcu==="function"){
       window.parent.returnToIcu();
@@ -1554,7 +1550,7 @@ document.getElementById("back").onclick = function(){
 document.getElementById("doors").onclick = function(event){
   const btn = event.target.closest("[data-door]");
   if(!btn) return;
-  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261031r";
+  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261031s";
 };
 document.getElementById("tabs").innerHTML = TABS.map(function(tab){
   return "<button type='button' data-tab='"+tab[0]+"'>"+tab[1]+"</button>";
