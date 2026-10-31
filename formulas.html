@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#05070c">
+<title>Formulas</title>
+<style>
+:root{--bg:#05070c;--fg:#f3efe6;--muted:#b7b1a4;--line:rgba(243,239,230,.18);--cool:#7fd4e6;--warm:#e2b48a}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:Figtree,ui-sans-serif,sans-serif;font-size:16px}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;background:#102028;border:1px solid var(--line);border-radius:999px;min-height:40px;padding:0 12px}
+button.on{border-color:var(--warm);color:#fff8ee;background:#2a2118}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--warm);outline-offset:2px}
+header{padding:12px 14px 0}
+h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:28px;letter-spacing:-.03em;margin:0}
+.lede{margin:6px 0 0;color:var(--muted);line-height:1.4}
+.mods,.list{display:flex;gap:8px;overflow:auto;padding:10px 14px;-webkit-overflow-scrolling:touch}
+.mods button,.list button{flex:none;font-size:14px;text-align:left}
+.card{margin:0 14px 18px;padding:12px;border:1px solid var(--line);border-radius:16px;background:#0c141c}
+.card h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:0 0 6px;letter-spacing:-.02em}
+.expr{margin:0 0 8px;color:var(--cool);font-size:17px;line-height:1.35}
+.case{margin:0 0 10px;color:var(--muted);line-height:1.4}
+label{display:block;margin:0 0 8px;color:var(--muted);font-size:14px}
+input,select{display:block;width:100%;margin-top:4px;background:#071018;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:16px}
+.result{margin:8px 0;padding:10px;border-radius:12px;background:#101820;border:1px solid var(--line)}
+.result b{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:26px;letter-spacing:-.03em}
+.read{margin:6px 0 0;line-height:1.4}
+.work{margin:6px 0 0;color:var(--warm);font-size:14px;line-height:1.4}
+.key{margin:10px 0 0;padding:0;list-style:none}
+.key li{margin:0 0 4px;line-height:1.35;font-size:14px}
+.key b{color:var(--cool);font-weight:650}
+</style>
+</head>
+<body>
+<header>
+  <h1>Formulas</h1>
+  <p class="lede">Enter the values from the case, or your own. The result, the reading, and the abbreviations update together.</p>
+</header>
+<div class="mods" id="mods"></div>
+<div class="list" id="list"></div>
+<article class="card" id="card"></article>
+<script>
+const MODULES = [
+  ["haem","Haemodynamics"],
+  ["vent","Ventilation"],
+  ["abg","Acid–base"],
+  ["renal","Renal"],
+  ["echo","Echo and neuro"],
+  ["drug","Dosing"]
+];
+function num(v){ const n = parseFloat(String(v).replace(",",".")); return Number.isFinite(n) ? n : null; }
+function round(n, d){
+  if(n==null || !Number.isFinite(n)) return "—";
+  const p = Math.pow(10, d);
+  return String(Math.round(n*p)/p);
+}
+function fio2(raw){
+  if(raw==null) return null;
+  if(raw > 1) return {v: raw/100, note:"FiO₂ was read as a percent and divided by 100."};
+  return {v: raw, note:""};
+}
+const F = [
+  {id:"map", mod:"haem", name:"Mean arterial pressure",
+    expr:"MAP = (SBP + 2 × DBP) / 3",
+    abbr:[["MAP","Mean arterial pressure"],["SBP","Systolic blood pressure"],["DBP","Diastolic blood pressure"]],
+    case:"Blood pressure 88/52 mmHg in septic shock.",
+    inputs:[["sbp","Systolic pressure","mmHg","88"],["dbp","Diastolic pressure","mmHg","52"]],
+    run:function(v){
+      const map = (v.sbp + 2*v.dbp)/3;
+      return {value:round(map,1)+" mmHg", work:"("+v.sbp+" + 2 × "+v.dbp+") / 3",
+        read: map<65 ? "Below 65 mmHg. That is under the usual first target in shock. The right target still depends on the patient." : "65 mmHg or higher. That meets the usual first target in shock. Perfusion still has to be checked at the bedside."};
+    }},
+  {id:"si", mod:"haem", name:"Shock index",
+    expr:"Shock index = HR / SBP",
+    abbr:[["HR","Heart rate"],["SBP","Systolic blood pressure"]],
+    case:"Heart rate 128 beats/min, systolic pressure 84 mmHg.",
+    inputs:[["hr","Heart rate","beats/min","128"],["sbp","Systolic pressure","mmHg","84"]],
+    run:function(v){
+      const si = v.hr/v.sbp;
+      return {value:round(si,2), work:v.hr+" / "+v.sbp,
+        read: si>=1 ? "1 or above. This is a marker of more severe shock. It is not a diagnosis." : si>=0.9 ? "Above 0.9. The index is raised." : "Under 0.9. A resting index is often nearer 0.5–0.7."};
+    }},
+  {id:"co", mod:"haem", name:"Cardiac output",
+    expr:"Cardiac output = HR × SV",
+    abbr:[["HR","Heart rate"],["SV","Stroke volume"],["CO","Cardiac output"]],
+    case:"Heart rate 110 beats/min, stroke volume 42 mL.",
+    inputs:[["hr","Heart rate","beats/min","110"],["sv","Stroke volume","mL","42"]],
+    run:function(v){
+      const co = v.hr*v.sv/1000;
+      return {value:round(co,2)+" L/min", work:v.hr+" × "+v.sv+" mL / 1000",
+        read: co<4 ? "Under 4 L/min. Resting output is often 4–8 L/min. A low output needs the stroke volume and the rate read separately." : co>8 ? "Above 8 L/min. Output can be high in a hyperdynamic circulation." : "Inside the usual resting range of about 4–8 L/min."};
+    }},
+  {id:"ci", mod:"haem", name:"Cardiac index",
+    expr:"Cardiac index = CO / BSA",
+    abbr:[["CO","Cardiac output"],["BSA","Body surface area"],["CI","Cardiac index"]],
+    case:"Cardiac output 3.6 L/min, body surface area 1.9 m².",
+    inputs:[["co","Cardiac output","L/min","3.6"],["bsa","Body surface area","m²","1.9"]],
+    run:function(v){
+      const ci = v.co/v.bsa;
+      return {value:round(ci,2)+" L/min/m²", work:v.co+" / "+v.bsa,
+        read: ci<2.2 ? "Under 2.2 L/min/m². That is a low index." : ci>4 ? "Above 4 L/min/m². That is a high index." : "About 2.2–4 L/min/m² is a usual range."};
+    }},
+  {id:"svr", mod:"haem", name:"Systemic vascular resistance",
+    expr:"SVR = (MAP − CVP) × 80 / CO",
+    abbr:[["SVR","Systemic vascular resistance"],["MAP","Mean arterial pressure"],["CVP","Central venous pressure"],["CO","Cardiac output"]],
+    case:"MAP 62 mmHg, CVP 14 mmHg, cardiac output 8.5 L/min.",
+    inputs:[["map","Mean arterial pressure","mmHg","62"],["cvp","Central venous pressure","mmHg","14"],["co","Cardiac output","L/min","8.5"]],
+    run:function(v){
+      const svr = (v.map-v.cvp)*80/v.co;
+      return {value:round(svr,0)+" dyn·s·cm⁻⁵", work:"("+v.map+" − "+v.cvp+") × 80 / "+v.co,
+        read:(svr<800?"Under 800. Resistance is low, as in a distributive circulation. ":"")+ (svr>1200?"Above 1200. Resistance is high. ":"")+ (svr>=800 && svr<=1200?"Inside a usual range of about 800–1200. ":"")+"The ×80 factor is what puts the result in dyn·s·cm⁻⁵. Cardiac output must be in L/min."};
+    }},
+  {id:"pvr", mod:"haem", name:"Pulmonary vascular resistance",
+    expr:"PVR = (mPAP − PAWP) × 80 / CO",
+    abbr:[["PVR","Pulmonary vascular resistance"],["mPAP","Mean pulmonary artery pressure"],["PAWP","Pulmonary artery wedge pressure"],["CO","Cardiac output"]],
+    case:"Mean pulmonary artery pressure 38 mmHg, wedge pressure 12 mmHg, cardiac output 4.2 L/min.",
+    inputs:[["mpap","Mean pulmonary artery pressure","mmHg","38"],["pawp","Wedge pressure","mmHg","12"],["co","Cardiac output","L/min","4.2"]],
+    run:function(v){
+      const pvr = (v.mpap-v.pawp)*80/v.co;
+      return {value:round(pvr,0)+" dyn·s·cm⁻⁵", work:"("+v.mpap+" − "+v.pawp+") × 80 / "+v.co,
+        read: pvr>240 ? "Above about 240 dyn·s·cm⁻⁵. Pulmonary vascular resistance is raised. Confirm the units: cardiac output is in L/min." : "About 240 dyn·s·cm⁻⁵ or less is a usual upper range with this formula."};
+    }},
+  {id:"cpo", mod:"haem", name:"Cardiac power output",
+    expr:"CPO = MAP × CO / 451",
+    abbr:[["CPO","Cardiac power output"],["MAP","Mean arterial pressure"],["CO","Cardiac output"]],
+    case:"MAP 68 mmHg, cardiac output 3.1 L/min in cardiogenic shock.",
+    inputs:[["map","Mean arterial pressure","mmHg","68"],["co","Cardiac output","L/min","3.1"]],
+    run:function(v){
+      const cpo = v.map*v.co/451;
+      return {value:round(cpo,2)+" W", work:v.map+" × "+v.co+" / 451",
+        read: cpo<0.6 ? "Under 0.6 W. In cardiogenic shock this has been associated with higher mortality. It does not replace the clinical picture." : "0.6 W or higher. Higher cardiac power is more favourable in cardiogenic shock, still read with the whole picture."};
+    }},
+  {id:"do2", mod:"haem", name:"Oxygen delivery",
+    expr:"DO₂ = CO × CaO₂ × 10",
+    abbr:[["DO₂","Oxygen delivery"],["CO","Cardiac output"],["CaO₂","Arterial oxygen content"]],
+    case:"Cardiac output 4.5 L/min, arterial oxygen content 14 mL/dL.",
+    inputs:[["co","Cardiac output","L/min","4.5"],["cao2","Arterial oxygen content","mL/dL","14"]],
+    run:function(v){
+      const d = v.co*v.cao2*10;
+      return {value:round(d,0)+" mL/min", work:v.co+" × "+v.cao2+" × 10",
+        read:"Resting delivery is often around 900–1100 mL/min. A low result is a low haemoglobin, a low saturation, a low output, or more than one of those."};
+    }},
+  {id:"cao2", mod:"haem", name:"Arterial oxygen content",
+    expr:"CaO₂ = (1.34 × Hb × SaO₂) + (0.003 × PaO₂)",
+    abbr:[["CaO₂","Arterial oxygen content"],["Hb","Haemoglobin"],["SaO₂","Arterial oxygen saturation"],["PaO₂","Arterial partial pressure of oxygen"]],
+    case:"Haemoglobin 8.2 g/dL, saturation 92%, PaO₂ 68 mmHg.",
+    inputs:[["hb","Haemoglobin","g/dL","8.2"],["sao2","Saturation","%","92"],["pao2","PaO₂","mmHg","68"]],
+    run:function(v){
+      const sat = v.sao2>1 ? v.sao2/100 : v.sao2;
+      const c = (1.34*v.hb*sat) + (0.003*v.pao2);
+      return {value:round(c,2)+" mL/dL", work:"(1.34 × "+v.hb+" × "+round(sat,2)+") + (0.003 × "+v.pao2+")",
+        read:"Most of the oxygen is bound to haemoglobin. The dissolved part, 0.003 × PaO₂, is small unless the PaO₂ is very high. A usual content is about 16–22 mL/dL."};
+    }},
+  {id:"lac", mod:"haem", name:"Lactate clearance",
+    expr:"Clearance (%) = (Initial − Repeat) / Initial × 100",
+    abbr:[["Initial","First lactate"],["Repeat","Later lactate"]],
+    case:"Lactate falls from 6.4 mmol/L to 4.8 mmol/L.",
+    inputs:[["a","Initial lactate","mmol/L","6.4"],["b","Repeat lactate","mmol/L","4.8"]],
+    run:function(v){
+      const c = (v.a-v.b)/v.a*100;
+      return {value:round(c,1)+"%", work:"("+v.a+" − "+v.b+") / "+v.a+" × 100",
+        read: c<0 ? "The lactate has risen. Clearance is negative. That is more concerning than the percentage." : c>=10 ? "A fall of 10% or more is a commonly used early resuscitation mark. The cause of the lactate still has to be treated." : "The fall is under 10%. Clearance is limited so far."};
+    }},
+  {id:"pf", mod:"vent", name:"P/F ratio",
+    expr:"P/F = PaO₂ / FiO₂",
+    abbr:[["PaO₂","Arterial partial pressure of oxygen"],["FiO₂","Fraction of inspired oxygen"],["P/F","PaO₂ to FiO₂ ratio"]],
+    case:"PaO₂ 104 mmHg on FiO₂ 0.80, PEEP 10 cmH₂O.",
+    inputs:[["pao2","PaO₂","mmHg","104"],["fio2","FiO₂","fraction","0.8"]],
+    run:function(v){
+      const f = fio2(v.fio2);
+      const pf = v.pao2/f.v;
+      let band = "Above 300. This is not in the ARDS bands.";
+      if(pf<=100) band = "100 or below: severe band of the Berlin definition, if the other criteria and a PEEP of at least 5 cmH₂O are met.";
+      else if(pf<=200) band = "200 or below: moderate band, if the other Berlin criteria are met.";
+      else if(pf<=300) band = "300 or below: mild band, if the other Berlin criteria are met.";
+      return {value:round(pf,0), work:v.pao2+" / "+round(f.v,2), note:f.note, read:band};
+    }},
+  {id:"rox", mod:"vent", name:"ROX index",
+    expr:"ROX = (SpO₂ / FiO₂) / RR",
+    abbr:[["ROX","Respiratory rate–oxygenation index"],["SpO₂","Pulse oximeter saturation"],["FiO₂","Fraction of inspired oxygen"],["RR","Respiratory rate"]],
+    case:"Saturation 92% on FiO₂ 0.70, respiratory rate 32/min, on high-flow oxygen.",
+    inputs:[["spo2","Saturation","%","92"],["fio2","FiO₂","fraction","0.7"],["rr","Respiratory rate","breaths/min","32"]],
+    run:function(v){
+      const f = fio2(v.fio2);
+      const rox = (v.spo2/f.v)/v.rr;
+      return {value:round(rox,2), work:"("+v.spo2+" / "+round(f.v,2)+") / "+v.rr, note:f.note,
+        read: rox<3.85 ? "Below about 3.85. On high-flow nasal oxygen this has been associated with a higher chance of intubation. It is a trend, not a rule." : rox>4.88 ? "Above about 4.88. On high-flow nasal oxygen this has been a more reassuring range in the same studies." : "Between about 3.85 and 4.88. Repeat it. A single number is not a decision."};
+    }},
+  {id:"dp", mod:"vent", name:"Driving pressure",
+    expr:"Driving pressure = Pplat − PEEP",
+    abbr:[["Pplat","Plateau pressure"],["PEEP","Positive end-expiratory pressure"]],
+    case:"Plateau pressure 28 cmH₂O, PEEP 10 cmH₂O.",
+    inputs:[["pplat","Plateau pressure","cmH₂O","28"],["peep","PEEP","cmH₂O","10"]],
+    run:function(v){
+      const d = v.pplat-v.peep;
+      return {value:round(d,1)+" cmH₂O", work:v.pplat+" − "+v.peep,
+        read: d>=15 ? "15 cmH₂O or more. In ARDS a driving pressure under 15 is a common lung-protective target. It is not a guarantee." : "Under 15 cmH₂O. That meets the common ARDS target."};
+    }},
+  {id:"cstat", mod:"vent", name:"Static compliance",
+    expr:"Static compliance = VT / (Pplat − PEEP)",
+    abbr:[["VT","Tidal volume"],["Pplat","Plateau pressure"],["PEEP","Positive end-expiratory pressure"]],
+    case:"Tidal volume 420 mL, plateau 26 cmH₂O, PEEP 10 cmH₂O.",
+    inputs:[["vt","Tidal volume","mL","420"],["pplat","Plateau pressure","cmH₂O","26"],["peep","PEEP","cmH₂O","10"]],
+    run:function(v){
+      const d = v.pplat-v.peep;
+      const c = v.vt/d;
+      return {value:round(c,1)+" mL/cmH₂O", work:v.vt+" / ("+v.pplat+" − "+v.peep+")",
+        read: c<50 ? "Under about 50 mL/cmH₂O. The respiratory system is stiff." : "About 50–100 mL/cmH₂O is a usual range for a ventilated lung."};
+    }},
+  {id:"cdyn", mod:"vent", name:"Dynamic compliance",
+    expr:"Dynamic compliance = VT / (PIP − PEEP)",
+    abbr:[["VT","Tidal volume"],["PIP","Peak inspiratory pressure"],["PEEP","Positive end-expiratory pressure"]],
+    case:"Tidal volume 420 mL, peak pressure 34 cmH₂O, PEEP 10 cmH₂O.",
+    inputs:[["vt","Tidal volume","mL","420"],["pip","Peak pressure","cmH₂O","34"],["peep","PEEP","cmH₂O","10"]],
+    run:function(v){
+      const c = v.vt/(v.pip-v.peep);
+      return {value:round(c,1)+" mL/cmH₂O", work:v.vt+" / ("+v.pip+" − "+v.peep+")",
+        read:"Dynamic compliance includes airway resistance, so it is lower than the static compliance when the airway is narrow. A large gap between peak and plateau points to resistance."};
+    }},
+  {id:"vd", mod:"vent", name:"Dead-space fraction",
+    expr:"Dead-space fraction = (PaCO₂ − PECO₂) / PaCO₂",
+    abbr:[["PaCO₂","Arterial partial pressure of carbon dioxide"],["PECO₂","Mixed expired carbon dioxide"]],
+    case:"PaCO₂ 48 mmHg, mixed expired CO₂ 22 mmHg.",
+    inputs:[["paco2","PaCO₂","mmHg","48"],["peco2","Mixed expired CO₂","mmHg","22"]],
+    run:function(v){
+      const d = (v.paco2-v.peco2)/v.paco2;
+      return {value:round(d,2), work:"("+v.paco2+" − "+v.peco2+") / "+v.paco2,
+        read: d>0.6 ? "Above 0.6. Dead space is high. In ARDS this has been associated with worse outcome." : "A usual fraction is nearer 0.2–0.35. This uses mixed expired CO₂, not end-tidal CO₂."};
+    }},
+  {id:"rsbi", mod:"vent", name:"Rapid shallow breathing index",
+    expr:"RSBI = RR / VT, with VT in litres",
+    abbr:[["RSBI","Rapid shallow breathing index"],["RR","Respiratory rate"],["VT","Tidal volume"]],
+    case:"Respiratory rate 28/min, tidal volume 0.32 L, on a spontaneous trial.",
+    inputs:[["rr","Respiratory rate","breaths/min","28"],["vt","Tidal volume","L","0.32"]],
+    run:function(v){
+      let vt = v.vt, note = "";
+      if(vt>5){ vt = vt/1000; note = "Tidal volume above 5 was read as millilitres and converted to litres."; }
+      const r = v.rr/vt;
+      return {value:round(r,0)+" breaths/min/L", work:v.rr+" / "+round(vt,3)+" L", note:note,
+        read: r<105 ? "Under 105 breaths/min/L. That was the original mark suggesting a spontaneous breathing trial is more likely to succeed. The trial itself still decides." : "105 or above. Breathing is rapid and shallow. The trial is less likely to succeed, and the number does not replace looking at the patient."};
+    }},
+  {id:"oi", mod:"vent", name:"Oxygenation index",
+    expr:"Oxygenation index = FiO₂ × mean airway pressure × 100 / PaO₂",
+    abbr:[["FiO₂","Fraction of inspired oxygen"],["MAP","Mean airway pressure, not blood pressure"],["PaO₂","Arterial partial pressure of oxygen"]],
+    case:"FiO₂ 0.80, mean airway pressure 18 cmH₂O, PaO₂ 62 mmHg.",
+    inputs:[["fio2","FiO₂","fraction","0.8"],["paw","Mean airway pressure","cmH₂O","18"],["pao2","PaO₂","mmHg","62"]],
+    run:function(v){
+      const f = fio2(v.fio2);
+      const oi = f.v*v.paw*100/v.pao2;
+      return {value:round(oi,1), work:round(f.v,2)+" × "+v.paw+" × 100 / "+v.pao2, note:f.note,
+        read:"A higher index means worse oxygenation. The pressure in this formula is mean airway pressure, not the arterial mean. In paediatric practice, values above about 25–40 mark severe disease. Adult cut-offs are less fixed."};
+    }},
+  {id:"ag", mod:"abg", name:"Anion gap",
+    expr:"Anion gap = Na − (Cl + HCO₃)",
+    abbr:[["Na","Sodium"],["Cl","Chloride"],["HCO₃","Bicarbonate"],["AG","Anion gap"]],
+    case:"Sodium 138, chloride 100, bicarbonate 12 mmol/L. Lactate is 6 mmol/L.",
+    inputs:[["na","Sodium","mmol/L","138"],["cl","Chloride","mmol/L","100"],["hco3","Bicarbonate","mmol/L","12"]],
+    run:function(v){
+      const ag = v.na-(v.cl+v.hco3);
+      return {value:round(ag,1)+" mmol/L", work:v.na+" − ("+v.cl+" + "+v.hco3+")",
+        read: ag>12 ? "Above 12 mmol/L. The gap is raised if albumin is normal. Pair it with the pH before calling it a high-gap acidosis." : "12 mmol/L or less. The gap is not raised. A normal gap does not exclude a hyperchloraemic acidosis."};
+    }},
+  {id:"cag", mod:"abg", name:"Corrected anion gap",
+    expr:"Corrected AG = AG + 2.5 × (4 − albumin)",
+    abbr:[["AG","Anion gap"],["Albumin","Serum albumin, in g/dL"]],
+    case:"Anion gap 14 mmol/L, albumin 2.0 g/dL.",
+    inputs:[["ag","Anion gap","mmol/L","14"],["alb","Albumin","g/dL","2"]],
+    run:function(v){
+      let alb = v.alb, note = "";
+      if(alb>10){ alb = alb/10; note = "Albumin above 10 was read as g/L and converted to g/dL."; }
+      const c = v.ag + 2.5*(4-alb);
+      return {value:round(c,1)+" mmol/L", work:v.ag+" + 2.5 × (4 − "+round(alb,1)+")", note:note,
+        read:"Albumin carries part of the negative charge. A low albumin hides a raised gap unless it is corrected. A corrected gap above 12 mmol/L is raised."};
+    }},
+  {id:"winter", mod:"abg", name:"Winter’s formula",
+    expr:"Expected PaCO₂ = 1.5 × HCO₃ + 8 ± 2",
+    abbr:[["PaCO₂","Arterial partial pressure of carbon dioxide"],["HCO₃","Bicarbonate"]],
+    case:"Bicarbonate 12 mmol/L in a metabolic acidosis. Measured PaCO₂ is 28 mmHg.",
+    inputs:[["hco3","Bicarbonate","mmol/L","12"],["paco2","Measured PaCO₂, optional","mmHg","28"]],
+    run:function(v){
+      const exp = 1.5*v.hco3+8;
+      let read = "The expected carbon dioxide is "+round(exp-2,1)+" to "+round(exp+2,1)+" mmHg. This is the respiratory compensation for a metabolic acidosis.";
+      if(v.paco2!=null){
+        if(Math.abs(v.paco2-exp)<=2) read += " The measured PaCO₂ sits inside that range.";
+        else if(v.paco2<exp-2) read += " The measured PaCO₂ is lower, so there is an added respiratory alkalosis.";
+        else read += " The measured PaCO₂ is higher, so compensation is incomplete or there is an added respiratory acidosis.";
+      }
+      return {value:round(exp,1)+" ± 2 mmHg", work:"1.5 × "+v.hco3+" + 8", read:read};
+    }},
+  {id:"delta", mod:"abg", name:"Delta ratio",
+    expr:"Delta ratio = (AG − 12) / (24 − HCO₃)",
+    abbr:[["AG","Anion gap"],["HCO₃","Bicarbonate"]],
+    case:"Anion gap 28 mmol/L, bicarbonate 10 mmol/L.",
+    inputs:[["ag","Anion gap","mmol/L","28"],["hco3","Bicarbonate","mmol/L","10"]],
+    run:function(v){
+      const den = 24-v.hco3;
+      if(Math.abs(den)<0.5) return {value:"—", work:"( "+v.ag+" − 12 ) / ( 24 − "+v.hco3+" )", read:"The bicarbonate is too close to 24 for this ratio."};
+      const d = (v.ag-12)/den;
+      let read = "Under 0.4 suggests a pure hyperchloraemic acidosis. 0.4–0.8 suggests a mixed high-gap and hyperchloraemic acidosis. 1–2 fits a high-gap acidosis. Above 2 suggests a coexisting metabolic alkalosis.";
+      if(d<0.4) read = "Under 0.4. This pattern fits a hyperchloraemic metabolic acidosis more than a high-gap acidosis.";
+      else if(d<0.8) read = "Between 0.4 and 0.8. A high-gap acidosis and a hyperchloraemic acidosis may both be present.";
+      else if(d<=2) read = "Between 1 and 2. This fits a high-gap metabolic acidosis.";
+      else read = "Above 2. A metabolic alkalosis may be sitting with the high-gap acidosis.";
+      return {value:round(d,2), work:"("+v.ag+" − 12) / (24 − "+v.hco3+")", read:read};
+    }},
+  {id:"osm", mod:"abg", name:"Calculated osmolality",
+    expr:"Calculated osmolality = 2 × Na + glucose/18 + BUN/2.8",
+    abbr:[["Na","Sodium"],["BUN","Blood urea nitrogen"],["Glucose","Plasma glucose, in mg/dL"]],
+    case:"Sodium 142 mmol/L, glucose 180 mg/dL, BUN 28 mg/dL. Measured osmolality 318 mOsm/kg.",
+    inputs:[["na","Sodium","mmol/L","142"],["glu","Glucose","mg/dL","180"],["bun","BUN","mg/dL","28"],["meas","Measured osmolality, optional","mOsm/kg","318"]],
+    run:function(v){
+      const o = 2*v.na + v.glu/18 + v.bun/2.8;
+      let read = "A usual calculated osmolality is about 275–295 mOsm/kg. Glucose and urea in this formula are in mg/dL, not mmol/L.";
+      if(v.meas!=null){
+        const gap = v.meas-o;
+        read += " The osmolar gap is "+round(gap,1)+". A gap above 10 mOsm/kg suggests an unmeasured osmole, such as a toxic alcohol, if the assay and the units are right.";
+      }
+      return {value:round(o,1)+" mOsm/kg", work:"2 × "+v.na+" + "+v.glu+"/18 + "+v.bun+"/2.8", read:read};
+    }},
+  {id:"na", mod:"abg", name:"Corrected sodium",
+    expr:"Corrected Na = measured Na + 1.6 × [(glucose − 100) / 100]",
+    abbr:[["Na","Sodium"],["Glucose","Plasma glucose, in mg/dL"]],
+    case:"Sodium 128 mmol/L, glucose 600 mg/dL.",
+    inputs:[["na","Measured sodium","mmol/L","128"],["glu","Glucose","mg/dL","600"]],
+    run:function(v){
+      const c = v.na + 1.6*((v.glu-100)/100);
+      return {value:round(c,1)+" mmol/L", work:v.na+" + 1.6 × [("+v.glu+" − 100) / 100]",
+        read:"Hyperglycaemia draws water into the blood and lowers the measured sodium. This 1.6 correction is an estimate. Some use a larger factor. Recheck the sodium as the glucose falls."};
+    }},
+  {id:"crcl", mod:"renal", name:"Cockcroft–Gault creatinine clearance",
+    expr:"CrCl = (140 − age) × weight / (72 × SCr), × 0.85 if female",
+    abbr:[["CrCl","Creatinine clearance"],["SCr","Serum creatinine, in mg/dL"]],
+    case:"A 72-year-old woman, weight 60 kg, creatinine 1.6 mg/dL, creatinine stable.",
+    inputs:[["age","Age","years","72"],["wt","Weight","kg","60"],["scr","Creatinine","mg/dL","1.6"],["sex","Sex","","female"]],
+    run:function(v){
+      let scr = v.scr, note = "";
+      if(scr>20){ scr = scr/88.4; note = "Creatinine above 20 was read as µmol/L and converted to mg/dL."; }
+      let cr = (140-v.age)*v.wt/(72*scr);
+      if(v.sex==="female") cr *= 0.85;
+      return {value:round(cr,1)+" mL/min", work:"(140 − "+v.age+") × "+v.wt+" / (72 × "+round(scr,2)+")"+(v.sex==="female"?" × 0.85":""), note:note,
+        read:"This estimates clearance from a stable creatinine. It is unreliable in acute kidney injury, and it is not the same as an eGFR. In obesity, ideal body weight is sometimes used instead of actual weight."};
+    }},
+  {id:"fena", mod:"renal", name:"Fractional excretion of sodium",
+    expr:"FENa (%) = (UNa × PCr) / (PNa × UCr) × 100",
+    abbr:[["FENa","Fractional excretion of sodium"],["UNa","Urine sodium"],["PNa","Plasma sodium"],["UCr","Urine creatinine"],["PCr","Plasma creatinine"]],
+    case:"Urine sodium 12 mmol/L, plasma sodium 140, urine creatinine 140 mg/dL, plasma creatinine 2.0 mg/dL. No diuretic.",
+    inputs:[["una","Urine sodium","mmol/L","12"],["pcr","Plasma creatinine","same unit as urine","2"],["pna","Plasma sodium","mmol/L","140"],["ucr","Urine creatinine","same unit as plasma","140"]],
+    run:function(v){
+      const fe = (v.una*v.pcr)/(v.pna*v.ucr)*100;
+      return {value:round(fe,2)+"%", work:"("+v.una+" × "+v.pcr+") / ("+v.pna+" × "+v.ucr+") × 100",
+        read: fe<1 ? "Under 1%. This suggests a prerenal state if the creatinine is rising and the patient is not on a diuretic. Contrast, rhabdomyolysis and chronic kidney disease break the rule." : fe>2 ? "Above 2%. This is more in keeping with tubular injury, with the same exceptions." : "Between 1% and 2%. The fraction is indeterminate."};
+    }},
+  {id:"feurea", mod:"renal", name:"Fractional excretion of urea",
+    expr:"FEUrea (%) = (UUrea × PCr) / (PUrea × UCr) × 100",
+    abbr:[["FEUrea","Fractional excretion of urea"],["UUrea","Urine urea"],["PUrea","Plasma urea"],["PCr","Plasma creatinine"],["UCr","Urine creatinine"]],
+    case:"On a loop diuretic. Urine urea 420, plasma urea 48, urine creatinine 90, plasma creatinine 2.4, all in consistent units.",
+    inputs:[["uu","Urine urea","same unit as plasma","420"],["pcr","Plasma creatinine","same unit as urine","2.4"],["pu","Plasma urea","same unit as urine","48"],["ucr","Urine creatinine","same unit as plasma","90"]],
+    run:function(v){
+      const fe = (v.uu*v.pcr)/(v.pu*v.ucr)*100;
+      return {value:round(fe,1)+"%", work:"("+v.uu+" × "+v.pcr+") / ("+v.pu+" × "+v.ucr+") × 100",
+        read: fe<35 ? "Under 35%. This supports a prerenal state and is more useful than the sodium fraction after a diuretic." : fe>50 ? "Above 50%. This is less specific for tubular injury." : "Between 35% and 50%. The result is indeterminate."};
+    }},
+  {id:"fwd", mod:"renal", name:"Free-water deficit",
+    expr:"Free-water deficit = TBW × [(Na / 140) − 1]",
+    abbr:[["TBW","Total body water"],["Na","Serum sodium"]],
+    case:"Sodium 158 mmol/L. Total body water estimated at 42 L.",
+    inputs:[["tbw","Total body water","L","42"],["na","Sodium","mmol/L","158"]],
+    run:function(v){
+      const d = v.tbw*((v.na/140)-1);
+      return {value:round(d,2)+" L", work:v.tbw+" × [("+v.na+"/140) − 1]",
+        read: d>0 ? "This is the estimated free-water deficit in hypernatraemia. Replace it slowly and recheck the sodium. It is not a fixed prescription. A usual TBW is about 0.6 × weight in men and 0.5 × weight in women." : "The sodium is under 140, so this is a free-water excess rather than a deficit."};
+    }},
+  {id:"urr", mod:"renal", name:"Urea reduction ratio",
+    expr:"URR (%) = (Pre − Post) / Pre × 100",
+    abbr:[["URR","Urea reduction ratio"],["Pre","Urea before dialysis"],["Post","Urea after dialysis"]],
+    case:"Urea 140 before dialysis and 42 after, in the same units.",
+    inputs:[["pre","Urea before dialysis","same unit","140"],["post","Urea after dialysis","same unit","42"]],
+    run:function(v){
+      const u = (v.pre-v.post)/v.pre*100;
+      return {value:round(u,1)+"%", work:"("+v.pre+" − "+v.post+") / "+v.pre+" × 100",
+        read: u>=65 ? "65% or more. That is a commonly used adequacy target for a haemodialysis session. Kt/V is the paired measure." : "Under 65%. For thrice-weekly haemodialysis this is below the usual urea-reduction target."};
+    }},
+  {id:"ktv", mod:"renal", name:"Kt/V",
+    expr:"Kt/V = −ln(R) + (4 − 3.5 × R) × UF / W",
+    abbr:[["Kt/V","Dialyser clearance × time / volume"],["R","Post-dialysis urea / pre-dialysis urea"],["UF","Ultrafiltration volume"],["W","Post-dialysis weight"]],
+    case:"Urea 140 before and 42 after. Fluid removed 2.5 L. Post-dialysis weight 70 kg.",
+    inputs:[["pre","Urea before","same unit","140"],["post","Urea after","same unit","42"],["uf","Ultrafiltration","L","2.5"],["w","Weight after dialysis","kg","70"]],
+    run:function(v){
+      const R = v.post/v.pre;
+      if(!(R>0 && R<1.2)) return {value:"—", work:"R = "+v.post+" / "+v.pre, read:"R must be the post-dialysis urea divided by the pre-dialysis urea, and the post value should be lower."};
+      const k = -Math.log(R) + (4 - 3.5*R)*(v.uf/v.w);
+      return {value:round(k,2), work:"R = "+round(R,3)+". −ln(R) + (4 − 3.5 × R) × "+v.uf+" / "+v.w,
+        read: k>=1.2 ? "1.2 or more. That is a usual single-pool target for thrice-weekly haemodialysis. This is the second-generation Daugirdas estimate." : "Under 1.2. For thrice-weekly haemodialysis this is below the usual single-pool target."};
+    }},
+  {id:"ef", mod:"echo", name:"Ejection fraction",
+    expr:"EF (%) = (EDV − ESV) / EDV × 100",
+    abbr:[["EF","Ejection fraction"],["EDV","End-diastolic volume"],["ESV","End-systolic volume"]],
+    case:"End-diastolic volume 140 mL, end-systolic volume 82 mL.",
+    inputs:[["edv","End-diastolic volume","mL","140"],["esv","End-systolic volume","mL","82"]],
+    run:function(v){
+      const ef = (v.edv-v.esv)/v.edv*100;
+      let read = "The two volumes must be from the same cycle.";
+      if(ef>=50) read = "50% or more. This is in the preserved range.";
+      else if(ef>=41) read = "41–49%. This is mildly reduced.";
+      else read = "40% or below. This is in the reduced range.";
+      return {value:round(ef,1)+"%", work:"("+v.edv+" − "+v.esv+") / "+v.edv+" × 100", read:read};
+    }},
+  {id:"lvot", mod:"echo", name:"LVOT area",
+    expr:"LVOT area = 0.785 × diameter²",
+    abbr:[["LVOT","Left ventricular outflow tract"]],
+    case:"Left ventricular outflow tract diameter 2.0 cm.",
+    inputs:[["d","LVOT diameter","cm","2"]],
+    run:function(v){
+      const a = 0.785*v.d*v.d;
+      return {value:round(a,2)+" cm²", work:"0.785 × "+v.d+"²",
+        read:"0.785 is π/4, so this is the area of a circle. A small error in diameter changes the area, and the stroke volume, by a large amount."};
+    }},
+  {id:"sv", mod:"echo", name:"Stroke volume by echo",
+    expr:"SV = LVOT area × LVOT VTI",
+    abbr:[["SV","Stroke volume"],["LVOT","Left ventricular outflow tract"],["VTI","Velocity–time integral"]],
+    case:"LVOT area 3.14 cm², LVOT velocity–time integral 16 cm.",
+    inputs:[["area","LVOT area","cm²","3.14"],["vti","LVOT VTI","cm","16"]],
+    run:function(v){
+      const sv = v.area*v.vti;
+      return {value:round(sv,1)+" mL", work:v.area+" × "+v.vti,
+        read: sv<60 ? "Under 60 mL. A usual stroke volume is about 60–100 mL. Confirm the outflow diameter before calling the volume low." : "About 60–100 mL is a usual stroke volume."};
+    }},
+  {id:"ava", mod:"echo", name:"Aortic valve area",
+    expr:"Aortic valve area = LVOT area × LVOT VTI / AV VTI",
+    abbr:[["LVOT","Left ventricular outflow tract"],["VTI","Velocity–time integral"],["AV","Aortic valve"]],
+    case:"LVOT area 3.14 cm², LVOT VTI 18 cm, aortic valve VTI 70 cm.",
+    inputs:[["area","LVOT area","cm²","3.14"],["lvot","LVOT VTI","cm","18"],["av","Aortic valve VTI","cm","70"]],
+    run:function(v){
+      const a = v.area*v.lvot/v.av;
+      return {value:round(a,2)+" cm²", work:v.area+" × "+v.lvot+" / "+v.av,
+        read: a<=1 ? "1.0 cm² or less. That is in the severe range if the measurements agree. Low flow can make the area and the gradient disagree." : "Above 1.0 cm². Severe stenosis is less likely if the tracing is reliable."};
+    }},
+  {id:"bern", mod:"echo", name:"Pressure gradient",
+    expr:"Pressure gradient = 4 × velocity²",
+    abbr:[["Velocity","Blood velocity across the valve or jet"]],
+    case:"Tricuspid regurgitant velocity 3.2 m/s.",
+    inputs:[["v","Velocity","m/s","3.2"]],
+    run:function(v){
+      const g = 4*v.v*v.v;
+      return {value:round(g,1)+" mmHg", work:"4 × "+v.v+"²",
+        read:"This is the simplified Bernoulli equation. It is a peak gradient if you entered a peak velocity. It overestimates the gradient when the velocity just upstream is already high."};
+    }},
+  {id:"pasp", mod:"echo", name:"Pulmonary artery systolic pressure",
+    expr:"PASP = 4 × TR velocity² + RAP",
+    abbr:[["PASP","Pulmonary artery systolic pressure"],["TR","Tricuspid regurgitation"],["RAP","Right atrial pressure"]],
+    case:"Tricuspid regurgitant velocity 3.2 m/s. Right atrial pressure estimated at 15 mmHg from a plethoric vena cava.",
+    inputs:[["v","TR velocity","m/s","3.2"],["rap","Right atrial pressure","mmHg","15"]],
+    run:function(v){
+      const p = 4*v.v*v.v + v.rap;
+      return {value:round(p,1)+" mmHg", work:"4 × "+v.v+"² + "+v.rap,
+        read: p>40 ? "Above about 35–40 mmHg. The estimate is raised, and only if there is no pulmonary stenosis. The atrial pressure you entered moves the result." : "About 40 mmHg or less. This estimates pulmonary artery systolic pressure only if there is no pulmonary stenosis."};
+    }},
+  {id:"cpp", mod:"echo", name:"Cerebral perfusion pressure",
+    expr:"CPP = MAP − ICP",
+    abbr:[["CPP","Cerebral perfusion pressure"],["MAP","Mean arterial pressure"],["ICP","Intracranial pressure"]],
+    case:"Mean arterial pressure 78 mmHg, intracranial pressure 26 mmHg after traumatic brain injury.",
+    inputs:[["map","Mean arterial pressure","mmHg","78"],["icp","Intracranial pressure","mmHg","26"]],
+    run:function(v){
+      const c = v.map-v.icp;
+      return {value:round(c,1)+" mmHg", work:v.map+" − "+v.icp,
+        read: c<60 ? "Under 60 mmHg. In traumatic brain injury a perfusion pressure around 60–70 mmHg is a common target. The low value is either a low arterial pressure, a high intracranial pressure, or both." : "60 mmHg or higher. Around 60–70 mmHg is a common target after traumatic brain injury."};
+    }},
+  {id:"pi", mod:"echo", name:"Transcranial Doppler pulsatility index",
+    expr:"Pulsatility index = (PSV − EDV) / mean velocity",
+    abbr:[["PSV","Peak systolic velocity"],["EDV","End-diastolic velocity"]],
+    case:"Peak systolic velocity 120 cm/s, end-diastolic velocity 30 cm/s, mean velocity 55 cm/s.",
+    inputs:[["psv","Peak systolic velocity","cm/s","120"],["edv","End-diastolic velocity","cm/s","30"],["mean","Mean velocity","cm/s","55"]],
+    run:function(v){
+      const pi = (v.psv-v.edv)/v.mean;
+      return {value:round(pi,2), work:"("+v.psv+" − "+v.edv+") / "+v.mean,
+        read: pi>1.2 ? "Above about 1.2. Downstream resistance is high. This is not a direct measure of intracranial pressure." : "About 0.6–1.2 is a typical pulsatility index."};
+    }},
+  {id:"half", mod:"drug", name:"Drug half-life",
+    expr:"Half-life = 0.693 × Vd / clearance",
+    abbr:[["Vd","Volume of distribution"],["Clearance","Plasma clearance of the drug"]],
+    case:"Volume of distribution 40 L, clearance 5 L/h.",
+    inputs:[["vd","Volume of distribution","L","40"],["cl","Clearance","L/h","5"]],
+    run:function(v){
+      const t = 0.693*v.vd/v.cl;
+      return {value:round(t,2)+" h", work:"0.693 × "+v.vd+" / "+v.cl,
+        read:"The half-life lengthens when clearance falls or the volume of distribution rises. Organ failure can change both. The units here assume litres and litres per hour, so the result is in hours."};
+    }},
+  {id:"bmi", mod:"drug", name:"Body mass index",
+    expr:"BMI = weight (kg) / height² (m²)",
+    abbr:[["BMI","Body mass index"]],
+    case:"Weight 92 kg, height 170 cm.",
+    inputs:[["wt","Weight","kg","92"],["ht","Height","cm","170"]],
+    run:function(v){
+      const m = v.ht>3 ? v.ht/100 : v.ht;
+      const b = v.wt/(m*m);
+      let read = "30 or more is obesity.";
+      if(b<18.5) read = "Under 18.5. This is in the underweight range.";
+      else if(b<25) read = "18.5–24.9. This is the usual range.";
+      else if(b<30) read = "25–29.9. This is in the overweight range.";
+      read += " In critical care, some drug and ventilator calculations use ideal or adjusted weight instead.";
+      return {value:round(b,1)+" kg/m²", work:v.wt+" / "+round(m,2)+"²", read:read};
+    }}
+];
+const mods = document.getElementById("mods");
+const list = document.getElementById("list");
+const card = document.getElementById("card");
+let mod = "haem";
+let current = "map";
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return "&#"+c.charCodeAt(0)+";"; }); }
+function paintMods(){
+  mods.innerHTML = MODULES.map(function(m){
+    return "<button type='button' data-mod='"+m[0]+"'"+(m[0]===mod?" class='on'":"")+">"+esc(m[1])+"</button>";
+  }).join("");
+}
+function paintList(){
+  list.innerHTML = F.filter(function(f){ return f.mod===mod; }).map(function(f){
+    return "<button type='button' data-id='"+f.id+"'"+(f.id===current?" class='on'":"")+">"+esc(f.name)+"</button>";
+  }).join("");
+}
+function valuesOf(f){
+  const v = {};
+  f.inputs.forEach(function(inp){
+    const el = document.getElementById("in-"+inp[0]);
+    if(!el) return;
+    if(inp[0]==="sex") v.sex = el.value;
+    else {
+      const n = num(el.value);
+      if(el.value.trim()==="") v[inp[0]] = null;
+      else v[inp[0]] = n;
+    }
+  });
+  return v;
+}
+function requiredReady(f, v){
+  return f.inputs.every(function(inp){
+    if(inp[0]==="sex") return true;
+    if(/optional/i.test(inp[1])) return true;
+    return v[inp[0]]!=null;
+  });
+}
+function paintCard(){
+  const f = F.find(function(x){ return x.id===current; });
+  const fields = f.inputs.map(function(inp){
+    if(inp[0]==="sex"){
+      return "<label>"+esc(inp[1])+"<select id='in-sex'><option value='female'"+(inp[3]==="female"?" selected":"")+">Female</option><option value='male'"+(inp[3]==="male"?" selected":"")+">Male</option></select></label>";
+    }
+    return "<label>"+esc(inp[1])+" ("+esc(inp[2])+")<input id='in-"+inp[0]+"' inputmode='decimal' value='"+esc(inp[3])+"'></label>";
+  }).join("");
+  const key = f.abbr.map(function(pair){ return "<li><b>"+esc(pair[0])+"</b> — "+esc(pair[1])+"</li>"; }).join("");
+  card.innerHTML =
+    "<h2>"+esc(f.name)+"</h2>"+
+    "<p class='expr'>"+esc(f.expr)+"</p>"+
+    "<p class='case'>"+esc(f.case)+"</p>"+
+    fields+
+    "<div class='result' id='out'></div>"+
+    "<ul class='key'>"+key+"</ul>";
+  card.querySelectorAll("input,select").forEach(function(el){
+    el.addEventListener("input", calc);
+  });
+  calc();
+}
+function calc(){
+  const f = F.find(function(x){ return x.id===current; });
+  const v = valuesOf(f);
+  const out = document.getElementById("out");
+  if(!requiredReady(f, v)){
+    out.innerHTML = "<b>—</b><p class='read'>Enter every value.</p>";
+    return;
+  }
+  let res;
+  try{ res = f.run(v); }
+  catch(err){ res = {value:"—", work:"", read:"Those values cannot be used in this formula."}; }
+  if(!res || /Infinity|NaN/.test(String(res.value))) res = {value:"—", work:"", read:"Those values cannot be used in this formula."};
+  out.innerHTML = "<b>"+esc(res.value)+"</b>"+
+    (res.work ? "<p class='work'>"+esc(res.work)+"</p>" : "")+
+    (res.note ? "<p class='work'>"+esc(res.note)+"</p>" : "")+
+    "<p class='read'>"+esc(res.read||"")+"</p>";
+}
+mods.onclick = function(e){
+  const btn = e.target.closest("[data-mod]");
+  if(!btn) return;
+  mod = btn.getAttribute("data-mod");
+  const first = F.find(function(f){ return f.mod===mod; });
+  current = first.id;
+  paintMods(); paintList(); paintCard();
+};
+list.onclick = function(e){
+  const btn = e.target.closest("[data-id]");
+  if(!btn) return;
+  current = btn.getAttribute("data-id");
+  paintList(); paintCard();
+};
+paintMods(); paintList(); paintCard();
+</script>
+</body>
+</html>
