@@ -31,10 +31,15 @@ header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;marg
 .tag{position:absolute;left:8px;right:8px;bottom:8px;margin:0;background:rgba(7,17,26,.88);border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:13px;line-height:1.3;pointer-events:none}
 .chest-box{position:relative;height:42dvh;min-height:200px;touch-action:none;background:#14202c}
 .chest-box > svg{width:100%;height:100%;display:block}
+#bust{position:absolute;inset:0;width:100%;height:100%;display:none;touch-action:none;z-index:1}
+body.bust3d #bust{display:block}
+body.bust3d .patient{visibility:hidden}
+.shlab{display:none;position:absolute;z-index:2;margin:0;color:#e7f6fb;font-size:11px;pointer-events:none;transform:translate(-50%,-130%)}
+body.bust3d .shlab{display:block}
 #probe svg{width:40px;height:64px;display:block}
-#hint{position:absolute;left:8px;right:8px;top:8px;margin:0;padding:6px 8px;border-radius:10px;background:rgba(7,17,26,.78);color:var(--paper);font-size:13px;line-height:1.3;pointer-events:none}
+#hint{position:absolute;left:8px;right:8px;top:8px;z-index:3;margin:0;padding:6px 8px;border-radius:10px;background:rgba(7,17,26,.78);color:var(--paper);font-size:13px;line-height:1.3;pointer-events:none}
 #hint.hide{opacity:0}
-#contact,#probe{position:absolute;pointer-events:none}
+#contact,#probe{position:absolute;pointer-events:none;z-index:3}
 #contact{width:28px;height:28px;border-radius:50%;border:2px solid #9fd4ff;box-shadow:0 0 12px rgba(120,190,255,.8);left:calc(var(--x) * 1%);top:calc(var(--y) * 1%);transform:translate(-50%,-50%);opacity:0}
 #contact.on{opacity:1}
 #probe{width:40px;height:78px;left:calc(var(--x) * 1%);top:calc(var(--y) * 1%);transform-origin:50% 92%;transform:translate(-50%,calc(-92% - var(--lift) * 36px)) rotate(calc(var(--spin) * 1deg));transition:none;overflow:visible}
@@ -120,6 +125,9 @@ body.supply #ecg{height:240px}
   <section class="panel" aria-label="Patient and probe">
     <h2>Patient</h2>
     <div class="chest-box" id="torso">
+      <canvas id="bust"></canvas>
+      <p class="shlab" id="lab-r">Right shoulder</p>
+      <p class="shlab" id="lab-l">Left shoulder</p>
       <svg class="patient" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Patient lying supine. A finger on the chest is the echo probe.">
         <rect width="100" height="100" fill="#14202c"/>
         <ellipse cx="50" cy="18" rx="10" ry="8.2" fill="#c4a48c"/>
@@ -1139,11 +1147,85 @@ function viewMetrics(){
   const oy = (rect.height - 100*scale)/2;
   return {scale:scale, ox:ox, oy:oy};
 }
+let has3 = false;
+const contact3 = new THREE.Vector3();
+let bodyMesh = null;
+let bustCam = null;
+const bust = document.getElementById("bust");
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+if(mode==="sim" && bust){
+  const bustRenderer = new THREE.WebGLRenderer({ canvas: bust, antialias: true, alpha: false, powerPreference: "high-performance" });
+  bustRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  bustRenderer.setClearColor(0x14202c, 1);
+  bustRenderer.outputColorSpace = THREE.SRGBColorSpace;
+  bustRenderer.localClippingEnabled = true;
+  const bustScene = new THREE.Scene();
+  bustScene.add(new THREE.AmbientLight(0xfff4ea, 0.6));
+  bustScene.add(new THREE.HemisphereLight(0xfff1e6, 0x1a2836, 0.75));
+  const bustKey = new THREE.DirectionalLight(0xfff6ee, 1.25);
+  bustKey.position.set(0.4, 1.8, 2);
+  bustScene.add(bustKey);
+  bustCam = new THREE.PerspectiveCamera(26, 1, 0.02, 20);
+  bustCam.position.set(0, 1.40, 1.35);
+  bustCam.lookAt(0, 1.38, 0);
+  const clip = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.05);
+  const skinNames = { body: 1, eyes: 1, irises: 1, pupils: 1 };
+  new GLTFLoader().load("models/anatomy/human-reference.glb", function(gltf){
+    const model = gltf.scene;
+    model.traverse(function(obj){
+      if(!obj.isMesh) return;
+      const part = obj.name || "";
+      if(!skinNames[part]){ obj.visible = false; return; }
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach(function(mat){
+        if(!mat) return;
+        mat.clippingPlanes = [clip];
+        mat.clipShadows = true;
+        if(part === "body"){
+          mat.transparent = false;
+          mat.opacity = 1;
+          mat.depthWrite = true;
+          mat.roughness = 0.62;
+          mat.metalness = 0;
+          mat.color.setHex(0xd7b09a);
+          if(mat.emissive) mat.emissive.setHex(0x3a241c);
+          mat.emissiveIntensity = 0.08;
+        }
+      });
+      if(part === "body") bodyMesh = obj;
+    });
+    bustScene.add(model);
+    document.body.classList.add("bust3d");
+    syncContactFromProbe();
+    paintProbe();
+  });
+  function drawBust(){
+    const w = bust.clientWidth, h = bust.clientHeight;
+    if(w && h){
+      bustRenderer.setSize(w, h, false);
+      bustCam.aspect = w / Math.max(1, h);
+      bustCam.updateProjectionMatrix();
+    }
+    bustRenderer.render(bustScene, bustCam);
+    requestAnimationFrame(drawBust);
+  }
+  drawBust();
+}
 function paintProbe(){
   const p = state.probe;
   const m = viewMetrics();
-  const left = m.ox + p.x * m.scale;
-  const top = m.oy + p.y * m.scale;
+  let left = m.ox + p.x * m.scale;
+  let top = m.oy + p.y * m.scale;
+  if(has3 && bustCam){
+    const v = contact3.clone().project(bustCam);
+    const br = bust.getBoundingClientRect();
+    const tr = torso.getBoundingClientRect();
+    left = (v.x * 0.5 + 0.5) * br.width + br.left - tr.left;
+    top = (-v.y * 0.5 + 0.5) * br.height + br.top - tr.top;
+    placeShoulder("lab-r", -0.2, 1.55);
+    placeShoulder("lab-l", 0.2, 1.55);
+  }
   const rad = p.spin * Math.PI / 180;
   const px = left + Math.sin(rad) * 42;
   const py = top - Math.cos(rad) * 46;
@@ -1198,6 +1280,42 @@ function chestPoint(clientX, clientY){
     y: clamp((clientY - rect.top - m.oy) / m.scale, 0, 100)
   };
 }
+function svgFromHit(p){
+  return {
+    x: clamp(50 + p.x * 140, 0, 100),
+    y: clamp(22 + (1.70 - p.y) * (54 / 0.55), 0, 100)
+  };
+}
+function rayOnSkin(clientX, clientY){
+  if(!bodyMesh) return null;
+  const rect = bust.getBoundingClientRect();
+  ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(ndc, bustCam);
+  const hits = raycaster.intersectObject(bodyMesh, false);
+  return hits[0] || null;
+}
+function rememberHit(point){
+  contact3.copy(point);
+  has3 = true;
+}
+function syncContactFromProbe(){
+  if(!bodyMesh) return;
+  const x = (state.probe.x - 50) / 140;
+  const y = 1.70 - (state.probe.y - 22) * (0.55 / 54);
+  raycaster.set(new THREE.Vector3(x, y, 1), new THREE.Vector3(0, 0, -1));
+  const hits = raycaster.intersectObject(bodyMesh, false);
+  if(hits[0]) rememberHit(hits[0].point);
+}
+function placeShoulder(id, x, y){
+  const el = document.getElementById(id);
+  if(!el || !bustCam) return;
+  const v = new THREE.Vector3(x, y, 0.08).project(bustCam);
+  const br = bust.getBoundingClientRect();
+  const tr = torso.getBoundingClientRect();
+  el.style.left = ((v.x * 0.5 + 0.5) * br.width + br.left - tr.left) + "px";
+  el.style.top = ((-v.y * 0.5 + 0.5) * br.height + br.top - tr.top) + "px";
+}
 function seatProbe(){
   state.probe.rot = normDeg(state.probe.spin);
   state.probe.tilt = clamp((state.probe.y - 34) * 7.2, 8, 96);
@@ -1220,10 +1338,13 @@ torso.addEventListener("pointerdown", function(e){
   try{ torso.setPointerCapture(e.pointerId); }catch(err){}
   e.preventDefault();
   if(pointers.size > 1) return;
-  const c = chestPoint(e.clientX, e.clientY);
+  const c = rayOnSkin(e.clientX, e.clientY);
+  const spot = c ? svgFromHit(c.point) : (bodyMesh ? null : chestPoint(e.clientX, e.clientY));
+  if(!spot) return;
+  if(c) rememberHit(c.point);
   plant = {x:e.clientX, y:e.clientY, ang:null, base:state.probe.spin, unwrapped:null};
-  state.probe.x = c.x;
-  state.probe.y = c.y;
+  state.probe.x = spot.x;
+  state.probe.y = spot.y;
   state.probe.down = true;
   state.probe.docked = false;
   state.probe.lift = 0;
@@ -1246,8 +1367,16 @@ torso.addEventListener("pointermove", function(e){
   const dy = e.clientY - plant.y;
   const dist = Math.hypot(dx, dy);
   if(dist > 150){
-    state.probe.x = c.x;
-    state.probe.y = c.y;
+    const hit = rayOnSkin(e.clientX, e.clientY);
+    const spot = hit ? svgFromHit(hit.point) : (bodyMesh ? null : c);
+    if(!spot || !onBody(spot.x, spot.y)){
+      plant = null;
+      liftProbe();
+      return;
+    }
+    if(hit) rememberHit(hit.point);
+    state.probe.x = spot.x;
+    state.probe.y = spot.y;
     plant = {x:e.clientX, y:e.clientY, ang:null, base:state.probe.spin, unwrapped:null};
   } else if(dist >= 6){
     const ang = Math.atan2(dy, dx) * 180 / Math.PI;
@@ -1298,6 +1427,7 @@ function jump(view){
   state.probe.down = false;
   state.probe.docked = true;
   state.probe.lift = 0;
+  syncContactFromProbe();
   state.view = windowFrom();
   paintProbe(); paintStatus(); syncProbeCopy();
   if(!document.getElementById("probe-name")) renderSheet();
@@ -1617,7 +1747,7 @@ function releaseGraphics(){
 }
 document.getElementById("back").onclick = function(){
   releaseGraphics();
-  if(mode){ location.href = "echo-lab.html?v=20261031u"; return; }
+  if(mode){ location.href = "echo-lab.html?v=20261101c"; return; }
   try{
     if(window.parent && window.parent!==window && typeof window.parent.returnToIcu==="function"){
       window.parent.returnToIcu();
@@ -1629,7 +1759,7 @@ document.getElementById("back").onclick = function(){
 document.getElementById("doors").onclick = function(event){
   const btn = event.target.closest("[data-door]");
   if(!btn) return;
-  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261031u";
+  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261101c";
 };
 document.getElementById("tabs").innerHTML = TABS.map(function(tab){
   return "<button type='button' data-tab='"+tab[0]+"'>"+tab[1]+"</button>";
