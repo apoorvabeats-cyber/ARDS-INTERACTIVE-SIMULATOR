@@ -135,12 +135,13 @@ body.supply #ecg{height:240px}
         <ellipse cx="38" cy="40" rx="1.5" ry="1.1" fill="#b08978"/>
         <ellipse cx="62" cy="40" rx="1.5" ry="1.1" fill="#b08978"/>
         <path d="M22 48 C34 42 44 46 49 52 M78 48 C66 42 56 46 51 52" fill="none" stroke="#b39d88" stroke-width=".7"/>
-        <ellipse id="z-para" cx="63" cy="43" rx="11" ry="8" fill="none" stroke="rgba(80,60,40,.45)" stroke-dasharray="1.4 1.1"/>
+        <ellipse id="z-para" cx="64" cy="46" rx="12" ry="14" fill="none" stroke="rgba(80,60,40,.45)" stroke-dasharray="1.4 1.1"/>
         <ellipse id="z-apex" cx="76" cy="58" rx="10" ry="8" fill="none" stroke="rgba(80,60,40,.45)" stroke-dasharray="1.4 1.1"/>
         <ellipse id="z-sub" cx="50" cy="76" rx="8" ry="5.5" fill="none" stroke="rgba(80,60,40,.45)" stroke-dasharray="1.4 1.1"/>
+        <ellipse id="z-ssn" cx="50" cy="29" rx="6.5" ry="4.2" fill="none" stroke="rgba(80,60,40,.45)" stroke-dasharray="1.4 1.1"/>
         <ellipse id="z-ivc" cx="37" cy="78" rx="7" ry="5" fill="none" stroke="rgba(80,60,40,.45)" stroke-dasharray="1.4 1.1"/>
       </svg>
-      <p id="hint">Put a finger on the chest. The finger is the probe. Twist the finger and the probe turns on its axis.</p>
+      <p id="hint">Put a finger on a window. The probe follows it. Circle the finger without lifting and the probe turns with it. Lift on a marker and it stays. Drag it off the body and it lifts away.</p>
       <div id="contact"></div>
       <div id="probe" aria-hidden="true">
         <span class="nib" title="Probe pointer"></span>
@@ -154,7 +155,7 @@ body.supply #ecg{height:240px}
       </div>
     </div>
     <div class="dials">
-      <label>Turn <input id="rot" type="range" min="0" max="120" value="18"></label>
+      <label>Pointer <input id="rot" type="range" min="0" max="359" value="300"></label>
     </div>
   </section>
   <section class="panel scan" aria-label="Simulated echo and ECG">
@@ -197,21 +198,32 @@ const ZONE_OF = {
 };
 const VIEW = {
   off:{name:"Off the window", mark:"", note:"The footprint is not on a standard window.", see:[]},
-  plax:{name:"Parasternal long axis", mark:"pointer to the right shoulder", note:"Pointer to the right shoulder. Right ventricle nearest the probe, then septum, left ventricle and inferolateral wall. Aortic valve and left atrium sit at the base.", see:["Right ventricle","Septum","Left ventricle","Mitral valve","Aortic valve","Left atrium"]},
-  "psax-av":{name:"Parasternal short axis, aortic valve", mark:"pointer to the left shoulder", note:"Pointer to the left shoulder, shallow rock. The aortic valve is the Mercedes-Benz in the centre, with the tricuspid and right ventricular outflow beside it.", see:["Aortic valve","Left atrium","Right atrium","Right ventricular outflow","Tricuspid valve"]},
-  "psax-mv":{name:"Parasternal short axis, mitral valve", mark:"pointer to the left shoulder", note:"Pointer to the left shoulder, steeper rock. The mitral orifice is a fish-mouth. Basal segments ring the ventricle.", see:["Mitral valve","Basal left ventricle","Septum"]},
-  "psax-pap":{name:"Parasternal short axis, papillary muscles", mark:"pointer to the left shoulder", note:"Pointer to the left shoulder. Mid-ventricular ring. Anterior is at the top of a usual display, inferior at the bottom, lateral to one side and the septum to the other.", see:["Mid anterior","Mid anterolateral","Mid inferolateral","Mid inferior","Mid inferoseptal","Mid anteroseptal"]},
-  a4c:{name:"Apical four-chamber", mark:"pointer to the patient’s left", note:"Probe on the apex, pointer to the patient’s left. Apex is near the probe. The septum and lateral wall face each other.", see:["Left ventricle","Left atrium","Right ventricle","Right atrium","Mitral valve","Tricuspid valve"]},
-  a2c:{name:"Apical two-chamber", mark:"pointer rotated about 60° from the four-chamber", note:"Pointer rotated about 60° from the four-chamber. Anterior and inferior walls, no right ventricle.", see:["Left ventricle","Left atrium","Anterior wall","Inferior wall","Mitral valve"]},
-  a3c:{name:"Apical three-chamber", mark:"pointer further round, toward the right shoulder", note:"Pointer further round, toward the right shoulder. The aortic valve comes in. Anteroseptal and inferolateral walls.", see:["Left ventricle","Left atrium","Aortic valve","Anteroseptal wall","Inferolateral wall"]},
-  a5c:{name:"Apical five-chamber", mark:"pointer to the patient’s left, rocked anteriorly", note:"Pointer to the patient’s left, rocked anteriorly from the four-chamber. The left ventricular outflow and aortic valve appear.", see:["Left ventricle","Left atrium","Aortic valve","Left ventricular outflow","Septum"]},
-  sc4:{name:"Subcostal four-chamber", mark:"pointer toward the left shoulder", note:"Probe under the xiphoid, pointer toward the left shoulder. Liver is near the probe. Useful when the parasternal window is poor, and for pericardial fluid.", see:["Liver","Right ventricle","Left ventricle","Both atria"]},
-  ivc:{name:"Inferior vena cava", mark:"pointer toward the patient’s right", note:"From the subcostal window, pointer toward the patient’s right. A long tube entering the right atrium.", see:["Inferior vena cava","Right atrium","Liver"]}
+  plax:{name:"Parasternal long axis", mark:"pointer 10 o'clock, right shoulder", note:"Left parasternal border, 3rd–4th intercostal space. Pointer to the right shoulder, about 10 o'clock.", see:["Left ventricle","Left atrium","Mitral valve","Aortic valve","Aortic root","Right ventricular outflow"]},
+  "psax-av":{name:"Parasternal short axis, aortic valve", mark:"pointer 1–2 o'clock, left shoulder", note:"Same parasternal position as the long axis. Pointer to the left shoulder, about 1–2 o'clock.", see:["Aortic valve","Three cusps","Right ventricular outflow","Pulmonary valve","Tricuspid valve"]},
+  "psax-mv":{name:"Parasternal short axis, mitral valve", mark:"pointer to the left shoulder", note:"From the aortic level, angle toward the base of the left ventricle. Pointer stays toward the left shoulder.", see:["Mitral valve, fish-mouth","Basal left ventricle"]},
+  "psax-pap":{name:"Parasternal short axis, papillary muscles", mark:"pointer to the left shoulder", note:"Tilt toward the mid left ventricle. Pointer stays toward the left shoulder.", see:["Left ventricle","Right ventricle","Anterolateral papillary muscle","Posteromedial papillary muscle"]},
+  "psax-apex":{name:"Parasternal short axis, apex", mark:"pointer to the left shoulder", note:"Tilt further toward the apex. Pointer stays toward the left shoulder.", see:["Left ventricular apical segments"]},
+  a4c:{name:"Apical four-chamber", mark:"pointer 3 o'clock, patient's left", note:"Probe on the cardiac apex, usually the 5th intercostal space. Pointer to the patient's left, about 3 o'clock.", see:["Both atria","Both ventricles","Mitral valve","Tricuspid valve"]},
+  a5c:{name:"Apical five-chamber", mark:"pointer 3 o'clock, rocked anteriorly", note:"Same apical position as the four-chamber, tilted anteriorly. Pointer about 3 o'clock.", see:["Four chambers","Left ventricular outflow","Aortic valve"]},
+  a2c:{name:"Apical two-chamber", mark:"pointer 12 o'clock", note:"From the four-chamber, rotate about 60° counterclockwise. Pointer about 12 o'clock.", see:["Left atrium","Left ventricle","Anterior wall","Inferior wall"]},
+  a3c:{name:"Apical three-chamber", mark:"pointer 10 o'clock, right shoulder", note:"Rotate further from the two-chamber. Pointer about 10 o'clock.", see:["Left ventricle","Left atrium","Mitral valve","Aortic valve","Left ventricular outflow"]},
+  sc4:{name:"Subcostal four-chamber", mark:"pointer 3 o'clock, patient's left", note:"Probe below the xiphoid. Pointer to the patient's left, about 3 o'clock.", see:["All four chambers","Interatrial septum","Interventricular septum","Pericardium"]},
+  ivc:{name:"Subcostal inferior vena cava", mark:"pointer 12 o'clock", note:"From under the xiphoid, rotate toward the patient's right. Pointer about 12 o'clock. Use it for diameter and respiratory variation.", see:["Inferior vena cava","Hepatic vein junction","Right atrium"]},
+  ssn:{name:"Suprasternal long axis", mark:"pointer to the left shoulder", note:"Probe in the suprasternal notch. Pointer toward the left shoulder.", see:["Aortic arch","Ascending aorta","Descending aorta","Arch branches"]}
 };
 const PRESET = {
-  plax:{x:63,y:43,rot:18,tilt:40}, "psax-av":{x:63,y:41,rot:82,tilt:16}, "psax-mv":{x:63,y:43,rot:82,tilt:46},
-  "psax-pap":{x:64,y:46,rot:86,tilt:78}, a4c:{x:76,y:58,rot:16,tilt:48}, a2c:{x:76,y:58,rot:58,tilt:48},
-  a3c:{x:76,y:58,rot:96,tilt:48}, a5c:{x:76,y:56,rot:16,tilt:12}, sc4:{x:50,y:76,rot:8,tilt:40}, ivc:{x:37,y:78,rot:72,tilt:36}
+  plax:{x:63,y:43,spin:300},
+  "psax-av":{x:63,y:40,spin:45},
+  "psax-mv":{x:63,y:45,spin:45},
+  "psax-pap":{x:64,y:49,spin:45},
+  "psax-apex":{x:66,y:53,spin:45},
+  a4c:{x:76,y:58,spin:90},
+  a5c:{x:76,y:53,spin:90},
+  a2c:{x:76,y:58,spin:0},
+  a3c:{x:76,y:58,spin:300},
+  sc4:{x:50,y:76,spin:90},
+  ivc:{x:37,y:78,spin:0},
+  ssn:{x:50,y:29,spin:45}
 };
 const INFO = {
   "Left ventricle":"Thick-walled systemic pump. Inlet is the mitral valve, outlet the aortic valve.",
@@ -230,7 +242,7 @@ const state = {
   tab:"anatomy", lesion:"none", phase:"normal", dominance:"right", custom:false, globalOn:false, ef:55,
   wall:Object.fromEntries(LV.map(function(id){ return [id,"normal"]; })),
   rv:false, effusion:false, alternans:false, lowQrs:false,
-  probe:{down:false,x:63,y:43,rot:18,tilt:40,lift:1,spin:18,twistBase:null},
+  probe:{down:false,x:63,y:43,rot:300,tilt:40,lift:1,spin:300,twistBase:null,docked:false},
   view:"plax", score:0, asked:0, caseId:null, qIx:0, locked:false
 };
 const mode = new URLSearchParams(location.search).get("mode") || "";
@@ -332,32 +344,57 @@ function illustrativeEf(){
   const avg = mean(LV);
   return Math.round(clamp(26 + avg*36, 15, 75));
 }
+function normDeg(d){
+  d = d % 360;
+  if(d < 0) d += 360;
+  return d;
+}
+function angDist(a, b){
+  let d = Math.abs(normDeg(a) - normDeg(b));
+  if(d > 180) d = 360 - d;
+  return d;
+}
+function onBody(x, y){
+  return x >= 8 && x <= 92 && y >= 20 && y <= 93;
+}
+const WINDOWS = [
+  {id:"ssn", x:50, y:29, r:8},
+  {id:"para", x:63, y:44, r:15},
+  {id:"apex", x:76, y:58, r:12},
+  {id:"sub", x:50, y:76, r:10},
+  {id:"ivc", x:37, y:78, r:9}
+];
+function nearestWindow(x, y){
+  let best = null, bd = 1e9;
+  WINDOWS.forEach(function(z){
+    const d = Math.hypot(x - z.x, y - z.y);
+    if(d < z.r && d < bd){ bd = d; best = z; }
+  });
+  return best;
+}
 function windowFrom(){
   const p = state.probe;
-  if(!p.down) return state.view;
-  const zones = [
-    {id:"para",x:63,y:43,r:13},{id:"apex",x:76,y:58,r:13},
-    {id:"sub",x:50,y:76,r:10},{id:"ivc",x:37,y:78,r:9}
-  ];
-  let best = null, bd = 1e9;
-  zones.forEach(function(z){
-    const d = Math.hypot(p.x-z.x, p.y-z.y);
-    if(d<z.r && d<bd){ bd=d; best=z; }
-  });
+  if(!p.down && !p.docked) return "off";
+  if(!onBody(p.x, p.y)) return "off";
+  const best = nearestWindow(p.x, p.y);
   if(!best) return "off";
-  if(best.id==="ivc") return "ivc";
-  if(best.id==="sub") return "sc4";
-  const aim = shoulderAim();
-  if(best.id==="apex"){
-    if(p.tilt<22) return "a5c";
-    if(aim.right > aim.left && aim.right > 0.15) return "a3c";
-    if(aim.left > 0.35) return "a4c";
-    return "a2c";
+  const s = normDeg(p.spin);
+  if(best.id === "ssn") return "ssn";
+  if(best.id === "ivc") return "ivc";
+  if(best.id === "sub") return angDist(s, 90) <= 55 ? "sc4" : "ivc";
+  if(best.id === "apex"){
+    if(angDist(s, 90) <= 38) return p.y < 56 ? "a5c" : "a4c";
+    if(angDist(s, 0) <= 42 || angDist(s, 360) <= 42) return "a2c";
+    if(angDist(s, 300) <= 42) return "a3c";
+    const opts = [[90, p.y < 56 ? "a5c" : "a4c"], [0, "a2c"], [300, "a3c"]];
+    opts.sort(function(a, b){ return angDist(s, a[0]) - angDist(s, b[0]); });
+    return opts[0][1];
   }
-  if(aim.right >= aim.left) return "plax";
-  if(p.tilt<30) return "psax-av";
-  if(p.tilt<62) return "psax-mv";
-  return "psax-pap";
+  if(angDist(s, 300) <= angDist(s, 45)) return "plax";
+  if(p.y < 42.5) return "psax-av";
+  if(p.y < 47) return "psax-mv";
+  if(p.y < 52) return "psax-pap";
+  return "psax-apex";
 }
 function shoulderAim(){
   const p = state.probe;
@@ -476,8 +513,19 @@ function drawChambers(ctx, w, h, kind, squeeze){
     ctx.stroke();
     label(ctx, ax, ay+h*0.36, "IVC");
     label(ctx, ax, ay+h*0.78, "Right atrium");
+  } else if(kind==="ssn"){
+    ctx.strokeStyle = "#efe8dc";
+    ctx.lineWidth = 10;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(ax-w*0.22, ay+h*0.7);
+    ctx.quadraticCurveTo(ax-w*0.02, ay+h*0.16, ax+w*0.24, ay+h*0.58);
+    ctx.stroke();
+    label(ctx, ax-w*0.16, ay+h*0.78, "Ascending aorta");
+    label(ctx, ax+w*0.02, ay+h*0.2, "Arch");
+    label(ctx, ax+w*0.26, ay+h*0.66, "Descending aorta");
   } else if(kind==="psax"){
-    const level = state.view==="psax-av" ? "av" : state.view==="psax-mv" ? "mv" : "pap";
+    const level = state.view==="psax-av" ? "av" : state.view==="psax-mv" ? "mv" : state.view==="psax-apex" ? "apex" : "pap";
     const ids = level==="av" || level==="mv"
       ? ["bA","bAL","bIL","bI","bIS","bAS"]
       : ["mA","mAL","mIL","mI","mIS","mAS"];
@@ -500,6 +548,13 @@ function drawChambers(ctx, w, h, kind, squeeze){
       label(ctx, cx, cy+R0+18, "Left atrium");
       label(ctx, cx-R0-8, cy, "RA");
       label(ctx, cx, cy-R0-12, "RVOT");
+    } else if(level==="apex"){
+      ctx.fillStyle = "#6a6e74";
+      ctx.beginPath(); ctx.arc(cx, cy, R0*0.72, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "#0c1218";
+      ctx.beginPath(); ctx.arc(cx, cy, R0*0.34*(1-0.15*S), 0, Math.PI*2); ctx.fill();
+      label(ctx, cx, cy+4, "LV apex");
+      label(ctx, cx, cy-R0-10, "RV");
     } else {
       ctx.beginPath();
       for(let i=0;i<6;i++){
@@ -626,7 +681,7 @@ function mark(ctx,x,y){
 }
 function echoKind(){
   const v = state.view;
-  if(v==="off" || v==="ivc") return v;
+  if(v==="off" || v==="ivc" || v==="ssn") return v;
   if(v.indexOf("psax")===0) return "psax";
   return v;
 }
@@ -694,129 +749,11 @@ function drawEcho(){
     drawStill(ctx, w, h, photo, still.labels);
     return;
   }
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0,0,w,h);
-  const cx = w*0.5, top = h*0.04;
-  const R = Math.min(w*0.86, h*0.98);
-  const a0 = 0.38, a1 = Math.PI-0.38;
   const beat = performance.now()/1000;
   const phase = beat % 1;
   const S = phase<0.34 ? Math.sin(phase/0.34*Math.PI) : 0;
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(cx, top);
-  ctx.arc(cx, top, R, a0, a1);
-  ctx.closePath();
-  ctx.clip();
-  ctx.fillStyle = "#141414";
-  ctx.fillRect(0,0,w,h);
-  for(let i=0;i<900;i++){
-    const ang = a0 + ((i*37)%1000)/1000*(a1-a0);
-    const rad = ((i*91)%1000)/1000*R;
-    const x = cx + Math.cos(ang)*rad;
-    const y = top + Math.sin(ang)*rad;
-    const flick = Math.sin(beat*8 + i)*0.5+0.5;
-    const g = 22 + (i%48) + flick*36;
-    ctx.fillStyle = "rgba("+g+","+g+","+g+","+(0.18+flick*0.4)+")";
-    ctx.fillRect(x, y, 1.6, 1.6);
-  }
-  const kind = echoKind();
-  const septal = wallShift(mean(["bAS","mAS","aS"]), S);
-  const lat = wallShift(mean(["bAL","mAL","aL"]), S);
-  const ant = wallShift(mean(["bA","mA","aA"]), S);
-  const inf = wallShift(mean(["bI","mI","aI"]), S);
-  function cavity(x, y, rx, ry, still){
-    ctx.fillStyle = still<0.35 ? "#2a2a2a" : "#050505";
-    ctx.beginPath();
-    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI*2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(230,230,230,.8)";
-    ctx.lineWidth = still<0.35 ? 3.2 : 1.6;
-    ctx.stroke();
-  }
-  if(kind==="psax"){
-    const cy = top+R*0.55;
-    const r = R*0.30*(1-0.06*S);
-    ctx.fillStyle = "rgba(168,168,168,.72)";
-    ctx.beginPath(); ctx.arc(cx, cy, r*1.42, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "#050505";
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = "rgba(230,230,230,.85)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = "#080808";
-    ctx.beginPath(); ctx.ellipse(cx, cy-r*1.05, r*0.85, r*0.32, 0, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = "rgba(245,245,245,.95)";
-    ctx.lineWidth = 2.2;
-    if(state.view==="psax-av"){
-      ctx.beginPath(); ctx.arc(cx, cy, r*0.42, 0, Math.PI*2); ctx.stroke();
-      for(let i=0;i<3;i++){
-        const a = -Math.PI/2 + i*Math.PI*2/3;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx+Math.cos(a)*r*0.4, cy+Math.sin(a)*r*0.4);
-        ctx.stroke();
-      }
-    } else {
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, r*0.34, r*(0.16+0.18*(1-S)), 0.2, 0, Math.PI*2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(cx-r*0.34, cy);
-      ctx.lineTo(cx+r*0.34, cy);
-      ctx.stroke();
-    }
-    ctx.fillStyle = "#f3efe6";
-    ctx.font = "600 13px Figtree, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(state.view==="psax-av" ? "AV" : "MV", cx, cy-6);
-    ctx.fillText("RV", cx, cy-r*1.55);
-  } else if(kind==="a3c"){
-    const y = top + R*0.40;
-    cavity(cx-R*0.02, y, R*0.16, R*0.22, septal);
-    cavity(cx-R*0.02, y+R*0.28, R*0.14, R*0.12, 1);
-    ctx.strokeStyle = "rgba(245,245,245,.95)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx+R*0.08, y-R*0.02);
-    ctx.lineTo(cx+R*0.28, y-R*0.08);
-    ctx.moveTo(cx+R*0.08, y+R*0.08);
-    ctx.lineTo(cx+R*0.28, y+R*0.02);
-    ctx.stroke();
-    ctx.fillStyle = "#f3efe6";
-    ctx.font = "600 13px Figtree, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("LV", cx-R*0.02, y);
-    ctx.fillText("LA", cx-R*0.02, y+R*0.30);
-    ctx.fillText("Ao", cx+R*0.30, y-R*0.02);
-    ctx.fillText("MV", cx, y+R*0.16);
-  } else if(kind==="ivc"){
-    cavity(cx, top+R*0.48, R*0.08, R*0.28*(1-0.05*S), 1);
-  } else {
-    const y = top + R*0.42;
-    const spread = R*0.16;
-    cavity(cx-spread*septal, y, R*0.11, R*0.2, septal);
-    cavity(cx+spread*0.2, y+R*0.02, R*0.16*(1-0.08*lat), R*0.24, lat);
-    if(kind==="a4c" || kind==="a5c" || kind==="sc4"){
-      cavity(cx-spread*1.5, y, R*0.1, R*0.16, state.rv ? 0.2 : 1);
-    }
-  }
-  ctx.restore();
-  ctx.strokeStyle = "rgba(210,210,210,.45)";
-  ctx.beginPath();
-  ctx.moveTo(cx, top);
-  ctx.arc(cx, top, R, a0, a1);
-  ctx.closePath();
-  ctx.stroke();
-  ctx.fillStyle = "rgba(210,210,210,.75)";
-  ctx.font = "11px Figtree, sans-serif";
-  [0,4,8,12,16].forEach(function(cm){
-    ctx.fillText(String(cm), 6, top + (cm/16)*R*0.9);
-  });
-  ctx.font = "14px Figtree, sans-serif";
-  ctx.fillText((VIEW[state.view]||VIEW.off).name, 36, h-12);
+  drawChambers(ctx, w, h, echoKind(), S);
 }
-
 function ecgSpec(){
   const o = {};
   LEADS.forEach(function(id){ o[id] = {st:0,q:0,t:1,amp:1}; });
@@ -1143,127 +1080,149 @@ function paintProbe(){
   contactEl.style.left = left+"px";
   contactEl.style.top = top+"px";
   contactEl.style.transform = "translate(-50%,-50%)";
-  contactEl.classList.toggle("on", p.down);
+  contactEl.classList.toggle("on", p.down || p.docked);
   const hint = document.getElementById("hint");
-  if(hint) hint.classList.toggle("hide", p.down);
-  document.getElementById("rot").value = String(Math.round(Math.max(0, Math.min(120, p.rot))));
+  if(hint) hint.classList.toggle("hide", p.down || p.docked);
+  document.getElementById("rot").value = String(Math.round(normDeg(p.spin)));
   const meta = VIEW[state.view] || VIEW.off;
   document.getElementById("viewtitle").textContent = meta.mark ? meta.name+" · "+meta.mark : meta.name;
-  ["z-para","z-apex","z-sub","z-ivc"].forEach(function(id){
+  ["z-ssn","z-para","z-apex","z-sub","z-ivc"].forEach(function(id){
     const node = document.getElementById(id);
     if(node) node.setAttribute("stroke", "rgba(80,60,40,.45)");
   });
-  const map = {plax:"z-para","psax-av":"z-para","psax-mv":"z-para","psax-pap":"z-para",a4c:"z-apex",a2c:"z-apex",a3c:"z-apex",a5c:"z-apex",sc4:"z-sub",ivc:"z-ivc"};
+  const map = {plax:"z-para","psax-av":"z-para","psax-mv":"z-para","psax-pap":"z-para","psax-apex":"z-para",a4c:"z-apex",a2c:"z-apex",a3c:"z-apex",a5c:"z-apex",sc4:"z-sub",ivc:"z-ivc",ssn:"z-ssn"};
   const zone = document.getElementById(map[state.view] || "");
-  if(zone && p.down) zone.setAttribute("stroke", "#9fd4ff");
+  if(zone && (p.down || p.docked)) zone.setAttribute("stroke", "#9fd4ff");
   const aim = shoulderAim();
-  const rightOn = p.down && aim.right > aim.left && aim.right > 0.2;
-  const leftOn = p.down && aim.left >= aim.right && aim.left > 0.2;
+  const seated = p.down || p.docked;
+  const rightOn = seated && aim.right > aim.left && aim.right > 0.2;
+  const leftOn = seated && aim.left >= aim.right && aim.left > 0.2;
   const markR = document.getElementById("sh-r");
   const markL = document.getElementById("sh-l");
   if(markR) markR.setAttribute("stroke", rightOn ? "#e2b48a" : "#e7f6fb");
   if(markL) markL.setAttribute("stroke", leftOn ? "#e2b48a" : "#e7f6fb");
 }
 const pointers = new Map();
+let plant = null;
 function angleDelta(a, b){
   let d = b - a;
   while(d > 180) d -= 360;
   while(d < -180) d += 360;
   return d;
 }
-function foldSpin(){
-  let s = state.probe.spin % 180;
-  if(s < 0) s += 180;
-  state.probe.rot = s * (120/180);
-}
-function primaryPoint(){
-  return pointers.values().next().value || null;
-}
-function applyTwist(){
-  if(pointers.size < 2) return;
-  const pts = Array.from(pointers.values());
-  const ang = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * 180 / Math.PI;
-  if(state.probe.twistBase == null) state.probe.twistBase = ang - state.probe.spin;
-  state.probe.spin = ang - state.probe.twistBase;
-  foldSpin();
-}
-function moveProbe(clientX, clientY, down){
+function chestPoint(clientX, clientY){
   const rect = torso.getBoundingClientRect();
   const m = viewMetrics();
-  state.probe.x = clamp((clientX-rect.left-m.ox)/m.scale, 3, 97);
-  state.probe.y = clamp((clientY-rect.top-m.oy)/m.scale, 6, 96);
-  state.probe.down = down;
-  state.probe.lift = down ? 0 : 1;
-  if(down && Math.hypot(state.probe.x-63, state.probe.y-43) < 14) state.probe.tilt = clamp((state.probe.y - 34) * 7.2, 8, 96);
-  if(down) state.view = windowFrom();
+  return {
+    x: clamp((clientX - rect.left - m.ox) / m.scale, 0, 100),
+    y: clamp((clientY - rect.top - m.oy) / m.scale, 0, 100)
+  };
+}
+function seatProbe(){
+  state.probe.rot = normDeg(state.probe.spin);
+  state.probe.tilt = clamp((state.probe.y - 34) * 7.2, 8, 96);
+  state.view = windowFrom();
+  paintProbe();
+  paintStatus();
+  syncProbeCopy();
+}
+function liftProbe(){
+  state.probe.down = false;
+  state.probe.docked = false;
+  state.probe.lift = 1;
+  state.view = "off";
   paintProbe();
   paintStatus();
   syncProbeCopy();
 }
 torso.addEventListener("pointerdown", function(e){
-  pointers.set(e.pointerId, {x:e.clientX, y:e.clientY, heading:null});
+  pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
   try{ torso.setPointerCapture(e.pointerId); }catch(err){}
   e.preventDefault();
-  if(pointers.size >= 2) state.probe.twistBase = null;
-  applyTwist();
-  const point = primaryPoint();
-  moveProbe(point.x, point.y, true);
+  if(pointers.size > 1) return;
+  const c = chestPoint(e.clientX, e.clientY);
+  plant = {x:e.clientX, y:e.clientY, ang:null, base:state.probe.spin, unwrapped:null};
+  state.probe.x = c.x;
+  state.probe.y = c.y;
+  state.probe.down = true;
+  state.probe.docked = false;
+  state.probe.lift = 0;
+  seatProbe();
 });
 torso.addEventListener("pointermove", function(e){
   const prev = pointers.get(e.pointerId);
-  if(!prev || !state.probe.down) return;
+  if(!prev || !state.probe.down || !plant) return;
   e.preventDefault();
-  const dx = e.clientX - prev.x;
-  const dy = e.clientY - prev.y;
-  const dist = Math.hypot(dx, dy);
-  if(pointers.size >= 2){
-    prev.x = e.clientX;
-    prev.y = e.clientY;
-    applyTwist();
-  } else if(dist > 3){
-    const head = Math.atan2(dy, dx) * 180 / Math.PI;
-    const want = head + 90;
-    state.probe.spin += angleDelta(state.probe.spin, want);
-    prev.heading = head;
-    prev.x = e.clientX;
-    prev.y = e.clientY;
-    foldSpin();
-  } else {
-    prev.x = e.clientX;
-    prev.y = e.clientY;
+  prev.x = e.clientX;
+  prev.y = e.clientY;
+  if(pointers.size > 1) return;
+  const c = chestPoint(e.clientX, e.clientY);
+  if(!onBody(c.x, c.y)){
+    plant = null;
+    liftProbe();
+    return;
   }
-  const point = primaryPoint();
-  moveProbe(point.x, point.y, true);
+  const dx = e.clientX - plant.x;
+  const dy = e.clientY - plant.y;
+  const dist = Math.hypot(dx, dy);
+  if(dist >= 8){
+    const want = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+    if(plant.ang == null){
+      plant.ang = want;
+      plant.base = state.probe.spin;
+      plant.unwrapped = want;
+      plant.rad = dist;
+    } else {
+      plant.unwrapped += angleDelta(plant.unwrapped, want);
+      const turned = Math.abs(plant.unwrapped - plant.ang);
+      const radial = Math.abs(dist - plant.rad);
+      if(turned > 12 && radial < 30 && dist < 96){
+        state.probe.spin = plant.base + (plant.unwrapped - plant.ang);
+      } else if(dist > 22){
+        state.probe.x = c.x;
+        state.probe.y = c.y;
+        plant = {x:e.clientX, y:e.clientY, ang:null, base:state.probe.spin, unwrapped:null};
+      }
+    }
+  }
+  state.probe.down = true;
+  state.probe.lift = 0;
+  seatProbe();
 });
-function liftProbe(){
-  state.probe.down = false;
-  state.probe.lift = 1;
-  state.probe.twistBase = null;
-  paintProbe();
-  paintStatus();
-}
 function endPointer(e){
   pointers.delete(e.pointerId);
-  state.probe.twistBase = null;
-  if(!pointers.size) liftProbe();
-  else {
-    const point = primaryPoint();
-    moveProbe(point.x, point.y, true);
+  if(pointers.size) return;
+  plant = null;
+  if(state.probe.down && onBody(state.probe.x, state.probe.y) && nearestWindow(state.probe.x, state.probe.y)){
+    state.probe.down = false;
+    state.probe.docked = true;
+    state.probe.lift = 0;
+    state.view = windowFrom();
+    paintProbe();
+    paintStatus();
+    syncProbeCopy();
+    return;
   }
+  liftProbe();
 }
 torso.addEventListener("pointerup", endPointer);
 torso.addEventListener("pointercancel", endPointer);
 document.getElementById("rot").addEventListener("input", function(){
-  state.probe.rot = Number(this.value);
   state.probe.spin = Number(this.value);
-  if(state.probe.down) state.view = windowFrom();
+  state.probe.rot = state.probe.spin;
+  if(state.probe.down || state.probe.docked) state.view = windowFrom();
   paintProbe(); paintStatus(); syncProbeCopy();
 });
 function jump(view){
   const p = PRESET[view];
   if(!p) return;
-  state.probe.x = p.x; state.probe.y = p.y; state.probe.rot = p.rot; state.probe.tilt = p.tilt; state.probe.spin = p.rot;
-  state.probe.down = true; state.probe.lift = 0;
+  state.probe.x = p.x;
+  state.probe.y = p.y;
+  state.probe.spin = p.spin;
+  state.probe.rot = normDeg(p.spin);
+  state.probe.down = false;
+  state.probe.docked = true;
+  state.probe.lift = 0;
   state.view = windowFrom();
   paintProbe(); paintStatus(); syncProbeCopy();
   if(!document.getElementById("probe-name")) renderSheet();
@@ -1271,7 +1230,7 @@ function jump(view){
 
 function paintStatus(){
   const meta = VIEW[state.view] || VIEW.off;
-  const touch = state.probe.down ? "Finger is the probe" : "Probe lifted";
+  const touch = state.probe.down ? "Finger is the probe" : state.probe.docked ? "Probe held on the marker" : "Probe lifted";
   const bits = [touch, meta.mark ? meta.name+" · "+meta.mark : meta.name];
   if(state.globalOn) bits.push("Global hypokinesia");
   else if(state.lesion!=="none") bits.push(lesionName()+" — "+territoryPhrase());
@@ -1400,7 +1359,7 @@ function teaching(){
   const see = meta.see.length ? " Visible structures: "+meta.see.join(", ")+"." : "";
   if(state.tab==="probe"){
     return "<p class='kicker'>Probe</p><h3 id='probe-name'>"+esc(meta.name)+"</h3><p id='probe-note'>"+esc(meta.note+see)+"</p>"+
-      "<p>Hold a finger on the chest. The probe sits under the fingertip. Lift the finger and the probe leaves the skin. Rotate and tilt change the window without sliding to a new rib space.</p>"+
+      "<p>Put a finger on a dashed window. The probe comes to the finger and follows it. Circle the finger without lifting and the probe turns through the same angle, and the window changes. Lift on a marker and the probe stays. Drag it off the body and it lifts away.</p>"+
       "<div class='bar' style='padding-left:0'>"+Object.keys(PRESET).map(function(id){
         return "<button type='button' data-jump='"+id+"'>"+esc(VIEW[id].name)+"</button>";
       }).join("")+"</div>"+
@@ -1583,7 +1542,7 @@ function releaseGraphics(){
 }
 document.getElementById("back").onclick = function(){
   releaseGraphics();
-  if(mode){ location.href = "echo-lab.html?v=20261030e"; return; }
+  if(mode){ location.href = "echo-lab.html?v=20261031r"; return; }
   try{
     if(window.parent && window.parent!==window && typeof window.parent.returnToIcu==="function"){
       window.parent.returnToIcu();
@@ -1595,7 +1554,7 @@ document.getElementById("back").onclick = function(){
 document.getElementById("doors").onclick = function(event){
   const btn = event.target.closest("[data-door]");
   if(!btn) return;
-  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261030c";
+  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261031r";
 };
 document.getElementById("tabs").innerHTML = TABS.map(function(tab){
   return "<button type='button' data-tab='"+tab[0]+"'>"+tab[1]+"</button>";
