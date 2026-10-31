@@ -866,7 +866,7 @@ function loadReal(id){
     });
     root.add(model);
     parts.forEach(function(mesh){ mesh.userData.home = mesh.position.clone(); });
-    if(id==="ett" || id==="lma") buildEttGuides(model);
+    if(id==="ett" || id==="lma" || id==="bvm") buildEttGuides(model);
     realModel = true;
     setEttStatus("", false);
     fit();
@@ -1029,11 +1029,27 @@ function lmaPartId(x, y, z){
 }
 function activeParts(){
   if(currentId==="lma") return LMA_PARTS;
+  if(currentId==="bvm") return BVM_PARTS;
   if(currentId==="ett") return ETT_PARTS;
   return null;
 }
 function activePartId(x, y, z){
-  return currentId==="lma" ? lmaPartId(x, y, z) : ettPartId(x, y, z);
+  if(currentId==="lma") return lmaPartId(x, y, z);
+  if(currentId==="bvm") return bvmPartId(x, y, z);
+  return ettPartId(x, y, z);
+}
+function bvmPartId(x, y, z){
+  if(z > -0.02 && x > -0.50 && x < 0.38) return "o2tube";
+  if(x < -0.62 && z > 0.02) return "mask";
+  if(x > -0.66 && x < -0.52 && z > -0.28 && z < -0.16) return "popoff";
+  if(x < -0.55 && z <= 0.02) return "expiratory";
+  if(x > 0.24 && z < 0.12) return "reservoir";
+  if(x > 0.02 && x < 0.26 && z > -0.34 && z < 0.05){
+    if(x < 0.14) return "inlet";
+    if(z > -0.14) return "socket";
+    return "release";
+  }
+  return "bag";
 }
 function ettPartId(x, y, z){
   if(x < -0.86) return "tip";
@@ -1055,6 +1071,17 @@ const LMA_PARTS = [
   {id:"line", title:"Inflation line", text:"The fine tube that carries air from the valve to the cuff."},
   {id:"pilot", title:"Pilot balloon", text:"The small balloon on the inflation line. It shows whether the cuff is inflated."},
   {id:"valve", title:"Valve", text:"A syringe fits here to inflate or deflate the cuff."}
+];
+const BVM_PARTS = [
+  {id:"mask", title:"Face mask", text:"The clear mask that seals over the nose and mouth."},
+  {id:"expiratory", title:"Expiratory valve", text:"The valve the patient breathes out through. It keeps expired gas out of the bag."},
+  {id:"popoff", title:"Pop-off valve", text:"A pressure-release valve. It opens if the pressure in the bag rises too high."},
+  {id:"bag", title:"Self-inflating bag", text:"The bag you squeeze to give a breath. It refills by itself."},
+  {id:"inlet", title:"Air-inlet one-way valve", text:"Lets room air into the bag when it refills, and stops the breath going back out that way."},
+  {id:"socket", title:"O2 reservoir socket", text:"The port where the oxygen tubing joins the reservoir."},
+  {id:"release", title:"Air-inlet and pressure release valves", text:"These sit by the reservoir. They let air in and let excess oxygen out."},
+  {id:"o2tube", title:"Oxygen tubing", text:"Carries oxygen from the flowmeter to the reservoir."},
+  {id:"reservoir", title:"Reservoir bag", text:"Stores oxygen so the breath you give is richer in oxygen."}
 ];
 function clearGuides(){
   if(!partGuides) return;
