@@ -866,7 +866,7 @@ function loadReal(id){
     });
     root.add(model);
     parts.forEach(function(mesh){ mesh.userData.home = mesh.position.clone(); });
-    try { if(id==="ett" || id==="lma" || id==="bvm" || id==="dl") buildEttGuides(model); } catch (err) {}
+    try { if(id==="ett" || id==="lma" || id==="bvm" || id==="dl" || id==="vl" || id==="defib") buildEttGuides(model); } catch (err) {}
     realModel = true;
     setEttStatus("", false);
     fit();
@@ -1032,6 +1032,8 @@ function activeParts(){
   if(currentId==="lma") return LMA_PARTS;
   if(currentId==="bvm") return BVM_PARTS;
   if(currentId==="dl") return DL_PARTS;
+  if(currentId==="vl") return VL_PARTS;
+  if(currentId==="defib") return DEFIB_PARTS;
   if(currentId==="ett") return ETT_PARTS;
   return null;
 }
@@ -1039,7 +1041,30 @@ function activePartId(x, y, z){
   if(currentId==="lma") return lmaPartId(x, y, z);
   if(currentId==="bvm") return bvmPartId(x, y, z);
   if(currentId==="dl") return scopePartId(x, y, z);
+  if(currentId==="vl") return vlPartId(x, y, z);
+  if(currentId==="defib") return defibPartId(x, y, z);
   return ettPartId(x, y, z);
+}
+function vlPartId(x, y, z){
+  if(y > 0.32) return "screen";
+  if(y > -0.52 && y < -0.26 && z > 0.40 && x > -0.05) return "hotkey";
+  if(y < -0.58 || (z < 0.18 && y < 0.05)) return "blade";
+  return "handle";
+}
+function defibPartId(x, y, z){
+  if(z > -0.02){
+    if(x < -0.30 && z < 0.52) return "paddles";
+    if(x > 0.32 && z < 0.50) return "paddles";
+    if(x > -0.40 && x < 0.08 && z > 0.22 && z < 0.68) return "pads";
+    return "padcable";
+  }
+  if(x < -0.55 && z > -0.58 && z < -0.32) return "padport";
+  if(x > -0.54 && x < -0.42 && z > -0.54 && z < -0.45) return "speaker";
+  if(x > -0.58 && x < -0.40 && z > -0.46 && z < -0.36) return "ecg";
+  if(x > -0.30 && x < 0.30 && z > -0.365 && z < -0.30) return "buttons";
+  if(x > 0.32 && x < 0.52 && z > -0.50 && z < -0.39) return "energy";
+  if(x > -0.28 && x < 0.26 && z > -0.52 && z < -0.35) return "screen";
+  return "case";
 }
 function scopePartId(x, y, z){
   if(x > 0.68 && y < 0.36) return "handle";
@@ -1126,6 +1151,24 @@ const DL_PARTS = [
   {id:"web", title:"Web", text:"The upright heel of the blade. It joins the tongue of the blade to the base."},
   {id:"base", title:"Base", text:"The block that hooks the blade onto the handle."},
   {id:"handle", title:"Handle", text:"The grip. It holds the batteries that power the lamp."}
+];
+const VL_PARTS = [
+  {id:"screen", title:"HD LCD display", text:"The wide-angle screen. It shows the view from the camera on the blade."},
+  {id:"hotkey", title:"Hotkey", text:"The button on the handle. Press it to take a photo or a short video."},
+  {id:"handle", title:"Non-slip handle", text:"The grip. Hold the laryngoscope here."},
+  {id:"blade", title:"Metal blade stand", text:"The curved metal stand. A disposable blade fits onto it."}
+];
+const DEFIB_PARTS = [
+  {id:"padport", title:"Paddle and pad connector", text:"The port where the paddle cable or the pad cable plugs in."},
+  {id:"ecg", title:"ECG connector", text:"The port for the ECG lead wires, so the rhythm can be monitored."},
+  {id:"speaker", title:"Speaker", text:"It gives the voice prompts and the alarms."},
+  {id:"screen", title:"Display screen", text:"It shows the ECG, the heart rate, and the energy selected."},
+  {id:"energy", title:"Energy selector", text:"Turn this dial to choose the shock energy, in joules."},
+  {id:"buttons", title:"Function buttons", text:"Power, menu, event, the arrows, and enter."},
+  {id:"paddles", title:"Paddles", text:"The handheld electrodes. They deliver the shock to the chest."},
+  {id:"pads", title:"Adhesive pads", text:"Self-adhesive electrodes. They stick to the chest and are used instead of the paddles."},
+  {id:"padcable", title:"Pad cable", text:"The cable that connects the adhesive pads to the defibrillator."},
+  {id:"case", title:"Defibrillator body", text:"The main unit that holds the screen, the dial, and the connectors."}
 ];
 function clearGuides(){
   if(!partGuides) return;
