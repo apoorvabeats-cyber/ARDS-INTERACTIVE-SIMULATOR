@@ -866,7 +866,7 @@ function loadReal(id){
     });
     root.add(model);
     parts.forEach(function(mesh){ mesh.userData.home = mesh.position.clone(); });
-    try { if(id==="ett" || id==="lma" || id==="bvm" || id==="dl" || id==="vl" || id==="defib") buildEttGuides(model); } catch (err) {}
+    try { if(id==="ett" || id==="lma" || id==="bvm" || id==="dl" || id==="vl" || id==="defib" || id==="o2tube" || id==="omask" || id==="suction") buildEttGuides(model); } catch (err) {}
     realModel = true;
     setEttStatus("", false);
     fit();
@@ -1034,6 +1034,9 @@ function activeParts(){
   if(currentId==="dl") return DL_PARTS;
   if(currentId==="vl") return VL_PARTS;
   if(currentId==="defib") return DEFIB_PARTS;
+  if(currentId==="o2tube") return CANNULA_PARTS;
+  if(currentId==="omask") return MASK_PARTS;
+  if(currentId==="suction") return NG_PARTS;
   if(currentId==="ett") return ETT_PARTS;
   return null;
 }
@@ -1043,6 +1046,9 @@ function activePartId(x, y, z){
   if(currentId==="dl") return scopePartId(x, y, z);
   if(currentId==="vl") return vlPartId(x, y, z);
   if(currentId==="defib") return defibPartId(x, y, z);
+  if(currentId==="o2tube") return cannulaPartId(x, y, z);
+  if(currentId==="omask") return maskPartId(x, y, z);
+  if(currentId==="suction") return ngPartId(x, y, z);
   return ettPartId(x, y, z);
 }
 function vlPartId(x, y, z){
@@ -1065,6 +1071,30 @@ function defibPartId(x, y, z){
   if(x > 0.32 && x < 0.52 && z > -0.50 && z < -0.39) return "energy";
   if(x > -0.28 && x < 0.26 && z > -0.52 && z < -0.35) return "screen";
   return "case";
+}
+function cannulaPartId(x, y, z){
+  if(y > 0.70 && x < -0.15) return "connector";
+  if(x > -0.76 && x < -0.50 && y > 0.32 && y < 0.46) return "prong";
+  if(x > -0.68 && x < -0.46 && y > -0.38 && y < -0.20) return "ring";
+  if(x > -0.70 && x < -0.54 && y > 0.45 && y < 0.54) return "inlet";
+  return "tubing";
+}
+function maskPartId(x, y, z){
+  if(x > -0.64 && x < -0.38 && y > 0.36 && y < 0.50) return "nose";
+  if(y > 0.08 && y < 0.30 && ((x > -0.74 && x < -0.60) || (x > -0.46 && x < -0.32))) return "ports";
+  if(y > -0.04 && y < 0.14 && (x < -0.72 || (x > -0.32 && x < -0.20))) return "buckle";
+  if(y > 0.54 && x > -0.90 && x < -0.15) return "strap";
+  if(x > -0.64 && x < -0.40 && y > -0.26 && y < -0.10) return "inlet";
+  if(x > 0.12 && x < 0.40 && y > 0.10 && y < 0.34) return "joint";
+  if(x > -0.80 && x < -0.18 && y > -0.24 && y < 0.58) return "body";
+  return "tubing";
+}
+function ngPartId(x, y, z){
+  if(x > -0.58 && x < -0.42 && z > -0.12 && z < 0.12) return "eye";
+  if(x > 0.32 && z > 0.78) return "port";
+  if(x > 0.50 && z > 0.68 && z < 0.80) return "port";
+  if(x > 0.28 && z > 0.58) return "colour";
+  return "tube";
 }
 function scopePartId(x, y, z){
   if(x > 0.68 && y < 0.36) return "handle";
@@ -1169,6 +1199,29 @@ const DEFIB_PARTS = [
   {id:"pads", title:"Adhesive pads", text:"Self-adhesive electrodes. They stick to the chest and are used instead of the paddles."},
   {id:"padcable", title:"Pad cable", text:"The cable that connects the adhesive pads to the defibrillator."},
   {id:"case", title:"Defibrillator body", text:"The main unit that holds the screen, the dial, and the connectors."}
+];
+const CANNULA_PARTS = [
+  {id:"prong", title:"Prong", text:"The two short tubes that sit in the nostrils."},
+  {id:"inlet", title:"Inlet connector", text:"It joins the prongs to the oxygen tubing."},
+  {id:"ring", title:"Regulating ring", text:"Slide this ring to tighten the loop under the chin."},
+  {id:"tubing", title:"PVC tubing", text:"It carries oxygen from the flowmeter to the prongs."},
+  {id:"connector", title:"Connector", text:"This end plugs into the oxygen flowmeter."}
+];
+const MASK_PARTS = [
+  {id:"body", title:"Oxygen mask body", text:"The clear mask that covers the nose and mouth."},
+  {id:"strap", title:"Elastic head strap", text:"It holds the mask comfortably on the face."},
+  {id:"buckle", title:"Adjustable strap connector", text:"It lets you tighten or loosen the strap."},
+  {id:"nose", title:"Nose bridge", text:"The metal strip that shapes the mask over the nose."},
+  {id:"ports", title:"Exhalation ports", text:"The holes through which exhaled air leaves the mask."},
+  {id:"inlet", title:"Oxygen inlet connector", text:"The oxygen tubing joins the mask here."},
+  {id:"tubing", title:"Oxygen tubing", text:"It carries oxygen from the source to the mask."},
+  {id:"joint", title:"Tubing connector joint", text:"It joins the lengths of oxygen tubing."}
+];
+const NG_PARTS = [
+  {id:"eye", title:"Lateral eye", text:"A side hole near the tip. The tube can still drain if the end lies against the stomach wall."},
+  {id:"port", title:"Drainage port with lock", text:"Open it to drain the stomach, or to give feed or medicine. Close the lock when it is not in use."},
+  {id:"colour", title:"Colour-coded connector", text:"The colour shows the size of the tube."},
+  {id:"tube", title:"PVC tubing", text:"Soft tubing that resists kinking. A radiopaque line runs in the wall, and length marks show how far the tube has been passed."}
 ];
 function clearGuides(){
   if(!partGuides) return;
