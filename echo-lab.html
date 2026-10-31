@@ -17,8 +17,9 @@ button{cursor:pointer;-webkit-appearance:none;appearance:none;background:#102028
 button:focus-visible,input:focus-visible{outline:2px solid var(--warm);outline-offset:2px}
 button.on{border-color:var(--warm);color:#fff8ee;background:#2a2118}
 a.go{color:var(--warm)}
-header{display:flex;gap:10px;align-items:center;padding:10px 12px 0}
+header{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px 0}
 header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:0;letter-spacing:-.03em}
+#hint{flex:1 1 180px;margin:0;color:var(--muted);font-size:13px;line-height:1.3}
 #status{margin:6px 12px 0;color:var(--warm);font-size:14px;line-height:1.35;min-height:1.35em}
 .bar{display:flex;gap:8px;overflow:auto;padding:8px 12px;-webkit-overflow-scrolling:touch}
 .bar button{flex:none;font-size:14px}
@@ -37,8 +38,6 @@ body.bust3d .patient{visibility:hidden}
 .shlab{display:none;position:absolute;z-index:2;margin:0;color:#e7f6fb;font-size:11px;pointer-events:none;transform:translate(-50%,-130%)}
 body.bust3d .shlab{display:block}
 #probe svg{width:40px;height:64px;display:block}
-#hint{position:absolute;left:8px;right:8px;top:8px;z-index:3;margin:0;padding:6px 8px;border-radius:10px;background:rgba(7,17,26,.78);color:var(--paper);font-size:13px;line-height:1.3;pointer-events:none}
-#hint.hide{opacity:0}
 #contact,#probe{position:absolute;pointer-events:none;z-index:3}
 #contact{width:28px;height:28px;border-radius:50%;border:2px solid #9fd4ff;box-shadow:0 0 12px rgba(120,190,255,.8);left:calc(var(--x) * 1%);top:calc(var(--y) * 1%);transform:translate(-50%,-50%);opacity:0}
 #contact.on{opacity:1}
@@ -85,8 +84,8 @@ body.doors #doors span{margin-top:8px;color:var(--muted);font-size:14px;line-hei
 }
 body.doors .stage,body.doors #tabs,body.doors #lesions,body.doors #phases,body.doors #status,body.doors .sheet{display:none}
 body.supply #legend,body.doors #legend,body.doors #views,body.supply #views{display:none}
-#views{padding-top:0}
-#views button{font-size:13px}
+body.sim #views{flex-wrap:wrap;overflow:visible}
+body.sim #views button{min-height:36px;padding:0 8px}
 body.sim #tabs,body.sim #lesions,body.sim #phases,body.sim .sheet,body.sim .caption,body.sim #ecg,body.supply #echo,body.supply [aria-label="Patient and probe"]{display:none}
 body.sim .stage{grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr)}
 body.sim .scan{grid-column:1;grid-row:1}
@@ -107,6 +106,7 @@ body.supply #ecg{height:240px}
 <header>
   <button type="button" id="back">Back to ICU</button>
   <h1>Echo bay</h1>
+  <p id="hint">The finger is the probe. Circle without lifting and it turns. Lift off the body and it comes away.</p>
 </header>
 <section id="doors" aria-label="Echo bay doors">
   <button type="button" data-door="supply"><b>Heart and supply</b><span>Four vessels, the lesion, and the trace.</span></button>
@@ -152,7 +152,6 @@ body.supply #ecg{height:240px}
         <ellipse id="z-ssn" cx="50" cy="29" rx="6.5" ry="4.2" fill="none" stroke="rgba(80,60,40,.45)" stroke-dasharray="1.4 1.1"/>
         <ellipse id="z-ivc" cx="37" cy="78" rx="7" ry="5" fill="none" stroke="rgba(80,60,40,.45)" stroke-dasharray="1.4 1.1"/>
       </svg>
-      <p id="hint">Tap a window and the probe sits there. Circle the finger without lifting and the probe turns with it. It does not slide. Lift on the marker and it stays. Drag far off the body and it lifts away.</p>
       <div id="contact"></div>
       <div id="probe" aria-hidden="true">
         <span class="nib" title="Probe pointer"></span>
@@ -1166,9 +1165,20 @@ if(mode==="sim" && bust){
   const bustKey = new THREE.DirectionalLight(0xfff6ee, 1.25);
   bustKey.position.set(0.4, 1.8, 2);
   bustScene.add(bustKey);
-  bustCam = new THREE.PerspectiveCamera(26, 1, 0.02, 20);
-  bustCam.position.set(0, 1.40, 1.35);
-  bustCam.lookAt(0, 1.38, 0);
+  bustCam = new THREE.PerspectiveCamera(28, 1, 0.02, 20);
+  function fitBust(){
+    const w = bust.clientWidth, h = bust.clientHeight;
+    if(!bustCam || w < 2 || h < 2) return;
+    bustCam.aspect = w / h;
+    const halfH = 0.40;
+    const halfW = 0.34;
+    const vFov = THREE.MathUtils.degToRad(bustCam.fov);
+    const tan = Math.tan(vFov / 2);
+    const dist = Math.max(halfH / tan, halfW / (tan * bustCam.aspect)) * 1.12;
+    bustCam.position.set(0, 1.38, dist);
+    bustCam.lookAt(0, 1.38, 0);
+    bustCam.updateProjectionMatrix();
+  }
   const clip = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.05);
   const skinNames = { body: 1, eyes: 1, irises: 1, pupils: 1 };
   new GLTFLoader().load("models/anatomy/human-reference.glb", function(gltf){
@@ -1203,10 +1213,11 @@ if(mode==="sim" && bust){
   function drawBust(){
     const w = bust.clientWidth, h = bust.clientHeight;
     if(w > 2 && h > 2){
-      if(bust.width !== Math.floor(w * bustRenderer.getPixelRatio()) || bust.height !== Math.floor(h * bustRenderer.getPixelRatio())){
+      const pw = Math.floor(w * bustRenderer.getPixelRatio());
+      const ph = Math.floor(h * bustRenderer.getPixelRatio());
+      if(bust.width !== pw || bust.height !== ph){
         bustRenderer.setSize(w, h, false);
-        bustCam.aspect = w / h;
-        bustCam.updateProjectionMatrix();
+        fitBust();
       }
       bustRenderer.render(bustScene, bustCam);
     }
@@ -1243,8 +1254,6 @@ function paintProbe(){
   contactEl.style.top = top+"px";
   contactEl.style.transform = "translate(-50%,-50%)";
   contactEl.classList.toggle("on", p.down || p.docked);
-  const hint = document.getElementById("hint");
-  if(hint) hint.classList.toggle("hide", p.down || p.docked);
   document.getElementById("rot").value = String(Math.round(normDeg(p.spin)));
   const meta = VIEW[state.view] || VIEW.off;
   document.getElementById("viewtitle").textContent = meta.mark ? meta.name+" · "+meta.mark : meta.name;
@@ -1752,7 +1761,7 @@ function releaseGraphics(){
 }
 document.getElementById("back").onclick = function(){
   releaseGraphics();
-  if(mode){ location.href = "echo-lab.html?v=20261101d"; return; }
+  if(mode){ location.href = "echo-lab.html?v=20261101e"; return; }
   try{
     if(window.parent && window.parent!==window && typeof window.parent.returnToIcu==="function"){
       window.parent.returnToIcu();
@@ -1764,7 +1773,7 @@ document.getElementById("back").onclick = function(){
 document.getElementById("doors").onclick = function(event){
   const btn = event.target.closest("[data-door]");
   if(!btn) return;
-  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261101d";
+  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261101e";
 };
 document.getElementById("tabs").innerHTML = TABS.map(function(tab){
   return "<button type='button' data-tab='"+tab[0]+"'>"+tab[1]+"</button>";
