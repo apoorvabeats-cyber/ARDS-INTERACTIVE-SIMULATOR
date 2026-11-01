@@ -16,6 +16,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 header{padding:12px 14px 0}
 h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:28px;letter-spacing:-.03em;margin:0}
 .lede{margin:6px 0 0;color:var(--muted);line-height:1.4}
+.find{padding:10px 14px 0}
+.find input{margin:0}
 .mods,.list{display:flex;gap:8px;overflow:auto;padding:10px 14px;-webkit-overflow-scrolling:touch}
 .mods button,.list button{flex:none;font-size:14px;text-align:left}
 .card{margin:0 14px 18px;padding:12px;border:1px solid var(--line);border-radius:16px;background:#0c141c}
@@ -44,6 +46,7 @@ table.grid th{width:34%;color:var(--cool);font-weight:650;border-right:1px solid
   <h1>Formulas</h1>
   <p class="lede">Enter the values from the case, or your own. The result, the reading, and the abbreviations update together.</p>
 </header>
+<div class="find"><input id="find" type="search" placeholder="Search a formula" autocomplete="off" enterkeyhint="search"></div>
 <div class="mods" id="mods"></div>
 <div class="list" id="list"></div>
 <article class="card" id="card"></article>
@@ -525,6 +528,121 @@ const F = [
       else if(b<30) read = "25–29.9. This is in the overweight range.";
       read += " In critical care, some drug and ventilator calculations use ideal or adjusted weight instead.";
       return {value:round(b,1)+" kg/m²", work:v.wt+" / "+round(m,2)+"²", read:read};
+    }},
+  {id:"ibw", mod:"drug", name:"Ideal body weight",
+    expr:"Men: 50 + 2.3 × (inches − 60). Women: 45.5 + 2.3 × (inches − 60).",
+    abbr:[["IBW","Ideal body weight, Devine formula"]],
+    case:"Woman, height 170 cm.",
+    inputs:[["sex","Sex","","female"],["ht","Height","cm","170"]],
+    run:function(v){
+      const inches = (v.ht>3 ? v.ht : v.ht*100)/2.54;
+      const over = inches-60;
+      const base = v.sex==="male" ? 50 : 45.5;
+      const ibw = base + 2.3*Math.max(0, over);
+      return {value:round(ibw,1)+" kg", work:base+" + 2.3 × "+round(Math.max(0, over),1),
+        read: over<0 ? "The Devine formula starts at 60 inches. Below that, do not use this number." : "Use about 6 to 8 mL per kg of this weight for a tidal volume. It is not the measured weight."};
+    }},
+  {id:"abw", mod:"drug", name:"Adjusted body weight",
+    expr:"Adjusted weight = ideal weight + 0.4 × (actual weight − ideal weight)",
+    abbr:[["IBW","Ideal body weight"],["ABW","Adjusted body weight"]],
+    case:"Man, 170 cm, actual weight 110 kg.",
+    inputs:[["sex","Sex","","male"],["ht","Height","cm","170"],["wt","Actual weight","kg","110"]],
+    run:function(v){
+      const inches = (v.ht>3 ? v.ht : v.ht*100)/2.54;
+      const base = v.sex==="male" ? 50 : 45.5;
+      const ibw = base + 2.3*Math.max(0, inches-60);
+      const adj = ibw + 0.4*(v.wt-ibw);
+      const used = v.wt>ibw ? adj : v.wt;
+      return {value:round(used,1)+" kg", work:"Ideal "+round(ibw,1)+" kg",
+        read: v.wt>ibw ? "Use this for some hydrophilic drugs when the actual weight is well above the ideal weight. Do not use it for the tidal volume." : "Actual weight is not above the ideal weight, so the adjusted weight is not used."};
+    }},
+  {id:"ve", mod:"vent", name:"Minute ventilation",
+    expr:"Minute ventilation = respiratory rate × tidal volume",
+    abbr:[["VE","Minute ventilation"],["VT","Tidal volume"]],
+    case:"Rate 16, tidal volume 480 mL.",
+    inputs:[["rr","Respiratory rate","breaths/min","16"],["vt","Tidal volume","mL","480"]],
+    run:function(v){
+      const vt = v.vt>10 ? v.vt/1000 : v.vt;
+      const ve = v.rr*vt;
+      return {value:round(ve,2)+" L/min", work:v.rr+" × "+round(vt,3)+" L",
+        read:"A rising minute ventilation is the work the patient, or the ventilator, is doing to clear carbon dioxide."};
+    }},
+  {id:"aa", mod:"vent", name:"A-a oxygen gradient",
+    expr:"PAO₂ = FiO₂ × (barometric pressure − 47) − PaCO₂ / 0.8. Gradient = PAO₂ − PaO₂.",
+    abbr:[["PAO₂","Alveolar oxygen tension"],["PaO₂","Arterial oxygen tension"],["A-a","Alveolar–arterial oxygen gradient"]],
+    case:"FiO₂ 0.21, PaCO₂ 40, PaO₂ 80, age 60, barometric pressure 760.",
+    inputs:[["fio","FiO₂","fraction or %","0.21"],["paco2","PaCO₂","mmHg","40"],["pao2","PaO₂","mmHg","80"],["age","Age","years","60"],["patm","Barometric pressure, optional","mmHg","760"]],
+    run:function(v){
+      const f = fio2(v.fio);
+      const bar = v.patm==null ? 760 : v.patm;
+      const alveolar = f.v*(bar-47) - v.paco2/0.8;
+      const gap = alveolar - v.pao2;
+      const expected = v.age/4 + 4;
+      return {value:round(gap,0)+" mmHg", work:"Alveolar "+round(alveolar,0)+". Expected about "+round(expected,0)+". "+f.note,
+        read: gap>expected+15 ? "The gradient is wider than expected for the age. The problem is in the lung or the circulation through it." : "The gradient is close to the age-expected value. A low PaO₂ here is more likely hypoventilation or a low inspired oxygen."};
+    }},
+  {id:"caca", mod:"abg", name:"Corrected calcium",
+    expr:"Corrected calcium = measured calcium + 0.8 × (4 − albumin)",
+    abbr:[["Albumin","Serum albumin"]],
+    case:"Calcium 7.8 mg/dL, albumin 2.2 g/dL.",
+    inputs:[["ca","Measured calcium","mg/dL","7.8"],["alb","Albumin","g/dL","2.2"]],
+    run:function(v){
+      const c = v.ca + 0.8*(4-v.alb);
+      return {value:round(c,2)+" mg/dL", work:v.ca+" + 0.8 × (4 − "+v.alb+")",
+        read:"Use this when the albumin is low and the calcium is reported in mg/dL. An ionised calcium is better if you have it."};
+    }},
+  {id:"ogap", mod:"abg", name:"Osmolar gap",
+    expr:"Gap = measured osmolality − (2 × sodium + glucose/18 + urea nitrogen/2.8)",
+    abbr:[["Osmolar gap","Measured minus calculated osmolality"]],
+    case:"Osmolality 320, sodium 140, glucose 180 mg/dL, urea nitrogen 28 mg/dL.",
+    inputs:[["osm","Measured osmolality","mOsm/kg","320"],["na","Sodium","mmol/L","140"],["glu","Glucose","mg/dL","180"],["bun","Urea nitrogen","mg/dL","28"]],
+    run:function(v){
+      const calc = 2*v.na + v.glu/18 + v.bun/2.8;
+      const gap = v.osm - calc;
+      return {value:round(gap,0)+" mOsm/kg", work:"Calculated "+round(calc,0),
+        read: gap>10 ? "Above about 10. Look for an unmeasured osmole: alcohol, a glycol, or mannitol." : "About 10 or less. A large unmeasured osmole is unlikely."};
+    }},
+  {id:"o2er", mod:"haem", name:"Oxygen extraction ratio",
+    expr:"Extraction = (SaO₂ − SvO₂) / SaO₂",
+    abbr:[["SaO₂","Arterial oxygen saturation"],["SvO₂","Mixed venous oxygen saturation"]],
+    case:"Arterial saturation 98 percent, mixed venous saturation 70 percent.",
+    inputs:[["sao","SaO₂","%","98"],["svo","SvO₂","%","70"]],
+    run:function(v){
+      const r = (v.sao-v.svo)/v.sao;
+      return {value:round(r*100,0)+" %", work:"("+v.sao+" − "+v.svo+") / "+v.sao,
+        read: r>0.35 ? "Above about 30 to 35 percent. Delivery is low for the demand, or the tissues are extracting more." : "About 25 to 30 percent is the usual extraction."};
+    }},
+  {id:"papi", mod:"haem", name:"Pulmonary artery pulsatility index",
+    expr:"PAPi = (systolic pulmonary pressure − diastolic pulmonary pressure) / right atrial pressure",
+    abbr:[["PAPi","Pulmonary artery pulsatility index"],["RAP","Right atrial pressure"]],
+    case:"Pulmonary artery 40 over 18, right atrial pressure 16.",
+    inputs:[["spap","Pulmonary artery systolic pressure","mmHg","40"],["dpap","Pulmonary artery diastolic pressure","mmHg","18"],["rap","Right atrial pressure","mmHg","16"]],
+    run:function(v){
+      const p = (v.spap-v.dpap)/v.rap;
+      return {value:round(p,2), work:"("+v.spap+" − "+v.dpap+") / "+v.rap,
+        read: p<1 ? "Under about 1. The right ventricle is struggling against its load." : "About 1 or more. Read it with the cardiac output, not alone."};
+    }},
+  {id:"mpow", mod:"vent", name:"Mechanical power",
+    expr:"Power = 0.098 × rate × tidal volume × (peak pressure − driving pressure / 2)",
+    abbr:[["Driving pressure","Plateau pressure minus PEEP"],["PEEP","Positive end-expiratory pressure"]],
+    case:"Rate 18, tidal volume 480 mL, peak 28, plateau 22, PEEP 8.",
+    inputs:[["rr","Respiratory rate","breaths/min","18"],["vt","Tidal volume","mL","480"],["peak","Peak pressure","cmH₂O","28"],["pplat","Plateau pressure","cmH₂O","22"],["peep","PEEP","cmH₂O","8"]],
+    run:function(v){
+      const vt = v.vt>10 ? v.vt/1000 : v.vt;
+      const dp = v.pplat-v.peep;
+      const power = 0.098*v.rr*vt*(v.peak - dp/2);
+      return {value:round(power,1)+" J/min", work:"Driving pressure "+round(dp,1),
+        read: power>17 ? "Above about 17 J/min has been linked with higher mortality. It is a warning, not a setting to chase." : "Under about 17 J/min in the studies that used this cut-off."};
+    }},
+  {id:"qtc", mod:"echo", name:"Corrected QT interval",
+    expr:"QTc = QT / square root of (60 / heart rate)",
+    abbr:[["QTc","QT corrected by the Bazett formula"],["QT","Measured QT interval"]],
+    case:"QT 420 ms, heart rate 80.",
+    inputs:[["qt","QT interval","ms","420"],["hr","Heart rate","beats/min","80"]],
+    run:function(v){
+      const qtc = v.qt/Math.sqrt(60/v.hr);
+      return {value:round(qtc,0)+" ms", work:v.qt+" / √(60 / "+v.hr+")",
+        read: qtc>=500 ? "500 ms or more. The risk of torsades is high. Look for a drug or an electrolyte cause." : qtc>=460 ? "Above about 460 ms. Prolonged. Check potassium, magnesium and the drug list." : "Under about 460 ms by this formula."};
     }}
 ];
 [
@@ -758,9 +876,112 @@ const F = [
 const mods = document.getElementById("mods");
 const list = document.getElementById("list");
 const card = document.getElementById("card");
+const findEl = document.getElementById("find");
 let mod = "haem";
 let current = "map";
+let query = "";
+let spokenId = "";
+let speakTimer = 0;
 function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return "&#"+c.charCodeAt(0)+";"; }); }
+function sayable(s){
+  return String(s||"")
+    .replace(/PaO₂\/FiO₂/gi,"P to F ratio")
+    .replace(/×/g," times ")
+    .replace(/²/g," squared")
+    .replace(/√/g," square root of ")
+    .replace(/−|–/g," ")
+    .replace(/µ/g," micro")
+    .replace(/≥/g," at least ")
+    .replace(/≤/g," at most ");
+}
+function femaleVoice(){
+  if(!window.speechSynthesis) return null;
+  const voices = speechSynthesis.getVoices() || [];
+  const soft = /samantha|karen|moira|fiona|tessa|serena|victoria|allison|ava|nicky|veena|heera|sonia|catherine|libby|susan|siri|google uk english female|female/i;
+  const male = /\bmale\b|alex|daniel|fred|rishi|aaron|arthur|gordon|oliver|ralph|reed|rocko|\btom\b|david|james|albert|bruce|junior|nathan|lee|ravi/i;
+  function label(voice){ return (voice.name || "") + " " + (voice.voiceURI || ""); }
+  const en = voices.filter(function(voice){ return /^en/i.test(voice.lang || "") && !male.test(label(voice)); });
+  return en.find(function(voice){ return soft.test(label(voice)); })
+    || voices.find(function(voice){ return soft.test(label(voice)) && !male.test(label(voice)); })
+    || en[0]
+    || null;
+}
+function soundAllowed(){
+  try{
+    if(window.parent && window.parent !== window){
+      const btn = window.parent.document.getElementById("sound");
+      if(btn) return btn.getAttribute("aria-pressed") !== "false";
+    }
+  }catch(err){}
+  return true;
+}
+function spokenPoints(rows){
+  if(!rows || !rows.length || (rows.length===1 && rows[0][0]==="No classification")) return "No classification.";
+  const out = [];
+  let i = 0;
+  while(i<rows.length){
+    const bits = [rows[i][1]];
+    let j = i+1;
+    while(j<rows.length && rows[j][0]===rows[i][0]){ bits.push(rows[j][1]); j++; }
+    out.push(rows[i][0]+". "+bits.join(". "));
+    i = j;
+  }
+  return out.join(". ");
+}
+function speakNow(text){
+  if(!soundAllowed() || !text || !window.speechSynthesis) return;
+  const utterance = new SpeechSynthesisUtterance(sayable(text));
+  utterance.rate = 0.9;
+  utterance.pitch = 1.08;
+  const go = function(){
+    const voice = femaleVoice();
+    if(voice){ utterance.voice = voice; utterance.lang = voice.lang || "en-GB"; }
+    else utterance.lang = "en-GB";
+    speechSynthesis.resume();
+    speechSynthesis.speak(utterance);
+  };
+  if(speechSynthesis.speaking || speechSynthesis.pending){
+    speechSynthesis.cancel();
+    setTimeout(go, 80);
+  } else go();
+}
+function speakCard(f){
+  if(!f) return;
+  let text;
+  if(f.kind==="crit"){
+    text = f.name+". Formula. "+spokenPoints(f.formula)+". Diagnostic criteria. "+spokenPoints(f.diagnostic)+". Classification. "+spokenPoints(f.classification)+". Clinical use. "+spokenPoints(f.application)+".";
+  } else {
+    const keys = (f.abbr||[]).map(function(pair){ return pair[0]+" means "+pair[1]; }).join(". ");
+    text = f.name+". "+f.expr+". "+keys;
+  }
+  speakNow(text);
+}
+function queueSpeak(f){
+  clearTimeout(speakTimer);
+  if(window.speechSynthesis) speechSynthesis.cancel();
+  speakTimer = setTimeout(function(){ speakCard(f); }, 400);
+}
+if(window.speechSynthesis){
+  speechSynthesis.getVoices();
+  speechSynthesis.addEventListener("voiceschanged", function(){ speechSynthesis.getVoices(); });
+}
+window.addEventListener("pagehide", function(){ if(window.speechSynthesis) speechSynthesis.cancel(); });
+function pool(){
+  return F.filter(function(f){ return mod==="crit" ? f.kind==="crit" : f.kind!=="crit"; });
+}
+function ranked(q){
+  const s = q.trim().toLowerCase();
+  if(!s) return [];
+  return pool().filter(function(f){
+    const blob = (f.name+" "+(f.expr||"")+" "+(f.abbr||[]).map(function(a){ return a[0]+" "+a[1]; }).join(" ")).toLowerCase();
+    return blob.indexOf(s)>=0;
+  }).sort(function(a,b){
+    const as = a.name.toLowerCase().indexOf(s)===0 ? 0 : 1;
+    const bs = b.name.toLowerCase().indexOf(s)===0 ? 0 : 1;
+    if(as!==bs) return as-bs;
+    return a.name.length-b.name.length;
+  });
+}
 function paintMods(){
   if(mod==="crit"){ mods.innerHTML = ""; mods.hidden = true; return; }
   mods.hidden = false;
@@ -769,7 +990,12 @@ function paintMods(){
   }).join("");
 }
 function paintList(){
-  list.innerHTML = F.filter(function(f){ return f.mod===mod; }).map(function(f){
+  const rows = query.trim() ? ranked(query) : F.filter(function(f){ return f.mod===mod; });
+  if(!rows.length){
+    list.innerHTML = "<p class='none'>No match.</p>";
+    return;
+  }
+  list.innerHTML = rows.map(function(f){
     return "<button type='button' data-id='"+f.id+"'"+(f.id===current?" class='on'":"")+">"+esc(f.name)+"</button>";
   }).join("");
 }
@@ -816,6 +1042,7 @@ function paintCard(){
       "<div class='sect'><b>Diagnostic criteria</b>"+tableOf(f.diagnostic)+"</div>"+
       "<div class='sect'><b>Classification</b>"+tableOf(f.classification)+"</div>"+
       "<div class='sect'><b>Clinical application</b>"+tableOf(f.application)+"</div>";
+    noteVoice(f);
     return;
   }
   const fields = f.inputs.map(function(inp){
@@ -836,6 +1063,12 @@ function paintCard(){
     el.addEventListener("input", calc);
   });
   calc();
+  noteVoice(f);
+}
+function noteVoice(f){
+  if(!f || spokenId===f.id) return;
+  spokenId = f.id;
+  queueSpeak(f);
 }
 function calc(){
   const f = F.find(function(x){ return x.id===current; });
@@ -855,9 +1088,24 @@ function calc(){
     (res.note ? "<p class='work'>"+esc(res.note)+"</p>" : "")+
     "<p class='read'>"+esc(res.read||"")+"</p>";
 }
+function openFound(f, now){
+  current = f.id;
+  if(f.kind!=="crit") mod = f.mod;
+  if(now) spokenId = f.id;
+  if(mod!=="crit") paintMods();
+  paintList();
+  paintCard();
+  if(now){
+    clearTimeout(speakTimer);
+    speakCard(f);
+  }
+}
 mods.onclick = function(e){
   const btn = e.target.closest("[data-mod]");
   if(!btn) return;
+  query = "";
+  findEl.value = "";
+  spokenId = "";
   mod = btn.getAttribute("data-mod");
   const first = F.find(function(f){ return f.mod===mod; });
   current = first.id;
@@ -867,8 +1115,33 @@ list.onclick = function(e){
   const btn = e.target.closest("[data-id]");
   if(!btn) return;
   current = btn.getAttribute("data-id");
+  spokenId = "";
+  const chosen = F.find(function(f){ return f.id===current; });
+  if(chosen && chosen.kind!=="crit") mod = chosen.mod;
   paintList(); paintCard();
 };
+findEl.addEventListener("input", function(){
+  query = findEl.value;
+  const rows = ranked(query);
+  const q = query.trim().toLowerCase();
+  if(q && rows.length){
+    const starts = rows.filter(function(f){ return f.name.toLowerCase().indexOf(q)===0; });
+    const pick = starts.length===1 ? starts[0] : (rows.length===1 ? rows[0] : null);
+    if(pick){
+      current = pick.id;
+      if(pick.kind!=="crit") mod = pick.mod;
+    }
+  }
+  if(mod!=="crit") paintMods();
+  paintList();
+  paintCard();
+});
+findEl.addEventListener("keydown", function(e){
+  if(e.key!=="Enter") return;
+  e.preventDefault();
+  const rows = ranked(query);
+  if(rows[0]) openFound(rows[0], true);
+});
 const asked = new URLSearchParams(location.search).get("mod");
 if(asked && F.some(function(f){ return f.mod===asked; })){
   mod = asked;
@@ -876,6 +1149,7 @@ if(asked && F.some(function(f){ return f.mod===asked; })){
   if(mod==="crit"){
     document.querySelector("h1").textContent = "Criterias";
     document.querySelector(".lede").textContent = "Choose a score. The cut-offs are in the table.";
+    findEl.placeholder = "Search a criteria";
   }
 }
 paintMods(); paintList(); paintCard();
