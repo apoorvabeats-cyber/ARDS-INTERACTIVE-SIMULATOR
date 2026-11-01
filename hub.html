@@ -394,7 +394,7 @@ body.hud3d.icu-open .rail-tabs button:nth-child(2){top:23%;left:3.6%;animation-d
 body.hud3d.icu-open .rail-tabs button:nth-child(3){top:34%;left:6%;animation-delay:.18s}
 body.hud3d.icu-open .rail-tabs button:nth-child(4){top:45%;left:8.4%;animation-delay:.27s}
 body.hud3d.icu-open .rail-tabs button:nth-child(5){top:56%;left:10.8%;animation-delay:.36s}
-body.hud3d.icu-open .rail-tabs button:nth-child(6){top:67%;left:13.2%;animation-delay:.45s}
+body.hud3d.icu-open .rail-tabs button:nth-child(6){top:67%;left:13.2%;animation-delay:.45s;width:24%;font-size:clamp(8px,1vw,12px);line-height:1.05;white-space:normal}
 body.hud3d.icu-open .rail-tabs button:nth-child(7){top:78%;left:15.6%;animation-delay:.54s}
 body.hud3d.icu-open.tabs-in .rail-tabs button{animation:none;opacity:1;transform:none}
 @keyframes tabSlide{from{opacity:0;transform:translateX(-60px)}to{opacity:1;transform:translateX(0)}}
@@ -504,7 +504,7 @@ body.icu-gate #icu-gate button{appearance:none;-webkit-appearance:none;min-heigh
         <button type="button" data-tab="drugs">Drugs and doses</button>
         <button type="button" data-tab="formulas">Formulas</button>
         <button type="button" data-tab="test">Test the brain</button>
-        <button type="button" data-tab="abg">ABG photo</button>
+        <button type="button" data-tab="abg">ABG photo simulator</button>
         <button type="button" data-tab="pocus">POCUS</button>
       </nav>
       <nav class="bubbles" id="organ-bubbles" hidden></nav>
@@ -580,7 +580,7 @@ const ORGANS = [
       ["ARDS ventilator","PEEP, prone position, driving pressure and rescue.","ARDS_Active_Simulator.html?v=20260925s"],
       ["COPD and asthma","Bronchodilator, the ventilator and the ICU pathway.","COPD_Asthma_V11_CASE_DRIVEN_CHECKED.html?v=20260925s"],
       ["COPD versus ARDS","An atlas of the two patterns.","COPD_vs_ARDS_Interactive_Atlas_NATIVE.html?v=20260925s"],
-      ["ABG photo","Photograph a report. The six-step reading is done for you.","ABG_Photo_Interpreter_Simulator.html?v=20260925s"]
+      ["ABG photo simulator","Photograph a report. The six-step reading is done for you. The criteria list sits in the same tab.","ABG_Photo_Interpreter_Simulator.html?v=20260925s"]
     ],
     practice:[
       ["Mechanical ventilation","Pressure, flow and volume. Name the pattern.","Ventilator_Waveform_Troubleshooting.html?v=20260925s"],
@@ -2068,7 +2068,7 @@ function renderTest(){
     speakMcq((mcqPicked===q.answer ? "Correct. " : "That is incorrect. The correct answer is "+answerText+". ") + q.explain);
   } else speakMcq(q.stem);
 }
-function renderAbg(){
+function renderAbg(which){
   stopSpoken();
   finishIntro();
   setSpin(false);
@@ -2076,10 +2076,20 @@ function renderAbg(){
   inside = null;
   document.body.classList.add("in","enter");
   document.body.classList.remove("inside","lab","arena","osce","reference","opening","scanning","doors");
+  const view = which==="crit" ? "crit" : "photo";
+  const frame = view==="crit"
+    ? '<iframe class="abg-frame" title="Criteria" src="formulas.html?mod=crit&v=20261101g" style="min-height:78dvh"></iframe>'
+    : '<iframe class="abg-frame" title="ABG photo simulator" src="ABG_Photo_Interpreter_Simulator.html?embed=1&v=20261023g" allow="camera"></iframe>';
   room.innerHTML =
     '<button type="button" class="back" id="back">Back to the body</button>'+
-    '<iframe class="abg-frame" title="ABG photo interpreter" src="ABG_Photo_Interpreter_Simulator.html?embed=1&v=20261023g" allow="camera"></iframe>';
+    '<h2>ABG photo simulator</h2>'+
+    '<div class="parts">'+
+      '<button type="button" id="abg-photo"'+(view==="photo"?' class="on"':'')+'>Photo</button>'+
+      '<button type="button" id="abg-crit"'+(view==="crit"?' class="on"':'')+'>Criteria</button>'+
+    '</div>'+frame;
   document.getElementById("back").onclick = closePage;
+  document.getElementById("abg-photo").onclick = function(){ renderAbg("photo"); };
+  document.getElementById("abg-crit").onclick = function(){ renderAbg("crit"); };
   room.scrollTop = 0;
 }
 function openRail(which){
@@ -2104,8 +2114,8 @@ function openRail(which){
       '<a class="card" href="IDSA_Antibiotic_Selection_Simulator.html?v=20261029a"><b>Enzymes</b><span>KPC, OXA-48, NDM and the other carbapenemases. The dose follows the enzyme.</span></a>';
   }else if(which==="formulas"){
     title = "Formulas";
-    lede = "Forty bedside formulas. Enter the values. The result and the abbreviations sit under the formula.";
-    bodyHtml = '<iframe class="abg-frame" title="Critical care formulas" src="formulas.html?v=20261101f" style="min-height:82dvh"></iframe>';
+    lede = "Forty bedside formulas, and the named criteria. Enter the values. The result and the abbreviations sit under the formula.";
+    bodyHtml = '<iframe class="abg-frame" title="Critical care formulas" src="formulas.html?v=20261101g" style="min-height:82dvh"></iframe>';
   }
   const toIcu = which==="osce";
   room.innerHTML =
