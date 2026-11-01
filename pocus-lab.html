@@ -92,14 +92,14 @@ const SHOTS = {
   consol:{title:"Consolidation", src:"pocus/consol.jpg", motion:"shimmer", labels:[["Lung",48,48,16,40],["Air",58,55,84,62]], note:"The lung looks like tissue. Bright branches are air bronchograms."},
   fluid:{title:"Free fluid, Morrison's pouch", src:"pocus/morrison.jpg", labels:[["Liver",40,38,16,30],["FF",52,52,84,46],["Kid",62,64,84,72]], note:"The black stripe between liver and kidney is free fluid. A normal liver on this view does not clear the rest of the abdomen."},
   bladder:{title:"Bladder", src:"pocus/bladder.jpg", labels:[["Bladder",48,48,16,40],["Balloon",55,58,84,66]], note:"Anechoic bladder. The round bright structure is the catheter balloon."},
-  onsd:{title:"Optic nerve sheath", src:"pocus/onsd.jpg", labels:[["Globe",30,52,14,28],["3mm",46,40,46,16],["ONS",64,48,86,30]], note:"Closed eyelid, transverse. The black circle is the globe. The dark track is the optic nerve sheath. Measure it 3 mm behind the globe. More than 5 mm in an adult raises concern for raised intracranial pressure. This still is not a caliper reading."},
+  onsd:{title:"Optic nerve sheath", src:"pocus/onsd.jpg", labels:[["Globe",28,50,12,30],["ONS",66,46,84,28]], note:"Closed eyelid, transverse. The black circle is the globe. The dark track is the optic nerve sheath. The amber marks are 3 mm behind the globe, where the sheath diameter is measured. More than 5 mm in an adult raises concern for raised intracranial pressure. This still is not a caliper reading on a real patient."},
   inguinal:{title:"Right groin, before compression", src:"pocus/vein.jpg", labels:[["CFA",38,52,14,44],["CFV",64,54,88,46]], note:"The artery is round and its lumen is empty. The vein is the larger oval lumen, also empty. Slide down to compress."},
   inguinalClot:{title:"Left groin, thrombus", src:"pocus/dvt.jpg", labels:[["CFA",36,50,14,42],["CFV",64,50,88,40],["Thr",64,50,88,66]], note:"The vein on the right of the image is filled. Sliding down does not close it."},
   pop:{title:"Right knee, before compression", src:"pocus/pop.jpg", labels:[["PA",38,54,16,36],["PV",62,54,86,40]], note:"Behind the knee. Both lumens are empty. The round vessel is the artery. The larger one beside it is the popliteal vein. Slide down to compress."},
   popClot:{title:"Left knee, thrombus", src:"pocus/popclot.jpg", labels:[["PA",36,54,14,44],["PV",62,54,88,44],["Thr",62,54,88,68]], note:"The popliteal vein is filled. It does not collapse."},
   calf:{title:"Right calf, before compression", src:"pocus/calf.jpg", labels:[["Art",50,40,50,24],["V1",38,62,16,74],["V2",62,62,86,74]], note:"The upper round lumen is the artery, and it is empty. The two below are paired calf veins, also empty. Slide down to compress."},
   calfClot:{title:"Left calf, thrombus", src:"pocus/calfclot.jpg", labels:[["Art",50,38,50,26],["V1",42,54,16,64],["V2",58,54,86,64],["Thr",50,54,84,74]], note:"The paired calf veins are filled. They do not collapse."},
-  shut:{title:"Compressed, vein closed", src:"pocus/veinshut.jpg", labels:[["Art",36,52,14,42],["Closed",70,48,88,40]], note:"The round lumen is the artery. The vein is the flat line: the walls have met."}
+  shut:{title:"Compressed, vein closed", src:"pocus/veinshut.jpg", labels:[["Art",38,48,14,34],["Closed",66,46,88,34]], note:"The round lumen is the artery, and it is empty. The flat line is the vein: the walls have met."}
 };
 
 let compressed = false;
@@ -188,6 +188,31 @@ function drawEcho(){
     ectx.lineWidth = 3.5; ectx.strokeStyle = "rgba(0,0,0,.9)"; ectx.strokeText(lb[0], lx, ly);
     ectx.fillStyle = "#f3efe6"; ectx.fillText(lb[0], lx, ly);
   });
+  if(shot.src === "pocus/onsd.jpg"){
+    const wallX = ox + dw * 0.515;
+    const nerveY = oy + dh * 0.48;
+    const siteX = ox + dw * 0.575;
+    const top = oy + dh * 0.445;
+    const bot = oy + dh * 0.515;
+    ectx.strokeStyle = "#e2b48a";
+    ectx.lineWidth = 1.6;
+    ectx.beginPath();
+    ectx.moveTo(wallX, nerveY - 10);
+    ectx.lineTo(wallX, nerveY + 10);
+    ectx.moveTo(wallX, nerveY);
+    ectx.lineTo(siteX, nerveY);
+    ectx.moveTo(siteX, top);
+    ectx.lineTo(siteX, bot);
+    ectx.moveTo(siteX - 5, top);
+    ectx.lineTo(siteX + 5, top);
+    ectx.moveTo(siteX - 5, bot);
+    ectx.lineTo(siteX + 5, bot);
+    ectx.stroke();
+    ectx.fillStyle = "#f3efe6";
+    ectx.font = "600 12px Figtree, sans-serif";
+    ectx.fillText("3 mm", (wallX + siteX) / 2, nerveY - 16);
+    ectx.fillText("ONSD", siteX, bot + 14);
+  }
 }
 function legend(shot){
   const seen = {};
@@ -358,7 +383,31 @@ function endPointer(e){
 body.addEventListener("pointerup", endPointer);
 body.addEventListener("pointercancel", endPointer);
 
-document.getElementById("back").onclick = function(){ location.href = "index.html"; };
+function seatEyes(model){
+  const bodyPart = model.getObjectByName("body");
+  if(!bodyPart) return;
+  const mid = new THREE.Box3().setFromObject(bodyPart).getCenter(new THREE.Vector3());
+  const found = [];
+  model.traverse(function(obj){
+    if(!obj.isMesh) return;
+    const n = (obj.name || "").toLowerCase();
+    if(n === "eyes" || n === "irises" || n === "pupils") found.push(obj);
+  });
+  found.forEach(function(mesh){
+    const previous = mesh.material;
+    const n = (mesh.name || "").toLowerCase();
+    const color = n === "eyes" ? 0xf4f1ea : n === "irises" ? 0x4a3024 : 0x111111;
+    mesh.material = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 });
+    mesh.renderOrder = 8;
+    const c = new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
+    const face = new THREE.Vector3(0, 0, c.z >= mid.z ? 1 : -1);
+    const start = mesh.getWorldPosition(new THREE.Vector3());
+    const end = mesh.parent.worldToLocal(start.add(face.multiplyScalar(0.012)));
+    mesh.position.copy(end);
+    if(previous && previous.dispose && previous !== mesh.material) previous.dispose();
+  });
+  model.updateMatrixWorld(true);
+}
 
 new GLTFLoader().load("models/anatomy/human-reference.glb", function(gltf){
   const model = gltf.scene;
@@ -396,6 +445,7 @@ new GLTFLoader().load("models/anatomy/human-reference.glb", function(gltf){
   });
   scene.add(model);
   model.updateMatrixWorld(true);
+  seatEyes(model);
   eyeBox.makeEmpty();
   model.traverse(function(obj){
     if(!obj.isMesh) return;
