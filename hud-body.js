@@ -177,8 +177,15 @@ canvas.addEventListener("pointermove", function(event){
   const prev = pointers.get(event.pointerId);
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   if(pointers.size === 1){
-    yawTo -= (event.clientX - prev.x) * 0.01;
-    moved += Math.abs(event.clientX - prev.x) + Math.abs(event.clientY - prev.y);
+    const dx = event.clientX - prev.x;
+    const dy = event.clientY - prev.y;
+    const zoomed = distTo < homeDist * 0.92;
+    if(zoomed && Math.abs(dy) > Math.abs(dx)){
+      targetTo.y -= dy * 0.0024 * Math.max(0.45, distTo);
+      const span = 0.85;
+      targetTo.y = Math.max(homeTarget.y - span, Math.min(homeTarget.y + span, targetTo.y));
+    }else yawTo -= dx * 0.01;
+    moved += Math.abs(dx) + Math.abs(dy);
   }else if(pointers.size >= 2){
     const next = span();
     if(lastSpan) distTo = Math.min(homeDist * 1.4, Math.max(0.35, distTo * (lastSpan / next)));

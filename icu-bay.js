@@ -325,7 +325,8 @@
       '<button type="button" class="card" data-mod="Shock_Bay.html?v=20261024e"><b>Shock bay</b><span>Phenotypes of shock, and a ventilator you control.</span></button>'+
       '<button type="button" class="card" data-mod="Shock_Identification_Management_Simulator.html?v=20261024e"><b>Shock identification</b><span>MAP, cardiac index and the phenotype.</span></button>'+
       '<button type="button" class="card" data-mod="Shock_POCUS_RUSH_Simulator.html?v=20261024e"><b>Shock and POCUS</b><span>RUSH exam, ScvO2 and lactate.</span></button>'+
-      '<button type="button" class="card" data-mod="Shock_Telemetry_POCUS_Simulator.html?v=20261024e"><b>Shock telemetry</b><span>Arterial line, IVC, PPV and the vasopressor.</span></button>';
+      '<button type="button" class="card" data-mod="Shock_Telemetry_POCUS_Simulator.html?v=20261024e"><b>Shock telemetry</b><span>Arterial line, IVC, PPV and the vasopressor.</span></button>'+
+      '<button type="button" class="card" data-mod="Practice_Simulator.html?focus=circulation&v=20261029a"><b>Shock practice</b><span>Septic shock. The small ventricle, the full vena cava, then norepinephrine.</span></button>';
     document.getElementById("back").onclick = function(){
       document.body.classList.remove("in", "enter");
       room.innerHTML = "";

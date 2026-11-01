@@ -93,53 +93,63 @@ const F = [
         read: co<4 ? "Under 4 L/min. Resting output is often 4–8 L/min. A low output needs the stroke volume and the rate read separately." : co>8 ? "Above 8 L/min. Output can be high in a hyperdynamic circulation." : "Inside the usual resting range of about 4–8 L/min."};
     }},
   {id:"ci", mod:"haem", name:"Cardiac index",
-    expr:"Cardiac index = CO / BSA",
-    abbr:[["CO","Cardiac output"],["BSA","Body surface area"],["CI","Cardiac index"]],
-    case:"Cardiac output 3.6 L/min, body surface area 1.9 m².",
-    inputs:[["co","Cardiac output","L/min","3.6"],["bsa","Body surface area","m²","1.9"]],
+    expr:"Cardiac index = CO / BSA. Cardiac output = heart rate × stroke volume. BSA (Mosteller) = √(height in cm × weight in kg / 3600).",
+    abbr:[["CO","Cardiac output, heart rate × stroke volume, in L/min"],["BSA","Body surface area, Mosteller formula, in m²"],["CI","Cardiac index"]],
+    case:"Heart rate 100 beats/min, stroke volume 36 mL, height 170 cm, weight 70 kg.",
+    inputs:[["hr","Heart rate","beats/min","100"],["sv","Stroke volume","mL","36"],["ht","Height","cm","170"],["wt","Weight","kg","70"]],
     run:function(v){
-      const ci = v.co/v.bsa;
-      return {value:round(ci,2)+" L/min/m²", work:v.co+" / "+v.bsa,
+      const co = v.hr*v.sv/1000;
+      const bsa = Math.sqrt(v.ht*v.wt/3600);
+      const ci = co/bsa;
+      return {value:round(ci,2)+" L/min/m²", work:"CO "+round(co,2)+" L/min. BSA "+round(bsa,2)+" m². "+round(co,2)+" / "+round(bsa,2),
         read: ci<2.2 ? "Under 2.2 L/min/m². That is a low index." : ci>4 ? "Above 4 L/min/m². That is a high index." : "About 2.2–4 L/min/m² is a usual range."};
     }},
   {id:"svr", mod:"haem", name:"Systemic vascular resistance",
-    expr:"SVR = (MAP − CVP) × 80 / CO",
-    abbr:[["SVR","Systemic vascular resistance"],["MAP","Mean arterial pressure"],["CVP","Central venous pressure"],["CO","Cardiac output"]],
-    case:"MAP 62 mmHg, CVP 14 mmHg, cardiac output 8.5 L/min.",
-    inputs:[["map","Mean arterial pressure","mmHg","62"],["cvp","Central venous pressure","mmHg","14"],["co","Cardiac output","L/min","8.5"]],
+    expr:"SVR = (MAP − CVP) × 80 / CO. MAP = (SBP + 2 × DBP) / 3. Cardiac output = heart rate × stroke volume.",
+    abbr:[["SVR","Systemic vascular resistance"],["MAP","Mean arterial pressure"],["CVP","Central venous pressure"],["CO","Cardiac output, in L/min"]],
+    case:"Blood pressure 88/50 mmHg, CVP 14 mmHg, heart rate 120 beats/min, stroke volume 70 mL.",
+    inputs:[["sbp","Systolic pressure","mmHg","88"],["dbp","Diastolic pressure","mmHg","50"],["cvp","Central venous pressure","mmHg","14"],["hr","Heart rate","beats/min","120"],["sv","Stroke volume","mL","70"]],
     run:function(v){
-      const svr = (v.map-v.cvp)*80/v.co;
-      return {value:round(svr,0)+" dyn·s·cm⁻⁵", work:"("+v.map+" − "+v.cvp+") × 80 / "+v.co,
-        read:(svr<800?"Under 800. Resistance is low, as in a distributive circulation. ":"")+ (svr>1200?"Above 1200. Resistance is high. ":"")+ (svr>=800 && svr<=1200?"Inside a usual range of about 800–1200. ":"")+"The ×80 factor is what puts the result in dyn·s·cm⁻⁵. Cardiac output must be in L/min."};
+      const map = (v.sbp+2*v.dbp)/3;
+      const co = v.hr*v.sv/1000;
+      const svr = (map-v.cvp)*80/co;
+      return {value:round(svr,0)+" dyn·s·cm⁻⁵", work:"MAP "+round(map,1)+". CO "+round(co,2)+" L/min. ("+round(map,1)+" − "+v.cvp+") × 80 / "+round(co,2),
+        read:(svr<800?"Under 800. Resistance is low, as in a distributive circulation. ":"")+ (svr>1200?"Above 1200. Resistance is high. ":"")+ (svr>=800 && svr<=1200?"Inside a usual range of about 800–1200. ":"")+"The ×80 factor is what puts the result in dyn·s·cm⁻⁵."};
     }},
   {id:"pvr", mod:"haem", name:"Pulmonary vascular resistance",
-    expr:"PVR = (mPAP − PAWP) × 80 / CO",
-    abbr:[["PVR","Pulmonary vascular resistance"],["mPAP","Mean pulmonary artery pressure"],["PAWP","Pulmonary artery wedge pressure"],["CO","Cardiac output"]],
-    case:"Mean pulmonary artery pressure 38 mmHg, wedge pressure 12 mmHg, cardiac output 4.2 L/min.",
-    inputs:[["mpap","Mean pulmonary artery pressure","mmHg","38"],["pawp","Wedge pressure","mmHg","12"],["co","Cardiac output","L/min","4.2"]],
+    expr:"PVR = (mPAP − PAWP) × 80 / CO. Cardiac output = heart rate × stroke volume.",
+    abbr:[["PVR","Pulmonary vascular resistance"],["mPAP","Mean pulmonary artery pressure"],["PAWP","Pulmonary artery wedge pressure"],["CO","Cardiac output, in L/min"]],
+    case:"Mean pulmonary artery pressure 38 mmHg, wedge pressure 12 mmHg, heart rate 90 beats/min, stroke volume 47 mL.",
+    inputs:[["mpap","Mean pulmonary artery pressure","mmHg","38"],["pawp","Wedge pressure","mmHg","12"],["hr","Heart rate","beats/min","90"],["sv","Stroke volume","mL","47"]],
     run:function(v){
-      const pvr = (v.mpap-v.pawp)*80/v.co;
-      return {value:round(pvr,0)+" dyn·s·cm⁻⁵", work:"("+v.mpap+" − "+v.pawp+") × 80 / "+v.co,
-        read: pvr>240 ? "Above about 240 dyn·s·cm⁻⁵. Pulmonary vascular resistance is raised. Confirm the units: cardiac output is in L/min." : "About 240 dyn·s·cm⁻⁵ or less is a usual upper range with this formula."};
+      const co = v.hr*v.sv/1000;
+      const pvr = (v.mpap-v.pawp)*80/co;
+      return {value:round(pvr,0)+" dyn·s·cm⁻⁵", work:"CO "+round(co,2)+" L/min. ("+v.mpap+" − "+v.pawp+") × 80 / "+round(co,2),
+        read: pvr>240 ? "Above about 240 dyn·s·cm⁻⁵. Pulmonary vascular resistance is raised." : "About 240 dyn·s·cm⁻⁵ or less is a usual upper range with this formula."};
     }},
   {id:"cpo", mod:"haem", name:"Cardiac power output",
-    expr:"CPO = MAP × CO / 451",
+    expr:"CPO = MAP × CO / 451. MAP = (SBP + 2 × DBP) / 3. Cardiac output = heart rate × stroke volume.",
     abbr:[["CPO","Cardiac power output"],["MAP","Mean arterial pressure"],["CO","Cardiac output"]],
-    case:"MAP 68 mmHg, cardiac output 3.1 L/min in cardiogenic shock.",
-    inputs:[["map","Mean arterial pressure","mmHg","68"],["co","Cardiac output","L/min","3.1"]],
+    case:"Blood pressure 90/55 mmHg, heart rate 110 beats/min, stroke volume 28 mL, in cardiogenic shock.",
+    inputs:[["sbp","Systolic pressure","mmHg","90"],["dbp","Diastolic pressure","mmHg","55"],["hr","Heart rate","beats/min","110"],["sv","Stroke volume","mL","28"]],
     run:function(v){
-      const cpo = v.map*v.co/451;
-      return {value:round(cpo,2)+" W", work:v.map+" × "+v.co+" / 451",
+      const map = (v.sbp+2*v.dbp)/3;
+      const co = v.hr*v.sv/1000;
+      const cpo = map*co/451;
+      return {value:round(cpo,2)+" W", work:"MAP "+round(map,1)+". CO "+round(co,2)+". "+round(map,1)+" × "+round(co,2)+" / 451",
         read: cpo<0.6 ? "Under 0.6 W. In cardiogenic shock this has been associated with higher mortality. It does not replace the clinical picture." : "0.6 W or higher. Higher cardiac power is more favourable in cardiogenic shock, still read with the whole picture."};
     }},
   {id:"do2", mod:"haem", name:"Oxygen delivery",
-    expr:"DO₂ = CO × CaO₂ × 10",
-    abbr:[["DO₂","Oxygen delivery"],["CO","Cardiac output"],["CaO₂","Arterial oxygen content"]],
-    case:"Cardiac output 4.5 L/min, arterial oxygen content 14 mL/dL.",
-    inputs:[["co","Cardiac output","L/min","4.5"],["cao2","Arterial oxygen content","mL/dL","14"]],
+    expr:"DO₂ = CO × CaO₂ × 10. Cardiac output = heart rate × stroke volume. CaO₂ = (1.34 × Hb × SaO₂) + (0.003 × PaO₂).",
+    abbr:[["DO₂","Oxygen delivery"],["CO","Cardiac output"],["CaO₂","Arterial oxygen content"],["Hb","Haemoglobin"],["SaO₂","Arterial oxygen saturation"]],
+    case:"Heart rate 100 beats/min, stroke volume 45 mL, haemoglobin 8.2 g/dL, saturation 92%, PaO₂ 68 mmHg.",
+    inputs:[["hr","Heart rate","beats/min","100"],["sv","Stroke volume","mL","45"],["hb","Haemoglobin","g/dL","8.2"],["sao2","Saturation","%","92"],["pao2","PaO₂","mmHg","68"]],
     run:function(v){
-      const d = v.co*v.cao2*10;
-      return {value:round(d,0)+" mL/min", work:v.co+" × "+v.cao2+" × 10",
+      const co = v.hr*v.sv/1000;
+      const sat = v.sao2>1 ? v.sao2/100 : v.sao2;
+      const cao2 = (1.34*v.hb*sat) + (0.003*v.pao2);
+      const d = co*cao2*10;
+      return {value:round(d,0)+" mL/min", work:"CO "+round(co,2)+" L/min. CaO₂ "+round(cao2,2)+" mL/dL. "+round(co,2)+" × "+round(cao2,2)+" × 10",
         read:"Resting delivery is often around 900–1100 mL/min. A low result is a low haemoglobin, a low saturation, a low output, or more than one of those."};
     }},
   {id:"cao2", mod:"haem", name:"Arterial oxygen content",
@@ -263,15 +273,16 @@ const F = [
         read: ag>12 ? "Above 12 mmol/L. The gap is raised if albumin is normal. Pair it with the pH before calling it a high-gap acidosis." : "12 mmol/L or less. The gap is not raised. A normal gap does not exclude a hyperchloraemic acidosis."};
     }},
   {id:"cag", mod:"abg", name:"Corrected anion gap",
-    expr:"Corrected AG = AG + 2.5 × (4 − albumin)",
-    abbr:[["AG","Anion gap"],["Albumin","Serum albumin, in g/dL"]],
-    case:"Anion gap 14 mmol/L, albumin 2.0 g/dL.",
-    inputs:[["ag","Anion gap","mmol/L","14"],["alb","Albumin","g/dL","2"]],
+    expr:"Anion gap = Na − (Cl + HCO₃). Corrected AG = AG + 2.5 × (4 − albumin).",
+    abbr:[["AG","Anion gap"],["Na","Sodium"],["Cl","Chloride"],["HCO₃","Bicarbonate"],["Albumin","Serum albumin, in g/dL"]],
+    case:"Sodium 138, chloride 102, bicarbonate 16 mmol/L, albumin 2.0 g/dL.",
+    inputs:[["na","Sodium","mmol/L","138"],["cl","Chloride","mmol/L","102"],["hco3","Bicarbonate","mmol/L","16"],["alb","Albumin","g/dL","2"]],
     run:function(v){
       let alb = v.alb, note = "";
       if(alb>10){ alb = alb/10; note = "Albumin above 10 was read as g/L and converted to g/dL."; }
-      const c = v.ag + 2.5*(4-alb);
-      return {value:round(c,1)+" mmol/L", work:v.ag+" + 2.5 × (4 − "+round(alb,1)+")", note:note,
+      const ag = v.na-(v.cl+v.hco3);
+      const c = ag + 2.5*(4-alb);
+      return {value:round(c,1)+" mmol/L", work:"AG "+round(ag,1)+". "+round(ag,1)+" + 2.5 × (4 − "+round(alb,1)+")", note:note,
         read:"Albumin carries part of the negative charge. A low albumin hides a raised gap unless it is corrected. A corrected gap above 12 mmol/L is raised."};
     }},
   {id:"winter", mod:"abg", name:"Winter’s formula",
@@ -290,20 +301,21 @@ const F = [
       return {value:round(exp,1)+" ± 2 mmHg", work:"1.5 × "+v.hco3+" + 8", read:read};
     }},
   {id:"delta", mod:"abg", name:"Delta ratio",
-    expr:"Delta ratio = (AG − 12) / (24 − HCO₃)",
-    abbr:[["AG","Anion gap"],["HCO₃","Bicarbonate"]],
-    case:"Anion gap 28 mmol/L, bicarbonate 10 mmol/L.",
-    inputs:[["ag","Anion gap","mmol/L","28"],["hco3","Bicarbonate","mmol/L","10"]],
+    expr:"Anion gap = Na − (Cl + HCO₃). Delta ratio = (AG − 12) / (24 − HCO₃).",
+    abbr:[["AG","Anion gap"],["Na","Sodium"],["Cl","Chloride"],["HCO₃","Bicarbonate"]],
+    case:"Sodium 140, chloride 100, bicarbonate 10 mmol/L.",
+    inputs:[["na","Sodium","mmol/L","140"],["cl","Chloride","mmol/L","100"],["hco3","Bicarbonate","mmol/L","10"]],
     run:function(v){
+      const ag = v.na-(v.cl+v.hco3);
       const den = 24-v.hco3;
-      if(Math.abs(den)<0.5) return {value:"—", work:"( "+v.ag+" − 12 ) / ( 24 − "+v.hco3+" )", read:"The bicarbonate is too close to 24 for this ratio."};
-      const d = (v.ag-12)/den;
+      if(Math.abs(den)<0.5) return {value:"—", work:"AG "+round(ag,1)+". (AG − 12) / (24 − "+v.hco3+")", read:"The bicarbonate is too close to 24 for this ratio."};
+      const d = (ag-12)/den;
       let read = "Under 0.4 suggests a pure hyperchloraemic acidosis. 0.4–0.8 suggests a mixed high-gap and hyperchloraemic acidosis. 1–2 fits a high-gap acidosis. Above 2 suggests a coexisting metabolic alkalosis.";
       if(d<0.4) read = "Under 0.4. This pattern fits a hyperchloraemic metabolic acidosis more than a high-gap acidosis.";
       else if(d<0.8) read = "Between 0.4 and 0.8. A high-gap acidosis and a hyperchloraemic acidosis may both be present.";
       else if(d<=2) read = "Between 1 and 2. This fits a high-gap metabolic acidosis.";
       else read = "Above 2. A metabolic alkalosis may be sitting with the high-gap acidosis.";
-      return {value:round(d,2), work:"("+v.ag+" − 12) / (24 − "+v.hco3+")", read:read};
+      return {value:round(d,2), work:"AG "+round(ag,1)+". ("+round(ag,1)+" − 12) / (24 − "+v.hco3+")", read:read};
     }},
   {id:"osm", mod:"abg", name:"Calculated osmolality",
     expr:"Calculated osmolality = 2 × Na + glucose/18 + BUN/2.8",
@@ -363,14 +375,16 @@ const F = [
         read: fe<35 ? "Under 35%. This supports a prerenal state and is more useful than the sodium fraction after a diuretic." : fe>50 ? "Above 50%. This is less specific for tubular injury." : "Between 35% and 50%. The result is indeterminate."};
     }},
   {id:"fwd", mod:"renal", name:"Free-water deficit",
-    expr:"Free-water deficit = TBW × [(Na / 140) − 1]",
+    expr:"TBW = 0.6 × weight in men, or 0.5 × weight in women. Free-water deficit = TBW × [(Na / 140) − 1].",
     abbr:[["TBW","Total body water"],["Na","Serum sodium"]],
-    case:"Sodium 158 mmol/L. Total body water estimated at 42 L.",
-    inputs:[["tbw","Total body water","L","42"],["na","Sodium","mmol/L","158"]],
+    case:"A man, weight 70 kg, sodium 158 mmol/L.",
+    inputs:[["wt","Weight","kg","70"],["sex","Sex","","male"],["na","Sodium","mmol/L","158"]],
     run:function(v){
-      const d = v.tbw*((v.na/140)-1);
-      return {value:round(d,2)+" L", work:v.tbw+" × [("+v.na+"/140) − 1]",
-        read: d>0 ? "This is the estimated free-water deficit in hypernatraemia. Replace it slowly and recheck the sodium. It is not a fixed prescription. A usual TBW is about 0.6 × weight in men and 0.5 × weight in women." : "The sodium is under 140, so this is a free-water excess rather than a deficit."};
+      const frac = v.sex==="female" ? 0.5 : 0.6;
+      const tbw = frac*v.wt;
+      const d = tbw*((v.na/140)-1);
+      return {value:round(d,2)+" L", work:"TBW "+round(tbw,1)+" L ("+frac+" × "+v.wt+"). "+round(tbw,1)+" × [("+v.na+"/140) − 1]",
+        read: d>0 ? "This is the estimated free-water deficit in hypernatraemia. Replace it slowly and recheck the sodium. It is not a fixed prescription." : "The sodium is under 140, so this is a free-water excess rather than a deficit."};
     }},
   {id:"urr", mod:"renal", name:"Urea reduction ratio",
     expr:"URR (%) = (Pre − Post) / Pre × 100",
@@ -418,23 +432,25 @@ const F = [
         read:"0.785 is π/4, so this is the area of a circle. A small error in diameter changes the area, and the stroke volume, by a large amount."};
     }},
   {id:"sv", mod:"echo", name:"Stroke volume by echo",
-    expr:"SV = LVOT area × LVOT VTI",
+    expr:"LVOT area = 0.785 × diameter². SV = LVOT area × LVOT VTI.",
     abbr:[["SV","Stroke volume"],["LVOT","Left ventricular outflow tract"],["VTI","Velocity–time integral"]],
-    case:"LVOT area 3.14 cm², LVOT velocity–time integral 16 cm.",
-    inputs:[["area","LVOT area","cm²","3.14"],["vti","LVOT VTI","cm","16"]],
+    case:"LVOT diameter 2.0 cm, LVOT velocity–time integral 16 cm.",
+    inputs:[["d","LVOT diameter","cm","2"],["vti","LVOT VTI","cm","16"]],
     run:function(v){
-      const sv = v.area*v.vti;
-      return {value:round(sv,1)+" mL", work:v.area+" × "+v.vti,
+      const area = 0.785*v.d*v.d;
+      const sv = area*v.vti;
+      return {value:round(sv,1)+" mL", work:"Area "+round(area,2)+" cm². "+round(area,2)+" × "+v.vti,
         read: sv<60 ? "Under 60 mL. A usual stroke volume is about 60–100 mL. Confirm the outflow diameter before calling the volume low." : "About 60–100 mL is a usual stroke volume."};
     }},
   {id:"ava", mod:"echo", name:"Aortic valve area",
-    expr:"Aortic valve area = LVOT area × LVOT VTI / AV VTI",
+    expr:"LVOT area = 0.785 × diameter². Aortic valve area = LVOT area × LVOT VTI / AV VTI.",
     abbr:[["LVOT","Left ventricular outflow tract"],["VTI","Velocity–time integral"],["AV","Aortic valve"]],
-    case:"LVOT area 3.14 cm², LVOT VTI 18 cm, aortic valve VTI 70 cm.",
-    inputs:[["area","LVOT area","cm²","3.14"],["lvot","LVOT VTI","cm","18"],["av","Aortic valve VTI","cm","70"]],
+    case:"LVOT diameter 2.0 cm, LVOT VTI 18 cm, aortic valve VTI 70 cm.",
+    inputs:[["d","LVOT diameter","cm","2"],["lvot","LVOT VTI","cm","18"],["av","Aortic valve VTI","cm","70"]],
     run:function(v){
-      const a = v.area*v.lvot/v.av;
-      return {value:round(a,2)+" cm²", work:v.area+" × "+v.lvot+" / "+v.av,
+      const area = 0.785*v.d*v.d;
+      const a = area*v.lvot/v.av;
+      return {value:round(a,2)+" cm²", work:"Area "+round(area,2)+" cm². "+round(area,2)+" × "+v.lvot+" / "+v.av,
         read: a<=1 ? "1.0 cm² or less. That is in the severe range if the measurements agree. Low flow can make the area and the gradient disagree." : "Above 1.0 cm². Severe stenosis is less likely if the tracing is reliable."};
     }},
   {id:"bern", mod:"echo", name:"Pressure gradient",
@@ -458,23 +474,25 @@ const F = [
         read: p>40 ? "Above about 35–40 mmHg. The estimate is raised, and only if there is no pulmonary stenosis. The atrial pressure you entered moves the result." : "About 40 mmHg or less. This estimates pulmonary artery systolic pressure only if there is no pulmonary stenosis."};
     }},
   {id:"cpp", mod:"echo", name:"Cerebral perfusion pressure",
-    expr:"CPP = MAP − ICP",
-    abbr:[["CPP","Cerebral perfusion pressure"],["MAP","Mean arterial pressure"],["ICP","Intracranial pressure"]],
-    case:"Mean arterial pressure 78 mmHg, intracranial pressure 26 mmHg after traumatic brain injury.",
-    inputs:[["map","Mean arterial pressure","mmHg","78"],["icp","Intracranial pressure","mmHg","26"]],
+    expr:"MAP = (SBP + 2 × DBP) / 3. CPP = MAP − ICP.",
+    abbr:[["CPP","Cerebral perfusion pressure"],["MAP","Mean arterial pressure"],["ICP","Intracranial pressure"],["SBP","Systolic blood pressure"],["DBP","Diastolic blood pressure"]],
+    case:"Blood pressure 120/60 mmHg, intracranial pressure 26 mmHg after traumatic brain injury.",
+    inputs:[["sbp","Systolic pressure","mmHg","120"],["dbp","Diastolic pressure","mmHg","60"],["icp","Intracranial pressure","mmHg","26"]],
     run:function(v){
-      const c = v.map-v.icp;
-      return {value:round(c,1)+" mmHg", work:v.map+" − "+v.icp,
+      const map = (v.sbp+2*v.dbp)/3;
+      const c = map-v.icp;
+      return {value:round(c,1)+" mmHg", work:"MAP "+round(map,1)+". "+round(map,1)+" − "+v.icp,
         read: c<60 ? "Under 60 mmHg. In traumatic brain injury a perfusion pressure around 60–70 mmHg is a common target. The low value is either a low arterial pressure, a high intracranial pressure, or both." : "60 mmHg or higher. Around 60–70 mmHg is a common target after traumatic brain injury."};
     }},
   {id:"pi", mod:"echo", name:"Transcranial Doppler pulsatility index",
-    expr:"Pulsatility index = (PSV − EDV) / mean velocity",
+    expr:"Mean velocity ≈ (PSV + 2 × EDV) / 3. Pulsatility index = (PSV − EDV) / mean velocity.",
     abbr:[["PSV","Peak systolic velocity"],["EDV","End-diastolic velocity"]],
-    case:"Peak systolic velocity 120 cm/s, end-diastolic velocity 30 cm/s, mean velocity 55 cm/s.",
-    inputs:[["psv","Peak systolic velocity","cm/s","120"],["edv","End-diastolic velocity","cm/s","30"],["mean","Mean velocity","cm/s","55"]],
+    case:"Peak systolic velocity 120 cm/s, end-diastolic velocity 30 cm/s.",
+    inputs:[["psv","Peak systolic velocity","cm/s","120"],["edv","End-diastolic velocity","cm/s","30"]],
     run:function(v){
-      const pi = (v.psv-v.edv)/v.mean;
-      return {value:round(pi,2), work:"("+v.psv+" − "+v.edv+") / "+v.mean,
+      const mean = (v.psv+2*v.edv)/3;
+      const pi = (v.psv-v.edv)/mean;
+      return {value:round(pi,2), work:"Mean "+round(mean,1)+" cm/s. ("+v.psv+" − "+v.edv+") / "+round(mean,1),
         read: pi>1.2 ? "Above about 1.2. Downstream resistance is high. This is not a direct measure of intracranial pressure." : "About 0.6–1.2 is a typical pulsatility index."};
     }},
   {id:"half", mod:"drug", name:"Drug half-life",

@@ -348,7 +348,7 @@ function initialize() {
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1,1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
   scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(32,1,.01,25); camera.position.set(0,1.04,4);
-  controls = new OrbitControls(camera,canvas); controls.target.copy(fullTarget); controls.enablePan = false; controls.enableDamping = true;
+  controls = new OrbitControls(camera,canvas); controls.target.copy(fullTarget); controls.enablePan = true; controls.screenSpacePanning = true; controls.enableDamping = true;
   controls.dampingFactor = .1; controls.autoRotateSpeed = .55; controls.minPolarAngle = Math.PI*.15; controls.maxPolarAngle = Math.PI*.85;
   controls.addEventListener('change',() => { dirty = true; }); controls.addEventListener('start',() => { cameraTween = null; setAuto(false); });
   scene.add(new THREE.HemisphereLight(0xfff5eb,0x30302b,1.4));
