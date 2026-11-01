@@ -49,7 +49,7 @@ body.sim .dials{flex:none;padding-bottom:6px}
 body.bust3d #bust{z-index:2}
 body.bust3d .patient{visibility:hidden}
 .shlab{display:none;position:absolute;z-index:2;margin:0;color:#e7f6fb;font-size:11px;pointer-events:none;transform:translate(-50%,-130%)}
-body.bust3d .shlab{display:block}
+body.bust3d #probe,body.bust3d #contact{display:none}
 #probe svg{width:40px;height:64px;display:block}
 #contact,#probe{position:absolute;pointer-events:none;z-index:3}
 #contact{width:28px;height:28px;border-radius:50%;border:2px solid #9fd4ff;box-shadow:0 0 12px rgba(120,190,255,.8);left:calc(var(--x) * 1%);top:calc(var(--y) * 1%);transform:translate(-50%,-50%);opacity:0}
@@ -120,7 +120,7 @@ body.sim #echo,body.sim .chest-box{height:auto;min-height:0;flex:1}
   <h1>Echo bay</h1>
 </header>
 <div class="bar" id="views" aria-label="Echo windows"></div>
-<p id="hint">The finger is the probe. Circle without lifting and it turns. Lift off the body and it comes away.</p>
+<p id="hint">The finger is the probe. It stays on the skin under the finger. Slide it, and the pointer follows that direction.</p>
 <section id="doors" aria-label="Echo bay doors">
   <button type="button" data-door="supply"><b>Heart and supply</b><span>Four vessels, the lesion, and the trace.</span></button>
   <button type="button" data-door="sim"><b>Echo simulator</b><span>The finger is the probe. The sector follows it.</span></button>
@@ -1158,7 +1158,10 @@ function viewMetrics(){
   const oy = (rect.height - 100*scale)/2;
   return {scale:scale, ox:ox, oy:oy};
 }
+let echoProbe = null;
 let has3 = false;
+const probeUp = new THREE.Vector3(0, 1, 0);
+let bustYaw = 0, bustYawTo = 0, bustDist = 1.8;
 const contact3 = new THREE.Vector3();
 let bodyMesh = null;
 let bustCam = null;
@@ -1187,10 +1190,21 @@ if(mode==="sim" && bust){
     const vFov = THREE.MathUtils.degToRad(bustCam.fov);
     const tan = Math.tan(vFov / 2);
     const dist = Math.max(halfH / tan, halfW / (tan * bustCam.aspect)) * 1.12;
-    bustCam.position.set(0, 1.38, dist);
+    bustDist = dist;
+    bustCam.position.set(Math.sin(bustYaw) * dist, 1.38, Math.cos(bustYaw) * dist);
     bustCam.lookAt(0, 1.38, 0);
     bustCam.updateProjectionMatrix();
   }
+  echoProbe = new THREE.Group();
+  const echoTip = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.055, 14), new THREE.MeshStandardMaterial({ color: 0xe2b48a, roughness: 0.45 }));
+  echoTip.geometry.translate(0, 0.03, 0);
+  const echoHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.012, 0.05, 12), new THREE.MeshStandardMaterial({ color: 0xd5dee6, roughness: 0.4 }));
+  echoHandle.position.y = 0.07;
+  const echoMark = new THREE.Mesh(new THREE.SphereGeometry(0.008, 10, 8), new THREE.MeshStandardMaterial({ color: 0xe2b48a }));
+  echoMark.position.set(0.02, 0.05, 0);
+  echoProbe.add(echoTip); echoProbe.add(echoHandle); echoProbe.add(echoMark);
+  echoProbe.visible = false;
+  bustScene.add(echoProbe);
   const clip = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.05);
   const skinNames = { body: 1, eyes: 1, irises: 1, pupils: 1 };
   new GLTFLoader().load("models/anatomy/human-reference.glb", function(gltf){
@@ -1232,6 +1246,9 @@ if(mode==="sim" && bust){
         fitBust();
       }
       bustRenderer.render(bustScene, bustCam);
+      bustYaw += (bustYawTo - bustYaw) * 0.15;
+      bustCam.position.set(Math.sin(bustYaw) * bustDist, 1.38, Math.cos(bustYaw) * bustDist);
+      bustCam.lookAt(0, 1.38, 0);
     }
     requestAnimationFrame(drawBust);
   }
@@ -1325,6 +1342,14 @@ function rememberHit(point){
   contact3.copy(point);
   has3 = true;
 }
+function seatSkinProbe(hit){
+  if(!echoProbe || !hit) return;
+  const n = hit.face.normal.clone().transformDirection(bodyMesh.matrixWorld).normalize();
+  echoProbe.visible = true;
+  echoProbe.position.copy(hit.point);
+  echoProbe.quaternion.setFromUnitVectors(probeUp, n);
+  echoProbe.rotateY(THREE.MathUtils.degToRad(-state.probe.spin));
+}
 function syncContactFromProbe(){
   if(!bodyMesh) return;
   const x = (state.probe.x - 50) / 140;
@@ -1355,6 +1380,7 @@ function liftProbe(){
   state.probe.docked = false;
   state.probe.lift = 1;
   state.view = "off";
+  if(echoProbe) echoProbe.visible = false;
   paintProbe();
   paintStatus();
   syncProbeCopy();
@@ -1367,7 +1393,7 @@ torso.addEventListener("pointerdown", function(e){
   const c = rayOnSkin(e.clientX, e.clientY);
   const spot = c ? svgFromHit(c.point) : (bodyMesh ? null : chestPoint(e.clientX, e.clientY));
   if(!spot) return;
-  if(c) rememberHit(c.point);
+  if(c){ rememberHit(c.point); seatSkinProbe(c); }
   plant = {x:e.clientX, y:e.clientY, ang:null, base:state.probe.spin, unwrapped:null};
   state.probe.x = spot.x;
   state.probe.y = spot.y;
@@ -1382,15 +1408,45 @@ torso.addEventListener("pointermove", function(e){
   e.preventDefault();
   prev.x = e.clientX;
   prev.y = e.clientY;
-  if(pointers.size > 1) return;
+  if(pointers.size > 1){
+    const pts = Array.from(pointers.values());
+    const span = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    bustYawTo -= (e.clientX - prev.x) * 0.008;
+    if(plant && plant.span) bustDist = Math.min(4.2, Math.max(0.8, bustDist * (plant.span / span)));
+    plant = plant || {};
+    plant.span = span;
+    return;
+  }
+  const dx = e.clientX - plant.x;
+  const dy = e.clientY - plant.y;
+  if(bodyMesh){
+    const hit = rayOnSkin(e.clientX, e.clientY);
+    if(!hit){
+      plant = null;
+      liftProbe();
+      return;
+    }
+    rememberHit(hit.point);
+    const spot = svgFromHit(hit.point);
+    state.probe.x = spot.x;
+    state.probe.y = spot.y;
+    if(Math.hypot(dx, dy) > 8){
+      state.probe.spin = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+      plant.x = e.clientX;
+      plant.y = e.clientY;
+    }
+    seatSkinProbe(hit);
+    state.probe.down = true;
+    state.probe.lift = 0;
+    seatProbe();
+    return;
+  }
   const c = chestPoint(e.clientX, e.clientY);
   if(!onBody(c.x, c.y)){
     plant = null;
     liftProbe();
     return;
   }
-  const dx = e.clientX - plant.x;
-  const dy = e.clientY - plant.y;
   const dist = Math.hypot(dx, dy);
   if(dist > 150){
     const hit = rayOnSkin(e.clientX, e.clientY);
@@ -1773,7 +1829,7 @@ function releaseGraphics(){
 }
 document.getElementById("back").onclick = function(){
   releaseGraphics();
-  if(mode){ location.href = "echo-lab.html?v=20261101g"; return; }
+  if(mode){ location.href = "echo-lab.html?v=20261101h"; return; }
   try{
     if(window.parent && window.parent!==window && typeof window.parent.returnToIcu==="function"){
       window.parent.returnToIcu();
@@ -1785,7 +1841,7 @@ document.getElementById("back").onclick = function(){
 document.getElementById("doors").onclick = function(event){
   const btn = event.target.closest("[data-door]");
   if(!btn) return;
-  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261101g";
+  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261101h";
 };
 document.getElementById("tabs").innerHTML = TABS.map(function(tab){
   return "<button type='button' data-tab='"+tab[0]+"'>"+tab[1]+"</button>";

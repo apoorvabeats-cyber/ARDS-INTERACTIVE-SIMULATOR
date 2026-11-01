@@ -19,7 +19,7 @@ h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:20px;margin:0}
 .bar{display:flex;gap:6px;overflow:auto;padding:8px 8px 0}
 .bar button{flex:none;background:#102028;border:1px solid var(--line);border-radius:999px;min-height:36px;padding:0 10px;font-size:13px}
 .bar button.on{background:#2a2118;border-color:var(--warm);color:#fff8ee}
-.stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;height:calc(100dvh - 118px);padding:6px}
+.stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;height:calc(100dvh - 78px);padding:6px}
 .panel{min-width:0;min-height:0;display:flex;flex-direction:column;background:#0c141c;border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .panel h2{margin:0;padding:6px 8px 0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm)}
 #echo{flex:1;width:100%;min-height:0;display:block;background:#000;touch-action:none}
@@ -35,15 +35,7 @@ h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:20px;margin:0}
   <button type="button" id="back">Back to ICU</button>
   <h1>POCUS</h1>
 </header>
-<div class="bar" id="modes">
-  <button type="button" data-chest="normal">Normal lung</button>
-  <button type="button" data-chest="effusion">Pleural effusion</button>
-  <button type="button" data-chest="ptx">Pneumothorax</button>
-  <button type="button" data-chest="consol">Consolidation</button>
-  <button type="button" data-abd="fluid">Free fluid</button>
-  <button type="button" data-abd="bladder">Bladder</button>
-</div>
-<p class="note" id="hint">One finger is the probe. Two fingers turn the body. On a leg, slide the finger down to compress and up to release. As you look at the front, the leg on your left is the patient's right, and it is normal. The leg on your right is the patient's left, and it has thrombus at the groin, the knee and the calf.</p>
+<p class="note" id="hint">The finger is the probe. This patient already has findings. Move across the chest and the image changes. On a leg, slide down to compress and up to release. The leg on your left, as you look at the front, is normal. The leg on your right has thrombus.</p>
 <div class="stage">
   <section class="panel">
     <h2 id="title">Ultrasound</h2>
@@ -64,6 +56,8 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 const FULL = {
   PL:"Pleural line",
   A:"A-lines, reverberation from aerated lung",
+  Sea:"Seashore sign, lung sliding on M-mode",
+  B:"B-lines, interstitial fluid",
   Fluid:"Pleural fluid",
   Dia:"Diaphragm",
   Spine:"Spine, seen behind fluid",
@@ -86,7 +80,9 @@ const FULL = {
   Closed:"Vein walls apposed"
 };
 const SHOTS = {
-  normal:{title:"Normal lung", src:"pocus/alines.jpg", labels:[["PL",50,28,18,22],["A",50,48,82,55]], note:"A-lines under a bright pleural line. This is aerated lung. Sliding is a movement, so a still cannot prove it."},
+  normal:{title:"Normal lung, A-lines", src:"pocus/alines.jpg", labels:[["PL",50,28,18,22],["A",50,48,82,55]], note:"A-lines under a bright pleural line. This rib space is aerated."},
+  seashore:{title:"Normal lung, seashore", src:"pocus/seashore.jpg", labels:[["PL",50,42,82,36],["Sea",50,64,18,72]], note:"M-mode seashore sign. The grain under the pleural line is lung sliding."},
+  blines:{title:"Fluid overload, B-lines", src:"pocus/blines.jpg", labels:[["PL",50,28,16,22],["B",52,55,82,48]], note:"Vertical B-lines from the pleural line. Several in one view fit interstitial fluid."},
   effusion:{title:"Pleural effusion", src:"pocus/effusion.jpg", labels:[["Fluid",58,36,84,28],["Dia",46,52,16,48],["Spine",52,74,82,82]], note:"Black fluid above the diaphragm. The spine shows through behind it."},
   ptx:{title:"Pneumothorax", src:"pocus/barcode.jpg", labels:[["Bar",50,62,18,70]], note:"M-mode barcode, or stratosphere, sign. The lung is not sliding at this rib space."},
   consol:{title:"Consolidation", src:"pocus/consol.jpg", labels:[["Lung",48,48,16,40],["Air",58,55,84,62]], note:"The lung looks like tissue. Bright branches are air bronchograms."},
@@ -101,10 +97,17 @@ const SHOTS = {
   shut:{title:"Compressed, vein closed", src:"pocus/veinshut.jpg", labels:[["Art",36,52,14,42],["Closed",70,48,88,40]], note:"The round lumen is the artery. The vein is the flat line: the walls have met."}
 };
 
-let chestMode = "";
-let abdMode = "";
 let compressed = false;
 let zoneKey = "";
+const POOL = ["normal", "seashore", "blines", "effusion", "consol", "ptx"];
+const chestGrid = {};
+function chestFinding(p){
+  const gx = Math.max(-4, Math.min(4, Math.round(p.x / 0.07)));
+  const gy = Math.max(0, Math.min(8, Math.round((p.y - 1.28) / 0.05)));
+  const key = gx + ":" + gy;
+  if(!chestGrid[key]) chestGrid[key] = POOL[Math.floor(Math.random() * POOL.length)];
+  return chestGrid[key];
+}
 const images = {};
 function load(src){
   if(!src || images[src]) return;
@@ -212,17 +215,13 @@ function classify(p){
 function shotFor(info){
   if(!info || info.zone === "off") return { wait: "Move the probe onto the chest, the right upper abdomen, the bladder, or either leg." };
   if(info.zone === "chest"){
-    if(!chestMode) return { wait: "Choose normal lung, pleural effusion, pneumothorax, or consolidation. Then keep the probe on the chest." };
-    return SHOTS[chestMode];
+    const id = chestFinding(hitPoint);
+    const shot = Object.assign({}, SHOTS[id]);
+    shot.title = (hitPoint.x >= 0 ? "Left chest, " : "Right chest, ") + shot.title;
+    return shot;
   }
-  if(info.zone === "ruq"){
-    if(abdMode !== "fluid") return { wait: "This is Morrison's pouch, on the patient's right. Choose Free fluid." };
-    return SHOTS.fluid;
-  }
-  if(info.zone === "bladder"){
-    if(abdMode !== "bladder") return { wait: "This is the bladder, low in the midline. Choose Bladder." };
-    return SHOTS.bladder;
-  }
+  if(info.zone === "ruq") return SHOTS.fluid;
+  if(info.zone === "bladder") return SHOTS.bladder;
   const clot = info.side === "left";
   const key = info.zone === "groin" ? "inguinal" : info.zone === "knee" ? "pop" : "calf";
   if(!clot && compressed){
@@ -313,16 +312,6 @@ function endPointer(e){
 body.addEventListener("pointerup", endPointer);
 body.addEventListener("pointercancel", endPointer);
 
-document.getElementById("modes").onclick = function(e){
-  const b = e.target.closest("button");
-  if(!b) return;
-  if(b.dataset.chest){ chestMode = b.dataset.chest; abdMode = ""; }
-  if(b.dataset.abd){ abdMode = b.dataset.abd; chestMode = ""; }
-  document.querySelectorAll("#modes button").forEach(function(btn){
-    btn.classList.toggle("on", btn === b);
-  });
-  show();
-};
 document.getElementById("back").onclick = function(){ location.href = "index.html"; };
 
 new GLTFLoader().load("models/anatomy/human-reference.glb", function(gltf){
