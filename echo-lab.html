@@ -17,16 +17,17 @@ button{cursor:pointer;-webkit-appearance:none;appearance:none;background:#102028
 button:focus-visible,input:focus-visible{outline:2px solid var(--warm);outline-offset:2px}
 button.on{border-color:var(--warm);color:#fff8ee;background:#2a2118}
 a.go{color:var(--warm)}
-header{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px 0}
+header{display:flex;gap:10px;align-items:center;padding:8px 12px 0}
 header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:0;letter-spacing:-.03em}
-#hint{margin:0;padding:2px 12px 6px;color:var(--muted);font-size:13px;line-height:1.3}
+body.embed #back{display:none}
+#hint{display:block;margin:0;padding:4px 12px 6px;color:var(--muted);font-size:13px;line-height:1.35}
 body.doors #hint,body.supply #hint,body.doors #views{display:none}
 body.sim{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 body.sim header,#views,#hint,#status{flex:none}
 body.sim #views{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;overflow:visible;padding:6px 8px 0}
 body.sim #views button{min-height:32px;padding:0 2px;font-size:11px;width:100%}
 body.sim #status{margin:0 12px 4px}
-body.sim .stage{flex:1;min-height:0;height:auto;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:stretch}
+body.sim .stage{flex:1;min-height:0;height:auto;grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr);align-items:stretch}
 body.sim .panel{display:flex;flex-direction:column;min-height:0}
 body.sim .panel h2{display:none}
 body.sim .scan{grid-column:1;grid-row:1}
@@ -110,7 +111,7 @@ body.supply #ecg{height:240px}
   body.doors #doors{grid-template-columns:1fr 1fr}
   body.doors #doors button{min-height:calc(100dvh - 96px);padding:14px}
   body.doors #doors b{font-size:clamp(22px,6vw,30px)}
-  body.sim .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  body.sim .stage{grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr)}
 }
 body.sim .scan{grid-column:1;grid-row:1}
 body.sim .panel[aria-label="Patient and probe"]{grid-column:2;grid-row:1}
@@ -122,8 +123,8 @@ body.sim #echo,body.sim .chest-box{height:auto;min-height:0;flex:1}
   <button type="button" id="back">Back to ICU</button>
   <h1>Echo bay</h1>
 </header>
-<div class="bar" id="views" aria-label="Echo windows"></div>
 <p id="hint">The finger is the probe. It stays on the skin under the finger. Slide it, and the pointer follows that direction.</p>
+<div class="bar" id="views" aria-label="Echo windows"></div>
 <section id="doors" aria-label="Echo bay doors">
   <button type="button" data-door="supply"><b>Heart and supply</b><span>Four vessels, the lesion, and the trace.</span></button>
   <button type="button" data-door="sim"><b>Echo simulator</b><span>The finger is the probe. The sector follows it.</span></button>
@@ -279,6 +280,7 @@ const state = {
 };
 const mode = new URLSearchParams(location.search).get("mode") || "";
 document.body.classList.add(mode==="sim" ? "sim" : mode==="supply" ? "supply" : "doors");
+if(/[?&]embed=1(?:&|$)/.test(location.search)) document.body.classList.add("embed");
 try{
   const saved = JSON.parse(sessionStorage.getItem("echoState") || "null");
   if(saved && saved.lesion) state.lesion = saved.lesion;
@@ -1193,8 +1195,8 @@ if(mode==="sim" && bust){
     const w = bust.clientWidth, h = bust.clientHeight;
     if(!bustCam || w < 2 || h < 2) return;
     bustCam.aspect = w / h;
-    const halfH = 0.40;
-    const halfW = 0.34;
+    const halfH = 0.24;
+    const halfW = 0.22;
     const vFov = THREE.MathUtils.degToRad(bustCam.fov);
     const tan = Math.tan(vFov / 2);
     const dist = Math.max(halfH / tan, halfW / (tan * bustCam.aspect)) * 1.12;
@@ -1861,7 +1863,7 @@ function releaseGraphics(){
 }
 document.getElementById("back").onclick = function(){
   releaseGraphics();
-  if(mode){ location.href = "echo-lab.html?v=20261101i"; return; }
+  if(mode){ location.href = "echo-lab.html?v=20261101j"; return; }
   try{
     if(window.parent && window.parent!==window && typeof window.parent.returnToIcu==="function"){
       window.parent.returnToIcu();
@@ -1873,7 +1875,7 @@ document.getElementById("back").onclick = function(){
 document.getElementById("doors").onclick = function(event){
   const btn = event.target.closest("[data-door]");
   if(!btn) return;
-  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261101i";
+  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261101j";
 };
 document.getElementById("tabs").innerHTML = TABS.map(function(tab){
   return "<button type='button' data-tab='"+tab[0]+"'>"+tab[1]+"</button>";
