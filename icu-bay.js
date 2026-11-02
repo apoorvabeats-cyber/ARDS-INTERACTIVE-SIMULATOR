@@ -26,6 +26,7 @@
   let goTimer = 0;
   let synced = false;
   const flags = { pulse: true, vent: true, room: true };
+  window.bedHeld = true;
 
   function pip(){
     const flow = (sim.vt / 1000) / ((60 / sim.rr) * tiFrac);
@@ -159,7 +160,11 @@
       ventGain.gain.setTargetAtTime(whoosh, audioCtx.currentTime, 0.22);
     }
     if(humGain) humGain.gain.setTargetAtTime(allow && flags.vent ? 0.007 : 0, audioCtx.currentTime, 0.25);
-    if(allow && flags.room) syncBed();
+    window.bedHeld = !!(flags.pulse || flags.vent);
+    const bed = document.getElementById("bed");
+    if(window.bedHeld){
+      if(bed && !bed.paused) bed.pause();
+    } else if(allow && flags.room) syncBed();
     if(allow && flags.pulse && audioCtx.currentTime >= nextBeat){
       beep();
       nextBeat = audioCtx.currentTime + 60 / sim.hr;
@@ -377,6 +382,7 @@
     const key = btn.getAttribute("data-audio");
     flags[key] = !flags[key];
     btn.setAttribute("aria-pressed", flags[key] ? "true" : "false");
+    window.bedHeld = !!(flags.pulse || flags.vent);
     if(key === "room"){
       const bed = document.getElementById("bed");
       if(bed){
