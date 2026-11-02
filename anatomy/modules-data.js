@@ -75,7 +75,9 @@ export const ROOMS = {
   liver: {
     name: 'Liver', room: 'Hepatic',
     line: 'Failure, cirrhosis, infected ascites, and a blocked duct.',
-    learn: [],
+    learn: [
+      ['Liver Learning Lab', 'Anatomy, physiology, diseases, investigations, imaging, procedures and critical care management.', 'liver-learning-lab.html?v=20261103a']
+    ],
     practice: [
       ['Liver Practice Simulator', 'Acute liver failure, decompensated cirrhosis, infected ascites, hepatorenal syndrome, and cholangitis.', 'Practice_Simulator.html?focus=liver&v=20261029a']
     ],
