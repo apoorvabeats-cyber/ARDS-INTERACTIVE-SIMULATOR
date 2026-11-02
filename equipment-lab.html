@@ -138,6 +138,78 @@ const REAL = {
   chest: {url:"assets/models/CHEST.glb", label:"Chest drainage system", text:"An underwater seal that drains air or fluid from the pleural space."},
   defib: {url:"assets/models/DEFIB.glb", label:"Defibrillator", text:"Pads placed on the chest to read the rhythm and deliver a shock."}
 };
+const QUIZ = {
+  ett:[
+    {name:"Endotracheal tube", use:"The tube is the airway. A stylet shapes it. A bougie is the thin introducer for a poor view, and the tube is then railroaded over it.", check:"Do not force a tube that will not pass over the bougie. Cuff pressure sits around 20 to 30 centimetres of water, and carbon dioxide still confirms the trachea."},
+    {name:"Waveform capnography", use:"Waveform capnography is the continuous trace of exhaled carbon dioxide. A sustained wave means the tube is in the airway, and then it monitors ventilation.", check:"No wave after a few breaths means the tube is not in the trachea until proved otherwise. Do not wait for a chest film to remove an esophageal tube."}
+  ],
+  dl:[{name:"Direct laryngoscope", use:"It is used to see the vocal cords so the tube is passed under vision.", check:"Seeing the cords is not the final check. A sustained waveform of exhaled carbon dioxide confirms the tube is in the trachea."}],
+  vl:[{name:"Video laryngoscope", use:"A video laryngoscope shows the vocal cords to the whole team, without needing a direct line of sight.", check:"Seeing the cords is not the final check. A sustained waveform of exhaled carbon dioxide confirms the tube is in the trachea."}],
+  bvm:[{name:"Bag-valve mask", use:"The bag and mask oxygenate and ventilate a patient who is not breathing well, and they preoxygenate the patient before intubation.", check:"Use two people, a jaw thrust, and an oral airway if the tongue is in the way. Squeeze only enough to see the chest rise."}],
+  hfnc:[{name:"High-flow nasal cannula", use:"High-flow nasal oxygen is for hypoxemia when the patient is not yet failing and is still protecting the airway.", check:"Do not use it to delay intubation in someone who is vomiting, moribund, or not protecting the airway. Set a time limit and a plan to intubate."}],
+  niv:[{name:"NIV mask", use:"Mask ventilation is for a patient who is still protecting the airway, often a flare of COPD or cardiogenic edema.", check:"Do not use a mask to delay intubation in someone who is vomiting, moribund, or not protecting the airway. Set a time limit and a plan to intubate."}],
+  nrb:[{name:"Non-rebreather mask", use:"Wall oxygen runs the mask. The reservoir raises the oxygen the patient breathes.", check:"The bag should stay partly full. A collapsed bag means the flow is too low."}],
+  omask:[{name:"Oxygen mask", use:"A face mask raises the oxygen the patient breathes when nasal prongs are not enough.", check:"Before the patient moves, confirm the oxygen supply and that the tubing is connected."}],
+  o2kit:[{name:"Oxygen supply", use:"Wall oxygen runs the ventilator and the bag. The cylinder is the backup when the wall fails, and it is the supply you take on a transfer.", check:"Before the patient moves, confirm the cylinder has enough gas and that the regulator fits the outlet you are going to."}],
+  o2tube:[{name:"Oxygen tubing", use:"The tube carries oxygen from the flowmeter to the mask or the cannula.", check:"Follow it from the flowmeter to the patient before you trust the number on the dial."}],
+  cvc:[{name:"Central venous catheter", use:"A central catheter is for longer vasopressors, irritant infusions, or when no peripheral vein exists. Norepinephrine may start in a watched peripheral vein if a central line would delay it.", check:"Use ultrasound for the central vein. Never lose the wire. After a neck or subclavian attempt, look for a pneumothorax."}],
+  needles:[{name:"Arterial line", use:"An arterial catheter gives beat-to-beat blood pressure and a source for arterial blood gases. The radial artery is the usual first site.", check:"Zero it at the phlebostatic axis and read the waveform, not only the number. A pale cold hand means the catheter comes out."}],
+  dialysis:[{name:"Dialysis catheter", use:"A dialysis catheter is for renal replacement when the kidneys cannot cope: refractory acidosis, refractory potassium, fluid the lungs cannot hold, or some poisonings. Continuous therapy is for the unstable patient.", check:"The indication is the patient, not a single creatinine. This catheter is not a routine line for vasopressors. Anticoagulation of the circuit is a separate decision from anticoagulation of the patient."}],
+  chest:[{name:"Chest drain", use:"The kit and the underwater seal drain a pneumothorax or a large pleural collection. Air and fluid can leave, and outside air cannot be sucked back in.", check:"Use the triangle of safety, and ultrasound when you are draining fluid. Never clamp a drain that is bubbling. Keep the bottle below the patient."}],
+  defib:[{name:"Defibrillator", use:"An unsynchronized shock is for ventricular fibrillation and pulseless ventricular tachycardia. A synchronized shock is for an unstable tachycardia that still has a pulse.", check:"Sync is on when there is a pulse. Sync is off for ventricular fibrillation. Nobody is touching the patient when you shock."}]
+};
+let quizAt = 0;
+let quizStep = "use";
+let quizOpen = false;
+function quizPool(field, except){
+  const pool = [];
+  Object.keys(QUIZ).forEach(function(id){
+    QUIZ[id].forEach(function(item){
+      if(item.name!==except && item[field]) pool.push(item[field]);
+    });
+  });
+  const out = [];
+  while(out.length<3 && pool.length) out.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
+  return out;
+}
+function quizPanel(){
+  const list = QUIZ[currentId];
+  if(!list) return "";
+  if(!quizOpen) return "<button type='button' id='ask'>Questions</button>";
+  const item = list[quizAt];
+  const correct = item[quizStep];
+  const options = quizPool(quizStep, item.name);
+  options.splice(Math.floor(Math.random()*(options.length+1)), 0, correct);
+  const prompt = quizStep==="use" ? "What is it for?" : "Which check matters?";
+  return "<div id='quiz'><b>"+item.name+"</b><p>"+prompt+"</p>"+
+    options.map(function(opt,i){ return "<button type='button' data-q='"+i+"' data-ok='"+(opt===correct?1:0)+"'>"+opt+"</button>"; }).join("")+
+    "<p id='qfb' hidden></p></div>";
+}
+function wireQuiz(aside){
+  const ask = aside.querySelector("#ask");
+  if(ask) ask.onclick = function(){ quizOpen = true; quizAt = 0; quizStep = "use"; paintLists(true); };
+  aside.querySelectorAll("[data-q]").forEach(function(btn){
+    btn.onclick = function(){
+      const ok = btn.getAttribute("data-ok")==="1";
+      aside.querySelectorAll("[data-q]").forEach(function(b){ b.disabled = true; if(b.getAttribute("data-ok")==="1") b.classList.add("on"); });
+      const fb = aside.querySelector("#qfb");
+      const list = QUIZ[currentId];
+      const item = list[quizAt];
+      fb.hidden = false;
+      fb.textContent = (ok ? "Correct. " : "That is incorrect. ") + item[quizStep];
+      if(window.speechSynthesis){
+        const u = new SpeechSynthesisUtterance(fb.textContent);
+        u.lang = "en-GB"; u.rate = 0.92;
+        speechSynthesis.cancel(); speechSynthesis.speak(u);
+      }
+      setTimeout(function(){
+        if(quizStep==="use"){ quizStep = "check"; }
+        else { quizStep = "use"; quizAt += 1; if(quizAt>=list.length){ quizOpen = false; quizAt = 0; } }
+        paintLists(true);
+      }, 1600);
+    };
+  });
+}
 let selected = null;
 let exploded = false;
 let turning = false;
@@ -924,6 +996,9 @@ function loadReal(id){
 function showItem(id){
   stopSpeak();
   currentId = id;
+  quizAt = 0;
+  quizStep = "use";
+  quizOpen = false;
   clearRoot();
   clearTouch();
   clearGuides();
@@ -979,7 +1054,7 @@ function paintLists(keepCats){
     "<div id='readout'><b>"+(info ? (info.userData ? info.userData.title : info.title) : "Touch a part")+"</b><p>"+(info ? (info.userData ? info.userData.text : info.text) : "It lights, and the voice names it and says what it is for.")+"</p></div>"+
     "<p class='fine'>"+(REAL[currentId]
       ? (realModel ? REAL[currentId].label+". Drag to turn. Pinch to zoom." : "Loading "+REAL[currentId].label+".")
-      : "Real-time 3D teaching model with separate parts. Drag to turn. Pinch or use Zoom. Not a manufacturer scan.")+"</p>";
+      : "Real-time 3D teaching model with separate parts. Drag to turn. Pinch or use Zoom. Not a manufacturer scan.")+"</p>"+quizPanel();
   aside.scrollTop = asideTop;
   aside.querySelectorAll("[data-part]").forEach(function(btn){
     btn.onclick = function(){
@@ -997,6 +1072,7 @@ function paintLists(keepCats){
       paintLists(true);
     };
   });
+  wireQuiz(aside);
   const dock = document.getElementById("dock");
   dock.innerHTML =
     "<button type='button' id='turn'"+(turning?" class='on'":"")+">Turn</button>"+

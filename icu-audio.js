@@ -222,21 +222,37 @@
       alarm: !!alarm,
     };
   }
+  function hushBed(){
+    try{
+      if(!window.parent || window.parent === window) return;
+      if(window.parent.homeAudio && window.parent.homeAudio()) return;
+      window.parent.bedHeld = true;
+      const bed = window.parent.document.getElementById("bed");
+      if(bed && !bed.paused) bed.pause();
+    }catch(e){}
+  }
+  function releaseBed(){
+    try{
+      if(!window.parent || window.parent === window) return;
+      window.parent.bedHeld = false;
+      if(window.parent.keepScore) window.parent.keepScore();
+    }catch(e){}
+  }
   function tick() {
     if (!enabled) return;
     ensure();
     const s = read();
     const now = performance.now();
     if (s && s.rhythmSound === "vf") {
-      if (now >= pulseAt) { playVf(); pulseAt = now + 680; }
+      if (now >= pulseAt) { playVf(); pulseAt = now + 680; hushBed(); }
     } else if (s && s.pulse && s.pulse.kind !== "absent" && s.pulse.bpm > 20) {
       let wait = 60000 / clamp(s.pulse.bpm, 30, 200);
       if (s.pulse.kind === "irregular") wait *= 0.45 + Math.random() * 1.15;
-      if (now >= pulseAt) { playPulse(s.pulse.kind); pulseAt = now + wait; }
+      if (now >= pulseAt) { playPulse(s.pulse.kind); pulseAt = now + wait; hushBed(); }
     }
     if (s && s.breath && s.breath.bpm > 4) {
       const wait = 60000 / clamp(s.breath.bpm, 6, 48);
-      if (now >= breathAt) { playBreath(s.breath.kind); breathAt = now + wait; }
+      if (now >= breathAt) { playBreath(s.breath.kind); breathAt = now + wait; hushBed(); }
     }
     if (s && s.alarm && now >= alarmAt) {
       if (s.rhythmSound === "asystole") playAsystole();
@@ -269,6 +285,7 @@
     try { sessionStorage.removeItem("icu-sound"); } catch (e) {}
     clearInterval(timer);
     try { speechSynthesis.cancel(); } catch (e) {}
+    releaseBed();
   }
   btn.addEventListener("click", (e) => {
     e.preventDefault();
@@ -298,5 +315,6 @@
     try { if (window.speechSynthesis) speechSynthesis.getVoices(); } catch (e) {}
   }
   if (document.body) mount(); else document.addEventListener("DOMContentLoaded", mount);
+  window.addEventListener("pagehide", releaseBed);
   window.ICUAudio = { enable: enable, disable: disable, sayCorrect: sayCorrect, sayWrong: sayWrong, read: read };
 })();

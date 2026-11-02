@@ -26,7 +26,6 @@
   let goTimer = 0;
   let synced = false;
   const flags = { pulse: true, vent: true, room: true };
-  window.bedHeld = true;
 
   function pip(){
     const flow = (sim.vt / 1000) / ((60 / sim.rr) * tiFrac);
@@ -160,11 +159,7 @@
       ventGain.gain.setTargetAtTime(whoosh, audioCtx.currentTime, 0.22);
     }
     if(humGain) humGain.gain.setTargetAtTime(allow && flags.vent ? 0.007 : 0, audioCtx.currentTime, 0.25);
-    window.bedHeld = !!(flags.pulse || flags.vent);
-    const bed = document.getElementById("bed");
-    if(window.bedHeld){
-      if(bed && !bed.paused) bed.pause();
-    } else if(allow && flags.room) syncBed();
+    if(allow && flags.room) syncBed();
     if(allow && flags.pulse && audioCtx.currentTime >= nextBeat){
       beep();
       nextBeat = audioCtx.currentTime + 60 / sim.hr;
@@ -309,15 +304,28 @@
     document.body.classList.add("in", "enter");
     const dialysis = /Dialysis_/.test(url || "");
     const label = back && back.label ? back.label : "Back to ICU";
+    const shock = /Shock_|focus=circulation/.test(url || "");
+    const toMonitor = shock && back && back.fn;
     room.innerHTML =
-      '<button type="button" class="back" id="back">'+label+'</button>'+
+      (toMonitor
+        ? '<div class="backrow"><button type="button" class="back" id="back">Back to monitor</button><button type="button" class="back" id="backicu">Back to ICU</button></div>'
+        : '<button type="button" class="back" id="back">'+label+'</button>')+
       (dialysis ? "" : '<h2>'+title+'</h2>')+
       '<iframe class="abg-frame" title="'+title+'" src="'+url+'"></iframe>';
     document.getElementById("back").onclick = function(){
+      if(toMonitor){ back.fn(); return; }
       if(back && back.fn){ back.fn(); return; }
       document.body.classList.remove("in", "enter", "inside", "lab", "arena", "osce", "reference");
       room.innerHTML = "";
+      if(window.keepScore) window.keepScore();
     };
+    if(toMonitor){
+      document.getElementById("backicu").onclick = function(){
+        document.body.classList.remove("in", "enter", "inside", "lab", "arena", "osce", "reference");
+        room.innerHTML = "";
+        if(window.keepScore) window.keepScore();
+      };
+    }
   }
   function openShock(){
     quietLine();
@@ -336,7 +344,7 @@
       document.body.classList.remove("in", "enter");
       room.innerHTML = "";
     };
-    bindModules(room);
+    bindModules(room, {label:"Back to monitor", fn: openShock});
     holdRoom(room);
   }
   function loadBody(){}
@@ -348,6 +356,7 @@
     document.body.classList.add("body-only", "live3d");
     document.body.classList.remove("flat");
     quietLine();
+    window.bedHeld = false;
     if(typeof window.keepScore === "function") window.keepScore();
     const bubbles = document.getElementById("organ-bubbles");
     if(bubbles){ bubbles.hidden = true; bubbles.innerHTML = ""; }
@@ -368,8 +377,8 @@
     if(!hit || !live) return;
     unlock();
     const go = hit.getAttribute("data-go");
-    if(go === "cart") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261030b", "Crash cart");
-    else if(go === "defib") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261030b", "Defibrillator");
+    if(go === "cart") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261102e", "Crash cart");
+    else if(go === "defib") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261102e", "Defibrillator");
     else if(go === "vent") openModule("Ventilator_Waveform_Troubleshooting.html?v=20261025a", "Ventilator");
     else if(go === "monitor") openShock();
     else if(go === "dialysis") openDialysis();
@@ -382,7 +391,6 @@
     const key = btn.getAttribute("data-audio");
     flags[key] = !flags[key];
     btn.setAttribute("aria-pressed", flags[key] ? "true" : "false");
-    window.bedHeld = !!(flags.pulse || flags.vent);
     if(key === "room"){
       const bed = document.getElementById("bed");
       if(bed){
@@ -408,6 +416,7 @@
     if(tabs) tabs.hidden = false;
     const room = document.getElementById("room");
     if(room) room.innerHTML = "";
+    window.bedHeld = false;
     bedOn();
     if(master && audioCtx) master.gain.setTargetAtTime(0.5, audioCtx.currentTime, 0.08);
   };
