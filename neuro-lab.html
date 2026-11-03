@@ -64,7 +64,7 @@ input.find{width:100%;background:transparent;border:0;border-bottom:1px solid va
 </head>
 <body>
 <canvas id="view" aria-label="Three dimensional brain. Drag to turn, pinch to zoom, tap a structure."></canvas>
-<a class="back" href="hub.html">Brain</a>
+<a class="back" id="page-back" href="index.html?doors=brain">Back</a>
 <div class="bar mods" id="mods" role="tablist" aria-label="Anatomy modules"></div>
 <div class="bar layers" id="layers" aria-label="Layer visibility"></div>
 <div class="dock" id="dock"></div>
@@ -1576,6 +1576,39 @@ function openSheet(msg){
   sheet.innerHTML = '<p>'+esc(msg)+'</p>';
   sheet.classList.add("open");
   renderAbout();
+}
+
+function pageBack(){
+  var stage = document.getElementById("stage");
+  if(stage && stage.classList.contains("on")){
+    lesson = null;
+    stage.classList.remove("on");
+    document.getElementById("aim").textContent = "";
+    applyModule();
+    return true;
+  }
+  if(sheet.classList.contains("open")){
+    sheet.classList.remove("open");
+    return true;
+  }
+  return false;
+}
+window.__pageBack = pageBack;
+var pageBackLink = document.getElementById("page-back");
+if(pageBackLink){
+  if(/(?:^|[?&])embed=1(?:&|$)/.test(location.search)) pageBackLink.hidden = true;
+  pageBackLink.addEventListener("click", function(event){
+    event.preventDefault();
+    if(pageBack()) return;
+    try{
+      if(window.parent && window.parent !== window && typeof window.parent.returnFromModule === "function"){
+        window.parent.returnFromModule();
+        return;
+      }
+    }catch(err){}
+    if(history.length > 1){ history.back(); return; }
+    location.href = "index.html?doors=brain";
+  });
 }
 paint();
 boot();

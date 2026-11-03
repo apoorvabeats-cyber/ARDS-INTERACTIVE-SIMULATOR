@@ -69,7 +69,7 @@ a.tablet{text-decoration:none;color:inherit}
 </head>
 <body>
 <header>
-  <button type="button" id="icuBack">Back to ICU</button>
+  <button type="button" id="icuBack">Back</button>
   <strong>OSCE World</strong>
   <div id="clock" role="timer" aria-live="polite" aria-label="Twenty seconds for each answer">20</div>
   <div class="tools">
@@ -95,15 +95,17 @@ voiceBtn.onclick = function(){
   else say("Voice on.");
 };
 document.getElementById("icuBack").onclick = function(){
-  if(window.speechSynthesis) speechSynthesis.cancel();
+  if(pageBack()) return;
   try{
-    if(window.parent && window.parent !== window && typeof window.parent.returnToIcu === "function"){
-      window.parent.returnToIcu();
+    if(window.parent && window.parent !== window && typeof window.parent.returnFromModule === "function"){
+      window.parent.returnFromModule();
       return;
     }
   }catch(err){}
+  if(history.length > 1){ history.back(); return; }
   location.href = "index.html";
 };
+if(/(?:^|[?&])embed=1(?:&|$)/.test(location.search)) document.getElementById("icuBack").hidden = true;
 document.getElementById("stations").onclick = function(){
   mode = "";
   history.replaceState(null, "", "osce.html?v=20261021q");
@@ -1134,6 +1136,38 @@ function advanceFilm(id, stepName){
   renderFilmList();
 }
 
+
+function pageBack(){
+  if(window.speechSynthesis) speechSynthesis.cancel();
+  if(typeof stopClock === "function") stopClock();
+  if(document.getElementById("drugBack")){ renderDrugGroups(); return true; }
+  if(document.getElementById("kitBack")){ renderKitGroups(); return true; }
+  if(document.getElementById("filmBack")){ renderFilmGroups(); return true; }
+  if(document.getElementById("radBack")){ renderFilmList(); return true; }
+  if(mode==="drug" && drugQueue.length && document.querySelector(".choice")){
+    if(fieldAt>0){ fieldAt -= 1; renderDrugQ(); return true; }
+    if(drugAt>0){ drugAt -= 1; fieldAt = FIELDS.length - 1; renderDrugQ(); return true; }
+    renderDrugList();
+    return true;
+  }
+  if(mode==="abg"){
+    if(abgStep==="cause"){ abgStep = "id"; renderAbg(); return true; }
+    if(abgAt>0){ abgAt -= 1; abgStep = "id"; renderAbg(); return true; }
+  }
+  if(mode==="ecg"){
+    if(ecgStep==="treat"){ ecgStep = "name"; renderEcg(); return true; }
+    if(ecgAt>0){ ecgAt -= 1; ecgStep = "name"; renderEcg(); return true; }
+  }
+  if(mode==="kit" && kitGroup){ kitGroup = ""; renderKitGroups(); return true; }
+  if(mode){
+    mode = "";
+    history.replaceState(null, "", location.pathname);
+    home();
+    return true;
+  }
+  return false;
+}
+window.__pageBack = pageBack;
 function start(){
   if(mode==="abg") startAbg();
   else if(mode==="drug") startDrug();

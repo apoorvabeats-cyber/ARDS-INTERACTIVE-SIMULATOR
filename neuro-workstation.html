@@ -1638,6 +1638,57 @@ window.addEventListener("hashchange", function(){
   enter(route);
 });
 var initial = (location.hash || "#").replace("#", "") || "home";
+
+function pageBack(){
+  if (state.route === "stroke" && state.stroke && !state.stroke.menu) {
+    if (state.stroke.followOpen) {
+      state.stroke.followOpen = false;
+      resetStep();
+      render();
+      return true;
+    }
+    if (state.stroke.stage > 0) {
+      state.stroke.stage -= 1;
+      state.stroke.followOpen = false;
+      resetStep();
+      render();
+      return true;
+    }
+    state.stroke.menu = true;
+    render();
+    return true;
+  }
+  if (state.route !== "home" && state.route !== "stroke" && state.step > 0 && STATIONS[state.route]) {
+    state.step -= 1;
+    resetStep();
+    render();
+    return true;
+  }
+  if (state.route !== "home") {
+    enter("home");
+    if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+    return true;
+  }
+  return false;
+}
+window.__pageBack = pageBack;
+var pageBackLink = document.getElementById("toplink");
+if (pageBackLink) {
+  pageBackLink.textContent = "Back";
+  pageBackLink.setAttribute("href", "index.html?doors=brain");
+  pageBackLink.addEventListener("click", function(event){
+    event.preventDefault();
+    if (pageBack()) return;
+    try {
+      if (window.parent && window.parent !== window && typeof window.parent.returnFromModule === "function") {
+        window.parent.returnFromModule();
+        return;
+      }
+    } catch (err) {}
+    if (history.length > 1) { history.back(); return; }
+    location.href = "index.html?doors=brain";
+  });
+}
 enter(initial);
 })();
 </script>

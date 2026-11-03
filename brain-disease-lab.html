@@ -92,7 +92,7 @@ main{padding:4px 14px 40px}
 <body>
 <header>
   <div><p class="kicker">Critical care · brain</p><h1>Disease learning lab</h1></div>
-  <a class="back" href="index.html?lab=brain" target="_top">Learning lab</a>
+  <a class="back" id="page-back" href="index.html?doors=brain">Back</a>
 </header>
 <div class="scroller diseases" id="diseases" role="tablist" aria-label="Brain diseases"></div>
 <p class="context" id="context"></p>
@@ -1266,7 +1266,7 @@ function renderShow(d, topic){
   const steps = def.steps;
   work.innerHTML =
     '<p class="kicker">'+esc(d.full)+' · '+esc(sectionTitle())+'</p>'+
-    '<div class="backrow"><button type="button" id="backcat">Back to the list</button></div>'+
+    '<div class="backrow"><button type="button" id="backcat">Back</button></div>'+
     '<div class="stage wide">'+
       '<div class="panel side-l"><span class="badge">'+(def.clip?"Animation":def.inspect?"3D teaching view":"3D teaching sequence")+'</span><h2>'+esc(topic.name)+'</h2>'+
         (topic.indication?'<h3>Indication</h3><p>'+esc(topic.indication)+'</p>':"")+
@@ -1518,6 +1518,65 @@ function simLink(d){
 }
 function footnote(){
   return "";
+}
+
+function pageBack(){
+  if(scanMode){
+    if(scanAt > 0){
+      scanAt -= 1;
+      scanPick = null;
+      scanLocked = false;
+      render();
+      return true;
+    }
+    leaveScans();
+    return true;
+  }
+  if(topicId){
+    topicId = "";
+    spotId = "";
+    writeHash();
+    render();
+    return true;
+  }
+  if(!listMode && !chapterMenu && quizAt > 0){
+    quizAt -= 1;
+    render();
+    return true;
+  }
+  if(!listMode && !chapterMenu){
+    chapterMenu = true;
+    topicId = "";
+    writeHash();
+    render();
+    return true;
+  }
+  if(!listMode && chapterMenu){
+    listMode = true;
+    chapterMenu = false;
+    topicId = "";
+    writeHash();
+    render();
+    return true;
+  }
+  return false;
+}
+window.__pageBack = pageBack;
+var pageBackLink = document.getElementById("page-back");
+if(pageBackLink){
+  if(/(?:^|[?&])embed=1(?:&|$)/.test(location.search)) pageBackLink.hidden = true;
+  pageBackLink.addEventListener("click", function(event){
+    event.preventDefault();
+    if(pageBack()) return;
+    try{
+      if(window.parent && window.parent !== window && typeof window.parent.returnFromModule === "function"){
+        window.parent.returnFromModule();
+        return;
+      }
+    }catch(err){}
+    if(history.length > 1){ history.back(); return; }
+    location.href = "index.html?doors=brain";
+  });
 }
 window.addEventListener("hashchange", function(){ readHash(); render(); });
 readHash();

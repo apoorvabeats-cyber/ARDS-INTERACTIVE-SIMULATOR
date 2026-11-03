@@ -285,7 +285,7 @@
     const room = document.getElementById("room");
     document.body.classList.add("in", "enter");
     room.innerHTML =
-      '<button type="button" class="back" id="back">Back to ICU</button>'+
+      '<button type="button" class="back" id="back">Back</button>'+
       '<h2>Dialysis</h2>'+
       '<p class="lede">The machine is on. The learning lab is the circuit and the ten modalities. Practice is one skill, or a whole session.</p>'+
       '<button type="button" class="card" data-mod="Dialysis_Learning_Lab.html?v=20261029a"><b>Dialysis Learning Lab</b><span>IHD, SLED, PIKRT, the continuous modes, ultrafiltration and the peritoneum. SLED sits inside prolonged intermittent therapy.</span></button>'+
@@ -303,43 +303,36 @@
     const room = document.getElementById("room");
     document.body.classList.add("in", "enter");
     const dialysis = /Dialysis_/.test(url || "");
-    const label = back && back.label ? back.label : "Back to ICU";
-    const shock = /Shock_|focus=circulation/.test(url || "");
-    const toMonitor = shock && back && back.fn;
     room.innerHTML =
-      (toMonitor
-        ? '<div class="backrow"><button type="button" class="back" id="back">Back to monitor</button><button type="button" class="back" id="backicu">Back to ICU</button></div>'
-        : '<button type="button" class="back" id="back">'+label+'</button>')+
+      '<button type="button" class="back" id="back">Back</button>'+
       (dialysis ? "" : '<h2>'+title+'</h2>')+
       '<iframe class="abg-frame" title="'+title+'" src="'+url+'"></iframe>';
     document.getElementById("back").onclick = function(){
-      if(toMonitor){ back.fn(); return; }
+      const frame = room.querySelector("iframe");
+      if(frame && frame.contentWindow){
+        try{
+          if(typeof frame.contentWindow.__pageBack === "function" && frame.contentWindow.__pageBack() === true) return;
+        }catch(err){}
+      }
       if(back && back.fn){ back.fn(); return; }
       document.body.classList.remove("in", "enter", "inside", "lab", "arena", "osce", "reference");
       room.innerHTML = "";
       if(window.keepScore) window.keepScore();
     };
-    if(toMonitor){
-      document.getElementById("backicu").onclick = function(){
-        document.body.classList.remove("in", "enter", "inside", "lab", "arena", "osce", "reference");
-        room.innerHTML = "";
-        if(window.keepScore) window.keepScore();
-      };
-    }
   }
   function openShock(){
     quietLine();
     const room = document.getElementById("room");
     document.body.classList.add("in", "enter");
     room.innerHTML =
-      '<button type="button" class="back" id="back">Back to ICU</button>'+
+      '<button type="button" class="back" id="back">Back</button>'+
       '<h2>Monitor</h2>'+
       '<p class="lede">The wall monitor is a simulation. Choose the shock module that already exists.</p>'+
       '<button type="button" class="card" data-mod="Shock_Bay.html?v=20261024e"><b>Shock bay</b><span>Phenotypes of shock, and a ventilator you control.</span></button>'+
       '<button type="button" class="card" data-mod="Shock_Identification_Management_Simulator.html?v=20261024e"><b>Shock identification</b><span>MAP, cardiac index and the phenotype.</span></button>'+
       '<button type="button" class="card" data-mod="Shock_POCUS_RUSH_Simulator.html?v=20261024e"><b>Shock and POCUS</b><span>RUSH exam, ScvO2 and lactate.</span></button>'+
       '<button type="button" class="card" data-mod="Shock_Telemetry_POCUS_Simulator.html?v=20261024e"><b>Shock telemetry</b><span>Arterial line, IVC, PPV and the vasopressor.</span></button>'+
-      '<button type="button" class="card" data-mod="Practice_Simulator.html?focus=circulation&v=20261029a"><b>Shock practice</b><span>Septic shock. The small ventricle, the full vena cava, then norepinephrine.</span></button>';
+      '<button type="button" class="card" data-mod="Practice_Simulator.html?focus=circulation&v=20261103e"><b>Shock practice</b><span>Septic shock. The small ventricle, the full vena cava, then norepinephrine.</span></button>';
     document.getElementById("back").onclick = function(){
       document.body.classList.remove("in", "enter");
       room.innerHTML = "";

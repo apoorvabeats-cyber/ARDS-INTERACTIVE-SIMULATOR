@@ -24,7 +24,7 @@ export const ROOMS = {
       ['CNS infection', 'Meningitis, encephalitis, abscess and the ICU complications.', 'CNS_Infection_Interactive_Algorithm_v7.html?v=20260925s']
     ],
     practice: [
-      ['Neurology Practice Simulator', 'A patient, a study, and the next decision. Stroke and subarachnoid hemorrhage.', 'Practice_Simulator.html?focus=neuro&v=20261029a']
+      ['Neurology Practice Simulator', 'A patient, a study, and the next decision. Stroke and subarachnoid hemorrhage.', 'Practice_Simulator.html?focus=neuro&v=20261103e']
     ],
     soon: ''
   },
@@ -50,7 +50,7 @@ export const ROOMS = {
     ],
     practice: [
       ['Mechanical ventilation', 'Pressure, flow and volume. Name the pattern.', 'Ventilator_Waveform_Troubleshooting.html?v=20260925s'],
-      ['Respiratory Practice Simulator', 'ARDS. Click the opacity, name the severity, then set the tidal volume.', 'Practice_Simulator.html?focus=lungs&v=20261029a']
+      ['Respiratory Practice Simulator', 'ARDS. Click the opacity, name the severity, then set the tidal volume.', 'Practice_Simulator.html?focus=lungs&v=20261103e']
     ],
     soon: ''
   },
@@ -59,7 +59,7 @@ export const ROOMS = {
     line: 'Rhythm, pressure and the failing pump.',
     learn: [
       ['Cardiac Anatomy Lab', 'A real heart model. Chambers, valves, coronaries, flow and the conduction drawing.', 'cardiac-lab.html?v=20261030a'],
-      ['Echo bay', 'Finger on the chest. The probe, the coronary territory, the wall motion and the trace move together.', 'echo-lab.html?v=20261030a'],
+      ['Echo bay', 'Finger on the chest. The probe, the coronary territory, the wall motion and the trace move together.', 'echo-lab.html?v=20261103e'],
       ['ACLS, 2025 AHA', 'Arrest, tachycardia and bradycardia, with the current doses.', 'ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20260925s'],
       ['Shock identification', 'MAP, cardiac index and the phenotype.', 'Shock_Identification_Management_Simulator.html?v=20260925s'],
       ['Shock and POCUS', 'RUSH exam, ScvO2 and lactate.', 'Shock_POCUS_RUSH_Simulator.html?v=20260925l'],
@@ -67,8 +67,8 @@ export const ROOMS = {
     ],
     practice: [
       ['Cardiac rhythm', 'A moving ECG, the arrest and the reversible causes.', 'Cardiac_Rhythm_Decision_Simulator_V29_FINAL_AUDITED.html?v=20260925t'],
-      ['Shock Practice Simulator', 'Septic shock. The small ventricle, the full IVC, then norepinephrine.', 'Practice_Simulator.html?focus=circulation&v=20261029a'],
-      ['Cardiac Practice Simulator', 'Infarction, heart block, cardiogenic shock, ventricular fibrillation, and tamponade.', 'Practice_Simulator.html?focus=heart&v=20261029a']
+      ['Shock Practice Simulator', 'Septic shock. The small ventricle, the full IVC, then norepinephrine.', 'Practice_Simulator.html?focus=circulation&v=20261103e'],
+      ['Cardiac Practice Simulator', 'Infarction, heart block, cardiogenic shock, ventricular fibrillation, and tamponade.', 'Practice_Simulator.html?focus=heart&v=20261103e']
     ],
     soon: ''
   },
@@ -76,10 +76,10 @@ export const ROOMS = {
     name: 'Liver', room: 'Hepatic',
     line: 'Failure, cirrhosis, infected ascites, and a blocked duct.',
     learn: [
-      ['Liver Learning Lab', 'Anatomy, physiology, diseases, investigations, imaging, procedures and critical care management.', 'liver-learning-lab.html?v=20261103d']
+      ['Liver Learning Lab', 'Anatomy, physiology, diseases, investigations, imaging, procedures and critical care management.', 'liver-learning-lab.html?v=20261103e']
     ],
     practice: [
-      ['Liver Practice Simulator', 'Acute liver failure, decompensated cirrhosis, infected ascites, hepatorenal syndrome, and cholangitis.', 'Practice_Simulator.html?focus=liver&v=20261029a']
+      ['Liver Practice Simulator', 'Acute liver failure, acute viral hepatitis, decompensated cirrhosis, encephalopathy, portal-vein thrombosis, infected ascites, hepatorenal syndrome, and cholangitis.', 'Practice_Simulator.html?focus=liver&v=20261103e']
     ],
     soon: ''
   },
@@ -88,7 +88,7 @@ export const ROOMS = {
     line: 'Upper gastrointestinal bleeding. Variceal and non-variceal.',
     learn: [],
     practice: [
-      ['Upper gastrointestinal bleeding', 'Variceal and non-variceal. The endoscope, then the bundle that matches the lesion.', 'Practice_Simulator.html?focus=bleed&v=20261029a']
+      ['Upper gastrointestinal bleeding', 'Variceal and non-variceal. The endoscope, then the bundle that matches the lesion.', 'Practice_Simulator.html?focus=bleed&v=20261103e']
     ],
     soon: ''
   },
@@ -99,7 +99,7 @@ export const ROOMS = {
       ['Acute pancreatitis', 'Diagnosis, fluids, cause, and the step-up approach.', 'Acute_Pancreatitis_Simulator.html?v=20260926s']
     ],
     practice: [
-      ['GI Practice Simulator', 'Pancreatitis, variceal bleeding, a duodenal ulcer, and cholangitis.', 'Practice_Simulator.html?focus=gi&v=20261029a']
+      ['GI Practice Simulator', 'Pancreatitis, variceal bleeding, a duodenal ulcer, and cholangitis.', 'Practice_Simulator.html?focus=gi&v=20261103e']
     ],
     soon: ''
   },
@@ -113,11 +113,11 @@ export const ROOMS = {
       ['Antifungal resistance', 'C. auris, Mucorales, and the site the drug does not reach.', 'Antifungal_Resistance_Simulator.html?v=20260925s']
     ],
     practice: [
-      ['Integrated ICU cases', 'Every practice case, from the brain to the blood film.', 'Practice_Simulator.html?v=20261029a'],
-      ['Infection Practice Simulator', 'Septic shock, severe malaria, and dengue shock.', 'Practice_Simulator.html?focus=id&v=20261029a'],
-      ['Hematology Practice Simulator', 'Thrombotic thrombocytopenic purpura. The film, then plasma exchange.', 'Practice_Simulator.html?focus=heme&v=20261029a'],
-      ['Trauma Practice Simulator', 'Rib fractures, and an open pelvic ring.', 'Practice_Simulator.html?focus=trauma&v=20261029a'],
-      ['Toxicology Practice Simulator', 'Organophosphate poisoning. Atropine until the chest is dry.', 'Practice_Simulator.html?focus=tox&v=20261029a']
+      ['Integrated ICU cases', 'Every practice case, from the brain to the blood film.', 'Practice_Simulator.html?v=20261103e'],
+      ['Infection Practice Simulator', 'Septic shock, severe malaria, and dengue shock.', 'Practice_Simulator.html?focus=id&v=20261103e'],
+      ['Hematology Practice Simulator', 'Thrombotic thrombocytopenic purpura. The film, then plasma exchange.', 'Practice_Simulator.html?focus=heme&v=20261103e'],
+      ['Trauma Practice Simulator', 'Rib fractures, and an open pelvic ring.', 'Practice_Simulator.html?focus=trauma&v=20261103e'],
+      ['Toxicology Practice Simulator', 'Organophosphate poisoning. Atropine until the chest is dry.', 'Practice_Simulator.html?focus=tox&v=20261103e']
     ],
     soon: ''
   },
@@ -129,7 +129,7 @@ export const ROOMS = {
       ['Dialysis Learning Lab', 'Ten modalities. The circuit, the dose, and why SLED sits inside prolonged intermittent therapy.', 'Dialysis_Learning_Lab.html?v=20261029a']
     ],
     practice: [
-      ['Renal Practice Simulator', 'Hyperkalemia, obstructed acute kidney injury, and missed dialysis.', 'Practice_Simulator.html?focus=kidney&v=20261029a'],
+      ['Renal Practice Simulator', 'Hyperkalemia, obstructed acute kidney injury, and missed dialysis.', 'Practice_Simulator.html?focus=kidney&v=20261103e'],
       ['Dialysis practice', 'Indication, modality, prescription, and a whole session.', 'Dialysis_Practice_Simulator.html?v=20261029a']
     ],
     soon: ''

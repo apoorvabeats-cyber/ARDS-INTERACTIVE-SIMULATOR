@@ -122,7 +122,7 @@ body.sim #echo,body.sim .chest-box{height:auto;min-height:0;flex:1}
 </head>
 <body>
 <header>
-  <button type="button" id="back">Back to ICU</button>
+  <button type="button" id="back">Back</button>
   <h1>Echo bay</h1>
 </header>
 <p id="hint">The finger is the probe. It stays on the skin under the finger. Slide it, and the pointer follows that direction.</p>
@@ -1881,21 +1881,27 @@ function releaseGraphics(){
     renderer = null;
   }
 }
+function pageBack(){
+  if(mode && history.length > 1){ releaseGraphics(); history.back(); return true; }
+  return false;
+}
+window.__pageBack = pageBack;
 document.getElementById("back").onclick = function(){
   releaseGraphics();
-  if(mode){ location.href = "echo-lab.html?v=20261101l"; return; }
+  if(pageBack()) return;
   try{
-    if(window.parent && window.parent!==window && typeof window.parent.returnToIcu==="function"){
-      window.parent.returnToIcu();
+    if(window.parent && window.parent!==window && typeof window.parent.returnFromModule==="function"){
+      window.parent.returnFromModule();
       return;
     }
   }catch(err){}
+  if(history.length > 1){ history.back(); return; }
   location.href = "index.html";
 };
 document.getElementById("doors").onclick = function(event){
   const btn = event.target.closest("[data-door]");
   if(!btn) return;
-  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261101l";
+  location.href = "echo-lab.html?mode="+btn.getAttribute("data-door")+"&v=20261103e"+(/embed=1/.test(location.search)?"&embed=1":"");
 };
 document.getElementById("tabs").innerHTML = TABS.map(function(tab){
   return "<button type='button' data-tab='"+tab[0]+"'>"+tab[1]+"</button>";
