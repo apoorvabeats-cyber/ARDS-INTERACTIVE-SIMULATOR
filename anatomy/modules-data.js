@@ -16,6 +16,7 @@ export const ROOMS = {
     name: 'Brain', room: 'Neurology',
     line: 'Consciousness, cerebral vessels and seizure.',
     learn: [
+      ['Intracranial pressure', 'ICP, CPP, the waveform, Monro–Kellie on the atlas brain, and autoregulation.', 'brain-physiology.html?v=20261104c'],
       ['Acute ischemic stroke', 'Assessment, NIHSS, imaging, thrombolysis and EVT.', 'Acute_Ischemic_Stroke_Simulator_V6_FINAL.html?v=20260925s'],
       ['Intracerebral hemorrhage', 'Blood pressure, reversal and the ICP pathway.', 'Intracerebral_Hemorrhage_Interactive_Simulator_v1.html?v=20260925s'],
       ['Subarachnoid hemorrhage', 'Grading, the aneurysm and the day-one bundle.', 'Subarachnoid_Hemorrhage_Interactive_Simulator_v1.html?v=20260925s'],
@@ -58,7 +59,7 @@ export const ROOMS = {
     name: 'Heart', room: 'Cardiac',
     line: 'Rhythm, pressure and the failing pump.',
     learn: [
-      ['Cardiac Anatomy Lab', 'A real heart model. Chambers, valves, coronaries, flow and the conduction drawing.', 'cardiac-lab.html?v=20261030a'],
+      ['Cardiac Anatomy Lab', 'Conduction, the cardiac cycle, wall motion and the ECG, on the Z-Anatomy heart.', 'cardiac-lab.html?v=20261104c'],
       ['Echo bay', 'Finger on the chest. The probe, the coronary territory, the wall motion and the trace move together.', 'echo-lab.html?v=20261103e'],
       ['ACLS, 2025 AHA', 'Arrest, tachycardia and bradycardia, with the current doses.', 'ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20260925s'],
       ['Shock identification', 'MAP, cardiac index and the phenotype.', 'Shock_Identification_Management_Simulator.html?v=20260925s'],

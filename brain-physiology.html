@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#05070c">
+<title>Intracranial pressure</title>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+<style>
+:root{--bg:#05070c;--fg:#f3efe6;--muted:#b7b1a4;--faint:#8a8478;--line:rgba(243,239,230,.18);--cool:#7fd4e6;--warm:#e2b48a;--moss:#8fbf9f;--card:#10161c}
+*{box-sizing:border-box}
+html,body{margin:0;background:radial-gradient(900px 420px at 10% -10%, rgba(127,212,230,.08), transparent 46%), var(--bg);color:var(--fg);font-family:Figtree,ui-sans-serif,sans-serif}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-appearance:none;appearance:none}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
+a{color:inherit;text-decoration:none}
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 16px 0}
+header a.back{color:var(--fg);min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:#10161c}
+header a.back[hidden]{display:none}
+h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:clamp(28px,7vw,40px);letter-spacing:-.03em;margin:4px 0 0;line-height:1.05}
+h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:16px 0 8px}
+.kicker{margin:0;color:var(--cool);letter-spacing:.16em;text-transform:uppercase;font-size:11px}
+main{padding:12px 16px 32px;max-width:40rem}
+.stack{display:flex;flex-direction:column;gap:10px;margin:14px 0}
+.vcard{display:flex;flex-direction:column;gap:4px;width:100%;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:18px;padding:14px 16px;min-height:64px}
+.vcard b{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;letter-spacing:-.02em}
+.vcard span{color:var(--muted);font-size:14px;line-height:1.4}
+.point{display:block;position:relative;margin-top:8px;padding-left:14px;color:var(--muted);font-size:14px;line-height:1.45}
+.point:before{content:"";position:absolute;left:0;top:.55em;width:6px;height:6px;border-radius:50%;background:var(--warm)}
+.fine{color:var(--faint);font-size:13px;line-height:1.45}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.row button{min-height:44px;border-radius:999px;border:1px solid var(--line);background:#10161c;padding:0 14px}
+.row button.on{border-color:var(--moss);background:#14211c}
+label.sl{display:block;margin:12px 0}
+label.sl span{display:flex;justify-content:space-between;color:var(--muted);font-size:14px;margin-bottom:6px}
+label.sl b{color:var(--fg);font-weight:650}
+input[type=range]{width:100%;accent-color:#7fd4e6}
+.readout{border:1px solid var(--moss);border-radius:18px;padding:14px 16px;margin:12px 0}
+.readout p{margin:0;color:var(--cool);font-size:13px;letter-spacing:.12em;text-transform:uppercase}
+.readout strong{display:block;margin-top:4px;font-family:Fraunces,Georgia,serif;font-size:40px;font-weight:520}
+.readout em{font-style:normal;color:var(--muted);font-size:14px}
+canvas.trace,canvas.plot{width:100%;height:180px;display:block;background:#07111a;border:1px solid var(--line);border-radius:18px}
+.player{position:relative;height:min(52vh,420px);margin:12px 0;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#07111a}
+.player canvas{width:100%;height:100%;display:block;touch-action:none}
+.player .load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;color:var(--muted)}
+.player .load.hide{display:none}
+.legal{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);color:var(--faint);font-size:12px}
+.legal p{margin:0}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <p class="kicker" id="kicker">Critical care · brain</p>
+    <h1 id="title">Intracranial pressure</h1>
+  </div>
+  <a class="back" id="up" href="index.html?doors=brain">Back</a>
+</header>
+<main id="root"></main>
+<script>
+(function(){
+  const root = document.getElementById("root");
+  const back = document.getElementById("up");
+  const state = {icp:15, map:90, paco2:40, pao2:95, auto:"intact", co2:true, wave:"normal", brain:20, blood:20, csf:30};
+  let nav = ["#home"];
+  let applying = false;
+  let waveTimer = 0;
+  let spikeUntil = 0;
+  let monroeStop = null;
+
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return "&#"+c.charCodeAt(0)+";"; }); }
+  function points(list){ return list.map(function(line){ return "<span class='point'>"+esc(line)+"</span>"; }).join(""); }
+  function card(href, title, text){ return "<a class='vcard' href='#"+href+"'><b>"+esc(title)+"</b><span>"+esc(text)+"</span></a>"; }
+  function footer(){ return "<footer class='legal'><p>© 2026 Dr Apoorva Chandra. All rights reserved.</p></footer>"; }
+  function femaleVoice(){
+    if(!window.speechSynthesis) return null;
+    const voices = speechSynthesis.getVoices() || [];
+    const named = /female|samantha|victoria|karen|moira|fiona|tessa|serena|zira|susan|veena|heera|sonia|catherine|allison|ava|nicky|libby/i;
+    const en = voices.filter(function(v){ return /^en/i.test(v.lang||""); });
+    return en.find(function(v){ return named.test((v.name||"")+" "+(v.voiceURI||"")); })
+      || en.find(function(v){ return /en-GB|en-IN|en-AU/i.test(v.lang) && !/male/i.test(v.name||""); }) || null;
+  }
+  function speak(text){
+    if(!text || !window.speechSynthesis) return;
+    const say = function(){
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      const voice = femaleVoice();
+      u.lang = voice && voice.lang ? voice.lang : "en-GB";
+      u.rate = 0.92; u.pitch = 1.05;
+      if(voice) u.voice = voice;
+      speechSynthesis.speak(u);
+    };
+    if(!speechSynthesis.getVoices().length){
+      const once = function(){ speechSynthesis.removeEventListener("voiceschanged", once); say(); };
+      speechSynthesis.addEventListener("voiceschanged", once);
+      speechSynthesis.getVoices();
+      return;
+    }
+    say();
+  }
+  function parse(){ return (location.hash || "#home").replace(/^#/, "") || "home"; }
+  function cpp(){ return state.map - state.icp; }
+  function flowModel(){
+    const pressure = cpp();
+    const co2 = state.co2 ? Math.max(0.45, Math.min(1.7, 1 + 0.03 * (state.paco2 - 40))) : 1;
+    const oxygen = state.pao2 < 60 ? 1 + (60 - state.pao2) * 0.015 : 1;
+    let flow;
+    if(state.auto === "intact"){
+      if(pressure < 50) flow = 50 * (pressure / 50);
+      else if(pressure > 150) flow = 50 * (1 + (pressure - 150) / 100);
+      else flow = 50;
+    } else flow = 50 * (pressure / 80);
+    flow = Math.max(0, flow * co2 * oxygen);
+    return {cpp: pressure, flow: flow, co2: co2, oxygen: oxygen};
+  }
+  function implications(){
+    const m = flowModel();
+    const lines = [];
+    lines.push("CPP is "+m.cpp+" mmHg. In this model CPP is mean arterial pressure minus intracranial pressure.");
+    if(state.icp >= 22) lines.push("ICP is at or above 22 mmHg, the treatment threshold used in the adult TBI guideline. The number is a threshold, not proof that this brain is injured.");
+    else lines.push("ICP is under 22 mmHg. A normal number does not exclude a mass, a seizure, or a failing exam.");
+    if(m.cpp < 50) lines.push("CPP is under 50 mmHg. On an intact curve this is the left shoulder: flow falls as pressure falls.");
+    else if(m.cpp < 60) lines.push("CPP is under 60 mmHg. Many adult TBI pathways aim above this. Flow may still be held if autoregulation is intact and the shoulder has not been reached.");
+    else lines.push("CPP is in the range where intact autoregulation can hold flow steady. Impaired autoregulation cannot.");
+    if(state.auto === "impaired") lines.push("Autoregulation is set to impaired. Flow is drawn as pressure-passive around a CPP of 80. Raising pressure raises flow, and dropping pressure drops it.");
+    else lines.push("Autoregulation is set to intact. Between CPP 50 and 150 the model holds flow near 50 mL per 100 g per minute, then lets it fall or rise outside that band.");
+    if(state.paco2 < 35) lines.push("PaCO2 is low. With CO2 reactivity on, the model lowers flow. Vessels constrict, intracranial blood volume can fall, and so can ICP. Oxygen delivery can fall with the flow.");
+    else if(state.paco2 > 45) lines.push("PaCO2 is high. With CO2 reactivity on, the model raises flow. Vessels dilate, blood volume rises, and ICP can rise even though CPP has not changed.");
+    else lines.push("PaCO2 is near 40 mmHg. The model treats this as the reference for CO2 reactivity.");
+    if(!state.co2) lines.push("CO2 reactivity is off. Changing PaCO2 does not move flow in this run.");
+    if(state.pao2 < 60) lines.push("PaO2 is under 60 mmHg. The model adds hypoxic vasodilation, so flow and blood volume rise. Hypoxia is treated by oxygen, not by more hypocapnia.");
+    else lines.push("Oxygenation is above the hypoxic vasodilating range used here.");
+    lines.push("These slopes are teaching assumptions. A normal flow here was set at 50, CO2 reactivity at about 3 percent per mmHg, and the plateau at CPP 50 to 150. None of that is a measurement from one person.");
+    return lines;
+  }
+
+  function slider(id, label, min, max, step, value, unit){
+    return "<label class='sl'><span>"+esc(label)+"<b id='v-"+id+"'>"+value+" "+esc(unit)+"</b></span><input id='"+id+"' type='range' min='"+min+"' max='"+max+"' step='"+step+"' value='"+value+"'></label>";
+  }
+  function bindSliders(map, paint){
+    Object.keys(map).forEach(function(id){
+      const node = document.getElementById(id);
+      if(!node) return;
+      node.oninput = function(){
+        state[map[id]] = Number(node.value);
+        const badge = document.getElementById("v-"+id);
+        if(badge) badge.textContent = node.value + " " + (node.getAttribute("data-unit") || "");
+        paint();
+      };
+    });
+  }
+
+  function renderHome(){
+    document.getElementById("kicker").textContent = "Critical care · brain";
+    document.getElementById("title").textContent = "Intracranial pressure";
+    root.innerHTML = points(["Four models. Each one states its assumptions.", "The brain on the Monro–Kellie page is the atlas model, not a drawing."])
+      + "<div class='stack'>"
+      + card("monitor", "ICP monitor", "Move ICP and MAP. CPP and the physiological reading update together.")
+      + card("wave", "ICP waveform", "P1, P2 and P3, a stiff brain, a high baseline, and a cough.")
+      + card("monroe", "Monro–Kellie", "Brain, blood and CSF on the atlas model, until compliance runs out.")
+      + card("auto", "Autoregulation", "Intact, impaired, carbon dioxide, hypoxia and hypotension.")
+      + "</div>";
+    speak("Intracranial pressure and cerebral physiology. Choose a model.");
+  }
+
+  function renderMonitor(){
+    document.getElementById("kicker").textContent = "Monitor";
+    document.getElementById("title").textContent = "ICP and CPP";
+    root.innerHTML = "<div class='readout'><p>Cerebral perfusion pressure</p><strong id='cpp'></strong><em id='flow'></em></div>"
+      + slider("icp", "Intracranial pressure", 0, 60, 1, state.icp, "mmHg")
+      + slider("map", "Mean arterial pressure", 40, 160, 1, state.map, "mmHg")
+      + slider("paco2", "PaCO2", 20, 70, 1, state.paco2, "mmHg")
+      + slider("pao2", "PaO2", 30, 150, 1, state.pao2, "mmHg")
+      + "<div class='row' id='auto'>"
+      + "<button type='button' data-a='intact'>Autoregulation intact</button>"
+      + "<button type='button' data-a='impaired'>Autoregulation impaired</button>"
+      + "<button type='button' data-c='1'>CO2 reactivity on</button>"
+      + "</div>"
+      + "<div id='why'></div>"
+      + "<p class='fine'>CPP = MAP − ICP. Flow is a teaching index in mL per 100 g per minute, not a measured study.</p>";
+    document.getElementById("icp").setAttribute("data-unit","mmHg");
+    document.getElementById("map").setAttribute("data-unit","mmHg");
+    document.getElementById("paco2").setAttribute("data-unit","mmHg");
+    document.getElementById("pao2").setAttribute("data-unit","mmHg");
+    function paint(){
+      const m = flowModel();
+      document.getElementById("cpp").textContent = m.cpp + " mmHg";
+      document.getElementById("flow").textContent = "Teaching flow " + m.flow.toFixed(0) + " mL/100 g/min";
+      document.getElementById("why").innerHTML = points(implications());
+      root.querySelectorAll("[data-a]").forEach(function(btn){ btn.classList.toggle("on", btn.getAttribute("data-a")===state.auto); });
+      const co2 = root.querySelector("[data-c]");
+      if(co2){ co2.classList.toggle("on", state.co2); co2.textContent = state.co2 ? "CO2 reactivity on" : "CO2 reactivity off"; }
+    }
+    bindSliders({icp:"icp", map:"map", paco2:"paco2", pao2:"pao2"}, paint);
+    root.querySelectorAll("[data-a]").forEach(function(btn){
+      btn.onclick = function(){ state.auto = btn.getAttribute("data-a"); paint(); };
+    });
+    root.querySelector("[data-c]").onclick = function(){ state.co2 = !state.co2; paint(); };
+    paint();
+    speak("CPP is mean arterial pressure minus intracranial pressure. Change either one and read what the pressure means.");
+  }
+
+  function waveShape(mode){
+    if(mode==="stiff") return {base:18, p1:4, p2:9, p3:3};
+    if(mode==="high") return {base:32, p1:5, p2:10, p3:3};
+    return {base:10, p1:8, p2:5, p3:3};
+  }
+  function sampleWave(t, mode){
+    const s = waveShape(mode);
+    function bump(center, width, amp){
+      const x = (t - center) / width;
+      return amp * Math.exp(-x * x);
+    }
+    let y = s.base + bump(0.18, 0.05, s.p1) + bump(0.34, 0.07, s.p2) + bump(0.52, 0.055, s.p3);
+    const now = performance.now();
+    if(now < spikeUntil){
+      const k = (spikeUntil - now) / 1400;
+      y += 22 * Math.sin(Math.max(0, k) * Math.PI);
+    }
+    return y;
+  }
+  function renderWave(){
+    document.getElementById("kicker").textContent = "Waveform";
+    document.getElementById("title").textContent = "ICP waveform";
+    root.innerHTML = "<canvas class='trace' id='trace' width='640' height='320'></canvas>"
+      + "<div class='row'>"
+      + "<button type='button' data-w='normal'>Normal compliance</button>"
+      + "<button type='button' data-w='stiff'>P2 rises</button>"
+      + "<button type='button' data-w='high'>Sustained elevation</button>"
+      + "<button type='button' id='cough'>Cough</button>"
+      + "<button type='button' id='suction'>Suction</button>"
+      + "</div>"
+      + "<div id='why'></div>"
+      + "<p class='fine'>Simulated monitor. Not a recording from a patient.</p>";
+    const canvas = document.getElementById("trace");
+    const ctx = canvas.getContext("2d");
+    function explain(){
+      const lines = {
+        normal: ["P1 is the percussion wave, from the arterial pulse.", "P2 is the tidal wave. P3 is the dicrotic wave, after aortic valve closure.", "With normal compliance, P1 is taller than P2."],
+        stiff: ["When compliance falls, P2 becomes as tall as P1, or taller.", "The same added volume now costs more pressure. This is the waveform side of the pressure-volume curve.", "A tall P2 is a warning. It is not, by itself, a diagnosis or a treatment."],
+        high: ["The baseline itself is high. The mean ICP stays up between the pulses.", "A plateau wave is a sustained rise. It is not the same as a cough spike, which should fall back."]
+      };
+      document.getElementById("why").innerHTML = points(lines[state.wave] || lines.normal);
+      root.querySelectorAll("[data-w]").forEach(function(btn){ btn.classList.toggle("on", btn.getAttribute("data-w")===state.wave); });
+    }
+    root.querySelectorAll("[data-w]").forEach(function(btn){ btn.onclick = function(){ state.wave = btn.getAttribute("data-w"); explain(); }; });
+    document.getElementById("cough").onclick = function(){ spikeUntil = performance.now() + 900; };
+    document.getElementById("suction").onclick = function(){ spikeUntil = performance.now() + 1400; };
+    explain();
+    cancelAnimationFrame(waveTimer);
+    function draw(now){
+      waveTimer = requestAnimationFrame(draw);
+      if(parse()!=="wave") return;
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0,0,w,h);
+      ctx.strokeStyle = "rgba(243,239,230,.16)";
+      ctx.lineWidth = 1;
+      for(let g=1;g<4;g++){ ctx.beginPath(); ctx.moveTo(0, h*g/4); ctx.lineTo(w, h*g/4); ctx.stroke(); }
+      ctx.beginPath();
+      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = "#7fd4e6";
+      const cycles = 3;
+      for(let x=0;x<w;x++){
+        const u = ((x / w) * cycles + now / 1800) % 1;
+        const mm = sampleWave(u, state.wave);
+        const y = h - 16 - (mm / 70) * (h - 32);
+        if(x===0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.fillStyle = "#b7b1a4";
+      ctx.font = "14px Figtree, sans-serif";
+      ctx.fillText("0", 8, h-8);
+      ctx.fillText("70 mmHg", 8, 18);
+    }
+    draw(performance.now());
+    speak("P1, P2 and P3. When compliance falls, P2 grows. A cough is a spike. A high baseline stays up.");
+  }
+
+  function monroeRead(){
+    const demand = state.brain * 0.85 + state.blood * 0.65 + state.csf * 0.75;
+    const csfRoom = 38, veinRoom = 20;
+    const csfGive = Math.min(csfRoom, demand);
+    const veinGive = Math.min(veinRoom, Math.max(0, demand - csfGive));
+    const overflow = Math.max(0, demand - csfGive - veinGive);
+    const icp = 8 + Math.pow(overflow, 1.32) * 0.28;
+    const csfScale = Math.max(0.28, Math.min(1.7, 1 + state.csf / 140 - csfGive / csfRoom * 0.62));
+    const veinScale = Math.max(0.45, Math.min(1.55, 1 + state.blood / 180 - veinGive / veinRoom * 0.4));
+    const tissueScale = 1 + state.brain / 520;
+    const lines = [];
+    lines.push("The skull is treated as a closed box. Brain, blood and CSF share one volume.");
+    if(overflow < 4) lines.push("Added volume is still being buffered. CSF leaves the ventricles first. Venous blood is the next buffer.");
+    else lines.push("The buffers are used up. Further volume now raises pressure on a steep curve. This is loss of compliance.");
+    lines.push("Teaching ICP from this volume model is " + icp.toFixed(0) + " mmHg. It is not a transducer reading.");
+    lines.push("The ventricles, the venous sinuses and the arteries are meshes from the atlas. Tissue is the remaining brain. Scales are exaggerated so the shift is visible.");
+    return {icp:icp, csfScale:csfScale, veinScale:veinScale, tissueScale:tissueScale, lines:lines};
+  }
+  function renderMonroe(){
+    document.getElementById("kicker").textContent = "Monro–Kellie";
+    document.getElementById("title").textContent = "Three volumes";
+    root.innerHTML = "<div class='player'><canvas id='brain3d'></canvas><p class='load' id='brainload'>Opening the atlas brain…</p></div>"
+      + "<div class='readout'><p>Teaching ICP</p><strong id='micp'></strong></div>"
+      + slider("brainv", "Brain volume", 0, 100, 1, state.brain, "")
+      + slider("bloodv", "Cerebral blood volume", 0, 100, 1, state.blood, "")
+      + slider("csfv", "CSF volume", 0, 100, 1, state.csf, "")
+      + "<div id='why'></div>"
+      + "<p class='fine'>Model: Z-Anatomy, derived from BodyParts3D. CC BY-SA.</p>";
+    function paint(){
+      const m = monroeRead();
+      document.getElementById("micp").textContent = m.icp.toFixed(0) + " mmHg";
+      document.getElementById("why").innerHTML = points(m.lines);
+      if(window.__monroeScale) window.__monroeScale(m);
+    }
+    bindSliders({brainv:"brain", bloodv:"blood", csfv:"csf"}, paint);
+    paint();
+    mountMonroe();
+    speak("Brain, blood and cerebrospinal fluid share one closed box. Compensation fails when the curve turns steep.");
+  }
+  function kindOf(name){
+    const n = String(name || "").toLowerCase();
+    if(/ventricle|aqueduct|choroid/.test(n)) return "csf";
+    if(/sinus/.test(n)) return "vein";
+    if(/artery|striate|branch/.test(n)) return "artery";
+    return "tissue";
+  }
+  function mountMonroe(){
+    if(monroeStop) monroeStop();
+    const canvas = document.getElementById("brain3d");
+    if(!canvas) return;
+    let stopped = false;
+    let frame = 0;
+    let renderer = null;
+    let controls = null;
+    const groups = {csf:[], vein:[], artery:[], tissue:[]};
+    monroeStop = function(){
+      stopped = true;
+      cancelAnimationFrame(frame);
+      window.__monroeScale = null;
+      if(controls) controls.dispose();
+      if(renderer){ renderer.dispose(); try{ renderer.forceContextLoss(); }catch(err){} }
+    };
+    import("three").then(function(THREE){
+      return Promise.all([
+        import("three/addons/loaders/GLTFLoader.js"),
+        import("three/addons/controls/OrbitControls.js"),
+        import("three/addons/loaders/DRACOLoader.js"),
+        Promise.resolve(THREE)
+      ]);
+    }).then(function(mods){
+      if(stopped) return;
+      const GLTFLoader = mods[0].GLTFLoader;
+      const OrbitControls = mods[1].OrbitControls;
+      const DRACOLoader = mods[2].DRACOLoader;
+      const THREE = mods[3];
+      renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true, alpha:false});
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+      renderer.setClearColor(0x07111a, 1);
+      if(THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
+      const scene = new THREE.Scene();
+      scene.add(new THREE.HemisphereLight(0xf7f1e6, 0x1a1412, 1.05));
+      const key = new THREE.DirectionalLight(0xfff6ea, 1.4);
+      key.position.set(2, 3, 4);
+      scene.add(key);
+      const camera = new THREE.PerspectiveCamera(32, 1, 0.01, 80);
+      controls = new OrbitControls(camera, canvas);
+      controls.enableDamping = true;
+      controls.enablePan = false;
+      const root3 = new THREE.Group();
+      scene.add(root3);
+      function resize(){
+        const w = canvas.clientWidth || 320, h = canvas.clientHeight || 360;
+        renderer.setSize(w, h, false);
+        camera.aspect = w / Math.max(1, h);
+        camera.updateProjectionMatrix();
+      }
+      const colour = {csf:0x7fd4e6, vein:0x24507a, artery:0xc23b3b, tissue:0xc4b5a4};
+      function style(mesh, kind){
+        mesh.material = new THREE.MeshStandardMaterial({
+          color: colour[kind],
+          roughness: kind==="tissue" ? 0.72 : 0.4,
+          metalness: 0.04,
+          transparent: kind==="tissue",
+          opacity: kind==="tissue" ? 0.42 : 1,
+          depthWrite: kind!=="tissue",
+          side: THREE.DoubleSide
+        });
+        groups[kind].push(mesh);
+      }
+      window.__monroeScale = function(m){
+        groups.csf.forEach(function(mesh){ mesh.scale.setScalar(m.csfScale); });
+        groups.vein.forEach(function(mesh){ mesh.scale.setScalar(m.veinScale); });
+        groups.artery.forEach(function(mesh){ mesh.scale.setScalar(1 + (m.veinScale - 1) * 0.25); });
+        groups.tissue.forEach(function(mesh){ mesh.scale.setScalar(m.tissueScale); });
+      };
+      function loop(){
+        if(stopped) return;
+        frame = requestAnimationFrame(loop);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      resize();
+      const loader = new GLTFLoader();
+      const draco = new DRACOLoader();
+      draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
+      loader.setDRACOLoader(draco);
+      loader.load("neuro/brain.glb", function(gltf){
+        if(stopped) return;
+        gltf.scene.traverse(function(obj){
+          if(!obj.isMesh) return;
+          const name = obj.name || (obj.parent && obj.parent.name) || "";
+          style(obj, kindOf(name));
+        });
+        root3.add(gltf.scene);
+        const box = new THREE.Box3().setFromObject(root3);
+        const center = box.getCenter(new THREE.Vector3());
+        root3.position.sub(center);
+        const span = box.getSize(new THREE.Vector3()).length() || 1;
+        root3.scale.setScalar(1.7 / span);
+        camera.position.set(0.2, 0.15, 1.4);
+        controls.target.set(0, 0, 0);
+        controls.update();
+        if(window.__monroeScale) window.__monroeScale(monroeRead());
+        const load = document.getElementById("brainload");
+        if(load) load.classList.add("hide");
+        resize();
+        loop();
+      }, undefined, function(){
+        const load = document.getElementById("brainload");
+        if(load) load.textContent = "The brain model did not load.";
+      });
+      window.addEventListener("resize", resize);
+    }).catch(function(){
+      const load = document.getElementById("brainload");
+      if(load) load.textContent = "The 3D viewer did not start.";
+    });
+  }
+
+  function renderAuto(){
+    document.getElementById("kicker").textContent = "Autoregulation";
+    document.getElementById("title").textContent = "Pressure and flow";
+    root.innerHTML = "<canvas class='plot' id='plot' width='640' height='360'></canvas>"
+      + slider("map2", "Mean arterial pressure", 40, 160, 1, state.map, "mmHg")
+      + slider("icp2", "Intracranial pressure", 0, 40, 1, state.icp, "mmHg")
+      + slider("co2s", "PaCO2", 20, 70, 1, state.paco2, "mmHg")
+      + slider("o2s", "PaO2", 30, 120, 1, state.pao2, "mmHg")
+      + "<div class='row'>"
+      + "<button type='button' data-a='intact'>Intact</button>"
+      + "<button type='button' data-a='impaired'>Impaired</button>"
+      + "<button type='button' data-c='1'>CO2 reactivity</button>"
+      + "</div>"
+      + "<div id='why'></div>"
+      + "<p class='fine'>The curve is a teaching drawing. The dot is this page's settings, not a measured blood flow.</p>";
+    ["map2","icp2","co2s","o2s"].forEach(function(id){
+      document.getElementById(id).setAttribute("data-unit", "mmHg");
+    });
+    const canvas = document.getElementById("plot");
+    const ctx = canvas.getContext("2d");
+    function yOf(flow, h){ return h - 28 - (flow / 120) * (h - 52); }
+    function xOf(mm, w){ return 36 + ((mm - 20) / 160) * (w - 52); }
+    function paint(){
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0,0,w,h);
+      ctx.strokeStyle = "rgba(243,239,230,.2)";
+      ctx.strokeRect(36, 16, w-52, h-44);
+      ctx.fillStyle = "#b7b1a4";
+      ctx.font = "13px Figtree, sans-serif";
+      ctx.fillText("CPP", w-48, h-8);
+      ctx.fillText("Flow", 4, 14);
+      function curve(mode, color){
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = mode===state.auto ? 2.6 : 1.2;
+        const co2 = state.co2 ? Math.max(0.45, Math.min(1.7, 1 + 0.03 * (state.paco2 - 40))) : 1;
+        const oxygen = state.pao2 < 60 ? 1 + (60 - state.pao2) * 0.015 : 1;
+        for(let mm=20; mm<=180; mm+=2){
+          let flow;
+          if(mode==="intact"){
+            if(mm < 50) flow = 50 * (mm / 50);
+            else if(mm > 150) flow = 50 * (1 + (mm - 150) / 100);
+            else flow = 50;
+          } else flow = 50 * (mm / 80);
+          flow = Math.max(0, flow * co2 * oxygen);
+          const x = xOf(mm, w), y = yOf(flow, h);
+          if(mm===20) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+      }
+      curve("intact", "#8fbf9f");
+      curve("impaired", "#e2b48a");
+      const m = flowModel();
+      ctx.fillStyle = "#f3efe6";
+      ctx.beginPath();
+      ctx.arc(xOf(Math.max(20, Math.min(180, m.cpp)), w), yOf(m.flow, h), 6, 0, Math.PI*2);
+      ctx.fill();
+      document.getElementById("why").innerHTML = points([
+        "Green is intact autoregulation. The flat part is the assumption that flow stays near 50 while CPP is between 50 and 150.",
+        "Warm is impaired autoregulation. Flow rises and falls with pressure. There is no plateau.",
+        "The dot is CPP "+m.cpp+" mmHg and teaching flow "+m.flow.toFixed(0)+".",
+        state.paco2 < 35 ? "Hypocapnia lowers the whole curve when CO2 reactivity is on." : state.paco2 > 45 ? "Hypercapnia lifts the whole curve when CO2 reactivity is on." : "PaCO2 is near the reference of 40.",
+        state.pao2 < 60 ? "Hypoxia lifts flow by the vasodilating rule used on this page." : "PaO2 is above 60, so the hypoxia rule is not adding flow.",
+        m.cpp < 50 ? "This CPP is on the hypotensive shoulder. Even an intact curve cannot hold flow here." : "Systemic hypotension moves the dot left. Intact autoregulation fails once CPP leaves the plateau."
+      ]);
+      root.querySelectorAll("[data-a]").forEach(function(btn){ btn.classList.toggle("on", btn.getAttribute("data-a")===state.auto); });
+      const co2 = root.querySelector("[data-c]");
+      co2.classList.toggle("on", state.co2);
+      co2.textContent = state.co2 ? "CO2 reactivity on" : "CO2 reactivity off";
+    }
+    bindSliders({map2:"map", icp2:"icp", co2s:"paco2", o2s:"pao2"}, paint);
+    root.querySelectorAll("[data-a]").forEach(function(btn){ btn.onclick = function(){ state.auto = btn.getAttribute("data-a"); paint(); }; });
+    root.querySelector("[data-c]").onclick = function(){ state.co2 = !state.co2; paint(); };
+    paint();
+    speak("Intact autoregulation holds flow across a wide pressure. Impaired flow follows the blood pressure. Carbon dioxide and hypoxia move the curve.");
+  }
+
+  function render(){
+    cancelAnimationFrame(waveTimer);
+    if(monroeStop && parse()!=="monroe"){ monroeStop(); monroeStop = null; }
+    const embedded = /(?:^|[?&])embed=1(?:&|$)/.test(location.search);
+    back.hidden = embedded;
+    const head = parse();
+    if(head==="home") renderHome();
+    else if(head==="monitor") renderMonitor();
+    else if(head==="wave") renderWave();
+    else if(head==="monroe") renderMonroe();
+    else if(head==="auto") renderAuto();
+    else { location.hash = "home"; return; }
+    if(!root.querySelector(".legal")) root.insertAdjacentHTML("beforeend", footer());
+    const here = location.hash || "#home";
+    if(applying) applying = false;
+    else if(nav[nav.length-1] !== here) nav.push(here);
+    requestAnimationFrame(function(){ window.scrollTo(0,0); });
+  }
+  function pageBack(){
+    if(nav.length > 1){
+      nav.pop();
+      applying = true;
+      location.hash = nav[nav.length-1];
+      return true;
+    }
+    return false;
+  }
+  window.__pageBack = pageBack;
+  back.onclick = function(event){
+    event.preventDefault();
+    if(window.speechSynthesis) speechSynthesis.cancel();
+    if(pageBack()) return;
+    if(/(?:^|[?&])embed=1(?:&|$)/.test(location.search)) return;
+    location.href = "index.html?doors=brain";
+  };
+  window.addEventListener("hashchange", render);
+  if(!location.hash) location.hash = "home";
+  else render();
+})();
+</script>
+</body>
+</html>
