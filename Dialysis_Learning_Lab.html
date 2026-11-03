@@ -50,10 +50,14 @@ svg{width:100%;height:auto;display:block}
 .choice.bad{border-color:#b42318;background:#fdf4f4}
 .fb{margin-top:8px}
 .fine{color:#5f6f86;font-size:13px}
+.searchrow{display:block;padding:10px 14px 0}
+.searchrow span{display:block;color:#1457a6;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.searchrow input{display:block;width:100%;min-height:44px;border:0;border-bottom:1px solid #d7e0ec;background:transparent;font:inherit;font-size:16px;color:#14213d}
 </style>
 </head>
 <body>
-<div class="top"><button type="button" id="back" hidden>Modalities</button><b id="crumb">Dialysis Learning Lab</b></div>
+<div class="top"><button type="button" id="back" hidden>Back</button><b id="crumb">Dialysis Learning Lab</b></div>
+<label class="searchrow"><span>Search</span><input id="labfind" placeholder="Search a modality" aria-label="Search this lab" autocomplete="off"></label>
 <main class="wrap" id="app"></main>
 <script>
 const MODS = [
@@ -293,6 +297,7 @@ const SECTIONS = ["Principle","Indications","Circuit","Prescription","Limits","C
 let current = null;
 let tab = 0;
 let picked = {};
+let labQuery = "";
 
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"\u0026amp;","<":"\u0026lt;",">":"\u0026gt;","\"":"\u0026quot;","'":"\u0026#39;"}[c];});}
 function femaleVoice(){
@@ -394,6 +399,14 @@ function readout(mod){
 }
 
 function render(){
+  const viewKey = (current ? current.id : "home") + ":" + tab;
+  if(render.view !== viewKey){
+    render.view = viewKey;
+    requestAnimationFrame(function(){
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+    });
+  }
   const back = document.getElementById("back");
   const crumb = document.getElementById("crumb");
   if(!current){
@@ -402,7 +415,10 @@ function render(){
     document.getElementById("app").innerHTML =
       '<section class="hero"><p>Ten modalities. The mechanism first, then the circuit, then the hour you would actually choose it.</p></section>'+
       '<div class="note"><b>SLED sits inside PIKRT.</b> Sustained low-efficiency dialysis is one way of doing prolonged intermittent kidney replacement. PIKRT is the umbrella. They are not two membranes and not two laws of diffusion.</div>'+
-      '<div class="grid">'+MODS.map(function(m){
+      '<div class="grid">'+MODS.filter(function(m){
+        const q = labQuery.trim().toLowerCase();
+        return !q || (m.name + " " + m.short + " " + m.tag).toLowerCase().indexOf(q) !== -1;
+      }).map(function(m){
         return '<button class="card" type="button" data-id="'+m.id+'"><span class="kicker">'+esc(m.short)+'</span><b>'+esc(m.name)+'</b><span>'+esc(m.tag)+'</span></button>';
       }).join("")+'</div>';
     document.querySelectorAll("[data-id]").forEach(function(b){b.onclick=function(){current=MODS.find(function(m){return m.id===b.getAttribute("data-id");}); tab=0; picked={}; render();};});
@@ -482,6 +498,11 @@ function render(){
   }
 }
 document.getElementById("back").onclick=function(){current=null; render();};
+document.getElementById("labfind").addEventListener("input", function(){
+  labQuery = this.value;
+  if(current){ current = null; tab = 0; }
+  render();
+});
 render();
 </script>
 <script src="bed-bridge.js?v=20261029a"></script>

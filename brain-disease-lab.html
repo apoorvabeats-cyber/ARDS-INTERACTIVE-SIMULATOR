@@ -94,6 +94,7 @@ main{padding:4px 14px 40px}
   <div><p class="kicker">Critical care · brain</p><h1>Disease learning lab</h1></div>
   <a class="back" id="page-back" href="index.html?doors=brain">Back</a>
 </header>
+<label style="display:block;margin:0;padding:8px 16px 0"><span style="display:block;color:#7fd4e6;letter-spacing:.14em;text-transform:uppercase;font-size:11px">Search</span><input id="labfind" placeholder="Search a disease" aria-label="Search this lab" autocomplete="off" style="display:block;width:100%;min-height:44px;border:0;border-bottom:1px solid rgba(127,212,230,.28);background:transparent;color:#e7f1f4;font:inherit"></label>
 <div class="scroller diseases" id="diseases" role="tablist" aria-label="Brain diseases"></div>
 <p class="context" id="context"></p>
 <div class="layout">
@@ -966,6 +967,7 @@ function writeHash(){
   const next = chapterMenu ? diseaseId : (topicId ? diseaseId+"/"+sectionId+"/"+topicId : diseaseId+"/"+sectionId);
   if(location.hash.replace(/^#/, "") !== next) history.replaceState(null, "", "#"+next);
 }
+let labQuery = "";
 function paintChrome(){
   const diseases = document.getElementById("diseases");
   const sections = document.getElementById("sections");
@@ -983,9 +985,13 @@ function paintChrome(){
     sections.hidden = true;
     sections.innerHTML = "";
     context.textContent = "Choose a disease. The next screen is overview, anatomy, and the other chapters.";
-    diseases.innerHTML = DISEASES.map(function(d){
+    const q = labQuery.trim().toLowerCase();
+    const shown = DISEASES.filter(function(d){
+      return !q || (d.name + " " + d.full).toLowerCase().indexOf(q) !== -1;
+    });
+    diseases.innerHTML = shown.map(function(d){
       return '<button type="button" data-d="'+d.id+'">'+thumbHtml(d)+'<span><b>'+esc(d.name)+'</b><span>'+esc(d.full)+'</span></span></button>';
-    }).join("") + '<button type="button" data-d="scans"><b>Unknown scans</b><span>Ten films, different from each other. The options are shuffled each time you open the set.</span></button>';
+    }).join("") + (!q || "unknown scans".indexOf(q) !== -1 ? '<button type="button" data-d="scans"><b>Unknown scans</b><span>Ten films, different from each other. The options are shuffled each time you open the set.</span></button>' : "");
     diseases.querySelectorAll("[data-d]").forEach(function(btn){
       btn.onclick = function(){
         if(btn.getAttribute("data-d")==="scans"){
@@ -1038,6 +1044,16 @@ function openTopic(id){
   render();
 }
 function render(){
+  const viewKey = [scanMode, listMode, chapterMenu, diseaseId, sectionId, topicId, scanAt].join(":");
+  if(render.view !== viewKey){
+    render.view = viewKey;
+    requestAnimationFrame(function(){
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      const work = document.getElementById("work");
+      if(work) work.scrollTop = 0;
+    });
+  }
   stopSpoken();
   playerToken++;
   brainToken++;
@@ -1579,6 +1595,22 @@ if(pageBackLink){
   });
 }
 window.addEventListener("hashchange", function(){ readHash(); render(); });
+const labfind = document.getElementById("labfind");
+if(labfind){
+  labfind.addEventListener("input", function(){
+    labQuery = labfind.value;
+    if(!listMode || scanMode){
+      listMode = true;
+      scanMode = false;
+      chapterMenu = false;
+      topicId = "";
+      writeHash();
+      render();
+      return;
+    }
+    paintChrome();
+  });
+}
 readHash();
 render();
 
