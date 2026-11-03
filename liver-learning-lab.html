@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05070c">
 <title>Liver Learning Lab</title>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
 <style>
 :root{--bg:#05070c;--fg:#f3efe6;--muted:#b7b1a4;--faint:#8a8478;--line:rgba(243,239,230,.18);--cool:#7fd4e6;--warm:#e2b48a;--moss:#8fbf9f;--card:#10161c}
 *{box-sizing:border-box}
@@ -34,6 +37,11 @@ main{padding:12px 16px 32px;max-width:40rem}
 .fine{color:var(--faint);font-size:13px;line-height:1.45}
 .group{margin:16px 0 0;color:var(--cool);letter-spacing:.14em;text-transform:uppercase;font-size:12px}
 .schematic{width:100%;height:auto;border:1px solid var(--line);border-radius:18px;background:#10151c;display:block}
+.player{position:relative;height:min(58vh,460px);margin-top:12px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#07111a}
+.player canvas{width:100%;height:100%;display:block;touch-action:none}
+.player .load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);margin:0;pointer-events:none}
+.player .load.hide{display:none}
+.player .cap{position:absolute;left:12px;right:12px;bottom:12px;margin:0;padding:8px 12px;border-radius:12px;background:rgba(5,7,12,.72);color:var(--fg);font-family:Fraunces,Georgia,serif;font-size:18px;pointer-events:none}
 .field{display:block;margin:10px 0}
 .field span{display:block;color:var(--muted);font-size:13px;margin-bottom:4px}
 .field input,.field select{width:100%;min-height:44px;border-radius:12px;border:1px solid var(--line);background:#05070c;padding:0 12px}
@@ -282,6 +290,7 @@ button.vcard{font:inherit}
     stopSpoken();
     const route = parse();
     const head = route.head;
+    if(head !== "anatomy") stopLiver();
     const onHome = head === "home";
     back.textContent = onHome ? "Learning lab" : "Back";
     if (head === "home") renderHome();
@@ -309,39 +318,286 @@ button.vcard{font:inherit}
     speakLine("Liver learning lab. Anatomy, physiology, diseases, investigations, imaging, procedures and critical care management.");
   }
 
-  function renderAnatomy(rest) {
-    const pages = DATA.anatomy.concat([{ title: "Blood and bile flow", body: [
-      "Portal blood and hepatic arterial blood both enter the sinusoid. They mix there.",
-      "Blood leaves by the central vein into hepatic veins. Bile leaves in the opposite direction, into the canaliculus.",
-      "The portal triad therefore contains inflow of two kinds and outflow of bile, side by side."
-    ], flow: true }]);
+  let liverStop = null;
+  const LIVER_PARTS = [
+    {id:"i", mesh:"Posterior segment of liver (I)", title:"Segment I", short:"Caudate lobe", say:"Segment one, the caudate lobe. It sits behind the porta hepatis and drains by small veins straight into the inferior vena cava. That is why it can enlarge in early Budd-Chiari syndrome."},
+    {id:"ii", mesh:"Left posterior lateral segment of liver (II)", title:"Segment II", short:"Left lateral, superior", say:"Segment two. Left posterior lateral segment. It is the superior part of the left lateral section, to the left of the falciform ligament."},
+    {id:"iii", mesh:"Left anterior lateral segment of liver (III)", title:"Segment III", short:"Left lateral, inferior", say:"Segment three. Left anterior lateral segment. With segment two it is the left lateral section, the part that crosses the midline."},
+    {id:"iv", mesh:"Left medial segment of liver (IV)", title:"Segment IV", short:"Left medial, quadrate lobe", say:"Segment four. Left medial segment. It includes the quadrate lobe and lies between the falciform ligament and Cantlie's line."},
+    {id:"v", mesh:"Anterior medial segment of liver (V)", title:"Segment V", short:"Right anterior, inferior", say:"Segment five. Right anterior inferior segment. It lies beside the gallbladder fossa."},
+    {id:"vi", mesh:"Anterior lateral segment of liver (VI)", title:"Segment VI", short:"Right posterior, inferior", say:"Segment six. Right posterior inferior segment."},
+    {id:"vii", mesh:"Posterior lateral segment of liver (VII)", title:"Segment VII", short:"Right posterior, superior", say:"Segment seven. Right posterior superior segment. It is the part of the right lobe that is hardest to see from the front."},
+    {id:"viii", mesh:"Posterior medial segment of liver (VIII)", title:"Segment VIII", short:"Right anterior, superior", say:"Segment eight. Right anterior superior segment. It lies next to the middle hepatic vein, which is Cantlie's line."},
+    {id:"gb", mesh:"Gallbladder", title:"Gallbladder", short:"Stores bile", say:"Gallbladder. It stores and concentrates bile, in a fossa on the visceral surface between segments four and five."},
+    {id:"duct", mesh:"Bile duct", title:"Bile duct", short:"To the duodenum", say:"Bile duct. It carries bile to the duodenum. In the free edge of the lesser omentum it lies in front of the portal vein and to the right of the hepatic artery. Those vessels are not separate meshes in this atlas."},
+    {id:"whole", mesh:"Liver", title:"Whole liver", short:"Show the organ", say:"Whole liver. The functional right and left lobes are divided by Cantlie's line, from the gallbladder fossa to the inferior vena cava, not by the falciform ligament."}
+  ];
+  function liverPartById(id){ return LIVER_PARTS.find(function(item){ return item.id===id; }) || null; }
+  function normLiverName(name){
+    return String(name || "").replace(/\.\d+$/, "").replace(/_/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+  }
+  function liverPartByMesh(name){
+    const clean = normLiverName(name);
+    return LIVER_PARTS.find(function(item){ return normLiverName(item.mesh) === clean; }) || null;
+  }
+  function stopLiver(){
+    if(liverStop){ liverStop(); liverStop = null; }
+  }
+  function renderAnatomy(rest){
     document.getElementById("kicker").textContent = "Anatomy";
-    if (!rest.length) {
-      document.getElementById("title").textContent = "Liver anatomy";
-      root.innerHTML = stack(pages.map(function (page, index) { return card("anatomy/" + index, page.title, page.body[0]); }).join(""));
-      speakLine("Liver anatomy. Choose a page. Lobes, segments, vessels, bile and the lobule.");
-      return;
+    document.getElementById("title").textContent = "Liver anatomy";
+    const chosen = rest[0] || "";
+    if(!document.getElementById("liver3d")){
+      root.innerHTML = "<p class='lede'>Drag to turn the liver. Pinch to zoom. Tap a segment, the gallbladder, or the bile duct. It lights up, and the name is spoken.</p>"
+        + "<div class='player'><canvas id='liver3d'></canvas><p class='load' id='liverload'>Loading the liver model...</p><p class='cap' id='livercap'>Tap a structure</p></div>"
+        + "<article class='sheet' id='livercard'><h3>Tap a structure</h3><p>Segments follow the Couinaud numbering on this model. The portal vein and the hepatic artery are not separate meshes here.</p></article>"
+        + "<div class='stack' id='liverparts'></div>"
+        + "<p class='fine'>Model: Z-Anatomy, derived from BodyParts3D. CC BY-SA. Teaching anatomy, not a surgical plan.</p>";
+      mountLiver(chosen);
+    } else {
+      paintLiverList(chosen);
+      if(window.__liverSelect) window.__liverSelect(chosen);
     }
-    const index = Math.max(0, Math.min(pages.length - 1, Number(rest[0]) || 0));
-    const page = pages[index];
-    document.getElementById("title").textContent = page.title;
-    let extra = "";
-    if (page.title === "Couinaud segments") {
-      const chosen = rest[1] || "IV";
-      extra = "<div class='stack'>" + DATA.segments.map(function (item) {
-        return "<a class='vcard" + (item.id === chosen ? " on" : "") + "' href='#anatomy/" + index + "/" + item.id + "'><b>Segment " + esc(item.id) + "</b><span>" + esc(item.title) + "</span></a>";
-      }).join("") + "</div>";
-      const seg = DATA.segments.find(function (item) { return item.id === chosen; }) || DATA.segments[0];
-      extra += "<article class='sheet'><h3>" + esc(seg.title) + "</h3><p>" + esc(seg.place) + "</p><p>" + esc(seg.role) + "</p></article>";
+    const part = liverPartById(chosen);
+    if(part) speakLine(part.title + ". " + part.say);
+    else speakLine("Liver anatomy. Drag the model. Tap a segment, the gallbladder, or the bile duct.");
+  }
+  function paintLiverList(chosen){
+    const box = document.getElementById("liverparts");
+    if(!box) return;
+    box.innerHTML = LIVER_PARTS.map(function(item){
+      return "<a class='vcard" + (item.id===chosen ? " on" : "") + "' href='#anatomy/" + item.id + "'><b>" + esc(item.title) + "</b><span>" + esc(item.short) + "</span></a>";
+    }).join("");
+    const card = document.getElementById("livercard");
+    const part = liverPartById(chosen);
+    if(card){
+      card.innerHTML = part
+        ? "<h3>" + esc(part.title) + "</h3><p>" + esc(part.say) + "</p>"
+        : "<h3>Tap a structure</h3><p>Segments follow the Couinaud numbering on this model. The portal vein and the hepatic artery are not separate meshes here.</p>";
     }
-    if (page.flow) {
-      const mode = rest[1] || "portal";
-      extra = "<div class='stack'>" + [["portal", "Portal flow"], ["artery", "Arterial flow"], ["vein", "Venous drainage"], ["bile", "Bile flow"]].map(function (item) {
-        return "<a class='vcard" + (item[0] === mode ? " on" : "") + "' href='#anatomy/" + index + "/" + item[0] + "'><b>" + esc(item[1]) + "</b></a>";
-      }).join("") + "</div>" + flowSvg(mode);
-    }
-    root.innerHTML = anatomySvg() + bullets(page.body) + extra + note();
-    speakLine(page.title + ". " + page.body[0]);
+    const cap = document.getElementById("livercap");
+    if(cap) cap.textContent = part ? part.title : "Tap a structure";
+  }
+  function mountLiver(initialId){
+    paintLiverList(initialId);
+    const canvas = document.getElementById("liver3d");
+    if(!canvas) return;
+    let stopped = false;
+    let frame = 0;
+    let renderer = null;
+    let controls = null;
+    let draco = null;
+    const selected = {id: initialId};
+    window.__liverSelect = function(id){
+      selected.id = id || "";
+      paintLiverList(selected.id);
+      if(window.__liverPaint) window.__liverPaint();
+      if(window.__liverFrame) window.__liverFrame(selected.id);
+    };
+    liverStop = function(){
+      stopped = true;
+      cancelAnimationFrame(frame);
+      window.__liverSelect = null;
+      window.__liverPaint = null;
+      window.__liverFrame = null;
+      if(window.__liverResize){ window.removeEventListener("resize", window.__liverResize); window.__liverResize = null; }
+      if(controls) controls.dispose();
+      if(draco) draco.dispose();
+      if(renderer){ renderer.dispose(); try{ renderer.forceContextLoss(); }catch(err){} }
+    };
+    import("three").then(function(THREE){
+      return Promise.all([
+        import("three/addons/loaders/GLTFLoader.js"),
+        import("three/addons/controls/OrbitControls.js"),
+        import("three/addons/loaders/DRACOLoader.js"),
+        Promise.resolve(THREE)
+      ]);
+    }).then(function(mods){
+      if(stopped) return;
+      const GLTFLoader = mods[0].GLTFLoader;
+      const OrbitControls = mods[1].OrbitControls;
+      const DRACOLoader = mods[2].DRACOLoader;
+      const THREE = mods[3];
+      try{ renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true, alpha:false, powerPreference:"high-performance"}); }
+      catch(err){
+        const load = document.getElementById("liverload");
+        if(load) load.textContent = "3D is not available in this browser. The structure list is still here.";
+        return;
+      }
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+      renderer.setClearColor(0x07111a, 1);
+      if("outputColorSpace" in renderer && THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
+      if(THREE.ACESFilmicToneMapping){ renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.2; }
+      const scene = new THREE.Scene();
+      scene.add(new THREE.HemisphereLight(0xf7f1e6, 0x2a211c, 1.2));
+      const key = new THREE.DirectionalLight(0xfff6ea, 1.7);
+      key.position.set(2.4, 3.6, 4.2);
+      scene.add(key);
+      const fill = new THREE.DirectionalLight(0xf3efe6, 0.55);
+      fill.position.set(-2.2, 0.6, 2.4);
+      scene.add(fill);
+      const rim = new THREE.DirectionalLight(0x7fd4e6, 0.28);
+      rim.position.set(-3, 1.2, -2.4);
+      scene.add(rim);
+      const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50);
+      controls = new OrbitControls(camera, canvas);
+      controls.enableDamping = true;
+      controls.enablePan = false;
+      const root3 = new THREE.Group();
+      scene.add(root3);
+      const meshes = [];
+      const COLOUR = {i:0x8e4b46, ii:0xc48978, iii:0xb56a5e, iv:0xd4a08c, v:0xa85a50, vi:0x965046, vii:0x7a3e3a, viii:0xc46e62, gb:0xd7b07a, duct:0x7fd4e6, whole:0xc4816e};
+      function colourOf(id){ return COLOUR[id] || 0xc4816e; }
+      function resize(){
+        const parent = canvas.parentElement;
+        const w = canvas.clientWidth || (parent && parent.clientWidth) || 320;
+        const h = canvas.clientHeight || (parent && parent.clientHeight) || 360;
+        renderer.setSize(w, h, false);
+        camera.aspect = w / Math.max(1, h);
+        camera.updateProjectionMatrix();
+      }
+      window.__liverResize = resize;
+      function paint(){
+        const part = liverPartById(selected.id);
+        meshes.forEach(function(mesh){
+          const mine = !!(part && mesh.userData.partId === part.id);
+          const shell = mesh.userData.partId === "whole";
+          const accessory = mesh.userData.partId === "gb" || mesh.userData.partId === "duct";
+          const showShell = !!(part && part.id === "whole");
+          mesh.visible = showShell ? (shell || accessory) : !shell;
+          const mat = mesh.material;
+          const base = new THREE.Color(colourOf(mesh.userData.partId));
+          if(!part || mine){
+            mat.color.copy(base);
+            if(mine) mat.color.lerp(new THREE.Color(0xfff6e8), 0.72);
+            mat.emissive.copy(mine ? new THREE.Color(0xe2b48a) : new THREE.Color(0x000000));
+            mat.emissiveIntensity = mine ? 0.85 : 0;
+            mat.opacity = 1;
+            mat.transparent = false;
+            mat.depthWrite = true;
+            mesh.renderOrder = mine ? 3 : 1;
+          }else{
+            mat.color.copy(base).multiplyScalar(0.42);
+            mat.emissive.set(0x000000);
+            mat.emissiveIntensity = 0;
+            mat.opacity = mesh.visible ? 0.3 : 0;
+            mat.transparent = true;
+            mat.depthWrite = false;
+            mesh.renderOrder = 0;
+          }
+        });
+      }
+      window.__liverPaint = paint;
+      function framePart(id){
+        const part = liverPartById(id);
+        const box = new THREE.Box3();
+        let n = 0;
+        meshes.forEach(function(mesh){
+          if(!mesh.visible) return;
+          if(part && mesh.userData.partId !== part.id) return;
+          box.expandByObject(mesh);
+          n += 1;
+        });
+        if(!n){
+          meshes.forEach(function(mesh){ if(mesh.visible) box.expandByObject(mesh); });
+        }
+        if(box.isEmpty()) return;
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const radius = Math.max(size.length() * 0.5, 0.012);
+        const vFov = camera.fov * Math.PI / 180;
+        const aspect = Math.max(0.45, camera.aspect || 1);
+        const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+        const dist = Math.max(radius / Math.tan(vFov / 2), radius / Math.tan(hFov / 2)) * 1.38;
+        controls.target.copy(center);
+        camera.position.copy(center).add(new THREE.Vector3(dist * 0.42, dist * 0.18, dist));
+        camera.near = Math.max(dist / 200, 0.001);
+        camera.far = Math.max(dist * 80, 8);
+        controls.minDistance = radius * 0.35;
+        controls.maxDistance = dist * 5;
+        camera.updateProjectionMatrix();
+        controls.update();
+      }
+      window.__liverFrame = framePart;
+      const ray = new THREE.Raycaster();
+      const ndc = new THREE.Vector2();
+      let downX = 0, downY = 0;
+      canvas.addEventListener("pointerdown", function(event){ downX = event.clientX; downY = event.clientY; });
+      canvas.addEventListener("pointerup", function(event){
+        if(Math.abs(event.clientX - downX) + Math.abs(event.clientY - downY) > 10) return;
+        const rect = canvas.getBoundingClientRect();
+        ndc.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -(((event.clientY - rect.top) / rect.height) * 2 - 1));
+        ray.setFromCamera(ndc, camera);
+        const hits = ray.intersectObjects(meshes.filter(function(mesh){ return mesh.visible; }), false);
+        if(!hits[0]) return;
+        const found = liverPartByMesh(hits[0].object.name);
+        if(!found) return;
+        location.hash = "anatomy/" + found.id;
+      });
+      function loop(){
+        if(stopped) return;
+        frame = requestAnimationFrame(loop);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      resize();
+      const loader = new GLTFLoader();
+      draco = new DRACOLoader();
+      draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
+      loader.setDRACOLoader(draco);
+      loader.load("liver/liver-anatomy.glb?v=20261103b", function(gltf){
+        if(stopped) return;
+        gltf.scene.traverse(function(obj){
+          if(!obj.isMesh) return;
+          const part = liverPartByMesh(obj.name) || liverPartByMesh(obj.parent && obj.parent.name);
+          if(!part){ obj.visible = false; return; }
+          obj.name = part.mesh;
+          obj.material = new THREE.MeshStandardMaterial({
+            color: colourOf(part.id),
+            roughness: 0.48,
+            metalness: 0.04,
+            side: THREE.DoubleSide,
+            emissive: 0x000000
+          });
+          obj.userData.partId = part.id;
+          meshes.push(obj);
+        });
+        root3.add(gltf.scene);
+        root3.updateMatrixWorld(true);
+        const fit = new THREE.Box3();
+        meshes.forEach(function(mesh){
+          if(mesh.userData.partId !== "whole") fit.expandByObject(mesh);
+        });
+        if(!fit.isEmpty()){
+          const center = fit.getCenter(new THREE.Vector3());
+          root3.position.sub(center);
+          const span = fit.getSize(new THREE.Vector3()).length();
+          if(span > 0 && (span < 0.02 || span > 4)) root3.scale.setScalar(0.22 / span);
+          root3.updateMatrixWorld(true);
+        }
+        if(!meshes.length){
+          const names = [];
+          gltf.scene.traverse(function(obj){ if(obj.isMesh && names.length < 6) names.push(obj.name); });
+          const load = document.getElementById("liverload");
+          if(load) load.textContent = names.length ? "The liver meshes were not named as expected." : "The liver model had no meshes.";
+          return;
+        }
+        resize();
+        paint();
+        framePart(selected.id);
+        requestAnimationFrame(function(){ if(stopped) return; resize(); framePart(selected.id); });
+        const load = document.getElementById("liverload");
+        if(load) load.classList.add("hide");
+        loop();
+      }, undefined, function(){
+        const load = document.getElementById("liverload");
+        if(load) load.textContent = "The liver model did not load.";
+      });
+      window.addEventListener("resize", resize);
+    }).catch(function(){
+      const load = document.getElementById("liverload");
+      if(load) load.textContent = "The 3D viewer did not start.";
+    });
   }
 
   function renderPhysiology(rest) {
