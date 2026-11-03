@@ -34,7 +34,10 @@ main{padding:12px 16px 32px;max-width:40rem}
 .sheet p{margin:8px 0 0;line-height:1.5}
 .bullets{margin:8px 0 0;padding-left:18px}
 .bullets li{margin:8px 0;line-height:1.45}
+.point{display:block;position:relative;margin-top:8px;padding-left:14px;color:var(--muted);font-size:14px;line-height:1.45}
+.point:before{content:"";position:absolute;left:0;top:.55em;width:6px;height:6px;border-radius:50%;background:var(--warm)}
 .fine{color:var(--faint);font-size:13px;line-height:1.45}
+.copy{margin:8px 0 0;color:var(--faint);font-size:12px;letter-spacing:.01em}
 .group{margin:16px 0 0;color:var(--cool);letter-spacing:.14em;text-transform:uppercase;font-size:12px}
 .schematic{width:100%;height:auto;border:1px solid var(--line);border-radius:18px;background:#10151c;display:block}
 .player{position:relative;height:min(58vh,460px);margin-top:12px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#07111a}
@@ -42,6 +45,10 @@ main{padding:12px 16px 32px;max-width:40rem}
 .player .load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);margin:0;pointer-events:none}
 .player .load.hide{display:none}
 .player .cap{position:absolute;left:12px;right:12px;bottom:12px;margin:0;padding:8px 12px;border-radius:12px;background:rgba(5,7,12,.72);color:var(--fg);font-family:Fraunces,Georgia,serif;font-size:18px;pointer-events:none}
+.player .reset{position:absolute;top:10px;right:10px;z-index:2;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:rgba(5,7,12,.82);color:var(--fg);font-size:14px}
+.scanfilm .swipe{fill:rgba(226,180,138,.34);stroke:none}
+.scanfilm .hi{fill:none;stroke:#f3efe6;stroke-width:1.5}
+.scanfilm .tag{fill:#f3efe6;font-size:12px;font-family:Figtree,sans-serif}
 .field{display:block;margin:10px 0}
 .field span{display:block;color:var(--muted);font-size:13px;margin-bottom:4px}
 .field input,.field select{width:100%;min-height:44px;border-radius:12px;border:1px solid var(--line);background:#05070c;padding:0 12px}
@@ -56,7 +63,7 @@ main{padding:12px 16px 32px;max-width:40rem}
 .film video{width:100%;border-radius:18px;background:#000;max-height:320px}
 .film figcaption{color:var(--muted);font-size:13px;margin-top:6px}
 .legal{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);color:var(--faint);font-size:12px;line-height:1.45}
-.legal p{margin:6px 0}
+.legal p{margin:0}
 button.vcard{font:inherit}
 </style>
 </head>
@@ -65,6 +72,7 @@ button.vcard{font:inherit}
   <div>
     <p class="kicker" id="kicker">Critical care · liver</p>
     <h1 id="title">Liver learning lab</h1>
+    <p class="copy">© 2026 Dr Apoorva Chandra. All rights reserved.</p>
   </div>
   <a class="back" id="up" href="index.html?lab=liver">Learning lab</a>
 </header>
@@ -124,15 +132,119 @@ button.vcard{font:inherit}
   function diseaseById(id) {
     return DATA.diseases.find(function (item) { return item.id === id; });
   }
+  function pointsOf(text) {
+    const raw = String(text || "").replace(/\s+/g, " ").trim();
+    if (!raw) return [];
+    const words = raw.split(" ");
+    const out = [];
+    let buf = "";
+    for (let i = 0; i < words.length; i++) {
+      buf = buf ? buf + " " + words[i] : words[i];
+      const word = words[i];
+      const next = words[i + 1] || "";
+      const stops = /[.?!]$/.test(word) && !/\d\.$/.test(word) && !/^[A-Za-z]\.$/.test(word);
+      if (stops && (!next || /^[A-Z0-9"'(]/.test(next))) {
+        out.push(buf);
+        buf = "";
+      }
+    }
+    if (buf) out.push(buf);
+    return out.length ? out : [raw];
+  }
+  function marks(items) {
+    const out = [];
+    (items || []).forEach(function (item) {
+      pointsOf(item).forEach(function (point) { if (point) out.push(point); });
+    });
+    return out;
+  }
   function bullets(items) {
-    if (!items || !items.length) return "";
-    return "<ul class='bullets'>" + items.map(function (item) { return "<li>" + esc(item) + "</li>"; }).join("") + "</ul>";
+    const list = marks(items);
+    if (!list.length) return "";
+    return "<ul class='bullets'>" + list.map(function (item) { return "<li>" + esc(item) + "</li>"; }).join("") + "</ul>";
+  }
+  function pointSpans(items) {
+    return marks(items).map(function (item) { return "<span class='point'>" + esc(item) + "</span>"; }).join("");
   }
   function note() {
-    return "<p class='fine'>Educational learning lab. Illustrative scores are not a listing tool and not a substitute for the current guideline or a local protocol.</p>";
+    return "<p class='fine'>Educational learning lab. Scores are illustrative, not a listing tool and not a local protocol.</p>";
   }
-  function film() {
-    return "<figure class='film'><video controls playsinline preload='metadata' src='neuro/ett-user.mp4'><track kind='captions'></video><figcaption>Endotracheal intubation teaching film. Confirm the tube with a sustained capnography waveform.</figcaption></figure>";
+  const FILMS = {
+    alf:{mod:"CT", scene:"ct", x:206, y:98, rx:34, ry:20, tag:"Necrosis", label:"Collapsed, heterogeneous liver"},
+    avh:{mod:"USG", scene:"us", x:196, y:102, rx:40, ry:24, tag:"Enlarged", label:"Enlarged, low-echo liver"},
+    dili:{mod:"USG", scene:"us", x:198, y:100, rx:36, ry:22, tag:"Coarse", label:"Nonspecific coarse or bright liver"},
+    ischemic:{mod:"CT", scene:"ct", x:214, y:92, rx:30, ry:18, tag:"Patchy", label:"Patchy hypoperfusion"},
+    toxic:{mod:"CT", scene:"ct", x:206, y:98, rx:38, ry:22, tag:"Necrosis", label:"Diffuse hepatic necrosis"},
+    wilson:{mod:"MRI", scene:"mri", x:204, y:100, rx:34, ry:20, tag:"Nodular", label:"Nodular contour if the disease is chronic"},
+    cld:{mod:"USG", scene:"us", x:200, y:92, rx:42, ry:18, tag:"Surface", label:"Coarse echo and an irregular surface"},
+    cirrhosis:{mod:"USG", scene:"us", x:208, y:86, rx:40, ry:16, tag:"Nodules", label:"Nodular capsule"},
+    masld:{mod:"USG", scene:"us", x:196, y:104, rx:38, ry:22, tag:"Bright", label:"Liver brighter than the kidney"},
+    ald:{mod:"USG", scene:"us", x:198, y:100, rx:36, ry:22, tag:"Fat", label:"Steatosis, then a coarse echo"},
+    aih:{mod:"USG", scene:"us", x:200, y:100, rx:34, ry:20, tag:"Uneven", label:"Heterogeneous parenchyma"},
+    pbc:{mod:"MRI", scene:"mrcp", x:188, y:112, rx:36, ry:14, tag:"Ducts", label:"Irregular intrahepatic ducts"},
+    psc:{mod:"MRI", scene:"mrcp", x:176, y:108, rx:48, ry:14, tag:"Beading", label:"Beaded ducts on MRCP"},
+    phtn:{mod:"USG", scene:"vein", x:168, y:124, rx:28, ry:12, tag:"Portal vein", label:"Wide portal vein and a large spleen"},
+    evarices:{mod:"CT", scene:"varix", x:132, y:78, rx:16, ry:28, tag:"Varices", label:"Esophageal varices"},
+    gvarices:{mod:"CT", scene:"varix", x:128, y:128, rx:22, ry:16, tag:"Fundus", label:"Gastric fundal varices"},
+    vbleed:{mod:"CT", scene:"varix", x:132, y:78, rx:16, ry:26, tag:"Bleed", label:"Varices. Extravasation means active bleeding"},
+    ascites:{mod:"USG", scene:"fluid", x:248, y:132, rx:28, ry:20, tag:"Fluid", label:"Anechoic ascites"},
+    sbp:{mod:"USG", scene:"fluid", x:246, y:128, rx:26, ry:18, tag:"Tap here", label:"Ascites to sample. Cells are not on the image"},
+    hydro:{mod:"USG", scene:"chest", x:196, y:58, rx:36, ry:14, tag:"Pleural fluid", label:"Fluid above the diaphragm"},
+    hrs:{mod:"USG", scene:"kidney", x:78, y:132, rx:22, ry:14, tag:"Normal kidney", label:"The kidney looks normal. The diagnosis is clinical"},
+    pvt:{mod:"CT", scene:"vein", x:176, y:118, rx:26, ry:12, tag:"Thrombus", label:"Filling defect in the portal vein"},
+    bcs:{mod:"CT", scene:"ct", x:198, y:86, rx:22, ry:12, tag:"Outflow", label:"Hepatic venous outflow occluded"},
+    mhe:{mod:"CT", scene:"head", x:180, y:104, rx:22, ry:16, tag:"No lesion", label:"No focal lesion. Imaging does not show minimal encephalopathy"},
+    ohe:{mod:"CT", scene:"head", x:180, y:100, rx:24, ry:18, tag:"Exclude bleed", label:"Exclude hemorrhage or a mass. Edema is a late sign"},
+    west:{mod:"CT", scene:"head", x:180, y:104, rx:22, ry:16, tag:"Clinical grade", label:"West Haven grade is clinical, not a scan finding"},
+    precip:{mod:"CT", scene:"head", x:168, y:96, rx:20, ry:16, tag:"Look here", label:"Look for bleed, infarct, or a mass"},
+    abscess:{mod:"CT", scene:"ct", x:228, y:96, rx:18, ry:16, tag:"Collection", label:"Rim-enhancing collection"},
+    hcc:{mod:"CT", scene:"ct", x:224, y:92, rx:16, ry:14, tag:"Arterial", label:"Arterial enhancement in a cirrhotic liver"},
+    cholangitis:{mod:"USG", scene:"mrcp", x:170, y:116, rx:40, ry:12, tag:"Dilated duct", label:"Dilated duct. The infection is clinical"},
+    chole:{mod:"USG", scene:"gb", x:132, y:132, rx:18, ry:26, tag:"Wall", label:"Thick wall, stone, pericholecystic fluid"},
+    obstruct:{mod:"MRI", scene:"mrcp", x:156, y:112, rx:34, ry:12, tag:"Cut-off", label:"Duct cut off on MRCP"}
+  };
+  function scanBody(scene) {
+    const liver = "<ellipse cx='198' cy='104' rx='72' ry='40' fill='#6d625c'/>";
+    const spleen = "<ellipse cx='108' cy='118' rx='26' ry='20' fill='#5a534e'/>";
+    const spine = "<circle cx='180' cy='162' r='9' fill='#c8c2b8'/>";
+    const body = "<ellipse cx='180' cy='108' rx='128' ry='80' fill='#14181c' stroke='#3c434a'/>";
+    if (scene === "us" || scene === "fluid" || scene === "chest" || scene === "kidney" || scene === "gb") {
+      return "<polygon points='180,24 62,176 298,176' fill='#0c1410'/>"
+        + "<ellipse cx='198' cy='108' rx='74' ry='42' fill='#24362c'/>"
+        + "<ellipse cx='250' cy='142' rx='22' ry='16' fill='#1a2428'/>"
+        + (scene === "gb" ? "<ellipse cx='132' cy='132' rx='16' ry='28' fill='#1a2420' stroke='#8fd8ea'/>" : "")
+        + (scene === "fluid" ? "<ellipse cx='250' cy='136' rx='34' ry='22' fill='#071018'/>" : "")
+        + (scene === "chest" ? "<ellipse cx='196' cy='52' rx='48' ry='16' fill='#071018'/>" : "")
+        + (scene === "kidney" ? "<ellipse cx='78' cy='132' rx='24' ry='16' fill='#1c2830' stroke='#7fd4e6'/>" : "");
+    }
+    if (scene === "head") {
+      return "<ellipse cx='180' cy='102' rx='74' ry='82' fill='#121416' stroke='#9aa097' stroke-width='7'/>"
+        + "<ellipse cx='180' cy='106' rx='52' ry='58' fill='#4a4e52'/>";
+    }
+    if (scene === "mrcp") {
+      return body + liver + spleen + "<path d='M150 108 C176 96 198 118 230 104' fill='none' stroke='#d5e7ea' stroke-width='3'/>"
+        + "<circle cx='168' cy='104' r='3' fill='#d5e7ea'/><circle cx='196' cy='112' r='3' fill='#d5e7ea'/><circle cx='214' cy='106' r='3' fill='#d5e7ea'/>";
+    }
+    if (scene === "varix") {
+      return body + liver + spleen + "<path d='M128 52 C122 78 126 100 120 128' fill='none' stroke='#8a623c' stroke-width='7'/>";
+    }
+    if (scene === "vein") {
+      return body + liver + spleen + spine + "<path d='M150 124 H210' stroke='#7a8490' stroke-width='8'/>";
+    }
+    if (scene === "mri") return body + "<ellipse cx='202' cy='102' rx='70' ry='38' fill='#3e4650'/>" + spleen;
+    return body + liver + spleen + spine;
+  }
+  function scanFilm(disease) {
+    const spec = FILMS[disease.id] || {mod:"USG", scene:"us", x:198, y:104, rx:36, ry:22, tag:"Liver", label:"Nonspecific appearance"};
+    const svg = "<svg class='schematic scanfilm' viewBox='0 0 360 210' role='img' aria-label='" + esc(spec.mod) + " teaching film, " + esc(disease.name) + "'>"
+      + "<rect width='360' height='210' fill='#07090c'/>"
+      + "<text x='14' y='22' fill='#7fd4e6' font-size='12' letter-spacing='1.4'>" + esc(spec.mod) + "</text>"
+      + scanBody(spec.scene)
+      + "<ellipse class='swipe' cx='" + spec.x + "' cy='" + spec.y + "' rx='" + spec.rx + "' ry='" + spec.ry + "'/>"
+      + "<ellipse class='hi' cx='" + spec.x + "' cy='" + spec.y + "' rx='" + (spec.rx + 4) + "' ry='" + (spec.ry + 3) + "'/>"
+      + "<text class='tag' x='" + Math.min(250, spec.x + spec.rx + 8) + "' y='" + Math.max(36, spec.y - spec.ry - 6) + "'>" + esc(spec.tag) + "</text>"
+      + "</svg>";
+    return "<figure class='film'>" + svg + "<figcaption>" + esc(spec.mod) + " · " + esc(spec.label) + ". Teaching film, not a patient study.</figcaption></figure>";
   }
   function card(href, title, text) {
     return "<a class='vcard' href='#" + href + "'><b>" + esc(title) + "</b>" + (text ? "<span>" + esc(text) + "</span>" : "") + "</a>";
@@ -291,8 +403,10 @@ button.vcard{font:inherit}
     const route = parse();
     const head = route.head;
     if(head !== "anatomy") stopLiver();
+    const embedded = /(?:^|[?&])embed=1(?:&|$)/.test(location.search);
     const onHome = head === "home";
-    back.textContent = onHome ? "Learning lab" : "Back";
+    back.hidden = embedded && onHome;
+    back.textContent = onHome ? "Learning lab" : "Up";
     if (head === "home") renderHome();
     else if (head === "anatomy") renderAnatomy(route.rest);
     else if (head === "physiology") renderPhysiology(route.rest);
@@ -300,7 +414,7 @@ button.vcard{font:inherit}
     else if (head === "investigations") renderListDetail("investigations", "Investigations", DATA.invest, route.rest, function (page) {
       const spoken = page.title + ". " + ((page.items && page.items[0]) || "Enter the values. The score is illustrative.");
       if (page.kind === "text") return { html: bullets(page.items) + note(), spoken: spoken };
-      return { html: calcBody(page.kind) + note(), spoken: spoken, calc: page.kind };
+      return { html: calcBody(page.kind).replace(/<p class='lede'>([\s\S]*?)<\/p>/g, function (_, text) { return bullets([text]); }) + note(), spoken: spoken, calc: page.kind };
     });
     else if (head === "imaging") renderImaging(route.rest);
     else if (head === "procedures") renderProcedures(route.rest);
@@ -312,7 +426,7 @@ button.vcard{font:inherit}
   function renderHome() {
     document.getElementById("kicker").textContent = "Critical care · liver";
     document.getElementById("title").textContent = "Liver learning lab";
-    root.innerHTML = "<p class='lede'>Anatomy, physiology, pathophysiology, diagnostics, procedures and management. Learning lab only. The practice arena is unchanged.</p>"
+    root.innerHTML = bullets(["Anatomy, physiology, diseases, investigations, imaging, procedures and critical care management.", "Learning lab only. The practice arena is unchanged."])
       + stack(HOME.map(function (item) { return card(item[0], item[1], item[2]); }).join(""))
       + "<p class='fine'>Scores use illustrative numbers. They are not a case simulator and not a listing tool.</p>";
     speakLine("Liver learning lab. Anatomy, physiology, diseases, investigations, imaging, procedures and critical care management.");
@@ -348,12 +462,21 @@ button.vcard{font:inherit}
     document.getElementById("title").textContent = "Liver anatomy";
     const chosen = rest[0] || "";
     if(!document.getElementById("liver3d")){
-      root.innerHTML = "<p class='lede'>Drag to turn the liver. Pinch to zoom. Tap a segment, the gallbladder, or the bile duct. It lights up, and the name is spoken.</p>"
-        + "<div class='player'><canvas id='liver3d'></canvas><p class='load' id='liverload'>Loading the liver model...</p><p class='cap' id='livercap'>Tap a structure</p></div>"
-        + "<article class='sheet' id='livercard'><h3>Tap a structure</h3><p>Segments follow the Couinaud numbering on this model. The portal vein and the hepatic artery are not separate meshes here.</p></article>"
+      root.innerHTML = bullets(["Drag to turn the liver.", "Pinch to zoom.", "Tap a segment, the gallbladder, or the bile duct.", "It lights up, and the name is spoken.", "Reset returns the original colours and the starting view."])
+        + "<div class='player'><canvas id='liver3d'></canvas><p class='load' id='liverload'>Loading the liver model...</p><p class='cap' id='livercap'>Tap a structure</p><button type='button' class='reset' id='liverreset'>Reset</button></div>"
+        + "<article class='sheet' id='livercard'><h3>Tap a structure</h3>" + bullets(["Segments follow the Couinaud numbering on this model.", "The portal vein and the hepatic artery are not separate meshes here."]) + "</article>"
         + "<div class='stack' id='liverparts'></div>"
         + "<p class='fine'>Model: Z-Anatomy, derived from BodyParts3D. CC BY-SA. Teaching anatomy, not a surgical plan.</p>";
       mountLiver(chosen);
+      document.getElementById("liverreset").onclick = function () {
+        const here = (location.hash || "").replace(/^#/, "") === "anatomy";
+        if (here) {
+          if (window.__liverSelect) window.__liverSelect("");
+          speakLine("Original liver view.");
+          return;
+        }
+        location.hash = "anatomy";
+      };
     } else {
       paintLiverList(chosen);
       if(window.__liverSelect) window.__liverSelect(chosen);
@@ -372,8 +495,8 @@ button.vcard{font:inherit}
     const part = liverPartById(chosen);
     if(card){
       card.innerHTML = part
-        ? "<h3>" + esc(part.title) + "</h3><p>" + esc(part.say) + "</p>"
-        : "<h3>Tap a structure</h3><p>Segments follow the Couinaud numbering on this model. The portal vein and the hepatic artery are not separate meshes here.</p>";
+        ? "<h3>" + esc(part.title) + "</h3>" + bullets([part.say])
+        : "<h3>Tap a structure</h3>" + bullets(["Segments follow the Couinaud numbering on this model.", "The portal vein and the hepatic artery are not separate meshes here."]);
     }
     const cap = document.getElementById("livercap");
     if(cap) cap.textContent = part ? part.title : "Tap a structure";
@@ -611,13 +734,13 @@ button.vcard{font:inherit}
     const pathway = DATA.pathways.find(function (item) { return item.id === rest[0]; }) || DATA.pathways[0];
     physStep = Math.max(0, Math.min(pathway.steps.length - 1, Number(rest[1]) || 0));
     document.getElementById("title").textContent = pathway.title;
-    root.innerHTML = "<p class='lede'>" + esc(pathway.summary) + "</p><div class='stack' id='steps'>" + pathway.steps.map(function (step, index) {
+    root.innerHTML = bullets([pathway.summary]) + "<div class='stack' id='steps'>" + pathway.steps.map(function (step, index) {
       const on = index === physStep;
       return "<button type='button' class='vcard" + (on ? " on" : "") + "' data-step='" + index + "'><b>" + (index + 1) + ". " + esc(step.title) + "</b>"
         + (step.enzyme ? "<span class='enzyme'>" + esc(step.enzyme) + "</span>" : "")
-        + (on ? "<span>" + esc(step.detail) + "</span><span class='warn'>When this fails: " + esc(step.fail) + "</span>" : "")
+        + (on ? pointSpans([step.detail, "When this fails: " + step.fail]) : "")
         + "</button>";
-    }).join("") + "</div><article class='sheet'><p>" + esc(pathway.significance) + "</p><p>" + esc(pathway.diseases) + "</p></article>" + note();
+    }).join("") + "</div><article class='sheet'><h3>Why it matters</h3>" + bullets([pathway.significance, pathway.diseases]) + "</article>" + note();
     root.querySelectorAll("[data-step]").forEach(function (btn) {
       btn.onclick = function () {
         location.hash = "physiology/" + pathway.id + "/" + btn.getAttribute("data-step");
@@ -654,8 +777,7 @@ button.vcard{font:inherit}
       const items = disease.blocks[chapter[0]] || [];
       return "<article class='sheet'><h3>" + esc(chapter[1]) + "</h3>" + bullets(items) + "</article>";
     }).join("");
-    const needsFilm = /intubat/i.test(JSON.stringify(disease.blocks));
-    root.innerHTML = "<p class='context'>" + esc(category ? category.title : "") + "</p>" + (needsFilm ? film() : "") + chapters + note();
+    root.innerHTML = "<p class='context'>" + esc(category ? category.title : "") + "</p>" + scanFilm(disease) + chapters + note();
     const first = (disease.blocks.definition && disease.blocks.definition[0]) || disease.name;
     speakLine(disease.name + ". " + first);
   }
@@ -690,7 +812,7 @@ button.vcard{font:inherit}
         last = item.group;
         return head + card("imaging/" + index, item.title, item.points[0]);
       }).join("");
-      root.innerHTML = "<p class='lede'>Labeled diagrams. They are not ultrasound, CT or MRI acquisitions.</p>" + stack(html);
+      root.innerHTML = bullets(["Labeled teaching films.", "They are not ultrasound, CT or MRI acquisitions from a patient."]) + stack(html);
       speakLine("Imaging lab. Diagrams only. Not a patient scan.");
       return;
     }
@@ -701,8 +823,8 @@ button.vcard{font:inherit}
     document.getElementById("kicker").textContent = finding.group;
     document.getElementById("title").textContent = finding.title;
     root.innerHTML = "<div id='diagram'>" + imageSvg(finding) + "</div>" + bullets(finding.points)
-      + (mark ? "<article class='sheet'><h3>" + esc(mark.label) + "</h3><p>" + esc(mark.text) + "</p></article>" : "")
-      + "<p class='fine'>Pinch is not required. Tap the mark. This is a diagram, not a scan.</p>" + note();
+      + (mark ? "<article class='sheet'><h3>" + esc(mark.label) + "</h3>" + bullets([mark.text]) + "</article>" : "")
+      + bullets(["Tap the mark.", "This is a diagram, not a scan."]) + note();
     root.querySelectorAll("[data-mark]").forEach(function (node) {
       node.style.cursor = "pointer";
       node.onclick = function () {
@@ -725,11 +847,9 @@ button.vcard{font:inherit}
     const stepAt = Math.max(0, Math.min(procedure.steps.length - 1, Number(rest[1]) || 0));
     const step = procedure.steps[stepAt];
     document.getElementById("title").textContent = procedure.title;
-    const needsFilm = /intubat/i.test(step.text);
     root.innerHTML = stageSvg(step.stage, procedure.title)
-      + "<div class='pager'><button type='button' id='prev' " + (stepAt === 0 ? "disabled" : "") + ">Step back</button><span>Step " + (stepAt + 1) + " of " + procedure.steps.length + "</span><button type='button' id='next' " + (stepAt === procedure.steps.length - 1 ? "disabled" : "") + ">Step on</button></div>"
-      + "<article class='sheet'><h3>" + esc(step.title) + "</h3><p>" + esc(step.text) + "</p></article>"
-      + (needsFilm ? film() : "")
+      + "<div class='pager'><button type='button' id='prev' " + (stepAt === 0 ? "disabled" : "") + ">Previous</button><span>Step " + (stepAt + 1) + " of " + procedure.steps.length + "</span><button type='button' id='next' " + (stepAt === procedure.steps.length - 1 ? "disabled" : "") + ">Next</button></div>"
+      + "<article class='sheet'><h3>" + esc(step.title) + "</h3>" + bullets([step.text]) + "</article>"
       + "<div class='stack'>" + procedure.steps.map(function (item, itemIndex) {
         return "<a class='vcard" + (itemIndex === stepAt ? " on" : "") + "' href='#procedures/" + index + "/" + itemIndex + "'><b>" + esc(item.title) + "</b></a>";
       }).join("") + "</div>" + note();
@@ -749,14 +869,14 @@ button.vcard{font:inherit}
     const index = Math.max(0, Math.min(DATA.management.length - 1, Number(rest[0]) || 0));
     const chapter = DATA.management[index];
     document.getElementById("title").textContent = chapter.title;
-    root.innerHTML = (chapter.intubation ? film() : "") + chapter.blocks.map(function (block) {
+    root.innerHTML = chapter.blocks.map(function (block) {
       return "<article class='sheet'><h3>" + esc(block.heading) + "</h3>" + bullets(block.items) + "</article>";
     }).join("") + note();
     speakLine(chapter.title + ". " + chapter.blocks[0].heading + ". " + chapter.blocks[0].items[0]);
   }
 
   function footer() {
-    return "<footer class='legal'><p>CRITICAL CARE HUB™</p><p>Created by Dr Apoorva Chandra<br>Intensivist</p><p>© 2026 Dr Apoorva Chandra. All Rights Reserved.</p><p>Original educational content, learning modules and software materials, to the extent owned by the copyright holder.</p></footer>";
+    return "<footer class='legal'><p>© 2026 Dr Apoorva Chandra. Critical Care Hub. All rights reserved.</p></footer>";
   }
 
   back.onclick = function (event) {
