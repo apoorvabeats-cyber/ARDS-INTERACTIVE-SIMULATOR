@@ -112,25 +112,36 @@ hl();
 });}
 const tube=(id,pts,r,c,key)=>{const q=new T.CatmullRomCurve3(pts),m=new T.Mesh(new T.TubeGeometry(q,90,r,10,false),mat(c,.5));m.userData={id,b:.5};N.add(m);nm.push(m);cu[key]=q};
 const wig=(a,b,amp,n,f)=>{const A=V3(...a),Z=V3(...b),d=Z.clone().sub(A),p=V3(-d.y,d.x).normalize(),o=[];for(let i=0;i<=n;i++){const t=i/n;o.push(A.clone().lerp(Z,t).addScaledVector(p,Math.sin(t*Math.PI*f)*amp))}return o};
-tube('pct',wig([-5.3,3.3],[-2.5,3.6],.5,60,6),.2,0xf0a35a,'pct');
+const neckPts=[V3(-6,2.84,0),V3(-5.72,3.06,0),V3(-5.46,3.18,0)];
+const pctWig=wig([-5.3,3.3],[-2.5,3.6],.5,60,6);
+tube('pct',pctWig,.2,0xf0a35a,'pct');
+cu.pct=new T.CatmullRomCurve3(neckPts.concat(pctWig));
+const neck=new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(neckPts.concat([pctWig[0]])),28,.15,8,false),mat(0xf0a35a,.72));
+neck.userData={id:'pct',b:.72,link:1};neck.renderOrder=2;N.add(neck);nm.push(neck);
 tube('loop',[V3(-2.5,3.6),V3(-2.5,0),V3(-2.5,-3.5),V3(-2.1,-4.5)],.09,0x6aa8ff,'dl');
-tube('loop',[V3(-2.1,-4.5),V3(-1.6,-3.5),V3(-1.5,0),V3(-1.5,2.8)],.15,0x4f7fe0,'al');
-tube('dct',wig([-1.5,2.8],[1,3.2],.32,50,4),.16,0x66c28a,'dct');
+const mac=V3(-7.14,4.70,.2);
+const alPts=[V3(-2.1,-4.5),V3(-1.6,-3.5),V3(-1.55,0),V3(-1.75,1.7),V3(-2.55,1.92,.7),V3(-3.5,2.08,.22),V3(-4.9,2.12,0),V3(-6.15,2.28,0),V3(-7.12,3.28,.06),V3(-7.26,4.12,.1),mac];
+tube('loop',alPts,.15,0x4f7fe0,'al');nm[nm.length-1].userData.jga=1;
+const dctWig=wig([-1.5,2.8],[1,3.2],.32,50,4);
+tube('dct',[mac.clone(),V3(-7.38,3.72,.22),V3(-6.95,2.58,.16),V3(-5.4,1.62,.4),V3(-3.5,1.52,.6),V3(-2.5,1.68,.85),V3(-1.62,2.15,.3)].concat(dctWig),.16,0x66c28a,'dct');
 tube('cd',[V3(1,3.2),V3(2,2.5),V3(2.2,0),V3(2.2,-4.6)],.22,0xd8b24a,'cd');
+const md=new T.Mesh(new T.SphereGeometry(.2,18,12),mat(0xd4684a,.98));
+md.scale.set(1.15,.48,.85);md.position.copy(mac);md.renderOrder=4;md.userData={id:'loop',b:.98,jga:1};N.add(md);nm.push(md);
 const Gc=V3(-6,4,0);
 function addGlo(mesh,b,cap){mesh.userData={id:'glo',b:b,cap:cap?1:0};N.add(mesh);nm.push(mesh);return mesh}
-const bow=addGlo(new T.Mesh(new T.SphereGeometry(1.16,32,24),mat(0xe8dcc8,.12)),.12,1);
+const bow=addGlo(new T.Mesh(new T.SphereGeometry(1.16,32,24),mat(0xe8dcc8,.07)),.07,1);
 bow.material.depthWrite=false;bow.material.side=T.DoubleSide;bow.renderOrder=3;bow.position.copy(Gc);
-[[.62,.48,.16,0.2],[.5,.58,.2,1.05],[.55,.4,.28,2.1],[.42,.5,.22,3.2],[.58,.34,.18,4.2],[.36,.44,.26,5.1]].forEach(function(L,n){
-const pts=[];
-for(let k=0;k<28;k++){const a=k/28*Math.PI*2,x=Math.cos(a)*L[0],y=Math.sin(a)*L[1],z=Math.sin(a*2+L[3])*L[2];
-const cy=y*Math.cos(L[3])-z*Math.sin(L[3]),cz=y*Math.sin(L[3])+z*Math.cos(L[3]);
-pts.push(new T.Vector3(Gc.x+x,Gc.y+cy,Gc.z+cz))}
-const m=addGlo(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),64,.09,8,true),mat(n%2?0x9a2e2e:0xd25545,.98)),.98,0);
-m.renderOrder=1});
+const affTip=V3(-6.62,4.12,.06),effTip=V3(-5.38,4.16,.06),coil=[];
+coil.push(affTip.clone(),V3(-6.35,4.02,.08));
+for(let i=0;i<=80;i++){const t=i/80,a=t*Math.PI*2*4,env=Math.sin(t*Math.PI),rad=.12+.5*env;
+coil.push(V3(Gc.x+Math.cos(a)*rad,Gc.y+.1-Math.sin(t*Math.PI)*.66,Gc.z+Math.sin(a)*rad*.8))}
+coil.push(V3(-5.62,4.02,.08),effTip.clone());
+const tuft=addGlo(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(coil),280,.072,8,false),mat(0xc23b3b,.98)),.98,0);
+tuft.renderOrder=1;
 const cyl=(a,b,r,c)=>{const A=V3(...a),Z=V3(...b),d=Z.clone().sub(A),m=new T.Mesh(new T.CylinderGeometry(r,r,d.length(),16),mat(c,.92));m.position.copy(A.clone().add(Z).multiplyScalar(.5));m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),d.clone().normalize());m.renderOrder=2;return addGlo(m,.92,0)};
 const aff=cyl([-9,6.8,0],[-6.62,4.12,.06],.2,0xd0443a),eff=cyl([-5.38,4.16,.06],[-3,6.8,0],.13,0xa83232);
-const vc=new T.CatmullRomCurve3([V3(-9,6.8,0),V3(-7.6,5.5,.08),V3(-6.62,4.12,.06),V3(-6.2,4.28,.22),V3(-6,3.78,-.12),V3(-5.75,4.22,.16),V3(-5.38,4.16,.06),V3(-4.2,5.4,.04),V3(-3,6.8,0)]);
+function span(a,b,n){const o=[];for(let i=0;i<n;i++)o.push(a.clone().lerp(b,i/n));return o}
+const vc=new T.CatmullRomCurve3(span(V3(-9,6.8,0),affTip,8).concat(coil,span(effTip,V3(-3,6.8,0),8).slice(1),[V3(-3,6.8,0)]));
 /* particles: lumen solutes survive only while u < remaining fraction; the rest drift out through the wall = reabsorbed */
 const TY=[['w',0x62b0ff,110,.05],['na',0xffd23f,80,.07],['k',0xb26bff,40,.07],['g',0xffffff,50,.085],['b',0xff9a3c,50,.07]],PL=[];
 TY.forEach(([k,c,n,s])=>{for(let i=0;i<n;i++)PL.push({k,c,s,u:Math.random(),T:Math.random(),v:.8+Math.random()*.4,ph:Math.random()*6.28,rho:Math.random()})});
@@ -141,23 +152,25 @@ const rd=[.2,.09,.15,.16,.22],fi=(a,t)=>{let i=0;while(i<4&&t>Tb[i+1])i++;return
 function anim(dt,o){const sp=.04*(.3+.7*o.g/125);
 aff.scale.x=aff.scale.z=cl(Math.pow(o.Ra,-.45),.5,1.6);eff.scale.x=eff.scale.z=cl(Math.pow(o.Re,-.45),.5,1.6);
 PL.forEach((p,i)=>{let P,s=p.s;
-if(p.k=='rbc'){p.T=(p.T+dt*.07*o.rbf/1100)%1;P=vc.getPoint(p.T);P.x+=Math.cos(p.ph)*.05;P.y+=Math.sin(p.ph)*.05}
+if(p.k=='rbc'){p.T=(p.T+dt*.07*o.rbf/1100)%1;P=vc.getPoint(p.T);P.x+=Math.cos(p.ph)*.03;P.y+=Math.sin(p.ph)*.03}
 else{p.T=(p.T+dt*sp*p.v)%1;let j=0;while(j<4&&p.T>Tb[j+1])j++;P=cu[SK[j]].getPoint((p.T-Tb[j])/(Tb[j+1]-Tb[j]));
 const off=cl((p.u-fi(o.fr[p.k],p.T))/.08,0,1),r=rd[j];P.x+=Math.cos(p.ph)*(p.rho*r*.6+off*r*2.4);P.y+=Math.sin(p.ph)*(p.rho*r*.6+off*r*2.4);s*=1-.55*off}
 du.position.copy(P);du.scale.setScalar(s);du.updateMatrix();im.setMatrixAt(i,du.matrix)});im.instanceMatrix.needsUpdate=true}
+const liftC=new T.Color(),liftW=new T.Color(0xffffff);
+function liftHex(hex){return liftC.setHex(hex).lerp(liftW,.48).getHex()}
 function hl(){K.visible=sel=='kid';N.visible=!K.visible;
-nm.forEach(m=>{const on=sel=='all'||m.userData.id==sel;m.material.opacity=on?(m.userData.cap?m.userData.b:(sel=='all'?m.userData.b:Math.min(1,m.userData.b+.28))):.08;m.material.emissive.setHex(on&&sel!='all'&&!m.userData.cap?0x331810:0)});
-ks.forEach(m=>{const id=m.userData.id;m.material.emissive.setHex(id==kp?0x3a2418:0);if(m.userData.shell){m.material.clippingPlanes=cut?[clip]:[];m.material.opacity=cut?(id==='capsule'?0.08:0.3):(id==='capsule'?0.5:0.96);m.material.transparent=true;m.material.depthWrite=!cut;m.material.needsUpdate=true}})}
+nm.forEach(m=>{const extra=(m.userData.jga&&(sel==='glo'||sel==='loop'))||(m.userData.link&&(sel==='glo'||sel==='pct'));const on=sel==='all'||m.userData.id===sel||extra;m.material.opacity=on?(m.userData.cap?m.userData.b:(sel==='all'?m.userData.b:Math.min(1,m.userData.b+.28))):.08;m.material.emissive.setHex(on&&sel!=='all'&&!m.userData.cap?0x331810:0)});
+ks.forEach(m=>{const id=m.userData.id;if(m.userData.baseCol==null)m.userData.baseCol=m.material.color.getHex();const on=!!kp&&id===kp;m.material.color.setHex(on?liftHex(m.userData.baseCol):m.userData.baseCol);m.material.emissive.setHex(on?0xe08a55:0);if('emissiveIntensity' in m.material)m.material.emissiveIntensity=on?0.85:1;if(m.userData.shell){m.material.clippingPlanes=cut?[clip]:[];m.material.opacity=cut?(id==='capsule'?0.08:0.3):(id==='capsule'?0.5:0.96);m.material.transparent=true;m.material.depthWrite=!cut;m.material.needsUpdate=true}})}
 /* ---------- content ---------- */
-const FOC={kid:[[0,-.35,0],[.45,-.1,9]],all:[[-3,1,0],[-3,1,19]],glo:[[-6,4,0],[-5.15,4.65,4.05]],pct:[[-3.8,3.5,0],[-3.8,3.5,6.5]],loop:[[-2,-.4,0],[-2,-.4,11]],dct:[[0,3,0],[0,3,6]],cd:[[2.2,-1,0],[2.2,-1,11]]};
+const FOC={kid:[[0,-.35,0],[.45,-.1,9]],all:[[-3.4,.9,0],[-3.4,.9,20.5]],glo:[[-6.2,4.05,0],[-5.35,4.45,5.6]],pct:[[-4.2,3.25,0],[-4.2,3.25,7.4]],loop:[[-4.2,.2,0],[-4.2,.2,14]],dct:[[0,3,0],[0,3,6]],cd:[[2.2,-1,0],[2.2,-1,11]]};
 const NV=[['kid','Kidney'],['all','Nephron'],['glo','Glomerulus'],['pct','PCT'],['loop','Loop'],['dct','DCT'],['cd','Collecting duct']];
 const DR={loop:['Furosemide / torsemide','loop · NKCC2'],thz:['Thiazide / chlorthalidone','DCT · NCC'],cai:['Acetazolamide','PCT · carbonic anhydrase'],sglt:['Dapagliflozin / empagliflozin','PCT · SGLT2'],amil:['Amiloride','CD · ENaC'],mra:['Spironolactone / eplerenone','CD · mineralocorticoid receptor'],tolv:['Tolvaptan','CD · V2 antagonist'],mann:['Mannitol','osmotic diuretic'],acei:['ACE inhibitor / ARB','efferent · angiotensin II'],nsaid:['NSAID','afferent · prostaglandins']};
 const KN={capsule:['Renal capsule','Tough fibrous covering; limits swelling, so oedema raises interstitial pressure.'],cortex:['Renal cortex','Renal corpuscles, PCT and DCT of cortical nephrons; interlobular arteries run here. Use Enter nephron to follow one.'],medulla:['Renal pyramids (medulla)','Outer and inner stripe, loops of Henle, collecting ducts; papillae drain into minor calyces. Home of the countercurrent gradient.'],pelvis:['Renal pelvis and calyces','Minor to major calyces to pelvis; urine then passes into the ureter.'],ureter:['Ureter','Peristaltic conduit from pelvis to bladder; flow runs downward.'],artery:['Renal artery','About 20% of cardiac output; branches to segmental, interlobar, arcuate and interlobular arteries, then afferent arterioles.'],vein:['Renal vein','Drains the kidney to the IVC; lies anterior to the artery at the hilum.']};
 const SEG={
-all:{n:'Nephron explorer',an:'One continuous nephron: glomerulus, PCT, loop of Henle, DCT, collecting duct. Particles: water (blue), Na⁺ (yellow), K⁺ (violet), glucose (white), HCO₃⁻ (orange), red cells (red). Particles drifting out through the wall are being reabsorbed.',tr:[],el:'Every Output value comes from one coupled mass-balance model that also tracks body Na⁺, K⁺, water and bicarbonate over time.',ph:'Open Drugs to combine agents and watch additive effects.',dr:[]},
-glo:{n:'Glomerular filtration lab',an:'Afferent arteriole, capillary tuft, efferent arteriole; filtrate collects in Bowman’s space. Vessel width follows resistance.',tr:[['Prostaglandins','Dilate afferent arteriole','NSAIDs block'],['Angiotensin II','Constricts efferent arteriole','ACEi / ARB block']],el:'Na⁺, K⁺, Cl⁻, HCO₃⁻ and glucose filter freely; protein stays, so oncotic pressure rises along the tuft.',ph:'ACEi/ARB: efferent dilation lowers PGC and GFR. NSAIDs: afferent constriction lowers RPF and GFR. Severe efferent constriction raises FF until oncotic pressure halts filtration.',dr:['acei','nsaid']},
+all:{n:'Nephron explorer',an:'One continuous nephron: glomerulus, PCT, loop of Henle, DCT, collecting duct. The thick ascending limb returns to the afferent arteriole (macula densa). Particles: water (blue), Na⁺ (yellow), K⁺ (violet), glucose (white), HCO₃⁻ (orange), red cells (red). Particles drifting out through the wall are being reabsorbed.',tr:[],el:'Every Output value comes from one coupled mass-balance model that also tracks body Na⁺, K⁺, water and bicarbonate over time.',ph:'Open Drugs to combine agents and watch additive effects.',dr:[]},
+glo:{n:'Glomerular filtration lab',an:'One capillary leaves the afferent arteriole, coils inside Bowman’s capsule and exits into the efferent arteriole. Filtrate leaves at the urinary pole into the proximal tubule. The macula densa lies against the afferent arteriole. Vessel width follows resistance.',tr:[['Prostaglandins','Dilate afferent arteriole','NSAIDs block'],['Angiotensin II','Constricts efferent arteriole','ACEi / ARB block'],['Macula densa','Senses luminal NaCl and constricts the afferent when delivery is high','Lost if NKCC2 is blocked']],el:'Na⁺, K⁺, Cl⁻, HCO₃⁻ and glucose filter freely; protein stays, so oncotic pressure rises along the tuft.',ph:'ACEi/ARB: efferent dilation lowers PGC and GFR. NSAIDs: afferent constriction lowers RPF and GFR. Severe efferent constriction raises FF until oncotic pressure halts filtration.',dr:['acei','nsaid']},
 pct:{n:'Proximal convoluted tubule',an:'Cuboidal cells with a brush border; reabsorbs about 65% of filtered Na⁺ and water.',tr:[['NHE3','Na⁺ in, H⁺ out','Falls with CA inhibition'],['SGLT2 / SGLT1','Glucose + Na⁺','Gliflozins'],['Carbonic anhydrase','HCO₃⁻ reclamation','Acetazolamide'],['Na⁺/K⁺-ATPase','Basolateral pump','Essential driver'],['NaPi-IIa/IIc','Phosphate','PTH lowers activity'],['URAT1','Urate','Probenecid, lesinurad']],el:'Na⁺, water, K⁺, ~80% of HCO₃⁻, all glucose, amino acids and phosphate; H⁺ secreted. Fractional reabsorption stays constant as GFR changes (glomerulotubular balance).',ph:'Block SGLT2: more glucose and Na⁺ reach downstream segments, glycosuria, osmotic diuresis, and tubuloglomerular feedback constricts the afferent arteriole (small GFR dip). Acetazolamide: bicarbonaturia, metabolic acidosis.',dr:['sglt','cai','mann']},
-loop:{n:'Loop of Henle',an:'Thin descending limb, thin ascending limb, thick ascending limb (drawn wider).',tr:[['AQP1','Water (descending limb)','No routine blocker'],['NKCC2','Na⁺-K⁺-2Cl⁻ (thick ascending)','Furosemide, torsemide'],['ROMK','K⁺ recycling for NKCC2','Regulates NKCC2'],['ClC-Kb','Cl⁻ exit','Bartter physiology']],el:'Descending: water leaves. Thick ascending: ~25% of filtered Na⁺, water-impermeable; builds the medullary gradient; Ca²⁺ and Mg²⁺ follow the lumen-positive potential.',ph:'Block NKCC2: more urinary Na⁺, downstream K⁺ loss, Ca²⁺ and Mg²⁺ loss, flattened medullary gradient, poor concentrating ability, high urine output, and macula densa signalling is lost.',dr:['loop','mann']},
+loop:{n:'Loop of Henle',an:'Thin descending limb, thin ascending limb, thick ascending limb (drawn wider). The thick limb ends on the afferent arteriole as the macula densa.',tr:[['AQP1','Water (descending limb)','No routine blocker'],['NKCC2','Na⁺-K⁺-2Cl⁻ (thick ascending)','Furosemide, torsemide'],['ROMK','K⁺ recycling for NKCC2','Regulates NKCC2'],['ClC-Kb','Cl⁻ exit','Bartter physiology'],['Macula densa','Senses luminal NaCl at the end of the thick limb','Signals the afferent arteriole']],el:'Descending: water leaves. Thick ascending: ~25% of filtered Na⁺, water-impermeable; builds the medullary gradient; Ca²⁺ and Mg²⁺ follow the lumen-positive potential.',ph:'Block NKCC2: more urinary Na⁺, downstream K⁺ loss, Ca²⁺ and Mg²⁺ loss, flattened medullary gradient, poor concentrating ability, high urine output, and macula densa signalling is lost.',dr:['loop','mann']},
 dct:{n:'Distal convoluted tubule',an:'Short, convoluted, water-impermeable segment (diluting) next to the glomerulus.',tr:[['NCC','Na⁺-Cl⁻ reabsorption','Thiazides'],['TRPM6','Mg²⁺','Thiazide-related Mg²⁺ loss'],['TRPV5','Ca²⁺','PTH-regulated']],el:'About 5% of filtered Na⁺, plus Ca²⁺ and Mg²⁺.',ph:'Block NCC: natriuresis, more Na⁺ delivered to the collecting duct (K⁺ wasting), lower urinary Ca²⁺ unlike loop diuretics.',dr:['thz']},
 cd:{n:'Collecting duct',an:'Principal cells (ENaC, ROMK/BK, AQP2, basolateral Na⁺/K⁺-ATPase) and intercalated cells (α: H⁺ secretion; β: HCO₃⁻ secretion via pendrin).',tr:[['ENaC','Na⁺ reabsorption','Amiloride'],['ROMK / BK','K⁺ secretion','Flow and aldosterone driven'],['Aquaporin-2','ADH-regulated water','Vasopressin up; tolvaptan down'],['α-intercalated','H⁺ secretion, HCO₃⁻ reabsorption','Reduced by MRA/amiloride'],['β-intercalated','HCO₃⁻ secretion, Cl⁻ (pendrin)','—'],['MR / V2 receptors','Aldosterone / ADH signalling','Spironolactone, eplerenone / tolvaptan, desmopressin']],el:'Final adjustment of Na⁺ (aldosterone), K⁺, H⁺/HCO₃⁻ and water (ADH).',ph:'More ADH: concentrated urine. Less ADH or tolvaptan: dilute urine. More aldosterone: Na⁺ retention, K⁺ and H⁺ loss. MRA or amiloride: the opposite (hyperkalaemia, acidosis).',dr:['amil','mra','tolv']}};
 const OUT=[['g','GFR','mL/min',0],['rpf','Renal plasma flow','mL/min',0],['ffp','Filtration fraction','%',1],['vh','Urine output','mL/h',0],['uo','Urine osmolality','mOsm/kg',0],['uNa','Urine Na⁺','mmol/L',0],['uK','Urine K⁺','mmol/L',0],['uCl','Urine Cl⁻','mmol/L',0],['ph','Urine pH','',2],['ug','Urine glucose','',0],['uB','Urine HCO₃⁻','mmol/L',1],['fena','FENa','%',2],['feu','FEUrea','%',0],['fwc','Free-water clearance','mL/min',2],['Na','Serum Na⁺','mmol/L',1],['Ks','Serum K⁺','mmol/L',2],['Po','Serum osmolality','mOsm/kg',0],['Hs','Serum HCO₃⁻','mmol/L',1],['acc','Urine collected','mL',0],['ex','Na⁺ / K⁺ excreted','mmol',0]];
