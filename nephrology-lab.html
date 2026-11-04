@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111a">
+<title>Nephrology Learning Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Fraunces:opsz,wght@9..144,500&display=swap" rel="stylesheet">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#07111a;--fg:#e7f1f4;--muted:#93a8b3;--line:rgba(226,180,138,.35);--warm:#e2b48a;--paper:#f3efe6}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:Figtree,sans-serif}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-appearance:none;appearance:none;background:#102028;color:var(--paper);border:1px solid var(--line);border-radius:999px;min-height:44px;padding:0 14px}
+button:focus-visible,input:focus-visible{outline:2px solid var(--warm);outline-offset:2px}
+button.on{border-color:var(--warm);color:#fff8ee;background:#2a2118}
+a.go{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--line);text-decoration:none;background:#102028;color:var(--paper);flex:none}
+header{display:flex;gap:8px;align-items:center;padding:10px 12px 0}
+header h1{font-family:Fraunces,Georgia,serif;font-weight:500;font-size:22px;margin:0;letter-spacing:-.03em;flex:1}
+.bar{display:flex;gap:8px;overflow:auto;padding:0;-webkit-overflow-scrolling:touch}
+.bar button{flex:none;font-size:15px}
+.labdock{position:fixed;left:0;right:0;bottom:0;z-index:6;background:#0b1620;border-top:1px solid var(--line);padding:8px 12px calc(8px + env(safe-area-inset-bottom))}
+.labdock .tag{display:block;margin:0 0 6px;color:var(--warm);font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.row button{flex:none}
+#view{position:fixed;inset:0;width:100%;height:100%;touch-action:none;z-index:0}
+.hud{position:relative;z-index:2;pointer-events:none}
+.hud header,.hud .tools,.hud .sheet{pointer-events:auto}
+.tools{display:flex;gap:8px;overflow:auto;padding:8px 12px 0}
+.tools button{flex:none;font-size:14px}
+.sheet{position:fixed;left:0;right:0;bottom:calc(96px + env(safe-area-inset-bottom));z-index:3;max-height:46dvh;overflow:auto;background:rgba(7,17,26,.94);border-top:1px solid var(--line);padding:8px 14px 14px;border-radius:18px 18px 0 0}
+.sheet.tall{max-height:52dvh}
+.sheet h2{font-family:Fraunces,Georgia,serif;font-weight:500;font-size:22px;margin:0 0 6px;letter-spacing:-.02em}
+.sheet h3{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm);margin:12px 0 4px}
+.sheet p{font-size:16px;line-height:1.4;margin:0 0 8px}
+.kicker{margin:0 0 4px;color:var(--warm);letter-spacing:.14em;text-transform:uppercase;font-size:11px}
+.live{font-size:15px;line-height:1.45}
+.live b{font-family:Fraunces,Georgia,serif;font-weight:500;font-size:18px}
+.sub{color:var(--muted);font-size:13px;line-height:1.4}
+.seg{font-size:15px}
+.credit{color:var(--muted);font-size:12px;line-height:1.35}
+.sticky{position:sticky;top:0;z-index:2;background:#07111a;padding:0 0 8px}
+.sheet-head{position:sticky;top:0;z-index:4;display:flex;justify-content:flex-end;background:#07111a;padding:2px 0 8px}
+#sheetx{background:#f3efe6;color:#05070c;font-weight:650}
+label.sl{display:block;font-size:14px;color:var(--paper);margin-top:8px}
+label.sl b{font-family:Fraunces,Georgia,serif;font-weight:500;color:var(--warm)}
+input[type=range]{width:100%;height:44px;accent-color:#e2b48a;background:transparent}
+.drugs{display:flex;gap:8px;overflow:auto;padding-bottom:4px}
+.drugs button{flex:none;font-size:14px}
+.chartbox{position:relative;height:140px;margin:6px 0 8px}
+.swatch{display:inline-block;width:11px;height:11px;border-radius:2px;margin:0 4px 0 8px;vertical-align:middle}
+.swatch.c{background:#8a4038}
+.swatch.m{background:#c4896a}
+.swatch.p{background:#e6d3bc}
+.load{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:#07111a}
+.load.hide{display:none}
+.sheet.shut{display:none}
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="Three dimensional kidney. Drag to turn. Tap a structure."></canvas>
+<div class="hud">
+<header>
+  <h1>Nephrology</h1>
+  <a class="go" href="hub.html">Wards</a>
+</header>
+<div class="tools">
+  <button type="button" id="reset">Reset</button>
+  <button type="button" id="panel">Panel</button>
+</div>
+<section class="sheet" id="sheet" aria-live="polite">
+  <div class="sheet-head"><button type="button" id="sheetx">Hide</button></div>
+  <div id="sheetbody"></div>
+</section>
+</div>
+<div class="labdock">
+  <span class="tag">Views</span>
+  <div class="bar" id="labs" role="tablist" aria-label="External kidney, internal cross section, and nephron">
+    <button type="button" data-mode="external" class="on">External</button>
+    <button type="button" data-mode="internal">Internal</button>
+    <button type="button" data-mode="nephron">Nephron</button>
+  </div>
+</div>
+<div class="load" id="load"><p>Opening the kidney…</p></div>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+function compute(s){
+  const MAP = 100, Pv = 12;
+  const flow = clamp(s.flow == null ? 1 : s.flow, 0.35, 1.85);
+  const Ra = 1 / flow;
+  const Re = clamp(s.efferent, 0.4, 1.8);
+  const RBF = 1050 * (2 / (Ra + Re));
+  const RPF = RBF * 0.58;
+  const PgcAuto = Pv + (MAP - Pv) * (Re / (Ra + Re));
+  const Pgc = s.pgcManual == null ? PgcAuto : clamp(s.pgcManual, 28, 70);
+  const Kf = 10.4 * clamp(s.kf, 0.15, 1.8);
+  let FF = 0.2, pi = s.pi, NFP = 0, GFR = 0;
+  for (let i = 0; i < 4; i++){
+    pi = s.pi * (1 + 0.16 * FF);
+    NFP = Pgc - s.Pbs - pi;
+    GFR = NFP > 0 ? Kf * NFP : 0;
+    FF = RPF > 1 ? clamp(GFR / RPF, 0, 0.42) : 0;
+  }
+
+  const nhe3 = clamp(s.nhe3, 0, 1.5);
+  const sglt2 = clamp(s.sglt2, 0, 1.5);
+  const ca = clamp(s.ca, 0, 1.5);
+  const nkcc2 = clamp(s.nkcc2, 0, 1.5);
+  const ncc = clamp(s.ncc, 0, 1.5);
+  const enac = clamp(s.enac, 0, 1.5);
+  const romk = clamp(s.romk, 0, 1.5);
+  const aqp2 = clamp(s.aqp2, 0, 1.6);
+  const hatp = clamp(s.hatp, 0, 1.5);
+  const aldo = clamp(s.aldo, 0, 1.6);
+  const mannitol = clamp(s.mannitol || 0, 0, 1);
+
+  const naF = GFR * 140 / 1000;
+  const kF = GFR * 4.2 / 1000;
+  const hcoF = GFR * 24 / 1000;
+  const gF = GFR * 5.5 / 1000;
+  const uF = GFR * 5 / 1000;
+
+  const naPct = clamp(0.67 * (0.2 + 0.8 * Math.min(nhe3, 1.2)), 0.08, 0.76);
+  const hcoPct = clamp(0.50 + 0.498 * Math.min(ca, 1.05) * Math.min(nhe3, 1.15), 0, 0.9985);
+  const gPct = clamp(0.12 + 0.879 * Math.min(sglt2, 1.02), 0, 0.999);
+  const wPct = clamp(0.70 * (0.35 + 0.65 * Math.min(nhe3, 1.15)) * (1 - 0.30 * mannitol), 0.05, 0.74);
+
+  let na = naF * (1 - naPct);
+  let k = kF * (1 - 0.86);
+  let hco = hcoF * (1 - hcoPct);
+  let gluc = gF * (1 - gPct);
+  let urea = uF * 0.52;
+  let water = GFR * (1 - wPct);
+
+  const pct = { naIn: naF, naRe: naF - na, naOut: na, kOut: k, hcoRe: hcoF - hco, hcoOut: hco, gRe: gF - gluc, gOut: gluc, wOut: water };
+
+  const grad = clamp(0.35 + 0.65 * Math.min(nkcc2, 1.2), 0.28, 1.12);
+  const wDesc = clamp(0.68 * Math.min(grad, 1), 0, 0.8);
+  const wBeforeDesc = water;
+  water *= (1 - wDesc);
+
+  const talFrac = clamp(0.78 * Math.min(nkcc2, 1.15), 0, 0.9);
+  const naAtTal = na;
+  const naTalRe = na * talFrac;
+  na *= (1 - talFrac);
+  k *= (1 - clamp(0.72 * Math.min(nkcc2, 1.15), 0, 0.84));
+
+  const loop = { naIn: naAtTal, naRe: naTalRe, naOut: na, kOut: k, wIn: wBeforeDesc, wOut: water };
+
+  const dctFrac = clamp(0.74 * Math.min(ncc, 1.25), 0, 0.88);
+  const dctCap = 3.45 * Math.max(0.06, ncc);
+  const naAtDct = na;
+  const dctTake = Math.min(na * dctFrac, dctCap);
+  na -= dctTake;
+
+  const dct = { naIn: naAtDct, naRe: dctTake, naOut: na };
+
+  const enacEff = clamp(enac * (0.38 + 0.62 * aldo), 0, 1.45);
+  const cdFrac = clamp(0.64 * enacEff, 0, 0.9);
+  const cdCap = 1.7 * Math.max(0.05, enacEff);
+  const naAtCd = na;
+  const cdTake = Math.min(na * cdFrac, cdCap);
+  na -= cdTake;
+
+  const naDrive = clamp(0.4 + naAtCd * 0.85, 0.35, 1.7);
+  const kSec = 0.034 * aldo * romk * clamp(enac, 0.1, 1.35) * naDrive;
+  k = Math.max(0, k) + kSec;
+  hco = Math.max(0, hco - 0.0038 * hatp * Math.min(GFR / 80, 1.4));
+
+  const cd = { naIn: naAtCd, naRe: cdTake, naOut: na, kSec, kOut: k, hcoOut: hco };
+
+  const osmoles = Math.max(0.02, 2 * (na + k) + urea + Math.max(0, gluc) + hco + 0.32 * mannitol * Math.min(GFR / 100, 1.3));
+  const targetOsm = clamp(80 + 680 * Math.min(aqp2, 1.35) * Math.min(grad, 1.05) * (1 - 0.12 * mannitol), 60, 1200);
+  const delivered = Math.max(water, 0.3);
+  const eq = osmoles / targetOsm * 1000;
+  const pull = clamp((aqp2 - 0.04) / 0.96, 0, 0.988) * (1 - 0.08 * mannitol);
+  let urine = eq + (delivered - eq) * (1 - pull);
+  urine = clamp(urine, 0.18, Math.min(8, Math.max(delivered, 0.18)));
+
+  const perL = (m) => urine > 0.05 ? m / urine * 1000 : 0;
+  const hc = perL(hco);
+  let pH = hc > 10 ? 6.1 + Math.log10(hc / 1.2) : 5.82 + hc * 0.05 - 0.22 * Math.max(0, hatp - 0.35);
+  pH = clamp(pH, 4.6, 8);
+
+  const round1 = (v) => Math.round(v * 10) / 10;
+  return {
+    Ra: round1(Ra), Re: round1(Re), RBF: Math.round(RBF), RPF: Math.round(RPF),
+    Pgc: round1(Pgc), PgcAuto: round1(PgcAuto), pi: round1(pi), NFP: round1(NFP),
+    GFR: Math.round(GFR), FF: Math.round(FF * 100),
+    urineMl: round1(urine), urineLDay: round1(urine * 1.44),
+    uOsm: Math.round(perL(osmoles)), pH: round1(pH),
+    naDay: Math.round(na * 1440), kDay: Math.round(k * 1440),
+    uNa: Math.round(perL(na)), uK: Math.round(perL(k)),
+    hcoDay: Math.round(hco * 1440), uHco3: round1(perL(hco)),
+    glucDay: Math.round(Math.max(0, gluc) * 1440), uGluc: Math.round(perL(Math.max(0, gluc))),
+    targetOsm: Math.round(targetOsm),
+    pct, loop, dct, cd
+  };
+}
+
+
+const CREDIT = "The left kidney, cortex, columns, pyramids, papillae, pelvis, calyces, ureter and vessels are meshes from the Human Reference Atlas (Kristen Browne and Heidi Schlehlein, CC BY 4.0), the atlas already used on this site. This is not a Z-Anatomy model. Z-Anatomy is the heart elsewhere on the site. The nephron, the moving particles and the numbers are a teaching model.";
+
+const COL = {capsule:0x6e322c,cortex:0x8a4038,column:0x9a5144,hilum:0x7c4038,medulla:0xc4896a,pelvis:0xe6d3bc,ureter:0xd7c4ae,artery:0xc4513c,vein:0x6e8f9c};
+const BLURB = {
+  capsule:"The fibrous capsule is the outside of the kidney. It is not the cortex.",
+  cortex:"Outer cortex. Filtration and the proximal tubules sit in this layer. The columns of Bertin are cortex that dips between the pyramids.",
+  column:"A column of Bertin. Cortex between the pyramids, so it is the same tissue as the outer cortex, not medulla.",
+  hilum:"The hilum is the medial door. Artery in, vein and ureter out.",
+  medulla:"A pyramid is medulla. The papilla is its tip and it empties into a minor calyx. The loop of Henle and the collecting duct run in this layer.",
+  pelvis:"The renal pelvis and the calyces collect urine from the papillae and lead it into the ureter.",
+  ureter:"The ureter leaves the hilum and carries urine to the bladder. It is long in this model, so the camera is framed on the kidney rather than on its whole length.",
+  artery:"The renal artery enters the hilum and divides. Afferent arterioles, too small to see on this mesh, leave the cortical branches and enter each glomerulus.",
+  vein:"The renal vein leaves the hilum. It is the blood that was not filtered, plus what the tubules returned."
+};
+
+const DRUGS = [
+  {id:"none", name:"No drug", note:"No drug. Transporters and vessel tone are at the resting nephron. Blood and filtrate keep moving.", set:{}},
+  {id:"furosemide", name:"Furosemide", note:"Loop diuretic. Blocks NKCC2 in the thick ascending limb. Sodium stays in the lumen, the medullary gradient washes out, and the urine becomes copious and closer to plasma osmolality. Potassium loss rises.", set:{nkcc2:0.12}},
+  {id:"hctz", name:"Hydrochlorothiazide", note:"Thiazide. Blocks NCC in the distal convoluted tubule. A milder sodium loss than a loop diuretic, with some extra potassium secretion.", set:{ncc:0.12}},
+  {id:"amiloride", name:"Amiloride", note:"Blocks ENaC in the collecting duct. Less sodium reabsorption, and less of the lumen-negative drive that secretes potassium, so potassium in the urine falls.", set:{enac:0.12}},
+  {id:"spiro", name:"Spironolactone", note:"Mineralocorticoid-receptor antagonist. Aldosterone does less, so ENaC and potassium secretion both fall.", set:{aldo:0.25}},
+  {id:"acetazolamide", name:"Acetazolamide", note:"Carbonic anhydrase inhibitor in the proximal tubule. Bicarbonate is not reclaimed. The urine becomes alkaline and bicarbonate appears in it.", set:{ca:0.22}},
+  {id:"sglt2", name:"SGLT2 inhibitor", note:"Blocks sodium-glucose cotransport in the proximal tubule. Glucose that was reabsorbed now leaves in the urine, and the urine volume rises a little with it.", set:{sglt2:0.42}},
+  {id:"ddavp", name:"Desmopressin", note:"ADH analogue. More aquaporin-2 in the collecting duct. A smaller volume of more concentrated urine.", set:{aqp2:1.45}},
+  {id:"tolvaptan", name:"Tolvaptan", note:"V2-receptor antagonist. The collecting duct cannot insert aquaporin-2. A large volume of dilute urine, the picture of a water diuresis.", set:{aqp2:0.05}},
+  {id:"mannitol", name:"Mannitol", note:"A non-reabsorbable osmole. It holds water in the lumen, so volume rises and osmolality falls. An osmotic diuresis.", set:{mannitol:0.55}},
+  {id:"nsaid", name:"NSAID", note:"Constricts the afferent arteriole. Renal blood flow, glomerular pressure and GFR all fall.", set:{flow:0.72}},
+  {id:"acei", name:"ACE inhibitor", note:"Dilates the efferent arteriole. Glomerular capillary pressure falls, and so does GFR. Filtration fraction falls with it.", set:{efferent:0.8}}
+];
+
+function fresh(){
+  return {flow:1,efferent:1,Pbs:15,pi:28,kf:1,pgcManual:null,nhe3:1,sglt2:1,ca:1,nkcc2:1,ncc:1,enac:1,romk:1,aqp2:1,hatp:1,aldo:1,mannitol:0};
+}
+function kindOf(name){
+  const n = name.toLowerCase();
+  if(n.includes("pyramid") || n.includes("papilla")) return "medulla";
+  if(n.includes("pelvis") || n.includes("calyx")) return "pelvis";
+  if(n.includes("ureter")) return "ureter";
+  if(n.includes("artery")) return "artery";
+  if(n.includes("vein")) return "vein";
+  if(n.includes("capsule")) return "capsule";
+  if(n.includes("column")) return "column";
+  if(n.includes("hilum")) return "hilum";
+  return "cortex";
+}
+function pretty(name){
+  const n = name.toLowerCase();
+  const m = name.match(/_([a-i])$/i);
+  const letter = m ? " " + m[1].toUpperCase() : "";
+  if(n.includes("capsule")) return "Capsule";
+  if(n.includes("outer_cortex")) return "Outer cortex";
+  if(n.includes("column")) return "Renal column";
+  if(n.includes("hilum")) return "Hilum";
+  if(n.includes("pyramid")) return "Renal pyramid" + letter;
+  if(n.includes("papilla")) return "Renal papilla" + letter;
+  if(n.includes("pelvis")) return "Renal pelvis";
+  if(n.includes("major_calyx")) return "Major calyx" + letter;
+  if(n.includes("minor_calyx")) return "Minor calyx" + letter;
+  if(n.includes("ureter")) return "Ureter";
+  if(n.includes("artery")) return "Renal artery";
+  if(n.includes("vein")) return "Renal vein";
+  return name;
+}
+function level(v){
+  if(v < 0.45) return "block";
+  if(v > 1.2) return "activate";
+  return "normal";
+}
+function tri(key, label, note){
+  const lv = level(state[key]);
+  const block = key === "aqp2" ? 0.05 : key === "aldo" ? 0.22 : 0.08;
+  const high = key === "aqp2" || key === "aldo" ? 1.45 : 1.35;
+  return "<h3>" + label + "</h3><p class=\"seg\">" + note + "</p><div class=\"row\">" +
+    "<button type=\"button\" data-k=\"" + key + "\" data-v=\"" + block + "\"" + (lv==="block"?" class=\"on\"":"") + ">Block</button>" +
+    "<button type=\"button\" data-k=\"" + key + "\" data-v=\"1\"" + (lv==="normal"?" class=\"on\"":"") + ">Normal</button>" +
+    "<button type=\"button\" data-k=\"" + key + "\" data-v=\"" + high + "\"" + (lv==="activate"?" class=\"on\"":"") + ">Activate</button></div>";
+}
+function slider(key, label, min, max, step){
+  const val = key === "pgc" ? (state.pgcManual == null ? compute(state).Pgc : state.pgcManual) : state[key];
+  return "<label class=\"sl\">" + label + " <b data-read=\"" + key + "\">" + Number(val).toFixed(2) + "</b></label>" +
+    "<input id=\"" + key + "\" data-k=\"" + key + "\" type=\"range\" min=\"" + min + "\" max=\"" + max + "\" step=\"" + step + "\" value=\"" + val + "\" aria-label=\"" + label + "\">";
+}
+
+const canvas = document.getElementById("view");
+const sheet = document.getElementById("sheet");
+const sheetBody = document.getElementById("sheetbody");
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:"high-performance"});
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+renderer.setClearColor(0x07111a, 1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.localClippingEnabled = true;
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xf3efe6, 0x1c1612, 0.95));
+const key = new THREE.DirectionalLight(0xfff6ea, 1.35);
+key.position.set(2.2, 3.2, 4);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xffe2c4, 0.28);
+rim.position.set(-3, 1.2, -2);
+scene.add(rim);
+const camera = new THREE.PerspectiveCamera(32, 1, 0.01, 80);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxDistance = 24;
+controls.minDistance = 0.04;
+const kidneyRoot = new THREE.Group();
+const nephronRoot = new THREE.Group();
+scene.add(kidneyRoot);
+scene.add(nephronRoot);
+const clip = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0.008);
+const kidneyMeshes = [];
+const kidneyCenter = new THREE.Vector3();
+const kidneyBox = new THREE.Box3();
+let kidneyReady = false;
+let fitDist = 0.6;
+let mode = "external";
+let state = fresh();
+let drugId = "none";
+let selectedMesh = null;
+let selectedPart = null;
+let flying = false;
+const goalPos = new THREE.Vector3(0.1, 0.08, 0.6);
+const goalTarget = new THREE.Vector3();
+let chart = null;
+let sampleAcc = 0;
+const history = [];
+let bloodDots = null;
+let filtDots = null;
+let arteryMesh = null;
+
+function resize(){
+  const w = canvas.clientWidth || innerWidth;
+  const h = canvas.clientHeight || innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / Math.max(1, h);
+  camera.updateProjectionMatrix();
+  updateFit();
+}
+function updateFit(){
+  if(!kidneyReady) return;
+  const size = kidneyBox.getSize(new THREE.Vector3());
+  const aspect = Math.max(0.35, camera.aspect || 0.5);
+  const fov = camera.fov * Math.PI / 180;
+  const distH = (size.y * 0.62) / Math.tan(fov / 2);
+  const distW = (size.x * 0.7) / (Math.tan(fov / 2) * aspect);
+  fitDist = Math.max(distH, distW, 0.2) * 1.45;
+}
+function nephronDist(){
+  const aspect = Math.max(0.35, camera.aspect || 0.5);
+  const fov = camera.fov * Math.PI / 180;
+  return (3.4 * 0.5) / (Math.tan(fov / 2) * aspect) * 1.02;
+}
+function homeVectors(){
+  const p = new THREE.Vector3();
+  const t = new THREE.Vector3();
+  if(mode === "nephron"){
+    const d = nephronDist();
+    t.set(0.0, -0.05, 0);
+    p.set(d * 0.16, 0.15, d);
+  } else if(!kidneyReady){
+    t.set(0, 0, 0);
+    p.set(0.08, 0.04, 0.5);
+  } else if(mode === "internal"){
+    t.copy(kidneyCenter);
+    p.copy(kidneyCenter).add(new THREE.Vector3(fitDist * 1.05, fitDist * 0.06, fitDist * 0.08));
+  } else {
+    t.copy(kidneyCenter);
+    p.copy(kidneyCenter).add(new THREE.Vector3(fitDist * 0.22, fitDist * 0.1, fitDist));
+  }
+  return {p, t};
+}
+function flyHome(jump){
+  const h = homeVectors();
+  goalPos.copy(h.p);
+  goalTarget.copy(h.t);
+  if(jump){
+    camera.position.copy(h.p);
+    controls.target.copy(h.t);
+    flying = false;
+  } else flying = true;
+}
+function clearHighlight(){
+  kidneyMeshes.forEach(m => m.material.emissive.setHex(0x000000));
+  nephronRoot.traverse(o => { if(o.isMesh && o.material && o.material.emissive) o.material.emissive.setHex(0x000000); });
+}
+function highlightMesh(mesh){
+  clearHighlight();
+  if(mesh && mesh.material && mesh.material.emissive) mesh.material.emissive.setHex(0x4a3428);
+}
+function highlightPart(part){
+  clearHighlight();
+  nephronRoot.traverse(o => {
+    if(o.isMesh && o.userData.part === part && o.material && o.material.emissive) o.material.emissive.setHex(0x4a3428);
+  });
+}
+function applyKidneyLook(){
+  const cut = mode === "internal";
+  kidneyMeshes.forEach(m => {
+    const k = m.userData.kind;
+    m.material.clippingPlanes = cut ? [clip] : [];
+    let op = 1;
+    if(cut){
+      if(k === "capsule") op = 0.14;
+      else if(k === "cortex") op = 0.4;
+      else if(k === "hilum") op = 0.38;
+      else op = 1;
+    }
+    m.material.opacity = op;
+    m.material.transparent = op < 1;
+    m.material.depthWrite = op > 0.55;
+    m.material.needsUpdate = true;
+  });
+  kidneyRoot.visible = mode !== "nephron";
+  nephronRoot.visible = mode === "nephron";
+}
+function segmentLine(r){
+  const p = r.pct, l = r.loop, d = r.dct, c = r.cd;
+  if(selectedPart === "pct") return "Sodium arriving " + p.naIn.toFixed(2) + " mmol/min. Reabsorbed " + p.naRe.toFixed(2) + ". Still in the lumen " + p.naOut.toFixed(2) + ". Bicarbonate reabsorbed " + p.hcoRe.toFixed(2) + ", leaving " + p.hcoOut.toFixed(3) + ". Glucose reabsorbed " + p.gRe.toFixed(2) + ", leaving " + p.gOut.toFixed(3) + ".";
+  if(selectedPart === "loop") return "NKCC2 reabsorbs " + l.naRe.toFixed(2) + " mmol/min of the sodium that entered the loop. " + l.naOut.toFixed(2) + " mmol/min continues to the distal tubule. Potassium leaving the loop is " + l.kOut.toFixed(3) + " mmol/min. Water was " + l.wIn.toFixed(1) + " mL/min before the descending limb and " + l.wOut.toFixed(1) + " mL/min after it.";
+  if(selectedPart === "dct") return "NCC reabsorbs " + d.naRe.toFixed(2) + " mmol/min. " + d.naOut.toFixed(2) + " mmol/min of sodium reaches the collecting duct.";
+  if(selectedPart === "cd" || selectedPart === "urine") return "ENaC reabsorbs " + c.naRe.toFixed(2) + " mmol/min of sodium. ROMK secretes " + c.kSec.toFixed(3) + " mmol/min of potassium into the lumen. Sodium left in the urine " + c.naOut.toFixed(3) + " mmol/min. Bicarbonate left " + c.hcoOut.toFixed(3) + " mmol/min.";
+  if(selectedPart === "afferent" || selectedPart === "efferent" || selectedPart === "glom" || selectedPart === "bowman") return "Filtration is " + r.GFR + " mL/min. Glomerular pressure " + r.Pgc + " mmHg, Bowman pressure " + state.Pbs + ", oncotic pressure " + r.pi + ", net filtration pressure " + r.NFP + " mmHg.";
+  return "Sodium in the final urine " + r.naDay + " mmol/day. Potassium " + r.kDay + ". Bicarbonate " + r.hcoDay + ". Glucose " + r.glucDay + ".";
+}
+function detailHtml(){
+  if(selectedPart === "afferent"){
+    return "<h2>Afferent arteriole</h2><p>Blood arrives here. The slider is blood flow, not a drug dose. One is the resting arteriole. Lower it and glomerular pressure falls. Raise it and both flow and filtration rise.</p>" + slider("flow","Blood flow",0.4,1.7,0.01) + "<p class=\"seg\" id=\"seg\"></p>";
+  }
+  if(selectedPart === "glom"){
+    return "<h2>Glomerulus</h2><p>Net filtration pressure is glomerular hydrostatic pressure, minus the pressure in Bowman space, minus the oncotic pressure of the capillary blood. GFR is that pressure times the filtration coefficient.</p>" +
+      slider("pgc","Glomerular pressure",36,68,0.5) +
+      "<div class=\"row\"><button type=\"button\" id=\"follow\">Follow the vessels</button></div>" +
+      slider("Pbs","Bowman pressure",2,40,0.5) +
+      slider("pi","Oncotic pressure",16,40,0.5) +
+      slider("kf","Filtration coefficient",0.3,1.5,0.01) +
+      "<p class=\"seg\" id=\"seg\"></p>";
+  }
+  if(selectedPart === "bowman"){
+    return "<h2>Bowman capsule</h2><p>The capsule catches the filtrate. Pressure in this space opposes filtration. Obstruction of the tubule or the ureter raises it, and GFR falls.</p>" + slider("Pbs","Bowman pressure",2,40,0.5) + "<p class=\"seg\" id=\"seg\"></p>";
+  }
+  if(selectedPart === "efferent"){
+    return "<h2>Efferent arteriole</h2><p>Blood leaves the glomerulus here, then supplies the tubules. Constriction holds pressure in the glomerular capillaries. Dilation, as with an ACE inhibitor, lets the pressure fall.</p>" + slider("efferent","Efferent tone",0.5,1.6,0.01) + "<p class=\"seg\">Higher tone is constriction.</p><p class=\"seg\" id=\"seg\"></p>";
+  }
+  if(selectedPart === "pct"){
+    return "<h2>Proximal convoluted tubule</h2><p>Most of the filtrate is reclaimed here, isosmotically. Block a transporter, leave it, or push it above normal.</p>" +
+      tri("nhe3","NHE3","Sodium in, hydrogen out. The hydrogen ion is what allows bicarbonate to be reabsorbed.") +
+      tri("sglt2","SGLT2","Sodium with glucose. Block it and glucose appears in the urine.") +
+      tri("ca","Carbonic anhydrase","Needed to reclaim bicarbonate. Block it and the urine turns alkaline.") +
+      "<p class=\"seg\" id=\"seg\"></p>";
+  }
+  if(selectedPart === "loop"){
+    return "<h2>Loop of Henle</h2><p>The thin descending limb lets water out when the medulla is concentrated. The thick ascending limb is watertight and reabsorbs sodium, potassium and chloride through NKCC2. That pump is what builds the gradient.</p>" +
+      tri("nkcc2","NKCC2","Thick ascending limb. Block it, as a loop diuretic does, and the gradient collapses.") +
+      "<p class=\"seg\" id=\"seg\"></p>";
+  }
+  if(selectedPart === "dct"){
+    return "<h2>Distal convoluted tubule</h2><p>A smaller sodium load is reclaimed here by NCC. Thiazides block this step.</p>" +
+      tri("ncc","NCC","Sodium and chloride together. Block, normal, or activate.") +
+      "<p class=\"seg\" id=\"seg\"></p>";
+  }
+  if(selectedPart === "cd" || selectedPart === "urine"){
+    return "<h2>" + (selectedPart === "urine" ? "Final urine" : "Collecting duct") + "</h2><p>This is where the urine becomes dilute or concentrated, and where potassium and acid are secreted. Aldosterone increases both sodium reabsorption and potassium secretion.</p>" +
+      tri("enac","ENaC","Sodium channel of the principal cell. Amiloride blocks it.") +
+      tri("romk","ROMK","Potassium secretion into the lumen.") +
+      tri("aqp2","Aquaporin-2","Water channels. ADH inserts them. A V2 blocker takes them away.") +
+      tri("hatp","H-ATPase","Hydrogen secretion. This is what keeps ordinary urine acid.") +
+      tri("aldo","Aldosterone","Raises ENaC and potassium secretion together.") +
+      "<p class=\"seg\" id=\"seg\"></p>";
+  }
+  return "<h2>One nephron</h2><p>Blood is already moving from the afferent arteriole, through the glomerular capillaries, and out the efferent arteriole. Filtrate is moving down the tubule. Nothing is blocked. Tap a part and it will come closer.</p><p class=\"seg\" id=\"seg\"></p>";
+}
+function paintAnatomy(){
+  const cut = mode === "internal";
+  const title = selectedMesh ? pretty(selectedMesh.name) : (cut ? "Cortex, medulla, pelvis" : "Left kidney");
+  const body = selectedMesh ? (BLURB[selectedMesh.userData.kind] || "") : (cut
+    ? "The lateral part of the kidney is cut away. Cortex is the darker rim and the columns between the pyramids. Medulla is the pyramids and the papillae. The pale space is the pelvis and the calyces. Tap any of them."
+    : "The outer surface of the left kidney. Drag to turn it. Tap the capsule, the artery, the vein or the ureter. Internal opens the cut. Nephron is the live filtration model, and it is already running.");
+  const legend = cut ? "<p><i class=\"swatch c\"></i>Cortex<i class=\"swatch m\"></i>Medulla<i class=\"swatch p\"></i>Pelvis</p>" : "";
+  sheetBody.innerHTML = "<p class=\"kicker\">" + (cut ? "Cross section" : "Surface") + "</p><h2>" + title + "</h2><p>" + body + "</p>" + legend + "<p class=\"credit\">" + CREDIT + "</p>";
+}
+function paintNephron(){
+  const buttons = DRUGS.map(d => "<button type=\"button\" data-drug=\"" + d.id + "\">" + d.name + "</button>").join("");
+  sheetBody.innerHTML =
+    "<div class=\"sticky\"><p class=\"live\" id=\"live\"></p><p class=\"sub\" id=\"extra\"></p></div>" +
+    "<div id=\"detail\"></div>" +
+    "<h3>Drugs</h3><div class=\"drugs\" id=\"drugs\">" + buttons + "</div><p class=\"seg\" id=\"drugnote\"></p>" +
+    "<div class=\"chartbox\"><canvas id=\"chart\"></canvas></div>" +
+    "<p class=\"credit\">" + CREDIT + "</p>";
+  chart = null;
+  ensureChart();
+  fillDetail();
+  refreshNumbers();
+  markDrugs();
+}
+function fillDetail(){
+  const node = document.getElementById("detail");
+  if(!node) return;
+  node.innerHTML = detailHtml();
+}
+function markDrugs(){
+  document.querySelectorAll("[data-drug]").forEach(b => b.classList.toggle("on", b.dataset.drug === drugId));
+}
+function refreshNumbers(){
+  const r = compute(state);
+  const live = document.getElementById("live");
+  if(!live) return;
+  live.innerHTML = "<b>" + r.GFR + "</b> mL/min GFR · <b>" + r.RBF + "</b> blood flow · urine <b>" + r.urineMl + "</b> mL/min (<b>" + r.urineLDay + "</b> L/day) · <b>" + r.uOsm + "</b> mOsm · pH <b>" + r.pH + "</b> · Na <b>" + r.naDay + "</b> · K <b>" + r.kDay + "</b> mmol/day";
+  const extra = document.getElementById("extra");
+  if(extra) extra.textContent = "HCO3 " + r.hcoDay + " mmol/day · glucose " + r.glucDay + " mmol/day · glomerular pressure " + r.Pgc + " mmHg · Bowman " + state.Pbs + " · capillary oncotic " + r.pi + " · net filtration pressure " + r.NFP + " · filtration fraction " + r.FF + "%";
+  const seg = document.getElementById("seg");
+  if(seg) seg.textContent = segmentLine(r);
+  document.querySelectorAll("[data-read]").forEach(el => {
+    const k = el.dataset.read;
+    if(k === "pgc") el.textContent = Number(r.Pgc).toFixed(1);
+    else if(state[k] != null) el.textContent = Number(state[k]).toFixed(2);
+  });
+  const pgc = document.getElementById("pgc");
+  if(pgc && document.activeElement !== pgc) pgc.value = String(state.pgcManual == null ? r.Pgc : state.pgcManual);
+  const note = document.getElementById("drugnote");
+  if(note){
+    const d = DRUGS.find(x => x.id === drugId);
+    note.textContent = d ? d.note : "Adjusted by hand. The drug preset is off, and the sliders are what the nephron is using.";
+  }
+  return r;
+}
+function ensureChart(){
+  const node = document.getElementById("chart");
+  if(!node || chart || !window.Chart) return;
+  try {
+  chart = new window.Chart(node, {
+    type:"line",
+    data:{labels:[], datasets:[
+      {label:"Urine osmolality", data:[], borderColor:"#e2b48a", backgroundColor:"#e2b48a", tension:0.25, pointRadius:0, borderWidth:2, yAxisID:"y"},
+      {label:"Urine sodium mmol/L", data:[], borderColor:"#7fd4e6", backgroundColor:"#7fd4e6", tension:0.25, pointRadius:0, borderWidth:2, yAxisID:"y1"}
+    ]},
+    options:{
+      animation:false,
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:"#e7f1f4", boxWidth:10, font:{size:11}}}},
+      scales:{
+        x:{display:false},
+        y:{position:"left", suggestedMin:0, suggestedMax:1200, ticks:{color:"#e2b48a", maxTicksLimit:4}, grid:{color:"rgba(226,180,138,.15)"}},
+        y1:{position:"right", suggestedMin:0, suggestedMax:200, ticks:{color:"#7fd4e6", maxTicksLimit:4}, grid:{drawOnChartArea:false}}
+      }
+    }
+  });
+  } catch (err) { chart = null; }
+}
+function pushSample(r){
+  history.push({osm:r.uOsm, na:r.uNa});
+  if(history.length > 36) history.shift();
+  if(!chart) return;
+  chart.data.labels = history.map((_, i) => i);
+  chart.data.datasets[0].data = history.map(h => h.osm);
+  chart.data.datasets[1].data = history.map(h => h.na);
+  chart.update();
+}
+function renderSheet(){
+  if(mode !== "nephron" && chart){
+    chart.destroy();
+    chart = null;
+  }
+  if(mode === "nephron"){
+    sheet.classList.add("tall");
+    paintNephron();
+  } else {
+    sheet.classList.remove("tall");
+    paintAnatomy();
+  }
+}
+function setMode(next){
+  if(mode === next && !selectedMesh && !selectedPart) {
+    flyHome(false);
+    return;
+  }
+  mode = next;
+  selectedMesh = null;
+  selectedPart = null;
+  clearHighlight();
+  if(mode === "nephron" || kidneyReady) document.getElementById("load").classList.add("hide");
+  else document.getElementById("load").classList.remove("hide");
+  document.querySelectorAll("#labs button").forEach(b => {
+    const on = b.dataset.mode === mode;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  applyKidneyLook();
+  renderSheet();
+  flyHome(false);
+}
+function applyDrug(id){
+  const d = DRUGS.find(x => x.id === id) || DRUGS[0];
+  state = fresh();
+  Object.assign(state, d.set || {});
+  drugId = d.id;
+  fillDetail();
+  refreshNumbers();
+  markDrugs();
+  pushSample(compute(state));
+}
+function zoomToObject(obj){
+  const box = new THREE.Box3();
+  if(obj) box.expandByObject(obj);
+  else {
+    nephronRoot.traverse(o => { if(o.isMesh && o.userData.part === selectedPart) box.expandByObject(o); });
+  }
+  if(box.isEmpty()) return;
+  const c = box.getCenter(new THREE.Vector3());
+  const size = Math.max(0.02, box.getSize(new THREE.Vector3()).length());
+  const aspect = Math.max(0.35, camera.aspect || 0.5);
+  const fov = camera.fov * Math.PI / 180;
+  let dist = (size * 0.55) / (Math.tan(fov / 2) * aspect);
+  dist = Math.max(dist, mode === "nephron" ? 1.15 : 0.05);
+  dist = Math.min(dist, mode === "nephron" ? 8 : fitDist * 0.85);
+  const dir = new THREE.Vector3().subVectors(camera.position, controls.target);
+  if(dir.lengthSq() < 1e-6) dir.set(0.2, 0.1, 1);
+  dir.normalize();
+  goalTarget.copy(c);
+  goalPos.copy(c).addScaledVector(dir, dist);
+  flying = true;
+}
+function pick(ev){
+  const rect = canvas.getBoundingClientRect();
+  const ndc = new THREE.Vector2(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(ndc, camera);
+  const root = mode === "nephron" ? nephronRoot : kidneyRoot;
+  const hits = ray.intersectObjects(root.children, true).filter(h => h.object.isMesh && h.object.userData && (h.object.userData.part || h.object.userData.kind));
+  if(!hits.length){
+    selectedMesh = null;
+    selectedPart = null;
+    clearHighlight();
+    if(mode === "nephron") fillDetail();
+    else paintAnatomy();
+    refreshNumbers();
+    flyHome(false);
+    return;
+  }
+  const mesh = hits[0].object;
+  if(mode === "nephron"){
+    selectedPart = mesh.userData.part;
+    selectedMesh = null;
+    highlightPart(selectedPart);
+    fillDetail();
+    refreshNumbers();
+    zoomToObject(null);
+  } else {
+    selectedMesh = mesh;
+    selectedPart = null;
+    highlightMesh(mesh);
+    paintAnatomy();
+    zoomToObject(mesh);
+  }
+}
+
+function tube(points, radius, color, part, opacity){
+  const curve = new THREE.CatmullRomCurve3(points);
+  const geo = new THREE.TubeGeometry(curve, Math.max(20, points.length * 6), radius, 12, false);
+  const mat = new THREE.MeshStandardMaterial({color, roughness:0.46, metalness:0.05, transparent:opacity < 1, opacity, side:THREE.DoubleSide, depthWrite:opacity > 0.5, emissive:new THREE.Color(0x000000)});
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.part = part;
+  nephronRoot.add(mesh);
+  return curve;
+}
+function buildNephron(){
+  const v = (x,y,z) => new THREE.Vector3(x,y,z);
+  const affPts = [v(-1.55,1.72,0), v(-0.9,1.52,0.05), v(-0.28,1.32,0)];
+  const effPts = [v(0.24,1.38,0.02), v(0.7,1.12,0.12), v(0.86,0.25,0.14), v(0.58,-0.7,0.05)];
+  const pct = [];
+  for(let i=0;i<=36;i++){
+    const t = i/36;
+    const ang = t * Math.PI * 2 * 2.15;
+    pct.push(v(Math.cos(ang)*0.28, 0.98 - t*0.92, Math.sin(ang)*0.28));
+  }
+  pct[0].set(0.02, 1.02, 0.02);
+  const last = pct[pct.length-1];
+  const desc = [last.clone(), v(last.x*0.6, -0.15, last.z*0.4), v(0.16,-1.12,0.02)];
+  const hair = [v(0.16,-1.12,0.02), v(0.0,-1.38,0), v(-0.28,-1.12,0)];
+  const asc = [v(-0.28,-1.12,0), v(-0.36,-0.05,0.02), v(-0.22,0.62,0)];
+  const dct = [];
+  for(let i=0;i<=22;i++){
+    const t = i/22;
+    const ang = t * Math.PI * 2 * 1.45;
+    dct.push(v(-0.05 + Math.cos(ang)*0.16, 0.66 + t*0.38, Math.sin(ang)*0.16));
+  }
+  const cd = [dct[dct.length-1].clone(), v(0.12,0.55,0.02), v(0.1,-0.35,0), v(0.04,-1.45,0)];
+  const affC = tube(affPts, 0.095, 0xc4513c, "afferent", 1);
+  const effC = tube(effPts, 0.075, 0xa33b32, "efferent", 1);
+  const pctC = tube(pct, 0.086, 0xc4896a, "pct", 1);
+  const descC = tube(desc, 0.064, 0xe2b48a, "loop", 1);
+  const hairC = tube(hair, 0.066, 0xd7b48a, "loop", 1);
+  const ascC = tube(asc, 0.086, 0xb56a48, "loop", 1);
+  const dctC = tube(dct, 0.08, 0xc9896a, "dct", 1);
+  const cdC = tube(cd, 0.086, 0xc5d0d2, "cd", 1);
+
+  const glom = new THREE.Mesh(new THREE.SphereGeometry(0.2, 28, 20), new THREE.MeshStandardMaterial({color:0xd36a5a, roughness:0.4, emissive:new THREE.Color(0x2a1210)}));
+  glom.position.set(0, 1.24, 0);
+  glom.userData.part = "glom";
+  nephronRoot.add(glom);
+  const knot = new THREE.Mesh(new THREE.TorusKnotGeometry(0.11, 0.032, 90, 8, 2, 3), new THREE.MeshStandardMaterial({color:0xe07a68, roughness:0.35, emissive:new THREE.Color(0x3a1814)}));
+  knot.position.copy(glom.position);
+  knot.userData.part = "glom";
+  nephronRoot.add(knot);
+  const capsule = new THREE.Mesh(new THREE.SphereGeometry(0.36, 28, 20), new THREE.MeshStandardMaterial({color:0xf3efe6, transparent:true, opacity:0.14, roughness:0.2, depthWrite:false, side:THREE.DoubleSide}));
+  capsule.position.copy(glom.position);
+  capsule.raycast = function(){};
+  nephronRoot.add(capsule);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.045, 12, 32), new THREE.MeshStandardMaterial({color:0xf3efe6, roughness:0.35, emissive:new THREE.Color(0x000000)}));
+  ring.position.copy(glom.position);
+  ring.rotation.x = Math.PI / 2.3;
+  ring.userData.part = "bowman";
+  nephronRoot.add(ring);
+  const drop = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), new THREE.MeshStandardMaterial({color:0xf3efe6, roughness:0.25, emissive:new THREE.Color(0x000000)}));
+  drop.position.copy(cd[cd.length-1]);
+  drop.userData.part = "urine";
+  nephronRoot.add(drop);
+
+  const glomLoop = [];
+  for(let i=0;i<=18;i++){
+    const a = (i/18) * Math.PI * 2;
+    glomLoop.push(v(Math.cos(a)*0.15, 1.24 + Math.sin(a)*0.11, Math.sin(a*2)*0.06));
+  }
+  const bloodPts = affC.getPoints(24).concat(glomLoop, effC.getPoints(28));
+  const filtPts = [v(0, 1.16, 0)].concat(pctC.getPoints(40), descC.getPoints(16), hairC.getPoints(8), ascC.getPoints(18), dctC.getPoints(16), cdC.getPoints(24));
+  bloodDots = makeDots(bloodPts, 0xd45b4a, 70, 0.09);
+  filtDots = makeDots(filtPts, 0xd7ebe6, 90, 0.07);
+  nephronRoot.add(bloodDots.mesh);
+  nephronRoot.add(filtDots.mesh);
+  nephronRoot.position.y = 0.45;
+}
+function makeDots(pts, color, count, size){
+  const geo = new THREE.BufferGeometry();
+  const arr = new Float32Array(count * 3);
+  geo.setAttribute("position", new THREE.BufferAttribute(arr, 3));
+  const mat = new THREE.PointsMaterial({color, size, sizeAttenuation:true, depthWrite:false});
+  const mesh = new THREE.Points(geo, mat);
+  mesh.raycast = function(){};
+  const seeds = [];
+  for(let i=0;i<count;i++) seeds.push(i / count);
+  return {mesh, pts, arr, seeds};
+}
+function stepDots(dots, dt, speed){
+  if(!dots) return;
+  const n = dots.pts.length - 1;
+  if(n < 1) return;
+  for(let i=0;i<dots.seeds.length;i++){
+    dots.seeds[i] = (dots.seeds[i] + dt * speed) % 1;
+    const f = dots.seeds[i] * n;
+    const i0 = Math.floor(f);
+    const u = f - i0;
+    const a = dots.pts[i0];
+    const b = dots.pts[Math.min(n, i0 + 1)];
+    const o = i * 3;
+    dots.arr[o] = a.x + (b.x - a.x) * u;
+    dots.arr[o+1] = a.y + (b.y - a.y) * u;
+    dots.arr[o+2] = a.z + (b.z - a.z) * u;
+  }
+  dots.mesh.geometry.attributes.position.needsUpdate = true;
+}
+
+buildNephron();
+resize();
+flyHome(true);
+renderSheet();
+applyKidneyLook();
+
+new GLTFLoader().load("kidney/kidney.glb?v=20261104a", (gltf) => {
+  gltf.scene.traverse(obj => {
+    if(!obj.isMesh) return;
+    const kind = kindOf(obj.name || "");
+    const mat = new THREE.MeshStandardMaterial({
+      color: COL[kind] || COL.cortex,
+      roughness: 0.62,
+      metalness: 0.03,
+      side: THREE.DoubleSide,
+      emissive: new THREE.Color(0x000000)
+    });
+    obj.material = mat;
+    obj.userData.kind = kind;
+    kidneyMeshes.push(obj);
+    if(kind === "artery") arteryMesh = obj;
+  });
+  kidneyRoot.add(gltf.scene);
+  kidneyBox.makeEmpty();
+  kidneyMeshes.forEach(m => { if(m.userData.kind !== "ureter") kidneyBox.expandByObject(m); });
+  kidneyBox.getCenter(kidneyCenter);
+  kidneyReady = true;
+  document.getElementById("load").classList.add("hide");
+  applyKidneyLook();
+  resize();
+  if(mode !== "nephron" && !selectedMesh) flyHome(true);
+}, undefined, () => {
+  document.getElementById("load").classList.add("hide");
+  sheetBody.innerHTML = "<h2>The kidney model did not load</h2><p>The nephron lab is still available from the Nephron tab. The surface model is kidney/kidney.glb.</p>";
+});
+
+document.getElementById("labs").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button");
+  if(!b || !b.dataset.mode) return;
+  setMode(b.dataset.mode);
+});
+document.getElementById("reset").addEventListener("click", () => {
+  state = fresh();
+  drugId = "none";
+  history.length = 0;
+  selectedMesh = null;
+  selectedPart = null;
+  clearHighlight();
+  renderSheet();
+  flyHome(false);
+});
+document.getElementById("panel").addEventListener("click", () => sheet.classList.remove("shut"));
+document.getElementById("sheetx").addEventListener("click", () => sheet.classList.add("shut"));
+sheet.addEventListener("click", (ev) => {
+  const b = ev.target.closest("button");
+  if(!b || b.id === "sheetx") return;
+  if(b.id === "follow"){
+    state.pgcManual = null;
+    drugId = "none";
+    fillDetail();
+    refreshNumbers();
+    markDrugs();
+    return;
+  }
+  if(b.dataset.drug){
+    applyDrug(b.dataset.drug);
+    return;
+  }
+  if(b.dataset.k){
+    state[b.dataset.k] = Number(b.dataset.v);
+    drugId = "none";
+    fillDetail();
+    refreshNumbers();
+    markDrugs();
+    pushSample(compute(state));
+  }
+});
+sheet.addEventListener("input", (ev) => {
+  const el = ev.target;
+  if(!el.dataset || !el.dataset.k) return;
+  const k = el.dataset.k;
+  if(k === "pgc") state.pgcManual = Number(el.value);
+  else {
+    state[k] = Number(el.value);
+    if(k === "flow" || k === "efferent") state.pgcManual = null;
+  }
+  drugId = "none";
+  markDrugs();
+  refreshNumbers();
+});
+
+let down = null;
+canvas.addEventListener("pointerdown", (ev) => { down = {x:ev.clientX, y:ev.clientY}; });
+canvas.addEventListener("pointerup", (ev) => {
+  if(!down) return;
+  const dx = ev.clientX - down.x, dy = ev.clientY - down.y;
+  down = null;
+  if(dx*dx + dy*dy > 18) return;
+  pick(ev);
+});
+controls.addEventListener("start", () => { flying = false; });
+addEventListener("resize", () => {
+  resize();
+  if(!selectedMesh && !selectedPart && !flying) flyHome(true);
+});
+
+const clock = new THREE.Clock();
+function frame(){
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, clock.getDelta());
+  if(flying){
+    camera.position.lerp(goalPos, 0.08);
+    controls.target.lerp(goalTarget, 0.08);
+    if(camera.position.distanceTo(goalPos) < 0.01) flying = false;
+  }
+  controls.update();
+  const r = compute(state);
+  const flowRate = Math.max(0.04, r.RBF / 1050);
+  const filtRate = r.GFR < 2 ? 0.015 : Math.max(0.05, r.GFR / 126);
+  stepDots(bloodDots, dt, 0.11 * flowRate);
+  stepDots(filtDots, dt, 0.075 * filtRate);
+  if(arteryMesh && mode !== "nephron" && selectedMesh !== arteryMesh){
+    const pulse = 0.08 + 0.07 * Math.sin(clock.elapsedTime * 2.4);
+    arteryMesh.material.emissive.setRGB(pulse, pulse * 0.25, pulse * 0.18);
+  }
+  sampleAcc += dt;
+  if(sampleAcc > 0.8){
+    sampleAcc = 0;
+    pushSample(r);
+    if(mode === "nephron") refreshNumbers();
+  }
+  renderer.render(scene, camera);
+}
+resize();
+requestAnimationFrame(frame);
+</script>
+<script src="bed-bridge.js?v=20261029c"></script>
+</body>
+</html>
