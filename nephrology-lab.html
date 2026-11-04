@@ -13,6 +13,9 @@ button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
 #st{position:relative;height:58vh;min-height:320px;flex:none;background:#0a141d}
 #cv{width:100%;height:100%;display:block;touch-action:none}
 #hud{position:absolute;left:8px;top:6px;color:#cfe;font:11px system-ui;pointer-events:none}
+#lead,#labs{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden}
+#labs span{position:absolute;color:#e8eef2;font:11px/1.15 system-ui,sans-serif;letter-spacing:.01em;white-space:nowrap;text-shadow:0 1px 2px #041018;transform:translate(-50%,-50%)}
+#lead line{stroke:#b7c6d0;stroke-width:1}
 #hint{position:absolute;left:8px;bottom:6px;color:#9bb;font:11px system-ui;pointer-events:none}
 #tb{position:absolute;right:8px;top:8px;bottom:8px;width:16px;border:2px solid #7fb;border-radius:3px 3px 9px 9px;display:flex;align-items:flex-end;overflow:hidden}
 #tf{display:block;width:100%;height:0;background:#e8d36a;transition:height .3s}
@@ -28,7 +31,7 @@ input[type=range]{width:100%;display:block}
 </style></head><body>
 <header><h1>Nephrology Learning Lab<small>Explore. Manipulate. Understand.</small></h1><button onclick="location.href='index.html'">Hub</button><button id="vx">Voice</button><button id="sp">×2</button><button id="rs">Reset</button></header>
 <div id="nv"></div>
-<div id="st"><canvas id="cv"></canvas><div id="hud"></div><div id="hint">Pinch to zoom</div><div id="tb"><i id="tf"></i></div></div>
+<div id="st"><canvas id="cv"></canvas><svg id="lead"></svg><div id="labs"></div><div id="hud"></div><div id="hint">Pinch to zoom</div><div id="tb"><i id="tf"></i></div></div>
 <div id="pn"><div class="tabs" id="tabs"><button data-t="0" class="on">Explore</button><button data-t="1">Output</button><button data-t="2">Drugs</button><button data-t="3">Disease</button></div><div id="c"></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -110,6 +113,7 @@ const size=box.getSize(new T.Vector3()),c=box.getCenter(new T.Vector3()),s=4.6/M
 Kg.scale.setScalar(s);
 Kg.position.set(-c.x*s,-c.y*s+0.1,-c.z*s);
 hl();
+if(typeof buildKidneyTags==='function')buildKidneyTags();
 });}
 const tube=(id,pts,r,c,key)=>{const q=new T.CatmullRomCurve3(pts),m=new T.Mesh(new T.TubeGeometry(q,90,r,10,false),mat(c,.5));m.userData={id,b:.5};N.add(m);nm.push(m);cu[key]=q};
 const wig=(a,b,amp,n,f)=>{const A=V3(...a),Z=V3(...b),d=Z.clone().sub(A),p=V3(-d.y,d.x).normalize(),o=[];for(let i=0;i<=n;i++){const t=i/n;o.push(A.clone().lerp(Z,t).addScaledVector(p,Math.sin(t*Math.PI*f)*amp))}return o};
@@ -160,7 +164,8 @@ du.position.copy(P);du.scale.setScalar(s);du.updateMatrix();im.setMatrixAt(i,du.
 const liftC=new T.Color(),liftW=new T.Color(0xffffff);
 function liftHex(hex){return liftC.setHex(hex).lerp(liftW,.48).getHex()}
 function hl(){K.visible=sel=='kid';N.visible=!K.visible;
-nm.forEach(m=>{const extra=(m.userData.jga&&(sel==='glo'||sel==='loop'))||(m.userData.link&&(sel==='glo'||sel==='pct'));const on=sel==='all'||m.userData.id===sel||extra;m.material.opacity=on?(m.userData.cap?m.userData.b:(sel==='all'?m.userData.b:Math.min(1,m.userData.b+.28))):.08;m.material.emissive.setHex(on&&sel!=='all'&&!m.userData.cap?0x331810:0)});
+const wide=sel!=='kid'&&sel!=='all'&&zoom>=1.6,view=wide?'all':sel;
+nm.forEach(m=>{const extra=(m.userData.jga&&(view==='glo'||view==='loop'))||(m.userData.link&&(view==='glo'||view==='pct'));const on=view==='all'||m.userData.id===view||extra;m.material.opacity=on?(m.userData.cap?m.userData.b:(view==='all'?m.userData.b:Math.min(1,m.userData.b+.28))):.08;m.material.emissive.setHex(on&&view!=='all'&&!m.userData.cap?0x331810:0)});
 ks.forEach(m=>{const id=m.userData.id;if(m.userData.baseCol==null)m.userData.baseCol=m.material.color.getHex();const on=!!kp&&id===kp;m.material.color.setHex(on?liftHex(m.userData.baseCol):m.userData.baseCol);m.material.emissive.setHex(on?0xe08a55:0);if('emissiveIntensity' in m.material)m.material.emissiveIntensity=on?0.85:1;if(m.userData.shell){m.material.clippingPlanes=cut?[clip]:[];m.material.opacity=cut?(id==='capsule'?0.08:0.3):(id==='capsule'?0.5:0.96);m.material.transparent=true;m.material.depthWrite=!cut;m.material.needsUpdate=true}})}
 /* ---------- content ---------- */
 const FOC={kid:[[0,-.35,0],[.45,-.1,9]],all:[[-3.4,.9,0],[-3.4,.9,20.5]],glo:[[-6.2,4.05,0],[-5.35,4.45,5.6]],pct:[[-4.2,3.25,0],[-4.2,3.25,7.4]],loop:[[-4.2,.2,0],[-4.2,.2,14]],dct:[[0,3,0],[0,3,6]],cd:[[2.2,-1,0],[2.2,-1,11]]};
@@ -191,7 +196,7 @@ const DIS=[['Normal','Baseline physiology.',{},{}],
 ['Central diabetes insipidus','No ADH: large volumes of dilute urine; serum Na⁺ rises unless intake keeps up.',{adh:0},{}],
 ['Nephrogenic diabetes insipidus','Kidney ignores ADH (modelled as V2 blockade): dilute polyuria despite high ADH.',{adh:2},{tolv:.95}]];
 const disHTML=()=>'<div class="dz">'+DIS.map((d,i)=>`<button data-i="${i}"${i==dis?' class="on"':''}>${d[0]}</button>`).join('')+`</div><p><b>${DIS[dis][0]}.</b> ${DIS[dis][1]}</p><p style="color:var(--mu);font-size:11px">Presets load into the same engine. Watch the Output tab, then add drugs on top.</p>`;
-function applyDis(i){const prev=calc();dis=i;S={...S0,...DIS[i][2]};D={...D0,...DIS[i][3]};B=newB();H1=[];H2=[];render();speakChange(prev,DIS[i][0])}
+function applyDis(i){const prev=calc();dis=i;S={...S0,...DIS[i][2]};D={...D0,...DIS[i][3]};B=newB();H1=[];H2=[];render();speakDisease(prev,i)}
 const ar=(m,x1,y1,x2,y2,c)=>`<line class="a" data-m="${m}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}"/>`,tx=(x,y,t,b)=>`<text x="${x}" y="${y}" font-size="8" ${b?'font-weight="600" ':''}fill="var(--fg)" text-anchor="middle">${t}</text>`;
 const CELL='<svg id="cellsv" viewBox="0 0 340 200" style="width:100%;border:1px solid var(--bd);border-radius:8px"><rect width="340" height="30" fill="#8fd0ff" opacity=".25"/><rect y="138" width="340" height="62" fill="#c23b3b" opacity=".18"/>'+[[8,170],[184,72],[262,72]].map(([x,w])=>`<rect x="${x}" y="34" width="${w}" height="100" rx="6" fill="var(--cd)" stroke="var(--mu)"/>`).join('')+tx(170,12,'Tubular lumen')+tx(170,192,'Peritubular blood')+tx(93,46,'Principal cell',1)+tx(220,46,'α-intercalated',1)+tx(298,46,'β-intercalated',1)+ar('enac',40,20,40,72,'#d4a017')+ar('k',90,72,90,20,'#9b5de5')+ar('w',140,20,140,72,'#3a8dde')+ar('pump',50,112,50,150,'#d4a017')+ar('w',140,112,140,150,'#3a8dde')+ar('h',208,72,208,20,'#e05a47')+ar('h',220,112,220,150,'#e8873a')+ar('bb',298,72,298,20,'#e8873a')+ar('bb',298,112,298,150,'#e05a47')+tx(40,84,'ENaC')+tx(90,84,'ROMK/BK')+tx(140,84,'AQP2')+tx(50,106,'Na⁺/K⁺-ATPase')+tx(140,106,'AQP3/4')+tx(208,84,'H⁺-ATPase')+tx(220,106,'AE1 HCO₃⁻')+tx(298,84,'Pendrin')+tx(298,106,'H⁺-ATPase')+'</svg><p style="font-size:11px;color:var(--mu)">Arrow weight and speed show live activity (normal = 1). Yellow Na⁺, violet K⁺, blue water, red H⁺, orange HCO₃⁻.<br><span id="cellro"></span></p>';
 function render(){let h='';
@@ -225,9 +230,9 @@ if(sel!=='all'&&sel!=='kid'&&z>1){const u=cl((z-1)/.85,0,1),a=FOC.all;zA.set(a[0
 else{zA.copy(zP).sub(zL).multiplyScalar(z);zP.copy(zL).add(zA)}
 tl.copy(zL);tp.copy(zP)}
 function fingerD(t){const a=t[0],b=t[1];return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)}
-function go(id){sel=id;tab=0;zoom=1;if(id==='kid')cut=true;frameZoom();document.querySelectorAll('#nv button').forEach(b=>b.classList.toggle('on',b.dataset.g==id));hl();render()}
+function go(id,speak){sel=id;tab=0;zoom=1;if(id==='kid')cut=true;frameZoom();document.querySelectorAll('#nv button').forEach(b=>b.classList.toggle('on',b.dataset.g==id));hl();render();if(speak&&FULL[id])say(FULL[id])}
 $('#nv').innerHTML=NV.map(([k,l])=>`<button data-g="${k}">${l}</button>`).join('');
-$('#nv').onclick=e=>{if(e.target.dataset.g)go(e.target.dataset.g)};
+$('#nv').onclick=e=>{if(e.target.dataset.g)go(e.target.dataset.g,true)};
 $('#tabs').onclick=e=>{if(e.target.dataset.t){tab=+e.target.dataset.t;render()}};
 $('#c').onclick=e=>{if(e.target.id=='cutb'){cut=!cut;hl();render()}if(e.target.id=='ent')go('all');const i=e.target.dataset.i;if(i!==undefined)applyDis(+i)};
 document.addEventListener('input',e=>{const t=e.target,k=t.dataset.k;if(!k)return;(t.dataset.o=='S'?S:D)[k]=+t.value;const b=$('#v'+t.dataset.o+k);if(b)b.textContent=t.dataset.o=='D'?Math.round(t.value*100)+'%':t.value});
@@ -235,7 +240,7 @@ $('#rs').onclick=()=>{dis=0;S={...S0};D={...D0};B=newB();H1=[];H2=[];render();if
 $('#sp').onclick=e=>{SPD=SPD==1?2:SPD==2?5:SPD==5?20:1;e.target.textContent='×'+SPD;if(tab==1)render()};
 const SN={Ra:'Afferent resistance',Re:'Efferent resistance',Kf:'Filtration coefficient',PBS:"Bowman's capsule pressure",MAP:'Blood pressure',ang:'Angiotensin II',ald:'Aldosterone',adh:'ADH',glu:'Plasma glucose',fl:'Fluid intake',loop:'Furosemide',thz:'Thiazide',cai:'Acetazolamide',sglt:'SGLT2 inhibitor',amil:'Amiloride',mra:'Spironolactone',tolv:'Tolvaptan',mann:'Mannitol',acei:'ACE inhibitor',nsaid:'NSAID'};
 function say(text){if(!voiceOn||!text||!window.speechSynthesis)return;const s=speechSynthesis;s.cancel();const u=new SpeechSynthesisUtterance(text);u.rate=1.02;u.lang='en-GB';const vs=s.getVoices(),v=vs.find(x=>x.lang==='en-GB')||vs.find(x=>x.lang&&x.lang.startsWith('en'));if(v)u.voice=v;s.speak(u)}
-function facts(prev,now){const L=[],add=s=>{if(L.length<3)L.push(s)};
+function facts(prev,now){const L=[],add=s=>{if(L.length<4)L.push(s)};
 if(Math.abs(now.g-prev.g)>=8)add(now.g<prev.g?`GFR falls to ${now.g.toFixed(0)}`:`GFR rises to ${now.g.toFixed(0)}`);
 const vr=now.V/Math.max(prev.V,1e-6),vh=now.V*60;
 if(vr>=1.35)add(`urine output rises to ${vh.toFixed(0)} millilitres per hour`);
@@ -250,29 +255,83 @@ if(now.kE>prev.kE*1.35&&now.kE>iK*1.15)add('potassium loss increases');
 else if(now.kE<prev.kE*.7)add('potassium loss falls');
 if(now.NaE>prev.NaE*1.4)add('sodium loss increases');
 return L}
-function speakChange(prev,name){if(!prev)return;const L=facts(prev,calc());if(!L.length)return;say(name?name+'. '+L.join('. ')+'.':L.join('. ')+'.')}
+const FULL={glo:'Glomerulus',pct:'Proximal convoluted tubule',loop:'Loop of Henle',dct:'Distal convoluted tubule',cd:'Collecting duct'};
+const MECH={loop:'It blocks NKCC2 in the thick ascending limb, so sodium, potassium and chloride stay in the lumen and the medullary gradient falls.',thz:'It blocks NCC in the distal convoluted tubule, so more sodium is delivered to the collecting duct.',cai:'It blocks carbonic anhydrase in the proximal tubule, so bicarbonate is lost in the urine.',sglt:'It blocks SGLT2 in the proximal tubule, so glucose stays in the lumen and pulls water with it.',amil:'It blocks ENaC in the collecting duct, so less sodium is reabsorbed and less potassium is secreted.',mra:'It blocks the aldosterone receptor, so the collecting duct reabsorbs less sodium and secretes less potassium and hydrogen.',tolv:'It blocks the V2 receptor, so aquaporin-2 is not inserted and water stays in the lumen.',mann:'It is filtered and not reabsorbed, so it holds water in the tubule.',acei:'It lowers angiotensin II, the efferent arteriole dilates, and glomerular pressure falls.',nsaid:'It removes prostaglandin dilation of the afferent arteriole, so renal blood flow and GFR fall.',adh:'It changes aquaporin-2 in the collecting duct, and with it free-water reabsorption.',ald:'It changes sodium reabsorption and potassium and hydrogen secretion in the collecting duct.',ang:'It constricts the efferent arteriole and raises glomerular capillary pressure.',Ra:'It changes blood flow into the glomerular capillaries.',Re:'It changes pressure inside the glomerular capillaries.',Kf:'It changes how much filtrate is formed at a given net filtration pressure.',PBS:'Pressure in Bowman space opposes filtration.',MAP:'Arterial pressure changes renal blood flow.',glu:'The filtered glucose load changes.',fl:'Water intake changes external balance.'};
+function controlLine(el,was){const k=el.dataset.k,v=+el.value,name=SN[k]||k,mech=MECH[k]||'';
+if(el.dataset.o==='D'){const pct=Math.round(v*100),dir=v>=+was?'increased':'decreased';return `${name} ${dir} to ${pct} percent. ${mech}`}
+if(k==='MAP'||k==='PBS')return `${name} set to ${Math.round(v)} millimetres of mercury. ${mech}`;
+if(k==='glu')return `Plasma glucose set to ${v} millimoles per litre. ${mech}`;
+if(k==='fl')return `Fluid intake set to ${v} litres a day. ${mech}`;
+return `${name} set to ${v}. ${mech}`}
+function speakChange(prev,el){if(!prev||!el)return;const was=el.dataset.was;if(was!=null&&Math.abs(+el.value-+was)<1e-9)return;const L=facts(prev,calc());say(controlLine(el,was==null?el.value:was)+(L.length?' '+L.join('. ')+'.':''))}
+function speakDisease(prev,i){const L=facts(prev,calc());if(i===0&&!L.length)return;say(DIS[i][0]+'. '+DIS[i][1]+(L.length?' '+L.join('. ')+'.':''))}
 const vx=$('#vx');
 function paintVoice(){vx.classList.toggle('on',voiceOn);vx.textContent=voiceOn?'Voice':'Muted'}
 paintVoice();
 vx.onclick=()=>{voiceOn=!voiceOn;try{localStorage.setItem('nx-voice',voiceOn?'1':'0')}catch(e){}paintVoice();if(!voiceOn&&window.speechSynthesis)speechSynthesis.cancel();else say('Voice on.')};
 if(window.speechSynthesis)speechSynthesis.onvoiceschanged=()=>{};
-document.addEventListener('pointerdown',e=>{if(e.target.matches&&e.target.matches('input[type=range]'))snap=O},true);
-document.addEventListener('change',e=>{const t=e.target;if(!t.dataset||!t.dataset.k)return;speakChange(snap,SN[t.dataset.k]||'');snap=calc()},true);
+document.addEventListener('pointerdown',e=>{if(e.target.matches&&e.target.matches('input[type=range]')){snap=O;e.target.dataset.was=e.target.value}},true);
+document.addEventListener('change',e=>{const t=e.target;if(!t.dataset||!t.dataset.k)return;speakChange(snap,t);snap=calc()},true);
 const rc=new T.Raycaster(),pt=new T.Vector2();
 function pick(e){const r=cv.getBoundingClientRect();pt.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);rc.setFromCamera(pt,cam);
 const hs=rc.intersectObjects(sel=='kid'?ks:nm).filter(h=>!(sel=='kid'&&cut&&h.point.z>0&&/capsule|cortex/.test(h.object.userData.id))),h=hs.find(h=>h.object.userData.id!='capsule')||hs[0];
-if(!h)return;const id=h.object.userData.id;if(sel=='kid'){kp=id;tab=0;hl();render()}else go(id)}
+if(!h)return;const id=h.object.userData.id;if(sel=='kid'){kp=id;tab=0;hl();render();if(KN[id])say(KN[id][0])}else go(id,true)}
 cv.onpointerdown=e=>{if(pinch||suppressPick){dr=0;return}dr=[e.clientX,e.clientY,0]};
 cv.onpointermove=e=>{if(pinch){dr=0;return}if(!dr)return;const dx=e.clientX-dr[0];dr[2]+=Math.abs(dx)+Math.abs(e.clientY-dr[1]);if(sel=='kid')K.rotation.y+=dx*.012;dr[0]=e.clientX;dr[1]=e.clientY};
 cv.onpointerup=e=>{if(suppressPick){suppressPick=0;dr=0;return}if(dr&&dr[2]<6)pick(e);dr=0};
+function endZoom(){if(sel!=='kid'&&sel!=='all'&&zoom>=1.6){sel='all';zoom=1;document.querySelectorAll('#nv button').forEach(b=>b.classList.toggle('on',b.dataset.g==='all'));frameZoom();liveZoom=1;hl();render()}}
 cv.addEventListener('touchstart',e=>{if(e.touches.length>=2){suppressPick=1;dr=0;pinch={d:fingerD(e.touches),zoom}}},{passive:true});
-cv.addEventListener('touchmove',e=>{if(e.touches.length>=2&&pinch){e.preventDefault();suppressPick=1;zoom=cl(pinch.zoom*(pinch.d/Math.max(fingerD(e.touches),1)),.42,2.5);frameZoom();liveZoom=1}},{passive:false});
-cv.addEventListener('touchend',e=>{if(e.touches.length<2)pinch=null});
-cv.addEventListener('wheel',e=>{e.preventDefault();zoom=cl(zoom*(e.deltaY>0?1.08:.92),.42,2.5);frameZoom()},{passive:false});
+cv.addEventListener('touchmove',e=>{if(e.touches.length>=2&&pinch){e.preventDefault();suppressPick=1;zoom=cl(pinch.zoom*Math.pow(pinch.d/Math.max(fingerD(e.touches),1),1.6),.42,2.5);frameZoom();liveZoom=1;if(sel!=='kid')hl()}},{passive:false});
+cv.addEventListener('touchend',e=>{if(e.touches.length<2){pinch=null;endZoom()}});
+cv.addEventListener('wheel',e=>{e.preventDefault();zoom=cl(zoom*(e.deltaY>0?1.12:.9),.42,2.5);frameZoom();if(sel!=='kid')hl();endZoom()},{passive:false});
+const lead=$('#lead'),labs=$('#labs'),tagP=new T.Vector3();
+function makeTag(text){const el=document.createElement('span');el.textContent=text;labs.appendChild(el);const ln=document.createElementNS('http://www.w3.org/2000/svg','line');lead.appendChild(ln);return {el,ln}}
+const TAGS=[
+['Afferent',V3(-8.05,5.85,0),-18,-26],
+['Glomerulus',V3(-6.15,4.15,0),-46,6],
+['Efferent',V3(-4.15,5.6,0),22,-24],
+['Macula',mac.clone(),-36,20],
+['PCT',V3(-4.35,3.05,0),-28,22],
+['Loop of Henle',V3(-2.15,-4.35,0),36,16],
+['DCT',V3(-.2,3.25,0),8,-28],
+['Collecting duct',V3(2.45,-.2,0),34,0]
+].map(([t,p,ox,oy])=>Object.assign(makeTag(t),{p,ox,oy,kid:0}));
+let KT=[];
+function buildKidneyTags(){KT.forEach(t=>{t.el.remove();t.ln.remove()});KT=[];
+const names={capsule:'Capsule',cortex:'Cortex',medulla:'Pyramid',pelvis:'Pelvis',ureter:'Ureter',artery:'Artery',vein:'Vein'},grp={};
+K.updateWorldMatrix(true,true);
+ks.forEach(m=>{const id=m.userData.id;if(!names[id]||!m.geometry)return;if(!m.geometry.boundingBox)m.geometry.computeBoundingBox();const c=m.geometry.boundingBox.getCenter(new T.Vector3()).applyMatrix4(m.matrixWorld);(grp[id]||(grp[id]=[])).push(c)});
+const ids=Object.keys(grp);if(!ids.length)return;
+const mid=new T.Vector3();let n=0;ids.forEach(id=>grp[id].forEach(c=>{mid.add(c);n++}));mid.multiplyScalar(1/n);
+ids.forEach(id=>{const pts=grp[id];const edge=id==='capsule'||id==='cortex'||id==='medulla';
+const c=edge?pts.reduce((b,p)=>p.distanceToSquared(mid)>b.distanceToSquared(mid)?p:b):pts.reduce((a,p)=>a.add(p),new T.Vector3()).multiplyScalar(1/pts.length);
+const local=K.worldToLocal(c.clone()),lm=K.worldToLocal(mid.clone()),away=local.clone().sub(lm);
+if(away.lengthSq()<1e-8)away.set(0,1,0);away.normalize();
+const tag=makeTag(names[id]);tag.p=local;tag.q=local.clone().addScaledVector(away,1.1);tag.kid=1;KT.push(tag)})}
+const tagQ=new T.Vector3();
+function placeList(list){const w=cv.clientWidth,h=cv.clientHeight;
+if(list.some(t=>t.kid))K.updateWorldMatrix(true,false);
+list.forEach(tag=>{tagP.copy(tag.p);if(tag.kid)tagP.applyMatrix4(K.matrixWorld);tagP.project(cam);
+const behind=tagP.z>1,x=(tagP.x*.5+.5)*w,y=(-tagP.y*.5+.5)*h;let lx,ly;
+if(tag.kid){tagQ.copy(tag.q).applyMatrix4(K.matrixWorld).project(cam);const qx=(tagQ.x*.5+.5)*w,qy=(-tagQ.y*.5+.5)*h;let dx=qx-x,dy=qy-y,len=Math.hypot(dx,dy)||1;lx=x+dx/len*46;ly=y+dy/len*32}
+else{lx=x+tag.ox;ly=y+tag.oy}
+lx=cl(lx,36,w-36);ly=cl(ly,14,h-14);
+const vis=!behind&&x>-80&&x<w+80&&y>-80&&y<h+80;
+tag.el.style.display=tag.ln.style.display=vis?'':'none';
+if(!vis)return;
+tag.el.style.left=lx+'px';tag.el.style.top=ly+'px';
+tag.ln.setAttribute('x1',x);tag.ln.setAttribute('y1',y);tag.ln.setAttribute('x2',lx);tag.ln.setAttribute('y2',ly)})}
+function placeTags(){const w=cv.clientWidth,h=cv.clientHeight,box=`0 0 ${w} ${h}`;
+if(lead.getAttribute('viewBox')!==box){lead.setAttribute('viewBox',box);lead.setAttribute('width',w);lead.setAttribute('height',h)}
+const neph=sel!=='kid';
+lead.style.display=labs.style.display='';
+TAGS.forEach(t=>{t.el.style.display=t.ln.style.display=neph?'':'none'});
+KT.forEach(t=>{t.el.style.display=t.ln.style.display=neph?'none':''});
+placeList(neph?TAGS:KT)}
+buildKidneyTags();
 /* ---------- main loop ---------- */
 let last=performance.now(),lu=0;
 function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,(t-last)/1000);last=t;
-O=calc();step(O,dt*SPD);if(liveZoom){cam.position.copy(tp);look.copy(tl);liveZoom=0}else{cam.position.lerp(tp,.08);look.lerp(tl,.08)}cam.lookAt(look);
-if(sel=='kid'&&!dr&&!cut)K.rotation.y+=dt*.25;anim(dt,O);R.render(sc,cam);if(t-lu>250){lu=t;upd()}}
+O=calc();step(O,dt*SPD);if(liveZoom){cam.position.copy(tp);look.copy(tl);liveZoom=0}else{cam.position.lerp(tp,.08);look.lerp(tl,.08)}if(sel=='kid'&&!dr&&!cut)K.rotation.y+=dt*.25;anim(dt,O);cam.lookAt(look);placeTags();R.render(sc,cam);if(t-lu>250){lu=t;upd()}}
 O=calc();go('all');requestAnimationFrame(loop);
 </script></body></html>
