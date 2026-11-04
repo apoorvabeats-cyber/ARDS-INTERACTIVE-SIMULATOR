@@ -445,6 +445,9 @@ body.icu-open .icu{display:flex;align-items:center;justify-content:center;positi
 }
 #icu-return{display:none}
 body.body-only:not(.in) #icu-return{display:inline-flex !important;position:fixed;z-index:80;top:max(14px, env(safe-area-inset-top));left:14px;min-height:48px;padding:0 16px;border-radius:999px;border:1px solid rgba(127,212,230,.55);background:rgba(6,14,22,.92);color:#e7f6fb;font-size:16px;letter-spacing:0;text-transform:none}
+body.mod-frame #icu-return{display:inline-flex !important;position:fixed;z-index:90;top:max(8px, env(safe-area-inset-top));left:10px;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid rgba(127,212,230,.55);background:rgba(6,14,22,.92);color:#e7f6fb;font-size:15px}
+body.mod-frame .room{padding:0;overflow:hidden}
+body.mod-frame .abg-frame{min-height:100dvh;height:100dvh;border-radius:0}
 #icu-gate{display:none}
 body.icu-gate .atlas,body.icu-gate .approach,body.icu-gate .hud-header{visibility:hidden !important;pointer-events:none !important}
 body.icu-gate #view{display:none !important}
@@ -676,7 +679,7 @@ const ORGANS = [
     spots:[{x:46,y:41},{x:57,y:41}],
     plate:"plates/kidneys.jpg",
     learn:[
-      ["Nephrology Learning Lab","Live renal engine: afferent and efferent resistance, Starling forces, ten drugs, twelve disease presets and the urine they make.","nephrology-lab.html?v=20261104c"],
+      ["Nephrology Learning Lab","Live renal engine: afferent and efferent resistance, Starling forces, ten drugs, twelve disease presets and the urine they make.","nephrology-lab.html?v=20261104d"],
       ["Electrolytes","The number chooses the algorithm. Calcium starts from serum calcium and albumin.","Electrolyte_Disorders_Interactive_Simulator.html?v=20261014d"],
       ["Dialysis Learning Lab","Ten modalities. The circuit, the dose, and why SLED sits inside prolonged intermittent therapy.","Dialysis_Learning_Lab.html?v=20261104a"]
     ],
@@ -1285,6 +1288,7 @@ function fillPortal(which, el){
   grow(el, which, function(){ openPath(which); });
 }
 function returnFromModule(){
+  document.body.classList.remove("mod-frame");
   if(window.__moduleReturn) return;
   window.__moduleReturn = true;
   stopSpoken();
@@ -1317,8 +1321,16 @@ function openTitle(card){
   if(practice){
     room.innerHTML = frame;
   }else{
-    room.innerHTML = '<button type="button" class="back" id="back">Back</button>'+ frame;
-    document.getElementById("back").onclick = function(){ if(tryFrameBack()) return; returnFromModule(); };
+    document.body.classList.add("mod-frame");
+    room.innerHTML = frame;
+    const top = document.getElementById("icu-return");
+    if(top && !top.__hubBack) top.__hubBack = top.onclick;
+    if(top) top.onclick = function(){
+      document.body.classList.remove("mod-frame");
+      if(top.__hubBack) top.onclick = top.__hubBack;
+      if(tryFrameBack()) return;
+      returnFromModule();
+    };
   }
   room.scrollTop = 0;
 }
