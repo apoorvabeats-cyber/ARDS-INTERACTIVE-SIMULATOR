@@ -22,6 +22,8 @@ header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;marg
 .find{flex:1;min-width:0;background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:8px 0;font-size:16px;color:var(--paper)}
 .bar{display:flex;gap:8px;overflow:auto;padding:8px 12px;-webkit-overflow-scrolling:touch}
 .bar button{flex:none;font-size:15px}
+.bar.labs{padding-top:0}
+.bar .tag{flex:none;align-self:center;color:var(--warm);font-size:11px;letter-spacing:.14em;text-transform:uppercase}
 .tools{display:flex;gap:8px;overflow:auto;padding:0 12px 8px}
 .tools button{flex:none;font-size:14px}
 #view{position:fixed;inset:0;width:100%;height:100%;touch-action:none;z-index:0}
@@ -51,14 +53,15 @@ header h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;marg
   <h1>Heart</h1>
   <input class="find" id="find" placeholder="Search a structure" aria-label="Search a structure">
 </header>
-<div class="bar" id="mods" role="tablist" aria-label="Cardiac modules"></div>
+<div class="bar" id="mods" role="tablist" aria-label="Anatomy"></div>
+<div class="bar labs" id="labs" role="tablist" aria-label="Conduction, cycle, wall motion and ECG"></div>
 <div class="bar" id="layers" aria-label="Layers"></div>
 <div class="tools">
   <button type="button" id="reset">Reset</button>
   <button type="button" id="isolate">Isolate</button>
   <button type="button" id="beat">Beat</button>
   <button type="button" id="flow">Flow</button>
-  <button type="button" id="spark">Conduction</button>
+  <button type="button" id="spark" hidden>Conduction</button>
   <button type="button" id="cut">Cut</button>
 </div>
 <section class="sheet" id="sheet" aria-live="polite"></section>
@@ -92,10 +95,10 @@ const MODULES = [
   {id:"chambers", title:"Chambers", groups:["myocardium"], focus:["Right atrium","Right ventricle","Left atrium","Left ventricle"], text:"Right atrium, right ventricle, left atrium and left ventricle. Septa are the shared walls, not separate meshes."},
   {id:"valves", title:"Valves", groups:["valves","subvalvular"], focus:["Left coronary leaflet","Posterior leaflet of left atrioventricular valve","Septal leaflet of right atrioventricular valve","Anterior semilunar leaflet of pulmonary valve"], text:"Aortic, pulmonary, mitral and tricuspid leaflets that the atlas segmented, with the papillary muscles. The anterior mitral leaflet and some tricuspid leaflets are not in the model."},
   {id:"coronary", title:"Coronaries", groups:["coronaries","veins"], focus:["Left coronary artery","Anterior interventricular artery","Circumflex artery of heart","Right coronary artery","Coronary sinus"], text:"Left coronary artery, anterior interventricular artery (the left anterior descending), circumflex, right coronary artery, and the cardiac veins that drain to the coronary sinus."},
-  {id:"conduction", title:"Conduction", groups:["myocardium","vessels"], focus:["Superior vena cava","Right atrium","Right ventricle","Left ventricle"], text:"The impulse moves across the atlas chambers. Sinus node at the cava, then the atria, the atrioventricular node, the bundle of His, the bundle branches and the Purkinje network.", spark:true},
-  {id:"cycle", title:"Cycle", groups:["myocardium","valves","vessels"], focus:["Left atrium","Left ventricle","Ascending aorta","Right ventricle"], text:"Atrial systole, isovolumetric contraction, ejection, relaxation and filling, on the atlas chambers. The pressure-volume loop is a teaching diagram.", cycle:true},
-  {id:"rwma", title:"Wall motion", groups:["myocardium","coronaries"], focus:["Left ventricle","Anterior interventricular artery","Circumflex artery of heart","Right coronary artery"], text:"Choose a coronary artery. The matching region of this left ventricle loses contractility.", rwma:true},
-  {id:"ecg", title:"ECG", groups:["myocardium","coronaries"], focus:["Left ventricle","Anterior interventricular artery","Right coronary artery","Circumflex artery of heart"], text:"The trace and the atlas territory move together. Leads are named, not drawn on a body.", ecg:true},
+  {id:"conduction", title:"Conduction", groups:["myocardium","vessels"], focus:["Superior vena cava","Right atrium","Right ventricle","Left ventricle"], text:"The cross section opens with this lab. The arrow is the impulse. One pass takes 12 seconds, and the chamber the impulse has reached is the chamber that contracts.", spark:true},
+  {id:"cycle", title:"Cycle", groups:["myocardium","valves","vessels"], focus:["Left atrium","Left ventricle","Ascending aorta","Right ventricle"], text:"Atrial systole, isovolumetric contraction, ejection, relaxation and filling, on the intact atlas heart. No cut. One cycle takes 9 seconds.", cycle:true},
+  {id:"rwma", title:"Wall motion", groups:["myocardium","coronaries"], focus:["Left ventricle","Right ventricle","Anterior interventricular artery","Circumflex artery of heart","Right coronary artery"], text:"Only the three arteries that decide regional motion. The named territory stops. The other walls keep beating.", rwma:true},
+  {id:"ecg", title:"ECG", groups:["myocardium","coronaries"], focus:["Left ventricle","Right ventricle","Anterior interventricular artery","Right coronary artery","Circumflex artery of heart"], text:"The heart is already beating. The strip scrolls with that beat. A lesion names the artery and the chamber, and that territory stops.", ecg:true},
   {id:"flow", title:"Blood flow", groups:["myocardium","vessels","valves"], focus:["Superior vena cava","Right ventricle","Pulmonary trunk","Left ventricle","Ascending aorta"], text:"Particles move through the venous return, the right heart, the lungs, the left heart and the aorta. This is a teaching path, not a Doppler trace.", flow:true},
   {id:"imaging", title:"Imaging", groups:["myocardium","valves","vessels"], focus:["Left ventricle","Ascending aorta","Right ventricle","Left atrium"], text:"No echo, CT or angiogram loop is bundled. The windows below name which chamber you are looking at."}
 ];
@@ -153,6 +156,9 @@ let beatOn = false;
 let flowOn = false;
 let sparkOn = false;
 let sparkPhase = 0;
+let sparkArrows = [];
+let sparkPts = [];
+let sparkPulse = null;
 let cyclePhase = 0;
 let cutOn = false;
 let moduleId = "explore";
@@ -203,11 +209,13 @@ function speakLine(text){
   }
   say();
 }
+const MINOR_ARTERY = {"Septal branches of anterior interventricular artery":1,"Right inferolateral branch of right coronary artery":1};
 function visibleMeshes(){
   const mod = MODULES.find(function(m){ return m.id===moduleId; });
   const allow = {};
   (mod.groups||[]).forEach(function(g){ allow[g]=true; });
   return meshes.filter(function(mesh){
+    if((moduleId==="rwma" || moduleId==="ecg") && MINOR_ARTERY[mesh.name]) return false;
     return allow[groupOf(mesh.name)] && layerOn[groupOf(mesh.name)];
   });
 }
@@ -333,12 +341,21 @@ function applyModule(id){
   selected = null;
   document.getElementById("isolate").classList.remove("on");
   flowOn = !!mod.flow;
-  sparkOn = !!mod.spark || !!mod.ecg;
-  if(mod.rwma || mod.cycle || mod.ecg) beatOn = true;
+  sparkOn = id==="conduction";
+  if(id==="rwma" || id==="cycle" || id==="ecg") beatOn = true;
+  if(id==="ecg"){
+    const map = {lad:"lad", rca:"rca", lcx:"lcx", rv:"rv"};
+    territory = map[ecgMode] || "normal";
+    motionKind = territory==="normal" ? "hypo" : "aki";
+  }
+  if(id==="rwma" && territory==="rv") territory = "rca";
+  if(id==="conduction") beatOn = false;
   document.getElementById("beat").classList.toggle("on", beatOn);
   document.getElementById("flow").classList.toggle("on", flowOn);
-  document.getElementById("spark").classList.toggle("on", sparkOn);
+  const sparkBtn = document.getElementById("spark");
+  if(sparkBtn) sparkBtn.classList.toggle("on", sparkOn);
   sparkGroup.visible = sparkOn;
+  setCut(id==="conduction");
   paintLayers();
   paintMods();
   paint();
@@ -346,7 +363,7 @@ function applyModule(id){
   listSheet(document.getElementById("find").value);
 }
 function paintMods(){
-  document.getElementById("mods").querySelectorAll("button").forEach(function(btn){
+  document.querySelectorAll("#mods button, #labs button").forEach(function(btn){
     btn.classList.toggle("on", btn.getAttribute("data-mod")===moduleId);
   });
 }
@@ -402,42 +419,49 @@ function prepareChamber(name){
   mesh.userData.localCenter = new THREE.Box3().setFromBufferAttribute(pos).getCenter(new THREE.Vector3());
 }
 function prepareLV(){
-  const mesh = byName["Left ventricle"];
   prepareChamber("Left ventricle");
   prepareChamber("Right ventricle");
   prepareChamber("Left atrium");
   prepareChamber("Right atrium");
+  tagWall("Left ventricle", false);
+  tagWall("Right ventricle", true);
+  lvReady = true;
+}
+function tagWall(name, rightVentricle){
+  const mesh = byName[name];
   if(!mesh || !mesh.userData.orig) return;
   const pos = mesh.geometry.attributes.position;
-  const segs = new Uint8Array(pos.count);
+  const box = new THREE.Box3().setFromBufferAttribute(pos);
+  const cx = (box.min.x + box.max.x) / 2;
+  const cy = (box.min.y + box.max.y) / 2;
+  const cz = (box.min.z + box.max.z) / 2;
+  const size = box.getSize(new THREE.Vector3());
+  const tags = new Uint8Array(pos.count);
   const v = new THREE.Vector3();
-  mesh.updateWorldMatrix(true, false);
-  const center = new THREE.Vector3(0.017, -0.013, 0.003);
   for(let i=0;i<pos.count;i++){
-    v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
-    const yN = (v.y - center.y) / 0.045;
-    const ang = Math.atan2(v.x - center.x, v.z - center.z);
-    let seg = 17;
-    if(yN > -0.72){
-      const level = yN > 0.2 ? 0 : yN > -0.25 ? 1 : 2;
-      if(level < 2){
-        let wedge = 0;
-        if(ang >= -Math.PI/6 && ang < Math.PI/6) wedge = 0;
-        else if(ang >= Math.PI/6 && ang < Math.PI/2) wedge = 5;
-        else if(ang >= Math.PI/2 && ang < 5*Math.PI/6) wedge = 4;
-        else if(ang >= 5*Math.PI/6 || ang < -5*Math.PI/6) wedge = 3;
-        else if(ang >= -5*Math.PI/6 && ang < -Math.PI/2) wedge = 2;
-        else wedge = 1;
-        seg = level * 6 + wedge + 1;
-      }else if(ang >= -Math.PI/4 && ang < Math.PI/4) seg = 13;
-      else if(ang >= Math.PI/4 && ang < 3*Math.PI/4) seg = 16;
-      else if(ang >= 3*Math.PI/4 || ang < -3*Math.PI/4) seg = 15;
-      else seg = 14;
-    }
-    segs[i] = seg;
+    if(rightVentricle){ tags[i] = 4; continue; }
+    v.fromBufferAttribute(pos, i);
+    const ang = Math.atan2(v.x - cx, v.z - cz);
+    const yN = (v.y - cy) / (size.y || 1);
+    const front = Math.abs(ang) < 1.05 || yN < -0.22 && Math.abs(ang) < 1.6;
+    const inferior = Math.abs(ang) > 2.15;
+    if(inferior && !front) tags[i] = 3;
+    else if(!front && (ang > 0.9 || ang < -0.9)) tags[i] = 2;
+    else tags[i] = 1;
   }
-  mesh.userData.segs = segs;
-  lvReady = true;
+  mesh.userData.wall = tags;
+}
+function wallGain(tag){
+  if(!territory || territory==="normal") return 1;
+  let hit = false;
+  if(territory==="lad") hit = tag===1;
+  else if(territory==="lcx") hit = tag===2;
+  else if(territory==="rca" || territory==="rv") hit = tag===3 || tag===4;
+  else if(territory==="global") hit = true;
+  if(!hit) return 1;
+  if(motionKind==="hypo") return 0.1;
+  if(motionKind==="dys") return -0.5;
+  return 0;
 }
 function morphMesh(name, amount, regional){
   const mesh = byName[name];
@@ -447,7 +471,7 @@ function morphMesh(name, amount, regional){
   const c = mesh.userData.localCenter;
   const segs = mesh.userData.segs;
   for(let i=0;i<pos.count;i++){
-    const g = regional ? segGain(segs ? segs[i] : 0) : 1;
+    const g = regional ? wallGain(mesh.userData.wall ? mesh.userData.wall[i] : 0) : 1;
     const k = amount * g;
     const ox = orig[i*3], oy = orig[i*3+1], oz = orig[i*3+2];
     pos.setXYZ(i, ox + (c.x - ox) * k, oy + (c.y - oy) * k, oz + (c.z - oz) * k);
@@ -473,33 +497,35 @@ function conductionPhase(t){
 }
 function arteryName(){
   if(territory==="lad") return "Anterior interventricular artery";
-  if(territory==="rca") return "Right coronary artery";
+  if(territory==="rca" || territory==="rv") return "Right coronary artery";
   if(territory==="lcx") return "Circumflex artery of heart";
   return "";
 }
 function tintLive(){
   const t = sparkPhase;
-  ["Superior vena cava","Right atrium","Left atrium","Right ventricle","Left ventricle"].forEach(function(name){
-    const mesh = byName[name];
-    if(!mesh || mesh===selected) return;
-    let boost = 0;
-    if(sparkOn){
+  if(sparkOn && moduleId==="conduction"){
+    ["Superior vena cava","Right atrium","Left atrium","Right ventricle","Left ventricle"].forEach(function(name){
+      const mesh = byName[name];
+      if(!mesh || mesh===selected) return;
+      mesh.material.emissive.set(0x140804);
+      mesh.material.emissiveIntensity = 0.04;
+      let boost = 0;
       if(name==="Superior vena cava" || name==="Right atrium"){
-        const u = (t - 0.02) / 0.26;
+        const u = (t - 0.02) / 0.28;
         if(u>0 && u<1) boost = Math.sin(u * Math.PI);
       } else if(name==="Left atrium"){
-        const u = (t - 0.1) / 0.22;
+        const u = (t - 0.12) / 0.24;
         if(u>0 && u<1) boost = Math.sin(u * Math.PI) * 0.85;
       } else {
-        const u = (t - 0.46) / 0.28;
+        const u = (t - 0.58) / 0.32;
         if(u>0 && u<1) boost = Math.sin(u * Math.PI);
       }
-    }
-    if(boost){
-      mesh.material.emissive.set(0xe2b48a);
-      mesh.material.emissiveIntensity = 0.2 + boost;
-    }
-  });
+      if(boost){
+        mesh.material.emissive.set(0xe2b48a);
+        mesh.material.emissiveIntensity = 0.25 + boost;
+      }
+    });
+  }
   const vessel = byName[arteryName()];
   if(vessel && (moduleId==="rwma" || moduleId==="ecg") && territory!=="normal" && territory!=="global"){
     vessel.material.emissive.set(0xe2b48a);
@@ -529,43 +555,67 @@ function tintLive(){
   }
 }
 function cycleStep(t){
-  if(t < 0.12) return {name:"Atrial systole", say:"The atria contract and finish ventricular filling. The atria are the atlas chambers, not a separate diagram.", sound:"S4, if the ventricle is stiff, falls here."};
-  if(t < 0.20) return {name:"Isovolumetric contraction", say:"The atrioventricular valves have shut. Semilunar valves are not open yet. Volume is fixed while pressure rises.", sound:"S1. Mitral and tricuspid closure."};
-  if(t < 0.48) return {name:"Ventricular ejection", say:"Pressure exceeds aortic and pulmonary pressure. The ventricles empty. Stroke volume is the width of the pressure-volume loop.", sound:"No extra sound on a normal beat."};
-  if(t < 0.56) return {name:"Isovolumetric relaxation", say:"The semilunar valves shut. The atrioventricular valves are still shut. Volume is fixed while pressure falls.", sound:"S2. Aortic and pulmonary closure."};
-  if(t < 0.78) return {name:"Rapid filling", say:"The atrioventricular valves open and blood enters quickly.", sound:"S3, if it is present, falls in this early filling."};
+  if(t < 0.16) return {name:"Atrial systole", say:"The atria contract and finish ventricular filling. The heart is intact. There is no cut.", sound:"S4, if the ventricle is stiff, falls here."};
+  if(t < 0.26) return {name:"Isovolumetric contraction", say:"The atrioventricular valves have shut. Semilunar valves are not open yet. Volume is fixed while pressure rises.", sound:"S1. Mitral and tricuspid closure."};
+  if(t < 0.58) return {name:"Ventricular ejection", say:"Pressure exceeds aortic and pulmonary pressure. The ventricles empty. This step is held so the contraction is visible.", sound:"No extra sound on a normal beat."};
+  if(t < 0.68) return {name:"Isovolumetric relaxation", say:"The semilunar valves shut. The atrioventricular valves are still shut.", sound:"S2. Aortic and pulmonary closure."};
+  if(t < 0.86) return {name:"Rapid filling", say:"The atrioventricular valves open and blood enters quickly.", sound:"S3, if it is present, falls in this early filling."};
   return {name:"Diastasis", say:"Filling slows. The next atrial systole starts the cycle again.", sound:"Quiet interval."};
 }
-function drawEcg(ctx, w, h, mode, t){
+function drawEcg(ctx, w, h, mode, now, period){
   ctx.clearRect(0,0,w,h);
-  ctx.strokeStyle = "rgba(243,239,230,.15)";
-  ctx.strokeRect(8, 8, w-16, h-16);
-  ctx.beginPath();
-  ctx.strokeStyle = "#7fd4e6";
-  ctx.lineWidth = 2;
-  const mid = h * 0.55;
-  function yAt(u){
-    const x = (u % 1 + 1) % 1;
-    let y = 0;
+  ctx.fillStyle = "#07111a";
+  ctx.fillRect(0,0,w,h);
+  const leads = h < 170 ? ["II"] : ["II","V2","V5"];
+  const lane = h / leads.length;
+  const px = Math.max(90, w / 4.5);
+  const beat = Math.max(0.4, period / 1000);
+  const stMap = {
+    sinus:{II:0,V2:0,V5:0}, lad:{II:-0.28,V2:0.95,V5:0.22}, rca:{II:0.95,V2:-0.4,V5:0.02},
+    lcx:{II:0.06,V2:-0.12,V5:0.9}, rv:{II:0.8,V2:0.72,V5:-0.06},
+    lbbb:{II:0,V2:0.08,V5:0.08}, rbbb:{II:0,V2:0.12,V5:0}, longqt:{II:0,V2:0,V5:0}
+  };
+  const gain = {II:{p:0.16,r:1.1,s:-0.22,t:0.32}, V2:{p:0.1,r:0.3,s:-1.15,t:0.2}, V5:{p:0.14,r:1.2,s:-0.22,t:0.34}};
+  function sample(frac, lead){
+    const x = (frac % 1 + 1) % 1;
     function bump(c, width, amp){ const d = (x-c)/width; return amp * Math.exp(-d*d); }
-    y += bump(0.18, 0.02, -0.35);
-    if(mode==="lbbb" || mode==="rbbb") y += bump(0.40, 0.045, 1.1) + bump(0.50, 0.04, -0.7);
-    else y += bump(0.36, 0.012, -0.45) + bump(0.40, 0.012, 1.15) + bump(0.45, 0.014, -0.35);
-    const tCenter = mode==="longqt" ? 0.72 : 0.62;
-    let st = 0;
-    if(mode==="lad") st = 0.55;
-    if(mode==="rca") st = 0.4;
-    if(mode==="lcx") st = 0.28;
-    y += st;
-    y += bump(tCenter, 0.05, 0.55);
-    return mid - y * (h * 0.28);
+    const a = gain[lead];
+    let y = a.p*bump(0.1,0.02,1) + (-0.18)*bump(0.31,0.008,1) + a.r*bump(0.34,0.012,1) + a.s*bump(0.37,0.012,1) + a.t*bump(mode==="longqt"?0.74:0.58, mode==="longqt"?0.055:0.04, 1);
+    if(mode==="lbbb" || mode==="rbbb") y += bump(0.46, 0.045, mode==="rbbb" && lead==="V2" ? 0.7 : 0.45);
+    const st = (stMap[mode] || stMap.sinus)[lead] || 0;
+    if(x>0.39 && x<0.7 && st){
+      const up = Math.min(1, (x-0.39)/0.03);
+      const down = Math.max(0, 1 - Math.max(0, x-0.54)/0.16);
+      y += st * up * down;
+    }
+    return y;
   }
-  for(let i=0;i<w;i++){
-    const u = i / w + t;
-    const y = yAt(u);
-    if(i===0) ctx.moveTo(i, y); else ctx.lineTo(i, y);
+  ctx.lineWidth = 1;
+  for(let y=0; y<h; y+=8){
+    ctx.strokeStyle = y % 40 === 0 ? "rgba(226,180,138,.28)" : "rgba(226,180,138,.1)";
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
   }
-  ctx.stroke();
+  for(let x=0; x<w; x+=8){
+    ctx.strokeStyle = x % 40 === 0 ? "rgba(226,180,138,.28)" : "rgba(226,180,138,.1)";
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+  }
+  leads.forEach(function(lead, index){
+    const base = lane * index + lane * 0.62;
+    const hot = Math.abs((stMap[mode] || stMap.sinus)[lead] || 0) > 0.4;
+    ctx.strokeStyle = hot ? "#e2b48a" : "#7fd4e6";
+    ctx.lineWidth = hot ? 2.4 : 1.8;
+    ctx.beginPath();
+    for(let x=0;x<w;x++){
+      const age = (w - 12 - x) / px;
+      const frac = ((now/1000 - age) % beat + beat) % beat / beat;
+      const y = base - sample(frac, lead) * (lane * 0.28);
+      if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = hot ? "#e2b48a" : "#93a8b3";
+    ctx.font = "12px Figtree, sans-serif";
+    ctx.fillText(lead, 8, lane * index + 16);
+  });
 }
 function drawLoop(ctx, w, h){
   ctx.clearRect(0,0,w,h);
@@ -605,8 +655,9 @@ function bullseye(){
 function conductionSheet(){
   showSheet(
     "<p class='kicker'>Conduction</p><h2 id='phase'>SA node</h2><p id='phasesay'>The sinus node sits where the superior vena cava meets the right atrium.</p>"
-    + "<canvas class='trace' id='ecg' width='640' height='220' style='width:100%;height:120px;background:#07111a;border-radius:12px'></canvas>"
-    + pointsHtml(["P wave: atrial depolarisation.", "PR segment: the pause in the atrioventricular node.", "QRS: His bundle, both bundle branches, Purkinje fibres, ventricular muscle.", "T wave: ventricular repolarisation.", "The nodes are sites on these chambers. The light moving across the atlas heart is the impulse."])
+    + "<p>The cross section is open. Follow the arrow. One impulse takes 12 seconds, and the lit chamber is the one contracting.</p>"
+    + "<canvas class='trace' id='ecg' width='640' height='140' style='width:100%;height:88px;background:#07111a;border-radius:12px'></canvas>"
+    + pointsHtml(["P wave: atrial depolarisation.", "PR segment: the pause in the atrioventricular node.", "QRS: His bundle, both bundle branches, Purkinje fibres, ventricular muscle.", "T wave: ventricular repolarisation.", "This strip is slowed to the same 12-second impulse."])
   );
 }
 function cycleSheet(){
@@ -627,44 +678,65 @@ function cycleSheet(){
 }
 function rwmaSheet(){
   const buttons = [
-    ["normal","Normal"],["lad","LAD occlusion"],["rca","RCA occlusion"],["lcx","LCx occlusion"],["global","Global hypokinesia"]
+    ["normal","Normal"],["lad","Left anterior descending"],["lcx","Circumflex"],["rca","Right coronary"]
   ];
   const modes = [["hypo","Hypokinesia"],["aki","Akinesia"],["dys","Dyskinesia"]];
+  const say = {
+    normal:"Every ventricular wall moves inward. The atria beat first.",
+    lad:"Anterior wall, septum and apex stop. The lateral wall, the inferior wall and the right ventricle keep contracting.",
+    lcx:"The lateral wall stops. The anterior wall, the inferior wall and the right ventricle keep contracting.",
+    rca:"The inferior wall and the right ventricle stop. The anterior and lateral left-ventricular walls keep contracting. Right-dominant circulation."
+  };
   showSheet(
-    "<p class='kicker'>Regional wall motion</p><h2>17 segments of this left ventricle</h2>"
+    "<p class='kicker'>Wall motion</p><h2>Three arteries</h2><p>"+esc(say[territory] || say.normal)+"</p>"
     + "<div class='row'>"+buttons.map(function(b){ return "<button type='button' data-ter='"+b[0]+"'"+(territory===b[0]?" class='on'":"")+">"+b[1]+"</button>"; }).join("")+"</div>"
     + "<div class='row'>"+modes.map(function(b){ return "<button type='button' data-mot='"+b[0]+"'"+(motionKind===b[0]?" class='on'":"")+">"+b[1]+"</button>"; }).join("")+"</div>"
-    + bullseye()
-    + pointsHtml(["Segments are regions of the atlas left-ventricle mesh, named with the ASE 17-segment model. They are one mesh, divided for teaching.", "LAD: anterior and septal segments, and the apex.", "RCA, right-dominant assumption: inferior wall.", "LCx: lateral wall.", "Akinesia does not move. Hypokinesia moves less. Dyskinesia moves outward."])
+    + pointsHtml(["Only the anterior interventricular artery, the circumflex and the right coronary artery are shown.", "The territory you press is the territory that fails. The other chambers keep beating.", "Akinesia does not move. Hypokinesia barely moves. Dyskinesia bulges outward."])
   );
   sheet.querySelectorAll("[data-ter]").forEach(function(btn){
-    btn.onclick = function(){ territory = btn.getAttribute("data-ter"); if(territory==="global") motionKind = "hypo"; rwmaSheet(); };
+    btn.onclick = function(){ territory = btn.getAttribute("data-ter"); motionKind = territory==="normal" ? "hypo" : motionKind; rwmaSheet(); };
   });
   sheet.querySelectorAll("[data-mot]").forEach(function(btn){
     btn.onclick = function(){ motionKind = btn.getAttribute("data-mot"); rwmaSheet(); };
   });
 }
 function ecgSheet(){
-  const modes = [["sinus","Normal"],["lad","Anterior STEMI"],["rca","Inferior STEMI"],["lcx","Lateral STEMI"],["lbbb","Left bundle branch block"],["rbbb","Right bundle branch block"],["longqt","Long QT"]];
+  const modes = [["sinus","Normal sinus"],["lad","Anterior STEMI"],["lcx","Lateral STEMI"],["rca","Inferior STEMI"],["rv","Right ventricular infarction"],["lbbb","Left bundle branch block"],["rbbb","Right bundle branch block"],["longqt","Long QT"]];
+  const card = {
+    sinus:{title:"Normal sinus", supply:"No coronary occlusion", chamber:"All chambers are beating."},
+    lad:{title:"Anterior STEMI", supply:"Anterior interventricular artery, the left anterior descending", chamber:"Anterior left ventricle, septum and apex stop. Lateral wall, inferior wall and the right ventricle keep beating."},
+    lcx:{title:"Lateral STEMI", supply:"Circumflex artery", chamber:"The lateral left ventricle stops. Anterior wall, inferior wall and the right ventricle keep beating."},
+    rca:{title:"Inferior STEMI", supply:"Right coronary artery", chamber:"Inferior left ventricle and the right ventricle stop. Anterior and lateral walls keep beating."},
+    rv:{title:"Right ventricular infarction", supply:"Proximal right coronary artery", chamber:"The right ventricle stops, with the inferior wall. The anterior left ventricle keeps beating."},
+    lbbb:{title:"Left bundle branch block", supply:"Not a coronary occlusion by itself", chamber:"The left ventricle is activated late. The chambers keep beating."},
+    rbbb:{title:"Right bundle branch block", supply:"Not a coronary occlusion by itself", chamber:"The right ventricle is activated late. The chambers keep beating."},
+    longqt:{title:"Long QT", supply:"No coronary territory", chamber:"Repolarisation is late. The chambers keep beating."}
+  };
+  const fact = card[ecgMode] || card.sinus;
   showSheet(
-    "<p class='kicker'>ECG</p><h2 id='phase'>Sinus</h2>"
-    + "<canvas id='ecg' width='640' height='240' style='width:100%;height:140px;background:#07111a;border-radius:12px'></canvas>"
+    "<p class='kicker'>ECG</p><h2>"+esc(fact.title)+"</h2>"
+    + "<p><strong>Supply.</strong> "+esc(fact.supply)+"</p><p><strong>Chamber.</strong> "+esc(fact.chamber)+"</p>"
+    + "<canvas id='ecg' width='640' height='300' style='width:100%;height:168px;background:#07111a;border-radius:12px'></canvas>"
     + "<div class='row'>"+modes.map(function(b){ return "<button type='button' data-ecg='"+b[0]+"'"+(ecgMode===b[0]?" class='on'":"")+">"+b[1]+"</button>"; }).join("")+"</div>"
     + "<div id='ecgsay'></div>"
   );
   sheet.querySelectorAll("[data-ecg]").forEach(function(btn){
     btn.onclick = function(){
       ecgMode = btn.getAttribute("data-ecg");
-      territory = ecgMode==="lad" ? "lad" : ecgMode==="rca" ? "rca" : ecgMode==="lcx" ? "lcx" : "normal";
-      motionKind = "aki";
+      const map = {lad:"lad", rca:"rca", lcx:"lcx", rv:"rv"};
+      territory = map[ecgMode] || "normal";
+      motionKind = territory==="normal" ? "hypo" : "aki";
+      beatOn = true;
+      document.getElementById("beat").classList.add("on");
       ecgSheet();
     };
   });
   const say = {
-    sinus: ["Limb leads: I, II, III, aVR, aVL, aVF.", "Chest leads: V1 at the right sternal edge, 4th interspace, through V6 in the mid-axillary line.", "P, PR, QRS, ST and T are one cycle of this trace.", "Axis is the net direction of the QRS. This page does not calculate a degree from a patient."],
-    lad: ["Anterior ST elevation is V1 to V4.", "That territory is the anterior interventricular artery on this heart.", "The anterior and septal muscle of this left ventricle stops moving."],
-    rca: ["Inferior ST elevation is II, III and aVF.", "Right-dominant assumption: the right coronary artery supplies that wall.", "A right-sided lead looks for right ventricular infarction. The right ventricle is the anterior chamber on the model."],
-    lcx: ["Lateral ST elevation is I, aVL, V5 and V6. Posterior infarction can be easy to miss.", "The circumflex artery is the lateral vessel on this heart."],
+    sinus: ["Leads II, V2 and V5 scroll together.", "The heart is already beating. Nothing is hypokinetic until you choose a lesion.", "The warm trace is the lead that shows ST elevation."],
+    lad: ["Anterior ST elevation is V2 here, standing in for V1 to V4.", "The anterior interventricular artery is lit on the heart.", "That anterior muscle stops. The other walls do not."],
+    rca: ["Inferior ST elevation is lead II, standing in for II, III and aVF.", "The right coronary artery is lit.", "The inferior wall and the right ventricle stop."],
+    lcx: ["Lateral ST elevation is V5, standing in for I, aVL, V5 and V6.", "The circumflex artery is lit.", "The lateral wall stops."],
+    rv: ["Inferior ST elevation plus elevation in V2, the right-sided pattern.", "This is a proximal right coronary occlusion.", "The right ventricle stops."],
     lbbb: ["The QRS is wide. The left ventricle is late.", "A new left bundle branch block with a compatible story is treated as an occlusion until proved otherwise."],
     rbbb: ["The QRS is wide and the right ventricle is late.", "Right bundle branch block alone is not an anterior infarct."],
     longqt: ["The T wave comes later. A long QT is a repolarisation problem, not a coronary occlusion.", "Drugs, electrolytes and congenital long QT all sit here. This trace only shows the delay."]
@@ -674,7 +746,74 @@ function ecgSheet(){
 function pointsHtml(list){
   return list.map(function(line){ return "<span class='point' style='display:block;position:relative;margin-top:8px;padding-left:14px;color:#93a8b3'>"+esc(line)+"</span>"; }).join("");
 }
-function buildSpark(){ sparkGroup.visible = false; }
+function buildSpark(){
+  while(sparkGroup.children.length) sparkGroup.remove(sparkGroup.children[0]);
+  sparkArrows = [];
+  const svc = centerOf("Superior vena cava");
+  const ra = centerOf("Right atrium");
+  const la = centerOf("Left atrium");
+  const rv = centerOf("Right ventricle");
+  const lv = centerOf("Left ventricle");
+  if(!ra || !lv){ sparkPts = []; return; }
+  const box = new THREE.Box3().setFromObject(root);
+  const mid = box.getCenter(new THREE.Vector3());
+  function tuck(p){ return mid.clone().lerp(p, 0.62); }
+  const av = tuck(ra.clone().lerp(lv, 0.42));
+  const septum = tuck(rv && lv ? rv.clone().lerp(lv, 0.5) : lv);
+  sparkPts = [svc, ra, la, av, septum, lv].filter(Boolean).map(tuck);
+  for(let i=0;i<sparkPts.length-1;i++){
+    const a = sparkPts[i], b = sparkPts[i+1];
+    const dir = b.clone().sub(a);
+    const len = Math.max(0.001, dir.length());
+    const mat = new THREE.MeshBasicMaterial({color:0x7fd4e6, transparent:true, opacity:0.2, depthTest:false, toneMapped:false});
+    const unit = dir.clone().normalize();
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, len*0.68, 8), mat);
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.01, Math.min(0.022, len*0.34), 10), mat);
+    shaft.position.copy(a).add(unit.clone().multiplyScalar(len*0.34));
+    head.position.copy(a).add(unit.clone().multiplyScalar(len*0.8));
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), unit);
+    shaft.quaternion.copy(q);
+    head.quaternion.copy(q);
+    shaft.renderOrder = head.renderOrder = 4;
+    sparkGroup.add(shaft, head);
+    sparkArrows.push(mat);
+  }
+  sparkPulse = new THREE.Mesh(new THREE.SphereGeometry(0.012, 14, 10), new THREE.MeshBasicMaterial({color:0xf3efe6, depthTest:false, toneMapped:false}));
+  sparkPulse.renderOrder = 5;
+  sparkGroup.add(sparkPulse);
+  sparkGroup.visible = false;
+}
+function updateSpark(){
+  if(!sparkPts || sparkPts.length<2) return;
+  const show = moduleId==="conduction";
+  sparkGroup.visible = show;
+  if(!show || !sparkPulse) return;
+  const n = sparkPts.length - 1;
+  const f = sparkPhase * n;
+  const i = Math.min(n-1, Math.floor(f));
+  sparkPulse.position.copy(sparkPts[i]).lerp(sparkPts[i+1], f-i);
+  sparkArrows.forEach(function(mat, idx){
+    const live = idx===i;
+    mat.color.set(live ? 0xf3efe6 : 0x7fd4e6);
+    mat.opacity = live ? 1 : idx<i ? 0.8 : 0.16;
+  });
+}
+function conductionGains(t){
+  function sm(a,b,x){ const u=Math.max(0, Math.min(1, (x-a)/((b-a)||1))); return u*u*(3-2*u); }
+  const atria = sm(0.04, 0.16, t) * (1 - sm(0.34, 0.48, t));
+  const vent = sm(0.62, 0.78, t) * (1 - sm(0.88, 0.98, t));
+  return {atria: atria * 0.18, vent: vent * 0.22};
+}
+function setCut(open){
+  cutOn = !!open;
+  const btn = document.getElementById("cut");
+  if(btn) btn.classList.toggle("on", cutOn);
+  if(!cutOn){ clip.normal.set(0,0,-1); clip.constant = 1e6; return; }
+  const box = new THREE.Box3().setFromObject(root);
+  const center = box.getCenter(new THREE.Vector3());
+  clip.normal.set(0.1, 0.03, -1).normalize();
+  clip.constant = -clip.normal.dot(center);
+}
 function fit(object){
   const box = new THREE.Box3().setFromObject(object);
   const size = box.getSize(new THREE.Vector3());
@@ -698,14 +837,20 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-document.getElementById("mods").innerHTML = MODULES.map(function(mod){
-  return '<button type="button" data-mod="'+mod.id+'">'+esc(mod.title)+'</button>';
-}).join("");
-document.getElementById("mods").onclick = function(event){
+const ANATOMY_TABS = ["explore","chambers","valves","coronary","flow","imaging"];
+const LAB_TABS = ["conduction","cycle","rwma","ecg"];
+function tabButton(mod){
+  return '<button type="button" role="tab" data-mod="'+mod.id+'">'+esc(mod.title)+'</button>';
+}
+document.getElementById("mods").innerHTML = MODULES.filter(function(mod){ return ANATOMY_TABS.indexOf(mod.id)!==-1; }).map(tabButton).join("");
+document.getElementById("labs").innerHTML = '<span class="tag">Labs</span>' + MODULES.filter(function(mod){ return LAB_TABS.indexOf(mod.id)!==-1; }).map(tabButton).join("");
+function onTab(event){
   const btn = event.target.closest("[data-mod]");
   if(!btn) return;
   applyModule(btn.getAttribute("data-mod"));
-};
+}
+document.getElementById("mods").onclick = onTab;
+document.getElementById("labs").onclick = onTab;
 document.getElementById("layers").innerHTML = Object.keys(LAYER_NAME).map(function(id){
   return '<button type="button" data-layer="'+id+'">'+esc(LAYER_NAME[id])+'</button>';
 }).join("");
@@ -718,7 +863,11 @@ document.getElementById("layers").onclick = function(event){
   paint();
 };
 document.getElementById("find").addEventListener("input", function(){ listSheet(this.value); });
-document.getElementById("reset").onclick = function(){ applyModule(moduleId); beatOn=false; cutOn=false; clip.constant=1e6; document.getElementById("beat").classList.remove("on"); document.getElementById("cut").classList.remove("on"); root.scale.setScalar(baseScale); };
+document.getElementById("reset").onclick = function(){
+  restoreChambers();
+  root.scale.setScalar(baseScale);
+  applyModule(moduleId);
+};
 document.getElementById("isolate").onclick = function(){
   if(!selected) return;
   isolate = !isolate;
@@ -728,13 +877,7 @@ document.getElementById("isolate").onclick = function(){
 document.getElementById("beat").onclick = function(){ beatOn=!beatOn; this.classList.toggle("on", beatOn); };
 document.getElementById("flow").onclick = function(){ flowOn=!flowOn; this.classList.toggle("on", flowOn); flowDots.forEach(function(d){ d.mesh.visible=flowOn; }); };
 document.getElementById("spark").onclick = function(){ sparkOn=!sparkOn; sparkGroup.visible=sparkOn; this.classList.toggle("on", sparkOn); };
-document.getElementById("cut").onclick = function(){
-  cutOn = !cutOn;
-  this.classList.toggle("on", cutOn);
-  if(!cutOn){ clip.constant = 1e6; return; }
-  const box = new THREE.Box3().setFromObject(root);
-  clip.constant = box.getCenter(new THREE.Vector3()).z;
-};
+document.getElementById("cut").onclick = function(){ setCut(!cutOn); };
 const askBtn = document.getElementById("ask");
 if(askBtn) askBtn.onclick = function(){
   if(selected && infoFor(selected.name).q) ask(selected.name);
@@ -780,23 +923,39 @@ function frame(now){
     controls.target.copy(focus);
     if(fly.t>=1){ fly=null; controls.enableDamping=true; }
   }
-  sparkPhase = (now % 1700) / 1700;
-  cyclePhase = (now % 1500) / 1500;
-  if(beatOn && (moduleId==="rwma" || moduleId==="cycle" || (moduleId==="ecg" && territory!=="normal"))){
+  sparkPhase = (now % 12000) / 12000;
+  cyclePhase = (now % 9000) / 9000;
+  updateSpark();
+  if(moduleId==="conduction"){
     root.scale.setScalar(baseScale);
-    if(moduleId==="cycle"){
-      const aAmt = cyclePhase < 0.12 ? 0.07 * preload : 0;
-      let vAmt = 0;
-      if(cyclePhase >= 0.18 && cyclePhase < 0.48) vAmt = 0.14 * contractility * Math.sin((cyclePhase - 0.18) / 0.3 * Math.PI);
-      else if(cyclePhase >= 0.56 && cyclePhase < 0.78) vAmt = -0.035;
-      morphMesh("Left ventricle", vAmt / Math.max(0.7, afterload), false);
-      morphMesh("Right ventricle", vAmt * 0.65, false);
-      morphMesh("Left atrium", aAmt, false);
-      morphMesh("Right atrium", aAmt, false);
-    } else {
-      const kick = 0.15 * Math.max(0, Math.sin(now * 0.005));
-      morphMesh("Left ventricle", kick, true);
+    const gained = conductionGains(sparkPhase);
+    morphMesh("Right atrium", gained.atria, false);
+    morphMesh("Left atrium", gained.atria * 0.9, false);
+    morphMesh("Left ventricle", gained.vent, false);
+    morphMesh("Right ventricle", gained.vent * 0.85, false);
+    frame.morphed = true;
+  } else if(beatOn && moduleId==="cycle"){
+    root.scale.setScalar(baseScale);
+    const aAmt = cyclePhase < 0.16 ? 0.1 * preload * Math.sin(Math.min(1, cyclePhase / 0.16) * Math.PI) : 0;
+    let vAmt = 0;
+    if(cyclePhase >= 0.16 && cyclePhase < 0.66){
+      const u = (cyclePhase - 0.16) / 0.5;
+      vAmt = 0.2 * contractility * Math.sin(Math.min(1, u) * Math.PI);
     }
+    morphMesh("Left ventricle", vAmt / Math.max(0.7, afterload), false);
+    morphMesh("Right ventricle", vAmt * 0.7, false);
+    morphMesh("Left atrium", aAmt, false);
+    morphMesh("Right atrium", aAmt, false);
+    frame.morphed = true;
+  } else if(beatOn && (moduleId==="rwma" || moduleId==="ecg")){
+    root.scale.setScalar(baseScale);
+    const pulse = (now % 1100) / 1100;
+    const vAmt = Math.exp(-Math.pow(pulse - 0.38, 2) / 0.012) * 0.26;
+    const aAmt = Math.exp(-Math.pow(pulse - 0.12, 2) / 0.004) * 0.08;
+    morphMesh("Left ventricle", vAmt, true);
+    morphMesh("Right ventricle", vAmt, true);
+    morphMesh("Left atrium", aAmt, false);
+    morphMesh("Right atrium", aAmt, false);
     frame.morphed = true;
   } else if(beatOn){
     if(frame.morphed){ restoreChambers(); frame.morphed = false; }
@@ -808,7 +967,7 @@ function frame(now){
   }
   tintLive();
   const ecg = document.getElementById("ecg");
-  if(ecg) drawEcg(ecg.getContext("2d"), ecg.width, ecg.height, moduleId==="ecg" ? ecgMode : "sinus", sparkPhase);
+  if(ecg) drawEcg(ecg.getContext("2d"), ecg.width, ecg.height, moduleId==="ecg" ? ecgMode : "sinus", now, moduleId==="ecg" ? 1100 : 12000);
   const pv = document.getElementById("pv");
   if(pv) drawLoop(pv.getContext("2d"), pv.width, pv.height);
   if(flowOn && paths.length){
