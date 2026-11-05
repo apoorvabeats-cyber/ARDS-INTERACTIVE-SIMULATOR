@@ -227,7 +227,7 @@ ae1:{say:'AE1 returns bicarbonate from the alpha-intercalated cell to the blood 
 pendrin:{say:'Pendrin on the beta-intercalated cell secretes bicarbonate into the lumen and reabsorbs chloride. No drug in this lab blocks it directly.',drugs:[]},
 hatpb:{say:'The hydrogen ATPase on the basolateral side of the beta-intercalated cell moves hydrogen toward the blood while pendrin secretes bicarbonate. No drug in this lab blocks it directly.',drugs:[]}
 };
-function drugArrows(id,x,side){if(enz!==id||!EZ[id])return '';const d=EZ[id].drugs;if(!d.length)return '';return d.map((dr,i)=>{const dx=x+(i-(d.length-1)/2)*52;const y1=side==='top'?-30:230,y2=side==='top'?16:186,col=dr.s==='−'?'#c0392b':'#1b7f45',mx=(dx+x)/2,my=(y1+8+y2)/2;return `<text x="${dx}" y="${y1}" font-size="8" fill="var(--fg)" text-anchor="middle">${dr.n}</text><line x1="${dx}" y1="${y1+4}" x2="${x}" y2="${y2}" stroke="${col}" stroke-width="1.3"/><circle cx="${mx}" cy="${my}" r="7" fill="${col}"/><text x="${mx}" y="${my+3.5}" font-size="11" fill="#fff" text-anchor="middle">${dr.s}</text>`}).join('')}
+function drugArrows(id,x,side){if(enz!==id||!EZ[id])return '';const d=(hit&&hit.id===id)?[hit]:EZ[id].drugs;if(!d.length||!d[0].s)return '';return d.map((dr,i)=>{const dx=x+(i-(d.length-1)/2)*52;const y1=side==='top'?-30:230,y2=side==='top'?16:186,col=dr.s==='−'?'#c0392b':'#1b7f45',mx=(dx+x)/2,my=(y1+8+y2)/2;return `<text x="${dx}" y="${y1}" font-size="8" fill="var(--fg)" text-anchor="middle">${dr.n}</text><line x1="${dx}" y1="${y1+4}" x2="${x}" y2="${y2}" stroke="${col}" stroke-width="1.3"/><circle cx="${mx}" cy="${my}" r="7" fill="${col}"/><text x="${mx}" y="${my+3.5}" font-size="11" fill="#fff" text-anchor="middle">${dr.s}</text>`}).join('')}
 function lane(id,x,name,color,y1,y2,side){const on=enz===id;return `<g class="enz${on?' on':''}" data-enz="${id}"><rect x="${x-24}" y="${Math.min(y1,y2)-6}" width="48" height="${Math.abs(y2-y1)+18}" fill="transparent"/><line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="${color}" stroke-width="${on?2.6:1.4}" stroke-dasharray="5 4"/>${tx(x,side==='base'?106:84,name)}${drugArrows(id,x,side==='base'?'bot':'top')}</g>`}
 function dot(id,x,name,color){const on=enz===id;return `<g class="enz${on?' on':''}" data-enz="${id}"><circle cx="${x}" cy="92" r="16" fill="transparent"/><circle cx="${x}" cy="92" r="12" fill="none" stroke="${color}" stroke-width="${on?2.4:1.4}"/>${tx(x,95,name)}${drugArrows(id,x,'top')}</g>`}
 function bands(){return '<rect width="340" height="30" fill="#8fd0ff" opacity=".25"/><rect y="138" width="340" height="62" fill="#c23b3b" opacity=".18"/>'}
@@ -262,7 +262,7 @@ const cs=$('#cellsv');if(cs){const A={enac:cl((.4+.6*o.act)*(1-.85*D.amil),0,2),
 H1.push(o.g);H2.push(o.V*60);if(H1.length>120){H1.shift();H2.shift()}
 const c2=$('#sk2');if(c2){const x=c2.getContext('2d');x.clearRect(0,0,360,70);[[H1,200,'#3aa0ff'],[H2,1500,'#3ecf8e']].forEach(([h,m,col])=>{x.strokeStyle=col;x.beginPath();h.forEach((y,i)=>{const py=68-cl(y/m,0,1)*66;i?x.lineTo(i*3,py):x.moveTo(0,py)});x.stroke()})}}
 /* ---------- interaction ---------- */
-let zoom=1,pinch=null,suppressPick=0,liveZoom=0,snap=null,voiceOn=true,enz=null;
+let zoom=1,pinch=null,suppressPick=0,liveZoom=0,snap=null,voiceOn=true,enz=null,hit=null;
 try{voiceOn=localStorage.getItem('nx-voice')!=='0'}catch(e){}
 const zL=new T.Vector3(),zP=new T.Vector3(),zA=new T.Vector3(),zB=new T.Vector3();
 function frameZoom(){
@@ -272,12 +272,14 @@ if(sel!=='all'&&sel!=='kid'&&z>1){const u=cl((z-1)/.85,0,1),a=FOC.all;zA.set(a[0
 else{zA.set(f[1][0]-f[0][0],f[1][1]-f[0][1],f[1][2]-f[0][2]).multiplyScalar(z);zP.copy(zL).add(zA)}
 tl.copy(zL);tp.copy(zP)}
 function fingerD(t){const a=t[0],b=t[1];return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)}
-function go(id,speak){sel=id;enz=null;tab=0;zoom=1;if(id==='kid')cut=true;frameZoom();document.querySelectorAll('#nv button').forEach(b=>b.classList.toggle('on',b.dataset.g==id));hl();render();if(speak&&FULL[id])say(FULL[id])}
+function go(id,speak){sel=id;enz=null;hit=null;tab=0;zoom=1;if(id==='kid')cut=true;frameZoom();document.querySelectorAll('#nv button').forEach(b=>b.classList.toggle('on',b.dataset.g==id));hl();render();if(speak&&FULL[id])say(FULL[id])}
 $('#nv').innerHTML=NV.map(([k,l])=>`<button data-g="${k}">${l}</button>`).join('');
 $('#nv').onclick=e=>{if(e.target.dataset.g)go(e.target.dataset.g,true)};
 $('#tabs').onclick=e=>{if(e.target.dataset.t){tab=+e.target.dataset.t;render()}};
-$('#c').onclick=e=>{const z=e.target.closest&&e.target.closest('[data-enz]');if(z){const id=z.getAttribute('data-enz');enz=enz===id?null:id;render();if(enz&&EZ[id])say(EZ[id].say);return}if(e.target.id=='cutb'){cut=!cut;hl();render()}if(e.target.id=='ent')go('all');const i=e.target.dataset.i;if(i!==undefined)applyDis(+i)};
-document.addEventListener('input',e=>{const t=e.target,k=t.dataset.k;if(!k)return;(t.dataset.o=='S'?S:D)[k]=+t.value;const b=$('#v'+t.dataset.o+k);if(b)b.textContent=t.dataset.o=='D'?Math.round(t.value*100)+'%':t.value});
+$('#c').onclick=e=>{const z=e.target.closest&&e.target.closest('[data-enz]');if(z){const id=z.getAttribute('data-enz');hit=null;enz=enz===id?null:id;render();if(enz&&EZ[id])say(EZ[id].say);return}if(e.target.id=='cutb'){cut=!cut;hl();render()}if(e.target.id=='ent')go('all');const i=e.target.dataset.i;if(i!==undefined)applyDis(+i)};
+const SITE={loop:['loop','nkcc2','Furosemide','−'],thz:['dct','ncc','Thiazide','−'],cai:['pct','ca','Acetazolamide','−'],sglt:['pct','sglt','Gliflozin','−'],amil:['cd','enac','Amiloride','−'],mra:['cd','enac','Spironolactone','−'],tolv:['cd','aqp2','Tolvaptan','−'],mann:['loop',null],acei:['glo','at2','ACE inhibitor','−'],nsaid:['glo','pg','NSAID','−'],adh:['cd','aqp2','ADH','+'],ald:['cd','enac','Aldosterone','+'],ang:['glo','at2','Angiotensin II','+']};
+function aim(k){const s=SITE[k];if(!s)return;sel=s[0];enz=s[1]||null;hit=s[2]?{id:s[1],n:s[2],s:s[3]}:null;zoom=1;frameZoom();liveZoom=1;document.querySelectorAll('#nv button').forEach(b=>b.classList.toggle('on',b.dataset.g==sel));hl()}
+document.addEventListener('input',e=>{const t=e.target,k=t.dataset.k;if(!k)return;(t.dataset.o=='S'?S:D)[k]=+t.value;const b=$('#v'+t.dataset.o+k);if(b)b.textContent=t.dataset.o=='D'?Math.round(t.value*100)+'%':t.value;aim(k)});
 $('#rs').onclick=()=>{dis=0;S={...S0};D={...D0};B=newB();H1=[];H2=[];render();if(window.speechSynthesis)speechSynthesis.cancel()};
 $('#sp').onclick=e=>{SPD=SPD==1?2:SPD==2?5:SPD==5?20:1;e.target.textContent='×'+SPD;if(tab==1)render()};
 const SN={Ra:'Afferent resistance',Re:'Efferent resistance',Kf:'Filtration coefficient',PBS:"Bowman's capsule pressure",MAP:'Blood pressure',ang:'Angiotensin II',ald:'Aldosterone',adh:'ADH',glu:'Plasma glucose',fl:'Fluid intake',loop:'Furosemide',thz:'Thiazide',cai:'Acetazolamide',sglt:'SGLT2 inhibitor',amil:'Amiloride',mra:'Spironolactone',tolv:'Tolvaptan',mann:'Mannitol',acei:'ACE inhibitor',nsaid:'NSAID'};
@@ -312,8 +314,8 @@ function paintVoice(){vx.classList.toggle('on',voiceOn);vx.textContent=voiceOn?'
 paintVoice();
 vx.onclick=()=>{voiceOn=!voiceOn;try{localStorage.setItem('nx-voice',voiceOn?'1':'0')}catch(e){}paintVoice();if(!voiceOn&&window.speechSynthesis)speechSynthesis.cancel();else say('Voice on.')};
 if(window.speechSynthesis)speechSynthesis.onvoiceschanged=()=>{};
-document.addEventListener('pointerdown',e=>{if(e.target.matches&&e.target.matches('input[type=range]')){snap=O;e.target.dataset.was=e.target.value}},true);
-document.addEventListener('change',e=>{const t=e.target;if(!t.dataset||!t.dataset.k)return;speakChange(snap,t);snap=calc()},true);
+document.addEventListener('pointerdown',e=>{if(e.target.matches&&e.target.matches('input[type=range]')){snap=O;e.target.dataset.was=e.target.value;aim(e.target.dataset.k)}},true);
+document.addEventListener('change',e=>{const t=e.target;if(!t.dataset||!t.dataset.k)return;if(SITE[t.dataset.k]){aim(t.dataset.k);if(tab===0)render()}speakChange(snap,t);snap=calc()},true);
 const rc=new T.Raycaster(),pt=new T.Vector2();
 function pick(e){const r=cv.getBoundingClientRect();pt.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);rc.setFromCamera(pt,cam);
 const hs=rc.intersectObjects(sel=='kid'?ks:nm).filter(h=>!(sel=='kid'&&cut&&h.point.z>0&&/capsule|cortex/.test(h.object.userData.id))),h=hs.find(h=>h.object.userData.id!='capsule')||hs[0];
@@ -321,7 +323,7 @@ if(!h)return;const id=h.object.userData.id;if(sel=='kid'){kp=id;tab=0;hl();rende
 cv.onpointerdown=e=>{if(pinch||suppressPick){dr=0;return}dr=[e.clientX,e.clientY,0]};
 cv.onpointermove=e=>{if(pinch){dr=0;return}if(!dr)return;const dx=e.clientX-dr[0];dr[2]+=Math.abs(dx)+Math.abs(e.clientY-dr[1]);if(sel=='kid')K.rotation.y+=dx*.012;dr[0]=e.clientX;dr[1]=e.clientY};
 cv.onpointerup=e=>{if(suppressPick){suppressPick=0;dr=0;return}if(dr&&dr[2]<6)pick(e);dr=0};
-function endZoom(){if(sel!=='kid'&&sel!=='all'&&zoom>=1.6){sel='all';enz=null;zoom=1;document.querySelectorAll('#nv button').forEach(b=>b.classList.toggle('on',b.dataset.g==='all'));frameZoom();liveZoom=1;hl();render()}}
+function endZoom(){if(sel!=='kid'&&sel!=='all'&&zoom>=1.6){sel='all';enz=null;hit=null;zoom=1;document.querySelectorAll('#nv button').forEach(b=>b.classList.toggle('on',b.dataset.g==='all'));frameZoom();liveZoom=1;hl();render()}}
 cv.addEventListener('touchstart',e=>{if(e.touches.length>=2){suppressPick=1;dr=0;pinch={d:fingerD(e.touches),zoom}}},{passive:true});
 cv.addEventListener('touchmove',e=>{if(e.touches.length>=2&&pinch){e.preventDefault();suppressPick=1;zoom=cl(pinch.zoom*Math.pow(pinch.d/Math.max(fingerD(e.touches),1),1.6),.42,2.5);frameZoom();liveZoom=1;if(sel!=='kid')hl()}},{passive:false});
 cv.addEventListener('touchend',e=>{if(e.touches.length<2){pinch=null;endZoom()}});
@@ -356,7 +358,7 @@ const FIGS=[
 ['romkcd','cd','ROMK',2.22,0.55,0,42,-6],
 ['aqp2','cd','AQP2',2.2,-1.45,0,-40,6],
 ['hatp','cd','H⁺ ATPase',2.16,-3.25,0,42,8]
-].map(([id,seg,name,x,y,z,ox,oy])=>{const tag=makeTag(name);tag.el.className='ez';tag.el.dataset.enz=id;tag.id=id;tag.seg=seg;tag.name=name;tag.p=V3(x,y,z);tag.ox=ox;tag.oy=oy;tag.el.addEventListener('click',ev=>{ev.stopPropagation();enz=enz===id?null:id;render();if(enz&&EZ[id])say(EZ[id].say)});return tag});
+].map(([id,seg,name,x,y,z,ox,oy])=>{const tag=makeTag(name);tag.el.className='ez';tag.el.dataset.enz=id;tag.id=id;tag.seg=seg;tag.name=name;tag.p=V3(x,y,z);tag.ox=ox;tag.oy=oy;tag.el.addEventListener('click',ev=>{ev.stopPropagation();hit=null;enz=enz===id?null:id;render();if(enz&&EZ[id])say(EZ[id].say)});return tag});
 let KT=[];
 function buildKidneyTags(){KT.forEach(t=>{t.el.remove();t.ln.remove()});KT=[];
 const names={capsule:'Capsule',cortex:'Cortex',medulla:'Pyramid',pelvis:'Pelvis',ureter:'Ureter',artery:'Artery',vein:'Vein'},grp={};
@@ -394,7 +396,7 @@ tagP.copy(tag.p).project(cam);const behind=tagP.z>1,x=(tagP.x*.5+.5)*w,y=(-tagP.
 let lx=cl(x+tag.ox,40,w-40),ly=cl(y+tag.oy,16,h-16);
 const vis=!behind&&x>-60&&x<w+60&&y>-60&&y<h+60;
 tag.el.style.display=tag.ln.style.display=vis?'':'none';if(!vis)return;
-const drugs=enz===tag.id&&EZ[tag.id]?EZ[tag.id].drugs:[];
+const drugs=(hit&&hit.id===tag.id)?[hit]:(enz===tag.id&&EZ[tag.id]?EZ[tag.id].drugs:[]);
 const html=tag.name+(drugs.length?drugs.map(d=>`<i class="${d.s==='−'?'m':'p'}">${d.n} ${d.s}</i>`).join(''):'');
 if(tag.el.dataset.h!==html){tag.el.innerHTML=html;tag.el.dataset.h=html}
 tag.el.classList.toggle('on',enz===tag.id);
