@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shock: identify, monitor, treat</title>
+<style>
+:root{--bg:#06101a;--p:#0c1b27;--t:#eaf6ff;--m:#9cb4c6;--a:#36d4a7;--b:#67b2ff;--w:#f6c453;--d:#ff6d7c;--l:#244157}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:15px/1.45 system-ui,sans-serif}
+.w{max-width:760px;margin:auto;padding:14px}a{color:var(--b)}h1{font-size:22px;margin:6px 0}h2{font-size:16px;margin:0 0 8px;color:var(--b)}
+.s,.n{color:var(--m);font-size:12px}.card,details{background:var(--p);border:1px solid var(--l);border-radius:12px;padding:12px;margin:10px 0}
+summary{cursor:pointer;font-weight:700}.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:8px}
+label{font-size:11px;color:var(--m);display:block}input,select{width:100%;padding:7px;border-radius:8px;border:1px solid #38556b;background:#0b1823;color:var(--t)}
+input[type=checkbox]{width:auto}.k{background:#0a1722;border:1px solid var(--l);border-radius:8px;padding:7px}.k b{display:block;font-size:16px;color:var(--a)}.k span{font-size:11px;color:var(--m)}
+.chip{border:1px solid var(--l);background:#132837;color:var(--t);border-radius:999px;padding:6px 10px;margin:0 4px 6px 0;font-size:12px;cursor:pointer}.chip.on{border-color:var(--a);color:var(--a)}
+.bar{height:7px;background:#0a1722;border-radius:4px;margin:2px 0 6px}.bar i{display:block;height:100%;background:var(--b);border-radius:4px}
+.al{border-left:4px solid var(--a);padding:8px 10px;margin:8px 0;background:rgba(54,212,167,.08);border-radius:8px}.al.warn{border-color:var(--w)}.al.bad{border-color:var(--d)}
+canvas{width:100%;height:110px;background:#02040a;border-radius:8px;margin-top:8px}button.go{background:var(--a);color:#022117;border:0;border-radius:10px;padding:9px 14px;font-weight:700}
+ul{padding-left:18px;margin:6px 0}li{margin:4px 0}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:5px;border-bottom:1px solid var(--l);text-align:left}
+</style></head><body><div class="w">
+<a href="hub.html">Back to hub</a><h1>Shock: identify, monitor, treat</h1>
+<p class="s">One teaching model that joins the identification, RUSH and arterial-line simulators. Numbers are simulated, not a validated monitor.</p>
+<div id="chips"></div>
+<details open><summary>Bedside inputs</summary><div id="in" class="g"></div><div id="sel" class="g"></div><div id="chk" class="g"></div></details>
+<div class="card"><h2>Calculated</h2><div id="m" class="g"></div></div>
+<div class="card"><h2>Which pattern fits</h2><div id="dx"></div><div id="bars"></div><ul id="ev"></ul></div>
+<div class="card"><h2>What to do</h2><ul id="mg"></ul></div>
+<div class="card"><h2>Treat and watch</h2><div class="g">
+<div><label>Fluid or blood <b id="vf">0 mL</b></label><input id="fl" type="range" min="0" max="3000" step="250" value="0"></div>
+<div><label>Norepinephrine <b id="vn">0.00</b> mcg/kg/min</label><input id="ne" type="range" min="0" max="1" step="0.05" value="0"></div>
+<div><label>Dobutamine <b id="vd">0</b> mcg/kg/min</label><input id="db" type="range" min="0" max="20" step="2.5" value="0"></div>
+<div><label>Procedure</label><select id="pr"><option value="">None</option><option value="ab">Antibiotics</option><option value="hem">Stop the bleed / transfuse</option><option value="peri">Pericardiocentesis</option><option value="lysis">Thrombolysis / embolectomy</option><option value="dec">Chest decompression</option></select></div></div>
+<div id="res"></div><canvas id="art"></canvas><canvas id="ivc"></canvas></div>
+<div class="card"><h2>Transpulmonary thermodilution</h2><p class="n">Educational model. Run it when the pattern is mixed or unclear.</p><button class="go" id="tp">Run TPTD</button><div id="tpo"></div></div>
+<p class="n">Educational simulator. Verify with the bedside exam, validated monitoring and local protocols.</p>
+</div>
+<script>
+const F=[['sbp','SBP mmHg'],['dbp','DBP mmHg'],['hr','HR /min'],['ht','Height cm'],['wt','Weight kg'],['sv','Stroke volume mL'],['pcwp','PCWP mmHg'],['ivx','IVC max cm'],['ivn','IVC min cm'],['ppv','PPV %'],['svv','SVV %'],['scvo2','ScvO2 %'],['lac','Lactate'],['hb','Hb g/dL'],['paco2','PaCO2 mmHg'],['pvco2','PvCO2 mmHg'],['plb','CI before leg raise'],['plp','CI at leg raise peak']];
+const S=[['lung','Lungs',[['a','A-lines'],['b','Bilateral B-lines'],['ards','Patchy B-lines, irregular pleura'],['ptx','No sliding, barcode sign']]],['lv','Left ventricle',[['hyper','Hyperdynamic'],['norm','Normal'],['hypo','Poorly contracting']]],['rv','Right heart',[['norm','Normal'],['dil','Dilated, D-shaped septum'],['tamp','Effusion with chamber collapse']]],['vent','Breathing',[['mech','Controlled ventilation'],['spont','Spontaneous']]]];
+const K=[['bleed','Bleeding'],['anaph','Anaphylaxis'],['af','Atrial fibrillation']];
+const C=[['Hemorrhagic',[78,46,130,172,68,30,6,1,.3,20,18,52,5,6.8,32,43,1.9,2.4],'a','hyper','norm','mech',{bleed:1}],
+['Cardiogenic',[84,62,116,172,78,26,24,2.4,2.2,6,5,44,6,13,34,48,1.6,1.65],'b','hypo','norm','mech'],
+['Massive PE',[84,58,130,178,86,27,10,2.3,2.1,10,9,46,4.2,13,36,50,1.7,1.8],'a','norm','dil','mech'],
+['Tamponade',[80,64,128,168,72,24,12,2.5,2.4,22,12,50,4.4,12,36,50,1.6,1.65],'a','hyper','tamp','mech'],
+['Tension pneumothorax',[78,54,134,176,80,24,4,2.5,2.4,12,10,48,5,13.5,36,48,1.6,1.65],'ptx','norm','norm','mech'],
+['Septic, vasodilated',[84,42,122,168,71,60,9,1.9,.8,16,15,76,4.2,10.5,30,36,3.6,4.3],'a','hyper','norm','mech'],
+['Septic cardiomyopathy',[82,38,120,165,62,34,16,2,1.6,10,9,60,6,9.8,34,48,1.8,1.85],'b','hypo','norm','mech'],
+['Neurogenic',[88,40,58,175,75,95,4,1.2,.4,14,13,70,2,13,36,40,2.8,3.2],'a','norm','norm','mech']];
+const N={hypo:'Hypovolemic',card:'Cardiogenic',obs:'Obstructive',dist:'Distributive',neu:'Neurogenic'};
+const $=id=>document.getElementById(id);let cur=0,T=0,shown=null;
+function load(n){cur=n;const c=C[n],v=c[1];F.forEach((f,j)=>$('i_'+f[0]).value=v[j]);S.forEach((s,j)=>$('s_'+s[0]).value=c[2+j]);K.forEach(k=>$('k_'+k[0]).checked=!!(c[6]&&c[6][k[0]]));
+ ['fl','ne','db'].forEach(x=>$(x).value=0);$('pr').value='';$('tpo').innerHTML='';
+ $('chips').innerHTML=C.map((x,j)=>'<button class="chip'+(j==n?' on':'')+'" onclick="load('+j+')">'+x[0]+'</button>').join('');run();}
+function read(){const i={};F.forEach(f=>i[f[0]]=parseFloat($('i_'+f[0]).value)||0);S.forEach(s=>i[s[0]]=$('s_'+s[0]).value);K.forEach(k=>i[k[0]]=$('k_'+k[0]).checked);if(i.af)i.vent='spont';return i;}
+function calc(i){const map=(i.sbp+2*i.dbp)/3,bsa=Math.sqrt(i.ht*i.wt/3600)||1.7,co=i.hr*i.sv/1000,ci=co/bsa,col=i.ivx>0?(i.ivx-i.ivn)/i.ivx*100:0;
+ const rap=i.ivx<=2.1?(col>50?3:8):(col>50?8:15),svri=80*(map-rap)/Math.max(.3,ci),plr=i.plb>0?(i.plp-i.plb)/i.plb*100:0,valid=i.vent==='mech'&&!i.af;
+ return{map,bsa,co,ci,col,rap,svri,plr,valid,dp:i.pvco2-i.paco2,ea:valid&&i.svv>0?i.ppv/i.svv:null,si:i.hr/Math.max(1,i.sbp),wet:i.rv!=='norm'||i.lung==='b'||i.lung==='ptx'||rap>=15};}
+function dxOf(i){const c=calc(i),s={hypo:0,card:0,obs:0,dist:0,neu:0},e=[],a=(k,n,t)=>{s[k]+=n;e.push(t)};
+ if(c.ci<2.2){s.card+=2;s.hypo+=1;s.obs+=1;e.push('Low cardiac index '+c.ci.toFixed(1))}
+ if(c.ci>=3)a('dist',2,'High cardiac index '+c.ci.toFixed(1));
+ if(c.svri<1500)a('dist',3,'Low SVRI '+Math.round(c.svri));else if(c.svri<1900)s.dist+=1;else if(c.svri>2200){s.hypo+=2;s.card+=1;s.obs+=1;e.push('High SVRI: compensatory vasoconstriction')}
+ if(i.pcwp>18)a('card',3,'High left filling pressure (PCWP '+i.pcwp+')');
+ if(c.rap>=12&&i.pcwp<15)a('obs',3,'High right-sided pressure with a normal or low left filling pressure');else if(c.rap>=12){s.obs+=1;s.card+=1}
+ if(c.rap<=5)s.hypo+=1;
+ if(i.ivx<=2.1&&c.col>50){s.hypo+=2;s.dist+=1;e.push('Small, collapsing IVC')}
+ if(c.dp>6){s.card+=1;s.obs+=1;s.hypo+=1;e.push('Delta PCO2 '+c.dp.toFixed(0)+' mmHg: low-flow component')}
+ if(i.scvo2<60){s.card+=1;s.hypo+=1;s.obs+=1;e.push('Low ScvO2 '+i.scvo2)}
+ if(i.scvo2>70&&c.svri<1500)a('dist',2,'High ScvO2 with low SVRI');
+ if(i.lung==='b')a('card',2,'Bilateral B-lines');if(i.lung==='ards')a('dist',1,'Patchy B-lines: permeability edema');
+ if(i.lung==='ptx')a('obs',8,'No lung sliding: pneumothorax pattern');
+ if(i.lv==='hypo')a('card',4,'Poorly contracting left ventricle');if(i.lv==='hyper'){s.hypo+=1;s.dist+=1}
+ if(i.rv==='dil')a('obs',4,'Dilated right ventricle with D-shaped septum');if(i.rv==='tamp')a('obs',6,'Pericardial effusion with chamber collapse');
+ if(i.hb<7)a('hypo',3,'Hemoglobin '+i.hb);if(i.bleed)a('hypo',4,'Known bleeding');if(i.anaph)a('dist',4,'Anaphylaxis');
+ if(i.lv==='hypo'&&c.svri<1900)a('dist',3,'Low resistance together with pump failure');
+ if(i.hr<70&&c.svri<1900&&i.sbp<100)a('neu',9,'Low resistance without tachycardia');
+ const r=Object.entries(s).sort((x,y)=>y[1]-x[1]),top=r[0],sec=r.slice(1).filter(x=>x[1]>=6&&x[1]>=top[1]*.7).map(x=>x[0]),set=new Set([top[0],...sec]);
+ const sub=i.lung==='ptx'?'Tension pneumothorax':i.rv==='tamp'?'Tamponade':i.rv==='dil'?'Massive PE (RV strain)':'Obstructive';
+ const nm=k=>k==='obs'?sub:N[k];
+ return{s,r,top:top[0],sec,set,mixed:sec.length>0,label:sec.length?'Mixed: '+[top[0],...sec].map(nm).join(' + '):nm(top[0])+' shock',e,c};}
+function treat(i,d){const s=Object.assign({},i),L=[],f=+$('fl').value/1000,ne=+$('ne').value,db=+$('db').value,pr=$('pr').value,c=d.c,fr=c.plr>=10||(c.valid&&i.ppv>13);
+ if(f>0){if(fr&&!c.wet){s.sbp+=f*8;s.dbp+=f*4;s.hr-=f*6;s.ivx=Math.min(2.4,s.ivx+f*.3);s.ppv=Math.max(4,s.ppv-f*4);s.lac=Math.max(.8,s.lac-f*.4)}
+  else if(c.wet&&f>.5){s.sbp-=f*4;s.lac+=f*.3;s.ivx+=f*.2;L.push(['bad','Fluid into a full or obstructed circulation. Pressure and lactate got worse; the lungs will fill.'])}else s.sbp+=f*2;}
+ s.dbp+=ne*28;s.sbp+=ne*18;if(ne>0&&d.top==='hypo'&&f<500)L.push(['warn','Pressor on an empty tank. Give blood or stop the bleed first.']);
+ s.hr+=db*.8;s.sv+=db*1.2;s.sbp+=db*.6;if(db>0&&d.top==='hypo'&&f<500)L.push(['bad','Inotrope on an empty tank. Fill or stop the bleed first.']);
+ const no=t=>L.push(['bad',t]);
+ if(pr==='ab'){if(d.set.has('dist'))s.lac=Math.max(1.2,s.lac*.85);else no('No infectious pattern here. Antibiotics do not change the physiology.')}
+ if(pr==='hem'){if(i.bleed||(d.set.has('hypo')&&i.hb<10)){s.hb=Math.min(14,s.hb+2.5);s.sbp+=10;s.hr-=8;s.lac=Math.max(1.2,s.lac-1)}else no('No bleeding pattern and Hb '+i.hb+'. Transfusion adds risk without benefit.')}
+ if(pr==='peri'){if(i.rv==='tamp'){s.rv='norm';s.ivx=1.6;s.ivn=1.1;s.sbp+=18;s.sv+=10;s.ppv=8;s.lac=Math.max(1.5,s.lac-1.2)}else no('No pericardial effusion with chamber collapse. Drainage will not help and carries risk.')}
+ if(pr==='lysis'){if(i.rv==='dil'&&i.lung!=='ptx'){s.rv='norm';s.ivx=1.8;s.ivn=1.3;s.sbp+=12;s.sv+=8;s.lac=Math.max(1.4,s.lac-.8)}else{if(i.rv==='tamp'||i.bleed){s.sbp-=15;s.lac+=.5}no('Not a massive PE. A thrombolytic is dangerous in tamponade and in bleeding.')}}
+ if(pr==='dec'){if(i.lung==='ptx'){s.lung='a';s.ivx=1.6;s.ivn=1;s.sbp+=22;s.sv+=12;s.lac=Math.max(1.4,s.lac-1)}else no('The lung slides. Decompression is not indicated.')}
+ if(c.ci<1.9&&f>1&&d.top==='card')L.push(['bad','A lot of fluid into a weak pump.']);
+ s.sbp=Math.max(40,Math.min(200,s.sbp));s.dbp=Math.max(20,Math.min(s.sbp-8,s.dbp));s.hr=Math.max(40,Math.min(180,s.hr));
+ return{s,L};}
+function plan(i,d){const L=[],c=d.c,has=k=>d.set.has(k),fr=c.plr>=10||(c.valid&&i.ppv>13);
+ if(i.lung==='ptx')L.push('Decompress the chest now. This is not a pulmonary embolus and not a reason for a thrombolytic.');
+ if(i.rv==='tamp')L.push('Drain the pericardium. No thrombolytic. Fluid is at most a short bridge to drainage.');
+ if(i.rv==='dil'&&i.lung!=='ptx')L.push('Massive PE pattern: start unfractionated heparin. If the pressure stays low, alteplase 100 mg over 2 hours (a bolus protocol applies in arrest). Support the right ventricle with norepinephrine, avoid fluid loading, and confirm on CT if the patient can travel.');
+ if(i.anaph)L.push('Anaphylaxis: epinephrine 0.5 mg intramuscular (1 mg/mL) into the thigh now, repeat in 5 minutes if needed, then airway review. An infusion is only for shock that remains.');
+ if(has('hypo'))L.push(i.bleed?'Bleeding: stop it and give blood (red cells, plasma and platelets 1:1:1 if massive). Until it is controlled aim for a systolic of 80 to 90, unless there is brain or spinal cord injury. Do not push the MAP above 65 with norepinephrine. Tranexamic acid 1 g only for trauma within 3 hours.':'Hypovolemia: replace the loss, guided by the leg raise. Norepinephrine is only a bridge.');
+ if(has('dist'))L.push('Distributive: cultures, then an antibiotic within 1 hour. Norepinephrine first, aimed above 65. Add vasopressin 0.03 U/min when norepinephrine reaches about 0.25 mcg/kg/min. Hydrocortisone if still pressor-dependent.');
+ if(has('card'))L.push('Pump failure: ECG and troponin. Dobutamine once the MAP is safe; milrinone only while the MAP stays at 65 or above. A mechanical pump is for refractory shock.');
+ if(has('neu'))L.push('Neurogenic: norepinephrine. Atropine only if the rate itself is causing the low pressure. In acute spinal cord injury a MAP of 85 to 90 is commonly targeted.');
+ L.push(c.wet?'Do not give a fluid bolus. The lungs, the right heart or the cava say the patient is already full or obstructed.':i.bleed?'Do not use crystalloid for this bleeding. Use blood.':fr?'The fluid-responsiveness test is positive. Give a 250 to 500 mL challenge, then look at the lungs and recheck.':'Fluid-responsiveness is negative. Do not give fluid on this result.');
+ if(c.valid&&c.ea!==null)L.push(i.svv<10?'Ea,dyn needs preload dependence (SVV 10% or more).':c.ea>=.89?'Ea,dyn '+c.ea.toFixed(2)+': MAP is likely to rise with fluid.':c.ea>=.73?'Ea,dyn '+c.ea.toFixed(2)+' is in the gray zone.':'Ea,dyn '+c.ea.toFixed(2)+': MAP is unlikely to rise with fluid alone. A vasopressor is more likely to be needed.');
+ else L.push('PPV, SVV and Ea,dyn are not valid: use the leg raise.');
+ if(i.lung==='ards')L.push('If this is ARDS, ventilate at about 6 mL/kg predicted body weight with a plateau at or below 30.');
+ if(i.lac>=4)L.push('Lactate '+i.lac+'. Recheck after the pressure and the cause are treated. Do not chase it with bicarbonate.');return L;}
+function run(){const i=read(),d=dxOf(i),c=d.c;['fl','ne','db'].forEach((x,j)=>$(['vf','vn','vd'][j]).textContent=x=='fl'?$(x).value+' mL':(+$(x).value).toFixed(x=='ne'?2:1));
+ $('m').innerHTML=[['MAP',c.map.toFixed(0)+' mmHg'],['Shock index',c.si.toFixed(2)],['BSA',c.bsa.toFixed(2)+' m2'],['CO',c.co.toFixed(1)+' L/min'],['CI',c.ci.toFixed(1)],['Est. RAP',c.rap+' mmHg'],['SVRI',Math.round(c.svri)],['Delta PCO2',c.dp.toFixed(0)],['IVC collapse',c.col.toFixed(0)+'%'],['Leg raise',(c.plr>=0?'+':'')+c.plr.toFixed(0)+'%'],['Ea,dyn',c.ea===null?'invalid':c.ea.toFixed(2)]].map(x=>'<div class="k"><span>'+x[0]+'</span><b>'+x[1]+'</b></div>').join('');
+ $('dx').innerHTML='<div class="al'+(d.mixed?' warn':'')+'"><b>'+d.label+'</b></div>';
+ const tot=Object.values(d.s).reduce((a,v)=>a+Math.max(0,v),0)||1;$('bars').innerHTML=d.r.map(x=>'<div style="display:flex;justify-content:space-between;font-size:13px"><span>'+(x[0]==='obs'?'Obstructive':N[x[0]])+'</span><b>'+Math.round(Math.max(0,x[1])/tot*100)+'%</b></div><div class="bar"><i style="width:'+Math.round(Math.max(0,x[1])/tot*100)+'%"></i></div>').join('')+'<p class="n">Pattern match from your inputs, not a calibrated probability.</p>';
+ $('ev').innerHTML=d.e.map(x=>'<li>'+x+'</li>').join('');$('mg').innerHTML=plan(i,d).map(x=>'<li>'+x+'</li>').join('');
+ const r=treat(i,d),a=calc(r.s);shown=r.s;
+ $('res').innerHTML='<div class="g"><div class="k"><span>MAP after</span><b>'+a.map.toFixed(0)+' mmHg</b></div><div class="k"><span>CI after</span><b>'+a.ci.toFixed(1)+'</b></div><div class="k"><span>Lactate after</span><b>'+r.s.lac.toFixed(1)+'</b></div><div class="k"><span>Hb after</span><b>'+r.s.hb.toFixed(1)+'</b></div></div>'+r.L.map(x=>'<div class="al '+x[0]+'">'+x[1]+'</div>').join('')+'<div class="al'+(a.map>=65&&r.s.lac<2.2?'':' warn')+'">'+(a.map>=65&&r.s.lac<2.2?'MAP at least 65 and lactate under 2.2.':'MAP under 65 or lactate still high. Change the treatment.')+'</div>';}
+function tptd(){const i=read(),d=dxOf(i),c=d.c,R=(a,b)=>a+Math.random()*(b-a),p={hypo:[[430,520],[4,6]],card:[[880,1040],[12,18]],obs:[[620,780],[5,8]],dist:[[700,800],[6,9]],neu:[[640,740],[4,6]]}[d.top];
+ const co=c.co,runs=[1,2,3].map(()=>co*R(.96,1.04)),mco=runs.reduce((a,b)=>a+b)/3,gedvi=R(...p[0]),elwi=R(...p[1])+(i.lung==='ards'?3:0),pbw=50+.91*(i.ht-152.4);
+ const gedv=gedvi*c.bsa,itbv=1.25*gedv,evlw=elwi*pbw,ittv=itbv+evlw,ptv=ittv-gedv,q=mco*1000/60,mtt=ittv/q,dst=ptv/q,cfi=c.ci*1000/gedvi,gef=4*i.sv/gedv*100;
+ const pv=i.lung==='ards'?R(3.1,4):R(1.4,2.6);
+ const n=[];n.push(gedvi<680?'Low preload (GEDVI under 680).':gedvi>800?'High preload (GEDVI over 800).':'Preload in the normal range.');
+ n.push(c.ci<2.5?'Low flow: cardiac index '+c.ci.toFixed(1)+'.':'Flow is adequate.');if(cfi<4.5||gef<25)n.push(gedvi<680?'CFI '+cfi.toFixed(1)+' and GEF '+gef.toFixed(0)+'% are low because the heart is underfilled. Fill, then measure again.':cfi<4.5&&gef<25?'CFI '+cfi.toFixed(1)+' and GEF '+gef.toFixed(0)+'% with a normal or large GEDV point to a pump problem.':'CFI or GEF is borderline. Read it with the preload and the echo.');
+ n.push(elwi>10?'ELWI over 10: pulmonary edema. Avoid more fluid.':elwi>7?'ELWI mildly raised.':'No excess lung water.');n.push(pv>3?'PVPI '+pv.toFixed(1)+': permeability edema.':'PVPI '+pv.toFixed(1)+': hydrostatic or no permeability signal.');
+ $('tpo').innerHTML='<table><tr><th>Run</th><th>CO L/min</th></tr>'+runs.map((x,j)=>'<tr><td>'+(j+1)+'</td><td>'+x.toFixed(2)+'</td></tr>').join('')+'</table><div class="g">'+[['GEDVI',gedvi.toFixed(0)+' mL/m2'],['GEDV',gedv.toFixed(0)+' mL'],['ITBV',itbv.toFixed(0)+' mL'],['ITTV',ittv.toFixed(0)+' mL'],['PTV',ptv.toFixed(0)+' mL'],['EVLW',evlw.toFixed(0)+' mL'],['ELWI (PBW)',elwi.toFixed(1)+' mL/kg'],['PVPI',pv.toFixed(1)],['CFI',cfi.toFixed(1)],['GEF',gef.toFixed(0)+'%'],['MTt',mtt.toFixed(0)+' s'],['DSt',dst.toFixed(0)+' s']].map(x=>'<div class="k"><span>'+x[0]+'</span><b>'+x[1]+'</b></div>').join('')+'</div><ul>'+n.map(x=>'<li>'+x+'</li>').join('')+'</ul><p class="n">EVLW = ITTV - ITBV. PTV = ITTV - GEDV. ITTV = CO x MTt. ELWI is indexed to predicted body weight (male formula).</p>';}
+function sz(c){const r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d;const x=c.getContext('2d');x.setTransform(d,0,0,d,0,0);return[x,r.width,r.height];}
+function draw(){T+=2;if(shown){let[x,w,h]=sz($('art')),b=shown;x.strokeStyle='#38bdf8';x.lineWidth=2;x.beginPath();const cyc=60/Math.max(40,b.hr)*70,v=b.vent==='mech'&&!b.af,pp=b.sbp-b.dbp,dp=Math.max(.3,Math.min(2.5,(b.sv||40)/45));
+ for(let k=0;k<w;k++){const ph=((k+T)%cyc)/cyc,sw=Math.sin((k+T)*.02)*(v?b.ppv:b.ppv/2)/100,S=b.sbp*(1+sw),D=b.dbp,yS=h-(S/200*h*.78+14),yD=h-(D/200*h*.78+14),yN=yD-(yD-yS)*.38;let y;
+  if(ph<.15)y=yD-(yD-yS)*Math.pow(ph/.15,1/dp);else if(ph<.35)y=yS+(yN-yS)*(ph-.15)/.2;else y=yN+(yD-yN)*Math.min(1,(ph-.35)/.65);k?x.lineTo(k,y):x.moveTo(k,y);}
+ x.stroke();x.fillStyle='#94a3b8';x.font='11px sans-serif';x.fillText(Math.round(b.sbp)+'/'+Math.round(b.dbp)+'  HR '+Math.round(b.hr)+'  Arterial line',8,h-4);
+ [x,w,h]=sz($('ivc'));const f=(Math.sin(T*.03)+1)/2,dd=b.ivn+(b.ivx-b.ivn)*f,ry=dd/3.5*h*.34;x.beginPath();x.ellipse(w/2,h/2,ry*1.8,ry,0,0,7);x.strokeStyle='#38bdf8';x.lineWidth=3;x.stroke();x.fillStyle='#94a3b8';x.fillText('IVC '+dd.toFixed(2)+' cm',8,h-4);}
+ requestAnimationFrame(draw);}
+F.forEach(f=>$('in').insertAdjacentHTML('beforeend','<div><label>'+f[1]+'</label><input id="i_'+f[0]+'" type="number" step="any"></div>'));
+S.forEach(s=>$('sel').insertAdjacentHTML('beforeend','<div><label>'+s[1]+'</label><select id="s_'+s[0]+'">'+s[2].map(o=>'<option value="'+o[0]+'">'+o[1]+'</option>').join('')+'</select></div>'));
+K.forEach(k=>$('chk').insertAdjacentHTML('beforeend','<label><input type="checkbox" id="k_'+k[0]+'"> '+k[1]+'</label>'));
+document.querySelectorAll('input,select').forEach(e=>e.addEventListener('input',run));document.querySelectorAll('input[type=checkbox]').forEach(e=>e.addEventListener('change',run));
+$('tp').onclick=tptd;load(0);draw();
+</script></body></html>
