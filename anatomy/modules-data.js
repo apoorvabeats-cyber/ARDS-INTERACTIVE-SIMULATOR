@@ -62,9 +62,7 @@ export const ROOMS = {
       ['Cardiac Anatomy Lab', 'Conduction, the cardiac cycle, wall motion and the ECG, on the Z-Anatomy heart.', 'cardiac-lab.html?v=20261104c'],
       ['Echo bay', 'Finger on the chest. The probe, the coronary territory, the wall motion and the trace move together.', 'echo-lab.html?v=20261103e'],
       ['ACLS, 2025 AHA', 'Arrest, tachycardia and bradycardia, with the current doses.', 'ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20260925s'],
-      ['Shock identification', 'MAP, cardiac index and the phenotype.', 'Shock_Identification_Management_Simulator.html?v=20260925s'],
-      ['Shock and POCUS', 'RUSH exam, ScvO2 and lactate.', 'Shock_POCUS_RUSH_Simulator.html?v=20260925l'],
-      ['Shock telemetry', 'Arterial line, IVC, PPV and the vasopressor.', 'Shock_Telemetry_POCUS_Simulator.html?v=20261001a']
+      ['Shock simulator', 'Identify the pattern, read the arterial line and IVC, then treat.', 'Shock_Combined_Simulator.html?v=20261105a']
     ],
     practice: [
       ['Cardiac rhythm', 'A moving ECG, the arrest and the reversible causes.', 'Cardiac_Rhythm_Decision_Simulator_V29_FINAL_AUDITED.html?v=20260925t'],
