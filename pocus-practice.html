@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101214">
+<title>Probe Bay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@420;600;700&family=Fraunces:opsz,wght@9..144,520&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#101214;--ink:#f3efe6;--muted:#b7b1a4;--cool:#7fd4e6;--warm:#e2b48a;--card:#171c22;--line:rgba(243,239,230,.16);--good:#8fd0a8;--bad:#e7a3a3}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Figtree,system-ui,sans-serif}
+button,img{font:inherit;color:inherit}
+button{cursor:pointer}
+header{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;padding:10px 12px;background:#101214ee;border-bottom:1px solid var(--line)}
+h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:0;letter-spacing:-.03em}
+#back,#voice{background:#171c22;border:1px solid var(--line);border-radius:999px;min-height:36px;padding:0 12px}
+#voice{margin-left:auto}
+#voice[aria-pressed="false"]{color:var(--muted)}
+main{max-width:720px;margin:0 auto;padding:12px 12px 28px}
+.kicker{margin:0 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm)}
+.lead{margin:0 0 10px;color:var(--muted);line-height:1.4}
+.prompt{margin:0 0 12px;font-size:18px;line-height:1.35}
+.dots{display:flex;gap:5px;margin:0 0 12px}
+.dots i{width:100%;height:4px;border-radius:99px;background:#2a3138}
+.dots i.on{background:var(--cool)}
+.dots i.bad{background:var(--bad)}
+.film{position:relative;margin:0 0 12px;background:#000;border-radius:14px;overflow:hidden;border:1px solid var(--line);touch-action:manipulation}
+.film img{width:100%;height:auto;display:block}
+.film svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.cap{margin:-4px 0 12px;color:var(--muted);font-size:12px;line-height:1.35}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opts button,.next{text-align:left;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;min-height:48px;line-height:1.35}
+.opts button.ok{border-color:var(--good)}
+.opts button.no{border-color:var(--bad);color:var(--muted)}
+.opts button:disabled{cursor:default}
+.next{width:100%;text-align:center;font-weight:700;border-color:var(--cool);margin-top:10px}
+.teach{background:#141a16;border:1px solid rgba(143,208,168,.4);border-radius:12px;padding:12px;line-height:1.45}
+.teach.miss{background:#241818;border-color:rgba(231,163,163,.45)}
+.foot{margin:16px 0 0;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <button type="button" id="back">Back</button>
+  <h1>Probe Bay</h1>
+  <button type="button" id="voice" aria-pressed="true">Voice on</button>
+</header>
+<main id="app"></main>
+<script>
+const R = function(cx,cy,rx,ry){ return {cx:cx,cy:cy,rx:rx,ry:ry}; };
+function choice(prompt, lead, options, teach){ return {kind:"choice", prompt:prompt, lead:lead, options:options, teach:teach}; }
+function mark(prompt, lead, src, alt, cap, regions, teach){ return {kind:"mark", prompt:prompt, lead:lead, src:src, alt:alt, cap:cap, regions:regions, teach:teach}; }
+const CASES = [
+  {id:"effusion", title:"Pleural effusion", discuss:"A basal opacity on a radiograph is not a diagnosis. A meniscus makes fluid likely and still does not prove it. The probe does: anechoic fluid, a diaphragm, and a spine sign. Consolidation is tissue with air bronchograms. Tap under ultrasound, above the diaphragm. An exudate with pH 7.34, glucose 88, and no organisms is not a drain tonight.",
+    steps:[
+      choice("He is breathless and febrile, with a dull right base. What is the first move?", "58-year-old man. Four days of fever and right chest pain. Oxygen saturation 91% on air. Blood pressure is normal.", [
+        {t:"Oxygen, and a chest radiograph now.", ok:true},
+        {t:"A blind diagnostic tap of the dull base.", ok:false},
+        {t:"Intravenous furosemide for presumed edema.", ok:false},
+        {t:"A CT before any bedside test.", ok:false}
+      ], "Oxygen and a radiograph come first. A needle without an image, a diuretic, and a trip to CT are not the opening move."),
+      mark("Mark the abnormal hemithorax.", "The marker places the patient's right on the viewer's left. One base is white.", "sim/rad/effusion.jpg", "Frontal chest radiograph with a white right base", "Frontal chest radiograph.", [R(0.30,0.64,0.18,0.16)], "The white base is the patient's right. The left lung, over the gastric bubble, is aerated."),
+      choice("What is the finding?", "The engine is asking for the finding, not a guess you cannot defend.", [
+        {t:"A right basal opacity. This film cannot prove fluid against consolidation.", ok:true},
+        {t:"Definite pleural effusion. No further image is needed.", ok:false},
+        {t:"Definite consolidation. Start antibiotics and do not image again.", ok:false},
+        {t:"Pneumothorax.", ok:false}
+      ], "A meniscus suggests fluid. Consolidation can still hide in a white base. A radiograph does not settle it. CT can, and so can ultrasound. Ultrasound is the next move."),
+      choice("Which study now?", "He is hypoxic. He does not need to leave the bay for the answer.", [
+        {t:"Ultrasound of the right base.", ok:true},
+        {t:"CT chest before any ultrasound.", ok:false},
+        {t:"Both a CT and a drain, before looking with the probe.", ok:false},
+        {t:"No further imaging. Tap where it is dull.", ok:false}
+      ], "CT separates fluid from consolidation. It is not required before a bedside ultrasound, and it moves a hypoxic patient. A blind tap is not a plan."),
+      mark("The probe is on. Mark the pleural fluid.", "Right base, coronal view.", "pocus/effusion.jpg", "Ultrasound of a pleural effusion", "Ultrasound, right base.", [R(0.64,0.38,0.15,0.11)], "The black collection above the diaphragm is fluid. The bright dots below it are the spine, seen through fluid. That is the spine sign."),
+      choice("What does the ultrasound show?", "Name the pattern.", [
+        {t:"Pleural effusion. Anechoic fluid, diaphragm, and a spine sign.", ok:true},
+        {t:"Consolidation. Those bright dots are air bronchograms.", ok:false},
+        {t:"Pneumothorax. The black area is free air.", ok:false},
+        {t:"Normal aerated lung.", ok:false}
+      ], "Fluid is black and sits above the diaphragm. Consolidation looks like liver, with branching air. Both can show a spine. The texture separates them."),
+      choice("What is the procedure?", "You have proved there is fluid.", [
+        {t:"Ultrasound-guided diagnostic tap.", ok:true},
+        {t:"A large-bore chest drain now, before the fluid is known.", ok:false},
+        {t:"A blind tap at the dullest point.", ok:false},
+        {t:"Diuretic only. Do not sample the fluid.", ok:false}
+      ], "Sample it under direct vision. A drain waits for pus, a low pH, a low glucose, or a trapped lung. A blind needle is how the liver and the spleen get punctured."),
+      choice("Where does the needle go?", "The diaphragm is on the screen.", [
+        {t:"One space above the diaphragm, in real time, not through it.", ok:true},
+        {t:"Through the diaphragm, because that is where the fluid is deepest.", ok:false},
+        {t:"The second intercostal space, mid-clavicular line.", ok:false},
+        {t:"Wherever the chest is dull, with the probe set aside.", ok:false}
+      ], "Stay above the diaphragm. The mid-clavicular second space is a decompression site, not a tap site. Take the probe off the skin only after the needle is in the pocket you chose."),
+      choice("The fluid is back. Protein 4.1 g/dL with serum 6.2. LDH 380 with serum 240. pH 7.34. Glucose 88 mg/dL. Gram stain shows no organisms. What is it?", "Light's criteria, then the decision to drain.", [
+        {t:"An exudate, and not a drain tonight.", ok:true},
+        {t:"A transudate. Give a diuretic and pull the catheter.", ok:false},
+        {t:"Empyema. Place a large drain now.", ok:false},
+        {t:"The numbers are not interpretable without a CT.", ok:false}
+      ], "Protein ratio 0.66 and LDH ratio well above 0.6 make an exudate. pH above 7.20, glucose above 60, and a negative gram stain are not an empyema. Antibiotics for the pneumonia. No drain tonight."),
+      choice("What is the plan for the night?", "He is on oxygen and the tap is done.", [
+        {t:"Antibiotics, and repeat the ultrasound if his oxygen falls.", ok:true},
+        {t:"A chest drain because every exudate is drained.", ok:false},
+        {t:"Stop the antibiotics. The gram stain was negative.", ok:false},
+        {t:"A CT tonight, before he is allowed to sleep.", ok:false}
+      ], "A negative gram stain does not clear an early pneumonia. Drain if he becomes complicated: pus, pH under 7.20, glucose under 60, or a loculation that will not let the lung expand. CT is for that problem, not for tonight.")
+    ]},
+  {id:"consol", title:"Consolidation", discuss:"The same white base can be fluid or lung. Ultrasound of consolidation is tissue-like lung with air bronchograms, not a black pocket. There is nothing to tap. Treat the pneumonia. Add a CT if he is not improving, or if you suspect an abscess or an empyema. Do not reach for NIV as the default ventilator for a focal pneumonia.",
+    steps:[
+      choice("Fever, a cough, and right-sided crackles. Saturation 93% on air. First move?", "44-year-old woman. Three days of fever. Blood pressure 124/72, respiratory rate 22.", [
+        {t:"Oxygen, cultures, and a chest radiograph.", ok:true},
+        {t:"A chest drain for a presumed effusion.", ok:false},
+        {t:"Furosemide for presumed edema.", ok:false},
+        {t:"Immediate intubation.", ok:false}
+      ], "She is speaking and her blood pressure is normal. Oxygen, cultures, and a film. Not a drain, a diuretic, or a tube."),
+      mark("Mark the abnormal lung.", "Frontal film. In the standard display the patient's right is on the viewer's left, which matches the crackles.", "xrays/pneumonia.jpg", "Frontal chest radiograph with a right-sided opacity", "Frontal chest radiograph.", [R(0.34,0.60,0.16,0.15)], "The opacity is in the right mid and lower zone. The other lung is comparatively clear."),
+      choice("What is the finding?", "Do not outrun the film.", [
+        {t:"A right-sided opacity. The film cannot prove consolidation against fluid.", ok:true},
+        {t:"Definite consolidation. Ultrasound would add nothing.", ok:false},
+        {t:"A pneumothorax on the right.", ok:false},
+        {t:"Pulmonary edema.", ok:false}
+      ], "One opaque zone is not a diagnosis. Edema is usually bilateral. A pneumothorax is a black rim with a pleural line, not a white base."),
+      choice("Next study?", "You need to know whether there is a pocket to tap.", [
+        {t:"Ultrasound of the right base.", ok:true},
+        {t:"A diagnostic tap of the opaque zone.", ok:false},
+        {t:"CT before ultrasound.", ok:false},
+        {t:"No image. Start a carbapenem.", ok:false}
+      ], "Ultrasound answers the question at the bed. A tap into consolidated lung is a dry, dangerous tap. A carbapenem is not first-line community pneumonia."),
+      mark("Mark what makes this consolidation.", "The probe is on the right base.", "pocus/consol.jpg", "Ultrasound of consolidated lung with air bronchograms", "Ultrasound, right base.", [R(0.52,0.50,0.24,0.20)], "Branching bright air inside tissue-like lung. That is an air bronchogram, not a rib and not a vessel."),
+      choice("What is the ultrasound diagnosis?", "Compare it with the effusion you have already seen.", [
+        {t:"Consolidation. Tissue-like lung with air bronchograms. No drainable pocket.", ok:true},
+        {t:"Pleural effusion. The bright lines are the spine.", ok:false},
+        {t:"Pneumothorax, because the image is bright.", ok:false},
+        {t:"Normal A-lines.", ok:false}
+      ], "Effusion is black and sits on the diaphragm. This lung looks like liver, with air inside it. A spine sign can occur in both. Do not tap tissue."),
+      choice("Treatment of the infection?", "Ward patient. No shock. No MRSA risk that you know of.", [
+        {t:"Ceftriaxone plus azithromycin.", ok:true},
+        {t:"Meropenem plus vancomycin, as the opening pair.", ok:false},
+        {t:"Metronidazole alone.", ok:false},
+        {t:"A chest drain, then decide on antibiotics.", ok:false}
+      ], "Community pneumonia without shock is a beta-lactam plus a macrolide, or a respiratory fluoroquinolone. Meropenem and vancomycin are not the opening pair. There is no pocket to drain."),
+      choice("An hour later she is tiring. Rate 32, saturation 90% on a face mask, still protecting her airway. What changes?", "Blood pressure remains normal.", [
+        {t:"High-flow oxygen and a senior review. Not NIV as the default.", ok:true},
+        {t:"Non-invasive ventilation, because all hypoxic pneumonia is treated that way.", ok:false},
+        {t:"Immediate intubation, because the rate is 32.", ok:false},
+        {t:"A fluid bolus of one litre.", ok:false}
+      ], "High-flow oxygen is a fair next step when she is protecting the airway. NIV is not the default for focal pneumonia. Intubate if she tires, not because of a single number. A litre of fluid is not oxygen."),
+      choice("When do you add a CT?", "She has a diagnosis.", [
+        {t:"If she is not improving, or you suspect an abscess or an empyema.", ok:true},
+        {t:"Tonight, before the first dose of antibiotic.", ok:false},
+        {t:"Only if the ultrasound had shown fluid.", ok:false},
+        {t:"Never. A radiograph is the last anatomical test.", ok:false}
+      ], "CT separates a persistent consolidation from an abscess, a loculated effusion, or another diagnosis. It is not a ticket to the first dose."),
+      choice("The gram stain of sputum shows gram-positive diplococci and she is improving on day two. What do you do?", "Blood cultures are not back.", [
+        {t:"Continue the pneumonia plan. Do not escalate to a carbapenem.", ok:true},
+        {t:"Change to meropenem because a gram stain is not a culture.", ok:false},
+        {t:"Stop antibiotics. A diplococcus is a contaminant.", ok:false},
+        {t:"Add a chest drain in case of a hidden effusion.", ok:false}
+      ], "Improvement on the right drugs is the result. Narrow when the culture allows. Do not escalate because the stain is not a printed name, and do not drain a lung that had no fluid.")
+    ]},
+  {id:"ptx", title:"Pneumothorax", discuss:"A radiograph can show a pneumothorax. It cannot be trusted to exclude a small one. Ultrasound looks for lung sliding, a seashore on M-mode, and a lung point. A barcode, the stratosphere sign, means the lung is not sliding. A breathless patient gets a drain in the safe triangle, not a needle in the second space. Needle or finger decompression is for shock.",
+    steps:[
+      choice("Sudden breathlessness. The left chest is quiet. Saturation 90%. Blood pressure 128/76. First move?", "26-year-old man. No trauma. Trachea is midline.", [
+        {t:"Oxygen and a chest radiograph. He is not in shock.", ok:true},
+        {t:"Finger thoracostomy now, before any look.", ok:false},
+        {t:"A litre of fluid for the low saturation.", ok:false},
+        {t:"Antibiotics for a presumed pneumonia.", ok:false}
+      ], "No shock and a midline trachea. Look, and give oxygen. Finger decompression is for tension physiology, not for every quiet chest."),
+      mark("Mark the pneumothorax.", "Frontal film. The gastric bubble sits under the lucent hemithorax. That side is the patient's left.", "xrays/ptx.jpg", "Frontal chest radiograph with a left pneumothorax", "Frontal chest radiograph.", [R(0.82,0.36,0.12,0.18), R(0.70,0.34,0.08,0.16)], "No lung markings in the periphery, and a visceral pleural line. The other lung is marked out to the chest wall."),
+      choice("What is the finding on this radiograph?", "This question is not the same as the white-base question.", [
+        {t:"Left pneumothorax. This film can show it.", ok:true},
+        {t:"The film cannot tell air from consolidation, so do not name it.", ok:false},
+        {t:"A left pleural effusion.", ok:false},
+        {t:"Pulmonary edema.", ok:false}
+      ], "A pleural line with absent markings is air. A white base is the problem that ultrasound must settle. This film is allowed to say pneumothorax. Ultrasound is still better at a small one, and it finds the lung point."),
+      choice("Do you add the probe?", "He is still breathless.", [
+        {t:"Yes. Confirm absent sliding, and look for a lung point.", ok:true},
+        {t:"No. A radiograph that shows air needs no second test, ever.", ok:false},
+        {t:"No. Go straight to a needle in the second intercostal space.", ok:false},
+        {t:"Only if he becomes hypotensive.", ok:false}
+      ], "The probe confirms the side and can show the lung point, which sizes the air. A needle is not the drain, and it is not the next move while the blood pressure holds."),
+      mark("M-mode is on. Mark the sign that says the lung is not sliding.", "Left anterior chest.", "pocus/barcode.jpg", "M-mode barcode sign", "M-mode, left anterior chest.", [R(0.50,0.64,0.40,0.22)], "Horizontal lines above and below the pleural line. That is the barcode, or stratosphere, sign. A seashore would be sandy movement under the line."),
+      choice("Name the ultrasound finding.", "You marked the pattern under the pleural line.", [
+        {t:"Absent lung sliding. Barcode sign. Pneumothorax until sliding is shown.", ok:true},
+        {t:"Seashore sign. The lung is sliding normally.", ok:false},
+        {t:"B-lines of pulmonary edema.", ok:false},
+        {t:"A pleural effusion, because the image is dark.", ok:false}
+      ], "No sliding, and a barcode. B-lines are vertical and erase A-lines. Effusion is a black collection over the diaphragm, not an M-mode pattern of the pleural line."),
+      choice("He is breathless and the air is large. Blood pressure is still normal. What do you place?", "Primary or secondary, a breathless patient is not an observe-only patient.", [
+        {t:"A chest drain.", ok:true},
+        {t:"Needle decompression in the second intercostal space, and stop there.", ok:false},
+        {t:"Observation on oxygen. The size does not matter if he can speak.", ok:false},
+        {t:"Antibiotics and no tube.", ok:false}
+      ], "Breathless pneumothorax is drained. Observation is for a small primary pneumothorax in a patient who is not breathless. A needle is for shock. It is not the definitive tube."),
+      choice("Where does the drain go?", "Pick the site, not the landmark you use for a crashing patient.", [
+        {t:"Safe triangle. Fourth or fifth space, mid-axillary line, just above the rib.", ok:true},
+        {t:"Second intercostal space, mid-clavicular line, and leave a drain there.", ok:false},
+        {t:"Through the back, under the scapula.", ok:false},
+        {t:"Wherever the ultrasound barcode was, including the mid-clavicular line.", ok:false}
+      ], "The safe triangle is the drain site. The second space is a decompression landmark in a crisis, not the place you leave a drain. Stay above the rib, and above the diaphragm."),
+      choice("The bottle is swinging and bubbling. What next?", "Do not walk away from a new drain.", [
+        {t:"Do not clamp a bubbling drain. Recheck with a film or with lung sliding.", ok:true},
+        {t:"Clamp it so the bottle can be emptied.", ok:false},
+        {t:"Pull it out once bubbling starts. That means the lung is up.", ok:false},
+        {t:"Add suction of 40 cm of water immediately.", ok:false}
+      ], "Bubbling means the air has a path. Clamping that path can recreate the tension. Confirm the lung with a film or with the return of sliding. Suction is a later decision, not a reflex at 40."),
+      choice("Suppose the trachea had shifted and the blood pressure had fallen before the drain. What would the first move have been?", "This is the fork you did not take.", [
+        {t:"Finger or needle decompression, then a drain.", ok:true},
+        {t:"A radiograph first, even in shock.", ok:false},
+        {t:"A fluid bolus, then the film.", ok:false},
+        {t:"Ultrasound of the other lung first.", ok:false}
+      ], "Shock and a deviated trachea are tension until proved otherwise. Decompress, then place the drain. The film is for the patient whose blood pressure is holding, which was this case.")
+    ]},
+  {id:"edema", title:"Pulmonary edema", discuss:"Bilateral opacity plus a cardiac history is edema until the probe says otherwise. Diffuse B-lines with a sliding pleural line fit interstitial fluid. A unilateral patch of B-lines is pneumonia or contusion, not a reason for a large diuretic. Hypertensive edema gets a nitrate, a loop diuretic, and NIV if he is tiring. Morphine is not a routine drug.",
+    steps:[
+      choice("He cannot lie flat. Blood pressure 190/110. Saturation 86%. Frothy sputum. Known heart failure. First move?", "68-year-old man. He is sitting up and speaking.", [
+        {t:"Sit him up. High-flow oxygen. Do not give a fluid bolus.", ok:true},
+        {t:"A litre of saline, because hypoxia injures the kidney.", ok:false},
+        {t:"Antibiotics before any other treatment.", ok:false},
+        {t:"A chest drain for a presumed effusion.", ok:false}
+      ], "This is edema until proved otherwise. Upright, oxygen, and no fluid. The film and the probe come with the treatment, not instead of it."),
+      mark("Mark the abnormal lung.", "Frontal film. Both sides are involved.", "xrays/edema.jpg", "Frontal chest radiograph with bilateral perihilar opacity", "Frontal chest radiograph.", [R(0.32,0.50,0.16,0.18), R(0.70,0.50,0.16,0.18)], "Perihilar and basal opacity on both sides, with a large cardiac silhouette. The apices are relatively spared."),
+      choice("What is the finding?", "The history is hypertensive pulmonary edema. The film has a differential.", [
+        {t:"Bilateral edema pattern. ARDS can look the same. The story decides a lot.", ok:true},
+        {t:"A pneumothorax, because the bases are white.", ok:false},
+        {t:"A right effusion only.", ok:false},
+        {t:"Normal lungs. The film is under-penetrated and nothing else.", ok:false}
+      ], "Bat-wing opacity is edema or diffuse alveolar damage. It is not a pneumothorax. ARDS is the mimic. The sudden hypertension and the known heart failure point to the heart."),
+      choice("What does the probe add?", "You already started oxygen.", [
+        {t:"Look for bilateral B-lines, and confirm the pleural line still slides.", ok:true},
+        {t:"Nothing. A radiograph this obvious ends the imaging.", ok:false},
+        {t:"A diagnostic pleural tap on both sides.", ok:false},
+        {t:"Compression ultrasound of the leg, as the only next test.", ok:false}
+      ], "Bilateral B-lines support interstitial fluid. Sliding excludes the pneumothorax you might have worried about on a rushed film. A tap is not the treatment of edema."),
+      mark("Mark a B-line.", "One anterior window. The same pattern is present on the other side.", "pocus/blines.jpg", "Lung ultrasound with B-lines", "Lung ultrasound.", [R(0.55,0.55,0.30,0.24)], "The vertical lines start at the pleural line and reach the bottom of the sector. They erase the A-lines. One or two can be normal. A screen full of them is not."),
+      choice("Name the ultrasound pattern.", "Both chests look like this.", [
+        {t:"Diffuse B-lines. Interstitial syndrome, fitting edema.", ok:true},
+        {t:"Barcode sign. Bilateral pneumothoraces.", ok:false},
+        {t:"Consolidation with air bronchograms.", ok:false},
+        {t:"A pleural effusion, and nothing in the lung.", ok:false}
+      ], "Vertical, laser-like, moving with the pleural line: B-lines. A barcode is horizontal and means no sliding. Consolidation is tissue. Effusion is a black pool over the diaphragm, which you should still look for, but it is not this image."),
+      choice("Blood pressure is still 188/104 and he is tiring on high-flow oxygen. What do you add?", "He protects his airway. There is no chest pain of infarction on the monitor.", [
+        {t:"A nitrate infusion, a loop diuretic, and NIV.", ok:true},
+        {t:"Morphine as the main drug, and no NIV.", ok:false},
+        {t:"A beta blocker to bring the pressure down over a day.", ok:false},
+        {t:"More fluid, slowly.", ok:false}
+      ], "Nitrate if the pressure is high, a loop diuretic, and NIV when he is tiring and can cooperate. Morphine is not routine. An oral beta blocker is the wrong speed. More fluid is the wrong direction."),
+      choice("He passes 1.2 litres and the B-lines thin. The creatinine has risen from 1.1 to 1.4. What now?", "Blood pressure is 140/80. He is less breathless.", [
+        {t:"Do not give a fluid bolus to chase the creatinine.", ok:true},
+        {t:"A litre of saline, because the creatinine rose.", ok:false},
+        {t:"Stop the diuretic and start a vasopressor.", ok:false},
+        {t:"A pleural drain, because some B-lines remain.", ok:false}
+      ], "A small rise in creatinine during a diuresis of frank edema is not an order for saline. He is perfusing. Remaining B-lines are not a pleural effusion."),
+      choice("A different patient has B-lines in one zone only, with a fever. What is that?", "Use the pattern, not the reflex.", [
+        {t:"Think focal pneumonia or contusion, not a large diuretic.", ok:true},
+        {t:"The same nitrate and diuretic plan.", ok:false},
+        {t:"Bilateral chest drains.", ok:false},
+        {t:"It is always cardiogenic if any B-line exists.", ok:false}
+      ], "Focal B-lines are local lung water or inflammation. Diffuse bilateral B-lines with a smooth sliding pleural line and a cardiac history are edema."),
+      choice("He settles. What do you not do tonight?", "The crisis is over.", [
+        {t:"A large fluid bolus, and morphine as a standing order.", ok:true},
+        {t:"Continue oxygen and reassess the diuretic in the morning.", ok:false},
+        {t:"Check the electrocardiogram and the troponin.", ok:false},
+        {t:"Sit him up to sleep.", ok:false}
+      ], "Look for the infarction that triggered this. Keep him upright, keep the oxygen, and review the diuretic. Do not put the fluid back, and do not leave morphine running.")
+    ]},
+  {id:"abscess", title:"Liver abscess", discuss:"A septic patient with a thick-walled low-density lesion in the liver has an abscess until the aspirate says otherwise. Pyogenic disease needs gram-negative and anaerobic cover, and a percutaneous drain once the cavity is large. Metronidazole alone is the amebic plan, followed by a luminal agent. Open surgery is for rupture, a failed drain, or a blocked duct. Ultrasound still guides the needle.",
+    steps:[
+      choice("Eight days of fever and right-upper-quadrant pain. Tender liver. He is not in shock. First move?", "52-year-old man. White cells 18. No travel, no dysentery.", [
+        {t:"Blood cultures, fluid if he needs it, and the scan that is already done. Not the operating room tonight.", ok:true},
+        {t:"Straight to open surgery.", ok:false},
+        {t:"Metronidazole alone, and no cultures.", ok:false},
+        {t:"A diagnostic peritoneal tap as the only test.", ok:false}
+      ], "Resuscitate and culture. The lesion is in the liver, not free in the peritoneum. Open surgery is not the opening move."),
+      mark("Mark the abscess. Ignore the small arrow at the top of the film.", "Axial CT. The patient's right is on the viewer's left.", "liver/scans/abscess.jpg", "Axial CT with a large low-density lesion in the right lobe of the liver", "Axial CT of the liver.", [R(0.30,0.48,0.17,0.20)], "The large low-density lesion is in the right lobe. The bright circles are contrast in vessels, not the abscess. The spleen is on the other side."),
+      choice("What is the lesion?", "He is febrile. The wall is thick.", [
+        {t:"Liver abscess, until the aspirate says otherwise.", ok:true},
+        {t:"A simple cyst. No antibiotics.", ok:false},
+        {t:"Hepatocellular carcinoma, and no infection work-up.", ok:false},
+        {t:"Normal liver. The darkness is a windowing artifact.", ok:false}
+      ], "A simple cyst is not this septic, and its wall is thin. A tumour is on the list later. Tonight this is an abscess."),
+      choice("Which antibiotics, before the culture?", "No amebic exposure in the history.", [
+        {t:"Ceftriaxone plus metronidazole, or piperacillin-tazobactam.", ok:true},
+        {t:"Metronidazole alone.", ok:false},
+        {t:"Vancomycin alone.", ok:false},
+        {t:"No antibiotics until the pus grows.", ok:false}
+      ], "Pyogenic abscess needs gram-negative rods and anaerobes. Metronidazole alone is the amebic drug. Vancomycin does not treat the gram-negative rods. Do not wait for the pus to start."),
+      choice("The cavity fills much of the right lobe, well over 5 cm. What besides antibiotics?", "He is stable enough for a planned procedure.", [
+        {t:"Percutaneous drainage.", ok:true},
+        {t:"Antibiotics alone for six weeks, with no drain at this size.", ok:false},
+        {t:"Open surgery tonight.", ok:false},
+        {t:"Aspiration of 2 mL and stop, whatever the size.", ok:false}
+      ], "A large pyogenic abscess is drained through the skin. Antibiotics alone fit a small one. Open surgery is not first. A tiny aspirate is a sample, not drainage of a cavity this size."),
+      choice("When would metronidazole alone have been the right drug?", "Change the history.", [
+        {t:"An amebic abscess: endemic exposure, and usually no drain unless it threatens to rupture, sits in the left lobe, or fails to improve.", ok:true},
+        {t:"Whenever the lesion is in the liver, whatever the organism.", ok:false},
+        {t:"Only after E. coli has grown.", ok:false},
+        {t:"Never. Metronidazole has no role near the liver.", ok:false}
+      ], "Amebic abscess is a medical disease, then a luminal agent to clear the gut. Metronidazole is also half of pyogenic cover. It is not the whole of it, and it is not useless."),
+      choice("Who guides the drain?", "The CT has made the diagnosis. The needle still needs a path.", [
+        {t:"Ultrasound or CT. Stay out of the pleura and the big vessels.", ok:true},
+        {t:"A blind needle at the point of maximum tenderness.", ok:false},
+        {t:"No image. The CT from this morning is enough to push a needle.", ok:false},
+        {t:"Only an open operation can place a drain.", ok:false}
+      ], "The probe, or a CT, keeps the needle out of the chest and out of the portal vein. Tenderness is not a coordinate."),
+      choice("The pus grows E. coli, sensitive to ceftriaxone. What changes?", "He is improving. The drain is still in.", [
+        {t:"Narrow the antibiotics. Keep them for weeks, and keep the drain until the cavity shrinks.", ok:true},
+        {t:"Stop everything on day three.", ok:false},
+        {t:"Add vancomycin because one drug is never enough.", ok:false},
+        {t:"Take the drain out tonight because a name has been printed.", ok:false}
+      ], "Narrow to the organism. Durations are often four to six weeks, and the drain stays until output falls and the cavity is small. A name on a plate is not the end of the cavity."),
+      choice("The drain stops and the fever returns. Next?", "The tube has been in for four days.", [
+        {t:"Flush the drain and re-image. Look for a blocked tube or an undrained locule.", ok:true},
+        {t:"A broader antibiotic, and do not look at the tube.", ok:false},
+        {t:"Pull the drain out.", ok:false},
+        {t:"Start heparin. Fever means thrombus.", ok:false}
+      ], "A stopped drain is a plumbing problem until you prove otherwise. Image it. Do not answer a blocked tube with a carbapenem."),
+      choice("When do you call a surgeon or an endoscopist?", "Most of these do not go to theatre.", [
+        {t:"Rupture, a failed percutaneous drain, or a blocked duct that needs ERCP.", ok:true},
+        {t:"Every abscess, before the first antibiotic.", ok:false},
+        {t:"Only if the culture is negative.", ok:false},
+        {t:"Never. A liver abscess is never operated.", ok:false}
+      ], "Percutaneous drainage fails sometimes, a left-lobe lesion can threaten the pericardium, and a stone in the duct will refill the abscess. Those are the calls. The rest stay with the drain and the antibiotic.")
+    ]},
+  {id:"ascites", title:"Cirrhosis with ascites", discuss:"New confusion and a tense abdomen in cirrhosis is spontaneous bacterial peritonitis until the fluid says otherwise. Tap despite the INR and the platelets. Left lower quadrant, with the probe. A neutrophil count of 250 or more is the diagnosis. A third-generation cephalosporin starts now. Albumin on day one and day three if the creatinine or the bilirubin is high. Hold the beta blocker. A diuretic is not the treatment of infected ascites.",
+    steps:[
+      choice("Known cirrhosis. A tense abdomen and new confusion. Creatinine 1.6, bilirubin 4.2. First move?", "59-year-old woman. INR 2.1. Platelets 58,000.", [
+        {t:"A diagnostic tap. Do it before any diuretic.", ok:true},
+        {t:"Furosemide and spironolactone, and tap tomorrow if she is no better.", ok:false},
+        {t:"Plasma and platelets first. No tap until the INR is normal.", ok:false},
+        {t:"A beta blocker for the portal pressure, as the only new drug.", ok:false}
+      ], "Confusion plus ascites is infected fluid until you count the neutrophils. The diuretic and the beta blocker can wait. Plasma is not a ticket to a diagnostic tap."),
+      mark("Mark the ascites. Do not mark the liver.", "The still has the word printed on it. Mark the black fluid, not the liver under it.", "liver/scans/ascites.jpg", "Ultrasound labeled ascites above the liver", "Abdominal ultrasound.", [R(0.46,0.28,0.20,0.12)], "The black crescent is free fluid. The gray tissue below it is liver. A normal scan does not have this stripe."),
+      choice("What is the finding?", "You marked the black stripe.", [
+        {t:"Ascites.", ok:true},
+        {t:"A liver abscess.", ok:false},
+        {t:"A pleural effusion.", ok:false},
+        {t:"Hydronephrosis.", ok:false}
+      ], "Free fluid over the liver is ascites. An abscess is inside the liver. A pleural effusion is above the diaphragm. A dilated kidney is a different organ."),
+      choice("INR 2.1 and platelets 58,000. Do you still tap?", "There is no bleeding skin and no fibrinolysis you know of.", [
+        {t:"Yes. Do not transfuse plasma just to do a diagnostic tap.", ok:true},
+        {t:"No tap until the INR is below 1.3.", ok:false},
+        {t:"No tap until the platelets are above 100,000.", ok:false},
+        {t:"Only in an operating room.", ok:false}
+      ], "A diagnostic paracentesis in cirrhosis is done at these numbers. Transfusing to a normal INR adds delay and volume, and it does not make the tap safer in any way you can use tonight."),
+      choice("Where do you put the needle?", "The abdomen is tense. Veins are visible on the skin.", [
+        {t:"Left lower quadrant, ultrasound-guided, away from vessels and the spleen.", ok:true},
+        {t:"A blind tap in the right upper quadrant.", ok:false},
+        {t:"Through a visible abdominal-wall vein, because it marks the midline.", ok:false},
+        {t:"Through the spleen, where the fluid is deepest on this one view.", ok:false}
+      ], "Left lower quadrant is the usual safe pocket. The probe moves you off a vessel and off the spleen. The right upper quadrant risks the liver and a low-lying bowel. A visible vein is not a landmark to enter."),
+      choice("Fluid: albumin 0.6 with serum 2.4. Protein 1.1. Neutrophils 920. Gram stain negative. What is it?", "SAAG is serum albumin minus fluid albumin.", [
+        {t:"Portal-hypertension ascites, and spontaneous bacterial peritonitis.", ok:true},
+        {t:"SAAG under 1.1, so this is not cirrhosis.", ok:false},
+        {t:"Neutrophils are high, but a negative gram stain means you wait.", ok:false},
+        {t:"Malignant ascites, because the protein is low.", ok:false}
+      ], "SAAG 1.8 is portal hypertension. Neutrophils of 250 or more are spontaneous bacterial peritonitis. A negative gram stain changes nothing. Low protein fits cirrhosis. It does not name a tumour."),
+      choice("Which antibiotic now?", "She has no penicillin anaphylaxis.", [
+        {t:"Cefotaxime or ceftriaxone.", ok:true},
+        {t:"Vancomycin, because ascites is a gram-positive disease.", ok:false},
+        {t:"Wait for the culture.", ok:false},
+        {t:"Metronidazole alone.", ok:false}
+      ], "A third-generation cephalosporin covers the gram-negative rods that cause this. Start it now. Vancomycin does not. Waiting for the bottle is how the infection is missed for a day."),
+      choice("Does she get albumin?", "Creatinine 1.6. Bilirubin 4.2.", [
+        {t:"Yes. 1.5 g/kg today and 1 g/kg on day 3.", ok:true},
+        {t:"No. Albumin is only for a large-volume tap.", ok:false},
+        {t:"One dose of any size, and never again.", ok:false},
+        {t:"Albumin instead of the antibiotic.", ok:false}
+      ], "This is the patient from the albumin trial: creatinine over 1, or bilirubin over 4. Day one is 1.5 g/kg. Day three is 1 g/kg. It is added to the antibiotic, not swapped for it."),
+      choice("She is dyspneic from the tense abdomen. What else tonight?", "The diagnostic sample is already taken.", [
+        {t:"A large-volume tap is reasonable, with albumin, and hold the beta blocker. No big diuretic tonight.", ok:true},
+        {t:"A large dose of furosemide, and no further tap.", ok:false},
+        {t:"Start a beta blocker for the first time tonight.", ok:false},
+        {t:"A chest drain for presumed hepatic hydrothorax, without looking.", ok:false}
+      ], "If the abdomen itself is the reason she cannot breathe, take the fluid off and give albumin, about 6 to 8 g for each litre when the volume is large. Hold the beta blocker in spontaneous bacterial peritonitis. A diuretic is not the treatment of infected, tense ascites. A chest drain for hepatic hydrothorax is a last resort, not a guess."),
+      choice("A different sample comes back with neutrophils of 80 and the same high SAAG. What changes?", "She is comfortable and awake in this version.", [
+        {t:"No antibiotic. Salt restriction and a diuretic, not a cephalosporin.", ok:true},
+        {t:"The same antibiotic. Every cirrhotic abdomen is treated.", ok:false},
+        {t:"A chest drain.", ok:false},
+        {t:"Stop the diuretic forever.", ok:false}
+      ], "Under 250 neutrophils, with a high SAAG and no other infection, is ordinary ascites. Salt, and a diuretic when she is stable. The cephalosporin was for the count of 920.")
+    ]},
+  {id:"bladder", title:"Bladder outlet obstruction", discuss:"No urine from a catheter is a blocked or misplaced catheter until the bladder is seen empty. A full anechoic bladder with the balloon inside it means the tube is in the right place and is not draining. Replace it or flush it. The creatinine falls after the litre comes out. Replace only part of a post-obstructive diuresis if the blood pressure holds. Hydronephrosis does not need a nephrostomy tonight when the bladder was the blockage and it is now empty.",
+    steps:[
+      choice("Day two after a hip repair. The catheter has produced nothing for six hours. Creatinine 2.8, from 1.1. The bladder is palpable. First move?", "72-year-old man. Blood pressure is normal. No fever.", [
+        {t:"Ultrasound the bladder. Do not start dialysis and do not pour in fluid.", ok:true},
+        {t:"Dialysis. The creatinine is 2.8.", ok:false},
+        {t:"A litre of saline, because the kidney is dry.", ok:false},
+        {t:"Antibiotics for a urinary infection, with no image.", ok:false}
+      ], "A palpable bladder and a silent catheter is obstruction until you look. Dialysis is not the treatment of a blocked tube. Fluid into a full bladder does not create urine."),
+      mark("Mark the bladder.", "Suprapubic view.", "pocus/bladder.jpg", "Ultrasound of a distended bladder with a catheter balloon", "Bladder ultrasound.", [R(0.50,0.48,0.24,0.16)], "The large black cavity is the bladder. The bright ring inside it is the catheter balloon."),
+      choice("The bladder is still this full, and the balloon is inside it. What does that mean?", "The catheter was placed yesterday and has stopped.", [
+        {t:"The catheter is in the bladder and it is blocked, or it is sitting badly.", ok:true},
+        {t:"The bladder is empty. The black area is bowel gas.", ok:false},
+        {t:"The balloon is in the urethra. That is why the bladder is full.", ok:false},
+        {t:"This is a normal post-void residual.", ok:false}
+      ], "A balloon inside a distended bladder means the tip is in the right organ and the lumen is not draining. An empty bladder is not a black lake. A balloon sitting in the urethra would not be floating in the middle of that lake."),
+      choice("What do you do to the catheter?", "You have proved the bladder is full.", [
+        {t:"Flush it, and replace it if it will not drain.", ok:true},
+        {t:"Start antibiotics and leave the tube alone.", ok:false},
+        {t:"Pull it out and do not replace it.", ok:false},
+        {t:"Book dialysis for this evening.", ok:false}
+      ], "Clear the blockage or change the tube. Antibiotics treat infection, which he has not shown. Taking the only drain out, and not replacing it, leaves the obstruction. Dialysis is not a catheter."),
+      choice("1.4 litres drains. Blood pressure stays normal. What do you watch?", "The relief can be brisk.", [
+        {t:"Post-obstructive diuresis. Do not replace every millilitre. Watch sodium and potassium.", ok:true},
+        {t:"Replace every millilitre with saline, for the next day.", ok:false},
+        {t:"Nothing. The problem ended when the bag filled.", ok:false},
+        {t:"A nephrostomy tonight, because the volume was large.", ok:false}
+      ], "After relief the kidney can pour out dilute urine. If he is perfusing, replace a fraction, not the whole volume, and check the electrolytes. A nephrostomy is for a blockage above a bladder you cannot drain."),
+      mark("The bladder is empty now. The kidney still looks like this. Mark the dilated collecting system.", "Right kidney, longitudinal.", "pocus/hydro.jpg", "Ultrasound of a hydronephrotic kidney", "Renal ultrasound.", [R(0.50,0.48,0.20,0.18), R(0.42,0.26,0.12,0.08)], "The black branches connect. That is a dilated pelvis and calyces, not a cluster of cysts."),
+      choice("Does this kidney need a nephrostomy tonight?", "The bladder has just been emptied. The creatinine has not yet been repeated.", [
+        {t:"No. Hydronephrosis from a blocked outlet can linger. Recheck the creatinine.", ok:true},
+        {t:"Yes. Any hydronephrosis is a nephrostomy.", ok:false},
+        {t:"Yes, because the image is dramatic.", ok:false},
+        {t:"Only if you also start dialysis.", ok:false}
+      ], "Decompress the bladder, then give the kidney a few hours. A nephrostomy is for obstruction you cannot relieve from below, or a kidney that is infected and blocked."),
+      choice("The urine is pink after relief. He has no clots and the new catheter is draining. What is it?", "The bag is filling.", [
+        {t:"Common after emptying a very full bladder. Watch it. Call urology if clots block the tube.", ok:true},
+        {t:"A reason to remove the catheter immediately.", ok:false},
+        {t:"Proof of a coagulopathy. Transfuse plasma.", ok:false},
+        {t:"A reason to start dialysis.", ok:false}
+      ], "A little blood after decompression is common. Clot retention is the emergency, and it is a urology problem: flush, and a bigger catheter. Plasma and dialysis do not unblock clot."),
+      choice("Who else needs to know, and when?", "The new catheter is draining clear urine.", [
+        {t:"Urology if you cannot pass a catheter, if clots block it, or if the creatinine does not fall.", ok:true},
+        {t:"Urology before anyone flushes a blocked catheter.", ok:false},
+        {t:"Nephrology first, for dialysis, before the bladder is emptied.", ok:false},
+        {t:"Nobody, if the creatinine was ever above 2.", ok:false}
+      ], "You can flush and replace a catheter. Call urology when you cannot, when clot keeps blocking it, or when the kidney does not recover. Nephrology is not the first call for a full bladder."),
+      choice("A different image shows a collapsed bladder and no balloon, and the catheter is dry. What was wrong?", "Change the picture.", [
+        {t:"The catheter was never in the bladder.", ok:true},
+        {t:"The same blocked-but-intrabbladder problem as tonight.", ok:false},
+        {t:"Bilateral renal infarction.", ok:false},
+        {t:"Nothing. A dry catheter and an empty bladder is success.", ok:false}
+      ], "Tonight the balloon was inside a full bladder, so the tube was in and blocked. An empty bladder with no balloon, and a dry tube, means the catheter is in the wrong place. Put it in the bladder.")
+    ]},
+  {id:"dvt", title:"Lower-limb deep-vein thrombosis", discuss:"A swollen leg in hospital is a compression ultrasound, not a D-dimer. The artery is round and black. The vein should flatten. A vein that stays open and is filled with echo is thrombus. Look at the groin and behind the knee. A stable proximal clot gets a treatment dose, not a filter and not a lytic drug. A vein that flattens is not a clot.",
+    steps:[
+      choice("Day six in hospital. The left leg is newly swollen. No bleeding. What do you arrange?", "61-year-old woman. Creatinine clearance about 50. She is comfortable.", [
+        {t:"Compression ultrasound of the common femoral and popliteal veins.", ok:true},
+        {t:"A D-dimer. If it is negative, stop.", ok:false},
+        {t:"A week of observation, then a scan if it is still swollen.", ok:false},
+        {t:"An IVC filter as the first order.", ok:false}
+      ], "In hospital, after days in bed, a D-dimer does not clear the leg. Scan the proximal veins. A filter is for a clot you are not allowed to anticoagulate."),
+      mark("Groin view, with compression. Mark the vein that contains thrombus. Do not mark the empty artery.", "Left groin.", "pocus/dvt.jpg", "Compression ultrasound of the groin with a thrombosed vein", "Left groin ultrasound.", [R(0.63,0.47,0.10,0.12)], "The right-hand lumen is filled and did not collapse. The left-hand lumen is black and is the artery."),
+      choice("Name the groin finding.", "You marked one of the two lumens.", [
+        {t:"Thrombus in the common femoral vein. The artery beside it is empty.", ok:true},
+        {t:"Thrombus in the artery. The black lumen is the vein.", ok:false},
+        {t:"A normal pair of vessels.", ok:false},
+        {t:"A lymph node.", ok:false}
+      ], "The vein is the one that should collapse, and it has not. It is filled with echo. The artery stays round and black. A lymph node is not a pair of vessels."),
+      mark("Now behind the knee. Mark the popliteal vein thrombus.", "Left popliteal fossa.", "pocus/popclot.jpg", "Popliteal ultrasound with a thrombosed vein", "Left popliteal ultrasound.", [R(0.57,0.55,0.09,0.10)], "Again the filled lumen is the vein. The black round lumen beside it is the artery."),
+      choice("What does the second view add?", "The groin was already abnormal.", [
+        {t:"The popliteal vein is thrombosed too. This is a proximal deep-vein thrombosis.", ok:true},
+        {t:"The popliteal vein is normal, so the groin clot does not count.", ok:false},
+        {t:"This is an arterial occlusion.", ok:false},
+        {t:"A calf clot only, so it is not treated.", ok:false}
+      ], "Common femoral and popliteal thrombus is proximal deep-vein thrombosis. One abnormal level is already enough to treat. The artery being open does not make the vein normal."),
+      choice("She is not bleeding and the leg is not threatened. Treatment?", "Clearance is about 50.", [
+        {t:"A treatment dose of anticoagulation.", ok:true},
+        {t:"A prophylactic dose, because she is in hospital.", ok:false},
+        {t:"Catheter thrombolysis tonight.", ok:false},
+        {t:"An IVC filter, and no anticoagulant.", ok:false}
+      ], "A stable proximal clot gets a treatment dose. Prophylaxis is what she should have had before the clot. Thrombolysis is for a threatened limb. A filter is for when anticoagulation is forbidden."),
+      choice("Which drug?", "No active bleed. Clearance about 50. She can swallow.", [
+        {t:"Apixaban, or low-molecular-weight heparin.", ok:true},
+        {t:"A prophylactic dose of heparin.", ok:false},
+        {t:"Alteplase infused into a peripheral vein.", ok:false},
+        {t:"Aspirin alone.", ok:false}
+      ], "Apixaban at a treatment dose is acceptable at this clearance. So is low-molecular-weight heparin. A prophylactic dose, aspirin, and systemic alteplase are not the treatment of this clot."),
+      choice("The right groin compresses completely. What do you do about the right leg?", "You looked, because the left side was abnormal.", [
+        {t:"Nothing extra. One treatment course covers the clot you found.", ok:true},
+        {t:"A second anticoagulant for the normal leg.", ok:false},
+        {t:"A filter, because one leg is normal.", ok:false},
+        {t:"Thrombolysis of the normal vein so it stays normal.", ok:false}
+      ], "A vein that flattens is not a clot. You do not anticoagulate by the leg. One course treats the thrombus on the left."),
+      choice("Suppose both veins had flattened, and the leg was still very swollen. What then?", "The two-point study is negative in this version.", [
+        {t:"Do not start thrombolysis. Repeat the proximal scan, and consider a whole-leg study.", ok:true},
+        {t:"Thrombolysis, because the clinical suspicion overrides a normal compression.", ok:false},
+        {t:"A filter.", ok:false},
+        {t:"Nothing, ever, if one scan is negative.", ok:false}
+      ], "A negative proximal compression study does not erase a high suspicion. Repeat it, or image the calf if you have the skill. It does not justify a lytic drug."),
+      choice("Which sentence is true of the images you marked?", "Close the case on the picture, not the drug.", [
+        {t:"A vein that does not collapse, and is filled with echo, is thrombus.", ok:true},
+        {t:"The black round lumen was the clot.", ok:false},
+        {t:"Compression is optional if the lumen looks busy.", ok:false},
+        {t:"A D-dimer would have been enough on its own.", ok:false}
+      ], "You compress. The vein disappears, or it does not. Echo in a vein that stays open is thrombus. The black round neighbour is the artery. A D-dimer does not do this job in hospital.")
+    ]},
+  {id:"onsd", title:"Optic nerve sheath", discuss:"The optic nerve sheath is a screen for raised intracranial pressure. It is not the pressure, and it is not a CT. Measure both eyes, 3 mm behind the globe, with a linear probe on a closed lid and almost no pressure. More than 5 mm in an adult raises concern. Some series use a higher cut. A new blown pupil is treated with osmotherapy, position, and carbon dioxide. It is not treated with another measurement. A wide sheath is a reason not to do a lumbar puncture.",
+    steps:[
+      choice("Intubated after a head injury. Pupils are equal. CT is delayed for a few minutes while he is unstable. What can the probe do?", "A linear probe is on the bay.", [
+        {t:"It can screen for a wide optic nerve sheath. It cannot give the intracranial pressure or replace the CT.", ok:true},
+        {t:"It measures the intracranial pressure in millimetres of mercury.", ok:false},
+        {t:"A normal sheath clears him for a lumbar puncture.", ok:false},
+        {t:"It replaces the CT if the number is under 5 mm.", ok:false}
+      ], "Sheath diameter is a screen. It does not read out the pressure, it does not name the lesion, and it does not clear the patient for a needle in the back."),
+      choice("How do you take the picture?", "The eye is closed.", [
+        {t:"Closed lid, gel, linear probe, transverse, almost no pressure on the globe.", ok:true},
+        {t:"Push an abdominal probe firmly onto the cornea.", ok:false},
+        {t:"Open the eye and rest the probe on the conjunctiva with no gel.", ok:false},
+        {t:"Any probe, pressed hard, so the sheath looks still.", ok:false}
+      ], "Closed lid, gel, a linear probe, a light hand. Pressure on the globe changes the measurement and can injure the eye."),
+      mark("Mark the place where the sheath is measured. Not the middle of the globe.", "Transverse view through the closed lid.", "pocus/onsd.jpg", "Ocular ultrasound showing the globe and the optic nerve sheath", "Ocular ultrasound.", [R(0.57,0.49,0.08,0.10)], "The black circle is the globe. The sheath is measured 3 mm behind it, where the dark track leaves the globe. The middle of the vitreous is not the site."),
+      choice("You measure 6.1 mm at 3 mm behind the globe, in an adult. What does that support?", "The other eye is not yet done.", [
+        {t:"Concern for raised intracranial pressure. It is not a number you treat by itself.", ok:true},
+        {t:"A normal sheath. Under 8 mm is normal.", ok:false},
+        {t:"The exact intracranial pressure.", ok:false},
+        {t:"A retinal detachment.", ok:false}
+      ], "More than 5 mm in an adult raises concern. Some series use 5.7 or 5.8. None of those numbers is the intracranial pressure, and one eye is not enough."),
+      choice("The other eye reads 4.4 mm, taken in a hurry. What do you do with the pair?", "One is wide. One is not.", [
+        {t:"Repeat both. Do not diagnose from a single hurried view.", ok:true},
+        {t:"Average them and call it normal.", ok:false},
+        {t:"Start osmotherapy because one eye was 6.1.", ok:false},
+        {t:"Ignore the 6.1. The lower number is always the true one.", ok:false}
+      ], "Measure both, properly, at 3 mm. A difference this wide is a reason to repeat the picture, not a reason to average it and not a reason to hang mannitol on one frame."),
+      choice("He develops a new unilateral blown pupil while you are repeating the view. What is the treatment?", "Blood pressure is 150/80. Carbon dioxide has been drifting up.", [
+        {t:"Head up, neck straight, carbon dioxide in range, hypertonic saline or mannitol, and get the CT.", ok:true},
+        {t:"Another sheath measurement, as the treatment.", ok:false},
+        {t:"A lumbar puncture to lower the pressure.", ok:false},
+        {t:"Hyperventilation down to a carbon dioxide of 20 for the next hour.", ok:false}
+      ], "A new blown pupil is herniation until proved otherwise. Position, carbon dioxide, an osmotic drug, and the CT. The probe does not treat it. A lumbar puncture is dangerous. Prolonged severe hyperventilation starves the brain."),
+      choice("Do you chase the sheath diameter every ten minutes as a treatment target?", "The osmotic drug has been given.", [
+        {t:"No. Treat the pupil, the carbon dioxide, and the scan. The sheath is not a monitor.", ok:true},
+        {t:"Yes. Give another bolus every time it is over 5 mm.", ok:false},
+        {t:"Yes. It replaces the CT.", ok:false},
+        {t:"Yes, but only in one eye.", ok:false}
+      ], "The sheath supported the suspicion. It is the wrong target to chase. Osmotherapy is for signs of herniation, not for a millimetre."),
+      choice("A later reading is 6.4 mm, but the caliper was placed far back along the nerve and the probe was heavy on the lid. What is that reading?", "The globe was deformed by the pressure.", [
+        {t:"Unreliable. Measure again at 3 mm, with a light hand.", ok:true},
+        {t:"More accurate, because a heavier hand holds the eye still.", ok:false},
+        {t:"Proof that the pressure has risen further.", ok:false},
+        {t:"A reason for a lumbar puncture.", ok:false}
+      ], "Too far behind the globe, and pressure on the eye, both invent a wide sheath. Repeat it before you believe it."),
+      choice("Someone asks for a lumbar puncture to rule out infection. The sheath is wide and the pupil has been abnormal. What do you say?", "There is no open fracture and no coagulopathy in the question.", [
+        {t:"Not now. A wide sheath and a new pupil are reasons not to tap.", ok:true},
+        {t:"Yes. A wide sheath makes the tap safer.", ok:false},
+        {t:"Yes, if you only take 1 mL.", ok:false},
+        {t:"Yes, because the CT is delayed.", ok:false}
+      ], "A wide sheath is a reason to avoid a lumbar puncture, not a reason to do one. Wait for the CT, and for someone who can see the film."),
+      choice("The CT becomes possible. What is the sheath's job now?", "He is stable enough to travel.", [
+        {t:"It has done its job. It hurried the CT. It does not replace it.", ok:true},
+        {t:"Cancel the CT. The sheath was 6 mm.", ok:false},
+        {t:"The sheath names the bleed.", ok:false},
+        {t:"Repeat it instead of moving him.", ok:false}
+      ], "The probe bought urgency. The CT names the blood, the shift, and the lesion. A sheath diameter does none of those.")
+    ]}
+];
+let voiceOn = true;
+let order = [];
+let casePos = 0;
+let stepPos = 0;
+let marks = 0;
+let caseScore = 0;
+let locked = false;
+const app = document.getElementById("app");
+function say(text){
+  if(!voiceOn || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 0.96;
+  window.speechSynthesis.speak(u);
+}
+function shuffle(){
+  order = CASES.map(function(c){ return c.id; });
+  for(let i = order.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = order[i]; order[i] = order[j]; order[j] = t;
+  }
+}
+function currentCase(){ return CASES.filter(function(c){ return c.id === order[casePos]; })[0]; }
+function ellipses(regions, reveal){
+  return regions.map(function(r){
+    return '<ellipse cx="'+(r.cx*100)+'" cy="'+(r.cy*100)+'" rx="'+(r.rx*100)+'" ry="'+(r.ry*100)+'" fill="'+(reveal?'rgba(127,212,230,.18)':'none')+'" stroke="'+(reveal?'#7fd4e6':'none')+'" stroke-width="0.6"></ellipse>';
+  }).join("");
+}
+function dotRow(){
+  const c = currentCase();
+  return '<div class="dots">'+c.steps.map(function(_, i){
+    return '<i class="'+(i<stepPos?'on':'')+'"></i>';
+  }).join("")+'</div>';
+}
+function showTeach(ok, text){
+  locked = true;
+  const box = document.createElement("div");
+  box.className = "teach"+(ok?"":" miss");
+  box.textContent = text;
+  app.appendChild(box);
+  const btn = document.createElement("button");
+  btn.className = "next";
+  btn.type = "button";
+  btn.textContent = stepPos === currentCase().steps.length-1 ? "Discussion" : "Next decision";
+  btn.onclick = function(){ stepPos++; render(); };
+  app.appendChild(btn);
+  say((ok?"Correct. ":"Not that. ")+text);
+}
+function render(){
+  const c = currentCase();
+  if(!c){ return; }
+  if(stepPos >= c.steps.length){ return discuss(); }
+  const s = c.steps[stepPos];
+  locked = false;
+  marks = 0;
+  app.innerHTML =
+    '<p class="kicker">Patient '+(casePos+1)+' of '+order.length+' · Decision '+(stepPos+1)+' of 10</p>'+
+    '<p class="prompt">'+c.title+'</p>'+
+    dotRow()+
+    '<p class="lead">'+s.lead+'</p>'+
+    '<p class="prompt">'+s.prompt+'</p>';
+  if(s.kind === "mark"){
+    app.innerHTML += '<div class="film" id="film"><img alt="'+s.alt+'" src="'+s.src+'"><svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="none"></svg></div><p class="cap">'+s.cap+' Tap the finding.</p>';
+    const film = document.getElementById("film");
+    film.onclick = function(ev){
+      if(locked) return;
+      const img = film.querySelector("img");
+      const r = img.getBoundingClientRect();
+      const x = (ev.clientX - r.left) / r.width;
+      const y = (ev.clientY - r.top) / r.height;
+      if(x<0||y<0||x>1||y>1) return;
+      const hit = s.regions.some(function(g){
+        const dx = (x-g.cx)/g.rx, dy = (y-g.cy)/g.ry;
+        return dx*dx + dy*dy <= 1;
+      });
+      const svg = document.getElementById("overlay");
+      const ring = document.createElementNS("http://www.w3.org/2000/svg","circle");
+      ring.setAttribute("cx", x*100); ring.setAttribute("cy", y*100); ring.setAttribute("r", "1.6");
+      ring.setAttribute("fill", "none"); ring.setAttribute("stroke", hit?"#8fd0a8":"#e7a3a3"); ring.setAttribute("stroke-width", "0.7");
+      svg.appendChild(ring);
+      if(hit){
+        if(!locked) caseScore++;
+        showTeach(true, s.teach);
+      } else {
+        marks++;
+        if(marks >= 2){
+          svg.innerHTML += ellipses(s.regions, true);
+          showTeach(false, s.teach);
+        }
+      }
+    };
+  } else {
+    const wrap = document.createElement("div");
+    wrap.className = "opts";
+    s.options.forEach(function(op){
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = op.t;
+      b.onclick = function(){
+        if(locked) return;
+        wrap.querySelectorAll("button").forEach(function(btn){ btn.disabled = true; });
+        b.className = op.ok ? "ok" : "no";
+        if(op.ok) caseScore++;
+        showTeach(op.ok, s.teach);
+      };
+      wrap.appendChild(b);
+    });
+    app.appendChild(wrap);
+  }
+  say(s.prompt);
+}
+function discuss(){
+  const c = currentCase();
+  const last = casePos === order.length-1;
+  app.innerHTML =
+    '<p class="kicker">'+c.title+'</p>'+
+    '<p class="prompt">'+caseScore+' of 10</p>'+
+    '<div class="teach">'+c.discuss+'</div>'+
+    '<button class="next" id="go" type="button">'+(last?'Start the pool again':'Next patient')+'</button>'+
+    '<p class="foot">Teaching cases. Not a prescription for a named patient.</p>';
+  say(c.discuss);
+  document.getElementById("go").onclick = function(){
+    if(last){ shuffle(); casePos = 0; }
+    else casePos++;
+    stepPos = 0;
+    caseScore = 0;
+    render();
+  };
+}
+document.getElementById("back").onclick = function(){
+  if(history.length > 1){ history.back(); return; }
+  location.href = "index.html";
+};
+document.getElementById("voice").onclick = function(){
+  voiceOn = !voiceOn;
+  this.setAttribute("aria-pressed", voiceOn?"true":"false");
+  this.textContent = voiceOn ? "Voice on" : "Voice off";
+  if(!voiceOn && window.speechSynthesis) window.speechSynthesis.cancel();
+};
+shuffle();
+render();
+</script>
+</body>
+</html>
