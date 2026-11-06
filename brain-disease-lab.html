@@ -1434,7 +1434,24 @@ function mountAnatomy(labels){
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
       const on = !!wanted[obj.userData.bx_label];
       mats.forEach(function(mat){
-        if(on){ mat.color.set("#7fd4e6"); mat.emissive = new THREE.Color("#7fd4e6"); mat.emissiveIntensity = 0.25; }
+        if(!mat.color) return;
+        if(!mat.userData.baseColor) mat.userData.baseColor = mat.color.clone();
+        mat.emissive = mat.emissive || new THREE.Color();
+        if(on){
+          mat.color.copy(mat.userData.baseColor).lerp(new THREE.Color("#fff6ee"), 0.18);
+          mat.emissive.set("#9a5a42");
+          mat.emissiveIntensity = 0.32;
+          mat.opacity = 1;
+          mat.transparent = false;
+          mat.depthWrite = true;
+        }else{
+          mat.color.copy(mat.userData.baseColor).multiplyScalar(0.55);
+          mat.emissive.set(0x000000);
+          mat.emissiveIntensity = 0;
+          mat.transparent = true;
+          mat.opacity = 0.34;
+          mat.depthWrite = false;
+        }
       });
       if(on){ focus.expandByObject(obj); n++; }
     });

@@ -299,10 +299,24 @@ html.light .cell.resistant { background:#fee2e2; color:#991b1b; }
       <p class="note">This is not a measured level. One compartment, the dose from the clearance at the top, and a target of 100% of the interval in shock or 70% on the ward.</p>
       <label class="field"><span>Drug</span>
         <select id="pkDrug" class="full" onchange="drawPKPDGraph()">
-          <option value="meropenem">Meropenem</option>
-          <option value="cefepime">Cefepime</option>
-          <option value="piptazo">Piperacillin-tazobactam</option>
-          <option value="ceftazidime">Ceftazidime</option>
+          <optgroup label="Beta-lactams">
+            <option value="meropenem">Meropenem</option>
+            <option value="imipenem">Imipenem</option>
+            <option value="cefepime">Cefepime</option>
+            <option value="ceftazidime">Ceftazidime</option>
+            <option value="ceftriaxone">Ceftriaxone</option>
+            <option value="cefazolin">Cefazolin</option>
+            <option value="piptazo">Piperacillin-tazobactam</option>
+            <option value="aztreonam">Aztreonam</option>
+            <option value="cefiderocol">Cefiderocol</option>
+          </optgroup>
+          <optgroup label="Other ICU antibiotics">
+            <option value="vancomycin">Vancomycin</option>
+            <option value="linezolid">Linezolid</option>
+            <option value="daptomycin">Daptomycin</option>
+            <option value="ciprofloxacin">Ciprofloxacin</option>
+            <option value="amikacin">Amikacin</option>
+          </optgroup>
         </select>
       </label>
       <label class="field"><span>Infusion</span>
@@ -648,16 +662,52 @@ function showMatrixDetail(id){
 }
 function closeModal(){ $('detailModal').classList.add('hidden'); }
 function pkSpec(){
-  var id=$('pkDrug').value, b=band(), icu=icuOn();
-  var base={meropenem:{mg:icu||b==='arc'?2000:1000,every:8,vd:0.25*wt(),th:1,name:'Meropenem'},cefepime:{mg:2000,every:8,vd:0.25*wt(),th:2,name:'Cefepime'},piptazo:{mg:4000,every:6,vd:0.2*wt(),th:1,name:'Piperacillin'},ceftazidime:{mg:2000,every:8,vd:0.23*wt(),th:1.8,name:'Ceftazidime'}};
-  var s=base[id];
-  if(b==='moderate'){ s.th*=1.8; if(id==='meropenem') s.every=12; if(id==='cefepime') s.every=12; }
-  else if(b==='severe'){ s.th*=3.2; s.mg=id==='meropenem'?500:id==='piptazo'?2000:1000; s.every=id==='piptazo'?6:12; }
-  else if(b==='hd'){ s.th*=5; s.mg=id==='meropenem'?500:1000; s.every=24; }
-  else if(b==='crrt'){ s.th*=1.25; }
-  else if(b==='arc'){ s.th*=0.55; if(id==='cefepime') s.every=6; }
-  s.inf=$('pkInfusion').value==='bolus'?0.5:$('pkInfusion').value==='continuous'?s.every:Math.min(3,s.every-0.25);
+  var id=$('pkDrug').value, b=band(), icu=icuOn(), kg=wt();
+  var base={
+    meropenem:{name:'Meropenem',mg:icu||b==='arc'?2000:1000,every:8,vd:0.25*kg,th:1,fu:0.98,index:'ft'},
+    imipenem:{name:'Imipenem',mg:500,every:6,vd:0.23*kg,th:1,fu:0.8,index:'ft'},
+    cefepime:{name:'Cefepime',mg:2000,every:8,vd:0.25*kg,th:2,fu:0.8,index:'ft'},
+    ceftazidime:{name:'Ceftazidime',mg:2000,every:8,vd:0.23*kg,th:1.8,fu:0.9,index:'ft'},
+    ceftriaxone:{name:'Ceftriaxone',mg:2000,every:icu?12:24,vd:0.13*kg,th:8,fu:0.1,index:'ft'},
+    cefazolin:{name:'Cefazolin',mg:2000,every:8,vd:0.12*kg,th:2,fu:0.2,index:'ft'},
+    piptazo:{name:'Piperacillin',mg:4000,every:6,vd:0.2*kg,th:1,fu:0.8,index:'ft'},
+    aztreonam:{name:'Aztreonam',mg:2000,every:8,vd:0.18*kg,th:1.7,fu:0.7,index:'ft'},
+    cefiderocol:{name:'Cefiderocol',mg:2000,every:8,vd:0.26*kg,th:2.5,fu:0.5,index:'ft'},
+    vancomycin:{name:'Vancomycin',mg:Math.round(15*kg),every:12,vd:0.7*kg,th:7,fu:0.5,index:'auc',target:400},
+    linezolid:{name:'Linezolid',mg:600,every:12,vd:0.6*kg,th:5,fu:0.7,index:'auc',target:160},
+    daptomycin:{name:'Daptomycin',mg:Math.round((icu?10:8)*kg),every:24,vd:0.1*kg,th:8,fu:0.1,index:'auc',target:600},
+    ciprofloxacin:{name:'Ciprofloxacin',mg:400,every:8,vd:2.2*kg,th:4,fu:0.7,index:'cmax',target:8},
+    amikacin:{name:'Amikacin',mg:Math.round(15*kg),every:24,vd:0.3*kg,th:2.5,fu:1,index:'cmax',target:8}
+  };
+  var s=base[id]||base.meropenem;
+  var renal={
+    meropenem:{moderate:{every:12,thMul:1.8},severe:{mg:500,every:12,thMul:3.2},hd:{mg:500,every:24,thMul:5},crrt:{thMul:1.25},arc:{thMul:0.55}},
+    imipenem:{moderate:{every:8,thMul:1.6},severe:{mg:250,every:12,thMul:3},hd:{mg:250,every:12,thMul:4},crrt:{every:8,thMul:1.2},arc:{thMul:0.6}},
+    cefepime:{moderate:{every:12,thMul:1.8},severe:{mg:1000,every:12,thMul:3},hd:{mg:1000,every:24,thMul:5},crrt:{thMul:1.3},arc:{every:6,thMul:0.55}},
+    ceftazidime:{moderate:{every:12,thMul:1.6},severe:{mg:1000,every:12,thMul:2.4},hd:{mg:1000,every:24,thMul:3.5},crrt:{thMul:1.3},arc:{thMul:0.6}},
+    ceftriaxone:{hd:{thMul:1.25},arc:{thMul:0.9}},
+    cefazolin:{moderate:{every:12,thMul:1.5},severe:{mg:1000,every:24,thMul:3},hd:{every:24,thMul:4},crrt:{every:12,thMul:1.2},arc:{thMul:0.7}},
+    piptazo:{moderate:{mg:3000,thMul:1.6},severe:{mg:2000,thMul:2.6},hd:{mg:2000,every:8,thMul:4},crrt:{every:8,thMul:1.2},arc:{thMul:0.6}},
+    aztreonam:{moderate:{mg:1000,thMul:1.6},severe:{mg:1000,every:12,thMul:2.4},hd:{mg:1000,every:12,thMul:3},crrt:{thMul:1.3},arc:{every:6,thMul:0.6}},
+    cefiderocol:{moderate:{mg:1500,thMul:1.4},severe:{mg:1000,thMul:2},hd:{mg:750,every:12,thMul:3},crrt:{thMul:1.4},arc:{every:6,thMul:0.7}},
+    vancomycin:{moderate:{every:24,thMul:2},severe:{every:24,thMul:3.5},hd:{every:48,thMul:4},crrt:{every:24,thMul:1.7},arc:{every:8,thMul:0.55}},
+    linezolid:{severe:{thMul:1.2},hd:{thMul:1.2},crrt:{thMul:1}},
+    daptomycin:{severe:{every:48,thMul:2},hd:{every:48,thMul:2.5},crrt:{thMul:1.3}},
+    ciprofloxacin:{moderate:{every:12,thMul:1.5},severe:{every:24,thMul:2.5},hd:{every:24,thMul:3},crrt:{every:12,thMul:1.3},arc:{thMul:0.7}},
+    amikacin:{moderate:{every:36,thMul:1.6},severe:{every:48,thMul:3},hd:{every:48,thMul:6},crrt:{thMul:1.2},arc:{thMul:0.55}}
+  };
+  var rule=(renal[id]||{})[b];
+  if(rule){
+    if(rule.mg!=null) s.mg=rule.mg;
+    if(rule.every!=null) s.every=rule.every;
+    if(rule.thMul) s.th*=rule.thMul;
+  }
+  if(id==='vancomycin') s.mg=Math.round(15*kg);
+  if(id==='amikacin') s.mg=Math.min(1500, Math.round(15*kg));
+  if(id==='daptomycin' && b!=='severe' && b!=='hd') s.mg=Math.round((icu?10:8)*kg);
+  s.inf=$('pkInfusion').value==='bolus'?0.5:$('pkInfusion').value==='continuous'?s.every:Math.min(3, Math.max(0.5, s.every-0.25));
   s.mode=$('pkInfusion').value;
+  s.id=id;
   return s;
 }
 function drawPKPDGraph(){
@@ -666,14 +716,15 @@ function drawPKPDGraph(){
   var css=getComputedStyle(document.documentElement);
   var w=canvas.width, h=canvas.height;
   ctx.clearRect(0,0,w,h);
-  var s=pkSpec(), mic=parseFloat($('pkMIC').value)||4, ke=Math.LN2/s.th, c=0, dt=0.05, pts=[], above=0, n=0, peak=1;
+  var s=pkSpec(), mic=parseFloat($('pkMIC').value)||4, ke=Math.LN2/s.th, c=0, dt=0.05, pts=[], above=0, n=0, peak=1, auc=0;
   for(var t=0;t<=24;t+=dt){
     var cycle=t%s.every, R=0;
-    if(s.mode==='continuous'||cycle<s.inf) R=s.mg/s.inf;
-    if(s.mode==='continuous') R=s.mg/s.every;
+    if(s.mode==='continuous') R=(s.mg*s.fu)/s.every;
+    else if(cycle<s.inf) R=(s.mg*s.fu)/s.inf;
     c=Math.max(0, c+((R/s.vd)-ke*c)*dt);
     if(c>peak) peak=c;
     if(c>=mic) above++;
+    auc+=c*dt;
     n++;
     pts.push(c);
   }
@@ -690,16 +741,29 @@ function drawPKPDGraph(){
   ctx.lineWidth=2; ctx.beginPath();
   pts.forEach(function(v,i){ var x=i/(pts.length-1)*w, y=h-(v/max)*h; if(i) ctx.lineTo(x,y); else ctx.moveTo(x,y); });
   ctx.stroke();
-  var pct=Math.round(above/n*100), goal=icuOn()?100:70;
-  $('timeAboveMICVal').textContent=pct+'%';
-  $('targetGoalStatus').textContent=(pct>=goal?'The sketch clears ':'The sketch is short of ')+'the teaching target of '+goal+'%. '+(icuOn()?'Shock uses 100% of the interval.':'The ward target used here is 70%.');
+  var pct=Math.round(above/n*100), goal=icuOn()?100:70, ratio=peak/Math.max(mic,0.1);
+  var indexName=document.querySelector('#view-pkpd .kicker');
+  if(s.index==='auc'){
+    if(indexName) indexName.textContent='AUC over 24 h';
+    $('timeAboveMICVal').textContent=Math.round(auc)+'';
+    $('targetGoalStatus').textContent=(auc>=s.target?'The sketch clears ':'The sketch is short of ')+'a teaching AUC of '+s.target+' mg·h/L. This is not a measured level.';
+  }else if(s.index==='cmax'){
+    if(indexName) indexName.textContent='Peak / MIC';
+    $('timeAboveMICVal').textContent=ratio.toFixed(1);
+    $('targetGoalStatus').textContent=(ratio>=s.target?'The sketch clears ':'The sketch is short of ')+'a teaching peak of '+s.target+' times the MIC.';
+  }else{
+    if(indexName) indexName.textContent='Time above MIC';
+    $('timeAboveMICVal').textContent=pct+'%';
+    $('targetGoalStatus').textContent=(pct>=goal?'The sketch clears ':'The sketch is short of ')+'the teaching target of '+goal+'%. '+(icuOn()?'Shock uses 100% of the interval.':'The ward target used here is 70%.');
+  }
   $('pkDrugLabel').textContent=s.name+' '+s.mg+' mg every '+s.every+' h';
-  $('pkpdPearl').textContent='Teaching sketch, not a measured blood level. '+renalName()+' A longer infusion raises time above the MIC. It does not prove the patient is treated. Volume of distribution is estimated from '+wt()+' kg.';
+  var extra=s.id==='daptomycin'?' Daptomycin is not a pneumonia drug.':s.id==='vancomycin'?' Vancomycin is judged by the AUC, not by time above the MIC.':s.id==='amikacin'?' Amikacin is judged by the peak. Do not give the next dose on a clock if the level is still high.':s.index==='cmax'?' A longer infusion is not the usual plan for this drug.':' A longer infusion raises time above the MIC.';
+  $('pkpdPearl').textContent='Teaching sketch, not a measured blood level. '+renalName()+extra+' It does not prove the patient is treated. Volume of distribution is estimated from '+wt()+' kg.';
 }
 function switchTab(tabId){
   currentTab=tabId;
   document.querySelectorAll('.tab-view').forEach(function(el){ el.classList.add('hidden'); });
-  document.querySelectorAll('.tab-btn').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('header .tab-btn').forEach(function(el){ el.classList.remove('active'); });
   $('view-'+tabId).classList.remove('hidden');
   var btn=$('tab-'+tabId); if(btn) btn.classList.add('active');
   if(tabId==='pkpd') setTimeout(drawPKPDGraph, 30);
