@@ -1,0 +1,1294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101214">
+<title>Scenario Bay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@420;600;700&family=Fraunces:opsz,wght@9..144,520&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#101214;--ink:#f3efe6;--muted:#b7b1a4;--cool:#7fd4e6;--warm:#e2b48a;--card:#171c22;--line:rgba(243,239,230,.16);--good:#8fd0a8;--bad:#e7a3a3}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Figtree,system-ui,sans-serif}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+header{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;padding:10px 12px;background:#101214f2;border-bottom:1px solid var(--line)}
+h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:0;letter-spacing:-.03em}
+h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:20px;margin:0 0 8px}
+#back{background:#171c22;border:1px solid var(--line);border-radius:999px;min-height:36px;padding:0 12px}
+.modechip{margin-left:auto;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm)}
+main{max-width:860px;margin:0 auto;padding:12px 12px 36px}
+.kicker{margin:0 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm)}
+.lead{margin:0 0 12px;color:var(--muted);line-height:1.45}
+.clock{font-variant-numeric:tabular-nums;color:var(--bad);font-weight:700}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:560px){.grid{grid-template-columns:1fr}}
+.alarm{text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;min-height:76px}
+.alarm.on{border-color:var(--cool);background:#10242c}
+.alarm b{display:block;font-family:Fraunces,Georgia,serif;font-size:20px;font-weight:520}
+.alarm span{color:var(--muted);font-size:13px}
+.go{width:100%;margin-top:12px;min-height:48px;border-radius:12px;border:1px solid var(--cool);background:#10242c;font-weight:700}
+.go:disabled{opacity:.4}
+.vitals{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 12px}
+@media(max-width:560px){.vitals{grid-template-columns:repeat(2,1fr)}}
+.vitals div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px}
+.vitals b{display:block;font-size:18px;font-variant-numeric:tabular-nums}
+.vitals span{color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.badn{color:var(--bad)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin:0 0 10px;line-height:1.45}
+.card h3{margin:0 0 6px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--cool)}
+.hint{border-color:rgba(127,212,230,.45)}
+details{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 12px;margin:0 0 10px}
+summary{cursor:pointer;font-weight:700;min-height:36px;display:flex;align-items:center}
+.opts{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.opts button,.next{text-align:left;background:#10161c;border:1px solid var(--line);border-radius:12px;padding:12px;min-height:46px;line-height:1.35}
+.opts button.on{border-color:var(--cool)}
+.next{width:100%;text-align:center;font-weight:700;border-color:var(--cool);background:#10242c}
+.row{display:flex;gap:8px;align-items:center;margin:8px 0;color:var(--muted);font-size:13px}
+.row input[type=range]{flex:1}
+img.film{width:100%;border-radius:12px;display:block;margin:8px 0;background:#000}
+.log{margin:0;padding-left:18px}
+.log li{margin:0 0 6px}
+.teach{background:#141a16;border:1px solid rgba(143,208,168,.4);border-radius:12px;padding:12px;line-height:1.45;margin:0 0 8px}
+.teach.miss{background:#241818;border-color:rgba(231,163,163,.45)}
+label.f{display:block;margin:0 0 8px;color:var(--muted);font-size:13px}
+select,input[type=text],textarea{width:100%;background:#10161c;border:1px solid var(--line);border-radius:10px;padding:10px;min-height:42px}
+textarea{min-height:84px;resize:vertical}
+.foot{color:var(--muted);font-size:12px;margin-top:14px}
+.check{display:flex;gap:8px;align-items:center;margin:8px 0}
+</style>
+</head>
+<body>
+<header>
+  <button type="button" id="back">Back</button>
+  <h1>Scenario Bay</h1>
+  <span class="modechip" id="modechip"></span>
+</header>
+<main id="app"></main>
+<script>
+const FLAGS = [
+  {id:"hypoBP", name:"Hypotension", sub:"Low BP / shock"},
+  {id:"hyperBP", name:"Hypertension", sub:"Elevated BP"},
+  {id:"desat", name:"Desaturation", sub:"Low SpO2"},
+  {id:"tachypnea", name:"Tachypnea", sub:"Increased respiratory rate"},
+  {id:"tachy", name:"Tachycardia", sub:"Increased heart rate"},
+  {id:"lowGCS", name:"Low GCS", sub:"Altered consciousness"},
+  {id:"hypergly", name:"Hyperglycemia", sub:"High glucose"},
+  {id:"hypogly", name:"Hypoglycemia", sub:"Low glucose"}
+];
+const DX = [
+  ["sepsis","Septic shock from pneumonia"],
+  ["cardiogenic","Cardiogenic shock"],
+  ["pe","Massive pulmonary embolism"],
+  ["tension","Tension pneumothorax"],
+  ["edema","Hypertensive pulmonary edema"],
+  ["dka","Diabetic ketoacidosis"],
+  ["hhs","Hyperosmolar hyperglycemic state"],
+  ["hypogly","Hypoglycemia"],
+  ["ich","Intracerebral hemorrhage"],
+  ["gib","Hypovolemic shock from gastrointestinal bleeding"],
+  ["pneumonia","Hypoxemic pneumonia, not in shock"],
+  ["opioid","Opioid overdose"],
+  ["tamponade","Cardiac tamponade"],
+  ["asthma","Acute severe asthma"],
+  ["status","Status epilepticus"]
+];
+function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
+function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+function jit(n, f){ return Math.round(n + (Math.random()*2-1)*f); }
+function mapOf(sbp, dbp){ return Math.round(dbp + (sbp-dbp)/3); }
+function phOf(hco3, pco2){ return 6.1 + Math.log10(hco3 / (0.03*pco2)); }
+function once(list, text){ if(list.indexOf(text)<0) list.push(text); }
+
+const SYNDROMES = {
+  sepsis:{
+    bp:"low", glucose:"normal", preload:"empty", oxygen:"good", shock:"distributive", resp:"type1",
+    covers:["hypoBP","desat","tachypnea","tachy","lowGCS","hypergly"],
+    abx:["ctx-azi","piptazo","mero"], source:"lung",
+    hint:"The pressure is low and the oxygen is low. Fill only what is empty, then a vasopressor. An antibiotic is part of the resuscitation, not a later order.",
+    expert:["Oxygen to a saturation of 92 to 96.","Lactate and cultures, then an antibiotic that covers pneumonia within the hour.","Crystalloid while the heart is empty, then stop and look. Norepinephrine if the mean pressure stays under 65.","Echo. A hyperdynamic empty ventricle supports sepsis. A poor ventricle is a different shock.","Intubate if the airway is lost or the work of breathing fails. Tidal volume about 6 mL/kg predicted body weight.","The source here is the lung."]
+  },
+  cardiogenic:{
+    bp:"low", glucose:"normal", preload:"full", oxygen:"good", shock:"cardiogenic", resp:"type1",
+    covers:["hypoBP","desat","tachypnea","tachy","lowGCS"],
+    abx:[], source:"heart",
+    hint:"The lungs are wet and the pressure is low. Fluid will make the oxygen worse. Support the pressure and the airway, and look at the ventricle.",
+    expert:["Oxygen. Non-invasive ventilation if awake and working. A tube if the airway fails.","No fluid bolus. A loop diuretic if the lungs are wet and the pressure allows.","Norepinephrine if hypotensive. Dobutamine if the pressure is holding and the output is low.","Aspirin if this is an acute coronary pattern, and a reperfusion call. Nitrate is for high pressure, not for a mean pressure of 55.","Echo: poor left ventricle, full inferior vena cava."]
+  },
+  pe:{
+    bp:"low", glucose:"normal", preload:"obstruct", oxygen:"poor", shock:"obstructive", resp:"type1",
+    covers:["hypoBP","desat","tachypnea","tachy","lowGCS"],
+    abx:[], source:"clot",
+    hint:"Oxygen is lower than the film can explain. The right ventricle is the chamber to worry about. A large fluid load will not fix a blocked pulmonary artery.",
+    expert:["Oxygen. Intubation is a risk here because it drops venous return. Do it only if the airway is failing.","A small fluid challenge at most. Norepinephrine if the pressure is low.","Anticoagulate if there is no bleeding. Thrombolysis if shock persists.","Echo: a dilated, strained right ventricle and a full vein. A clear chest radiograph fits.","High PEEP will worsen the right ventricle."]
+  },
+  tension:{
+    bp:"low", glucose:"normal", preload:"obstruct", oxygen:"blocked", shock:"obstructive", resp:"type1",
+    covers:["hypoBP","desat","tachypnea","tachy","lowGCS"],
+    abx:[], source:"air",
+    hint:"One side of the chest is the emergency. Imaging that delays decompression, in a crashing patient, is the wrong order.",
+    expert:["Oxygen.","If the pressure is low and one side does not move air: decompress, then a chest drain. Do not travel for a CT first.","A large fluid bolus is not the treatment.","Ultrasound: no lung sliding, a barcode on M-mode.","After the drain, recheck the pressure and the saturation."]
+  },
+  edema:{
+    bp:"high", glucose:"normal", preload:"full", oxygen:"good", shock:"none", resp:"type1",
+    covers:["hyperBP","desat","tachypnea","tachy"],
+    abx:[], source:"pressure",
+    hint:"The pressure is high and the lungs are wet. Sit the patient up. A nitrate and a diuretic belong here. A fluid bolus does not.",
+    expert:["Sit up. Oxygen. Non-invasive ventilation if working hard and awake.","Intravenous nitrate, titrated. A loop diuretic.","Do not give a fluid bolus. Do not start a beta blocker as the drug that drops this pressure.","Echo often shows a stiff or weak left ventricle and a full vein. Lung ultrasound shows bilateral B-lines.","Intubate only if ventilation is failing."]
+  },
+  dka:{
+    bp:"low", glucose:"high", preload:"empty", oxygen:"good", shock:"hypovolemic", resp:"mixed",
+    covers:["hypoBP","tachypnea","tachy","lowGCS","hypergly","desat"],
+    abx:[], source:"ketoacid",
+    hint:"The rate is high because of acid, not because the lung is the whole story. Know the potassium before any insulin. Do not stop insulin just because the glucose falls.",
+    expert:["Fluid first. A balanced crystalloid or saline is acceptable.","Measure potassium. If it is under 3.3 mmol/L, replace potassium and hold insulin.","Insulin infusion at 0.1 units/kg/h once potassium is safe.","Add dextrose when glucose is near 200 mg/dL and keep insulin running until the gap closes.","Bicarbonate is not routine. Look for a trigger. Protect the airway if consciousness fails."]
+  },
+  hhs:{
+    bp:"low", glucose:"high", preload:"empty", oxygen:"good", shock:"hypovolemic", resp:"none",
+    covers:["hypoBP","tachy","lowGCS","hypergly"],
+    abx:[], source:"hyperosm",
+    hint:"The glucose is extreme and the patient is dry. Fluid is the resuscitation. Insulin is slower and smaller than in ketoacidosis. Know the potassium.",
+    expert:["Fluid is the main resuscitation. Replace the deficit over hours, not as one uncontrolled pour.","Potassium before and during insulin.","Insulin at a lower rate than ketoacidosis, once fluid has started and potassium is safe.","Glucose falls slowly. Watch sodium and osmolality.","Find the trigger. Protect the airway if consciousness is lost."]
+  },
+  hypogly:{
+    bp:"normal", glucose:"low", preload:"normal", oxygen:"good", shock:"none", resp:"none",
+    covers:["hypogly","lowGCS","tachy","hypoBP","desat"],
+    abx:[], source:"glucose",
+    hint:"Consciousness is down and the glucose is already on the monitor. Give dextrose before you treat this as a primary brain injury.",
+    expert:["Intravenous dextrose now. 50 mL of 50% dextrose is 25 g.","Recheck the glucose. Start an infusion if it falls again, especially after a sulfonylurea or insulin.","Airway protection if it does not recover. Do not intubate before the dextrose if the glucose is the cause you can see.","Look for the reason: insulin, a sulfonylurea, liver failure, sepsis."]
+  },
+  ich:{
+    bp:"high", glucose:"normal", preload:"normal", oxygen:"good", shock:"none", resp:"none",
+    covers:["hyperBP","lowGCS","tachy","desat"],
+    abx:[], source:"brain",
+    hint:"The pressure is high and the consciousness is low. This is a brain until a scan says otherwise. Do not drop the pressure off a cliff, and do not send this patient for a lumbar puncture.",
+    expert:["Airway and oxygen. Head up, neck straight, carbon dioxide in the normal range.","Non-contrast CT.","Lower a very high systolic pressure toward about 140 to 160, smoothly, with nicardipine or labetalol. Not a nitrate.","Reverse anticoagulation if it is present. Hypertonic saline or mannitol only for herniation, not as a standing drip.","Keep saturation and glucose in range. Fever and hypotension both hurt."]
+  },
+  gib:{
+    bp:"low", glucose:"normal", preload:"empty", oxygen:"good", shock:"hypovolemic", resp:"none",
+    covers:["hypoBP","tachy","lowGCS"],
+    abx:[], source:"bleed",
+    hint:"The pressure is low and the rate is high, and the lung is not the cause. Blood is the replacement. Crystalloid is a bridge, not the transfusion.",
+    expert:["Two large cannulae. Send a group and crossmatch.","Transfuse blood. A hemoglobin near 7 g/dL is the usual restrictive target, lower if the patient is still unstable or has a cardiac history.","Reverse warfarin if the INR is high. A proton-pump inhibitor. Hold antiplatelet and anticoagulant drugs.","Endoscopy when the pressure allows. Do not drown the patient in saline.","Airway protection if consciousness is lost or the vomit will not stop."]
+  },
+  pneumonia:{
+    bp:"normal", glucose:"normal", preload:"normal", oxygen:"good", shock:"none", resp:"type1",
+    covers:["desat","tachypnea","tachy","hypergly","lowGCS"],
+    abx:["ctx-azi","piptazo"], source:"lung",
+    hint:"The oxygen is the failing organ. Escalating the oxygen device is the first skill. Antibiotics for the lung. Fluid is not the treatment of hypoxemia.",
+    expert:["Oxygen, stepped up until the saturation is 92 to 96. High-flow before non-invasive ventilation in focal pneumonia.","An antibiotic that covers community pneumonia.","Cultures before the drug if it does not delay the dose.","Intubate if the work fails. Tidal volume about 6 mL/kg predicted body weight, and a PEEP that matches the oxygen need.","A fluid bolus does not treat a consolidation."]
+  },
+  opioid:{
+    bp:"normal", glucose:"normal", preload:"normal", oxygen:"good", shock:"none", resp:"type2",
+    covers:["lowGCS","desat","hypoBP"],
+    abx:[], source:"opioid",
+    hint:"The consciousness is down and the respiratory rate is slow. That slow rate is the clue. Glucose first if you have not seen it, then a trial of naloxone, and support the airway.",
+    expert:["Open the airway and give oxygen. Ventilate if the rate is not safe.","Check glucose. Give dextrose if it is low.","Naloxone, titrated, if the rate is slow and opioid is possible.","Do not give a huge dose and walk away. The opioid outlasts the antidote.","Look for co-ingestions."]
+  }
+};
+
+function fitScore(id, flags){
+  const s = SYNDROMES[id];
+  let score = Math.random()*1.2;
+  flags.forEach(function(f){
+    if(s.covers.indexOf(f)>=0) score += 3;
+    else score -= 2.2;
+  });
+  if(flags.indexOf("hypoBP")>=0 && s.bp!=="low") score -= 5;
+  if(flags.indexOf("hyperBP")>=0 && s.bp!=="high") score -= 5;
+  if(flags.indexOf("hypogly")>=0 && s.glucose!=="low") score -= 8;
+  if(id==="hypogly" && flags.indexOf("hypogly")<0) score -= 8;
+  if((id==="dka"||id==="hhs") && flags.indexOf("hypergly")<0) score -= 6;
+  if(flags.indexOf("hypergly")>=0 && s.glucose==="high") score += 3.5;
+  if(flags.indexOf("hypergly")>=0 && s.glucose!=="high") score -= 3;
+  if(id==="pneumonia" && flags.indexOf("desat")<0 && flags.indexOf("tachypnea")<0) score -= 3;
+  if(flags.indexOf("desat")>=0 && (id==="gib"||id==="hhs"||id==="opioid")) score -= 1.5;
+  if(flags.indexOf("tachypnea")>=0 && (id==="opioid"||id==="hhs"||id==="ich")) score -= 3;
+  if(flags.indexOf("tachy")>=0 && id==="ich") score -= 1.5;
+  if(flags.indexOf("hypoBP")<0 && (id==="sepsis"||id==="cardiogenic"||id==="pe"||id==="tension"||id==="gib")) score -= 2;
+  if(flags.indexOf("hyperBP")<0 && (id==="edema"||id==="ich")) score -= 2;
+  if(id==="dka" && flags.indexOf("tachypnea")<0) score -= 3;
+  if(flags.length===1 && flags[0]==="tachy" && id==="pe") score += 2;
+  return score;
+}
+function chooseSyndrome(flags){
+  let best = "pneumonia", bestScore = -1e9;
+  Object.keys(SYNDROMES).forEach(function(id){
+    const sc = fitScore(id, flags);
+    if(sc>bestScore){ bestScore = sc; best = id; }
+  });
+  return best;
+}
+function normalize(selected){
+  const flags = selected.slice();
+  const notes = [];
+  if(flags.indexOf("hypoBP")>=0 && flags.indexOf("hyperBP")>=0){
+    flags.splice(flags.indexOf("hyperBP"),1);
+    notes.push("The pressure an hour ago was about 210/120. The pressure in front of you is the low one.");
+  }
+  if(flags.indexOf("hypogly")>=0 && flags.indexOf("hypergly")>=0){
+    flags.splice(flags.indexOf("hypogly"),1);
+    notes.push("Glucose is high at the start. It will crash if insulin runs after the glucose has fallen and no dextrose is given.");
+  }
+  return {flags:flags, notes:notes};
+}
+
+const SURNAMES = ["Raman","Iyer","Khan","Das","Singh","Joseph","Mehta","Nair","Shah","Gupta","Kaur","Ali","Fernandes","Banerjee","Chopra","Reddy"];
+function buildPatient(selected){
+  const norm = normalize(selected);
+  const id = chooseSyndrome(norm.flags);
+  const s = SYNDROMES[id];
+  const sex = Math.random()<0.5?"man":"woman";
+  const age = jit(62, 18);
+  const wt = jit(72, 12);
+  const ht = sex==="man"?jit(172,6):jit(160,6);
+  const pbw = sex==="man" ? 50+0.91*(ht-152.4) : 45.5+0.91*(ht-152.4);
+  const name = pick("ABCDEFGHJKLMNPQRSTUVW".split(""))+". "+pick(SURNAMES);
+  const flags = norm.flags;
+  const want = function(f){ return flags.indexOf(f)>=0; };
+  let sbp = 122, dbp = 74, hr = jit(84,6), rr = jit(16,2), spo2 = 97, gcs = 15, glucose = jit(118,12), temp = 36.8;
+  if(want("hypoBP")){ sbp = jit(80,4); dbp = jit(46,3); }
+  else if(want("hyperBP")){ sbp = jit(198,8); dbp = jit(110,6); }
+  if(want("hypoBP") && !want("tachy")) hr = jit(106,4);
+  if(want("tachy")) hr = jit(128,8);
+  if(id==="opioid") hr = want("tachy")?jit(118,6):jit(62,6);
+  if(want("tachypnea")) rr = jit(32,3);
+  else if(id==="opioid") rr = jit(8,1);
+  else if(id==="dka") rr = jit(28,3);
+  if(want("desat")) spo2 = jit(86,2);
+  else if(id==="opioid") spo2 = jit(93,1);
+  if(want("lowGCS")) gcs = (id==="hypogly"||id==="opioid") ? 6+Math.floor(Math.random()*3) : 7+Math.floor(Math.random()*2);
+  if(want("hypergly")) glucose = id==="hhs"?jit(740,40):id==="dka"?jit(480,30):jit(286,20);
+  if(want("hypogly")) glucose = jit(36,4);
+  if(id==="sepsis"||id==="pneumonia") temp = jit(38.8,0.3);
+  if(id==="dka"||id==="hhs") temp = 37.1;
+  const creat = id==="hhs"||id==="gib"||id==="dka"? +(1.6+Math.random()*0.8).toFixed(1) : +(0.9+Math.random()*0.4).toFixed(1);
+  const egfr = Math.round(((140-age)*wt*(sex==="woman"?0.85:1))/(72*creat));
+  let k = id==="dka" ? (Math.random()<0.45?2.9:5.3) : id==="hhs" ? jit(5,0.4) : +(4.1+Math.random()*0.6).toFixed(1);
+  if(id==="dka") k = Math.round(k*10)/10;
+  const hb = id==="gib" ? +(6.4+Math.random()*1.2).toFixed(1) : +(12.4+Math.random()*1.5).toFixed(1);
+  const inr = id==="gib" && Math.random()<0.5 ? 4.2 : 1.1;
+  const lactate = want("hypoBP")||id==="dka" ? +(2.6+Math.random()*2).toFixed(1) : 1.2;
+  let hco3 = 24, pco2 = 40;
+  if(id==="dka"){ hco3 = jit(8,2); pco2 = jit(22,3); }
+  else if(id==="hhs"){ hco3 = 20; pco2 = 36; }
+  else if(want("hypoBP")||lactate>2.5){ hco3 = jit(16,2); pco2 = want("tachypnea")?jit(30,3):34; }
+  else if(id==="opioid"){ hco3 = 26; pco2 = 58; }
+  else if(want("tachypnea")&&want("desat")){ hco3 = 23; pco2 = 32; }
+  const story = storyFor(id, name, age, sex, norm.notes, flags, inr);
+  const p = {
+    id:id, syn:s, name:name, age:age, sex:sex, wt:wt, ht:ht, pbw:Math.round(pbw), egfr:egfr,
+    flags:flags, asked:selected.slice(), notes:norm.notes,
+    sbp:sbp, dbp:dbp, hr:hr, rr:rr, spo2:spo2, gcs:gcs, temp:+temp.toFixed(1), glucose:glucose,
+    uo: want("hypoBP")?15:45, lactate:lactate, k:k, na:id==="hhs"?151:138, creat:creat, hb:hb, inr:inr,
+    hco3:hco3, pco2:pco2, lungWater:s.preload==="full"?7:s.preload==="obstruct"?3:1,
+    fluidMl:0, boluses:0, t:0, support:"room",
+    vent:{mode:"VC-AC", tv:Math.round(6*pbw), rr:16, peep:8, fio2:60, ps:10, ie:"1:2", ipap:12, epap:6, backup:12, rise:0.2, ti:1.0, mask:"oronasal"},
+    pressor:"none", abx:null, renal:false, insulin:false, dextrose:false, decompressed:false, drained:false,
+    diuretic:false, nitrate:false, bloodU:0, anticoag:false, lytic:false, aspirin:false, reversed:false,
+    naloxone:false, headUp:false, osmotic:false, intubated:false, echoSeen:false, echoRead:null,
+    results:{}, log:[], good:[], bad:[], critical:[], timeline:[], events:[], sedation:null,
+    story:story.text, exam:story.exam, pmh:story.pmh, meds:story.meds, complaint:story.complaint
+  };
+  p.map = mapOf(p.sbp, p.dbp);
+  return p;
+}
+
+function storyFor(id, name, age, sex, notes, flags, inr){
+  const who = name+", a "+age+"-year-old "+sex;
+  const alarm = FLAGS.filter(function(f){ return flags.indexOf(f.id)>=0; }).map(function(f){ return f.name.toLowerCase(); }).join(", ");
+  const lead = "You selected "+alarm+". The case is built so those are true, and so the rest of the illness agrees with them.";
+  const extra = notes.length? " "+notes.join(" ") : "";
+  const bank = {
+    sepsis:{
+      complaint:"Fever and breathlessness for two days, now hard to rouse.",
+      text:who+" was well until two days ago. Fever, a cough, and today the family could not wake "+(sex==="man"?"him":"her")+" properly. The ward has just moved "+(sex==="man"?"him":"her")+" to the intensive care unit.",
+      exam:"Hot peripheries at first, now cool. Crackles at the right base. Capillary refill is slow. The abdomen is soft.",
+      pmh:"Type 2 diabetes. No known heart failure.",
+      meds:"Metformin 500 mg twice daily. No anticoagulant."
+    },
+    cardiogenic:{
+      complaint:"Sudden breathlessness and a heavy chest since dawn.",
+      text:who+" has ischemic heart disease. The pain started at rest. The oxygen fell on the way in, and the pressure followed it down.",
+      exam:"Cold, wet, and quiet. A gallop. Crackles to the mid zones. No leg swelling of a chronic size. The monitor shows sinus tachycardia.",
+      pmh:"Previous myocardial infarction. Hypertension.",
+      meds:"Aspirin 75 mg, atorvastatin 40 mg, bisoprolol 2.5 mg. The morning dose of bisoprolol was not taken."
+    },
+    pe:{
+      complaint:"Sudden breathlessness four days after a fractured femur.",
+      text:who+" has been in bed since an operation four days ago. The breathlessness was sudden. The chest is clear to listen to, and the oxygen is not.",
+      exam:"Clear lungs. A loud pulmonary component. The operated leg is swollen. The neck veins are up. There is no fever.",
+      pmh:"No chronic lung disease.",
+      meds:"Prophylactic heparin was missed yesterday. No antiplatelet."
+    },
+    tension:{
+      complaint:"Sudden one-sided chest pain and collapse of the oxygen and the pressure.",
+      text:who+" became acutely breathless. One side of the chest does not move. The pressure fell in front of the team.",
+      exam:"Trachea pushed away from the quiet side. That side is resonant and silent. Neck veins are up. There is no time being wasted on a second opinion.",
+      pmh:"Tall, and a smoker. No known heart disease.",
+      meds:"None."
+    },
+    edema:{
+      complaint:"Could not lie flat. Frothy sputum. A very high pressure.",
+      text:who+" slept in a chair. The sputum is pink. The pressure at the door was already severe, and the oxygen is falling with it.",
+      exam:"Sitting upright. Diffuse crackles. A displaced apex. No fever. The legs are swollen.",
+      pmh:"Hypertension, often above 180 systolic at clinic. Heart failure with a reduced ejection fraction.",
+      meds:"Amlodipine 10 mg. Furosemide 40 mg, which ran out three days ago."
+    },
+    dka:{
+      complaint:"Vomiting, thirst, and deep breathing.",
+      text:who+" has type 1 diabetes. Insulin was not taken during a vomiting illness. The breathing is deep and fast. The glucose on the monitor is high.",
+      exam:"Dry mouth. Mild abdominal tenderness. No focal chest finding unless the oxygen is also low, in which case there are right-base crackles from aspiration.",
+      pmh:"Type 1 diabetes since adolescence.",
+      meds:"Basal-bolus insulin. The last dose was yesterday morning."
+    },
+    hhs:{
+      complaint:"Days of thirst and a progressive fall in consciousness.",
+      text:who+" has type 2 diabetes and has been drinking water by the litre. There is no deep acidotic breathing. Consciousness has slipped over a day, not a minute.",
+      exam:"Profoundly dry. The tongue is crusted. Lungs are clear. There is no focal neurology yet.",
+      pmh:"Type 2 diabetes, chronic kidney disease.",
+      meds:"Insulin glargine, which was stopped last week during an illness, and a sulfonylurea."
+    },
+    hypogly:{
+      complaint:"Found unresponsive. The glucose on the monitor is already low.",
+      text:who+" was found unresponsive at home. The finger-stick glucose is the number on the opening monitor. There is a history of diabetes and a recent increase in insulin.",
+      exam:"Sweating. Cool. Pupils are mid-size. No lateralizing sign. The rate may be fast. The lungs are clear unless aspiration has started.",
+      pmh:"Diabetes on insulin.",
+      meds:"Insulin, doses increased three days ago. No sulfonylurea on the list you have."
+    },
+    ich:{
+      complaint:"Sudden headache and a fall in consciousness.",
+      text:who+" complained of the worst headache, then became drowsy within minutes. The pressure is high. There is no fever.",
+      exam:"Eyes open to pain. One side moves less. Pupils are still equal. Neck is not stiff in a way you would trust. Glucose must still be checked.",
+      pmh:"Hypertension, poorly controlled.",
+      meds:"Amlodipine, taken irregularly. No anticoagulant."
+    },
+    gib:{
+      complaint:"Black stools, then a faint, then a low pressure.",
+      text:who+" had melena overnight and then stood up and fainted. The lung is not the complaint. The pressure is.",
+      exam:"Pale, cool, restless. A clear chest. A soft abdomen with epigastric tenderness. Melena on the glove. "+(inr>2?"The clinic list includes warfarin.":"No anticoagulant on the list."),
+      pmh:inr>2?"Atrial fibrillation on warfarin, and a previous ulcer.":"A previous duodenal ulcer.",
+      meds:inr>2?"Warfarin, last INR not done for two months. No aspirin.":"Ibuprofen most days for a bad knee."
+    },
+    pneumonia:{
+      complaint:"Fever and breathlessness, pressure still holding.",
+      text:who+" has had three days of fever and a productive cough. The oxygen is the reason for the intensive care call. The pressure is, for now, acceptable.",
+      exam:"Warm. Crackles in one base. Talking in short sentences. No mottling.",
+      pmh:"Smoker. No heart failure.",
+      meds:"None regular."
+    },
+    opioid:{
+      complaint:"Unresponsive, with a slow respiratory rate.",
+      text:who+" was found with slow breathing and a low consciousness. Pinpoint pupils. A glucose has to be part of the first look, and the rate is the other clue.",
+      exam:"Pupils are small. The respiratory rate is slow, not fast. Lungs have a few coarse sounds. There is no fever and no lateralizing sign.",
+      pmh:"Chronic back pain.",
+      meds:"A prescribed opioid. An empty packet was in the room."
+    }
+  };
+  const b = bank[id];
+  b.text = lead+extra+" "+b.text;
+  return b;
+}
+
+function labsSnapshot(p){
+  const wbc = p.id==="sepsis"||p.id==="pneumonia" ? jit(18,4) : p.id==="dka"? jit(14,2) : jit(9,2);
+  const plt = p.id==="sepsis"? jit(110,30) : jit(220,40);
+  const urea = Math.round(20+p.creat*18);
+  const bili = 0.8, ast = p.id==="hhs"? jit(64,10): 32, alt = 28, alb = p.id==="gib"?2.9:3.6;
+  const crp = p.id==="sepsis"? jit(160,30) : p.id==="pneumonia"? jit(96,20) : p.id==="dka"? 14 : 6;
+  const pct = p.id==="sepsis"? 6.4 : p.id==="pneumonia"? 0.6 : 0.08;
+  const aptt = p.inr>2? 46 : 30;
+  return {
+    cbc:{hb:p.hb, wbc:wbc, plt:plt, dlc:p.id==="sepsis"||p.id==="pneumonia"?"Neutrophils 86%":"Neutrophils 68%"},
+    rft:{urea:urea, creat:p.creat, na:p.na, k:p.k, egfr:p.egfr},
+    lft:{bili:bili, ast:ast, alt:alt, alb:alb},
+    coags:{pt:Math.round(12*p.inr), inr:p.inr, aptt:aptt},
+    inflam:{crp:crp, pct:pct}
+  };
+}
+function gasSnapshot(p){
+  const po2 = p.spo2>=97? jit(92,8) : p.spo2>=94? jit(75,6) : p.spo2>=90? jit(62,4) : p.spo2>=85? jit(52,4) : jit(44,3);
+  const ph = phOf(Math.max(4,p.hco3), Math.max(12,p.pco2));
+  const be = Math.round((p.hco3-24)*1.2);
+  return {ph:+ph.toFixed(2), pco2:Math.round(p.pco2), po2:po2, hco3:Math.round(p.hco3), lactate:+p.lactate.toFixed(1), be:be, glucose:Math.round(p.glucose)};
+}
+function echoReport(p){
+  const id = p.id;
+  if(id==="sepsis"||id==="pneumonia"||id==="dka"||id==="hhs"||id==="gib"||id==="hypogly"){
+    return {lv:"Hyperdynamic, small cavity. Ejection fraction about 65%.", rv:"Normal size and function.", rwma:"None.", pericardium:"No effusion.", ivc:id==="gib"||id==="dka"||id==="hhs"||id==="sepsis"?"Under 1.5 cm and collapses more than 50%.":"Normal size, collapses.", volume:"underfilled", obstruct:"no", ef:"high"};
+  }
+  if(id==="cardiogenic"||id==="edema"){
+    return {lv:"Globally reduced. Ejection fraction about 30%.", rv:"Mildly enlarged, not the main problem.", rwma:id==="cardiogenic"?"Anterior and septal walls move poorly.":"Global, no single territory.", pericardium:"No effusion.", ivc:"Dilated, collapses less than 50%.", volume:"overloaded", obstruct:"no", ef:"low"};
+  }
+  if(id==="pe"){
+    return {lv:"Underfilled left ventricle, function preserved.", rv:"Dilated right ventricle. The septum is flattened. TAPSE is reduced.", rwma:"McConnell pattern. Not a left coronary territory.", pericardium:"No effusion.", ivc:"Dilated, poorly collapsing.", volume:"overloaded", obstruct:"rv", ef:"high"};
+  }
+  if(id==="tension"){
+    return {lv:"Small, vigorous.", rv:"A little dilated from the pressure in the chest.", rwma:"None.", pericardium:"No effusion.", ivc:"Dilated.", volume:"obstructed", obstruct:"chest", ef:"high"};
+  }
+  return {lv:"Normal size and function.", rv:"Normal.", rwma:"None.", pericardium:"No effusion.", ivc:"Normal.", volume:"normal", obstruct:"no", ef:"normal"};
+}
+function usgReport(p){
+  if(p.id==="edema"||p.id==="cardiogenic") return {text:"Bilateral anterior B-lines from the pleural line. A small pleural effusion may sit at the bases. The inferior vena cava is full.", img:"pocus/blines.jpg", cap:"Lung ultrasound. Vertical B-lines."};
+  if(p.id==="pneumonia"||p.id==="sepsis") return {text:"One base is tissue-like, with air bronchograms. The other lung slides and shows A-lines. No large pleural effusion. The vein is empty if the patient is still underfilled.", img:"pocus/consol.jpg", cap:"Lung ultrasound. Consolidation with air bronchograms."};
+  if(p.id==="tension") return {text:"No lung sliding on the quiet side. M-mode is a barcode. The other side slides. The vein is full.", img:"pocus/barcode.jpg", cap:"M-mode. Barcode sign."};
+  if(p.id==="pe") return {text:"Lungs slide. A-lines. No consolidation and no B-line field. The vein is full. Look at the right ventricle.", img:null, cap:""};
+  if(p.id==="gib") return {text:"Lungs are dry. The vein is flat. The abdomen does not show free fluid on this pass. The bladder is empty.", img:null, cap:""};
+  return {text:"Lungs slide with A-lines. No B-line field, no pneumothorax, no free fluid. The vein matches the story of the circulation.", img:null, cap:""};
+}
+function cxrReport(p){
+  if(p.id==="edema"||p.id==="cardiogenic") return {text:"Bilateral perihilar opacity and a large cardiac silhouette. This fits edema. It does not, by itself, exclude a pneumonia.", img:"xrays/edema.jpg", cap:"Frontal chest radiograph."};
+  if(p.id==="pneumonia"||p.id==="sepsis") return {text:"Opacity at one base. Fluid and consolidation cannot be separated on this film alone.", img:"xrays/pneumonia.jpg", cap:"Frontal chest radiograph."};
+  if(p.id==="tension") return {text:"A pneumothorax is visible, and the mediastinum is shifted. If the pressure is already low, you should not have waited for this film.", img:"xrays/ptx.jpg", cap:"Frontal chest radiograph."};
+  if(p.id==="pe"||p.id==="opioid"||p.id==="hypogly"||p.id==="ich"||p.id==="hhs"||p.id==="gib") return {text:"No edema, no lobar opacity, and no pneumothorax. A clear film does not clear a pulmonary embolism.", img:null, cap:""};
+  if(p.id==="dka") return {text:p.spo2<94?"Right basal opacity, which may be aspiration. The deep breathing is still the acidosis.":"No major opacity. The respiratory rate is the acidosis, not a wet lung.", img:p.spo2<94?"xrays/pneumonia.jpg":null, cap:"Frontal chest radiograph."};
+  return {text:"No acute finding that explains the presentation by itself.", img:null, cap:""};
+}
+function ctReport(p){
+  if(p.id==="ich") return "Non-contrast CT of the head: acute intracerebral hemorrhage in the basal ganglia, volume about 18 mL, with local mass effect. No hydrocephalus on this report. The chest was not the test that was needed first.";
+  if(p.id==="pe") return "CT pulmonary angiogram: clot in the main and lobar pulmonary arteries. The right ventricle is dilated. This study is for a patient whose pressure can tolerate the trip.";
+  if(p.id==="tension") return "CT would show the pneumothorax you can already treat. Doing it before decompression, while the pressure is low, is a harm.";
+  if(p.id==="gib") return "No CT is required to start blood and call endoscopy. A later study is for a patient who does not stop bleeding.";
+  if(p.id==="sepsis"||p.id==="pneumonia") return "CT chest would separate collapse, effusion, and necrosis. It is not required before oxygen and the first antibiotic.";
+  if(p.id==="dka"||p.id==="hhs"||p.id==="hypogly") return "No CT replaces glucose, potassium, and the circulation. Image the head only if consciousness does not match the metabolic picture after treatment.";
+  return "No CT finding is the first move in this case.";
+}
+
+let mode = "lab";
+let patient = null;
+let selected = [];
+let timer = null;
+let wall = 12*60;
+let finished = false;
+
+function isLab(){ return mode==="lab"; }
+function note(why, seen){
+  const line = isLab()? why : seen;
+  patient.log.unshift({t:patient.t, text:line});
+  patient.timeline.push(patient.t+" min — "+seen);
+}
+function setBP(sbp, dbp){
+  patient.sbp = Math.round(clamp(sbp,60,230));
+  patient.dbp = Math.round(clamp(dbp,30,140));
+  patient.map = mapOf(patient.sbp, patient.dbp);
+}
+function nudgeBP(ds, dd){ setBP(patient.sbp+ds, patient.dbp+dd); }
+function spoilLungs(n){
+  patient.lungWater = Math.max(0, Math.min(10, patient.lungWater + n));
+  if(n>0 && patient.lungWater>=6){
+    patient.spo2 = Math.max(70, Math.min(100, patient.spo2 - n*2));
+    patient.rr = Math.min(46, patient.rr+2);
+  }
+}
+function raiseEvent(seen, why){
+  const text = isLab()? why : seen;
+  if(patient.events.indexOf(text)>=0) return;
+  patient.events.push(text);
+  patient.timeline.push(patient.t+" min — "+seen);
+  patient.log.unshift({t:patient.t, text:text});
+}
+function tick(min){
+  patient.t += min;
+  const id = patient.id;
+  if((id==="sepsis"||id==="pneumonia") && !patient.abx && patient.t>=45){
+    nudgeBP(-4, -3); patient.lactate += 0.4; patient.hr += 4;
+    if(patient.t>=90) once(patient.critical, "Antibiotic delayed past 90 minutes in a lung infection");
+  }
+  if(patient.map<65){ patient.lactate += 0.3; patient.uo = Math.max(0, patient.uo-8); }
+  else if(patient.lactate>1.2) patient.lactate = Math.max(1, patient.lactate-0.2);
+  if((id==="hypogly") && !patient.dextrose){
+    patient.gcs = Math.max(3, patient.gcs-1);
+    patient.spo2 = Math.max(70, patient.spo2-1);
+  }
+  if(patient.gcs<=8 && !patient.intubated && patient.support!=="imv"){
+    if(!patient.airwaySince) patient.airwaySince = patient.t;
+    if(patient.t - patient.airwaySince > 25 && !(id==="hypogly" && !patient.dextrose)){
+      once(patient.critical, "Airway left unprotected after the reversible causes were addressed or were not the problem");
+      patient.spo2 = Math.max(70, patient.spo2-4);
+    }
+  } else patient.airwaySince = 0;
+  if(id==="tension" && !patient.decompressed && patient.t>20){
+    nudgeBP(-3,-2); patient.spo2 = Math.max(68, patient.spo2-2);
+    once(patient.critical, "Tension pneumothorax left under pressure");
+  }
+  if(id==="dka" && patient.insulin && !patient.dextrose && patient.glucose<180){
+    patient.glucose -= 30;
+    if(patient.glucose<70){
+      patient.gcs = Math.max(3, patient.gcs-1);
+      once(patient.critical, "Insulin continued after the glucose fell, with no dextrose");
+    }
+  }
+  if((id==="sepsis"||id==="pneumonia") && !patient.abx && patient.t>=40)
+    raiseEvent("New event. Mottling is worse and the lactate has not turned.", "New event. The infection is untreated. Lactate is climbing because the first antibiotic is not in.");
+  if(id==="pe" && !patient.anticoag && !patient.lytic && patient.t>=30 && patient.map<70)
+    raiseEvent("New event. The neck veins are still up and the pressure is falling again.", "New event. Shock is persisting with a strained right heart and no treatment for clot.");
+  if(id==="dka" && patient.insulin && !patient.dextrose && patient.glucose<220 && patient.glucose>=70)
+    raiseEvent("New event. Glucose is nearing 200 mg/dL and insulin is still running.", "New event. Glucose is nearing 200 mg/dL. Add dextrose and keep insulin until the gap closes.");
+  if(id==="gib" && patient.bloodU===0 && patient.t>=20 && patient.map<70)
+    raiseEvent("New event. Still pale. The pressure did not hold.", "New event. Still pale and hypotensive. Crystalloid is not a substitute for blood.");
+  if(id==="ich" && !patient.results.ct && patient.t>=25)
+    raiseEvent("New event. Consciousness has not returned.", "New event. Consciousness has not returned and the head has not been imaged.");
+  if(id==="tension" && !patient.decompressed && patient.t>=15)
+    raiseEvent("New event. The quiet side of the chest is unchanged.", "New event. The quiet hemithorax is still the emergency. Decompress before any further imaging.");
+  patient.spo2 = Math.max(68, Math.min(100, Math.round(patient.spo2)));
+  patient.hr = Math.max(40, Math.min(180, Math.round(patient.hr)));
+  patient.rr = Math.max(6, Math.min(48, Math.round(patient.rr)));
+  patient.lactate = +Math.max(0.6, Math.min(15, patient.lactate)).toFixed(1);
+  patient.glucose = Math.round(Math.max(20, Math.min(900, patient.glucose)));
+  patient.map = mapOf(patient.sbp, patient.dbp);
+}
+
+function orderTest(kind){
+  tick(10);
+  if(kind==="abg") patient.results.abg = gasSnapshot(patient);
+  if(kind==="labs") patient.results.labs = labsSnapshot(patient);
+  if(kind==="usg") patient.results.usg = usgReport(patient);
+  if(kind==="cxr") patient.results.cxr = cxrReport(patient);
+  if(kind==="ct"){
+    patient.results.ct = ctReport(patient);
+    if(patient.id==="tension" && !patient.decompressed && patient.map<70){
+      once(patient.critical, "CT before decompression in tension pneumothorax");
+      nudgeBP(-6,-4);
+    }
+  }
+  if(kind==="echo"){
+    patient.results.echo = echoReport(patient);
+    patient.echoSeen = true;
+  }
+  note("The result is back. Read it against the pressure and the oxygen, not as a list.", "Result filed at "+patient.t+" min.");
+  render();
+}
+
+function oxygenBonus(level){
+  const table = {room:0, np:3, fm:5, nrb:8, hfnc:11, cpap:12, bipap:13, imv:14};
+  let b = table[level]||0;
+  if(patient.syn.oxygen==="poor") b = Math.round(b*0.6);
+  if(patient.syn.oxygen==="blocked" && !patient.decompressed) b = Math.round(b*0.35);
+  return b;
+}
+function setSupport(level){
+  tick(5);
+  const before = oxygenBonus(patient.support);
+  patient.support = level;
+  if(level==="imv") patient.intubated = true;
+  const delta = oxygenBonus(level) - before;
+  patient.spo2 = Math.max(70, Math.min(100, patient.spo2+delta));
+  if((level==="cpap"||level==="bipap") && patient.gcs<9 && !patient.intubated){
+    patient.spo2 = Math.max(70, patient.spo2-6);
+    once(patient.critical, "Non-invasive ventilation while the airway was not protected");
+    note("The mask is on a patient who is not protecting the airway. Oxygen fell.", "Vomited under the mask. Saturation fell.");
+  } else if(level==="imv" && patient.id==="hypogly" && !patient.dextrose){
+    once(patient.critical, "Intubation before dextrose in witnessed hypoglycemia");
+    note("The tube treats the airway. It does not treat a glucose of this level. Dextrose was still the first drug.", "Intubated. Glucose unchanged.");
+  } else if(level==="imv" && patient.id==="pe" && patient.map<70){
+    nudgeBP(-8,-4);
+    note("Induction dropped the venous return. The right ventricle had no reserve.", "Pressure fell on induction.");
+    once(patient.bad, "Intubation in massive pulmonary embolism while shocked");
+  } else if(delta>0){
+    once(patient.good, "Oxygen support matched to the saturation");
+    note("Saturation rose because the inspired oxygen, or the pressure in the airway, met the problem.", "Saturation changed after the device change.");
+  } else {
+    note("This device was not enough for the mechanism in front of you.", "Little change in saturation.");
+  }
+  render();
+}
+function applyVent(){
+  tick(5);
+  const v = patient.vent;
+  const tvkg = v.tv / patient.pbw;
+  if(patient.support==="imv"){
+    if(tvkg>10){ once(patient.critical, "Tidal volume above 10 mL/kg predicted body weight"); spoilLungs(2); }
+    else if(tvkg>8){ once(patient.bad, "Tidal volume above 8 mL/kg predicted body weight"); spoilLungs(1); }
+    else once(patient.good, "Lung-protective tidal volume");
+    if(patient.id==="pe" && v.peep>=14){
+      nudgeBP(-10,-6);
+      once(patient.critical, "High PEEP in right-ventricular failure");
+      note("High PEEP raised the afterload on a failing right ventricle. The pressure fell.", "Pressure fell after the PEEP change.");
+    } else {
+      note("The ventilator is running at "+v.mode+", "+v.tv+" mL, about "+tvkg.toFixed(1)+" mL/kg predicted weight, PEEP "+v.peep+".", "Ventilator settings applied.");
+    }
+    patient.pco2 = Math.max(18, Math.min(70, 40 - (v.rr-14)*0.8 - (tvkg-6)*1.5));
+  } else if(patient.support==="cpap"||patient.support==="bipap"){
+    const drive = v.ipap - v.epap;
+    if(v.epap<5 && (patient.id==="edema"||patient.id==="cardiogenic")){
+      once(patient.bad, "EPAP too low for pulmonary edema");
+      note("Edema needs end-expiratory pressure. A wide drive with a low EPAP is the wrong shape.", "Work of breathing is still high.");
+    } else if(drive<4){
+      once(patient.bad, "Pressure support on NIV is too small");
+      note("The drive pressure is too small to rest the patient.", "The patient is still tachypneic.");
+    } else {
+      patient.rr = Math.max(16, patient.rr-4);
+      patient.spo2 = Math.max(70, Math.min(100, patient.spo2+2));
+      once(patient.good, "NIV pressures in a usable range");
+      note("The pressures are in a range that can rest a wet or a stiff lung, if the airway is safe.", "The rate has eased a little.");
+    }
+  } else {
+    note("Those ventilator numbers are not attached to a patient on NIV or a tube.", "Settings saved, but no NIV or tube is running.");
+  }
+  render();
+}
+function bolus(ml, fluid){
+  tick(8);
+  patient.fluidMl += ml;
+  patient.boluses += 1;
+  const pre = patient.syn.preload;
+  const echo = patient.results.echo;
+  const full = pre==="full" || (echo && (echo.volume==="overloaded"||echo.volume==="obstructed"));
+  const empty = pre==="empty" && !(echo && echo.volume==="overloaded");
+  if(patient.id==="tension" && !patient.decompressed){
+    once(patient.bad, "Fluid used as the treatment of tension");
+    note("Fluid does not leave the chest. The pressure barely moves.", "Little change. The chest is still silent.");
+    return render();
+  }
+  if(full || pre==="obstruct" && patient.boluses>1){
+    spoilLungs(pre==="full"?2:1);
+    if(pre==="full") nudgeBP(-4,-2);
+    if(echo && (echo.volume==="overloaded"||echo.ef==="low") && pre==="full")
+      once(patient.critical, "Fluid bolus into a full, failing heart after the echo was seen");
+    else once(patient.bad, "Fluid into a circulation that was not empty");
+    note("The ventricle was not asking for volume. Lung water rose and the oxygen fell.", "More breathless. Saturation dipped.");
+  } else if(empty && patient.boluses<=3){
+    nudgeBP(ml>=500?10:6, ml>=500?6:4);
+    patient.hr = Math.max(70, patient.hr-8);
+    patient.lactate = Math.max(1, patient.lactate-0.4);
+    patient.uo += 10;
+    once(patient.good, "Fluid while underfilled");
+    note((fluid==="balanced"?"A balanced crystalloid ":"Saline ")+"met an empty circulation. Pressure rose. Look again before the next bag.", "Pressure rose after the bolus.");
+    if(fluid==="saline" && patient.fluidMl>=2000){
+      patient.bad.push("Large saline load");
+      note("The chloride load of this much saline will show up as a tighter difference between sodium and chloride.", "A lot of saline is now in.");
+    }
+  } else if(pre==="obstruct" && patient.boluses===1 && ml<=250){
+    nudgeBP(3,2);
+    once(patient.good, "Small fluid challenge only, in obstruction");
+    note("A small challenge is the most the right ventricle will accept. Stop there.", "A small rise, then no more.");
+  } else if(pre==="obstruct" && patient.boluses===1){
+    spoilLungs(1);
+    once(patient.bad, "A large fluid load in obstructive shock");
+    note("Half a litre is more than a blocked circulation will accept. A small challenge is the ceiling.", "Little gain, and the oxygen is not better.");
+  } else {
+    spoilLungs(1);
+    once(patient.bad, "Repeated fluid without a new look");
+    note("Further fluid, after the first response, is how edema starts.", "The oxygen is not better.");
+  }
+  render();
+}
+function givePressor(which){
+  tick(5);
+  patient.pressor = which;
+  if(which==="none"){ note("Vasopressor stopped.", "Vasopressor stopped."); return render(); }
+  if(patient.id==="gib" && patient.bloodU===0){
+    once(patient.bad, "Vasopressor before blood in hemorrhage");
+    nudgeBP(6,5);
+    note("The number rose and the tank is still empty. Blood is the drug.", "Pressure up. Still pale.");
+  } else if(patient.id==="edema"){
+    once(patient.bad, "A vasopressor for hypertensive edema");
+    nudgeBP(16,12);
+    note("The pressure was already high. A vasopressor is the wrong direction.", "Pressure is higher.");
+  } else if(which==="dobutamine" && patient.map<65){
+    nudgeBP(-6,-4); patient.hr += 12;
+    once(patient.bad, "Dobutamine while profoundly hypotensive");
+    note("Dobutamine can drop the pressure when the tank of resistance is empty. Norepinephrine first.", "Pressure fell and the rate rose.");
+  } else if(which==="norepi" && (patient.map<70 || patient.id==="pe"||patient.id==="cardiogenic"||patient.id==="sepsis")){
+    nudgeBP(14,10);
+    once(patient.good, "Norepinephrine for a low mean pressure");
+    note("Norepinephrine raised the mean pressure. Check the fingers, the lactate, and the urine, not only the number.", "Mean pressure rose.");
+  } else if(which==="dobutamine" && (patient.id==="cardiogenic"||patient.id==="edema") && patient.map>=65){
+    nudgeBP(4,2); patient.hr += 8; patient.lactate = Math.max(1, patient.lactate-0.3);
+    once(patient.good, "Inotrope while the pressure allowed it");
+    note("An inotrope is reasonable once the pressure is not critically low and the ventricle is the problem.", "Output feels better. Rate is up.");
+  } else if(which==="vaso"){
+    nudgeBP(6,6);
+    once(patient.good, "Vasopressin as a second vasopressor");
+    note("Vasopressin is an adjunct, not the first drug, and not a substitute for blood or for opening a pneumothorax.", "A small additional rise.");
+  } else {
+    nudgeBP(8,6);
+    note("The pressure moved. Ask whether the mechanism wanted this drug.", "Pressure changed.");
+  }
+  render();
+}
+function giveBPDrug(which){
+  tick(5);
+  if(patient.map<70 || patient.sbp<100){
+    nudgeBP(-18,-14);
+    once(patient.critical, "An antihypertensive given to a hypotensive patient");
+    note("The pressure was already low. This drug took what was left.", "Pressure crashed.");
+    return render();
+  }
+  if(which==="gtn"){
+    patient.nitrate = true;
+    if(patient.id==="edema"){
+      nudgeBP(-28,-16); patient.spo2 = Math.min(100, patient.spo2+3); spoilLungs(-1);
+      once(patient.good, "Nitrate for hypertensive pulmonary edema");
+      note("Nitrate unloaded the left ventricle. Oxygen followed the pressure down toward a safer range.", "Pressure fell. Breathing is easier.");
+    } else if(patient.id==="ich"){
+      nudgeBP(-20,-12);
+      once(patient.bad, "Nitrate in intracranial hemorrhage");
+      note("A nitrate can raise intracranial pressure. Nicardipine or labetalol is the cleaner choice here.", "Pressure fell. This was not the preferred drug.");
+    } else {
+      nudgeBP(-16,-10);
+      note("The pressure fell. Be sure the syndrome was a high-pressure one.", "Pressure fell.");
+    }
+  } else if(which==="labetalol"){
+    if(patient.id==="ich" && patient.sbp>160){
+      nudgeBP(-22,-14); patient.hr -= 12;
+      once(patient.good, "Controlled blood-pressure fall in hemorrhage");
+      note("A smooth fall, not a collapse. The target is a safer systolic pressure, not a normal one in five minutes.", "Pressure and rate came down.");
+    } else if(patient.id==="edema"||patient.id==="cardiogenic"){
+      nudgeBP(-10,-8); patient.hr -= 16;
+      once(patient.bad, "Beta blockade in acute heart failure");
+      note("The failing heart needed rate and contractility. A beta blocker took both.", "Slower, and not stronger.");
+    } else { nudgeBP(-12,-8); note("Pressure fell.", "Pressure fell."); }
+  } else if(which==="nicardipine"){
+    if(patient.id==="ich" && patient.sbp>160){
+      nudgeBP(-20,-12);
+      once(patient.good, "Nicardipine in intracranial hemorrhage");
+      note("Nicardipine lowers the pressure without the beta-blocker hit on contractility.", "Pressure came down in a controlled way.");
+    } else if(patient.id==="edema"){
+      nudgeBP(-18,-12);
+      once(patient.good, "A vasodilator in hypertensive edema");
+      note("Useful, though a nitrate unloads the lung more directly.", "Pressure fell.");
+    } else { nudgeBP(-14,-8); note("Pressure fell.", "Pressure fell."); }
+  }
+  render();
+}
+function giveDiuretic(){
+  tick(8);
+  patient.diuretic = true;
+  if(patient.syn.preload==="full" && patient.sbp>=90){
+    spoilLungs(-2); patient.spo2 = Math.min(100, patient.spo2+3); patient.uo += 40;
+    once(patient.good, "Diuretic for a wet circulation");
+    note("Urine came. Lung water fell, as long as the pressure stayed safe.", "A diuresis started.");
+  } else if(patient.syn.preload==="empty"||patient.id==="gib"||patient.id==="dka"||patient.id==="hhs"){
+    nudgeBP(-8,-5); patient.uo += 20; patient.k = Math.max(2.6, patient.k-0.3);
+    once(patient.bad, "Diuretic while volume-deplete");
+    note("The patient was dry. The diuretic took pressure and potassium.", "Pressure dipped after the diuretic.");
+  } else {
+    patient.uo += 15;
+    note("A modest diuresis. Check that the lungs were the reason.", "Urine output rose.");
+  }
+  render();
+}
+function giveSedation(){
+  tick(5);
+  patient.sedation = "analgesia-sedation";
+  if(patient.intubated){
+    patient.hr = Math.max(50, patient.hr-6);
+    once(patient.good, "Analgesia and sedation on a secured airway");
+    note("The tube is in. Analgesia first, then a sedative, aimed at comfort rather than a flat line.", "Sedation started on the ventilator.");
+  } else {
+    patient.gcs = Math.max(3, patient.gcs-2);
+    patient.rr = Math.max(6, patient.rr-4);
+    patient.spo2 = Math.max(70, patient.spo2-3);
+    once(patient.bad, "Sedation without a protected airway");
+    if(patient.gcs<=8) once(patient.critical, "Sedation dropped consciousness with no airway plan");
+    note("A sedative took the respiratory drive in a patient who is not intubated.", "Harder to rouse, and the rate fell.");
+  }
+  render();
+}
+function giveAbx(id){
+  tick(5);
+  patient.abx = id;
+  const ok = patient.syn.abx.indexOf(id)>=0;
+  if(patient.syn.abx.length===0){
+    once(patient.bad, "Antibiotic with no bacterial source");
+    note("There is no bacterial source in this illness. The drug does not treat it.", "Antibiotic given. No change in the illness.");
+  } else if(id==="vanc"){
+    once(patient.bad, "Vancomycin alone for this source");
+    note("Vancomycin does not cover the gram-negative rods of a pneumonia or a urinary source.", "Antibiotic given. The fever is unchanged.");
+  } else if(ok){
+    once(patient.good, "Antibiotic covers the source");
+    if(patient.t<=60) once(patient.good, "Antibiotic within the hour");
+    note("The spectrum matches a lung source. The clock to the first dose matters as much as the name.", "Antibiotic running.");
+    if(patient.egfr<50 && !patient.renal && (id==="mero"||id==="piptazo")){
+      once(patient.bad, "No renal adjustment despite a low GFR");
+      note("The GFR is under 50. Meropenem and piperacillin need a wider interval. Ceftriaxone does not.", "Dose not changed for the kidney.");
+    }
+    if(patient.egfr>=60 && patient.renal){
+      once(patient.bad, "Renal dose despite a normal GFR");
+      note("The GFR does not need a reduction. A renal dose here is an underdose.", "Dose reduced without a renal reason.");
+    }
+    if(patient.egfr<50 && patient.renal && (id==="mero"||id==="piptazo")) once(patient.good, "Renal adjustment when the GFR was low");
+  } else {
+    once(patient.bad, "Antibiotic does not match the source");
+    note("This is not the best spectrum for the source in front of you.", "Antibiotic given.");
+  }
+  render();
+}
+function giveMetabolic(which){
+  tick(5);
+  if(which==="d50"){
+    patient.dextrose = true;
+    if(patient.glucose<70){
+      patient.glucose = jit(146,15);
+      if(patient.id==="hypogly"){
+        patient.gcs = Math.max(patient.gcs, 14);
+        patient.spo2 = Math.min(100, patient.spo2+4);
+        once(patient.good, "Dextrose for hypoglycemia");
+        note("Glucose rose and consciousness followed it, because hypoglycemia was the cause.", "Woke as the glucose rose.");
+      } else {
+        patient.gcs = Math.min(15, patient.gcs+1);
+        note("Glucose was low and is now safer. Consciousness only partly follows it, so the glucose was not the whole cause.", "Glucose corrected.");
+      }
+    } else {
+      patient.glucose += 80;
+      once(patient.bad, "Dextrose while glucose was already high");
+      note("The glucose was not low. Fifty percent dextrose made it higher.", "Glucose rose further.");
+    }
+  } else if(which==="insulin"){
+    if(!patient.results.labs){
+      once(patient.critical, "Insulin before the potassium was known");
+      note("You have not seen the potassium. Insulin can stop the heart if the potassium is low.", "Insulin started without a potassium.");
+    } else if(patient.k<3.3){
+      once(patient.critical, "Insulin while potassium was under 3.3");
+      patient.hr = 140; patient.k = Math.max(2.2, patient.k-0.4);
+      note("Potassium was under 3.3. Insulin drives it lower. Replace potassium and hold the infusion.", "Rhythm became unstable.");
+    } else if(patient.id==="dka"||patient.id==="hhs"||patient.glucose>250){
+      patient.insulin = true;
+      patient.glucose = Math.round(patient.glucose*0.75);
+      patient.k = Math.max(2.8, +(patient.k-0.4).toFixed(1));
+      patient.hco3 = Math.min(22, patient.hco3+3);
+      once(patient.good, "Insulin after a safe potassium");
+      note("Insulin is running. Potassium will fall. Add dextrose as the glucose nears 200 and do not stop insulin while the gap is open.", "Glucose is falling.");
+    } else {
+      patient.glucose = Math.max(40, patient.glucose-60);
+      once(patient.bad, "Insulin when glucose was not high");
+      note("There was no reason for insulin. Glucose fell.", "Glucose fell.");
+    }
+  } else if(which==="kcl"){
+    patient.k = +(patient.k+0.6).toFixed(1);
+    once(patient.good, "Potassium replaced");
+    note("Potassium replaced. Recheck it. This is what allows insulin when the serum value was low.", "Potassium rising.");
+  } else if(which==="dexinf"){
+    patient.dextrose = true;
+    if(patient.insulin && patient.glucose<220){
+      patient.glucose = Math.max(140, patient.glucose);
+      once(patient.good, "Dextrose infusion while insulin continues");
+      note("Dextrose lets the insulin keep closing the gap after the glucose has fallen.", "Dextrose running beside insulin.");
+    } else {
+      note("A dextrose infusion is for the moment insulin would otherwise make the patient hypoglycemic.", "Dextrose infusion started.");
+    }
+  } else if(which==="bicarb"){
+    if(patient.id==="dka" && phOf(patient.hco3, patient.pco2)<6.9){
+      patient.hco3 += 2; once(patient.good, "Bicarbonate only at a very low pH");
+    } else {
+      once(patient.bad, "Bicarbonate without a severe acidemia");
+      note("Bicarbonate is not the treatment of ketoacidosis, sepsis, or a respiratory acidosis.", "Bicarbonate given.");
+    }
+  }
+  render();
+}
+function procedure(which){
+  tick(8);
+  if(which==="decompress"){
+    if(patient.id==="tension"){
+      patient.decompressed = true;
+      setBP(jit(110,6), jit(68,4));
+      patient.spo2 = Math.min(100, patient.spo2+10);
+      patient.hr = Math.max(90, patient.hr-15);
+      once(patient.good, "Decompression of tension pneumothorax");
+      note("The pressure returned as the air left the pleura. A drain still has to follow the needle or the finger.", "Pressure and saturation rose as the chest was decompressed.");
+    } else {
+      once(patient.critical, "Pleural decompression with no pneumothorax");
+      spoilLungs(1); patient.spo2 = Math.max(80, patient.spo2-4);
+      note("You put air into a pleura that did not have a tension pneumothorax.", "A new pneumothorax. Saturation fell.");
+    }
+  } else if(which==="drain"){
+    patient.drained = true;
+    if(patient.id==="tension"){
+      if(!patient.decompressed){ patient.decompressed = true; setBP(jit(108,6), jit(66,4)); patient.spo2 = Math.min(100, patient.spo2+8); }
+      once(patient.good, "Chest drain for pneumothorax");
+      note("The drain is in. Do not clamp it while it bubbles.", "Drain swinging.");
+    } else {
+      once(patient.bad, "Chest drain without a collection or a pneumothorax");
+      note("There was no drainable collection and no pneumothorax.", "A drain was placed without a target.");
+    }
+  } else if(which==="blood"){
+    patient.bloodU += 1;
+    if(patient.id==="gib"||patient.hb<7.5){
+      patient.hb = +(patient.hb+1).toFixed(1);
+      nudgeBP(12,8); patient.hr = Math.max(80, patient.hr-10); patient.lactate = Math.max(1, patient.lactate-0.5);
+      once(patient.good, "Blood for bleeding or a low hemoglobin");
+      note("Blood is the replacement. Another unit is a response to the pressure and the hemoglobin, not a reflex.", "Less pale. Pressure rose.");
+    } else {
+      once(patient.bad, "Transfusion with a safe hemoglobin and no bleeding");
+      note("The hemoglobin did not ask for blood.", "A unit was given without a clear target.");
+    }
+  } else if(which==="pcc"){
+    if(patient.inr>2){
+      patient.inr = 1.4; patient.reversed = true;
+      once(patient.good, "Coagulopathy reversed in bleeding");
+      note("Warfarin reversal belongs with the blood, not instead of it.", "INR is coming down.");
+    } else {
+      once(patient.bad, "Clotting factors without a coagulopathy");
+      note("The INR was not high.", "Factors given. Little reason.");
+    }
+  } else if(which==="ppi"){
+    if(patient.id==="gib"){ once(patient.good, "Acid suppression in upper gastrointestinal bleeding"); note("A proton-pump inhibitor is part of ulcer bleeding. It does not replace blood or endoscopy.", "Infusion started."); }
+    else { once(patient.bad, "Acid suppression with no gastrointestinal bleed"); note("No ulcer to treat.", "Infusion started. No relevant effect."); }
+  } else if(which==="aspirin"){
+    if(patient.id==="cardiogenic"){ patient.aspirin = true; once(patient.good, "Aspirin in an acute coronary pattern"); note("Aspirin now, if the bleed risk is not the story. Reperfusion is a separate call.", "Aspirin given."); }
+    else if(patient.id==="ich"||patient.id==="gib"){ once(patient.critical, "Aspirin in hemorrhage"); note("This patient is bleeding. Aspirin adds to it.", "Aspirin given into a bleed."); }
+    else { once(patient.bad, "Aspirin without an acute coronary syndrome"); note("No coronary syndrome to treat.", "Aspirin given."); }
+  } else if(which==="heparin"){
+    patient.anticoag = true;
+    if(patient.id==="pe"){ once(patient.good, "Anticoagulation for pulmonary embolism"); note("Treatment-dose anticoagulation. Thrombolysis is for persistent shock, not for every clot.", "Anticoagulant running."); }
+    else if(patient.id==="ich"||patient.id==="gib"){ once(patient.critical, "Anticoagulation during active bleeding"); note("You anticoagulated a bleeding patient.", "Bleeding risk just rose."); }
+    else { once(patient.bad, "Anticoagulation without a clot"); note("No thrombus to treat.", "Anticoagulant started."); }
+  } else if(which==="lytic"){
+    patient.lytic = true;
+    if(patient.id==="pe" && patient.map<70){
+      nudgeBP(16,10); patient.spo2 = Math.min(100, patient.spo2+4);
+      once(patient.good, "Thrombolysis for massive pulmonary embolism");
+      note("Shock that is still there after pressure support is the setting for thrombolysis. Bleeding is the cost.", "Pressure rose after thrombolysis.");
+    } else if(patient.id==="ich"){
+      once(patient.critical, "Thrombolysis in intracerebral hemorrhage");
+      note("Thrombolysis into a brain hemorrhage is a catastrophe.", "The neurological picture worsened.");
+      patient.gcs = Math.max(3, patient.gcs-2);
+    } else {
+      once(patient.critical, "Thrombolysis without a massive pulmonary embolism or a coronary indication you have proved");
+      note("There is no proved massive clot to lyse.", "Thrombolysis given.");
+    }
+  } else if(which==="naloxone"){
+    patient.naloxone = true;
+    if(patient.id==="opioid"){
+      patient.rr = jit(16,2); patient.gcs = 13; patient.spo2 = Math.min(100, patient.spo2+6);
+      once(patient.good, "Naloxone for opioid overdose");
+      note("The rate and the consciousness rose. The opioid will outlast a single dose. Watch.", "Woke, and the rate rose.");
+    } else {
+      note("Naloxone did nothing. Opioid was not the cause. A trial in a slow, unconscious patient is reasonable. It is not a treatment of hemorrhage or sepsis.", "No change after naloxone.");
+      if(patient.rr>=18) once(patient.bad, "Naloxone in a patient who was not hypoventilating");
+    }
+  } else if(which==="head"){
+    patient.headUp = true;
+    if(patient.id==="ich"){ once(patient.good, "Head-up position in brain injury"); note("Head up, neck straight. That is the position, not a substitute for the scan.", "Positioned head up."); }
+    else note("Head-up is harmless in most of these illnesses and essential in brain injury.", "Head of the bed raised.");
+  } else if(which==="osmotic"){
+    patient.osmotic = true;
+    if(patient.id==="ich" && patient.gcs<=8){
+      once(patient.good, "Osmotherapy for a low consciousness in hemorrhage");
+      note("Hypertonic saline or mannitol is for herniation or a sharply falling consciousness, not a standing order.", "Osmotherapy given.");
+    } else {
+      once(patient.bad, "Osmotherapy without brain herniation");
+      note("There is no brain herniation to treat. Osmotherapy shifts volume and is not a blood-pressure drug.", "Osmotherapy given.");
+    }
+  }
+  render();
+}
+function commitEcho(lv, vol, obst){
+  const e = patient.results.echo;
+  if(!e) return;
+  patient.echoRead = {lv:lv, vol:vol, obst:obst};
+  const lvOk = (e.ef==="low"&&lv==="low") || (e.ef==="high"&&lv==="high") || (e.ef==="normal"&&lv==="normal") || (e.rwma.indexOf("Anterior")>=0 && lv==="rwma") || (e.ef==="low"&&lv==="rwma");
+  const volOk = e.volume===vol || (e.volume==="obstructed"&&vol==="overloaded");
+  const obOk = (e.obstruct==="no"&&obst==="no") || (e.obstruct!=="no"&&obst==="yes");
+  if(lvOk&&volOk&&obOk){
+    once(patient.good, "Echo read correctly");
+    note("The read matches the study. Use it. An empty heart can take fluid. A full one cannot. A failing right ventricle is an obstruction.", "Echo interpretation recorded.");
+  } else {
+    once(patient.bad, "Echo read does not match the study");
+    note("That read does not match the report. Fluid and pressor choices that follow it will be wrong.", "Echo interpretation recorded.");
+  }
+  render();
+}
+
+function scorePatient(dx, shock, resp){
+  let score = 35;
+  if(dx===patient.id) score += 25; else score -= 8;
+  if(shock===patient.syn.shock) score += 12;
+  if(resp===patient.syn.resp) score += 12;
+  score += Math.min(24, patient.good.length*4);
+  score -= patient.bad.length*4;
+  score -= patient.critical.length*12;
+  if(mode==="arena" && wall<=0) score -= 6;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c];
+  });
+}
+function vitalsHtml(){
+  const p = patient;
+  const cell = function(label, value, bad){ return "<div><span>"+label+"</span><b class='"+(bad?"badn":"")+"'>"+value+"</b></div>"; };
+  return "<div class='vitals'>"+
+    cell("MAP", p.map, p.map<65)+
+    cell("BP", p.sbp+"/"+p.dbp, p.sbp<90||p.sbp>180)+
+    cell("HR", p.hr, p.hr>120||p.hr<50)+
+    cell("RR", p.rr, p.rr>24||p.rr<10)+
+    cell("SpO2", p.spo2+"%", p.spo2<92)+
+    cell("GCS", p.gcs, p.gcs<=8)+
+    cell("Glucose", p.glucose, p.glucose<70||p.glucose>180)+
+    cell("Clock", p.t+" min", false)+
+    "</div>";
+}
+function resultCards(){
+  const r = patient.results;
+  let html = "";
+  if(r.abg){
+    const g = r.abg;
+    html += "<div class='card'><h3>ABG</h3>pH "+g.ph+" · PaCO2 "+g.pco2+" mmHg · PaO2 "+g.po2+" mmHg · HCO3 "+g.hco3+" · lactate "+g.lactate+" mmol/L · base "+g.be+" · glucose "+g.glucose+" mg/dL"+(isLab()?"<p class='lead'>A high lactate is a perfusion problem until proved otherwise. The pH has to agree with the bicarbonate and the carbon dioxide.</p>":"")+"</div>";
+  }
+  if(r.labs){
+    const l = r.labs;
+    html += "<div class='card'><h3>Bloods</h3>"+
+      "Hb "+l.cbc.hb+" g/dL · white cells "+l.cbc.wbc+" · "+l.cbc.dlc+" · platelets "+l.cbc.plt+"<br>"+
+      "Urea "+l.rft.urea+" mg/dL · creatinine "+l.rft.creat+" mg/dL · GFR about "+l.rft.egfr+" · Na "+l.rft.na+" · K "+l.rft.k+"<br>"+
+      "Bilirubin "+l.lft.bili+" · AST "+l.lft.ast+" · ALT "+l.lft.alt+" · albumin "+l.lft.alb+" g/dL<br>"+
+      "PT "+l.coags.pt+" · INR "+l.coags.inr+" · aPTT "+l.coags.aptt+"<br>"+
+      "CRP "+l.inflam.crp+" mg/L · procalcitonin "+l.inflam.pct+" ng/mL"+
+      (isLab() && patient.id==="dka"?"<p class='lead'>In ketoacidosis, insulin waits if potassium is under 3.3 mmol/L.</p>":"")+
+      "</div>";
+  }
+  if(r.cxr){
+    html += "<div class='card'><h3>Chest radiograph</h3><p>"+escapeHtml(r.cxr.text)+"</p>"+(r.cxr.img?"<img class='film' alt='"+escapeHtml(r.cxr.cap)+"' src='"+r.cxr.img+"'>":"")+"</div>";
+  }
+  if(r.usg){
+    html += "<div class='card'><h3>Ultrasound</h3><p>"+escapeHtml(r.usg.text)+"</p>"+(r.usg.img?"<img class='film' alt='"+escapeHtml(r.usg.cap)+"' src='"+r.usg.img+"'>":"")+"</div>";
+  }
+  if(r.ct) html += "<div class='card'><h3>CT</h3><p>"+escapeHtml(r.ct)+"</p></div>";
+  if(r.echo){
+    const e = r.echo;
+    html += "<div class='card'><h3>Echo</h3>LV: "+escapeHtml(e.lv)+"<br>RV: "+escapeHtml(e.rv)+"<br>Wall motion: "+escapeHtml(e.rwma)+"<br>Pericardium: "+escapeHtml(e.pericardium)+"<br>IVC: "+escapeHtml(e.ivc);
+    if(!patient.echoRead){
+      html += "<p class='lead'>Your read.</p>"+
+        "<label class='f'>Left ventricle<select id='elv'><option value='high'>Hyperdynamic</option><option value='low'>Reduced</option><option value='rwma'>Regional wall-motion abnormality</option><option value='normal'>Normal</option></select></label>"+
+        "<label class='f'>Volume<select id='evol'><option value='underfilled'>Underfilled</option><option value='normal'>Normal</option><option value='overloaded'>Overloaded</option></select></label>"+
+        "<label class='f'>Obstruction<select id='eob'><option value='no'>No obstructive lesion</option><option value='yes'>Right-heart strain, tamponade, or chest pressure</option></select></label>"+
+        "<button class='next' type='button' id='echoGo'>Commit the echo read</button>";
+    } else html += "<p>Your read is filed.</p>";
+    html += "</div>";
+  }
+  return html;
+}
+function btn(id, label){ return "<button type='button' data-act='"+id+"'>"+label+"</button>"; }
+
+function renderPick(){
+  document.getElementById("modechip").textContent = mode==="arena"?"Practice arena":"Learning lab";
+  const app = document.getElementById("app");
+  const notes = [];
+  if(selected.indexOf("hypoBP")>=0 && selected.indexOf("hyperBP")>=0) notes.push("Blood pressure cannot be low and high at the same minute. The case will carry both, in that order.");
+  if(selected.indexOf("hypogly")>=0 && selected.indexOf("hypergly")>=0) notes.push("Glucose cannot be low and high together. You will meet the high value first.");
+  app.innerHTML = "<p class='kicker'>"+(mode==="arena"?"No hints. Twelve minutes.":"Hints on. The clock is clinical, not a countdown.")+"</p>"+
+    "<h2>What is wrong at the door?</h2>"+
+    "<p class='lead'>Select one abnormality, or several. The engine builds one illness that can hold all of them. It will not paste an unrelated scan onto an unrelated gas.</p>"+
+    "<div class='grid'>"+FLAGS.map(function(f){
+      const on = selected.indexOf(f.id)>=0;
+      return "<button type='button' class='alarm"+(on?" on":"")+"' data-flag='"+f.id+"' aria-pressed='"+(on?"true":"false")+"'><b>"+f.name+"</b><span>"+f.sub+"</span></button>";
+    }).join("")+"</div>"+
+    (notes.length?"<p class='lead'>"+notes.join(" ")+"</p>":"")+
+    "<button class='go' id='gen' type='button'"+(selected.length?"":" disabled")+">Generate the patient</button>"+
+    "<p class='foot'>Teaching cases. Not a prescription for a named patient.</p>";
+  app.querySelectorAll("[data-flag]").forEach(function(b){
+    b.onclick = function(){
+      const id = b.getAttribute("data-flag");
+      const i = selected.indexOf(id);
+      if(i>=0) selected.splice(i,1); else selected.push(id);
+      renderPick();
+    };
+  });
+  document.getElementById("gen").onclick = function(){
+    patient = buildPatient(selected);
+    finished = false;
+    wall = 12*60;
+    if(mode==="arena") startWall();
+    render();
+  };
+}
+function startWall(){
+  if(timer) clearInterval(timer);
+  timer = setInterval(function(){
+    wall -= 1;
+    const el = document.getElementById("wall");
+    if(el) el.textContent = fmt(wall);
+    if(wall<=0){ clearInterval(timer); timer = null; if(!finished) openSubmit(true); }
+  }, 1000);
+}
+function fmt(s){ s = Math.max(0,s); return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); }
+function render(){
+  if(!patient) return renderPick();
+  const p = patient;
+  const app = document.getElementById("app");
+  document.getElementById("modechip").textContent = mode==="arena"?"Practice · "+fmt(wall):"Learning lab";
+  app.innerHTML = "<p class='kicker'>"+escapeHtml(p.name)+" · "+p.age+"-year-old "+p.sex+" · "+p.wt+" kg · predicted body weight "+p.pbw+" kg</p>"+
+    (mode==="arena"?"<p class='lead'>Time <span class='clock' id='wall'>"+fmt(wall)+"</span></p>":"")+
+    (p.events.length?"<div class='card'><h3>Event</h3><p>"+escapeHtml(p.events[p.events.length-1])+"</p></div>":"")+
+    vitalsHtml()+
+    "<div class='card'><h3>"+escapeHtml(p.complaint)+"</h3><p>"+escapeHtml(p.story)+"</p><p>"+escapeHtml(p.exam)+"</p><p>History: "+escapeHtml(p.pmh)+" Drugs: "+escapeHtml(p.meds)+"</p></div>"+
+    (isLab()?"<div class='card hint'><h3>Hint</h3>"+escapeHtml(p.syn.hint)+"</div>":"")+
+    "<details open><summary>Investigations</summary><div class='opts'>"+
+      btn("abg","ABG, with lactate")+btn("labs","Bloods — count, renal, liver, coagulation, CRP")+btn("usg","Ultrasound — lung, abdomen, IVC")+btn("cxr","Chest radiograph")+btn("ct","CT")+btn("echo","Echo")+
+    "</div></details>"+
+    resultCards()+
+    "<details open><summary>Oxygen and the ventilator</summary><div class='opts'>"+
+      btn("room","Room air")+btn("np","Nasal prongs")+btn("fm","Face mask")+btn("nrb","Non-rebreather")+btn("hfnc","High-flow nasal oxygen")+btn("cpap","NIV — CPAP")+btn("bipap","NIV — BiPAP")+btn("imv","Invasive ventilation")+
+    "</div>"+ventHtml()+"</details>"+
+    "<details><summary>Fluids, pressure, and urine</summary><div class='opts'>"+
+      btn("rl500","Balanced crystalloid 500 mL")+btn("ns500","Normal saline 500 mL")+btn("rl250","Balanced crystalloid 250 mL")+btn("diuretic","Furosemide 40 mg IV")+
+      btn("norepi","Norepinephrine 0.05 mcg/kg/min")+btn("dobutamine","Dobutamine 2.5 mcg/kg/min")+btn("vaso","Vasopressin 0.03 units/min")+btn("stoppress","Stop the vasopressor")+
+      btn("gtn","GTN infusion, start 10 mcg/min")+btn("nicardipine","Nicardipine infusion")+btn("labetalol","Labetalol bolus")+
+    "</div></details>"+
+    "<details><summary>Antibiotics</summary><label class='check'><input id='renal' type='checkbox' "+(p.renal?"checked":"")+"> Renal dose</label><div class='opts'>"+
+      btn("ctx-azi","Ceftriaxone 2 g daily + azithromycin 500 mg")+btn("piptazo","Piperacillin-tazobactam 4.5 g every 6 h")+btn("mero","Meropenem 1 g every 8 h")+btn("vanc","Vancomycin alone, 15 mg/kg")+
+    "</div></details>"+
+    "<details><summary>Glucose, potassium, blood, and procedures</summary><div class='opts'>"+
+      btn("sedation","Fentanyl, then propofol if the airway is secure")+btn("d50","Dextrose 50%, 50 mL")+btn("insulin","Insulin infusion 0.1 units/kg/h")+btn("kcl","Potassium chloride replacement")+btn("dexinf","Dextrose infusion beside insulin")+btn("bicarb","Sodium bicarbonate")+
+      btn("blood","One unit of blood")+btn("pcc","Reverse warfarin")+btn("ppi","Proton-pump inhibitor infusion")+btn("aspirin","Aspirin 300 mg")+btn("heparin","Treatment-dose heparin")+btn("lytic","Thrombolysis")+
+      btn("decompress","Decompress the pleura")+btn("drain","Chest drain")+btn("naloxone","Naloxone, titrated")+btn("head","Head up, neck straight")+btn("osmotic","Hypertonic saline or mannitol")+
+    "</div></details>"+
+    "<div class='card'><h3>Course</h3><ul class='log'>"+(p.log.slice(0,8).map(function(l){ return "<li>"+l.t+" min — "+escapeHtml(l.text)+"</li>"; }).join("")||"<li>No action yet.</li>")+"</ul></div>"+
+    "<button class='next' id='reassess' type='button'>Reassess in 15 minutes</button>"+
+    "<button class='next' id='submit' type='button'>Submit the diagnosis</button>";
+  app.querySelectorAll("[data-act]").forEach(function(b){
+    b.onclick = function(){ onAct(b.getAttribute("data-act")); };
+  });
+  const renal = document.getElementById("renal");
+  if(renal) renal.onchange = function(){ patient.renal = renal.checked; };
+  const echoGo = document.getElementById("echoGo");
+  if(echoGo) echoGo.onclick = function(){
+    commitEcho(document.getElementById("elv").value, document.getElementById("evol").value, document.getElementById("eob").value);
+  };
+  document.getElementById("reassess").onclick = function(){ tick(15); note("Fifteen minutes passed.", "Fifteen minutes passed."); render(); };
+  document.getElementById("submit").onclick = function(){ openSubmit(false); };
+  bindVent();
+}
+function ventHtml(){
+  const v = patient.vent;
+  const niv = patient.support==="cpap"||patient.support==="bipap";
+  const imv = patient.support==="imv";
+  if(!niv && !imv) return "<p class='lead'>The ventilator panel opens when you choose NIV or a tube.</p>";
+  if(niv){
+    return "<p class='lead'>NIV. Predicted body weight "+patient.pbw+" kg.</p>"+
+      slider("ipap","IPAP", v.ipap, 8, 24, 1)+" "+slider("epap","EPAP", v.epap, 4, 14, 1)+
+      slider("fio2","FiO2 %", v.fio2, 30, 100, 5)+" "+slider("backup","Backup rate", v.backup, 8, 24, 1)+
+      slider("rise","Rise time, s", v.rise, 0.1, 0.6, 0.1)+" "+slider("ti","Inspiratory time, s", v.ti, 0.6, 1.6, 0.1)+
+      "<label class='f'>Mask<select id='mask'><option value='nasal'>Nasal</option><option value='oronasal'>Oronasal</option><option value='full'>Full face</option><option value='helmet'>Helmet</option></select></label>"+
+      "<button class='next' type='button' id='applyVent'>Apply NIV settings</button>";
+  }
+  return "<p class='lead'>Invasive ventilation. Predicted body weight "+patient.pbw+" kg. A tidal volume of 6 mL/kg is "+Math.round(6*patient.pbw)+" mL.</p>"+
+    "<label class='f'>Mode<select id='modev'><option>VC-AC</option><option>PC-AC</option><option>SIMV</option><option>PS</option></select></label>"+
+    slider("tv","Tidal volume, mL", v.tv, 200, 800, 10)+" "+slider("vrr","Set rate", v.rr, 10, 30, 1)+
+    slider("peep","PEEP", v.peep, 0, 18, 1)+" "+slider("fio2","FiO2 %", v.fio2, 30, 100, 5)+
+    slider("ps","Pressure support", v.ps, 0, 20, 1)+
+    "<label class='f'>I:E<select id='ie'><option>1:1</option><option>1:2</option><option>1:3</option></select></label>"+
+    "<button class='next' type='button' id='applyVent'>Apply ventilator settings</button>";
+}
+function slider(id, label, value, min, max, step){
+  return "<label class='row'>"+label+" <input id='"+id+"' type='range' min='"+min+"' max='"+max+"' step='"+step+"' value='"+value+"'><b id='"+id+"v'>"+value+"</b></label>";
+}
+function bindVent(){
+  ["ipap","epap","fio2","backup","rise","ti","tv","vrr","peep","ps"].forEach(function(id){
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.oninput = function(){ const o = document.getElementById(id+"v"); if(o) o.textContent = el.value; };
+  });
+  const mask = document.getElementById("mask");
+  if(mask) mask.value = patient.vent.mask;
+  const modev = document.getElementById("modev");
+  if(modev) modev.value = patient.vent.mode;
+  const ie = document.getElementById("ie");
+  if(ie) ie.value = patient.vent.ie;
+  const apply = document.getElementById("applyVent");
+  if(!apply) return;
+  apply.onclick = function(){
+    const v = patient.vent;
+    const g = function(id){ const el = document.getElementById(id); return el? +el.value : null; };
+    if(patient.support==="imv"){
+      v.mode = document.getElementById("modev").value;
+      v.tv = g("tv"); v.rr = g("vrr"); v.peep = g("peep"); v.fio2 = g("fio2"); v.ps = g("ps");
+      v.ie = document.getElementById("ie").value;
+    } else {
+      v.ipap = g("ipap"); v.epap = g("epap"); v.fio2 = g("fio2"); v.backup = g("backup");
+      v.rise = g("rise"); v.ti = g("ti"); v.mask = document.getElementById("mask").value;
+    }
+    applyVent();
+  };
+}
+function onAct(act){
+  if(act==="abg"||act==="labs"||act==="usg"||act==="cxr"||act==="ct"||act==="echo") return orderTest(act);
+  if(["room","np","fm","nrb","hfnc","cpap","bipap","imv"].indexOf(act)>=0) return setSupport(act);
+  if(act==="rl500") return bolus(500,"balanced");
+  if(act==="ns500") return bolus(500,"saline");
+  if(act==="rl250") return bolus(250,"balanced");
+  if(act==="diuretic") return giveDiuretic();
+  if(act==="norepi"||act==="dobutamine"||act==="vaso") return givePressor(act);
+  if(act==="stoppress") return givePressor("none");
+  if(act==="gtn"||act==="nicardipine"||act==="labetalol") return giveBPDrug(act);
+  if(act==="ctx-azi"||act==="piptazo"||act==="mero"||act==="vanc") return giveAbx(act);
+  if(act==="sedation") return giveSedation();
+  if(act==="d50"||act==="insulin"||act==="kcl"||act==="dexinf"||act==="bicarb") return giveMetabolic(act);
+  return procedure(act);
+}
+function openSubmit(timedOut){
+  finished = true;
+  if(timer){ clearInterval(timer); timer = null; }
+  const p = patient;
+  const app = document.getElementById("app");
+  app.innerHTML = vitalsHtml()+
+    "<h2>"+(timedOut?"Time is up.":"Your diagnosis.")+"</h2>"+
+    "<p class='lead'>"+escapeHtml(p.name)+". Submit the illness, the shock, and the respiratory failure.</p>"+
+    "<label class='f'>Primary diagnosis<select id='dx'>"+DX.map(function(d){ return "<option value='"+d[0]+"'>"+d[1]+"</option>"; }).join("")+"</select></label>"+
+    "<label class='f'>Shock<select id='shock'><option value='distributive'>Distributive</option><option value='cardiogenic'>Cardiogenic</option><option value='hypovolemic'>Hypovolemic</option><option value='obstructive'>Obstructive</option><option value='none'>No shock</option></select></label>"+
+    "<label class='f'>Respiratory failure<select id='resp'><option value='type1'>Type 1, hypoxemic</option><option value='type2'>Type 2, hypercapnic</option><option value='mixed'>Mixed</option><option value='none'>No respiratory failure</option></select></label>"+
+    "<label class='f'>Leading alternative<select id='alt'>"+DX.map(function(d){ return "<option value='"+d[0]+"'>"+d[1]+"</option>"; }).join("")+"</select></label>"+
+    "<label class='f'>Management you would write in the notes<textarea id='plan' placeholder='Airway, the circulation, the specific drug, and what you would recheck.'></textarea></label>"+
+    "<button class='go' id='done' type='button'>Score this case</button>";
+  document.getElementById("done").onclick = function(){
+    showScore(document.getElementById("dx").value, document.getElementById("shock").value, document.getElementById("resp").value, document.getElementById("alt").value, document.getElementById("plan").value);
+  };
+}
+function showScore(dx, shock, resp, alt, plan){
+  const p = patient;
+  const sc = scorePatient(dx, shock, resp);
+  const nameOf = function(id){ return (DX.filter(function(d){ return d[0]===id; })[0]||["",id])[1]; };
+  const dxName = nameOf(dx);
+  const right = nameOf(p.id);
+  const altName = nameOf(alt);
+  plan = (plan||"").trim();
+  const shockOk = shock===p.syn.shock;
+  const respOk = resp===p.syn.resp;
+  document.getElementById("app").innerHTML =
+    "<p class='kicker'>Score</p><h2>"+sc+" / 100</h2>"+
+    "<div class='teach"+(dx===p.id?"":" miss")+"'>You said "+escapeHtml(dxName)+". The illness was "+escapeHtml(right)+".</div>"+
+    "<div class='teach"+(shockOk?"":" miss")+"'>Shock: you said "+escapeHtml(shock)+". It was "+escapeHtml(p.syn.shock)+".</div>"+
+    "<div class='teach"+(respOk?"":" miss")+"'>Respiratory failure: you said "+escapeHtml(resp)+". It was "+escapeHtml(p.syn.resp)+".</div>"+
+    "<div class='card'><h3>Differential</h3>You also named "+escapeHtml(altName)+"."+(alt===p.id && dx!==p.id?" That alternative was the illness.":alt===dx?" It was the same as the primary diagnosis.":"")+"</div>"+
+    "<div class='card'><h3>Your management note</h3>"+(plan?escapeHtml(plan):"No note written.")+"</div>"+
+    "<div class='card'><h3>What helped</h3>"+(p.good.length?p.good.map(escapeHtml).join("<br>"):"Nothing recorded as clearly helpful.")+"</div>"+
+    "<div class='card'><h3>What did not fit</h3>"+(p.bad.length?p.bad.map(escapeHtml).join("<br>"):"No suboptimal calls recorded.")+"</div>"+
+    "<div class='card'><h3>Critical errors</h3>"+(p.critical.length?p.critical.map(escapeHtml).join("<br>"):"None recorded.")+"</div>"+
+    "<div class='card'><h3>Timeline</h3>"+(p.timeline.map(escapeHtml).join("<br>")||"No actions.")+"</div>"+
+    "<div class='card'><h3>Expert pathway</h3>"+p.syn.expert.map(function(s){ return "<p>"+escapeHtml(s)+"</p>"; }).join("")+"</div>"+
+    "<button class='go' id='again' type='button'>Another patient</button>"+
+    "<p class='foot'>Teaching cases. Not a prescription for a named patient.</p>";
+  document.getElementById("again").onclick = function(){ patient = null; selected = []; finished = false; renderPick(); };
+}
+function showDoors(){
+  document.getElementById("modechip").textContent = "";
+  document.getElementById("app").innerHTML =
+    "<p class='kicker'>One engine. Two doors.</p>"+
+    "<div class='grid'>"+
+      "<button type='button' class='alarm' id='doorLab'><b>Learning lab</b><span>The reason is said out loud after every decision.</span></button>"+
+      "<button type='button' class='alarm' id='doorArena'><b>Practice arena</b><span>No hints. Twelve minutes. The patient still answers.</span></button>"+
+    "</div>";
+  document.getElementById("doorLab").onclick = function(){ mode = "lab"; renderPick(); };
+  document.getElementById("doorArena").onclick = function(){ mode = "arena"; renderPick(); };
+}
+function start(){
+  const q = new URLSearchParams(location.search);
+  const m = q.get("mode");
+  document.getElementById("back").onclick = function(){
+    if(timer) clearInterval(timer);
+    if(history.length>1){ history.back(); return; }
+    location.href = "index.html";
+  };
+  if(m==="lab"||m==="arena"){ mode = m; renderPick(); }
+  else showDoors();
+}
+if(typeof document!=="undefined") start();
+</script>
+</body>
+</html>
