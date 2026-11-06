@@ -31,7 +31,10 @@ h1 { font-size:20px; margin:0 0 4px; }
 .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:end; }
 label.mini { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
 select, input[type="number"] { background:var(--input); border:1px solid var(--line); border-radius:8px; padding:8px 10px; min-height:38px; }
-.stock { display:flex; gap:8px; align-items:center; background:var(--card2); border:1px solid var(--line); border-radius:10px; padding:8px 10px; font-size:13px; color:var(--ink); text-transform:none; letter-spacing:0; font-weight:600; }
+.india { margin-top:12px; border:1px solid var(--line); border-radius:12px; padding:10px 12px 4px; background:var(--card2); }
+.india p { margin:0 0 8px; }
+.india-grid { display:flex; flex-wrap:wrap; gap:8px; }
+.india-grid label { display:flex; gap:6px; align-items:center; font-size:13px; font-weight:600; color:var(--ink); background:var(--card); border:1px solid var(--line); border-radius:10px; padding:8px 10px; }
 .ghost { background:var(--chip); border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
 nav { display:flex; gap:8px; overflow:auto; padding-top:12px; }
 .tab-btn { border:1px solid var(--line); background:var(--chip); color:var(--muted); border-radius:10px; padding:8px 12px; white-space:nowrap; font-size:13px; font-weight:700; }
@@ -101,7 +104,7 @@ html.light .cell.resistant { background:#fee2e2; color:#991b1b; }
       <div>
         <a class="hub" href="hub.html">Back to hub</a>
         <h1>IDSA antibiotic selection and resistance</h1>
-        <p class="sub">IDSA 2026 suggestions for resistant gram-negative infections in the United States. Cefiderocol stays off unless you say it is in stock. Source: Tamma et al., Clin Infect Dis 2026, doi 10.1093/cid/ciag481. Current to March 1, 2026.</p>
+        <p class="sub">IDSA 2026 suggestions for resistant gram-negative infections. Drugs that are often not stocked in India stay off until you tick them. If a first drug is unticked, the next drug that is stocked becomes the choice. Source: Tamma et al., Clin Infect Dis 2026, doi 10.1093/cid/ciag481. Current to March 1, 2026.</p>
       </div>
       <div class="controls">
         <label class="mini">Clearance
@@ -117,17 +120,17 @@ html.light .cell.resistant { background:#fee2e2; color:#991b1b; }
         <label class="mini">Weight kg
           <input id="wtKg" type="number" min="30" max="200" value="70" oninput="refreshAll()">
         </label>
-        <label class="stock"><input id="fideStock" type="checkbox" onchange="refreshAll()"> Cefiderocol is in stock</label>
-        <select id="presetSelect" onchange="loadScenarioPreset(this.value)">
-          <option value="">Load a case</option>
-          <option value="oxa48_uti">OXA-48 urine infection</option>
-          <option value="ndm_sepsis">NDM septic shock</option>
-          <option value="dual_producer">NDM plus OXA-48</option>
-          <option value="crab_vap">CRAB pneumonia</option>
-          <option value="esbl_bacteremia">ESBL bacteremia</option>
-          <option value="ampc_bacteremia">AmpC bacteremia</option>
-          <option value="dtr_p_aeruginosa">Difficult Pseudomonas</option>
-        </select>
+        <label class="mini">Load a case
+          <select id="presetSelect" onchange="loadScenarioPreset(this.value)">
+            <option value="oxa48">OXA-48</option>
+            <option value="ndm_mbl">NDM</option>
+            <option value="dual_ndm_oxa">NDM plus OXA-48</option>
+            <option value="crab">CRAB</option>
+            <option value="esbl">ESBL</option>
+            <option value="ampc">AmpC</option>
+            <option value="dtr_p_aeruginosa">Difficult Pseudomonas</option>
+          </select>
+        </label>
         <button class="ghost" id="themeIcon" onclick="toggleTheme()">Light</button>
       </div>
     </div>
@@ -137,6 +140,18 @@ html.light .cell.resistant { background:#fee2e2; color:#991b1b; }
       <button class="tab-btn" id="tab-matrix" onclick="switchTab('matrix')">3. Matrix</button>
       <button class="tab-btn" id="tab-pkpd" onclick="switchTab('pkpd')">4. PK sketch</button>
     </nav>
+    <div class="india" id="indiaStock">
+      <p class="kicker">Often unavailable in India. Tick only what this hospital has.</p>
+      <div class="india-grid">
+        <label><input type="checkbox" data-stock="cefiderocol" onchange="refreshAll()"> Cefiderocol</label>
+        <label><input type="checkbox" data-stock="merovab" onchange="refreshAll()"> Meropenem-vaborbactam</label>
+        <label><input type="checkbox" data-stock="imirele" onchange="refreshAll()"> Imipenem-relebactam</label>
+        <label><input type="checkbox" data-stock="ceftolozane" onchange="refreshAll()"> Ceftolozane-tazobactam</label>
+        <label><input type="checkbox" data-stock="sulbactam" onchange="refreshAll()"> Sulbactam-durlobactam</label>
+        <label><input type="checkbox" data-stock="atmavi" onchange="refreshAll()"> Aztreonam-avibactam</label>
+        <label><input type="checkbox" data-stock="cefepimeenme" onchange="refreshAll()"> Cefepime-enmetazobactam</label>
+      </div>
+    </div>
   </div>
 </header>
 <main class="wrap">
@@ -311,11 +326,19 @@ html.light .cell.resistant { background:#fee2e2; color:#991b1b; }
             <option value="cefiderocol">Cefiderocol</option>
           </optgroup>
           <optgroup label="Other ICU antibiotics">
+            <option value="ertapenem">Ertapenem</option>
+            <option value="ampicillin">Ampicillin</option>
             <option value="vancomycin">Vancomycin</option>
+            <option value="teicoplanin">Teicoplanin</option>
             <option value="linezolid">Linezolid</option>
             <option value="daptomycin">Daptomycin</option>
             <option value="ciprofloxacin">Ciprofloxacin</option>
+            <option value="levofloxacin">Levofloxacin</option>
             <option value="amikacin">Amikacin</option>
+            <option value="gentamicin">Gentamicin</option>
+            <option value="polymyxin">Polymyxin B</option>
+            <option value="tigecycline">Tigecycline</option>
+            <option value="metronidazole">Metronidazole</option>
           </optgroup>
         </select>
       </label>
@@ -354,7 +377,8 @@ var currentTab='empirical', currentFilter='all', currentMechanism='oxa48';
 var BETA={cefepime:1,piptazo:1,meropenem:1,ceftriaxone:1,ertapenem:1,cefazolin:1,aztreonam:1,ceftazavi:1,cefepimeenme:1,merovab:1,imirele:1,ceftolozane:1,cefiderocol:1,sulbactam:1};
 function $(id){ return document.getElementById(id); }
 function band(){ return $('renalBand').value; }
-function fideOn(){ return $('fideStock').checked; }
+function stocked(id){ var el=document.querySelector('#indiaStock input[data-stock="'+id+'"]'); return !!(el && el.checked); }
+function fideOn(){ return stocked('cefiderocol'); }
 function wt(){ var n=parseFloat($('wtKg').value); return n>20?n:70; }
 function icuOn(){ return $('empSetting').value==='icu'; }
 function renalName(){
@@ -481,8 +505,12 @@ function updateEmpirical(){
 }
 function fillDtr(){
   var sel=$('dtrChoice'), prev=sel.value;
-  var opts=[['ceftolozane','Ceftolozane-tazobactam'],['ceftazavi','Ceftazidime-avibactam'],['imirele','Imipenem-relebactam'],['none','None of these is susceptible'],['mbl','Carbapenemase found: MBL (NDM, VIM, IMP)']];
-  if(fideOn()) opts.splice(3,0,['cefiderocol','Cefiderocol']);
+  var opts=[];
+  if(stocked('ceftolozane')) opts.push(['ceftolozane','Ceftolozane-tazobactam']);
+  opts.push(['ceftazavi','Ceftazidime-avibactam']);
+  if(stocked('imirele')) opts.push(['imirele','Imipenem-relebactam']);
+  if(fideOn()) opts.push(['cefiderocol','Cefiderocol']);
+  opts.push(['none','None of these is susceptible'],['mbl','Carbapenemase found: MBL (NDM, VIM, IMP)']);
   sel.innerHTML=opts.map(function(x){ return '<option value="'+x[0]+'">'+x[1]+'</option>'; }).join('');
   if(opts.some(function(x){ return x[0]===prev; })) sel.value=prev;
   else if(prev==='cefiderocol') sel.value='none';
@@ -522,48 +550,69 @@ function renderDirected(){
   var preferred='', note='', alts='';
   if(key==='esbl'){
     if($('dirSite').value==='urine'){
-      preferred='Complicated urine infection. If the isolate is susceptible: TMP-SMX, ciprofloxacin, or levofloxacin, and move to the oral drug once stable. '+doseOf('ciprofloxacin')+'. If those cannot be used: '+nd(doseOf('cefepimeenme'))+'; or a carbapenem: '+nd(doseOf('ertapenem',o))+' (meropenem if critically ill).';
-      note='ESBL complicated UTI, IDSA 2026. Preferred when susceptible: TMP-SMX, ciprofloxacin, or levofloxacin. Then cefepime-enmetazobactam or a carbapenem. Alternatives: IV fosfomycin 6 g every 8 hours over 1 hour (E. coli, and mind the sodium load), a once-daily aminoglycoside, or piperacillin-tazobactam only when the patient is not critically ill and not bacteremic.';
+      preferred='Complicated urine infection. If the isolate is susceptible: TMP-SMX, ciprofloxacin, or levofloxacin, and move to the oral drug once stable. '+doseOf('ciprofloxacin')+'. If those cannot be used: a carbapenem, '+nd(doseOf('ertapenem',o))+' (meropenem if critically ill)'+(stocked('cefepimeenme')?'; or '+nd(doseOf('cefepimeenme')):'')+'.';
+      note='ESBL complicated UTI. Preferred when susceptible: TMP-SMX, ciprofloxacin, or levofloxacin. A carbapenem is the next choice.'+(stocked('cefepimeenme')?' Cefepime-enmetazobactam is in stock and can be used.':' Cefepime-enmetazobactam is not in stock.');
       alts='Uncomplicated cystitis, preferred oral options: one aminoglycoside dose, gepotidacin 1.5 g every 12 hours, nitrofurantoin 100 mg every 12 hours, pivmecillinam 370 mg every 8 hours, sulopenem etzadroxil-probenecid 500 mg / 500 mg every 12 hours, or TMP-SMX 160 mg of trimethoprim every 12 hours. Oral fosfomycin 3 g once is an alternative for E. coli only.';
     } else {
       preferred=icuOn()?doseOf('meropenem',o)+'. Meropenem or imipenem is preferred over ertapenem in the critically ill or with a low albumin.':doseOf('ertapenem',o)+'. Or '+doseOf('meropenem',o);
-      note='ESBL outside the urine, IDSA 2026. Ertapenem, imipenem, and meropenem are preferred. Move to ciprofloxacin, levofloxacin, or TMP-SMX only when the isolate is susceptible, the patient is stable, and the gut absorbs.';
-      alts=nd(doseOf('cefepimeenme',o))+'. This is an alternative outside the urinary tract.';
+      note='ESBL outside the urine. A carbapenem is the drug of choice. Move to ciprofloxacin, levofloxacin, or TMP-SMX only when the isolate is susceptible, the patient is stable, and the gut absorbs.';
+      alts=stocked('cefepimeenme')?nd(doseOf('cefepimeenme',o))+'. This is an alternative outside the urinary tract.':'Cefepime-enmetazobactam is not in stock. A carbapenem remains the drug of choice.';
     }
   } else if(key==='kpc'){
-    preferred=doseOf('merovab',o)+'. Also preferred: '+doseOf('ceftazavi',o)+'. And '+doseOf('imirele',o)+'.';
-    note='KPC, IDSA 2026. Meropenem-vaborbactam has a slight edge. Ceftazidime-avibactam and imipenem-relebactam are the other preferred agents. Resistance on treatment is reported more often with ceftazidime-avibactam.';
-    alts=(fideOn()?doseOf('cefiderocol',o)+' if susceptible. ':'Cefiderocol is not in stock. ')+doseOf('atmavi');
+    if(stocked('merovab')){
+      preferred=doseOf('merovab',o)+'.';
+      note='KPC. Meropenem-vaborbactam is in stock, so it is the drug of choice. Ceftazidime-avibactam is the next agent.';
+      alts=doseOf('ceftazavi',o)+'.'+(stocked('imirele')?' '+doseOf('imirele',o)+'.':'')+(fideOn()?' '+doseOf('cefiderocol',o)+' if susceptible.':'');
+    } else {
+      preferred=doseOf('ceftazavi',o)+'.';
+      note='Meropenem-vaborbactam is not in stock. Ceftazidime-avibactam is the drug of choice. This is the agent used for KPC in India.';
+      alts=(stocked('imirele')?doseOf('imirele',o)+'. ':'Imipenem-relebactam is not in stock. ')+(fideOn()?doseOf('cefiderocol',o)+' if susceptible. ':'Cefiderocol is not in stock. ')+(stocked('atmavi')?doseOf('atmavi')+'.':'');
+    }
   } else if(key==='oxa48'){
     preferred=doseOf('ceftazavi',o);
-    note='OXA-48-like, IDSA 2026. Ceftazidime-avibactam is preferred. Meropenem-vaborbactam and imipenem-relebactam do not inhibit this enzyme.';
-    alts=doseOf('atmavi')+(fideOn()?'. If susceptible: '+doseOf('cefiderocol',o):'. Cefiderocol is not in stock.');
+    note='OXA-48-like. Ceftazidime-avibactam is the drug of choice. Meropenem-vaborbactam and imipenem-relebactam do not inhibit this enzyme.';
+    alts=(stocked('atmavi')?doseOf('atmavi')+'. ':'Aztreonam-avibactam is not in stock. ')+(fideOn()?doseOf('cefiderocol',o)+' if susceptible.':'Cefiderocol is not in stock, so ceftazidime-avibactam remains the choice.');
   } else if(key==='ndm_mbl'||key==='dual_ndm_oxa'){
-    preferred=doseOf('atmavi')+(fideOn()?'. Or, if susceptible: '+doseOf('cefiderocol',o)+'.':'');
-    note=key==='dual_ndm_oxa'?'NDM plus OXA-48, IDSA 2026. Aztreonam-avibactam covers both enzymes. Cefiderocol is the other preferred option when it is susceptible.':'NDM or another MBL, IDSA 2026. Aztreonam-avibactam and cefiderocol are preferred. Ceftazidime-avibactam plus aztreonam is the alternative when the combination product is not stocked.';
-    alts='If aztreonam-avibactam is not stocked: '+doseOf('ceftazavi',o)+' plus '+doseOf('aztreonam',o)+', infused together over 3 hours.'+(fideOn()?'':' Cefiderocol is not in stock.');
+    var both=key==='dual_ndm_oxa';
+    if(stocked('atmavi')){
+      preferred=doseOf('atmavi')+(fideOn()?'. Or, if susceptible: '+doseOf('cefiderocol',o)+'.':'');
+      note=both?'NDM plus OXA-48. Aztreonam-avibactam is in stock and covers both enzymes.':'NDM or another MBL. Aztreonam-avibactam is in stock, so it is the drug of choice.';
+      alts='If that product cannot be given: '+doseOf('ceftazavi',o)+' plus '+doseOf('aztreonam',o)+', infused together over 3 hours.';
+    } else if(fideOn()){
+      preferred=doseOf('cefiderocol',o)+'.';
+      note='Aztreonam-avibactam is not in stock. Cefiderocol is the drug of choice if the isolate is susceptible.';
+      alts='Also used where the product is not stocked: '+doseOf('ceftazavi',o)+' plus '+doseOf('aztreonam',o)+', infused together over 3 hours.';
+    } else {
+      preferred=doseOf('ceftazavi',o)+' plus '+doseOf('aztreonam',o)+', infused together over 3 hours.';
+      note=(both?'NDM plus OXA-48. ':'NDM or another MBL. ')+'Aztreonam-avibactam and cefiderocol are not in stock. Ceftazidime-avibactam plus aztreonam is the drug of choice. This is the regimen used for NDM in India.';
+      alts='Give both at the same time. Avibactam is given as ceftazidime-avibactam. There is no separate avibactam vial.';
+    }
   } else if(key==='ampc'){
     preferred='If the cefepime MIC is 8 mg/L or less and no ESBL gene has been found: '+doseOf('cefepime',o)+'. If the MIC is higher, or an ESBL is present: '+doseOf('meropenem',o)+'.';
     note='Inducible AmpC, IDSA 2026. Cefepime is preferred when the MIC is 8 mg/L or less and there is no ESBL. Not ceftriaxone, and not piperacillin-tazobactam, for invasive infection. Ceftriaxone already running in a non-severe, improving infection with source control may be finished.';
     alts='A carbapenem if cefepime is not appropriate. Keep ceftazidime-avibactam for carbapenem resistance.';
   } else if(key==='dtr_p_aeruginosa'){
-    var choice=$('dtrChoice').value||'ceftolozane';
+    var choice=$('dtrChoice').value||(stocked('ceftolozane')?'ceftolozane':'ceftazavi');
+    if(!stocked('ceftolozane') && choice==='ceftolozane') choice='ceftazavi';
     if(choice==='mbl'){
-      preferred=fideOn()?doseOf('cefiderocol',o):'Cefiderocol is not in stock. Alternative regimen: '+nd(doseOf('atmavi'))+', or '+nd(doseOf('ceftazavi',o))+' plus '+nd(doseOf('aztreonam',o))+', infused together. These are the MBL regimens used for Enterobacterales, not an IDSA suggestion for Pseudomonas. Confirm susceptibility and call infectious diseases.';
-      note='MBL-producing Pseudomonas, IDSA 2026. Cefiderocol is preferred. Ceftolozane-tazobactam, ceftazidime-avibactam, and imipenem-relebactam do not inhibit an MBL.';
+      preferred=fideOn()?doseOf('cefiderocol',o):'Cefiderocol is not in stock. Ceftazidime-avibactam plus aztreonam is the regimen used for an MBL in Enterobacterales. It is not an established choice for Pseudomonas. Confirm the report and call infectious diseases.';
+      note='MBL-producing Pseudomonas. Cefiderocol is the preferred drug when it is in stock. Ceftolozane-tazobactam, ceftazidime-avibactam, and imipenem-relebactam do not inhibit an MBL.';
     } else if(choice==='none'||(choice==='cefiderocol'&&!fideOn())){
       preferred=rescue(urine);
       note=urine?'None of the newer agents is active, and this is urine. Colistin.':'None of the newer agents is active. Polymyxin B. Not for urine.';
     } else if(choice==='cefiderocol'){
       preferred=doseOf('cefiderocol',o);
       note='Cefiderocol is in stock and the report says susceptible.';
+    } else if(choice==='ceftazavi' && !stocked('ceftolozane')){
+      preferred=doseOf('ceftazavi',o);
+      note='Ceftolozane-tazobactam is not in stock. Ceftazidime-avibactam is the drug of choice if the isolate is susceptible.';
     } else {
       preferred=doseOf(choice,o);
-      note=lung?'Pneumonia, IDSA 2026. Ceftolozane-tazobactam is preferred, at the 3 g dose.':'Outside the lung, use a susceptible newer agent. Ceftolozane-tazobactam is 1.5 g when this is not pneumonia. For urine, cefiderocol is also a preferred option.';
+      note=lung?'Pneumonia. Ceftolozane-tazobactam is preferred, at the 3 g dose.':'Outside the lung, use a susceptible newer agent. Ceftolozane-tazobactam is 1.5 g when this is not pneumonia.';
     }
-    alts=choice==='mbl'?'Repeat susceptibility testing if the patient relapses on treatment.':fideOn() && choice!=='cefiderocol' ? 'Cefiderocol, if susceptible: '+doseOf('cefiderocol',o) : (choice==='none'?'Cefiderocol is not in stock, and no other newer agent is active here. This needs infectious diseases and the laboratory.':'Cefiderocol is not in stock. Other preferred agents, if the isolate is susceptible: '+['ceftolozane','ceftazavi','imirele'].filter(function(x){return x!==choice;}).map(function(x){return nd(doseOf(x,o));}).join('; ')+'.');
+    alts=choice==='mbl'?'Repeat susceptibility testing if the patient relapses on treatment.':fideOn() && choice!=='cefiderocol' ? 'Cefiderocol, if susceptible: '+doseOf('cefiderocol',o) : 'Cefiderocol is not in stock.';
   } else if(key==='crab'){
-    var role=$('crabRole').value, sd=$('sdAvail').value, mbl=$('crabMbl').value==='yes', partner=$('crabPartner').value;
+    var role=$('crabRole').value, mbl=$('crabMbl').value==='yes', partner=$('crabPartner').value;
     if(role==='colon'){
       preferred='No antibiotic.';
       note='CRAB colonization. Do not treat it.';
@@ -573,34 +622,30 @@ function renderDirected(){
       note='';
       alts='';
     } else if(mbl){
-      note='NDM or another MBL in CRAB. Durlobactam does not inhibit a metallo-beta-lactamase, so sulbactam-durlobactam cannot be relied on. IDSA 2026 gives a separate approach for NDM-producing CRAB. Summaries of the guidance list cefiderocol, minocycline, polymyxin B, or tigecycline, and the evidence is scant. Check the guidance and call infectious diseases.';
-      preferred='Choose by susceptibility, never polymyxin B alone. Options: '+(fideOn()?nd(doseOf('cefiderocol',o))+'; ':'cefiderocol (not in stock); ')+nd(doseOf('minocycline',o))+'; '+nd(rescue(urine))+(tigeOk()?'; '+nd(doseOf('tigecycline',o)):'')+'.';
-      alts=fideOn()?'If the laboratory reports no MBL, use the sulbactam-durlobactam pathway instead.':'Cefiderocol is not in stock. Alternative regimen: two active non-sulbactam agents chosen by susceptibility, minocycline plus polymyxin B'+(tigeOk()?', or tigecycline in place of one of them at this site':'')+'. If the laboratory reports no MBL, use the sulbactam-durlobactam pathway instead.';
-    } else if(sd==='yes'){
+      note='NDM or another MBL in CRAB. Durlobactam does not inhibit a metallo-beta-lactamase. Choose by the report. Never use polymyxin B alone.';
+      preferred=(fideOn()?doseOf('cefiderocol',o)+' if susceptible. Otherwise ':'Cefiderocol is not in stock. ')+'The drugs of choice are two active agents from minocycline, polymyxin B'+(tigeOk()?', and tigecycline':'')+'.';
+      alts=doseOf('minocycline',o)+'. '+rescue(urine)+(tigeOk()?'. '+doseOf('tigecycline',o):'')+'.';
+    } else if(stocked('sulbactam')){
       preferred=doseOf('sulbactam',o)+' plus '+doseOf('meropenem',{icu:true,lung:true,high:true})+'.';
-      note='Invasive CRAB, IDSA 2026. Sulbactam-durlobactam plus imipenem or meropenem is the priority, not a polymyxin-first regimen.';
-      alts='High-dose ampicillin-sulbactam plus a second agent is a bridge only, until sulbactam-durlobactam is available.';
-    } else if(sd==='no'){
-      note='Sulbactam-durlobactam is not available. Bridge with high-dose ampicillin-sulbactam plus one susceptible agent until it is.';
+      note='Sulbactam-durlobactam is in stock. Give it with imipenem or meropenem. That is the drug of choice for invasive CRAB.';
+      alts='High-dose ampicillin-sulbactam plus a second agent is only a bridge if sulbactam-durlobactam cannot be given.';
+    } else {
+      note='Sulbactam-durlobactam is not in stock. High-dose ampicillin-sulbactam plus one susceptible partner is the drug of choice used in India.';
       if(!fideOn() && partner==='cefiderocol') partner='';
       if(partner==='tigecycline' && !tigeOk()){ preferred=doseOf('ampsulba',o)+'. Tigecycline does not fit this site.'; alts='Add minocycline, or '+rescue(urine); }
       else if(partner==='polymyxin'){ preferred=doseOf('ampsulba',o)+' plus '+rescue(urine); alts=''; }
       else if(partner){ preferred=doseOf('ampsulba',o)+' plus '+doseOf(partner,o); alts=''; }
-      else { preferred=doseOf('ampsulba',o); alts=fideOn()?'Add cefiderocol, minocycline, or polymyxin B.':'Cefiderocol is not in stock. Add minocycline or polymyxin B'+(tigeOk()?', or tigecycline.':'.'); }
-    } else {
-      preferred='Is sulbactam-durlobactam available?';
-      note='';
-      alts='';
+      else { preferred=doseOf('ampsulba',o)+' plus minocycline or polymyxin B.'; alts=fideOn()?'Cefiderocol can be the partner if the isolate is susceptible.':'Cefiderocol is not in stock.'; }
     }
   } else if(key==='steno'){
     if(fideOn()){
       preferred=doseOf('cefiderocol',o);
-      note='Invasive Stenotrophomonas, IDSA 2026. Cefiderocol alone is the preferred suggestion. The supporting clinical data are still thin. This is not treatment of colonization.';
-      alts='Alternative: '+nd(doseOf('atmavi'))+', preferably with a second active agent. Confirm the report.';
+      note='Invasive Stenotrophomonas. Cefiderocol is in stock, so it is the drug of choice. This is not treatment of colonization.';
+      alts='If it cannot be used: TMP-SMX, minocycline, or levofloxacin, chosen by the report.';
     } else {
-      preferred='Cefiderocol is not in stock. Alternative regimen: '+nd(doseOf('atmavi'))+', preferably with a second active agent chosen by susceptibility.';
-      note='Cefiderocol is the 2026 preferred drug for invasive Stenotrophomonas, and it is not in stock. Aztreonam-avibactam, preferably with a second active agent, is the IDSA alternative. Do not treat colonization.';
-      alts='Second agent, if susceptible: '+nd(doseOf('minocycline',o))+'; TMP-SMX 8 to 15 mg/kg/day of the trimethoprim component IV or by mouth, divided every 8 to 12 hours; or levofloxacin 750 mg IV or by mouth every 24 hours. The IDSA text names the second agent by susceptibility. Confirm the report.';
+      preferred='TMP-SMX, minocycline, or levofloxacin, chosen by the report.';
+      note='Cefiderocol is not in stock. Trimethoprim-sulfamethoxazole, minocycline, or levofloxacin is the drug of choice for invasive Stenotrophomonas in India. Do not treat colonization.';
+      alts=nd(doseOf('minocycline',o))+'. TMP-SMX 8 to 15 mg/kg/day of the trimethoprim component, divided every 8 to 12 hours. Levofloxacin 750 mg every 24 hours if the isolate is susceptible.';
     }
   } else if(key==='mrsa_vre'){
     preferred=lung?('MRSA in the lung: '+doseOf('linezolid')):('MRSA: '+doseOf('vancomycin')+'. If the lung or the marrow makes that a poor fit: '+doseOf('linezolid'));
@@ -622,7 +667,11 @@ var spectrumMatrixData=[
   {id:'crab',name:'CRAB',category:'other',cza:'resistant',mev:'resistant',ir:'resistant',ct:'resistant',suldur:'active',fdc:'active',atmavi:'resistant'},
   {id:'steno',name:'Stenotrophomonas',category:'other',cza:'resistant',mev:'resistant',ir:'resistant',ct:'resistant',suldur:'resistant',fdc:'active',atmavi:'active'}
 ];
-function shownStatus(row,key){ if(key==='fdc' && !fideOn()) return 'unstocked'; return row[key]; }
+function shownStatus(row,key){
+  var map={mev:'merovab',ir:'imirele',ct:'ceftolozane',suldur:'sulbactam',fdc:'cefiderocol',atmavi:'atmavi'};
+  if(map[key] && !stocked(map[key])) return 'unstocked';
+  return row[key];
+}
 function renderMatrix(){
   var keys=['cza','mev','ir','ct','suldur','fdc','atmavi'];
   var names={cza:'CZA',mev:'MEV',ir:'I-R',ct:'C/T',suldur:'SUL-DUR',fdc:'FDC',atmavi:'ATM-AVI'};
@@ -673,11 +722,19 @@ function pkSpec(){
     piptazo:{name:'Piperacillin',mg:4000,every:6,vd:0.2*kg,th:1,fu:0.8,index:'ft'},
     aztreonam:{name:'Aztreonam',mg:2000,every:8,vd:0.18*kg,th:1.7,fu:0.7,index:'ft'},
     cefiderocol:{name:'Cefiderocol',mg:2000,every:8,vd:0.26*kg,th:2.5,fu:0.5,index:'ft'},
+    ertapenem:{name:'Ertapenem',mg:1000,every:24,vd:0.12*kg,th:4,fu:0.1,index:'ft'},
+    ampicillin:{name:'Ampicillin',mg:2000,every:6,vd:0.28*kg,th:1.1,fu:0.8,index:'ft'},
     vancomycin:{name:'Vancomycin',mg:Math.round(15*kg),every:12,vd:0.7*kg,th:7,fu:0.5,index:'auc',target:400},
+    teicoplanin:{name:'Teicoplanin',mg:400,every:24,vd:0.9*kg,th:50,fu:0.1,index:'auc',target:750},
     linezolid:{name:'Linezolid',mg:600,every:12,vd:0.6*kg,th:5,fu:0.7,index:'auc',target:160},
     daptomycin:{name:'Daptomycin',mg:Math.round((icu?10:8)*kg),every:24,vd:0.1*kg,th:8,fu:0.1,index:'auc',target:600},
     ciprofloxacin:{name:'Ciprofloxacin',mg:400,every:8,vd:2.2*kg,th:4,fu:0.7,index:'cmax',target:8},
-    amikacin:{name:'Amikacin',mg:Math.round(15*kg),every:24,vd:0.3*kg,th:2.5,fu:1,index:'cmax',target:8}
+    levofloxacin:{name:'Levofloxacin',mg:750,every:24,vd:1.1*kg,th:7,fu:0.7,index:'auc',target:80},
+    amikacin:{name:'Amikacin',mg:Math.round(15*kg),every:24,vd:0.3*kg,th:2.5,fu:1,index:'cmax',target:8},
+    gentamicin:{name:'Gentamicin',mg:Math.round(5*kg),every:24,vd:0.3*kg,th:2.5,fu:1,index:'cmax',target:8},
+    polymyxin:{name:'Polymyxin B',mg:Math.round(1.5*kg),every:12,vd:0.35*kg,th:9,fu:0.42,index:'auc',target:50},
+    tigecycline:{name:'Tigecycline',mg:50,every:12,vd:7*kg,th:27,fu:0.2,index:'auc',target:6},
+    metronidazole:{name:'Metronidazole',mg:500,every:8,vd:0.74*kg,th:8,fu:0.8,index:'auc',target:70}
   };
   var s=base[id]||base.meropenem;
   var renal={
@@ -690,11 +747,19 @@ function pkSpec(){
     piptazo:{moderate:{mg:3000,thMul:1.6},severe:{mg:2000,thMul:2.6},hd:{mg:2000,every:8,thMul:4},crrt:{every:8,thMul:1.2},arc:{thMul:0.6}},
     aztreonam:{moderate:{mg:1000,thMul:1.6},severe:{mg:1000,every:12,thMul:2.4},hd:{mg:1000,every:12,thMul:3},crrt:{thMul:1.3},arc:{every:6,thMul:0.6}},
     cefiderocol:{moderate:{mg:1500,thMul:1.4},severe:{mg:1000,thMul:2},hd:{mg:750,every:12,thMul:3},crrt:{thMul:1.4},arc:{every:6,thMul:0.7}},
+    ertapenem:{moderate:{thMul:1.4},severe:{mg:500,thMul:2},hd:{mg:500,thMul:3},crrt:{thMul:1.2},arc:{thMul:0.85}},
+    ampicillin:{moderate:{every:8,thMul:1.6},severe:{every:12,thMul:2.5},hd:{every:12,thMul:3},crrt:{every:8,thMul:1.3},arc:{thMul:0.6}},
     vancomycin:{moderate:{every:24,thMul:2},severe:{every:24,thMul:3.5},hd:{every:48,thMul:4},crrt:{every:24,thMul:1.7},arc:{every:8,thMul:0.55}},
     linezolid:{severe:{thMul:1.2},hd:{thMul:1.2},crrt:{thMul:1}},
     daptomycin:{severe:{every:48,thMul:2},hd:{every:48,thMul:2.5},crrt:{thMul:1.3}},
     ciprofloxacin:{moderate:{every:12,thMul:1.5},severe:{every:24,thMul:2.5},hd:{every:24,thMul:3},crrt:{every:12,thMul:1.3},arc:{thMul:0.7}},
-    amikacin:{moderate:{every:36,thMul:1.6},severe:{every:48,thMul:3},hd:{every:48,thMul:6},crrt:{thMul:1.2},arc:{thMul:0.55}}
+    levofloxacin:{moderate:{every:48,thMul:1.8},severe:{every:48,thMul:2.5},hd:{every:48,thMul:3},crrt:{thMul:1.2},arc:{thMul:0.7}},
+    amikacin:{moderate:{every:36,thMul:1.6},severe:{every:48,thMul:3},hd:{every:48,thMul:6},crrt:{thMul:1.2},arc:{thMul:0.55}},
+    gentamicin:{moderate:{every:36,thMul:1.6},severe:{every:48,thMul:3},hd:{every:48,thMul:6},crrt:{thMul:1.2},arc:{thMul:0.55}},
+    teicoplanin:{moderate:{thMul:1.3},severe:{every:48,thMul:1.5},hd:{every:72,thMul:1.2},crrt:{thMul:1.1}},
+    polymyxin:{},
+    tigecycline:{severe:{thMul:1.1}},
+    metronidazole:{}
   };
   var rule=(renal[id]||{})[b];
   if(rule){
@@ -704,6 +769,8 @@ function pkSpec(){
   }
   if(id==='vancomycin') s.mg=Math.round(15*kg);
   if(id==='amikacin') s.mg=Math.min(1500, Math.round(15*kg));
+  if(id==='gentamicin') s.mg=Math.min(500, Math.round(5*kg));
+  if(id==='polymyxin') s.mg=Math.round(1.5*kg);
   if(id==='daptomycin' && b!=='severe' && b!=='hd') s.mg=Math.round((icu?10:8)*kg);
   s.inf=$('pkInfusion').value==='bolus'?0.5:$('pkInfusion').value==='continuous'?s.every:Math.min(3, Math.max(0.5, s.every-0.25));
   s.mode=$('pkInfusion').value;
@@ -757,7 +824,7 @@ function drawPKPDGraph(){
     $('targetGoalStatus').textContent=(pct>=goal?'The sketch clears ':'The sketch is short of ')+'the teaching target of '+goal+'%. '+(icuOn()?'Shock uses 100% of the interval.':'The ward target used here is 70%.');
   }
   $('pkDrugLabel').textContent=s.name+' '+s.mg+' mg every '+s.every+' h';
-  var extra=s.id==='daptomycin'?' Daptomycin is not a pneumonia drug.':s.id==='vancomycin'?' Vancomycin is judged by the AUC, not by time above the MIC.':s.id==='amikacin'?' Amikacin is judged by the peak. Do not give the next dose on a clock if the level is still high.':s.index==='cmax'?' A longer infusion is not the usual plan for this drug.':' A longer infusion raises time above the MIC.';
+  var extra=s.id==='daptomycin'?' Daptomycin is not a pneumonia drug.':s.id==='vancomycin'?' Vancomycin is judged by the AUC, not by time above the MIC.':s.id==='amikacin'||s.id==='gentamicin'?' Judge the peak. Do not give the next dose on a clock if the level is still high.':s.id==='teicoplanin'?' The sketch is the maintenance dose. A load of 12 mg/kg every 12 hours for three doses comes first. Judge a trough, often 15 to 30 mg/L.':s.id==='polymyxin'?' Load 2.5 mg/kg first. The kidney does not clear polymyxin B, so the interval stays. This is not colistin.':s.id==='tigecycline'?' Load 100 mg. Blood levels stay low. Not a urinary drug.':s.id==='metronidazole'?' The liver clears it. A usual renal cut is not required.':s.id==='ertapenem'?' Ertapenem is a poor drug on CRRT. Use meropenem.':s.index==='cmax'?' A longer infusion is not the usual plan for this drug.':' A longer infusion raises time above the MIC.';
   $('pkpdPearl').textContent='Teaching sketch, not a measured blood level. '+renalName()+extra+' It does not prove the patient is treated. Volume of distribution is estimated from '+wt()+' kg.';
 }
 function switchTab(tabId){
@@ -778,13 +845,9 @@ function toggleTheme(){
 function refreshAll(){ updateEmpirical(); renderDirected(); renderMatrix(); if(currentTab==='pkpd') drawPKPDGraph(); }
 function loadScenarioPreset(key){
   if(!key) return;
-  var map={oxa48_uti:['oxa48','urine'],ndm_sepsis:['ndm_mbl','blood'],dual_producer:['dual_ndm_oxa','blood'],crab_vap:['crab','lung'],esbl_bacteremia:['esbl','blood'],ampc_bacteremia:['ampc','blood'],dtr_p_aeruginosa:['dtr_p_aeruginosa','lung']};
-  var m=map[key]; if(!m) return;
-  $('dirSite').value=m[1];
-  if(key==='crab_vap') $('crabRole').value='invasive';
-  if(key==='ndm_sepsis') $('empSetting').value='icu';
+  if(key==='crab') $('crabRole').value='invasive';
   switchTab('directed');
-  selectMechanism(m[0]);
+  selectMechanism(key);
 }
 renderDirectedSelectors();
 selectMechanism('oxa48');
