@@ -36,6 +36,9 @@ main{max-width:860px;margin:0 auto;padding:12px 12px 36px}
 .head{text-align:left;min-height:74px;padding:12px;border-radius:16px;border:1px solid var(--line);background:var(--card)}
 .head b{display:block;font-family:Fraunces,Georgia,serif;font-weight:520;font-size:16px}
 .head.on{border-color:var(--cool);background:#10242c}
+@keyframes hintglow{0%,100%{border-color:rgba(226,180,138,.5);box-shadow:0 0 0 1px rgba(226,180,138,.2)}50%{border-color:#e2b48a;box-shadow:0 0 0 2px rgba(226,180,138,.8),0 0 14px rgba(226,180,138,.4)}}
+.head.hintglow{animation:hintglow 1.35s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.head.hintglow{animation:none;border-color:#e2b48a;box-shadow:0 0 0 1px rgba(226,180,138,.65)}}
 .missline{color:var(--warm);margin:8px 0}
 .head span{color:var(--warm);font-size:12px;letter-spacing:.08em}
 #bay{position:relative;top:auto;z-index:4;background:#0c1014;border-bottom:1px solid var(--line)}
@@ -369,6 +372,7 @@ function buildPatient(selected){
     naloxone:false, headUp:false, osmotic:false, intubated:false, echoSeen:false, echoRead:null,
     cultures:false, cultureReport:null, crrt:false, reads:{}, filmHint:{}, echoHint:false, sheet:"", zoom:"",
     results:{}, log:[], good:[], bad:[], critical:[], timeline:[], events:[], sedation:null, _ann:"",
+    born:Date.now(),
     story:story.text, exam:story.exam, pmh:story.pmh, meds:story.meds, complaint:story.complaint
   };
   p.map = mapOf(p.sbp, p.dbp);
@@ -544,26 +548,20 @@ function usgReport(p){
   return {text:"Lungs slide with A-lines. No B-line field, no pneumothorax, no free fluid. The vein matches the story of the circulation.", img:null, cap:""};
 }
 function cxrReport(p){
-  if(p.id==="edema"||p.id==="cardiogenic") return {text:"Bilateral perihilar opacity and a large cardiac silhouette. This fits edema. It does not, by itself, exclude a pneumonia.", img:"xrays/edema.jpg", cap:"Frontal chest radiograph.", mark:{cx:0.48, cy:0.42, label:"Edema"}};
-  if(p.id==="pneumonia"||p.id==="sepsis") return {text:"Opacity at one base. Fluid and consolidation cannot be separated on this film alone.", img:"xrays/pneumonia.jpg", cap:"Frontal chest radiograph.", mark:{cx:0.30, cy:0.72, label:"Opacity"}};
-  if(p.id==="tension") return {text:"A pneumothorax is visible, and the mediastinum is shifted. If the pressure is already low, you should not have waited for this film.", img:"xrays/ptx.jpg", cap:"Frontal chest radiograph.", mark:{cx:0.72, cy:0.36, label:"Pneumothorax"}};
+  if(p.id==="edema"||p.id==="cardiogenic") return {text:"Bilateral perihilar opacity and a large cardiac silhouette. This fits edema. It does not, by itself, exclude a pneumonia.", img:"xrays/edema.jpg", cap:"Frontal chest radiograph.", mark:{cx:0.36, cy:0.50, label:"Edema"}};
+  if(p.id==="pneumonia"||p.id==="sepsis") return {text:"Opacity at one base. Fluid and consolidation cannot be separated on this film alone.", img:"xrays/pneumonia.jpg", cap:"Frontal chest radiograph.", mark:{cx:0.31, cy:0.66, label:"Opacity"}};
+  if(p.id==="tension") return {text:"A right pneumothorax is visible at the base. If the pressure is already low, you should not have waited for this film.", img:"xrays/pneumo.jpg", cap:"Frontal chest radiograph. The visceral pleural line is at the patient's right base.", mark:{cx:0.19, cy:0.74, label:"Pneumothorax"}};
   if(p.id==="pe"||p.id==="opioid"||p.id==="hypogly"||p.id==="ich"||p.id==="hhs"||p.id==="gib") return {text:"No edema, no lobar opacity, and no pneumothorax. A clear film does not clear a pulmonary embolism.", img:null, cap:""};
-  if(p.id==="dka") return {text:p.spo2<94?"Right basal opacity, which may be aspiration. The deep breathing is still the acidosis.":"No major opacity. The respiratory rate is the acidosis, not a wet lung.", img:p.spo2<94?"xrays/pneumonia.jpg":null, cap:"Frontal chest radiograph.", mark:p.spo2<94?{cx:0.30, cy:0.72, label:"Opacity"}:null};
+  if(p.id==="dka") return {text:p.spo2<94?"Right basal opacity, which may be aspiration. The deep breathing is still the acidosis.":"No major opacity. The respiratory rate is the acidosis, not a wet lung.", img:p.spo2<94?"xrays/pneumonia.jpg":null, cap:"Frontal chest radiograph.", mark:p.spo2<94?{cx:0.31, cy:0.66, label:"Opacity"}:null};
   return {text:"No acute finding that explains the presentation by itself.", img:null, cap:""};
 }
 function ctReport(p){
-  if(p.id==="ich") return {text:"Non-contrast CT of the head shows acute hemorrhage in the right basal ganglia.", img:"sim/rad/ich.jpg", cap:"Non-contrast head CT. Acute blood is bright. On a standard radiologic display, the left side of the image is the patient's right.", hint:{cx:0.36, cy:0.52}, mark:{cx:0.36, cy:0.52, label:"Hemorrhage"}, points:[["Study","Non-contrast head CT"],["Finding","Right basal ganglia hemorrhage"],["Mass effect","Local"],["Hydrocephalus","Not shown"]], q:"Where is the acute blood?", options:[["rbg","Right basal ganglia"],["left","Left cortex"],["none","No hemorrhage"],["sah","Subarachnoid only"]], answer:"rbg"};
-  if(p.id==="pe") return {text:"CT pulmonary angiogram shows clot in the main pulmonary artery.", img:"sim/rad/pe.jpg", cap:"Axial CT pulmonary angiogram. A dark filling defect sits in the contrast-filled pulmonary artery. The bright round structure beside it is the aorta, not the clot.", hint:{cx:0.50, cy:0.48}, mark:{cx:0.50, cy:0.48, label:"Filling defect"}, points:[["Study","CT pulmonary angiogram"],["Finding","Filling defect in the pulmonary artery"],["Right ventricle","Dilated on this study"],["Timing","Only if the pressure can tolerate the trip"]], q:"What is the dark filling defect?", options:[["pe","Pulmonary embolism"],["aorta","The aorta"],["node","A lymph node"],["none","A normal artery"]], answer:"pe"};
-  if(p.id==="edema"||p.id==="cardiogenic") return {text:"Chest CT shows bilateral ground-glass opacity, septal lines, and a large heart.", img:"cts/edema.jpg", cap:"Coronal chest CT. Bilateral ground-glass opacity and septal thickening with a large cardiac silhouette.", hint:{cx:0.50, cy:0.46}, mark:{cx:0.46, cy:0.42, label:"Edema"}, points:[["Pattern","Bilateral ground-glass and septal lines"],["Heart","Enlarged"],["Use","Supports edema. It does not replace the echo."]], q:"What pattern is this?", options:[["edema","Pulmonary edema"],["ptx","Pneumothorax"],["ich","Intracranial blood"],["pe","A filling defect in the pulmonary artery"]], answer:"edema"};
-  if(p.id==="tension") return {text:"CT shows the pneumothorax. If the pressure is low, decompress before the trip.", img:"cts/ptx.jpg", cap:"Chest CT. The mark is the pneumothorax.", hint:{cx:0.62, cy:0.40}, mark:{cx:0.62, cy:0.40, label:"Pneumothorax"}, points:[["Finding","Pneumothorax"],["Priority","Decompress before travel if the pressure is low"]], q:"What is the emergency on this scan?", options:[["ptx","Pneumothorax"],["edema","Edema"],["pe","Pulmonary embolism"],["none","No acute finding"]], answer:"ptx"};
-  if(p.id==="sepsis"||p.id==="pneumonia") return {text:"CT of the chest is not required before oxygen and the first antibiotic.", img:"xrays/pneumonia.jpg", cap:"The opacity is already on the radiograph. CT is not the first move.", mark:{cx:0.34, cy:0.62, label:"Consolidation"}, hint:null, points:[["Role","Can later separate collapse, effusion, and necrosis"],["Now","Not the first move"]], q:null};
-  if(p.id==="gib") return {text:"No CT is required to start blood and call endoscopy.", img:null, cap:"", hint:null, points:[["Now","Blood and a reversal plan"],["Later","Imaging only if bleeding continues"]], q:null};
-  if(p.id==="dka"||p.id==="hhs"||p.id==="hypogly") return {text:"No CT replaces glucose, potassium, and the circulation.", img:null, cap:"", hint:null, points:[["First","Glucose and potassium"],["Head CT","Only if consciousness does not follow the metabolic treatment"]], q:null};
-  return {text:"No CT finding is the first move in this case.", img:null, cap:"", hint:null, points:[["CT","Not the first decision"]], q:null};
+  if(p.id==="ich") return {text:"Non-contrast CT of the head shows acute hemorrhage in the right basal ganglia.", img:"sim/rad/ich.jpg", cap:"Non-contrast head CT. Acute blood is bright. On a standard radiologic display, the left side of the image is the patient's right.", hint:{cx:0.35, cy:0.46}, mark:{cx:0.35, cy:0.46, label:"Hemorrhage"}, points:[["Study","Non-contrast head CT"],["Finding","Right basal ganglia hemorrhage"],["Mass effect","Local"],["Hydrocephalus","Not shown"]], q:"Where is the acute blood?", options:[["rbg","Right basal ganglia"],["left","Left cortex"],["none","No hemorrhage"],["sah","Subarachnoid only"]], answer:"rbg"};
+  if(p.id==="pe") return {text:"CT pulmonary angiogram shows clot in a pulmonary artery.", img:"cts/pe1.jpg", cap:"Axial CT pulmonary angiogram. The mark is a filling defect inside the pulmonary artery. The bright lumen beside it is contrast, not the clot.", hint:{cx:0.65, cy:0.56}, mark:{cx:0.65, cy:0.56, label:"Filling defect"}, points:[["Study","CT pulmonary angiogram"],["Finding","Filling defect in the pulmonary artery"],["Right ventricle","Strain is an echo finding"],["Timing","Only if the pressure can tolerate the trip"]], q:"What is the dark filling defect?", options:[["pe","Pulmonary embolism"],["aorta","The aorta"],["node","A lymph node"],["none","A normal artery"]], answer:"pe"};
+  return {text:"CT not required.", img:null, cap:"", hint:null, mark:null, points:[["CT","Not required"]], q:null};
 }
 function mriReport(p){
-  if(p.id==="ich") return {text:"MRI shows acute blood in the right basal ganglia. It does not replace the first non-contrast CT.", img:"mris/ich.jpg", cap:"MRI. Acute hemorrhage.", mark:{cx:0.46, cy:0.48, label:"Hemorrhage"}};
-  return {text:"MRI is not the study that changes the first decision.", img:null, cap:""};
+  return {text:"MRI not required.", img:null, cap:"", mark:null};
 }
 
 let mode = "lab";
@@ -709,8 +707,14 @@ function panelSpeech(kind){
     if(!p.results.cxr.mark) return "";
     return "Chest radiograph. "+p.results.cxr.mark.label+".";
   }
-  if(kind==="ct" && p.results.ct && p.results.ct.mark) return "CT. "+p.results.ct.mark.label+".";
-  if(kind==="mri" && p.results.mri && p.results.mri.mark) return "MRI. "+p.results.mri.mark.label+".";
+  if(kind==="ct" && p.results.ct){
+    if(p.results.ct.mark) return "CT. "+p.results.ct.mark.label+".";
+    return "CT not required.";
+  }
+  if(kind==="mri" && p.results.mri){
+    if(p.results.mri.mark) return "MRI. "+p.results.mri.mark.label+".";
+    return "MRI not required.";
+  }
   if(kind==="usg" && p.results.usg && p.results.usg.mark) return "Ultrasound. "+p.results.usg.mark.label+".";
   if(kind==="echo" && p.results.echo){
     var e = p.results.echo, out = [];
@@ -1011,7 +1015,9 @@ function givePressor(which){
   tick(5);
   patient.pressor = which;
   if(which==="none"){ lineOff("press"); note("Vasopressor stopped.", "Vasopressor stopped."); return render(); }
-  if(which==="norepi") lineOn("press","Norepinephrine","0.05 mcg/kg/min");
+  if(which==="norepi") lineOn("press","Noradrenaline","0.05 mcg/kg/min");
+  else if(which==="adr") lineOn("press","Adrenaline","0.05 mcg/kg/min");
+  else if(which==="dopa") lineOn("press","Dopamine","5 mcg/kg/min");
   else if(which==="dobutamine") lineOn("press","Dobutamine","2.5 mcg/kg/min");
   else if(which==="vaso") lineOn("press","Vasopressin","0.03 unit/min");
   if(patient.id==="gib" && patient.bloodU===0){
@@ -1026,7 +1032,7 @@ function givePressor(which){
     nudgeBP(-6,-4); patient.hr += 12;
     once(patient.bad, "Dobutamine while profoundly hypotensive");
     note("Dobutamine can drop the pressure when the tank of resistance is empty. Norepinephrine first.", "Pressure fell and the rate rose.");
-  } else if(which==="norepi" && (patient.map<70 || patient.id==="pe"||patient.id==="cardiogenic"||patient.id==="sepsis")){
+  } else if(which==="norepi" && (patient.map<70 || patient.id==="pe" || patient.id==="cardiogenic" || patient.id==="sepsis")){
     nudgeBP(14,10);
     once(patient.good, "Norepinephrine for a low mean pressure");
     note("Norepinephrine raised the mean pressure. Check the fingers, the lactate, and the urine, not only the number.", "Mean pressure rose.");
@@ -1034,6 +1040,18 @@ function givePressor(which){
     nudgeBP(4,2); patient.hr += 8; patient.lactate = Math.max(1, patient.lactate-0.3);
     once(patient.good, "Inotrope while the pressure allowed it");
     note("An inotrope is reasonable once the pressure is not critically low and the ventricle is the problem.", "Output feels better. Rate is up.");
+  } else if(which==="adr" && patient.map<70){
+    nudgeBP(18,12); patient.hr += 14;
+    once(patient.good, "Adrenaline for a low mean pressure");
+    note("Adrenaline raised the pressure and the rate. It is reasonable when the mean pressure is low. Watch the lactate and the fingers.", "Pressure and rate rose.");
+  } else if(which==="dopa" && patient.map<70){
+    nudgeBP(10,6); patient.hr += 18;
+    once(patient.good, "Dopamine while the mean pressure was low");
+    note("Dopamine raised the pressure and the heart rate. Noradrenaline is the cleaner first vasopressor. Dopamine is an option when you also want the rate up.", "Pressure rose. The rate rose more.");
+  } else if(which==="adr"||which==="dopa"){
+    nudgeBP(which==="adr"?8:4, which==="adr"?6:2);
+    patient.hr += which==="dopa"?16:8;
+    note("The pressure was not critically low. This infusion mainly added rate.", "The rate rose.");
   } else if(which==="vaso"){
     nudgeBP(6,6);
     once(patient.good, "Vasopressin as a second vasopressor");
@@ -1611,6 +1629,8 @@ function paintNums(){
 function pumpLabel(){
   var bits = [];
   if(patient.pressor==="norepi") bits.push("NE");
+  else if(patient.pressor==="adr") bits.push("ADR");
+  else if(patient.pressor==="dopa") bits.push("DOP");
   else if(patient.pressor==="dobutamine") bits.push("DOB");
   else if(patient.pressor==="vaso") bits.push("VP");
   else if(patient.pressor && patient.pressor!=="none") bits.push("DRIP");
@@ -2145,9 +2165,9 @@ function filmAsk(kind){
   if(!rep.img) return null;
   var id = patient.id;
   if(kind==="cxr"){
-    if(id==="edema"||id==="cardiogenic") return {q:"What is the dominant pattern on this film?", options:[["edema","Bilateral pulmonary edema"],["pna","Lobar pneumonia"],["ptx","Pneumothorax"],["clear","A clear film"]], answer:"edema", hint:{cx:0.48, cy:0.42}};
-    if(id==="pneumonia"||id==="sepsis"||id==="dka") return {q:"Where is the opacity?", options:[["rbase","Right base"],["lbase","Left base"],["edema","Pulmonary edema"],["ptx","Pneumothorax"]], answer:"rbase", hint:{cx:0.30, cy:0.72}};
-    if(id==="tension") return {q:"What is the emergency on this film?", options:[["lptx","Left pneumothorax"],["rbase","Right-base pneumonia"],["edema","Edema"],["clear","No acute finding"]], answer:"lptx", hint:{cx:0.72, cy:0.36}};
+    if(id==="edema"||id==="cardiogenic") return {q:"What is the dominant pattern on this film?", options:[["edema","Bilateral pulmonary edema"],["pna","Lobar pneumonia"],["ptx","Pneumothorax"],["clear","A clear film"]], answer:"edema", hint:{cx:0.36, cy:0.50}};
+    if(id==="pneumonia"||id==="sepsis"||id==="dka") return {q:"Where is the opacity?", options:[["rbase","Right base"],["lbase","Left base"],["edema","Pulmonary edema"],["ptx","Pneumothorax"]], answer:"rbase", hint:{cx:0.31, cy:0.66}};
+    if(id==="tension") return {q:"What is the emergency on this film?", options:[["rptx","Right pneumothorax"],["lptx","Left pneumothorax"],["edema","Edema"],["clear","No acute finding"]], answer:"rptx", hint:{cx:0.19, cy:0.74}};
   }
   if(kind==="usg"){
     if(id==="edema"||id==="cardiogenic") return {q:"What does this lung ultrasound show?", options:[["bline","B-lines"],["consol","Consolidation"],["bar","Barcode, no sliding"],["slide","Normal sliding"]], answer:"bline", hint:{cx:0.50, cy:0.42}};
@@ -2353,11 +2373,10 @@ function oxygenSheet(){
     "</div>"+ventHtml();
 }
 function circSheet(){
-  return "<h2 class='stage-no'>7. Circulation</h2><div class='opts'>"+
-    btn("rl250","Balanced crystalloid 250 mL")+btn("rl500","Balanced crystalloid 500 mL")+btn("ns500","Normal saline 500 mL")+btn("diuretic","Furosemide 40 mg IV")+
-    btn("norepi","Norepinephrine 0.05 mcg/kg/min")+btn("dobutamine","Dobutamine 2.5 mcg/kg/min")+btn("vaso","Vasopressin 0.03 units/min")+btn("stoppress","Stop the vasopressor")+
-    btn("gtn","GTN infusion, start 10 mcg/min")+btn("nicardipine","Nicardipine infusion")+btn("labetalol","Labetalol bolus")+
-    btn("crrt", patient.crrt?"CRRT is running":"Start CRRT")+
+  return "<h2 class='stage-no'>7. Circulation</h2><p class='lead'>Fluids and inotropes only. Nitrates, diuretics, and the other drugs are under Drugs and procedures.</p><div class='opts'>"+
+    btn("rl250","Balanced crystalloid 250 mL")+btn("rl500","Balanced crystalloid 500 mL")+btn("ns500","Normal saline 500 mL")+
+    btn("norepi","Noradrenaline 0.05 mcg/kg/min")+btn("adr","Adrenaline 0.05 mcg/kg/min")+btn("dopa","Dopamine 5 mcg/kg/min")+btn("dobutamine","Dobutamine 2.5 mcg/kg/min")+
+    btn("stoppress","Stop the infusion")+
     "</div>";
 }
 function abxSheet(){
@@ -2374,6 +2393,7 @@ function abxSheet(){
 }
 function procSheet(){
   return "<h2 class='stage-no'>9. Drugs and procedures</h2><div class='opts'>"+
+    btn("diuretic","Furosemide 40 mg IV")+btn("gtn","GTN infusion, start 10 mcg/min")+btn("nicardipine","Nicardipine infusion")+btn("labetalol","Labetalol bolus")+btn("vaso","Vasopressin 0.03 units/min")+btn("crrt", patient.crrt?"CRRT is running":"Start CRRT")+
     btn("sedation","Fentanyl, then propofol if the airway is secure")+btn("d50","Dextrose 50%, 50 mL")+btn("insulin","Insulin infusion 0.1 units/kg/h")+btn("kcl","Potassium chloride replacement")+btn("dexinf","Dextrose infusion beside insulin")+btn("bicarb","Sodium bicarbonate")+
     btn("blood","One unit of blood")+btn("pcc","Reverse warfarin")+btn("ppi","Proton-pump inhibitor infusion")+btn("aspirin","Aspirin 300 mg")+btn("heparin","Treatment-dose heparin")+btn("lytic","Thrombolysis")+
     btn("decompress","Decompress the pleura")+btn("drain","Chest drain")+btn("naloxone","Naloxone, titrated")+btn("head","Head up, neck straight")+btn("osmotic","Hypertonic saline or mannitol")+
@@ -2382,6 +2402,62 @@ function procSheet(){
 function courseSheet(){
   var p = patient;
   return "<h2 class='stage-no'>10. Course</h2><ul class='log'>"+(p.log.slice(0,12).map(function(l){ return "<li>"+l.t+" min — "+escapeHtml(l.text)+"</li>"; }).join("")||"<li>No action yet.</li>")+"</ul>";
+}
+function hasLine(id){
+  return (patient.lines||[]).some(function(l){ return l.id===id; });
+}
+function nextSteps(){
+  var p = patient, id = p.id, steps = [];
+  function add(s){ if(steps.length<3 && steps.indexOf(s)<0) steps.push(s); }
+  if(id==="tension" && !p.decompressed) add("Decompress the pleura now. A film or a CT is not the first move while the pressure is low.");
+  if(id==="hypogly" && p.glucose<70 && !p.dextrose) add("Give intravenous dextrose, then recheck the glucose.");
+  if(id==="opioid" && !p.naloxone && (p.rr<12 || p.gcs<=10)) add("Open the airway, give oxygen, and give titrated naloxone.");
+  if(p.support==="room" && (p.spo2<94 || (p.syn.resp && p.syn.resp!=="none")) && id!=="tension") add("Start oxygen. NIV or a tube appears only after you apply the settings.");
+  if((id==="edema"||id==="cardiogenic") && p.gcs>=9 && p.spo2<94 && p.support!=="cpap" && p.support!=="bipap" && p.support!=="imv") add("If the patient is awake and working, set NIV and apply it.");
+  if(id==="ich" && !p.results.ct) add("Order a non-contrast CT of the head.");
+  if(id==="ich" && !p.headUp) add("Head up, neck straight.");
+  if(id==="ich" && p.sbp>160 && !hasLine("nic") && !hasLine("lab")) add("Lower the systolic pressure smoothly with nicardipine or labetalol, under Drugs and procedures. Not a nitrate.");
+  if(id==="gib" && p.bloodU===0) add("Transfuse blood. Crystalloid is only a bridge.");
+  if((id==="dka"||id==="hhs") && !p.results.labs) add("Check the potassium before insulin.");
+  else if((id==="dka"||id==="hhs") && p.k<3.3) add("Replace potassium and hold insulin until it is safe.");
+  else if((id==="dka"||id==="hhs") && !p.insulin) add("Start the insulin infusion now that potassium is known.");
+  if((id==="sepsis"||id==="pneumonia") && !p.cultures) add("Send cultures from Investigations, then read the microbiology report before the antibiotic.");
+  else if((id==="sepsis"||id==="pneumonia") && !p.cultureReport) add("Open the microbiology report, then choose the antibiotic.");
+  else if((id==="sepsis"||id==="pneumonia") && !p.abx) add("Start an antibiotic the report says is active.");
+  if(p.syn.preload==="empty" && p.map<70 && p.fluidMl<500 && id!=="tension") add("The circulation is empty. Give a crystalloid bolus, then look again.");
+  if(p.syn.preload==="full" && p.fluidMl>0 && (id==="edema"||id==="cardiogenic")) add("Stop further fluid. The lungs are already wet.");
+  if(p.map<65 && (!p.pressor || p.pressor==="none") && id!=="gib" && id!=="hypogly" && id!=="edema" && !(id==="tension" && !p.decompressed)) add("Start noradrenaline for a mean pressure under 65. Adrenaline, dopamine, and dobutamine are the other inotropes on Circulation.");
+  if(id==="cardiogenic" && p.map>=65 && (!p.pressor || p.pressor==="none")) add("If output is the problem and the pressure is holding, start dobutamine.");
+  if(id==="edema" && p.sbp>=100 && !p.nitrate) add("Start GTN. It is under Drugs and procedures, not Circulation.");
+  if((id==="edema"||id==="cardiogenic") && p.sbp>=90 && !p.diuretic) add("Give furosemide if the pressure allows. It is under Drugs and procedures.");
+  if(id==="pe" && !p.anticoag) add("Anticoagulate. Thrombolysis is for shock that does not settle.");
+  if(id==="pe" && !p.results.ct && p.map>=70) add("CT pulmonary angiogram confirms the clot, if the pressure can tolerate the trip.");
+  if(!p.echoSeen && (id==="sepsis"||id==="cardiogenic"||id==="pe"||id==="edema")) add("Look at the echo before the next fluid or inotrope decision.");
+  if(!steps.length) add("Reassess in 15 minutes. Submit the diagnosis when the picture is stable.");
+  return steps.slice(0,3);
+}
+function hintSheet(){
+  var steps = nextSteps();
+  return "<h2 class='stage-no'>11. Hint</h2><p class='lead'>Next steps from where this case stands. Not the whole pathway.</p><ul class='points'>"+
+    steps.map(function(s,i){ return "<li class='stack'><b>"+(i+1)+"</b>"+escapeHtml(s)+"</li>"; }).join("")+
+    "</ul>";
+}
+function hintReady(){
+  return !!(isLab() && patient && !finished && patient.born && (Date.now()-patient.born)>=30000);
+}
+function ensureHint(){
+  if(!hintReady()) return;
+  if(document.querySelector("#app .heads [data-sheet='hint']")) return;
+  var heads = document.querySelector("#app .heads");
+  if(!heads) return;
+  heads.insertAdjacentHTML("beforeend", headBtn("hint","11","Hint"));
+  var b = heads.querySelector("[data-sheet='hint']");
+  if(b) b.onclick = function(){ openHead("hint"); };
+}
+var hintTimer = null;
+function armHint(){
+  if(hintTimer) return;
+  hintTimer = setInterval(ensureHint, 1000);
 }
 function sheetHtml(){
   if(!patient.sheet) return "";
@@ -2395,15 +2471,18 @@ function sheetHtml(){
   else if(patient.sheet==="abx") inner = abxSheet();
   else if(patient.sheet==="proc") inner = procSheet();
   else if(patient.sheet==="course") inner = courseSheet();
+  else if(patient.sheet==="hint") inner = hintSheet();
   return "<div class='sheet' id='sheet'><div class='panel'><button type='button' class='x' id='sheetX' aria-label='Close'>×</button>"+inner+"</div></div>";
 }
 function headBtn(id, num, title){
-  return "<button type='button' class='head"+(patient.sheet===id?" on":"")+"' data-sheet='"+id+"'><span>"+num+"</span><b>"+title+"</b></button>";
+  var glow = id==="hint" ? " hintglow" : "";
+  return "<button type='button' class='head"+(patient.sheet===id?" on":"")+glow+"' data-sheet='"+id+"'><span>"+num+"</span><b>"+title+"</b></button>";
 }
 function openHead(id){
   patient.zoom = "";
   patient.sheet = id;
   if(id==="echo" && !patient.results.echo) return orderTest("echo");
+  if(id==="hint") patient._ann = "Hint. "+nextSteps().join(" ");
   render();
 }
 function openZoom(kind){
@@ -2556,6 +2635,7 @@ function render(){
       headBtn("abx","8","Antibiotics")+
       headBtn("proc","9","Drugs and procedures")+
       headBtn("course","10","Course")+
+      (hintReady()?headBtn("hint","11","Hint"):"")+
     "</div>"+
     "<button class='next' id='reassess' type='button'>Reassess in 15 minutes</button>"+
     "<button class='next' id='submit' type='button'>Submit the diagnosis</button>"+
@@ -2666,7 +2746,7 @@ function onAct(act){
   if(act==="ns500") return bolus(500,"saline");
   if(act==="rl250") return bolus(250,"balanced");
   if(act==="diuretic") return giveDiuretic();
-  if(act==="norepi"||act==="dobutamine"||act==="vaso") return givePressor(act);
+  if(act==="norepi"||act==="adr"||act==="dopa"||act==="dobutamine"||act==="vaso") return givePressor(act);
   if(act==="stoppress") return givePressor("none");
   if(act==="gtn"||act==="nicardipine"||act==="labetalol") return giveBPDrug(act);
   if(act==="ctx-azi"||act==="piptazo"||act==="mero"||act==="vanc") return giveAbx(act);
@@ -2760,6 +2840,7 @@ function start(){
   };
   document.addEventListener("pointerdown", function(){ if(soundOn && typeof primeAudio==="function") primeAudio(); }, {passive:true});
   if(typeof ensureBed==="function") ensureBed();
+  armHint();
   if(window.speechSynthesis){
     speechSynthesis.getVoices();
     speechSynthesis.addEventListener("voiceschanged", function(){ speechSynthesis.getVoices(); });
