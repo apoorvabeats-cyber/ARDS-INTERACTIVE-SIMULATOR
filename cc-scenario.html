@@ -17,7 +17,8 @@ button{cursor:pointer}
 header{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;padding:10px 12px;background:#101214f2;border-bottom:1px solid var(--line)}
 h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:15px;line-height:1.2;margin:0;letter-spacing:-.03em}
 h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:20px;margin:0 0 8px}
-#back{background:#171c22;border:1px solid var(--line);border-radius:999px;min-height:36px;padding:0 12px}
+#back,#voice{background:#171c22;border:1px solid var(--line);border-radius:999px;min-height:36px;padding:0 12px}
+#voice[aria-pressed="false"]{opacity:.5}
 .modechip{margin-left:auto;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm)}
 main{max-width:860px;margin:0 auto;padding:12px 12px 36px}
 .kicker{margin:0 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm)}
@@ -67,6 +68,7 @@ textarea{min-height:84px;resize:vertical}
 <header>
   <button type="button" id="back">Back</button>
   <h1>Multi-Parameter Critical Care Scenario Simulator</h1>
+  <button type="button" id="voice" aria-pressed="true">Voice</button>
   <span class="modechip" id="modechip"></span>
 </header>
 <main id="app"></main>
@@ -292,7 +294,8 @@ function buildPatient(selected){
     pressor:"none", abx:null, renal:false, insulin:false, dextrose:false, decompressed:false, drained:false,
     diuretic:false, nitrate:false, bloodU:0, anticoag:false, lytic:false, aspirin:false, reversed:false,
     naloxone:false, headUp:false, osmotic:false, intubated:false, echoSeen:false, echoRead:null,
-    results:{}, log:[], good:[], bad:[], critical:[], timeline:[], events:[], sedation:null,
+    cultures:false, cultureReport:null,
+    results:{}, log:[], good:[], bad:[], critical:[], timeline:[], events:[], sedation:null, _ann:"",
     story:story.text, exam:story.exam, pmh:story.pmh, meds:story.meds, complaint:story.complaint
   };
   p.map = mapOf(p.sbp, p.dbp);
@@ -471,6 +474,99 @@ function note(why, seen){
   const line = isLab()? why : seen;
   patient.log.unshift({t:patient.t, text:line});
   patient.timeline.push(patient.t+" min — "+seen);
+  if(!/minutes passed|Result filed|Settings saved/i.test(seen)) announce(seen, false);
+}
+function announce(text, force){
+  if(!patient || !text) return;
+  if(force || !patient._ann) patient._ann = text;
+}
+let voiceOn = true;
+function maleVoice(){
+  if(!window.speechSynthesis) return null;
+  const voices = speechSynthesis.getVoices() || [];
+  const female = /female|samantha|karen|moira|victoria|allison|zira|susan|heera|sonia|libby|veena|siri|fiona|tessa|serena|nicky|catherine/i;
+  const rank = [/rishi/i, /daniel/i, /google uk english male/i, /google us english male/i, /microsoft david/i, /microsoft george/i, /microsoft ravi/i, /alex/i, /fred/i, /aaron/i, /arthur/i, /gordon/i, /oliver/i, /\btom\b/i, /david/i, /james/i, /nathan/i, /\blee\b/i, /\bmale\b/i];
+  function label(v){ return (v.name||"")+" "+(v.voiceURI||""); }
+  const en = voices.filter(function(v){ return /^en/i.test(v.lang||"") && !female.test(label(v)); });
+  for(let i=0;i<rank.length;i++){
+    const hit = en.find(function(v){ return rank[i].test(label(v)); });
+    if(hit) return hit;
+  }
+  return en[0] || null;
+}
+function say(text){
+  if(!voiceOn || !text || !window.speechSynthesis) return;
+  const u = new SpeechSynthesisUtterance(String(text).replace(/\s+/g," ").trim());
+  if(!u.text) return;
+  u.rate = 0.95;
+  u.volume = 1;
+  const go = function(){
+    const v = maleVoice();
+    if(v){ u.voice = v; u.pitch = 1; u.lang = v.lang || "en-GB"; }
+    else { u.pitch = 0.8; u.lang = "en-GB"; }
+    try{ speechSynthesis.resume(); speechSynthesis.speak(u); }catch(err){}
+  };
+  if(speechSynthesis.speaking || speechSynthesis.pending){
+    speechSynthesis.cancel();
+    setTimeout(go, 80);
+  } else go();
+}
+function hushVoice(){ if(window.speechSynthesis) speechSynthesis.cancel(); }
+function vitalLine(p){
+  const bits = [];
+  if(p.map<65) bits.push("Mean pressure "+p.map+", in the shock range");
+  else if(p.sbp>180) bits.push("Blood pressure "+p.sbp+" over "+p.dbp);
+  if(p.hr>120) bits.push("heart rate "+p.hr);
+  else if(p.hr<50) bits.push("heart rate "+p.hr+", slow");
+  if(p.rr>24) bits.push("respiratory rate "+p.rr);
+  else if(p.rr<10) bits.push("respiratory rate "+p.rr+", slow");
+  if(p.spo2<92) bits.push("saturation "+p.spo2+" percent");
+  if(p.gcs<=8) bits.push("GCS "+p.gcs);
+  if(p.glucose<70) bits.push("glucose "+p.glucose);
+  else if(p.glucose>180) bits.push("glucose "+p.glucose);
+  if(!bits.length) return "";
+  return "Important findings. "+bits.join(". ")+".";
+}
+function culturePlan(id){
+  if(id==="sepsis"||id==="pneumonia"){
+    return {
+      samples:"Two sets of blood cultures, plus sputum or a tracheal aspirate, before the first antibiotic if that does not delay the dose.",
+      gram:"Respiratory Gram stain: Gram-negative rods and many white cells. No acid-fast bacilli on this stain.",
+      id:"Blood culture: Klebsiella pneumoniae. The respiratory culture is the same organism.",
+      sens:"Susceptible to ceftriaxone, piperacillin-tazobactam, and meropenem. Resistant to ampicillin. Vancomycin has no activity.",
+      voice:"Microbiology report. Gram-negative rods in the respiratory sample. Klebsiella pneumoniae in the blood, susceptible to ceftriaxone, piperacillin-tazobactam, and meropenem. Vancomycin does not cover it."
+    };
+  }
+  return {
+    samples:"Two sets of blood cultures. This presentation does not point to a site that needs its own sample first.",
+    gram:"Gram stain: no organisms seen.",
+    id:"No growth on the preliminary culture.",
+    sens:"No susceptibility to act on. This report does not support an antibiotic.",
+    voice:"Microbiology report. No organisms on the Gram stain, and no growth so far. This report does not call for an antibiotic."
+  };
+}
+function resultSpeech(kind){
+  const p = patient;
+  if(kind==="abg"){
+    const g = p.results.abg;
+    return "Blood gas. pH "+g.ph+". Carbon dioxide "+g.pco2+". Lactate "+g.lactate+".";
+  }
+  if(kind==="labs"){
+    const l = p.results.labs;
+    const bits = ["Blood results."];
+    if(l.rft.k<3.5||l.rft.k>5.1) bits.push("Potassium "+l.rft.k+".");
+    if(l.cbc.hb<8) bits.push("Hemoglobin "+l.cbc.hb+".");
+    if(l.coags.inr>1.4) bits.push("INR "+l.coags.inr+".");
+    if(l.rft.creat>1.3) bits.push("Creatinine "+l.rft.creat+". Filtration about "+l.rft.egfr+".");
+    if(l.inflam.crp>10) bits.push("CRP "+l.inflam.crp+".");
+    if(bits.length===1) bits.push("No single number explains the presentation.");
+    return bits.join(" ");
+  }
+  if(kind==="cxr") return "Chest radiograph. "+p.results.cxr.text;
+  if(kind==="usg") return "Ultrasound. "+p.results.usg.text;
+  if(kind==="ct") return "CT. "+p.results.ct;
+  if(kind==="echo") return "Echo. "+p.results.echo.lv+" "+p.results.echo.rv;
+  return "";
 }
 function setBP(sbp, dbp){
   patient.sbp = Math.round(clamp(sbp,60,230));
@@ -490,6 +586,7 @@ function raiseEvent(seen, why){
   if(patient.events.indexOf(text)>=0) return;
   patient.events.push(text);
   patient.focus = "event";
+  announce(text, true);
   patient.timeline.push(patient.t+" min — "+seen);
   patient.log.unshift({t:patient.t, text:text});
 }
@@ -564,6 +661,37 @@ function orderTest(kind){
   patient.lastResult = kind;
   patient.focus = kind==="echo" ? "echo" : "result";
   note("The result is back. Read it against the pressure and the oxygen, not as a list.", "Result filed at "+patient.t+" min.");
+  announce(resultSpeech(kind), true);
+  render();
+}
+function sendCultures(){
+  tick(8);
+  if(patient.cultures){
+    patient.lastResult = patient.cultureReport ? "culture" : "culture-pending";
+    patient.focus = "result";
+    note("The bottles are already in the laboratory.", "Cultures were already sent.");
+    render();
+    return;
+  }
+  patient.cultures = true;
+  patient.lastResult = "culture-pending";
+  patient.focus = "result";
+  once(patient.good, "Cultures sent before the report");
+  note(culturePlan(patient.id).samples, "Cultures sent. The microbiology report is not back yet.");
+  render();
+}
+function openCultureReport(){
+  if(!patient.cultures){
+    note("Send the cultures before asking for a report.", "No culture was sent.");
+    render();
+    return;
+  }
+  tick(10);
+  patient.cultureReport = culturePlan(patient.id);
+  patient.lastResult = "culture";
+  patient.focus = "result";
+  announce(patient.cultureReport.voice, true);
+  note("The stain, the name, and the susceptibilities now decide the antibiotic.", "Microbiology report is back.");
   render();
 }
 
@@ -804,18 +932,21 @@ function giveAbx(id){
     note("There is no bacterial source in this illness. The drug does not treat it.", "Antibiotic given. No change in the illness.");
   } else if(id==="vanc"){
     once(patient.bad, "Vancomycin alone for this source");
-    note("Vancomycin does not cover the gram-negative rods of a pneumonia or a urinary source.", "Antibiotic given. The fever is unchanged.");
+    note("The report shows no activity for vancomycin against this Gram-negative rod.", "Vancomycin does not match the microbiology report.");
   } else if(ok){
     once(patient.good, "Antibiotic covers the source");
+    if(patient.cultures) once(patient.good, "Cultures taken before the antibiotic");
     if(patient.t<=60) once(patient.good, "Antibiotic within the hour");
-    note("The spectrum matches a lung source. The clock to the first dose matters as much as the name.", "Antibiotic running.");
+    note("The report shows this drug is active. Match the dose to the kidney, and do not add vancomycin for an organism it does not touch.", "Antibiotic matches the microbiology report.");
     if(patient.egfr<50 && !patient.renal && (id==="mero"||id==="piptazo")){
       once(patient.bad, "No renal adjustment despite a low GFR");
       note("The GFR is under 50. Meropenem and piperacillin need a wider interval. Ceftriaxone does not.", "Dose not changed for the kidney.");
+      announce("The filtration rate is under 50. This dose was not adjusted for the kidney.", true);
     }
     if(patient.egfr>=60 && patient.renal){
       once(patient.bad, "Renal dose despite a normal GFR");
       note("The GFR does not need a reduction. A renal dose here is an underdose.", "Dose reduced without a renal reason.");
+      announce("Filtration is normal. A renal dose here is an underdose.", true);
     }
     if(patient.egfr<50 && patient.renal && (id==="mero"||id==="piptazo")) once(patient.good, "Renal adjustment when the GFR was low");
   } else {
@@ -1076,6 +1207,26 @@ function resultCards(){
   }
   return html;
 }
+function cultureCard(){
+  if(!patient.cultures) return "";
+  const focus = (patient.lastResult==="culture"||patient.lastResult==="culture-pending") ? " id='focus-result'" : "";
+  if(!patient.cultureReport){
+    return "<div class='card'"+focus+"><h3>Cultures</h3><p>"+escapeHtml(culturePlan(patient.id).samples)+"</p><p>Received by the laboratory. The Gram stain and the name are still pending.</p><button class='next' type='button' id='cultureGo'>Open the microbiology report</button></div>";
+  }
+  const c = patient.cultureReport;
+  return "<div class='card'"+focus+"><h3>Microbiology report</h3><p>"+escapeHtml(c.gram)+"</p><p>"+escapeHtml(c.id)+"</p><p>"+escapeHtml(c.sens)+"</p></div>";
+}
+function abxHtml(){
+  if(!patient.cultureReport){
+    const lead = patient.cultures
+      ? "The bottles are in. Open the microbiology report. Antibiotic selection comes after that report."
+      : "Send cultures first. The report follows. Antibiotic selection is the step after the report.";
+    return "<details><summary>Antibiotics</summary><p class='lead'>"+lead+"</p></details>";
+  }
+  return "<details open><summary>Antibiotic selection</summary><p class='lead'>"+escapeHtml(patient.cultureReport.sens)+"</p><label class='check'><input id='renal' type='checkbox' "+(patient.renal?"checked":"")+"> Renal dose</label><div class='opts'>"+
+    btn("ctx-azi","Ceftriaxone 2 g daily + azithromycin 500 mg")+btn("piptazo","Piperacillin-tazobactam 4.5 g every 6 h")+btn("mero","Meropenem 1 g every 8 h")+btn("vanc","Vancomycin alone, 15 mg/kg")+
+    "</div></details>";
+}
 function btn(id, label){ return "<button type='button' data-act='"+id+"'>"+label+"</button>"; }
 
 function renderPick(){
@@ -1104,6 +1255,7 @@ function renderPick(){
   });
   document.getElementById("gen").onclick = function(){
     patient = buildPatient(selected);
+    patient._ann = vitalLine(patient);
     finished = false;
     wall = 12*60;
     if(mode==="arena") startWall();
@@ -1150,9 +1302,10 @@ function render(){
     "<div class='card'><h3>"+escapeHtml(p.complaint)+"</h3><p>"+escapeHtml(p.story)+"</p><p>"+escapeHtml(p.exam)+"</p><p>History: "+escapeHtml(p.pmh)+" Drugs: "+escapeHtml(p.meds)+"</p></div>"+
     (isLab()?"<div class='card hint'><h3>Hint</h3>"+escapeHtml(p.syn.hint)+"</div>":"")+
     "<details open><summary>Investigations</summary><div class='opts'>"+
-      btn("abg","ABG, with lactate")+btn("labs","Bloods — count, renal, liver, coagulation, CRP")+btn("usg","Ultrasound — lung, abdomen, IVC")+btn("cxr","Chest radiograph")+btn("ct","CT")+btn("echo","Echo")+
+      btn("abg","ABG, with lactate")+btn("labs","Bloods — count, renal, liver, coagulation, CRP")+btn("cultures","Cultures — two blood sets and a site sample")+btn("usg","Ultrasound — lung, abdomen, IVC")+btn("cxr","Chest radiograph")+btn("ct","CT")+btn("echo","Echo")+
     "</div></details>"+
     resultCards()+
+    cultureCard()+
     "<details open><summary>Oxygen and the ventilator</summary><div class='opts'>"+
       btn("room","Room air")+btn("np","Nasal prongs")+btn("fm","Face mask")+btn("nrb","Non-rebreather")+btn("hfnc","High-flow nasal oxygen")+btn("cpap","NIV — CPAP")+btn("bipap","NIV — BiPAP")+btn("imv","Invasive ventilation")+
     "</div>"+ventHtml()+"</details>"+
@@ -1161,9 +1314,7 @@ function render(){
       btn("norepi","Norepinephrine 0.05 mcg/kg/min")+btn("dobutamine","Dobutamine 2.5 mcg/kg/min")+btn("vaso","Vasopressin 0.03 units/min")+btn("stoppress","Stop the vasopressor")+
       btn("gtn","GTN infusion, start 10 mcg/min")+btn("nicardipine","Nicardipine infusion")+btn("labetalol","Labetalol bolus")+
     "</div></details>"+
-    "<details><summary>Antibiotics</summary><label class='check'><input id='renal' type='checkbox' "+(p.renal?"checked":"")+"> Renal dose</label><div class='opts'>"+
-      btn("ctx-azi","Ceftriaxone 2 g daily + azithromycin 500 mg")+btn("piptazo","Piperacillin-tazobactam 4.5 g every 6 h")+btn("mero","Meropenem 1 g every 8 h")+btn("vanc","Vancomycin alone, 15 mg/kg")+
-    "</div></details>"+
+    abxHtml()+
     "<details><summary>Glucose, potassium, blood, and procedures</summary><div class='opts'>"+
       btn("sedation","Fentanyl, then propofol if the airway is secure")+btn("d50","Dextrose 50%, 50 mL")+btn("insulin","Insulin infusion 0.1 units/kg/h")+btn("kcl","Potassium chloride replacement")+btn("dexinf","Dextrose infusion beside insulin")+btn("bicarb","Sodium bicarbonate")+
       btn("blood","One unit of blood")+btn("pcc","Reverse warfarin")+btn("ppi","Proton-pump inhibitor infusion")+btn("aspirin","Aspirin 300 mg")+btn("heparin","Treatment-dose heparin")+btn("lytic","Thrombolysis")+
@@ -1181,10 +1332,17 @@ function render(){
   if(echoGo) echoGo.onclick = function(){
     commitEcho(document.getElementById("elv").value, document.getElementById("evol").value, document.getElementById("eob").value);
   };
+  const cultureGo = document.getElementById("cultureGo");
+  if(cultureGo) cultureGo.onclick = function(){ openCultureReport(); };
   document.getElementById("reassess").onclick = function(){ tick(15); note("Fifteen minutes passed.", "Fifteen minutes passed."); render(); };
   document.getElementById("submit").onclick = function(){ openSubmit(false); };
   bindVent();
   settleView();
+  if(p._ann){
+    const line = p._ann;
+    p._ann = "";
+    say(line);
+  }
 }
 function ventHtml(){
   const v = patient.vent;
@@ -1240,6 +1398,7 @@ function bindVent(){
 }
 function onAct(act){
   if(act==="abg"||act==="labs"||act==="usg"||act==="cxr"||act==="ct"||act==="echo") return orderTest(act);
+  if(act==="cultures") return sendCultures();
   if(["room","np","fm","nrb","hfnc","cpap","bipap","imv"].indexOf(act)>=0) return setSupport(act);
   if(act==="rl500") return bolus(500,"balanced");
   if(act==="ns500") return bolus(500,"saline");
@@ -1297,7 +1456,7 @@ function showScore(dx, shock, resp, alt, plan){
     "<div class='card'><h3>Expert pathway</h3>"+p.syn.expert.map(function(s){ return "<p>"+escapeHtml(s)+"</p>"; }).join("")+"</div>"+
     "<button class='go' id='again' type='button'>Another patient</button>"+
     "<p class='foot'>Teaching cases. Not a prescription for a named patient.</p>";
-  document.getElementById("again").onclick = function(){ patient = null; selected = []; finished = false; renderPick(); };
+  document.getElementById("again").onclick = function(){ hushVoice(); patient = null; selected = []; finished = false; renderPick(); };
   patient.focus = "form";
   settleView();
 }
@@ -1316,10 +1475,22 @@ function start(){
   const q = new URLSearchParams(location.search);
   const m = q.get("mode");
   document.getElementById("back").onclick = function(){
+    hushVoice();
     if(timer) clearInterval(timer);
     if(history.length>1){ history.back(); return; }
     location.href = "index.html";
   };
+  const voiceBtn = document.getElementById("voice");
+  voiceBtn.onclick = function(){
+    voiceOn = !voiceOn;
+    voiceBtn.setAttribute("aria-pressed", voiceOn ? "true" : "false");
+    voiceBtn.textContent = voiceOn ? "Voice" : "Voice off";
+    if(!voiceOn) hushVoice();
+  };
+  if(window.speechSynthesis){
+    speechSynthesis.getVoices();
+    speechSynthesis.addEventListener("voiceschanged", function(){ speechSynthesis.getVoices(); });
+  }
   if(m==="lab"||m==="arena"){ mode = m; renderPick(); }
   else showDoors();
 }
