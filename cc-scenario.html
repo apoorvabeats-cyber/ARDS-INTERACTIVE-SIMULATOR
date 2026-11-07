@@ -11,12 +11,12 @@
 <style>
 :root{--bg:#101214;--ink:#f3efe6;--muted:#b7b1a4;--cool:#7fd4e6;--warm:#e2b48a;--card:#171c22;--line:rgba(243,239,230,.16);--good:#8fd0a8;--bad:#e7a3a3}
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Figtree,system-ui,sans-serif}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Figtree,system-ui,sans-serif;overflow-x:clip}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
-header{position:static;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:#101214;border-bottom:1px solid var(--line)}
+header{position:sticky;top:0;z-index:9;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:#101214;border-bottom:1px solid var(--line)}
 h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:15px;line-height:1.2;margin:0;letter-spacing:-.03em;flex:1 1 160px}
-#stick{position:sticky;top:0;z-index:8;background:#101214}
+#stick{position:static;background:#101214}
 h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:20px;margin:0 0 8px}
 #back,#voice{background:#171c22;border:1px solid var(--line);border-radius:999px;min-height:36px;padding:0 12px}
 #voice[aria-pressed="false"]{opacity:.5}
@@ -40,10 +40,10 @@ main{max-width:860px;margin:0 auto;padding:12px 12px 36px}
 .head span{color:var(--warm);font-size:12px;letter-spacing:.08em}
 #bay{position:relative;top:auto;z-index:4;background:#0c1014;border-bottom:1px solid var(--line)}
 #bay[hidden]{display:none !important}
-.scene{position:relative;width:100%;aspect-ratio:16/9;height:auto;overflow:hidden;background:#0c1014}
+.scene{position:relative;width:100%;aspect-ratio:16/9;height:auto;overflow:hidden;contain:paint;background:#0c1014}
 .scene .bedpic{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;transform:none;animation:none}
-.breathlayer{position:absolute;left:45%;top:54%;width:13%;height:13%;z-index:1;overflow:hidden;pointer-events:none;-webkit-mask-image:radial-gradient(ellipse 50% 48% at 50% 42%, #000 58%, transparent 84%);mask-image:radial-gradient(ellipse 50% 48% at 50% 42%, #000 58%, transparent 84%)}
-.breathlayer img{position:absolute;width:769.23%;height:769.23%;max-width:none;left:-346.15%;top:-415.38%;object-fit:fill;transform-origin:51.5% 54%;will-change:transform}
+.breathlayer{position:absolute;left:33%;top:53%;width:30%;height:12%;z-index:1;overflow:hidden;contain:paint;pointer-events:none;-webkit-mask-image:radial-gradient(ellipse 50% 48% at 50% 50%, #000 68%, transparent 92%);mask-image:radial-gradient(ellipse 50% 48% at 50% 50%, #000 68%, transparent 92%)}
+.breathlayer img{position:absolute;width:333.33%;height:833.33%;max-width:none;left:-110%;top:-441.67%;object-fit:fill;transform-origin:48% 59%;will-change:transform}
 @keyframes ivdrip{0%{transform:translateY(0);opacity:0}15%{opacity:1}80%{opacity:1}100%{transform:translateY(20px);opacity:0}}
 @keyframes pumpled{0%,100%{opacity:1}50%{opacity:.2}}
 .glass{position:absolute;z-index:2;overflow:hidden;pointer-events:none;background:#04110c;border-radius:2px}
@@ -59,7 +59,7 @@ main{max-width:860px;margin:0 auto;padding:12px 12px 36px}
 .o2-cpap .ventread,.o2-bipap .ventread,.o2-imv .ventread{display:flex;flex-direction:column;gap:1px}
 .ventread div{display:grid;grid-template-columns:52px 1fr;column-gap:6px}
 .ventread b{font-variant-numeric:tabular-nums}
-.rail{position:relative;z-index:4;display:flex;flex-direction:row;align-items:flex-end;gap:8px;width:100%;overflow-x:auto;overflow-y:hidden;padding:8px 8px 10px;background:#0c1014;pointer-events:auto}
+.rail{position:relative;z-index:4;display:flex;flex-direction:row;align-items:flex-end;gap:8px;width:100%;overflow:visible;touch-action:pan-y;padding:8px 8px 10px;background:#0c1014;pointer-events:auto}
 .addpump{width:36px;height:36px;flex:none;border-radius:50%;border:1px solid #7fd4e6;background:#10242c;color:#7fd4e6;font-weight:700;line-height:1}
 .gearsvg{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
 .gearbtns{position:absolute;inset:0;z-index:5;pointer-events:none}
@@ -1593,8 +1593,8 @@ function bedFrame(ts){
     }
     var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     var rise = Math.max(0, Math.min(1, amp * f));
-    var sy = (1 + 0.34 * rise).toFixed(3);
-    var sx = (1 + 0.05 * rise).toFixed(3);
+    var sy = (1 + 0.72 * rise).toFixed(3);
+    var sx = (1 + 0.16 * rise).toFixed(3);
     chest.style.transform = still ? "none" : "scale("+sx+","+sy+")";
   }
   runBedAudio();
@@ -2509,22 +2509,19 @@ function startWall(){
 function fmt(s){ s = Math.max(0,s); return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); }
 function settleView(){
   if(typeof placeBed==="function") placeBed();
-  const focus = patient && patient.focus;
+  var focus = patient && patient.focus;
   if(patient) patient.focus = "";
-  if(patient && patient.sheet) return;
-  const run = function(){
-    let el = null;
-    if(focus==="event") el = document.getElementById("focus-event");
-    else if(focus==="result") el = document.getElementById("focus-result");
+  if(!focus || focus==="event" || (patient && patient.sheet)) return;
+  var run = function(){
+    var el = null;
+    if(focus==="result") el = document.getElementById("focus-result");
     else if(focus==="echo") el = document.getElementById("focus-echo");
     else if(focus==="form") el = document.getElementById("focus-form");
-    else if(document.querySelector(".vitals .hot")) el = document.querySelector(".vitals");
     else if(focus==="vent") el = document.getElementById("focus-vent");
     if(!el || !el.scrollIntoView) return;
-    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el.scrollIntoView({behavior: reduce ? "auto" : "smooth", block: "start"});
+    el.scrollIntoView({behavior:"auto", block:"nearest"});
   };
-  if(typeof requestAnimationFrame==="function") requestAnimationFrame(function(){ requestAnimationFrame(run); });
+  if(typeof requestAnimationFrame==="function") requestAnimationFrame(run);
   else run();
 }
 function vitalsSheet(){
