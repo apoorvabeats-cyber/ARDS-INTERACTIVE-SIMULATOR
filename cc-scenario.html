@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#101214">
-<title>Scenario Bay</title>
+<title>Multi-Parameter Critical Care Scenario Simulator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@420;600;700&family=Fraunces:opsz,wght@9..144,520&display=swap" rel="stylesheet">
@@ -15,7 +15,7 @@ html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Figtree,sys
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
 header{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;padding:10px 12px;background:#101214f2;border-bottom:1px solid var(--line)}
-h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:0;letter-spacing:-.03em}
+h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:15px;line-height:1.2;margin:0;letter-spacing:-.03em}
 h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:20px;margin:0 0 8px}
 #back{background:#171c22;border:1px solid var(--line);border-radius:999px;min-height:36px;padding:0 12px}
 .modechip{margin-left:auto;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm)}
@@ -37,6 +37,9 @@ main{max-width:860px;margin:0 auto;padding:12px 12px 36px}
 .vitals b{display:block;font-size:18px;font-variant-numeric:tabular-nums}
 .vitals span{color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
 .badn{color:var(--bad)}
+.vitals .hot{outline:1px solid var(--bad);animation:hotPulse 1.1s ease}
+@keyframes hotPulse{0%{outline-color:transparent}35%{outline-color:var(--bad)}100%{outline-color:var(--bad)}}
+.vitals,#focus-event,#focus-result,#focus-echo,#focus-vent,#focus-form{scroll-margin-top:72px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin:0 0 10px;line-height:1.45}
 .card h3{margin:0 0 6px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--cool)}
 .hint{border-color:rgba(127,212,230,.45)}
@@ -63,7 +66,7 @@ textarea{min-height:84px;resize:vertical}
 <body>
 <header>
   <button type="button" id="back">Back</button>
-  <h1>Scenario Bay</h1>
+  <h1>Multi-Parameter Critical Care Scenario Simulator</h1>
   <span class="modechip" id="modechip"></span>
 </header>
 <main id="app"></main>
@@ -486,6 +489,7 @@ function raiseEvent(seen, why){
   const text = isLab()? why : seen;
   if(patient.events.indexOf(text)>=0) return;
   patient.events.push(text);
+  patient.focus = "event";
   patient.timeline.push(patient.t+" min — "+seen);
   patient.log.unshift({t:patient.t, text:text});
 }
@@ -557,6 +561,8 @@ function orderTest(kind){
     patient.results.echo = echoReport(patient);
     patient.echoSeen = true;
   }
+  patient.lastResult = kind;
+  patient.focus = kind==="echo" ? "echo" : "result";
   note("The result is back. Read it against the pressure and the oxygen, not as a list.", "Result filed at "+patient.t+" min.");
   render();
 }
@@ -573,6 +579,7 @@ function setSupport(level){
   const before = oxygenBonus(patient.support);
   patient.support = level;
   if(level==="imv") patient.intubated = true;
+  if(level==="cpap"||level==="bipap"||level==="imv") patient.focus = "vent";
   const delta = oxygenBonus(level) - before;
   patient.spo2 = Math.max(70, Math.min(100, patient.spo2+delta));
   if((level==="cpap"||level==="bipap") && patient.gcs<9 && !patient.intubated){
@@ -1013,7 +1020,7 @@ function escapeHtml(s){
 }
 function vitalsHtml(){
   const p = patient;
-  const cell = function(label, value, bad){ return "<div><span>"+label+"</span><b class='"+(bad?"badn":"")+"'>"+value+"</b></div>"; };
+  const cell = function(label, value, bad){ return "<div class='"+(bad?"hot":"")+"'><span>"+label+"</span><b class='"+(bad?"badn":"")+"'>"+value+"</b></div>"; };
   return "<div class='vitals'>"+
     cell("MAP", p.map, p.map<65)+
     cell("BP", p.sbp+"/"+p.dbp, p.sbp<90||p.sbp>180)+
@@ -1025,34 +1032,39 @@ function vitalsHtml(){
     cell("Clock", p.t+" min", false)+
     "</div>";
 }
+function markCard(kind){
+  if(!patient.lastResult || patient.lastResult!==kind) return "";
+  return kind==="echo" ? " id='focus-echo'" : " id='focus-result'";
+}
+function hi(value, bad){ return bad ? "<b class='badn'>"+value+"</b>" : String(value); }
 function resultCards(){
   const r = patient.results;
   let html = "";
   if(r.abg){
     const g = r.abg;
-    html += "<div class='card'><h3>ABG</h3>pH "+g.ph+" · PaCO2 "+g.pco2+" mmHg · PaO2 "+g.po2+" mmHg · HCO3 "+g.hco3+" · lactate "+g.lactate+" mmol/L · base "+g.be+" · glucose "+g.glucose+" mg/dL"+(isLab()?"<p class='lead'>A high lactate is a perfusion problem until proved otherwise. The pH has to agree with the bicarbonate and the carbon dioxide.</p>":"")+"</div>";
+    html += "<div class='card'"+markCard("abg")+"><h3>ABG</h3>pH "+hi(g.ph, g.ph<7.35||g.ph>7.45)+" · PaCO2 "+hi(g.pco2+" mmHg", g.pco2<35||g.pco2>45)+" · PaO2 "+hi(g.po2+" mmHg", g.po2<60)+" · HCO3 "+hi(g.hco3, g.hco3<22||g.hco3>28)+" · lactate "+hi(g.lactate+" mmol/L", g.lactate>2)+" · base "+g.be+" · glucose "+hi(g.glucose+" mg/dL", g.glucose<70||g.glucose>180)+(isLab()?"<p class='lead'>A high lactate is a perfusion problem until proved otherwise. The pH has to agree with the bicarbonate and the carbon dioxide.</p>":"")+"</div>";
   }
   if(r.labs){
     const l = r.labs;
-    html += "<div class='card'><h3>Bloods</h3>"+
-      "Hb "+l.cbc.hb+" g/dL · white cells "+l.cbc.wbc+" · "+l.cbc.dlc+" · platelets "+l.cbc.plt+"<br>"+
-      "Urea "+l.rft.urea+" mg/dL · creatinine "+l.rft.creat+" mg/dL · GFR about "+l.rft.egfr+" · Na "+l.rft.na+" · K "+l.rft.k+"<br>"+
-      "Bilirubin "+l.lft.bili+" · AST "+l.lft.ast+" · ALT "+l.lft.alt+" · albumin "+l.lft.alb+" g/dL<br>"+
-      "PT "+l.coags.pt+" · INR "+l.coags.inr+" · aPTT "+l.coags.aptt+"<br>"+
-      "CRP "+l.inflam.crp+" mg/L · procalcitonin "+l.inflam.pct+" ng/mL"+
+    html += "<div class='card'"+markCard("labs")+"><h3>Bloods</h3>"+
+      "Hb "+hi(l.cbc.hb+" g/dL", l.cbc.hb<8)+" · white cells "+hi(l.cbc.wbc, l.cbc.wbc<4||l.cbc.wbc>12)+" · "+l.cbc.dlc+" · platelets "+hi(l.cbc.plt, l.cbc.plt<100)+"<br>"+
+      "Urea "+l.rft.urea+" mg/dL · creatinine "+hi(l.rft.creat+" mg/dL", l.rft.creat>1.3)+" · GFR about "+hi(l.rft.egfr, l.rft.egfr<60)+" · Na "+hi(l.rft.na, l.rft.na<135||l.rft.na>145)+" · K "+hi(l.rft.k, l.rft.k<3.5||l.rft.k>5.1)+"<br>"+
+      "Bilirubin "+l.lft.bili+" · AST "+hi(l.lft.ast, l.lft.ast>40)+" · ALT "+l.lft.alt+" · albumin "+l.lft.alb+" g/dL<br>"+
+      "PT "+l.coags.pt+" · INR "+hi(l.coags.inr, l.coags.inr>1.4)+" · aPTT "+hi(l.coags.aptt, l.coags.aptt>40)+"<br>"+
+      "CRP "+hi(l.inflam.crp+" mg/L", l.inflam.crp>10)+" · procalcitonin "+hi(l.inflam.pct+" ng/mL", l.inflam.pct>0.5)+
       (isLab() && patient.id==="dka"?"<p class='lead'>In ketoacidosis, insulin waits if potassium is under 3.3 mmol/L.</p>":"")+
       "</div>";
   }
   if(r.cxr){
-    html += "<div class='card'><h3>Chest radiograph</h3><p>"+escapeHtml(r.cxr.text)+"</p>"+(r.cxr.img?"<img class='film' alt='"+escapeHtml(r.cxr.cap)+"' src='"+r.cxr.img+"'>":"")+"</div>";
+    html += "<div class='card'"+markCard("cxr")+"><h3>Chest radiograph</h3><p>"+escapeHtml(r.cxr.text)+"</p>"+(r.cxr.img?"<img class='film' alt='"+escapeHtml(r.cxr.cap)+"' src='"+r.cxr.img+"'>":"")+"</div>";
   }
   if(r.usg){
-    html += "<div class='card'><h3>Ultrasound</h3><p>"+escapeHtml(r.usg.text)+"</p>"+(r.usg.img?"<img class='film' alt='"+escapeHtml(r.usg.cap)+"' src='"+r.usg.img+"'>":"")+"</div>";
+    html += "<div class='card'"+markCard("usg")+"><h3>Ultrasound</h3><p>"+escapeHtml(r.usg.text)+"</p>"+(r.usg.img?"<img class='film' alt='"+escapeHtml(r.usg.cap)+"' src='"+r.usg.img+"'>":"")+"</div>";
   }
-  if(r.ct) html += "<div class='card'><h3>CT</h3><p>"+escapeHtml(r.ct)+"</p></div>";
+  if(r.ct) html += "<div class='card'"+markCard("ct")+"><h3>CT</h3><p>"+escapeHtml(r.ct)+"</p></div>";
   if(r.echo){
     const e = r.echo;
-    html += "<div class='card'><h3>Echo</h3>LV: "+escapeHtml(e.lv)+"<br>RV: "+escapeHtml(e.rv)+"<br>Wall motion: "+escapeHtml(e.rwma)+"<br>Pericardium: "+escapeHtml(e.pericardium)+"<br>IVC: "+escapeHtml(e.ivc);
+    html += "<div class='card'"+markCard("echo")+"><h3>Echo</h3>LV: "+escapeHtml(e.lv)+"<br>RV: "+escapeHtml(e.rv)+"<br>Wall motion: "+escapeHtml(e.rwma)+"<br>Pericardium: "+escapeHtml(e.pericardium)+"<br>IVC: "+escapeHtml(e.ivc);
     if(!patient.echoRead){
       html += "<p class='lead'>Your read.</p>"+
         "<label class='f'>Left ventricle<select id='elv'><option value='high'>Hyperdynamic</option><option value='low'>Reduced</option><option value='rwma'>Regional wall-motion abnormality</option><option value='normal'>Normal</option></select></label>"+
@@ -1108,6 +1120,24 @@ function startWall(){
   }, 1000);
 }
 function fmt(s){ s = Math.max(0,s); return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); }
+function settleView(){
+  const focus = patient && patient.focus;
+  if(patient) patient.focus = "";
+  const run = function(){
+    let el = null;
+    if(focus==="event") el = document.getElementById("focus-event");
+    else if(focus==="result") el = document.getElementById("focus-result");
+    else if(focus==="echo") el = document.getElementById("focus-echo");
+    else if(focus==="form") el = document.getElementById("focus-form");
+    else if(document.querySelector(".vitals .hot")) el = document.querySelector(".vitals");
+    else if(focus==="vent") el = document.getElementById("focus-vent");
+    if(!el || !el.scrollIntoView) return;
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({behavior: reduce ? "auto" : "smooth", block: "start"});
+  };
+  if(typeof requestAnimationFrame==="function") requestAnimationFrame(function(){ requestAnimationFrame(run); });
+  else run();
+}
 function render(){
   if(!patient) return renderPick();
   const p = patient;
@@ -1115,7 +1145,7 @@ function render(){
   document.getElementById("modechip").textContent = mode==="arena"?"Practice · "+fmt(wall):"Learning lab";
   app.innerHTML = "<p class='kicker'>"+escapeHtml(p.name)+" · "+p.age+"-year-old "+p.sex+" · "+p.wt+" kg · predicted body weight "+p.pbw+" kg</p>"+
     (mode==="arena"?"<p class='lead'>Time <span class='clock' id='wall'>"+fmt(wall)+"</span></p>":"")+
-    (p.events.length?"<div class='card'><h3>Event</h3><p>"+escapeHtml(p.events[p.events.length-1])+"</p></div>":"")+
+    (p.events.length?"<div class='card' id='focus-event'><h3>Event</h3><p>"+escapeHtml(p.events[p.events.length-1])+"</p></div>":"")+
     vitalsHtml()+
     "<div class='card'><h3>"+escapeHtml(p.complaint)+"</h3><p>"+escapeHtml(p.story)+"</p><p>"+escapeHtml(p.exam)+"</p><p>History: "+escapeHtml(p.pmh)+" Drugs: "+escapeHtml(p.meds)+"</p></div>"+
     (isLab()?"<div class='card hint'><h3>Hint</h3>"+escapeHtml(p.syn.hint)+"</div>":"")+
@@ -1154,6 +1184,7 @@ function render(){
   document.getElementById("reassess").onclick = function(){ tick(15); note("Fifteen minutes passed.", "Fifteen minutes passed."); render(); };
   document.getElementById("submit").onclick = function(){ openSubmit(false); };
   bindVent();
+  settleView();
 }
 function ventHtml(){
   const v = patient.vent;
@@ -1161,20 +1192,20 @@ function ventHtml(){
   const imv = patient.support==="imv";
   if(!niv && !imv) return "<p class='lead'>The ventilator panel opens when you choose NIV or a tube.</p>";
   if(niv){
-    return "<p class='lead'>NIV. Predicted body weight "+patient.pbw+" kg.</p>"+
+    return "<div id='focus-vent'><p class='lead'>NIV. Predicted body weight "+patient.pbw+" kg.</p>"+
       slider("ipap","IPAP", v.ipap, 8, 24, 1)+" "+slider("epap","EPAP", v.epap, 4, 14, 1)+
       slider("fio2","FiO2 %", v.fio2, 30, 100, 5)+" "+slider("backup","Backup rate", v.backup, 8, 24, 1)+
       slider("rise","Rise time, s", v.rise, 0.1, 0.6, 0.1)+" "+slider("ti","Inspiratory time, s", v.ti, 0.6, 1.6, 0.1)+
       "<label class='f'>Mask<select id='mask'><option value='nasal'>Nasal</option><option value='oronasal'>Oronasal</option><option value='full'>Full face</option><option value='helmet'>Helmet</option></select></label>"+
-      "<button class='next' type='button' id='applyVent'>Apply NIV settings</button>";
+      "<button class='next' type='button' id='applyVent'>Apply NIV settings</button></div>";
   }
-  return "<p class='lead'>Invasive ventilation. Predicted body weight "+patient.pbw+" kg. A tidal volume of 6 mL/kg is "+Math.round(6*patient.pbw)+" mL.</p>"+
+  return "<div id='focus-vent'><p class='lead'>Invasive ventilation. Predicted body weight "+patient.pbw+" kg. A tidal volume of 6 mL/kg is "+Math.round(6*patient.pbw)+" mL.</p>"+
     "<label class='f'>Mode<select id='modev'><option>VC-AC</option><option>PC-AC</option><option>SIMV</option><option>PS</option></select></label>"+
     slider("tv","Tidal volume, mL", v.tv, 200, 800, 10)+" "+slider("vrr","Set rate", v.rr, 10, 30, 1)+
     slider("peep","PEEP", v.peep, 0, 18, 1)+" "+slider("fio2","FiO2 %", v.fio2, 30, 100, 5)+
     slider("ps","Pressure support", v.ps, 0, 20, 1)+
     "<label class='f'>I:E<select id='ie'><option>1:1</option><option>1:2</option><option>1:3</option></select></label>"+
-    "<button class='next' type='button' id='applyVent'>Apply ventilator settings</button>";
+    "<button class='next' type='button' id='applyVent'>Apply ventilator settings</button></div>";
 }
 function slider(id, label, value, min, max, step){
   return "<label class='row'>"+label+" <input id='"+id+"' type='range' min='"+min+"' max='"+max+"' step='"+step+"' value='"+value+"'><b id='"+id+"v'>"+value+"</b></label>";
@@ -1228,7 +1259,7 @@ function openSubmit(timedOut){
   const p = patient;
   const app = document.getElementById("app");
   app.innerHTML = vitalsHtml()+
-    "<h2>"+(timedOut?"Time is up.":"Your diagnosis.")+"</h2>"+
+    "<h2 id='focus-form'>"+(timedOut?"Time is up.":"Your diagnosis.")+"</h2>"+
     "<p class='lead'>"+escapeHtml(p.name)+". Submit the illness, the shock, and the respiratory failure.</p>"+
     "<label class='f'>Primary diagnosis<select id='dx'>"+DX.map(function(d){ return "<option value='"+d[0]+"'>"+d[1]+"</option>"; }).join("")+"</select></label>"+
     "<label class='f'>Shock<select id='shock'><option value='distributive'>Distributive</option><option value='cardiogenic'>Cardiogenic</option><option value='hypovolemic'>Hypovolemic</option><option value='obstructive'>Obstructive</option><option value='none'>No shock</option></select></label>"+
@@ -1239,6 +1270,8 @@ function openSubmit(timedOut){
   document.getElementById("done").onclick = function(){
     showScore(document.getElementById("dx").value, document.getElementById("shock").value, document.getElementById("resp").value, document.getElementById("alt").value, document.getElementById("plan").value);
   };
+  patient.focus = "form";
+  settleView();
 }
 function showScore(dx, shock, resp, alt, plan){
   const p = patient;
@@ -1251,7 +1284,7 @@ function showScore(dx, shock, resp, alt, plan){
   const shockOk = shock===p.syn.shock;
   const respOk = resp===p.syn.resp;
   document.getElementById("app").innerHTML =
-    "<p class='kicker'>Score</p><h2>"+sc+" / 100</h2>"+
+    "<p class='kicker'>Score</p><h2 id='focus-form'>"+sc+" / 100</h2>"+
     "<div class='teach"+(dx===p.id?"":" miss")+"'>You said "+escapeHtml(dxName)+". The illness was "+escapeHtml(right)+".</div>"+
     "<div class='teach"+(shockOk?"":" miss")+"'>Shock: you said "+escapeHtml(shock)+". It was "+escapeHtml(p.syn.shock)+".</div>"+
     "<div class='teach"+(respOk?"":" miss")+"'>Respiratory failure: you said "+escapeHtml(resp)+". It was "+escapeHtml(p.syn.resp)+".</div>"+
@@ -1265,6 +1298,8 @@ function showScore(dx, shock, resp, alt, plan){
     "<button class='go' id='again' type='button'>Another patient</button>"+
     "<p class='foot'>Teaching cases. Not a prescription for a named patient.</p>";
   document.getElementById("again").onclick = function(){ patient = null; selected = []; finished = false; renderPick(); };
+  patient.focus = "form";
+  settleView();
 }
 function showDoors(){
   document.getElementById("modechip").textContent = "";
