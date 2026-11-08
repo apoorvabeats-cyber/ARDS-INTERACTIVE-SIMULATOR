@@ -58,6 +58,11 @@
   .note { font-size:13px; color:var(--muted); }
   a { color:var(--primary); }
   .hidden { display:none; }
+  .dock { position:sticky; top:0; z-index:20; background:var(--bg); border-bottom:1px solid var(--border); padding:8px 16px 6px; }
+  .mini { display:flex; gap:16px; flex-wrap:wrap; font-family:ui-monospace, monospace; font-size:14px; }
+  .mini b { font-weight:600; }
+  .dock .log { margin:4px 0 0; }
+  .hint { font-size:12px; color:var(--subtle); margin-top:6px; }
 </style>
 </head>
 <body>
@@ -183,7 +188,9 @@ function blankPatient(c) {
   const p = { ...c.phys, norepi:0, dobu:0, imEpi:false, metop:false, nrb:c.id==="sepsis"||c.id==="bleed"||c.id==="stemi"||c.id==="pe"||c.id==="ptx"||c.id==="ana", prone:false, vent:c.vent?{...c.vent}:null };
   return {
     t:0, p, fluids:0, blood:0, abx:false, mtp:false, gi:false, cath:false, lytics:false, drained:false,
-    needle:false, tube:false, steroids:false, cvc:false, harm:0, dx:null, outcome:null, why:"",
+    needle:false, tube:false, steroids:false, cvc:false, art:false, contour:false, pac:false, zeroed:false, echo:false,
+    off:{ a:(Math.random()<0.5?-1:1)*(6+Math.floor(Math.random()*5)), v:(Math.random()<0.5?-1:1)*(3+Math.floor(Math.random()*3)) },
+    nibp:null, nibpT:0, plr:null, used:{}, harm:0, dx:null, outcome:null, why:"",
     lowMap:0, lowOx:0, good:0, log:"Read the monitor, then treat the cause.",
     uo: c.id==="bleed"||c.id==="sepsis" ? 8 : 20,
   };
@@ -242,7 +249,30 @@ function compute(p) {
   const rr = v ? v.rr : clamp(14 + (97 - spo2) * 0.4 + p.sepsis * 3, 12, 42);
   const berlin = !v ? "" : pf <= 100 ? "severe" : pf <= 200 ? "moderate" : pf <= 300 ? "mild" : "none";
   const rhythm = p.ischemia > 0.25 ? "STE" : p.pvr > 1.6 ? "RV strain" : hr >= 100 ? "ST" : "NSR";
-  return { hr:Math.round(hr), sbp:Math.round(sbp), dbp:Math.round(dbp), map:Math.round(map), pp:Math.round(sbp-dbp), spo2:Math.round(spo2), rr:Math.round(rr), cvp:Math.round(cvp), co:Math.round(co*10)/10, sv:Math.round(sv), svr:Math.round(((map-cvp)*80)/Math.max(0.8,co)), pf:Math.round(pf), pplat:Math.round(pplat), dp:Math.round(dp), berlin, rhythm, fio2, pao2:Math.round(pao2) };
+  /* flow, mixed venous, pulmonary artery and dynamic indices */
+  const bsa = 0.6 + 0.0175 * p.pbw;
+  const cao2 = p.hb * 1.34 * (spo2 / 100);
+  const vo2 = 250 * (1 + Math.max(0, p.temp - 37) * 0.1) * (1 - 0.3 * p.sepsis);
+  const extraction = Math.min(0.62, vo2 / Math.max(0.8, co * p.hb * 13.4));
+  const svo2 = clamp(spo2 - extraction * 100, 30, 90);
+  const gap = clamp(3 + (5.5 - co) * 1.9, 2.5, 14);
+  let pcwp = 6 + (p.volume - 4.3) * 3.2 + p.pulmonaryEdema * 20 + Math.max(0, 0.85 - contract) * 22;
+  if (p.tamponade > 0.35) pcwp = cvp - 1;
+  pcwp = clamp(pcwp, 3, 36);
+  const pvrW = 1.2 + 4.2 * Math.max(0, p.pvr - 1) + 2.5 * p.lungInjury;
+  const mpap = clamp(pcwp + pvrW * co, 10, 75);
+  const ppa = clamp(8 + mpap * 0.5 + (p.pvr - 1) * 4, 8, 55);
+  const pad = Math.max(4, mpap - ppa / 3);
+  const pas = pad + ppa;
+  let ppv = 3 + Math.max(0, 4.5 - p.volume) * 11 + vaso * 3 + p.tamponade * 10 + p.ptx * 6 + Math.max(0, p.pvr - 1) * 8;
+  if (p.pulmonaryEdema > 0.3) ppv -= 3;
+  ppv = clamp(ppv, 3, 34);
+  const ppvOk = !!v && vt >= 8 && p.tamponade < 0.35;
+  const paradox = v ? 0 : p.tamponade * 20;
+  return { hr:Math.round(hr), sbp:Math.round(sbp), dbp:Math.round(dbp), map:Math.round(map), pp:Math.round(sbp-dbp), spo2:Math.round(spo2), rr:Math.round(rr), cvp:Math.round(cvp), co:Math.round(co*10)/10, sv:Math.round(sv), svr:Math.round(((map-cvp)*80)/Math.max(0.8,co)), pf:Math.round(pf), pplat:Math.round(pplat), dp:Math.round(dp), berlin, rhythm, fio2, pao2:Math.round(pao2),
+    ci:Math.round(co/bsa*10)/10, svo2:Math.round(svo2), scvo2:Math.round(clamp(svo2+4,25,92)), gap:Math.round(gap*10)/10,
+    pcwp:Math.round(pcwp), mpap:Math.round(mpap), pas:Math.round(pas), pad:Math.round(pad), pvr:Math.round(pvrW*80),
+    ppv:Math.round(ppv), svv:Math.round(ppv*0.92), ppvOk, paradox:Math.round(paradox), do2:Math.round(co*cao2*10) };
 }
 
 function protective(s) {
@@ -262,6 +292,12 @@ function causeMet(s, c) {
   if (c.id==="ards") return protective(s) && s.prone && s.steroids;
   if (c.id==="asp") return protective(s) && s.prone;
   return false;
+}
+
+function cuffNow(vit) {
+  const err = vit.map < 70 && vit.svr > 1200 ? 8 : 0;
+  S.nibp = { sbp:vit.sbp + err, dbp:vit.dbp + Math.round(err/2), map:vit.map + Math.round(err*0.6), err, t:S.t };
+  S.nibpT = S.t;
 }
 
 function step(dt) {
@@ -297,6 +333,7 @@ function step(dt) {
   else if (S.lowOx > 40) end("died", "Hypoxemia went on too long.");
   else if (S.good > 14) end("stable", "The cause is treated and the monitor has settled.");
   V = vit;
+  if (!S.art && S.t - S.nibpT >= 90) cuffNow(vit);
 }
 
 function end(outcome, why) {
@@ -312,6 +349,7 @@ function act(id) {
   const p = S.p;
   const c = CASES.find(x => x.id === caseId);
   const say = (t) => { S.log = t; };
+  S.used[id] = (S.used[id] || 0) + 1;
   if (id==="fluid") {
     if (p.pulmonaryEdema > 0.4 || c.id==="stemi" || c.id==="ards" || c.id==="asp") {
       p.pulmonaryEdema = Math.min(1, p.pulmonaryEdema + 0.12);
@@ -353,10 +391,48 @@ function act(id) {
   else if (id==="nrb") { p.nrb = true; say("Non-rebreather on."); }
   else if (id==="intubate") {
     if (c.id==="tamp" && !S.drained) { end("died", "Induction before drainage. Venous return stopped."); return; }
+    const pre = compute(p);
+    let extra = "";
+    if (pre.map < 75 && p.norepi < 0.08) { p.volume = Math.max(2.2, p.volume - 0.25); p.vasoplegia = Math.min(0.98, p.vasoplegia + 0.1); extra += " The pressure fell with the induction and positive pressure. Resuscitate first, then intubate."; }
+    if (p.ptx > 0.2 && !S.needle && !S.tube) { p.ptx = Math.min(0.95, p.ptx + 0.2); extra += " Positive pressure is making the pneumothorax worse."; }
+    if (c.id==="pe") { p.contractility = Math.max(0.3, p.contractility - 0.1); extra += " Induction and positive pressure strain a failing right ventricle."; }
     p.vent = { vt:8, rr:16, peep:5, fio2: p.fio2 < 0.6 ? 0.6 : p.fio2 };
-    say("Intubated. Set the tidal volume to predicted body weight.");
-  } else if (id==="cvc") { S.cvc = true; say("Central line in. CVP is a pressure, not a diagnosis."); }
-  else if (id==="echo") say(c.echo);
+    say("Intubated. Set the tidal volume to predicted body weight."+extra);
+  } else if (id==="cvc") { S.cvc = true; say("Central line in. CVP is a pressure, not a diagnosis. ScvO2 and the Pcv–aCO2 gap are now readable."); }
+  else if (id==="art") {
+    if (S.art) say("The arterial line is already in.");
+    else { S.art = true; step(10); say("Radial arterial line in. Every beat is visible. Zero and level it before you trust the number."); }
+  }
+  else if (id==="zero") {
+    if (!(S.art || S.cvc || S.pac)) say("There is no transducer to zero yet.");
+    else { S.zeroed = true; say("Transducer zeroed and leveled to the phlebostatic axis. The pressures are now true."); }
+  }
+  else if (id==="nibp") {
+    if (S.art) say("The arterial line is continuous. The cuff adds nothing.");
+    else { cuffNow(compute(p)); say("Cuff cycled."); }
+  }
+  else if (id==="contour") {
+    if (!S.art) say("Pulse contour reads the arterial waveform. Place the arterial line first.");
+    else { S.contour = true; say("Pulse contour on. Stroke volume, output and PPV are reading. Check that the PPV is valid before you act on it."); }
+  }
+  else if (id==="pac") {
+    if (!S.cvc) say("A PA catheter floats through a central introducer. Place the central line first.");
+    else if (S.pac) say("The PA catheter is already in.");
+    else { S.pac = true; step(20); say("PA catheter floated. It measures pressure, wedge, output, SVR and mixed venous saturation. It does not treat anything."); }
+  }
+  else if (id==="plr") {
+    const v0 = compute(p), v1 = compute({ ...p, volume:p.volume + 0.3 });
+    const pct = Math.round((v1.sv - v0.sv) / Math.max(1, v0.sv) * 100);
+    const flow = (S.contour && S.art) || S.pac || S.echo;
+    if (flow) {
+      S.plr = { pct, t:S.t };
+      say(pct >= 10 ? "Passive leg raise: stroke volume rose "+pct+"%. Fluid responsive. Volume is likely to raise output." : "Passive leg raise: stroke volume rose only "+pct+"%. Not fluid responsive. More fluid will mostly raise filling pressures.");
+    } else if (S.art) {
+      S.plr = { pct:Math.round(pct*0.7), t:S.t, rough:true };
+      say("The pulse pressure moved about "+Math.round(pct*0.7)+"%. It is a rough surrogate. A flow signal (contour, PAC or echo VTI) is better.");
+    } else say("A cuff cannot see a leg raise. You need a beat-to-beat or flow signal: arterial line, pulse contour, PA catheter or echo VTI.");
+  }
+  else if (id==="echo") { S.echo = true; say(c.echo); }
   else if (id==="cxr") say(c.cxr);
   else if (id==="abg") say(c.abg);
   else if (id==="metop") { p.metop = true; S.harm++; p.contractility = Math.max(0.2, p.contractility - 0.15); say("Beta blockade in shock. The rate falls and the pump worsens."); }
@@ -374,8 +450,8 @@ function clock(t) {
 }
 
 const waves = {
-  raf:0, buffers:null, write:0, t:0, last:0,
-  stop() { cancelAnimationFrame(this.raf); this.raf = 0; this.buffers = null; },
+  raf:0, buffers:null, write:0, t:0, last:0, _ro:null,
+  stop() { cancelAnimationFrame(this.raf); this.raf = 0; this.buffers = null; if (this._ro) { this._ro.disconnect(); this._ro = null; } },
   start() {
     this.stop();
     const canvas = $("#wave");
@@ -383,13 +459,35 @@ const waves = {
     const ctx = canvas.getContext("2d");
     const N = 600;
     const gauss = (x,mu,sig,amp) => amp * Math.exp(-0.5 * ((x-mu)/sig)**2);
-    const rowsOf = () => {
-      const rows = [{ id:"ecg", label:"II", color:"#3ee07a" }, { id:"art", label:"ART", color:"#ff6b6b" }, { id:"pleth", label:"SpO2", color:"#4cc9f0" }];
-      if (screen==="sim" && S && S.p.vent) rows.push({ id:"co2", label:"etCO2", color:"#c8b07a" });
+    /* one arterial-type beat: sharp upstroke, dicrotic notch, diastolic run-off. 0 at end-diastole, 1 at the peak */
+    const beat = (ph) => {
+      const raw = (x) => x < 0.3 ? Math.sin(Math.max(0, x-0.12)/0.18 * Math.PI/2) : Math.exp(-(x-0.3)*3.2) + 0.09*gauss(x,0.42,0.02,1);
+      const x = ph < 0.12 ? ph + 1 : ph;
+      const end = Math.exp(-(1.12-0.3)*3.2);
+      return Math.max(0, (raw(x) - end) / (1 - end));
+    };
+    const live = () => {
       if (screen==="hemo" && hemo) {
-        if (hemo.cvc) rows.push({ id:"cvp", label:"CVP", color:"#c8b07a" });
-        if (hemo.level==="advanced" && hemo.pac) rows.push({ id:"pa", label: hemo.wedged ? "PCWP" : "PA", color:"#d4a85a" });
+        const sn = hemo.snap;
+        return { hr:sn.hr, sbp:sn.sbp, dbp:sn.dbp, pp:sn.pp, spo2:sn.spo2, rr:sn.rr, cvp:sn.cvp, pas:sn.pas, pad:sn.pad, pcwp:sn.pcwp,
+          ppv: sn.vent==="controlled" ? sn.ppv : 0, paradox: sn.vent==="spontaneous" ? sn.paradox : 0, vent: sn.vent, tr:sn.tr, vWave:sn.vWave,
+          oa: hemo.art && !hemo.zeroed ? hemo.off.a : 0, ov: (hemo.cvc||hemo.pac) && !hemo.zeroed ? hemo.off.v : 0 };
       }
+      const v = V || { hr:80, sbp:110, dbp:70, pp:40, spo2:96, rr:16, cvp:6, pas:28, pad:12, pcwp:8, ppv:6, paradox:0, ppvOk:false };
+      return { hr:v.hr, sbp:v.sbp, dbp:v.dbp, pp:v.pp, spo2:v.spo2, rr:v.rr, cvp:v.cvp, pas:v.pas, pad:v.pad, pcwp:v.pcwp,
+        ppv: v.ppvOk ? v.ppv : 0, paradox:v.paradox, vent: S && S.p.vent ? "controlled" : "spontaneous", tr:0.1, vWave:0,
+        oa: S && S.art && !S.zeroed ? S.off.a : 0, ov: S && (S.cvc||S.pac) && !S.zeroed ? S.off.v : 0 };
+    };
+    const rowsOf = () => {
+      const rows = [{ id:"ecg", label:"II", color:"#3ee07a", lo:-0.25, hi:1.15 }];
+      let art = false, cvp = false, pa = false;
+      if (screen==="sim" && S) { art = S.art; cvp = S.cvc || S.pac; pa = S.pac; }
+      if (screen==="hemo" && hemo) { art = hemo.art; cvp = hemo.cvc || hemo.pac; pa = hemo.level==="advanced" && hemo.pac; }
+      if (art) rows.push({ id:"art", label:"ART", color:"#ff6b6b", lo:0, hi:200, grid:[50,100,150] });
+      rows.push({ id:"pleth", label:"SpO2", color:"#4cc9f0", lo:-0.4, hi:1 });
+      if (screen==="sim" && S && S.p.vent) rows.push({ id:"co2", label:"etCO2", color:"#c8b07a", lo:-0.1, hi:0.8 });
+      if (cvp) rows.push({ id:"cvp", label:"CVP", color:"#c8b07a", lo:0, hi:30, grid:[10,20] });
+      if (pa) rows.push({ id:"pa", label: screen==="hemo" && hemo.wedged ? "PCWP" : "PA", color:"#d4a85a", lo:0, hi:90, grid:[30,60] });
       return rows;
     };
     let rows = rowsOf();
@@ -403,25 +501,30 @@ const waves = {
     this.buffers = rows.map(() => new Float32Array(N));
     this.write = 0; this.t = 0; this.last = performance.now();
     const sample = (id, t) => {
-      const live = screen==="hemo" && hemo ? hemo.snap : V || { hr:80, map:70, spo2:96, rr:16, pp:40 };
-      const hr = live.hr || 80;
+      const L = live();
+      const hr = L.hr || 80;
       const period = 60/Math.max(40, hr);
       const phase = ((t % period) + period) % period / period;
-      const rr = live.rr || 16;
-      const rp = ((t % (60/rr)) + 60) % (60/rr) / (60/rr);
+      const rr = L.rr || 16;
+      const rper = 60/rr;
+      const rp = ((t % rper) + rper) % rper / rper;
+      const br = Math.sin(rp * Math.PI * 2);
       if (id==="ecg") return gauss(phase,.12,.018,.12)+gauss(phase,.225,.01,1)+gauss(phase,.48,.05,.28);
-      if (id==="art") {
-        let y = phase>0.12 && phase<0.3 ? Math.sin((phase-0.12)/0.18*Math.PI) : phase<0.55 ? 0.35*Math.exp(-(phase-0.3)*6) : 0.05;
-        const breath = Math.sin(rp * Math.PI * 2);
-        const swing = screen==="hemo" && hemo ? (hemo.snap.vent==="controlled" ? hemo.snap.ppv/200 : hemo.snap.paradox/80) : (live.pp||40)/400;
-        return y * (1 + breath * swing) - 0.2;
-      }
-      if (id==="pleth") return Math.max(0, Math.sin(((phase+0.2)%1) * Math.PI)) * ((live.spo2||90)/100) - 0.3;
+      if (id==="pleth") return Math.max(0, Math.sin(((phase+0.2)%1) * Math.PI)) * ((L.spo2||90)/100) - 0.3;
       if (id==="co2") return rp>0.15 && rp<0.62 ? 0.55 : 0.02;
-      if (id==="cvp") return gauss(phase,.14,.03,.4)+gauss(phase,.55,.05,.3+(hemo&&hemo.snap.tr||0)) - 0.15;
-      const w = hemo && hemo.wedged;
-      if (w) return gauss(phase,.16,.04,.25)+gauss(phase,.55,.06,.3+(hemo.snap.vWave||0));
-      return phase>0.12 && phase<0.34 ? Math.sin((phase-0.12)/0.22*Math.PI) : 0.15;
+      if (id==="art") {
+        let pp = L.pp;
+        if (L.vent==="controlled") pp *= 1 + (L.ppv/200) * br;
+        else pp = Math.max(6, pp - L.paradox * Math.max(0, br));
+        return L.dbp + L.oa + pp * beat(phase) + 1.2*br;
+      }
+      if (id==="cvp") {
+        const m = L.cvp + L.ov;
+        const v = m + 2.6*gauss(phase,.14,.03,1) + 0.7*gauss(phase,.25,.02,1) + (2.0 + (L.tr||0)*5)*gauss(phase,.55,.05,1) - 1.6 + (L.vent==="controlled" ? 1.2 : -2.0)*br;
+        return Math.max(0, v);
+      }
+      if (screen==="hemo" && hemo && hemo.wedged) return Math.max(0, L.pcwp + L.ov + 3*gauss(phase,.14,.04,1) + (2.6 + (L.vWave||0)*18)*gauss(phase,.56,.06,1) - 1.5);
+      return Math.max(0, L.pad + L.ov + (L.pas - L.pad) * beat(phase) + 0.8*br);
     };
     const loop = (now) => {
       const nextRows = rowsOf();
@@ -444,20 +547,22 @@ const waves = {
       const rowH = h/rows.length;
       rows.forEach((r,i) => {
         const y0 = i*rowH;
+        const yOf = (val) => y0 + rowH*0.92 - ((val - r.lo)/(r.hi - r.lo)) * rowH*0.8;
         ctx.strokeStyle = "rgba(232,237,242,.06)";
         ctx.beginPath();
         for (let g=1;g<8;g++) { const x=g/8*w; ctx.moveTo(x,y0); ctx.lineTo(x,y0+rowH); }
+        (r.grid||[]).forEach(gv => { const y = yOf(gv); ctx.moveTo(0,y); ctx.lineTo(w,y); });
         ctx.stroke();
         ctx.fillStyle = r.color;
         ctx.font = (11*dpr)+"px ui-monospace, monospace";
         ctx.fillText(r.label, 8*dpr, y0+14*dpr);
+        if (r.grid) { ctx.fillStyle = "rgba(232,237,242,.35)"; ctx.font = (9*dpr)+"px ui-monospace, monospace"; r.grid.forEach(gv => ctx.fillText(String(gv), w-26*dpr, yOf(gv)-2*dpr)); }
         ctx.beginPath();
         ctx.strokeStyle = r.color;
         ctx.lineWidth = 1.25*dpr;
-        const mid = y0+rowH*0.62, amp = rowH*0.32;
         for (let n=0;n<N;n++) {
           const idx = (this.write+1+n)%N;
-          const x = n/(N-1)*w, y = mid - this.buffers[i][idx]*amp;
+          const x = n/(N-1)*w, y = yOf(this.buffers[i][idx]);
           if (n===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
         }
         ctx.stroke();
@@ -515,6 +620,7 @@ function drawBrief() {
   $("#go").onclick = () => {
     S = blankPatient(c);
     V = compute(S.p);
+    cuffNow(V);
     speed = 1;
     screen = "sim";
     draw();
@@ -522,7 +628,7 @@ function drawBrief() {
 }
 
 function actionButtons(c) {
-  const B = [["fluid","500 mL"],["norepi","Norepinephrine"],["cvc","Central line"],["echo","Echo"],["abg","ABG"],["cxr","Film"]];
+  const B = [["fluid","500 mL"],["norepi","Norepinephrine"]];
   if (c.id==="sepsis") B.push(["abx","Antibiotics"],["nrb","Oxygen"]);
   if (c.id==="bleed") B.push(["blood","Red cells"],["mtp","MTP + GI"]);
   if (c.id==="stemi") B.push(["cath","Cath lab"],["dobu","Dobutamine"]);
@@ -538,6 +644,44 @@ function actionButtons(c) {
   return B.filter(([id]) => seen.has(id) ? false : (seen.add(id), true));
 }
 
+function monitorButtons() {
+  return [["nibp","Cycle cuff"],["art","Arterial line"],["cvc","Central line"],["zero","Zero and level"],["contour","Pulse contour"],["pac","PA catheter"],["plr","Passive leg raise"],["echo","Echo"],["abg","ABG"],["cxr","Film"]];
+}
+
+function ppvWhy(v, p) {
+  if (!p.vent) return "invalid: spontaneous breathing";
+  if (p.vent.vt < 8) return "invalid: tidal volume under 8 mL/kg";
+  return "invalid: right-sided obstruction";
+}
+
+function simHemo(v, p) {
+  const oa = S.art && !S.zeroed ? S.off.a : 0;
+  const ov = (S.cvc || S.pac) && !S.zeroed ? S.off.v : 0;
+  const cells = [];
+  if (S.cvc) {
+    cells.push(num("ScvO2", v.scvo2, "%", v.scvo2 < 65 ? "warn" : "pleth"));
+    cells.push(num("Pcv–aCO2", v.gap, v.gap > 6 ? "mmHg · flow too low" : "mmHg", v.gap > 6 ? "warn" : ""));
+  }
+  if ((S.contour && S.art) || S.pac) {
+    cells.push(num("CO / CI", v.co.toFixed(1), "CI "+v.ci.toFixed(1)));
+    cells.push(num("SV", v.sv, "mL/beat"));
+  }
+  if (S.contour && S.art) {
+    cells.push(num("PPV", v.ppvOk ? v.ppv : "—", v.ppvOk ? "SVV "+v.svv+"%"+(v.ppv >= 13 ? " · responsive" : "") : ppvWhy(v, p), v.ppvOk && v.ppv >= 13 ? "warn" : ""));
+  }
+  if (S.pac) {
+    cells.push(num("PAP", Math.max(0, v.pas+ov)+"/"+Math.max(0, v.pad+ov), "mean "+Math.max(0, v.mpap+ov), "co2"));
+    cells.push(num("PCWP", Math.max(0, v.pcwp+ov), "mmHg"));
+    cells.push(num("SVR", v.svr, "dyn·s·cm-5", v.svr < 800 ? "warn" : ""));
+    cells.push(num("PVR", v.pvr, "dyn·s·cm-5", v.pvr > 240 ? "warn" : ""));
+    cells.push(num("SvO2", v.svo2, "%", "pleth"));
+  }
+  if (S.plr) cells.push(num("PLR", "+"+S.plr.pct+"%", S.plr.rough ? "pulse pressure surrogate" : S.plr.pct >= 10 ? "responsive" : "not responsive", S.plr.pct >= 10 ? "warn" : ""));
+  const warn = (S.art || S.cvc || S.pac) && !S.zeroed ? `<p class="hint">Not zeroed and leveled. The invasive pressures can be off by several mmHg.</p>` : "";
+  if (!cells.length) return `<p class="note" style="padding:12px 14px">Basic monitoring only: cuff, skin, urine, lactate. Add an arterial line, central line, pulse contour or a PA catheter from the Monitor group.</p>`;
+  return `<div class="hemonums">${cells.join("")}</div>${warn}`;
+}
+
 function drawSim() {
   const c = CASES.find(x => x.id===caseId);
   app.innerHTML = `<div class="sim">
@@ -549,13 +693,15 @@ function drawSim() {
         <span id="clock" class="kicker"></span>
         <button id="pause">Pause</button>
       </div>
+      <div class="dock"><div class="mini" id="mini"></div><p class="log" id="log"></p></div>
       <p class="stem">${c.stem}</p>
       <canvas id="wave" aria-label="Monitor waveforms"></canvas>
       <div class="nums" id="nums"></div>
+      <div class="panel" id="hemopanel"></div>
       <div class="panel" id="ventbox"></div>
-      <p class="stem log" id="log"></p>
     </div>
     <aside class="side">
+      <div><h2>Monitor</h2><div class="grid2" id="mons" style="margin-top:8px"></div></div>
       <div><h2>Treat</h2><div class="grid2" id="acts" style="margin-top:8px"></div></div>
       <div><h2>Name it</h2>
         <select id="dx">${c.options.slice().sort(()=>Math.random()-0.5).map(o=>`<option>${o}</option>`).join("")}</select>
@@ -567,6 +713,8 @@ function drawSim() {
   $("#pause").onclick = () => { speed = speed ? 0 : 1; $("#pause").textContent = speed ? "Pause" : "Run"; };
   $("#acts").innerHTML = actionButtons(c).map(([id,label])=>`<button data-a="${id}">${label}</button>`).join("");
   $("#acts").onclick = (e) => { const b = e.target.closest("button"); if (b) act(b.dataset.a); };
+  $("#mons").innerHTML = monitorButtons().map(([id,label])=>`<button data-a="${id}">${label}</button>`).join("");
+  $("#mons").onclick = (e) => { const b = e.target.closest("button"); if (b && !b.disabled) act(b.dataset.a); };
   $("#call").onclick = () => {
     const right = $("#dx").value === c.dx;
     S.dx = right;
@@ -588,16 +736,34 @@ function paint() {
   const nums = $("#nums");
   if (!nums) return;
   const crit = (bad, cls) => bad ? "danger" : cls;
+  const oa = S.art && !S.zeroed ? S.off.a : 0;
+  const ov = (S.cvc || S.pac) && !S.zeroed ? S.off.v : 0;
+  const nb = S.nibp || { sbp:v.sbp, dbp:v.dbp, map:v.map, t:S.t };
+  const dispMap = S.art ? v.map + oa : nb.map;
+  const pressureCell = S.art
+    ? num("ART", (v.sbp+oa)+"/"+(v.dbp+oa), "MAP "+(v.map+oa)+" · PP "+v.pp, crit(dispMap<65, "art"))
+    : num("NIBP", nb.sbp+"/"+nb.dbp, "MAP "+nb.map+" · cuff "+clock(S.t-nb.t)+" ago", crit(dispMap<65, "art"));
   nums.innerHTML = [
     num("HR", v.hr, v.rhythm, crit(v.hr>130||v.hr<50, "ecg")),
-    num("ART", v.sbp+"/"+v.dbp, "MAP "+v.map+" · PP "+v.pp, crit(v.map<65, "art")),
+    pressureCell,
     num("SpO2", v.spo2, "%", crit(v.spo2<90, "pleth")),
     num("RR", v.rr, p.vent ? "et set" : "breaths", "co2"),
     num("Temp", p.temp.toFixed(1), "°C"),
-    num("CVP", S.cvc ? v.cvp : "—", S.cvc ? "mmHg" : "place a line"),
+    num("CVP", S.cvc||S.pac ? Math.max(0, v.cvp+ov) : "—", S.cvc||S.pac ? "mmHg"+(S.zeroed?"":" · zero it") : "place a line"),
     num("Lactate", p.lactate.toFixed(1), "mmol/L", p.lactate>=4 ? "danger" : ""),
     num("Hb / UO", p.hb.toFixed(1), Math.round(S.uo)+" mL/h"),
   ].join("");
+  const mini = $("#mini");
+  if (mini) mini.innerHTML = `<span class="ecg">HR <b>${v.hr}</b></span><span class="art">${S.art?"ART":"NIBP"} <b>${S.art?(v.sbp+oa)+"/"+(v.dbp+oa):nb.sbp+"/"+nb.dbp}</b> · MAP <b>${dispMap}</b></span><span class="pleth">SpO2 <b>${v.spo2}</b></span>${S.cvc||S.pac?`<span class="co2">CVP <b>${Math.max(0,v.cvp+ov)}</b></span>`:""}`;
+  const hp = $("#hemopanel");
+  if (hp) hp.innerHTML = simHemo(v, p);
+  const mons = $("#mons");
+  if (mons) mons.querySelectorAll("button").forEach(b => {
+    const k = b.dataset.a;
+    const on = k==="art"?S.art : k==="cvc"?S.cvc : k==="zero"?S.zeroed : k==="contour"?S.contour : k==="pac"?S.pac : k==="echo"?S.echo : false;
+    b.classList.toggle("on", !!on);
+    b.disabled = (k==="contour" && !S.art) || (k==="pac" && !S.cvc) || (k==="zero" && !(S.art||S.cvc||S.pac));
+  });
   const box = $("#ventbox");
   if (p.vent) {
     const vt = p.vent;
@@ -651,6 +817,17 @@ function scoreOf(s, c) {
   return clamp(Math.round(n), 0, 100);
 }
 
+function monitorDebrief() {
+  const used = [S.art&&"arterial line", S.cvc&&"central line", S.contour&&"pulse contour", S.pac&&"PA catheter", S.plr&&"passive leg raise", S.echo&&"echo"].filter(Boolean);
+  const out = [`Monitoring used: ${used.length ? used.join(", ") : "cuff and examination only"}.`];
+  if (!S.art) out.push("A cuff cycles every minute or two and over-reads in low flow. An arterial line shows every beat, and the pulse pressure and its swing.");
+  if ((S.art || S.cvc || S.pac) && !S.zeroed) out.push("The transducer was never zeroed and leveled. An invasive number you have not zeroed is a guess.");
+  if (S.fluids >= 1000 && !S.plr && !S.contour) out.push("Fluid went in without a dynamic test of responsiveness. A passive leg raise with a flow signal tells you whether the next liter will help.");
+  if (S.pac && !["stemi","pe","tamp"].includes(caseId)) out.push("The PA catheter was not needed to name this shock, and it has not improved survival. Echo and flow tests usually answer the question.");
+  if (S.contour && S.art && V && !V.ppvOk) out.push("PPV is only valid with controlled ventilation, a tidal volume of 8 mL/kg or more, sinus rhythm, and no right-sided obstruction. It was not valid here.");
+  return out.map(x=>`<p class="lede">${x}</p>`).join("");
+}
+
 function drawDebrief() {
   const c = CASES.find(x => x.id===caseId);
   const sc = scoreOf(S, c);
@@ -659,6 +836,7 @@ function drawDebrief() {
     <h1>${c.title}</h1>
     <p class="lede">${S.why}</p>
     <p class="lede">Score ${sc}. The shock was ${c.shock.toLowerCase()}: ${c.dx}.</p>
+    ${monitorDebrief()}
     <ul>${c.pearls.map(x=>`<li class="lede">${x}</li>`).join("")}</ul>
     <button id="back" style="margin-top:16px">Board</button>
     <button id="retry">Retry</button>
@@ -701,6 +879,8 @@ const HEMO = {
     adv:"The wedge mean is high because of a giant v wave. Echo confirms it. The catheter suggests it." },
 };
 const HEMO_IDS = Object.keys(HEMO);
+/* percent rise in stroke volume with a passive leg raise, by profile */
+const PLR = { hypovolemic:28, distributive:14, cardiogenic:2, pe:3, tamponade:9, mr:1 };
 function addBase(b, step, times) {
   const o = { ...b };
   if (!times) return o;
@@ -743,10 +923,14 @@ function hemoSnap(id, ix) {
     svv:Math.round(raw.ppv*0.92), vWave:pr.vWave, tr:pr.tr, vent:pr.vent, skin:pr.skin, rr: pr.vent==="spontaneous"?24:16,
     do2:Math.round(co*cao2*10), cao2:Math.round(cao2*10)/10, si:Math.round(hr/Math.max(40,sbp)*100)/100, padGrad:Math.round(pad-pcwp),
     drained: ix.drain && id==="tamponade",
+    gap: Math.round(clamp(3 + (5.5 - co) * 1.9, 2.5, 14) * 10) / 10,
+    plr: ix.drain && id==="tamponade" ? 3 : Math.max(1, Math.round(PLR[id] - 8*ix.fluid - (ix.blood && id==="hypovolemic" ? 8 : 0))),
+    cuffErr: map < 65 && svr > 1200 ? 8 : 0,
   };
 }
 function freshHemo(id, blind) {
-  return { id, blind, level:"basic", art:false, cvc:false, pac:false, contour:false, wedged:false,
+  return { id, blind, level:"basic", art:false, cvc:false, pac:false, contour:false, wedged:false, zeroed:false,
+    off:{ a:(Math.random()<0.5?-1:1)*(6+Math.floor(Math.random()*5)), v:(Math.random()<0.5?-1:1)*(3+Math.floor(Math.random()*3)) },
     ix:{fluid:0,norepi:0,dobu:0,peep:0,drain:false,blood:false}, note:"Nothing invasive yet. Read the cuff, the skin, and the urine.",
     lines:null, guess:null, called:false, snap:hemoSnap(id,{fluid:0,norepi:0,dobu:0,peep:0,drain:false,blood:false}) };
 }
@@ -781,19 +965,30 @@ function hemoNote(id, kind, ix) {
   }
   return id==="hypovolemic" ? "Hemoglobin and delivery rise with the red cells." : "Hemoglobin rises. The shock was not anemia.";
 }
+function plrNote(h) {
+  const sn = h.snap;
+  const flow = h.level==="advanced" && ((h.contour && h.art) || h.pac);
+  if (flow) return sn.plr >= 10
+    ? "Passive leg raise: stroke volume rose "+sn.plr+"%. Fluid responsive. Volume should raise output."
+    : "Passive leg raise: stroke volume rose only "+sn.plr+"%. Not responsive. More fluid will mostly raise filling pressures.";
+  if (h.art) return "The pulse pressure moved about "+Math.round(sn.plr*0.7)+"%. A rough surrogate. A flow signal is better.";
+  return "A cuff cannot see a leg raise. You need a beat-to-beat or flow signal: arterial line, pulse contour or a PA catheter.";
+}
 function hemoRead(sn, h) {
   const lines = [];
+  if (!h.art && sn.cuffErr) lines.push("The cuff over-reads by about "+sn.cuffErr+" mmHg in this low-flow state. An arterial line would show the true, lower pressure.");
+  if ((h.art || h.cvc || h.pac) && !h.zeroed) lines.push("The transducer is not zeroed and leveled. Arterial readings may be off by "+Math.abs(h.off.a)+" mmHg and venous pressures by "+Math.abs(h.off.v)+".");
   const ppWord = sn.pp<35?"narrow":sn.pp>55?"wide":"ordinary";
   lines.push(`Pressure ${sn.sbp}/${sn.dbp}, MAP ${sn.map}. Pulse pressure is ${ppWord} (${sn.pp}). Shock index ${sn.si.toFixed(2)}.`);
   lines.push(`${sn.skin} skin, capillary refill ${sn.crt}s, urine ${sn.uo} mL/h, lactate ${sn.lactate.toFixed(1)}, SpO2 ${sn.spo2}%.`);
   if (h.art && sn.paradox>=15 && sn.vent==="spontaneous") lines.push(`Arterial pressure falls ${sn.paradox} mmHg on inspiration. Pulsus paradoxus. The cuff misses it.`);
   else if (!h.art) lines.push("No arterial line. You have a cuff, not a waveform.");
-  if (h.cvc || h.pac) lines.push(sn.cvp<6?`CVP ${sn.cvp} is low.` : sn.cvp>14?`CVP ${sn.cvp} is high.` : `CVP ${sn.cvp} is mid-range and will not type the shock.`);
+  if (h.cvc || h.pac) lines.push((sn.cvp<6?`CVP ${sn.cvp} is low.` : sn.cvp>14?`CVP ${sn.cvp} is high.` : `CVP ${sn.cvp} is mid-range and will not type the shock.`) + ` ScvO2 ${sn.scvo2}%. Pcv–aCO2 gap ${sn.gap} mmHg: ${sn.gap>6?"flow is too low for the demand, even if ScvO2 looks acceptable.":"flow is adequate for the demand."}`);
   else lines.push("No central line. Filling pressure and ScvO2 are unknown.");
   if (h.level!=="advanced") { lines.push("Advanced view is off. Flow, wedge, and PVR stay hidden."); return lines; }
   if (h.contour && h.art) {
     if (sn.vent!=="controlled") lines.push("PPV and SVV are not valid while the patient is breathing spontaneously.");
-    else lines.push(sn.ppv>=13?`PPV ${sn.ppv}% — stroke volume still varies with the ventilator.`:`PPV ${sn.ppv}% is low. A fluid bolus is unlikely to help much.`);
+    else lines.push((sn.ppv>=13?`PPV ${sn.ppv}% — stroke volume still varies with the ventilator.`:`PPV ${sn.ppv}% is low. A fluid bolus is unlikely to help much.`) + " Valid only with a tidal volume of 8 mL/kg or more, sinus rhythm, and no spontaneous effort.");
   }
   if (h.pac) {
     lines.push(`PAC: PAP ${sn.pas}/${sn.pad}, PCWP ${sn.pcwp}, CO ${sn.co.toFixed(1)}, SVR ${sn.svr}, PVR ${sn.pvr}, SvO2 ${sn.svo2}%.`);
@@ -816,6 +1011,9 @@ function drawHemo() {
   const sn = h.snap;
   const adv = h.level==="advanced";
   const flow = adv && (h.pac || (h.contour && h.art));
+  const oa = h.art && !h.zeroed ? h.off.a : 0;
+  const ov = (h.cvc || h.pac) && !h.zeroed ? h.off.v : 0;
+  const ce = !h.art ? sn.cuffErr : 0;
   app.innerHTML = `<div class="sim">
     <div>
       <div class="top">
@@ -829,19 +1027,19 @@ function drawHemo() {
       <canvas id="wave" aria-label="Hemodynamic waveforms"></canvas>
       <div class="hemonums">
         ${num("HR", sn.hr, "sinus", "ecg")}
-        ${num(h.art?"ART":"NIBP", sn.sbp+"/"+sn.dbp, "MAP "+sn.map+" · PP "+sn.pp, "art")}
+        ${num(h.art?"ART":"NIBP", h.art ? (sn.sbp+oa)+"/"+(sn.dbp+oa) : (sn.sbp+ce)+"/"+(sn.dbp+Math.round(ce/2)), "MAP "+(h.art ? sn.map+oa : sn.map+Math.round(ce*0.6))+" · PP "+sn.pp, "art")}
         ${num("SpO2", sn.spo2, "%", "pleth")}
         ${num("Shock index", sn.si.toFixed(2), "HR / SBP", sn.si>=1?"warn":"")}
         ${num("Skin", sn.skin, "CRT "+sn.crt+"s")}
         ${num("Urine", sn.uo, "mL/h", sn.uo<20?"warn":"")}
         ${num("Lactate", sn.lactate.toFixed(1), "mmol/L", sn.lactate>=4?"danger":"")}
-        ${num("CVP", (h.cvc||h.pac)?sn.cvp:"—", h.cvc?"mmHg · ScvO2 "+sn.scvo2+"%":h.pac?"mmHg · PAC":"place a CVC")}
+        ${num("CVP", (h.cvc||h.pac)?Math.max(0,sn.cvp+ov):"—", h.cvc?"mmHg · ScvO2 "+sn.scvo2+"% · gap "+sn.gap:h.pac?"mmHg · PAC":"place a CVC")}
       </div>
       <div class="panel" style="padding:12px 14px">
         <h2 class="kicker">${adv?"Advanced numbers":"Advanced numbers hidden"}</h2>
         ${adv ? `<div class="hemonums" style="padding:12px 0 0">
-          ${num("PAP", h.pac?sn.pas+"/"+sn.pad:"—", h.pac?"mean "+sn.mpap:"place a PAC", "co2")}
-          ${num("PCWP", h.pac?sn.pcwp:"—", h.pac?(sn.vWave>=0.7?"giant v wave":"mmHg"):"place a PAC", sn.vWave>=0.7?"warn":"")}
+          ${num("PAP", h.pac?Math.max(0,sn.pas+ov)+"/"+Math.max(0,sn.pad+ov):"—", h.pac?"mean "+Math.max(0,sn.mpap+ov):"place a PAC", "co2")}
+          ${num("PCWP", h.pac?Math.max(0,sn.pcwp+ov):"—", h.pac?(sn.vWave>=0.7?"giant v wave":"mmHg"):"place a PAC", sn.vWave>=0.7?"warn":"")}
           ${num("CO", flow?sn.co.toFixed(1):"—", flow?"CI "+sn.ci.toFixed(1):"needs flow")}
           ${num("SVR", flow?sn.svr:"—", flow?"dyn·s·cm-5":"needs CO", flow&&sn.svr<800?"warn":"")}
           ${num("PVR", h.pac?sn.pvr:"—", h.pac?"PAD−PCWP "+sn.padGrad:"needs a PAC", h.pac&&sn.pvr>240?"warn":"")}
@@ -868,6 +1066,7 @@ function drawHemo() {
           ${tog("pac","Pulmonary artery catheter", h.pac, "PAP, wedge, CO, SVR, PVR, SvO2.", !adv)}
           ${tog("contour","Pulse contour", h.contour, h.art?"SV, CO, PPV, SVV.":"Needs an arterial line.", !adv||!h.art)}
           ${adv&&h.pac?tog("wedge","Balloon up — wedge", h.wedged, "Look for a v wave."):""}
+          ${tog("zeroed","Zero and level", h.zeroed, "Phlebostatic axis. A mis-leveled transducer reads a false pressure.", !(h.art||h.cvc||h.pac))}
         </div>
       </div>
       <div><h2>Challenge</h2>
@@ -878,6 +1077,7 @@ function drawHemo() {
           <button data-ch="dobu">${h.ix.dobu?"Dobutamine 5":"Dobutamine"}</button>
           <button data-ch="peep">${h.ix.peep?"PEEP 15":"PEEP +10"}</button>
           <button data-ch="drain">${h.ix.drain?"Drained":"Drain pericardium"}</button>
+          <button data-ch="plr">Passive leg raise</button>
         </div>
         <p class="note" style="margin-top:8px">${h.note}</p>
       </div>
@@ -914,6 +1114,7 @@ function drawHemo() {
   app.querySelectorAll("[data-ch]").forEach(b => b.onclick = () => {
     const k = b.dataset.ch;
     const ix = h.ix;
+    if (k==="plr") { h.note = plrNote(h); h.lines = null; draw(); return; }
     if (k==="fluid") ix.fluid = ix.fluid>=2 ? 0 : ix.fluid+1;
     if (k==="norepi") ix.norepi = ix.norepi===0 ? 0.1 : ix.norepi===0.1 ? 0.2 : 0;
     if (k==="dobu") ix.dobu = ix.dobu ? 0 : 5;
