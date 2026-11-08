@@ -157,7 +157,8 @@ const FLAGS = [
   {id:"tachy", name:"Tachycardia", sub:"Increased HR"},
   {id:"lowGCS", name:"Low GCS", sub:"Altered consciousness"},
   {id:"hypergly", name:"Hyperglycemia", sub:"High glucose"},
-  {id:"hypogly", name:"Hypoglycemia", sub:"Low glucose"}
+  {id:"hypogly", name:"Hypoglycemia", sub:"Low glucose"},
+  {id:"refractory", name:"Refractory hypoxemia", sub:"Poor response to oxygen"}
 ];
 const DX = [
   ["sepsis","Septic shock from pneumonia"],
@@ -171,6 +172,7 @@ const DX = [
   ["ich","Intracerebral hemorrhage"],
   ["gib","Hypovolemic shock from gastrointestinal bleeding"],
   ["pneumonia","Hypoxemic pneumonia, not in shock"],
+  ["ards","Acute respiratory distress syndrome (ARDS)"],
   ["opioid","Opioid overdose"],
   ["tamponade","Cardiac tamponade"],
   ["asthma","Acute severe asthma"],
@@ -182,6 +184,47 @@ function jit(n, f){ return Math.round(n + (Math.random()*2-1)*f); }
 function mapOf(sbp, dbp){ return Math.round(dbp + (sbp-dbp)/3); }
 function phOf(hco3, pco2){ return 6.1 + Math.log10(hco3 / (0.03*pco2)); }
 function once(list, text){ if(list.indexOf(text)<0) list.push(text); }
+function lungInfect(id){ return id==="sepsis"||id==="pneumonia"||id==="ards"; }
+/* ---- lung model: compliance, shunt, oxygen content ---- */
+function satOf(po2){ var q = Math.max(po2,1); return 1/(1+23400/(q*q*q+150*q)); }
+function crsOf(p){ return clamp(58 - 3.6*p.lungWater, 18, 60); }
+function fio2Of(p){
+  var t = {room:0.21, np:0.30, fm:0.45, nrb:0.75, hfnc:0.80};
+  if(p.support==="cpap"||p.support==="bipap"||p.support==="imv") return clamp((p.vent.fio2||60)/100, 0.21, 1);
+  return t[p.support]||0.21;
+}
+function peepEffOf(p){
+  if(p.support==="imv") return p.vent.peep||0;
+  if(p.support==="cpap"||p.support==="bipap") return p.vent.epap||0;
+  if(p.support==="hfnc") return 3;
+  return 0;
+}
+function ardsModel(p){
+  var fio2 = fio2Of(p), pe = peepEffOf(p);
+  var shunt = p.shunt0 * (0.1 + 0.9*p.lungWater/8);
+  var rec = pe>=5 ? 1 - 0.028*(Math.min(pe,14)-5) : 1 + 0.05*(5-pe);
+  if(pe>15) rec += 0.04*(pe-15);
+  shunt *= rec;
+  if(p.prone) shunt *= 0.62;
+  if(p.nmb && p.support==="imv") shunt *= 0.92;
+  shunt = clamp(shunt, 0.03, 0.6);
+  var pco2 = Math.max(20, p.pco2||38);
+  var pAO2 = Math.max(35, fio2*713 - pco2/0.8);
+  var hb = p.hb || 12.5;
+  var cc = 1.34*hb*satOf(pAO2) + 0.003*pAO2;
+  var cv = 1.34*hb*0.65 + 0.003*38;
+  var target = (1-shunt)*cc + shunt*cv;
+  var lo = 15, hi = 700, k, mid;
+  for(k=0;k<40;k++){ mid = (lo+hi)/2; if(1.34*hb*satOf(mid)+0.003*mid < target) lo = mid; else hi = mid; }
+  var pao2 = (lo+hi)/2, sat = satOf(pao2)*100;
+  if(p.ecmo){ sat = Math.max(sat, 94); pao2 = Math.max(pao2, 70); }
+  return {pao2:Math.round(pao2), spo2:clamp(Math.round(sat),60,100), pf:Math.round(pao2/fio2), shunt:shunt, fio2:fio2};
+}
+function ardsSet(){
+  if(!patient || patient.id!=="ards") return;
+  var m = ardsModel(patient);
+  patient.pao2 = m.pao2; patient.pf = m.pf; patient.spo2 = m.spo2;
+}
 
 const SYNDROMES = {
   sepsis:{
@@ -261,6 +304,13 @@ const SYNDROMES = {
     hint:"The oxygen is the failing organ. Escalating the oxygen device is the first skill. Antibiotics for the lung. Fluid is not the treatment of hypoxemia.",
     expert:["Oxygen, stepped up until the saturation is 92 to 96. High-flow before non-invasive ventilation in focal pneumonia.","An antibiotic that covers community pneumonia.","Cultures before the drug if it does not delay the dose.","Intubate if the work fails. Tidal volume about 6 mL/kg predicted body weight, and a PEEP that matches the oxygen need.","A fluid bolus does not treat a consolidation."]
   },
+  ards:{
+    bp:"normal", glucose:"normal", preload:"normal", oxygen:"poor", shock:"none", resp:"type1",
+    covers:["desat","tachypnea","tachy","lowGCS","hypergly","refractory"],
+    abx:["ctx-azi","piptazo","mero"], source:"lung",
+    hint:"The oxygen does not follow the oxygen. Both lungs are involved and the heart is not the reason. Protect the lung while you buy time: small breaths, enough PEEP, prone positioning, and no extra fluid.",
+    expert:["Name it: acute onset, bilateral opacities, not explained by heart failure or fluid, and a P/F ratio of 300 or less on PEEP of 5 or more. Under 100 is severe.","Do not wait for exhaustion. Escalate oxygen, and intubate when the work of breathing is failing. Then ventilate to protect the lung.","Tidal volume 6 mL/kg predicted body weight (4 to 8 allowed). Plateau pressure 30 cmH2O or less. Driving pressure 15 or less. Set PEEP against the FiO2 and the compliance, not by habit.","Accept a higher carbon dioxide if the pH stays above about 7.2. Do not buy a normal PaCO2 with a large tidal volume.","P/F under 150 on PEEP 5 or more and FiO2 0.6 or more: prone positioning for at least 12 to 16 hours a day.","Neuromuscular blockade is an option in severe early ARDS with dyssynchrony or a high plateau pressure, and only after deep sedation. It is not routine.","Once shock has resolved, keep the fluid balance even or negative. No boluses for the saturation.","Treat the cause. Cultures, then an antibiotic that covers pneumonia within the hour.","Refractory severe hypoxemia after prone positioning and optimized settings: refer early for ECMO."]
+  },
   opioid:{
     bp:"normal", glucose:"normal", preload:"normal", oxygen:"good", shock:"none", resp:"type2",
     covers:["lowGCS","desat","hypoBP"],
@@ -292,6 +342,8 @@ function fitScore(id, flags){
   if(flags.indexOf("hyperBP")<0 && (id==="edema"||id==="ich")) score -= 2;
   if(id==="dka" && flags.indexOf("tachypnea")<0) score -= 3;
   if(flags.length===1 && flags[0]==="tachy" && id==="pe") score += 2;
+  if(flags.indexOf("refractory")>=0 && id!=="ards") score -= 8;
+  if(id==="ards" && flags.indexOf("refractory")<0) score -= 8;
   return score;
 }
 function chooseSyndrome(flags){
@@ -312,6 +364,12 @@ function normalize(selected){
   if(flags.indexOf("hypogly")>=0 && flags.indexOf("hypergly")>=0){
     flags.splice(flags.indexOf("hypogly"),1);
     notes.push("Glucose is high at the start. It will crash if insulin runs after the glucose has fallen and no dextrose is given.");
+  }
+  if(flags.indexOf("refractory")>=0){
+    ["hypoBP","hyperBP","hypogly"].forEach(function(f){ var i = flags.indexOf(f); if(i>=0) flags.splice(i,1); });
+    if(flags.indexOf("desat")<0) flags.push("desat");
+    if(flags.indexOf("tachypnea")<0) flags.push("tachypnea");
+    notes.push("Refractory hypoxemia is built here as ARDS with a normal blood pressure.");
   }
   return {flags:flags, notes:notes};
 }
@@ -376,6 +434,16 @@ function buildPatient(selected){
     story:story.text, exam:story.exam, pmh:story.pmh, meds:story.meds, complaint:story.complaint
   };
   p.map = mapOf(p.sbp, p.dbp);
+  p.lastFio2 = 60; p.lastPe = null;
+  p.prone = false; p.nmb = false; p.ecmo = false; p.exh = 0; p._creep = 0;
+  if(id==="ards"){
+    p.lungWater = 8;
+    p.shunt0 = +(0.33+Math.random()*0.06).toFixed(3);
+    p.temp = jit(38.4,0.4);
+    p.spo2 = ardsModel(p).spo2;
+    p.pao2 = ardsModel(p).pao2;
+    p.pf = ardsModel(p).pf;
+  }
   return p;
 }
 
@@ -462,6 +530,13 @@ function storyFor(id, name, age, sex, notes, flags, inr){
       pmh:"Smoker. No heart failure.",
       meds:"None regular."
     },
+    ards:{
+      complaint:"Worsening breathlessness. The oxygen is not rising with the mask.",
+      text:who+" was admitted four days ago with a chest infection. Over the last day the breathing has become fast and shallow, and the oxygen has stopped responding to the mask. The ward has called for intensive care.",
+      exam:"Fast, shallow breathing and accessory muscles in use. Bilateral crackles. The heart sounds are normal. No leg swelling and no raised neck veins. Warm peripheries, and a pressure that is holding.",
+      pmh:"Recent chest infection. No heart failure.",
+      meds:"An oral antibiotic course for four days. No diuretic."
+    },
     opioid:{
       complaint:"Unresponsive, with a slow respiratory rate.",
       text:who+" was found with slow breathing and a low consciousness. Pinpoint pupils. A glucose has to be part of the first look, and the rate is the other clue.",
@@ -476,15 +551,15 @@ function storyFor(id, name, age, sex, notes, flags, inr){
 }
 
 function labsSnapshot(p){
-  const wbc = p.id==="sepsis"||p.id==="pneumonia" ? jit(18,4) : p.id==="dka"? jit(14,2) : jit(9,2);
+  const wbc = lungInfect(p.id) ? jit(18,4) : p.id==="dka"? jit(14,2) : jit(9,2);
   const plt = p.id==="sepsis"? jit(110,30) : jit(220,40);
   const urea = Math.round(20+p.creat*18);
   const bili = 0.8, ast = p.id==="hhs"? jit(64,10): 32, alt = 28, alb = p.id==="gib"?2.9:3.6;
-  const crp = p.id==="sepsis"? jit(160,30) : p.id==="pneumonia"? jit(96,20) : p.id==="dka"? 14 : 6;
+  const crp = p.id==="sepsis"? jit(160,30) : (p.id==="pneumonia"||p.id==="ards")? jit(96,20) : p.id==="dka"? 14 : 6;
   const pct = p.id==="sepsis"? 6.4 : p.id==="pneumonia"? 0.6 : 0.08;
   const aptt = p.inr>2? 46 : 30;
   return {
-    cbc:{hb:p.hb, wbc:wbc, plt:plt, dlc:p.id==="sepsis"||p.id==="pneumonia"?"Neutrophils 86%":"Neutrophils 68%"},
+    cbc:{hb:p.hb, wbc:wbc, plt:plt, dlc:lungInfect(p.id)?"Neutrophils 86%":"Neutrophils 68%"},
     rft:{urea:urea, creat:p.creat, na:p.na, k:p.k, egfr:p.egfr},
     lft:{bili:bili, ast:ast, alt:alt, alb:alb},
     coags:{pt:Math.round(12*p.inr), inr:p.inr, aptt:aptt},
@@ -492,10 +567,14 @@ function labsSnapshot(p){
   };
 }
 function gasSnapshot(p){
-  const po2 = p.spo2>=97? jit(92,8) : p.spo2>=94? jit(75,6) : p.spo2>=90? jit(62,4) : p.spo2>=85? jit(52,4) : jit(44,3);
+  const fio2 = fio2Of(p);
+  let po2;
+  if(p.id==="ards") po2 = Math.max(30, Math.round(p.pao2 + (Math.random()*2-1)*2));
+  else if(p.spo2>=97 && fio2>0.25) po2 = Math.round(fio2*jit(430,40));
+  else po2 = p.spo2>=97? jit(92,8) : p.spo2>=94? jit(75,6) : p.spo2>=90? jit(62,4) : p.spo2>=85? jit(52,4) : jit(44,3);
   const ph = phOf(Math.max(4,p.hco3), Math.max(12,p.pco2));
   const be = Math.round((p.hco3-24)*1.2);
-  return {ph:+ph.toFixed(2), pco2:Math.round(p.pco2), po2:po2, hco3:Math.round(p.hco3), lactate:+p.lactate.toFixed(1), be:be, glucose:Math.round(p.glucose)};
+  return {ph:+ph.toFixed(2), pco2:Math.round(p.pco2), po2:po2, fio2:Math.round(fio2*100), pf:Math.round(po2/fio2), hco3:Math.round(p.hco3), lactate:+p.lactate.toFixed(1), be:be, glucose:Math.round(p.glucose)};
 }
 function echoReport(p){
   const id = p.id;
@@ -531,7 +610,7 @@ function echoReport(p){
   if(id==="tension"){
     return finish({lv:"Small, vigorous left ventricle.", lvShort:"Hyperdynamic, small cavity", rv:"Mildly dilated by the high pressure in the chest.", rvBad:true, rwmaYes:false, rwmaText:"None.", ivc:"Dilated. Venous return is obstructed in the chest.", ivcKind:"dilated", volume:"obstructed", volLabel:"Overloaded", obstruct:"chest", ef:"high", cine:"hyper", stills:[stillPLAX, stillWide]});
   }
-  if(id==="pneumonia"||id==="ich"||id==="opioid"){
+  if(id==="pneumonia"||id==="ards"||id==="ich"||id==="opioid"){
     return finish({lv:"Normal size and systolic function.", lvShort:"Normal", rv:"Normal size and function.", rvBad:false, rwmaYes:false, rwmaText:"None.", ivc:"Normal caliber and normal respiratory collapse.", ivcKind:"normal", volume:"normal", volLabel:"Normal", obstruct:"no", ef:"normal", cine:"normal", stills:[stillPLAX, stillA4, stillPSAX, stillIVC]});
   }
   if(id==="sepsis"||id==="dka"||id==="hhs"||id==="gib"||id==="hypogly"){
@@ -540,6 +619,7 @@ function echoReport(p){
   return finish({lv:"Normal size and function.", lvShort:"Normal", rv:"Normal.", rvBad:false, rwmaYes:false, rwmaText:"None.", ivc:"Normal caliber and normal respiratory collapse.", ivcKind:"normal", volume:"normal", volLabel:"Normal", obstruct:"no", ef:"normal", cine:"normal", stills:[stillPLAX, stillA4, stillPSAX, stillIVC]});
 }
 function usgReport(p){
+  if(p.id==="ards") return {text:"Bilateral B-lines that are patchy and uneven. Thickened, irregular pleural lines with small subpleural consolidations, and spared areas between them. The inferior vena cava is normal. This is a lung that is leaking, not a heart that is full.", img:"pocus/blines.jpg", cap:"Lung ultrasound. B-lines and an irregular pleural line.", mark:{cx:0.50, cy:0.42, label:"B-lines"}};
   if(p.id==="edema"||p.id==="cardiogenic") return {text:"Bilateral anterior B-lines from the pleural line. A small pleural effusion may sit at the bases. The inferior vena cava is full.", img:"pocus/blines.jpg", cap:"Lung ultrasound. Vertical B-lines.", mark:{cx:0.50, cy:0.42, label:"B-lines"}};
   if(p.id==="pneumonia"||p.id==="sepsis") return {text:"One base is tissue-like, with air bronchograms. The other lung slides and shows A-lines. No large pleural effusion. The vein is empty if the patient is still underfilled.", img:"pocus/consol.jpg", cap:"Lung ultrasound. Consolidation with air bronchograms.", mark:{cx:0.50, cy:0.55, label:"Consolidation"}};
   if(p.id==="tension") return {text:"No lung sliding on the quiet side. M-mode is a barcode. The other side slides. The vein is full.", img:"pocus/barcode.jpg", cap:"M-mode. Barcode sign.", mark:{cx:0.55, cy:0.48, label:"No sliding"}};
@@ -548,6 +628,7 @@ function usgReport(p){
   return {text:"Lungs slide with A-lines. No B-line field, no pneumothorax, no free fluid. The vein matches the story of the circulation.", img:null, cap:""};
 }
 function cxrReport(p){
+  if(p.id==="ards") return {text:"Bilateral patchy and confluent opacities in both lungs. The heart is not enlarged and there is no upper-lobe diversion. This fits ARDS. It does not, by itself, exclude edema from a failing heart, so read it with the echo.", img:"sim/ards-cxr.jpg", cap:"Frontal chest radiograph. Bilateral airspace opacities.", mark:null};
   if(p.id==="edema"||p.id==="cardiogenic") return {text:"Bilateral perihilar opacity and a large cardiac silhouette. This fits edema. It does not, by itself, exclude a pneumonia.", img:"xrays/edema.jpg", cap:"Frontal chest radiograph.", mark:{cx:0.36, cy:0.50, label:"Edema"}};
   if(p.id==="pneumonia"||p.id==="sepsis") return {text:"Opacity at one base. Fluid and consolidation cannot be separated on this film alone.", img:"xrays/pneumonia.jpg", cap:"Frontal chest radiograph.", mark:{cx:0.31, cy:0.66, label:"Opacity"}};
   if(p.id==="tension") return {text:"A right pneumothorax is visible at the base. If the pressure is already low, you should not have waited for this film.", img:"xrays/pneumo.jpg", cap:"Frontal chest radiograph. The visceral pleural line is at the patient's right base.", mark:{cx:0.19, cy:0.74, label:"Pneumothorax"}};
@@ -630,7 +711,7 @@ function vitalLine(p){
   return "Important findings. "+bits.join(". ")+".";
 }
 function culturePlan(id){
-  if(id==="sepsis"||id==="pneumonia"){
+  if(lungInfect(id)){
     return {
       samples:"Two sets of blood cultures, plus sputum or a tracheal aspirate, before the first antibiotic if that does not delay the dose.",
       gram:"Respiratory Gram stain: Gram-negative rods and many white cells. No acid-fast bacilli on this stain.",
@@ -696,6 +777,7 @@ function panelSpeech(kind){
     if(g.ph<7.35 || g.ph>7.45) bits.push("pH "+g.ph+".");
     if(g.pco2<35 || g.pco2>45) bits.push("Carbon dioxide "+g.pco2+".");
     if(g.po2<80) bits.push("Oxygen tension "+g.po2+".");
+    if(g.pf<300) bits.push("P to F ratio "+g.pf+".");
     if(g.hco3<22 || g.hco3>26) bits.push("Bicarbonate "+g.hco3+".");
     if(g.lactate>2) bits.push("Lactate "+g.lactate+".");
     if(Math.abs(g.be)>2) bits.push("Base excess "+g.be+".");
@@ -794,6 +876,16 @@ function tick(min){
     raiseEvent("New event. Consciousness has not returned.", "New event. Consciousness has not returned and the head has not been imaged.");
   if(id==="tension" && !patient.decompressed && patient.t>=15)
     raiseEvent("New event. The quiet side of the chest is unchanged.", "New event. The quiet hemithorax is still the emergency. Decompress before any further imaging.");
+  if(id==="ards"){
+    if(patient.support!=="imv" && !patient.ecmo){
+      const bucket = Math.floor(patient.t/30);
+      if(bucket > patient._creep){ patient._creep = bucket; spoilLungs(1); }
+      if(patient.spo2<92 || patient.rr>=28) patient.exh += min;
+      if(patient.exh>=40) raiseEvent("New event. The breathing is shallow and tiring. The accessory muscles are working hard and the patient is struggling to talk.", "New event. The work of breathing is exhausting the patient. Do not wait for the saturation to fall further. Secure the airway and start lung-protective ventilation.");
+      if(patient.exh>=75) once(patient.critical, "Intubation delayed until the patient was exhausted");
+    }
+    ardsSet();
+  }
   patient.spo2 = Math.max(68, Math.min(100, Math.round(patient.spo2)));
   patient.hr = Math.max(40, Math.min(180, Math.round(patient.hr)));
   patient.rr = Math.max(6, Math.min(48, Math.round(patient.rr)));
@@ -881,10 +973,12 @@ function applyDevice(level, silent){
   if(!silent) tick(5);
   patient.shown = null;
   const before = oxygenBonus(patient.support);
+  const mBefore = patient.id==="ards" ? ardsModel(patient) : null;
   patient.support = level;
   patient.intubated = level==="imv";
   if(level==="cpap"||level==="bipap"||level==="imv") patient.focus = "vent";
-  const delta = oxygenBonus(level) - before;
+  let delta = oxygenBonus(level) - before;
+  if(mBefore) delta = ardsModel(patient).spo2 - mBefore.spo2;
   patient.spo2 = Math.max(70, Math.min(100, patient.spo2+delta));
   if((level==="cpap"||level==="bipap") && patient.gcs<9 && !patient.intubated){
     patient.spo2 = Math.max(70, patient.spo2-6);
@@ -916,19 +1010,53 @@ function applyVent(){
   if(fresh) applyDevice(level, true);
   tick(5);
   const v = patient.vent;
-  const tvkg = v.tv / patient.pbw;
+  const imvNow = patient.support==="imv";
+  const pe = imvNow ? v.peep : v.epap;
+  if(patient.id!=="ards"){
+    const dF = clamp(((v.fio2||60)-(patient.lastFio2||60))*0.1, -8, 6);
+    patient.spo2 = clamp(patient.spo2 + Math.round(dF), 70, 100);
+    if(patient.lungWater>=4 && patient.lastPe!=null){
+      patient.spo2 = clamp(patient.spo2 + Math.round(clamp((pe-patient.lastPe)*0.4, -4, 3)), 70, 100);
+    }
+  }
+  patient.lastFio2 = v.fio2; patient.lastPe = pe;
   if(patient.support==="imv"){
+    const m = ventNow();
+    const dvt = m.tv;
+    const tvkg = dvt / patient.pbw;
     if(tvkg>10){ once(patient.critical, "Tidal volume above 10 mL/kg predicted body weight"); spoilLungs(2); }
     else if(tvkg>8){ once(patient.bad, "Tidal volume above 8 mL/kg predicted body weight"); spoilLungs(1); }
     else once(patient.good, "Lung-protective tidal volume");
+    if(m.pplat>30){ once(patient.bad, "Plateau pressure above 30 cmH2O"); spoilLungs(1); }
+    else if(m.dp>15){ once(patient.bad, "Driving pressure above 15 cmH2O"); }
+    else once(patient.good, "Plateau and driving pressure kept in a safe range");
+    if(patient.id==="ards"){
+      if(v.peep<8) once(patient.bad, "PEEP too low for moderate to severe ARDS");
+      else if(v.peep<=16) once(patient.good, "PEEP matched to the severity of ARDS");
+      if(v.peep>16){ nudgeBP(-6,-4); once(patient.bad, "Very high PEEP. Venous return and the pressure fell."); }
+    }
+    let mech = "Plateau "+m.pplat+", driving pressure "+m.dp+", compliance about "+m.crs+" mL/cmH2O.";
     if(patient.id==="pe" && v.peep>=14){
       nudgeBP(-10,-6);
       once(patient.critical, "High PEEP in right-ventricular failure");
       note("High PEEP raised the afterload on a failing right ventricle. The pressure fell.", "Pressure fell after the PEEP change.");
     } else {
-      note("The ventilator is running at "+v.mode+", "+v.tv+" mL, about "+tvkg.toFixed(1)+" mL/kg predicted weight, PEEP "+v.peep+".", "Ventilator settings applied.");
+      note("The ventilator is running at "+v.mode+", "+dvt+" mL, about "+tvkg.toFixed(1)+" mL/kg predicted weight, PEEP "+v.peep+". "+mech, "Ventilator settings applied. Plateau "+m.pplat+", driving pressure "+m.dp+".");
     }
-    patient.pco2 = Math.max(18, Math.min(70, 40 - (v.rr-14)*0.8 - (tvkg-6)*1.5));
+    /* carbon dioxide follows alveolar ventilation, not a fixed formula */
+    const vd = 2.2*patient.pbw*(patient.id==="ards"?1.45:1);
+    const va = Math.max(0.5, (dvt - vd)*v.rr/1000);
+    const co2 = patient.id==="dka" ? 250 : (patient.id==="sepsis"||patient.id==="hhs") ? 220 : 200;
+    patient.pco2 = clamp(Math.round(0.863*co2/va), 15, 100);
+    const phNow = phOf(Math.max(4,patient.hco3), Math.max(12,patient.pco2));
+    if(patient.hco3<=16 && phNow<7.15){
+      once(patient.critical, "Minute ventilation set below the patient's own compensation for a metabolic acidosis");
+      nudgeBP(-8,-5);
+      note("The patient was breathing fast to blow off acid. On these settings the carbon dioxide is "+patient.pco2+" and the pH is "+phNow.toFixed(2)+". Match the minute ventilation the patient was making before the tube.", "Pressure fell and the acidosis worsened after intubation.");
+    } else if(patient.id==="ards"){
+      if(phNow<7.15 || patient.pco2>90){ once(patient.bad, "Hypercapnic acidosis left uncorrected in ARDS"); note("The carbon dioxide is "+patient.pco2+" and the pH is "+phNow.toFixed(2)+". Permissive hypercapnia stops at about pH 7.2. Raise the rate before you raise the tidal volume.", "The acidosis is too deep."); }
+      else if(phNow>=7.2 && patient.pco2>45) once(patient.good, "Permissive hypercapnia accepted for a protective tidal volume");
+    }
   } else if(patient.support==="cpap"||patient.support==="bipap"){
     const drive = v.ipap - v.epap;
     if(v.epap<5 && (patient.id==="edema"||patient.id==="cardiogenic")){
@@ -946,6 +1074,7 @@ function applyVent(){
   } else {
     note("Those ventilator numbers are not attached to a patient on NIV or a tube.", "Settings saved, but no NIV or tube is running.");
   }
+  ardsSet();
   render();
 }
 var ABXNAME = {"ctx-azi":"Ceftriaxone + azithromycin","piptazo":"Piperacillin-tazobactam","mero":"Meropenem","vanc":"Vancomycin"};
@@ -976,6 +1105,12 @@ function bolus(ml, fluid){
   if(patient.id==="tension" && !patient.decompressed){
     once(patient.bad, "Fluid used as the treatment of tension");
     note("Fluid does not leave the chest. The pressure barely moves.", "Little change. The chest is still silent.");
+    return render();
+  }
+  if(patient.id==="ards"){
+    spoilLungs(1);
+    once(patient.bad, "Liberal fluid in ARDS");
+    note("The lung is leaking. Fluid does not fix the saturation. The lungs got wetter and the compliance fell. Fluid is for hypoperfusion, not for oxygen.", "Heavier lungs. The oxygen is not better.");
     return render();
   }
   if(full || pre==="obstruct" && patient.boluses>1){
@@ -1122,6 +1257,16 @@ function giveDiuretic(){
     nudgeBP(-8,-5); patient.uo += 20; patient.k = Math.max(2.6, patient.k-0.3);
     once(patient.bad, "Diuretic while volume-deplete");
     note("The patient was dry. The diuretic took pressure and potassium.", "Pressure dipped after the diuretic.");
+  } else if(patient.id==="ards"){
+    if(patient.map>=65 && patient.sbp>=90){
+      spoilLungs(-1); patient.uo += 35;
+      once(patient.good, "Conservative fluid strategy in ARDS once the pressure was safe");
+      note("Keeping the lung drier while the pressure holds improves the compliance and the oxygen.", "Urine came. The lungs are a little drier.");
+    } else {
+      nudgeBP(-8,-5); patient.uo += 20;
+      once(patient.bad, "Diuretic in ARDS while the pressure was low");
+      note("The pressure is not safe enough to take fluid off.", "Pressure dipped after the diuretic.");
+    }
   } else {
     patient.uo += 15;
     note("A modest diuresis. Check that the lungs were the reason.", "Urine output rose.");
@@ -1366,7 +1511,75 @@ function procedure(which){
         note("The circuit is running. It is not the treatment of the main problem.", "Dialysis circuit started.");
       }
     }
+  } else if(which==="prone"){
+    if(patient.prone){
+      patient.prone = false;
+      note("Back to supine. The oxygen falls again if the lung still needs the prone position.", "Turned supine.");
+    } else {
+      const was = ardsModel(patient);
+      patient.prone = true;
+      if(patient.gcs<=8 && !patient.intubated){
+        once(patient.critical, "Prone position with an unprotected airway");
+        note("The airway is not protected and the patient is face down.", "Turned prone with no airway plan.");
+      } else if(patient.id==="ards"){
+        const now = ardsModel(patient);
+        if(patient.support==="imv" && was.pf<=150){
+          once(patient.good, "Prone positioning for severe ARDS (P/F 150 or less)");
+          note("P/F moved from "+was.pf+" to about "+now.pf+". Prone positioning recruits the dorsal lung and evens out the stress. Keep it on for 12 to 16 hours.", "Oxygen rose after turning prone.");
+        } else if(patient.support!=="imv"){
+          once(patient.good, "Awake prone positioning in hypoxemic respiratory failure");
+          note("Awake proning can help, but it does not replace a tube if the work of breathing is failing.", "A small rise in oxygen. Still working hard.");
+        } else {
+          once(patient.bad, "Prone positioning before the P/F ratio called for it");
+          note("The evidence is for a P/F under 150 on FiO2 0.6 or more and PEEP 5 or more. This patient was not there yet.", "Turned prone with little reason.");
+        }
+      } else if(patient.id==="pneumonia" && patient.support!=="imv"){
+        note("Awake proning can help in hypoxemic pneumonia. It is not an ARDS pathway.", "Turned prone.");
+      } else {
+        once(patient.bad, "Prone positioning with no ARDS or hypoxemic lung injury");
+        note("There is no lung injury here that prone positioning treats.", "Turned prone. No benefit.");
+      }
+    }
+  } else if(which==="nmb"){
+    lineOn("nmb","Cisatracurium","infusion");
+    if(!patient.intubated){
+      once(patient.critical, "Neuromuscular blocker in a patient with no secure airway");
+      patient.spo2 = Math.max(70, patient.spo2-14);
+      note("A paralysed patient who is not ventilated cannot breathe.", "Breathing stopped.");
+    } else if(!patient.sedation){
+      once(patient.critical, "Neuromuscular blockade with no sedation");
+      note("The patient is paralysed and awake. Sedation and analgesia come first.", "Paralysed and aware.");
+    } else if(patient.id==="ards"){
+      const was = ardsModel(patient);
+      patient.nmb = true;
+      if(was.pf<=150){
+        once(patient.good, "Short neuromuscular blockade in severe ARDS after deep sedation");
+        note("A short course can improve synchrony and oxygenation in severe ARDS. It is not routine, and the weakness afterwards is a cost.", "Settled on the ventilator.");
+      } else {
+        once(patient.bad, "Neuromuscular blockade in ARDS that was not severe");
+        note("The P/F is above 150. Paralysis is not needed and it adds weakness.", "Paralysed with little reason.");
+      }
+    } else {
+      once(patient.bad, "Neuromuscular blockade with no indication");
+      note("There is no ventilator problem here that paralysis treats.", "Paralysed with little reason.");
+    }
+  } else if(which==="ecmo"){
+    const m = patient.id==="ards" ? ardsModel(patient) : null;
+    const ph = phOf(Math.max(4,patient.hco3), Math.max(12,patient.pco2));
+    if(m && patient.support==="imv" && patient.prone && (m.pf<80 || (ph<7.25 && patient.pco2>=60))){
+      patient.ecmo = true;
+      lineOn("ecmo","ECMO","venovenous circuit");
+      once(patient.good, "Early ECMO referral for refractory severe ARDS");
+      note("Prone positioning and optimized settings were not enough. A venovenous circuit takes over the gas exchange and lets the lung rest.", "On ECMO. The saturation is holding.");
+    } else if(m){
+      once(patient.bad, "ECMO before conventional lung-protective therapy was optimized");
+      note("ECMO is for severe refractory hypoxemia, or severe hypercapnic acidosis, after lung-protective ventilation and prone positioning. That point has not been reached.", "ECMO referral. Not yet indicated.");
+    } else {
+      once(patient.bad, "ECMO with no refractory lung failure");
+      note("There is no refractory ARDS here for ECMO to treat.", "ECMO referral. Not indicated.");
+    }
   }
+  ardsSet();
   render();
 }
 function commitEcho(ans){
@@ -1435,7 +1648,7 @@ function resultCards(){
   let html = "";
   if(r.abg){
     const g = r.abg;
-    html += "<div class='card'"+markCard("abg")+"><h3>ABG</h3>pH "+hi(g.ph, g.ph<7.35||g.ph>7.45)+" · PaCO2 "+hi(g.pco2+" mmHg", g.pco2<35||g.pco2>45)+" · PaO2 "+hi(g.po2+" mmHg", g.po2<60)+" · HCO3 "+hi(g.hco3, g.hco3<22||g.hco3>28)+" · lactate "+hi(g.lactate+" mmol/L", g.lactate>2)+" · base "+g.be+" · glucose "+hi(g.glucose+" mg/dL", g.glucose<70||g.glucose>180)+(isLab()?"<p class='lead'>A high lactate is a perfusion problem until proved otherwise. The pH has to agree with the bicarbonate and the carbon dioxide.</p>":"")+"</div>";
+    html += "<div class='card'"+markCard("abg")+"><h3>ABG</h3>pH "+hi(g.ph, g.ph<7.35||g.ph>7.45)+" · PaCO2 "+hi(g.pco2+" mmHg", g.pco2<35||g.pco2>45)+" · PaO2 "+hi(g.po2+" mmHg", g.po2<60)+" · FiO2 "+g.fio2+"% · P/F "+hi(g.pf, g.pf<300)+" · HCO3 "+hi(g.hco3, g.hco3<22||g.hco3>28)+" · lactate "+hi(g.lactate+" mmol/L", g.lactate>2)+" · base "+g.be+" · glucose "+hi(g.glucose+" mg/dL", g.glucose<70||g.glucose>180)+(isLab()?"<p class='lead'>A high lactate is a perfusion problem until proved otherwise. The pH has to agree with the bicarbonate and the carbon dioxide.</p>":"")+"</div>";
   }
   if(r.labs){
     const l = r.labs;
@@ -1509,7 +1722,8 @@ var ICONS = {
   tachy: ico("<path d='M4 12h3l2 4 3-8 2 4h6'/>"),
   lowGCS: ico("<circle cx='12' cy='12' r='8'/><path d='M8 13h8'/>"),
   hypergly: ico("<path d='M12 19V7'/><path d='M7 11l5-5 5 5'/><path d='M8 21h8'/>"),
-  hypogly: ico("<path d='M12 5v12'/><path d='M7 13l5 5 5-5'/><path d='M8 3h8'/>")
+  hypogly: ico("<path d='M12 5v12'/><path d='M7 13l5 5 5-5'/><path d='M8 3h8'/>"),
+  refractory: ico("<path d='M5 8c0-2 2-3 4-3 2 0 3 2 3 4v8c0 1-1 2-2 2H7c-1 0-2-1-2-2z'/><path d='M19 8c0-2-2-3-4-3-2 0-3 2-3 4'/><path d='M15 12h4M15 16h4'/>")
 };
 
 function ensureBed(){
@@ -1580,7 +1794,7 @@ function runBedAudio(){
       nextBreath += bgap;
     }
   }
-  var ventIssue = vent && (patient.spo2<88 || (patient.support==="imv" && patient.vent.tv/patient.pbw>10));
+  var ventIssue = vent && (patient.spo2<88 || (patient.support==="imv" && (ventNow().tv/patient.pbw>10 || ventNow().pplat>30)));
   var monAlarm = patient.spo2<88 || patient.map<55;
   if(ventIssue || monAlarm){
     if(nextAlarm < now-0.2) nextAlarm = now;
@@ -1683,7 +1897,7 @@ function syncBay(){
   var scene = document.getElementById("scene");
   if(!scene) return;
   var vent = patient.support==="cpap" || patient.support==="bipap" || patient.support==="imv";
-  var alertOn = patient.spo2<88 || patient.map<55 || (patient.support==="imv" && patient.vent.tv/patient.pbw>10);
+  var alertOn = patient.spo2<88 || patient.map<55 || (patient.support==="imv" && (ventNow().tv/patient.pbw>10 || ventNow().pplat>30));
   scene.className = "scene o2-"+patient.support+(alertOn?" alerting":"");
   var src = bedFile();
   var pic = document.getElementById("bedpic");
@@ -1988,22 +2202,69 @@ function ventNow(){
   var imv = support==="imv";
   var rr = imv ? (v.rr||16) : (v.backup||12);
   var peep = imv ? v.peep : v.epap;
-  var pip = imv ? (peep + (v.mode==="PC-AC" || v.mode==="PS" ? (v.ps||10) : Math.max(8, Math.round((v.tv||400)/35)))) : v.ipap;
-  var flow = imv ? Math.round(((v.tv||400)/1000) / ((60/Math.max(8,rr))*0.33) * 60) : Math.round(Math.max(10, (v.ipap-v.epap)*3));
-  return {v:v, imv:imv, rr:rr, peep:peep, pip:Math.round(pip), flow:flow, tv: imv ? v.tv : Math.round(Math.max(250, (v.ipap-v.epap)*45))};
+  var crs = crsOf(patient);
+  var raw = 8;
+  if(!imv){
+    var dpn = Math.max(0, v.ipap - v.epap);
+    return {v:v, imv:false, rr:rr, peep:peep, pip:Math.round(v.ipap), pplat:Math.round(v.ipap), dp:Math.round(dpn), crs:Math.round(crs),
+      flow:Math.round(Math.max(10, dpn*3)), tv:Math.round(Math.max(250, dpn*45)), tiFrac:Math.min(0.55, Math.max(0.2, (v.ti||1)/(60/Math.max(6,rr))))};
+  }
+  var share = v.ie==="1:1" ? 0.5 : v.ie==="1:3" ? 0.25 : 0.33;
+  var tiSec = (60/Math.max(8,rr))*share;
+  var vc = v.mode==="VC-AC" || v.mode==="SIMV";
+  var tv, pplat, pip, flow;
+  if(vc){
+    tv = v.tv||400;
+    flow = (tv/1000)/Math.max(0.2,tiSec)*60;
+    pplat = peep + tv/crs;
+    pip = pplat + raw*(flow/60);
+  } else {
+    var dset = v.ps||10;
+    pplat = peep + dset;
+    pip = pplat;
+    tv = Math.round(dset*crs);
+    flow = Math.min(120, dset/raw*60*0.6);
+  }
+  return {v:v, imv:true, rr:rr, peep:peep, pip:Math.round(pip), pplat:Math.round(pplat), dp:Math.round(pplat-peep), crs:Math.round(crs),
+    flow:Math.round(flow), tv:Math.round(tv), tiFrac:share, vc:vc, tiSec:tiSec, expSec:(60/Math.max(8,rr))*(1-share), tau:Math.max(0.1, raw*crs/1000)};
 }
+/* returns pressure (cmH2O), flow (L/min) and volume (mL) at a fraction of the breath */
 function ventSample(frac, snap){
-  var ti = 0.33;
-  if(snap.imv && snap.v.ie==="1:1") ti = 0.5;
-  if(snap.imv && snap.v.ie==="1:3") ti = 0.25;
-  if(!snap.imv) ti = Math.min(0.55, Math.max(0.2, (snap.v.ti||1) / (60/Math.max(6, snap.rr))));
+  var ti = snap.tiFrac;
   var insp = frac < ti;
   var u = insp ? frac/Math.max(0.05,ti) : (frac-ti)/Math.max(0.05,1-ti);
-  var rise = u < 0.16 ? u / 0.16 : 1;
-  var pres = insp ? rise : Math.exp(-u * 6);
-  var square = snap.imv && (snap.v.mode==="VC-AC" || snap.v.mode==="SIMV");
-  var flow = insp ? (square ? 0.8 : Math.max(0, 0.85 - u * 0.7)) : (u < 0.48 ? -0.65 * Math.exp(-u * 3.4) : 0);
-  var vol = insp ? u : (u < 0.62 ? Math.max(0, 1 - u / 0.62) : 0);
+  var peep = snap.peep, pres, flow, vol;
+  if(!snap.imv){
+    var rise = snap.v.rise ? Math.min(1, u*((60/Math.max(6,snap.rr))*ti)/Math.max(0.1,snap.v.rise)) : Math.min(1, u/0.16);
+    if(insp){
+      pres = peep + (snap.pplat-peep)*rise;
+      flow = snap.flow*Math.max(0.05, 1-0.8*u)*Math.min(1, 0.35+rise);
+      vol = snap.tv*(1-Math.exp(-u*3.2))/(1-Math.exp(-3.2));
+    } else {
+      pres = peep + (snap.pplat-peep)*Math.exp(-u*9);
+      flow = u<0.5 ? -snap.flow*0.9*Math.exp(-u*5) : 0;
+      vol = u<0.62 ? snap.tv*Math.max(0,1-u/0.62) : 0;
+    }
+    return {pres:pres, flow:flow, vol:vol};
+  }
+  if(insp){
+    if(snap.vc){
+      pres = peep + 8*(snap.flow/60) + (snap.pplat-peep)*u;
+      flow = snap.flow;
+      vol = snap.tv*u;
+    } else {
+      var r2 = Math.min(1, u/0.12);
+      pres = peep + (snap.pplat-peep)*r2;
+      flow = snap.flow*Math.exp(-u*3.2)*Math.min(1, 0.35+r2);
+      vol = snap.tv*(1-Math.exp(-u*3.2))/(1-Math.exp(-3.2));
+    }
+  } else {
+    var t = u*snap.expSec;
+    var pEnd = snap.vc ? snap.pip : snap.pplat;
+    pres = peep + (pEnd-peep)*Math.exp(-t/0.1);
+    flow = -Math.min(110,(snap.tv/1000)/snap.tau*60)*Math.exp(-t/snap.tau);
+    vol = snap.tv*Math.exp(-t/snap.tau);
+  }
   return {pres:pres, flow:flow, vol:vol};
 }
 function drawVentWaves(ts){
@@ -2017,9 +2278,9 @@ function drawVentWaves(ts){
   }
   var snap = ventNow();
   var span = 120 / Math.max(6, snap.rr);
-  var pres = traceAt(ts, snap.rr, 100, span, function(ph){ return 0.18 + 0.82*ventSample(ph, snap).pres; });
-  var flow = traceAt(ts, snap.rr, 100, span, function(ph){ return ventSample(ph, snap).flow; });
-  var vol = traceAt(ts, snap.rr, 100, span, function(ph){ return ventSample(ph, snap).vol; });
+  var pres = traceAt(ts, snap.rr, 100, span, function(ph){ return Math.min(1.05, ventSample(ph, snap).pres/40); });
+  var flow = traceAt(ts, snap.rr, 100, span, function(ph){ return ventSample(ph, snap).flow/60; });
+  var vol = traceAt(ts, snap.rr, 100, span, function(ph){ return Math.min(1.1, ventSample(ph, snap).vol/700); });
   var lanes = [
     {arr:pres, color:"#e2b48a", mid:0.86, amp:0.46},
     {arr:flow, color:"#9ad7ff", mid:0.52, amp:0.28},
@@ -2044,7 +2305,8 @@ function paintVentReadout(){
   var cell = function(k, val){ return "<div><span>"+k+"</span><b>"+val+"</b></div>"; };
   var html = "";
   if(patient.support==="imv"){
-    html = cell("Mode", escapeHtml(snap.v.mode))+cell("Paw", snap.peep+"/"+snap.pip)+cell("Flow", snap.flow+" L/m")+cell("VT", snap.tv+" mL")+cell("RR", snap.rr)+cell("FiO2", snap.v.fio2+"%");
+    var warnP = snap.pplat>30 ? " style='color:#ff8d7a'" : "", warnD = snap.dp>15 ? " style='color:#ffcf6b'" : "";
+    html = cell("Mode", escapeHtml(snap.v.mode))+cell("Paw", snap.peep+"/"+snap.pip)+"<div"+warnP+"><span>Pplat</span><b>"+snap.pplat+"</b></div><div"+warnD+"><span>\u0394P</span><b>"+snap.dp+"</b></div>"+cell("VT", snap.tv+" mL")+cell("RR", snap.rr)+cell("FiO2", snap.v.fio2+"%");
   } else if(on){
     html = cell("NIV", escapeHtml(snap.v.mask))+cell("IPAP", snap.v.ipap)+cell("EPAP", snap.v.epap)+cell("Flow", snap.flow+" L/m")+cell("RR", snap.rr)+cell("FiO2", snap.v.fio2+"%");
   }
@@ -2229,6 +2491,8 @@ function abgZoom(){
     rowPoint("pH", g.ph, "7.35–7.45", g.ph<7.35||g.ph>7.45)+
     rowPoint("PaCO2", g.pco2+" mmHg", "35–45", g.pco2<35||g.pco2>45)+
     rowPoint("PaO2", g.po2+" mmHg", "80–100", g.po2<80)+
+    rowPoint("FiO2 at the time", g.fio2+"%", "", false)+
+    rowPoint("P/F ratio", g.pf, "over 400", g.pf<300)+
     rowPoint("HCO3", g.hco3+" mmol/L", "22–26", g.hco3<22||g.hco3>26)+
     rowPoint("Lactate", g.lactate+" mmol/L", "<2", g.lactate>2)+
     rowPoint("Base excess", g.be, "−2 to +2", g.be<-2||g.be>2)+
@@ -2396,6 +2660,7 @@ function procSheet(){
     btn("diuretic","Furosemide 40 mg IV")+btn("gtn","GTN infusion, start 10 mcg/min")+btn("nicardipine","Nicardipine infusion")+btn("labetalol","Labetalol bolus")+btn("vaso","Vasopressin 0.03 units/min")+btn("crrt", patient.crrt?"CRRT is running":"Start CRRT")+
     btn("sedation","Fentanyl, then propofol if the airway is secure")+btn("d50","Dextrose 50%, 50 mL")+btn("insulin","Insulin infusion 0.1 units/kg/h")+btn("kcl","Potassium chloride replacement")+btn("dexinf","Dextrose infusion beside insulin")+btn("bicarb","Sodium bicarbonate")+
     btn("blood","One unit of blood")+btn("pcc","Reverse warfarin")+btn("ppi","Proton-pump inhibitor infusion")+btn("aspirin","Aspirin 300 mg")+btn("heparin","Treatment-dose heparin")+btn("lytic","Thrombolysis")+
+    btn("prone", patient.prone?"Return to supine":"Prone position")+btn("nmb","Cisatracurium, neuromuscular blockade")+btn("ecmo","Refer for ECMO")+
     btn("decompress","Decompress the pleura")+btn("drain","Chest drain")+btn("naloxone","Naloxone, titrated")+btn("head","Head up, neck straight")+btn("osmotic","Hypertonic saline or mannitol")+
     "</div>";
 }
@@ -2412,6 +2677,15 @@ function nextSteps(){
   if(id==="tension" && !p.decompressed) add("Decompress the pleura now. A film or a CT is not the first move while the pressure is low.");
   if(id==="hypogly" && p.glucose<70 && !p.dextrose) add("Give intravenous dextrose, then recheck the glucose.");
   if(id==="opioid" && !p.naloxone && (p.rr<12 || p.gcs<=10)) add("Open the airway, give oxygen, and give titrated naloxone.");
+  if(id==="ards"){
+    var am = ardsModel(p);
+    if(p.support!=="imv" && (p.spo2<90 || p.exh>=20 || p.rr>=30)) add("Oxygen is failing and the work of breathing is high. Intubate and start lung-protective ventilation. Set it under Oxygen and ventilator.");
+    if(p.support==="imv" && ventNow().tv/p.pbw>8) add("Lower the tidal volume toward 6 mL/kg predicted body weight.");
+    if(p.support==="imv" && ventNow().pplat>30) add("Plateau pressure is above 30. Lower the tidal volume or the pressure.");
+    if(p.support==="imv" && !p.sedation) add("Give analgesia and sedation on the ventilator.");
+    if(p.support==="imv" && am.pf<=150 && !p.prone) add("P/F is 150 or less. Prone positioning is under Drugs and procedures.");
+    if(!p.results.abg) add("Send an ABG and read the P/F ratio.");
+  }
   if(p.support==="room" && (p.spo2<94 || (p.syn.resp && p.syn.resp!=="none")) && id!=="tension") add("Start oxygen. NIV or a tube appears only after you apply the settings.");
   if((id==="edema"||id==="cardiogenic") && p.gcs>=9 && p.spo2<94 && p.support!=="cpap" && p.support!=="bipap" && p.support!=="imv") add("If the patient is awake and working, set NIV and apply it.");
   if(id==="ich" && !p.results.ct) add("Order a non-contrast CT of the head.");
@@ -2421,9 +2695,9 @@ function nextSteps(){
   if((id==="dka"||id==="hhs") && !p.results.labs) add("Check the potassium before insulin.");
   else if((id==="dka"||id==="hhs") && p.k<3.3) add("Replace potassium and hold insulin until it is safe.");
   else if((id==="dka"||id==="hhs") && !p.insulin) add("Start the insulin infusion now that potassium is known.");
-  if((id==="sepsis"||id==="pneumonia") && !p.cultures) add("Send cultures from Investigations, then read the microbiology report before the antibiotic.");
-  else if((id==="sepsis"||id==="pneumonia") && !p.cultureReport) add("Open the microbiology report, then choose the antibiotic.");
-  else if((id==="sepsis"||id==="pneumonia") && !p.abx) add("Start an antibiotic the report says is active.");
+  if(lungInfect(id) && !p.cultures) add("Send cultures from Investigations, then read the microbiology report before the antibiotic.");
+  else if(lungInfect(id) && !p.cultureReport) add("Open the microbiology report, then choose the antibiotic.");
+  else if(lungInfect(id) && !p.abx) add("Start an antibiotic the report says is active.");
   if(p.syn.preload==="empty" && p.map<70 && p.fluidMl<500 && id!=="tension") add("The circulation is empty. Give a crystalloid bolus, then look again.");
   if(p.syn.preload==="full" && p.fluidMl>0 && (id==="edema"||id==="cardiogenic")) add("Stop further fluid. The lungs are already wet.");
   if(p.map<65 && (!p.pressor || p.pressor==="none") && id!=="gib" && id!=="hypogly" && id!=="edema" && !(id==="tension" && !p.decompressed)) add("Start noradrenaline for a mean pressure under 65. Adrenaline, dopamine, and dobutamine are the other inotropes on Circulation.");
@@ -2619,6 +2893,7 @@ function maybePromptReassess(){
 }
 function render(){
   if(!patient) return renderPick();
+  ardsSet();
   var p = patient;
   var app = document.getElementById("app");
   document.getElementById("modechip").textContent = mode==="arena"?"Practice · "+fmt(wall):"Learning lab";
@@ -2672,9 +2947,9 @@ function ventHtml(){
   }
   return "<div id='focus-vent'><p class='lead'>"+(patient.pending?"The tube is placed when you apply these settings. Predicted body weight "+patient.pbw+" kg. Six mL/kg is "+Math.round(6*patient.pbw)+" mL.":"The tube is in. Predicted body weight "+patient.pbw+" kg. Six mL/kg is "+Math.round(6*patient.pbw)+" mL.")+"</p>"+
     "<label class='f'>Mode<select id='modev'><option>VC-AC</option><option>PC-AC</option><option>SIMV</option><option>PS</option></select></label>"+
-    slider("tv","Tidal volume, mL", v.tv, 200, 800, 10)+" "+slider("vrr","Set rate", v.rr, 10, 30, 1)+
+    slider("tv","Tidal volume, mL", v.tv, 200, 800, 10)+" "+slider("vrr","Set rate", v.rr, 10, 35, 1)+
     slider("peep","PEEP", v.peep, 0, 18, 1)+" "+slider("fio2","FiO2 %", v.fio2, 30, 100, 5)+
-    slider("ps","Pressure support", v.ps, 0, 20, 1)+
+    slider("ps","Pressure above PEEP", v.ps, 0, 30, 1)+
     "<label class='f'>I:E<select id='ie'><option>1:1</option><option>1:2</option><option>1:3</option></select></label>"+
     "<button class='next' type='button' id='applyVent'>Apply ventilator settings</button>";
 }
