@@ -202,6 +202,10 @@ ul.abnorm li b{color:#eaf2f7}
         <label><span class="tip">Age (years)<span class="tip-box">Used only for the expected A-a gradient. Expected is about age/4 + 4, and at least 15.</span></span></label>
         <input id="fAge" type="number" step="1" min="1" max="110" placeholder="40">
       </div>
+      <div class="field">
+        <label><span class="tip">Albumin (g/dL)<span class="tip-box">Optional. Corrects the anion gap: add 2.5 for every 1 g/dL below 4.0. A low albumin hides a high gap.</span></span></label>
+        <input id="fAlb" type="number" step="0.1" min="0.5" max="6" placeholder="4.0">
+      </div>
     </div>
     <button class="primary" style="width:100%;margin-top:6px" onclick="interpretABG()">🔬 INTERPRET ABG</button>
   </div>
@@ -252,7 +256,7 @@ ul.abnorm li b{color:#eaf2f7}
 </div><!-- .app -->
 
 <!-- Tesseract.js CDN -->
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.4/dist/tesseract.min.js"></script>
 <script>
 'use strict';
 /* ============================================================
@@ -938,10 +942,10 @@ function suggestSampleTypeFromValues(pao2,spo2){
   }
   // Only one of the two available — need a clearer signal before calling venous
   if(spo2!==null&&spo2<65){
-    return {type:'venous',confidence:'uncertain',reason:'sO₂ '+spo2+'% alone is more typical of venous than arterial blood — verify if possible.'};
+    return {type:'unknown',confidence:'uncertain',reason:'sO₂ '+spo2+'% alone is either venous blood or critical arterial hypoxaemia — verify the source before acting. The P/F ratio is still shown, marked unconfirmed.'};
   }
   if(pao2!==null&&pao2<40){
-    return {type:'venous',confidence:'uncertain',reason:'PaO₂ '+pao2+' alone is more typical of venous than arterial blood — verify if possible.'};
+    return {type:'unknown',confidence:'uncertain',reason:'PaO₂ '+pao2+' alone is either venous blood or critical arterial hypoxaemia — verify the source before acting. The P/F ratio is still shown, marked unconfirmed.'};
   }
   const which=pao2!==null?'PaO₂ '+pao2:'sO₂ '+spo2+'%';
   return {type:'arterial',confidence:'uncertain',reason:which+' alone does not clearly confirm arterial vs venous — defaulting to arterial.'};
@@ -1017,10 +1021,10 @@ function extractABGMap(text){
       /\b(?:HC[O0]3-act|HC[O0]3-std|cHC[O0]3|HC[O0]3|BICARB(?:ONATE)?|HCO)\b[^\r\n]{0,26}?([0-9]+(?:[.,][0-9]+)?)/i
     ],
     fBE:[
-      /\b(?:BE|SBE|BEecf)\s*\([^)]{0,10}\)[\s:=-]*(-?[0-9]+(?:[.,][0-9]+)?)/i,
-      /\b(?:BE|SBE|BEecf|B\.?E\.?)\b[\s:=-]*(-?[0-9]+(?:[.,][0-9]+)?)/i,
+      /\b(?:BE|SBE|BEecf)\s*\([^)]{0,10}\)[\s:=]*(-?[0-9]+(?:[.,][0-9]+)?)/i,
+      /\b(?:BE|SBE|BEecf|B\.?E\.?)\b[\s:=]*(-?[0-9]+(?:[.,][0-9]+)?)/i,
       /\b(?:BE|SBE|BEecf|B\.?E\.?)\b[^\r\n]{0,14}?(-?[0-9]+(?:[.,][0-9]+)?)/i,
-      /\bBase\s*(?:Excess|Def(?:icit)?)\b[\s:=-]*(-?[0-9]+(?:[.,][0-9]+)?)/i
+      /\bBase\s*(?:Excess|Def(?:icit)?)\b[\s:=]*(-?[0-9]+(?:[.,][0-9]+)?)/i
     ],
     fFiO2:[
       /\b(?:Fi[O0]2|FI[O0]2|[O0]2\s*conc(?:entration)?)\b[\s:=-]*([0-9]+(?:[.,][0-9]+)?)/i,
@@ -1094,6 +1098,35 @@ function extractABGMap(text){
     }
   }
 
+  return applyUnitFixes(out,normalized);
+}
+
+/* Unit and sign fixes applied to the finished map. Each block is guarded by a cheap
+   test of the text, so a normal mmHg / mmol/L report pays nothing for them. */
+function applyUnitFixes(out,text){
+  /* Base deficit is printed as a positive number: -value */
+  if(/base\s*def/i.test(text)){
+    const m=text.match(/\bBase\s*Def(?:icit)?\b[\s:=]*(\d+(?:[.,]\d+)?)/i);
+    const val=m?parseFloat(m[1].replace(',','.')):null;
+    if(val!==null&&Number.isFinite(val)&&val<=40) out.fBE=-val;
+  }
+  /* kPa reports: a unit printed straight after the number decides it, not the range */
+  if(/\bk\s?pa\b/i.test(text)){
+    const num='(\\d{1,2}(?:[.,]\\d{1,2})?)\\s*kPa\\b';
+    const c=text.match(new RegExp('\\b(?:Pa?C[O0]2|PC[O0]2|pC[O0]2)\\b[^\\n\\[]{0,24}?'+num,'i'));
+    const o=text.match(new RegExp('\\b(?:Pa?[O0]2|P[O0]2|p[O0]2)\\b(?!\\s*\\/)[^\\n\\[]{0,24}?'+num,'i'));
+    const cv=c?parseFloat(c[1].replace(',','.')):null;
+    const ov=o?parseFloat(o[1].replace(',','.')):null;
+    if(cv!==null&&cv>=1.3&&cv<=20) out.fPaCO2=Math.round(cv*7.5*10)/10;
+    if(ov!==null&&ov>=2.7&&ov<=93) out.fPaO2=Math.round(ov*7.5*10)/10;
+  }
+  /* Lactate and ionised calcium printed in mg/dL */
+  if(/mg\s*\/?\s*dl/i.test(text)){
+    const l=text.match(/\bc?Lac(?:tate)?\b[^\n\[]{0,20}?(\d{1,3}(?:[.,]\d+)?)\s*mg\s*\/?\s*dl/i);
+    if(l){const mg=parseFloat(l[1].replace(',','.')); if(Number.isFinite(mg)&&mg>0&&mg<=270) out.fLactate=Math.round(mg/9.01*10)/10;}
+    const c=text.match(/\b(?:c?Ca\s*(?:2\+|\+\+)|iCa)[^\n\[]{0,20}?(\d(?:[.,]\d+)?)\s*mg\s*\/?\s*dl/i);
+    if(c){const mg=parseFloat(c[1].replace(',','.')); if(Number.isFinite(mg)&&mg>=1&&mg<=9) out.fCa=Math.round(mg/4.008*100)/100;}
+  }
   return out;
 }
 
@@ -1231,7 +1264,9 @@ function v(id){const el=document.getElementById(id);return el&&el.value!==''?par
    ============================================================ */
 function interpretABG(){
   const pH=v('fpH'),pco2=v('fPaCO2'),pao2=v('fPaO2'),hco3=v('fHCO3'),be=v('fBE');
-  const fio2=v('fFiO2')||0.21,na=v('fNa'),cl=v('fCl'),k=v('fK'),ca=v('fCa'),lactate=v('fLactate'),spo2=v('fSpO2'),age=v('fAge');
+  let fio2=v('fFiO2')||0.21;
+  if(fio2>1&&fio2<=100) fio2=fio2/100;
+  const na=v('fNa'),cl=v('fCl'),k=v('fK'),ca=v('fCa'),lactate=v('fLactate'),spo2=v('fSpO2'),age=v('fAge'),alb=v('fAlb');
   const sampleTypeEl=document.getElementById('fSampleType');
   const sampleType=sampleTypeEl?sampleTypeEl.value:'arterial';
 
@@ -1239,7 +1274,24 @@ function interpretABG(){
     alert('Please enter at least pH, PaCO₂, and HCO₃⁻ to interpret.');return;
   }
 
-  const res={pH,pco2,pao2,hco3,be,fio2,na,cl,k,ca,lactate,spo2,sampleType,abnorm:[],mgmt:[],context:ctx};
+  const res={pH,pco2,pao2,hco3,be,fio2,na,cl,k,ca,lactate,spo2,alb,sampleType,abnorm:[],mgmt:[],warnings:[],context:ctx};
+
+  /* --- Step 0: do the numbers agree with each other? --- */
+  if(pco2>0&&hco3>0){
+    res.phCalc=6.1+Math.log10(hco3/(0.0307*pco2));
+    if(Math.abs(res.phCalc-pH)>0.06){
+      res.warnings.push('The pH, PaCO₂ and HCO₃⁻ do not fit the Henderson–Hasselbalch equation. For this PaCO₂ and HCO₃⁻ the pH should be about '+res.phCalc.toFixed(2)+', not '+pH.toFixed(2)+'. One value was misread or mistyped, or the sample is wrong. Re-check the report before acting.');
+    }
+  }
+  /* --- Anion gap, corrected for albumin when it is given. Used by the classification below. --- */
+  if(na!==null&&cl!==null){
+    res.agRaw=na-(cl+hco3);
+    res.agCorrected=(alb!==null&&alb>0);
+    res.ag=res.agCorrected?res.agRaw+2.5*(4-alb):res.agRaw;
+    res.agHigh=res.ag>12;
+    res.deltaGap=(res.ag-12)-(24-hco3);
+    if(res.agRaw<0||res.agRaw>40) res.warnings.push('The anion gap works out at '+res.agRaw.toFixed(0)+', which is not plausible. Re-check the sodium and chloride.');
+  }
 
   /* --- Step 1: pH classification --- */
   res.phStatus = pH<7.35?'Acidaemia':pH>7.45?'Alkalaemia':'Normal pH';
@@ -1275,13 +1327,16 @@ function interpretABG(){
     const chron=24-(40-pco2)*5/10;
     const fitsMet=Math.abs(pco2-expCO2)<=2;
     const fitsResp=Math.abs(hco3-chron)<=3;
-    if(lactate!==null&&lactate>=2&&pco2<expCO2-2){
+    if(((lactate!==null&&lactate>=2)||res.agHigh)&&pco2<expCO2-2){
       res.primary='Mixed Metabolic Acidosis and Respiratory Alkalosis';
       res.primaryType='mixed';
     } else if(fitsMet&&!fitsResp){res.primary='Compensated metabolic acidosis';res.primaryType='met';}
     else if(fitsResp&&!fitsMet){res.primary='Compensated respiratory alkalosis';res.primaryType='resp';}
     else if(pco2>expCO2+2&&hco3<chron-3){res.primary='Mixed metabolic acidosis and respiratory acidosis';res.primaryType='mixed';}
     else{res.primary='Normal pH with low CO₂ and HCO₃';res.primaryType='either';}
+  } else if(pco2<35||pco2>45||hco3<22||hco3>26){
+    res.primary='Normal pH with '+(pco2<35?'low CO₂':pco2>45?'high CO₂':hco3<22?'low bicarbonate':'high bicarbonate')+' — a compensated disorder, or two processes cancelling';
+    res.primaryType='either';
   } else {
     res.primary='Normal ABG';res.primaryType='normal';
   }
@@ -1314,7 +1369,7 @@ function interpretABG(){
     else{res.comp='CO₂ is lower than expected — coexisting respiratory alkalosis';res.compAdequate=false;}
   } else if(res.primary==='Mixed Metabolic Acidosis and Respiratory Alkalosis'){
     const expCO2=1.5*hco3+8;
-    res.comp='Lactate is '+lactate+' mmol/L and PaCO₂ is below the Winter value of '+expCO2.toFixed(0)+' mmHg. This is not a compensated respiratory alkalosis.';
+    res.comp=(lactate!==null&&lactate>=2?'Lactate is '+lactate+' mmol/L. ':'')+(res.agHigh?'The anion gap is high ('+res.ag.toFixed(0)+'). ':'')+'PaCO₂ is below the Winter value of '+expCO2.toFixed(0)+' mmHg. This is a metabolic acidosis with a separate respiratory alkalosis, not a compensated respiratory alkalosis.';
     res.compAdequate=false;
   } else if(res.primaryType==='either'){
     res.comp='The gas alone cannot say which process is primary. Use the history.';
@@ -1336,26 +1391,31 @@ function interpretABG(){
     const pao2_alv=fio2*(760-47)-pco2/0.8;
     res.aaGrad=pao2_alv-pao2;
     const roomLimit=age?Math.max(15,age/4+4):20;
-    res.aaLimit=roomLimit+Math.max(0,fio2-0.21)*120;
+    res.aaLimit=roomLimit+Math.max(0,fio2-0.21)*60;
     res.aaHigh=res.aaGrad>res.aaLimit;
     // Hypoxaemia classification
-    if(pao2<55||res.pf<100){res.hypoxSev='Severe hypoxaemia';}
-    else if(pao2<70||res.pf<200){res.hypoxSev='Moderate hypoxaemia';}
-    else if(pao2<80||res.pf<300){res.hypoxSev='Mild hypoxaemia';}
+    /* Low PaO2 is hypoxaemia. A low P/F with an acceptable PaO2 means the oxygen is being propped up by FiO2. */
+    const lowPa=pao2<55?'Severe':pao2<70?'Moderate':pao2<80?'Mild':null;
+    const lowPf=res.pf<100?'Severe':res.pf<200?'Moderate':res.pf<300?'Mild':null;
+    const rk={Mild:1,Moderate:2,Severe:3};
+    if(lowPa&&(!lowPf||rk[lowPa]>=rk[lowPf])){res.hypoxSev=lowPa+' hypoxaemia';}
+    else if(lowPf){res.hypoxSev=lowPf+' impairment of oxygenation';}
     else{res.hypoxSev='Normal oxygenation';}
+    res.hyperoxia=(pao2>100&&fio2>0.3);
   }
 
-  /* --- Step 5: Anion gap & delta-delta --- */
-  if(na!==null&&cl!==null){
-    res.ag=na-(cl+hco3);
-    const agCorrected=(k!==null)?na+k-(cl+hco3):res.ag;
-    res.agHigh=res.ag>12;
-    if(res.agHigh){
-      const deltaGap=(res.ag-12)-(24-hco3);
-      res.deltaDelta=hco3<24?(res.ag-12)/(24-hco3):null;
-      if(deltaGap>6){res.ddInterp='Concomitant metabolic alkalosis';}
-      else if(deltaGap<-6){res.ddInterp='Concomitant normal anion gap acidosis';}
-      else{res.ddInterp='Pure HAGMA';}
+  /* --- Step 5: Anion gap & delta-delta (the gap itself is worked out above) --- */
+  if(res.ag!==undefined&&res.agHigh){
+    res.deltaDelta=hco3<24?(res.ag-12)/(24-hco3):null;
+    if(res.deltaGap>6){res.ddInterp='Concomitant metabolic alkalosis';}
+    else if(res.deltaGap<-6){res.ddInterp='Concomitant normal anion gap acidosis';}
+    else{res.ddInterp='Pure HAGMA';}
+    /* A normal pH with a high gap is a hidden mixed disorder, not a normal gas */
+    if(res.primaryType==='normal'||res.primaryType==='either'){
+      res.primary=(res.deltaGap>6?'Hidden high anion gap metabolic acidosis with a metabolic alkalosis':'High anion gap metabolic acidosis hidden by a second process')+' — the pH is normal';
+      res.primaryType='mixed';
+      res.comp='The anion gap is '+res.ag.toFixed(0)+(res.agCorrected?' (albumin-corrected)':'')+' but the bicarbonate is not as low as that gap predicts (delta gap '+res.deltaGap.toFixed(0)+'). A metabolic alkalosis, or a chronic respiratory acidosis, is also present.';
+      res.compAdequate=false;
     }
   }
 
@@ -1375,6 +1435,7 @@ function interpretABG(){
   }
 
   /* --- Build abnormality list --- */
+  res.warnings.forEach(w=>res.abnorm.push({sev:'Severe',text:'Check the numbers — '+w}));
   if(res.phStatus!=='Normal pH') res.abnorm.push({sev:res.phSeverity,text:res.phStatus+' (pH '+pH.toFixed(2)+')'});
   if(pco2>45) res.abnorm.push({sev:pco2>65?'Severe':pco2>55?'Moderate':'Mild',text:'Hypercapnia (PaCO₂ '+pco2+')'});
   if(pco2<35) res.abnorm.push({sev:pco2<25?'Severe':'Mild',text:'Hypocapnia (PaCO₂ '+pco2+')'});
@@ -1385,7 +1446,8 @@ function interpretABG(){
   if(res.venousSample) res.abnorm.push({sev:'Note',text:'Sample marked as venous — PaO₂ '+pao2+' reflects tissue O₂ extraction, not oxygenation. P/F ratio and A-a gradient are not calculated; a venous PaO₂ this low is expected and is not hypoxaemia.'});
   else if(pao2!==null&&res.hypoxSev!=='Normal oxygenation') res.abnorm.push({sev:res.hypoxSev.split(' ')[0],text:res.hypoxSev+' (PaO₂ '+pao2+', P/F '+res.pf.toFixed(0)+')'+(res.sampleTypeUncertain?' — sample type unconfirmed, verify arterial before acting on this':'')});
   if(res.aaHigh) res.abnorm.push({sev:'Moderate',text:'Elevated A-a gradient ('+res.aaGrad.toFixed(1)+' mmHg, limit '+res.aaLimit.toFixed(0)+' for this FiO₂) — parenchymal or vascular'});
-  if(res.agHigh) res.abnorm.push({sev:'Moderate',text:'High anion gap ('+res.ag.toFixed(0)+') — HAGMA'});
+  if(res.agHigh) res.abnorm.push({sev:'Moderate',text:'High anion gap ('+res.ag.toFixed(0)+(res.agCorrected?', albumin-corrected; measured '+res.agRaw.toFixed(0):'')+') — HAGMA'});
+  if(res.hyperoxia) res.abnorm.push({sev:'Note',text:'PaO₂ '+pao2+' mmHg on FiO₂ '+fio2.toFixed(2)+' is above the usual target. Consider weaning the FiO₂ unless a specific target applies.'});
   if(res.ddInterp&&res.ddInterp!=='Pure HAGMA') res.abnorm.push({sev:'Moderate',text:'Delta-delta: '+res.ddInterp});
   if(lactate!==null&&lactate>=2) res.abnorm.push({sev:lactate>=4?'Severe':'Moderate',text:res.lactateSev+' ('+lactate+' mmol/L)'});
   if(k!==null&&res.kStatus!=='Normal potassium') res.abnorm.push({sev:k<3.0||k>5.5?'Severe':'Mild',text:res.kStatus+' (K⁺ '+k+')'});
@@ -1410,9 +1472,12 @@ function buildMgmt(res){
   const c=res.context;
   const add=(title,text)=>res.mgmt.push({title,text});
 
+  if(res.warnings&&res.warnings.length){
+    add('Check the numbers first',res.warnings.join(' ')+' Do not act on this interpretation until the values are confirmed.');
+  }
   // pH management
   if(res.phStatus==='Acidaemia'&&res.phSeverity==='Severe'){
-    add('Severe Acidaemia (pH <7.20) — Urgent Action','Consider urgent respiratory support (NIV/intubation) if respiratory; IV sodium bicarbonate only in life-threatening metabolic acidosis (pH <7.10) as a bridge to definitive therapy. Avoid excessive alkali in lactic acidosis.');
+    add('Severe Acidaemia (pH <7.20) — Urgent Action','Consider urgent respiratory support (NIV/intubation) if respiratory; IV sodium bicarbonate is not routine. BICAR-ICU found benefit for a pH of 7.20 or lower with severe acute kidney injury, as a bridge while the cause is treated. In DKA it is only for a pH below about 7.0. Avoid excessive alkali in lactic acidosis. Follow your local protocol.');
   }
 
   // Respiratory acidosis
@@ -1431,7 +1496,7 @@ function buildMgmt(res){
   // Metabolic acidosis
   if(res.primary.includes('Metabolic Acidosis')||(res.primaryType==='met'&&res.hco3<22)){
     if(res.agHigh||(res.lactate!==null&&res.lactate>=2)){
-      add('High Anion Gap Metabolic Acidosis (HAGMA)',(res.agHigh?'The anion gap is high. ':'The calculated gap is not high, but the lactate is. A low sodium or a low albumin can hide the gap. ')+'Causes to screen: lactate, ketones, uraemia, methanol, ethylene glycol, and salicylate. '+
+      add('High Anion Gap Metabolic Acidosis (HAGMA)',(res.agHigh?'The anion gap is high. ':'The calculated gap is not high, but the lactate is. A low sodium or a low albumin can hide the gap. ')+'Causes to screen: lactate, ketones, uraemia, methanol, ethylene glycol, and salicylate. Also consider metformin, paracetamol (5-oxoproline), and propylene glycol from lorazepam infusions. '+
         (res.lactateSev&&res.lactateSev.includes('hyperlact')?'Elevated lactate — look for shock, sepsis, or metformin. Treat the cause. Do not chase the lactate with bicarbonate.':'')+
         ' In DKA: insulin, fluid, and potassium. In lactic acidosis: restore oxygen delivery.');
     } else if(res.na===null||res.cl===null){
@@ -1450,8 +1515,8 @@ function buildMgmt(res){
   if(res.venousSample){
     add('Venous Sample — Oxygenation Not Assessable','PaO₂/sO₂ from venous blood reflect tissue oxygen extraction, not lung oxygenation — P/F ratio and A-a gradient cannot be calculated from this sample. The pH, PaCO₂ and metabolic values above remain usable as a rough guide, but if oxygenation status is actually needed clinically, repeat with an arterial sample.');
   } else if(res.pf!==undefined&&res.hypoxSev!=='Normal oxygenation'){
-    const pfGrade=res.pf<100?'Severe hypoxaemia (P/F <100)':res.pf<200?'Moderate hypoxaemia (P/F 100–200)':res.pf<300?'Mild hypoxaemia (P/F 200–300)':'Hypoxaemia';
-    add('Hypoxaemia — '+pfGrade,(res.sampleTypeUncertain?'Sample type is unconfirmed. Do not act on the P/F ratio until the sample is known to be arterial. ':'')+'A low P/F ratio is not ARDS by itself. ARDS also needs an acute bilateral infiltrate that is not cardiogenic. Target SpO₂ 94–98%, or 88–92% if the patient retains CO₂. '+(res.pf<=150?'If this is ARDS and the P/F stays ≤150, prone the patient. If intubated, use about 6 mL/kg and keep plateau ≤30.':'Increase oxygen, sit the patient up, and treat the cause.'));
+    const pfGrade=res.hypoxSev+' (P/F '+Math.round(res.pf)+', PaO₂ '+res.pao2+')';
+    add(pfGrade,(res.sampleTypeUncertain?'Sample type is unconfirmed. Do not act on the P/F ratio until the sample is known to be arterial. ':'')+'A low P/F ratio is not ARDS by itself. ARDS also needs an acute bilateral infiltrate that is not cardiogenic. Target SpO₂ 94–98%, or 88–92% if the patient retains CO₂. '+(res.pf<=150?'If this is ARDS and the P/F stays ≤150, prone the patient. If intubated, use about 6 mL/kg and keep plateau ≤30.':'Increase oxygen, sit the patient up, and treat the cause.'));
     if(res.aaHigh) add('Raised A-a Gradient','The gradient is above the limit for this FiO₂ ('+res.aaLimit.toFixed(0)+' mmHg). That points to lung or pulmonary vascular disease, not simple hypoventilation.');
     else if(res.pf<300) add('A-a gradient within the limit','Hypoxaemia with a gradient inside the limit for this FiO₂ is more in keeping with hypoventilation or a low inspired oxygen than with parenchymal disease.');
   }
@@ -1474,7 +1539,7 @@ function buildMgmt(res){
         +'Identify cause: diuretics, diarrhoea, alkalosis, hyperaldosteronism. Recheck after each dose. Concurrent hypomagnesaemia is common — check Mg²⁺.');
     } else {
       add('Hyperkalaemia (K⁺ '+res.k+')',
-        (parseFloat(res.k)>6.0?'Severe: ECG urgently. IV calcium gluconate 10 mL 10% for membrane stabilisation. Insulin-dextrose. Salbutamol nebulisation. Consider dialysis.':'Moderate: treat cause, repeat ECG, calcium resonium or patiromer, consider fludrocortisone if adrenal cause.'));
+        (parseFloat(res.k)>6.0?'Severe: ECG urgently. IV calcium gluconate 10 mL 10% for membrane stabilisation. Insulin-dextrose. Salbutamol nebulisation. A potassium binder such as sodium zirconium cyclosilicate. Dialysis if refractory or the kidneys are failing.':'Moderate: treat the cause, stop potassium-raising drugs, repeat the ECG, and repeat the sample if haemolysis is possible. A newer binder (sodium zirconium cyclosilicate or patiromer) is preferred to calcium resonium. Insulin-dextrose if there are ECG changes or the level is rising.'));
     }
   }
 
@@ -1490,7 +1555,7 @@ function buildMgmt(res){
     add('High ionized calcium','Ionized calcium is '+res.ca+' mmol/L. Look for malignancy, hyperparathyroidism, or excess calcium replacement. Give fluid if the patient is volume depleted.');
   }
   if(res.primaryType==='either'){
-    add('Normal pH, two numbers moved together','This can be one compensated disorder or two disorders cancelling out. A stable patient with a high CO₂ and a matching bicarbonate is not in acute ventilatory failure. Do not ventilate the CO₂ to normal.');
+    add('Normal pH, abnormal CO₂ or bicarbonate','This can be one compensated disorder or two disorders cancelling out. Check the anion gap and the history. A stable patient with a high CO₂ and a matching bicarbonate is not in acute ventilatory failure. Do not ventilate the CO₂ to normal.');
   }
   if(res.primary==='Mixed respiratory acidosis and metabolic alkalosis'){
     add('Respiratory acidosis plus metabolic alkalosis','The bicarbonate is above the chronic respiratory expectation and the CO₂ is above the metabolic-alkalosis expectation. Treat both. Do not correct only the CO₂.');
@@ -1514,13 +1579,14 @@ function renderResults(res){
   const diagEl=document.getElementById('diagPanel');
   const cls=res.phStatus==='Acidaemia'?'acid':res.phStatus==='Alkalaemia'?'alk':res.primaryType==='mixed'?'mixed':'norm';
   const sevBadge=s=>`<span class="badge ${s==='Severe'?'acid':s==='Moderate'?'warn':'info'}">${s}</span>`;
-  let dHTML=`<div class="diag-card ${cls}">
+  const warnHTML=(res.warnings||[]).map(w=>`<div style="background:#4a1620;border:1px solid #a93244;border-radius:10px;padding:10px;margin-bottom:10px;font-size:13px"><b>Check the numbers first.</b> ${w}</div>`).join('');
+  let dHTML=warnHTML+`<div class="diag-card ${cls}">
     <h3>${res.primary}</h3>
     <p><b>pH Status:</b> ${res.phStatus} ${sevBadge(res.phSeverity)} (pH ${res.pH.toFixed(2)})</p>
     <p><b>Compensation:</b> ${res.comp}</p>`;
   if(res.venousSample) dHTML+=`<p><b>Oxygenation:</b> Not calculated — venous sample (PaO₂ ${res.pao2} reflects tissue extraction, not lung function)</p>`;
   else if(res.pf!==undefined) dHTML+=`<p><b>Oxygenation:</b> ${res.hypoxSev} — P/F ${res.pf.toFixed(0)}, A-a gradient ${res.aaGrad.toFixed(1)} mmHg${res.sampleTypeUncertain?' <span style="color:#e0b04a">(sample type unconfirmed)</span>':''}</p>`;
-  if(res.agHigh) dHTML+=`<p><b>Anion Gap:</b> ${res.ag.toFixed(0)} (HIGH) — ${res.ddInterp||'HAGMA'}</p>`;
+  if(res.agHigh) dHTML+=`<p><b>Anion Gap:</b> ${res.ag.toFixed(0)}${res.agCorrected?' (albumin-corrected)':''} (HIGH) — ${res.ddInterp||'HAGMA'}</p>`;
   if(res.lactateSev) dHTML+=`<p><b>Lactate:</b> ${res.lactateSev}</p>`;
   dHTML+=`</div>`;
   diagEl.innerHTML=dHTML;
@@ -1591,6 +1657,8 @@ function buildExportText(){
   if(r.pao2) txt+=`PaO₂: ${r.pao2}  FiO₂: ${r.fio2}  P/F: ${r.pf?.toFixed(0)??'—'}  A-a: ${r.aaGrad?.toFixed(1)??'—'}\n`;
   if(r.na&&r.cl) txt+=`Na: ${r.na}  Cl: ${r.cl}  K: ${r.k??'—'}  AG: ${r.ag?.toFixed(0)??'—'}\n`;
   if(r.lactate) txt+=`Lactate: ${r.lactate}\n`;
+  if(r.alb) txt+=`Albumin: ${r.alb}  Corrected AG: ${r.ag?.toFixed(0)??'—'}\n`;
+  if(r.warnings&&r.warnings.length) txt+=`CHECK THE NUMBERS: ${r.warnings.join(' ')}\n`;
   txt+=`─────────────────────────────\n`;
   txt+=`PRIMARY: ${r.primary}\n`;
   txt+=`Compensation: ${r.comp}\n`;
@@ -1627,7 +1695,9 @@ function toggleExportBox(){
    Reset
    ============================================================ */
 function resetAll(){
-  ['fpH','fPaCO2','fPaO2','fHCO3','fBE','fFiO2','fNa','fCl','fK','fCa','fLactate','fSpO2','fTemp'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['fpH','fPaCO2','fPaO2','fHCO3','fBE','fFiO2','fNa','fCl','fK','fCa','fLactate','fSpO2','fTemp','fAge','fAlb'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const stSel=document.getElementById('fSampleType'); if(stSel) stSel.value='arterial';
+  const stNote=document.getElementById('sampleTypeNote'); if(stNote) stNote.textContent='';
   document.getElementById('resultsSection').style.display='none';
   document.getElementById('ocrStatus').style.display='none';
   document.getElementById('previewWrap').style.display='none';
