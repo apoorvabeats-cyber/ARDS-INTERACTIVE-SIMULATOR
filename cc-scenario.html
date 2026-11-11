@@ -1814,18 +1814,16 @@ function bedFrame(ts){
   if(chest){
     var rate = breathRate();
     var ph = ((ts/1000) * rate/60) % 1;
-    var f, amp = 1;
+    var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var rise = 0.5 - 0.5 * Math.cos(ph * Math.PI * 2);
     if(onVent()){
       var snap = ventNow();
-      f = ventSample(ph, snap).vol;
-      amp = Math.max(0.6, Math.min(1.5, snap.tv/450));
-    } else {
-      f = respWave(ph);
+      var deeper = Math.max(0.85, Math.min(1.35, (snap.tv||400)/420));
+      rise = rise * deeper;
     }
-    var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    var rise = Math.max(0, Math.min(1, amp * f));
-    var lift = (-1.5 * rise).toFixed(2);
-    chest.style.transform = still ? "none" : "translateY("+lift+"%)";
+    var lift = (-2.4 * rise).toFixed(2);
+    var scale = (1 + 0.02 * rise).toFixed(4);
+    chest.style.transform = still ? "none" : "translateY("+lift+"%) scale(1,"+scale+")";
   }
   runBedAudio();
 }
