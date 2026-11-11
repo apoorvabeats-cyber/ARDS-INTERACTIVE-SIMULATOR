@@ -73,7 +73,7 @@ const CASES = [
     pearls: [
       "A high serum potassium is a shift, not a surplus. Total body potassium is low, and it will fall as soon as insulin starts.",
       "Fluid first, then insulin at 0.1 unit/kg/hour. A bolus is optional and not required.",
-      "When glucose reaches about 200, add dextrose and keep the insulin on until the gap closes.",
+      "When glucose falls below about 250 mg/dL, add dextrose and keep the insulin on until the ketosis resolves.",
     ],
   },
   {
@@ -86,8 +86,8 @@ const CASES = [
     mode: "dka", needAbx: false,
     phys: { na: 132, cl: 96, k: 2.7, hco3: 8, glucose: 410, bhb: 6.4, pco2: 20, deficit: 5, weight: 62, temp: 36.6, bun: 24, gcs: 15 },
     pearls: [
-      "If potassium is under 3.3, hold insulin. Replace potassium first or the first insulin will drive it into the muscle and the heart.",
-      "Once potassium is at least 3.3, start the infusion and keep replacing.",
+      "If potassium is under 3.5, hold insulin and replace potassium at 10 to 20 mEq/hour. Replace potassium first or the first insulin will drive it into the muscle and the heart.",
+      "Once potassium is above 3.5, start the infusion and keep replacing.",
       "The gap, not the glucose, tells you when the ketoacidosis is over.",
     ],
   },
@@ -174,11 +174,11 @@ function step(p, dt) {
   }
   if (p.dextrose || p.rate === "d5half") p.glucose += (p.glucose < 180 ? 18 : 8) * dt;
   if (p.insulin > 0) {
-    if (p.k < 3.3) {
+    if (p.k < 3.5) {
       p.k -= 0.9 * (p.insulin / 0.1) * dt;
       p.lowK = true;
       p.glucose -= 25 * dt;
-      p.note = "Potassium is under 3.3 and insulin is still running.";
+      p.note = "Potassium is under 3.5 and insulin is still running.";
     } else {
       const perf = p.deficit > 6.5 ? 0.65 : 1;
       const gFall = (p.mode === "hhs" ? 140 : 72) * (p.insulin / 0.1) * perf;
@@ -230,16 +230,16 @@ function indicated(id, p) {
     if (p.mode === "hhs") return p.glucose <= 320;
     return p.glucose <= 220;
   }
-  if (id === "ins1") return p.mode === "dka" && p.k >= 3.3;
+  if (id === "ins1") return p.mode === "dka" && p.k >= 3.5;
   if (id === "ins05") {
-    if (p.k < 3.3) return false;
+    if (p.k < 3.5) return false;
     if (p.mode === "hhs") return !!p.rate || p.deficit < 8;
     return p.glucose < 250 || p.fastDrop;
   }
   if (id === "insoff") return p.insulin > 0 && p.basal && s.ag <= 14 && p.bhb <= 1.5;
   if (id === "k20") return p.k <= 5.2 && p.kcl !== 20;
-  if (id === "k40") return p.k < 3.3;
-  if (id === "bicarb") return s.ph < 6.9;
+  if (id === "k40") return p.k < 3.5;
+  if (id === "bicarb") return s.ph < 7.0;
   if (id === "abx") return !!p.needAbx && !p.abx;
   if (id === "cause") return !p.cause;
   if (id === "basal") {
@@ -265,11 +265,11 @@ function order(id) {
     say(p.dextrose ? "Dextrose added. Keep insulin running if the gap is still open." : "Dextrose stopped.");
   }
   else if (id === "ins1") {
-    if (p.k < 3.3) { p.insulin = 0.1; p.lowK = true; say("Insulin started at potassium " + p.k.toFixed(1) + ". This is unsafe."); }
+    if (p.k < 3.5) { p.insulin = 0.1; p.lowK = true; say("Insulin started at potassium " + p.k.toFixed(1) + ". This is unsafe."); }
     else { p.insulin = 0.1; say("Insulin 0.1 unit/kg/hour. No bolus."); }
   }
   else if (id === "ins05") {
-    if (p.k < 3.3) { p.insulin = 0.05; p.lowK = true; say("Even a low dose will drop the potassium further."); }
+    if (p.k < 3.5) { p.insulin = 0.05; p.lowK = true; say("Even a low dose will drop the potassium further."); }
     else { p.insulin = 0.05; say(p.mode === "hhs" ? "Low-dose insulin. Right pace for HHS after fluid." : "Rate cut to 0.05. Only do this if the glucose is falling too fast and the gap is closing."); }
   }
   else if (id === "insoff") {
@@ -278,14 +278,14 @@ function order(id) {
   }
   else if (id === "k20") { p.kcl = p.kcl === 20 ? 0 : 20; say(p.kcl ? "Potassium chloride 20 mEq/hour." : "Potassium stopped."); }
   else if (id === "k40") {
-    if (p.k >= 4.5) say("Potassium is not low. 40 mEq/hour is for a level under 3.3, with a monitor.");
+    if (p.k >= 4.5) say("Potassium is not low. 40 mEq/hour is only for a level under 3.5, through a central line with a monitor. The usual rate is 10 to 20 mEq/hour.");
     p.kcl = 40;
     say("Potassium chloride 40 mEq/hour. Recheck often.");
   }
   else if (id === "bicarb") {
     p.bicarbUsed = true;
-    if (s.ph >= 6.9) { p.bicarbBad = true; say("pH is " + s.ph.toFixed(2) + ". Bicarbonate is not indicated and will drop the potassium."); }
-    else say("Bicarbonate for pH under 6.9, while potassium is watched.");
+    if (s.ph >= 7.0) { p.bicarbBad = true; say("pH is " + s.ph.toFixed(2) + ". Bicarbonate is not indicated and will drop the potassium."); }
+    else say("Bicarbonate for pH under 7.0, while potassium is watched.");
   }
   else if (id === "abx") {
     p.abx = true;
@@ -310,8 +310,8 @@ function tick() {
   if (resolved(P)) stable += 15; else stable = 0;
   if (stable >= 30) { finish(); return; }
   const s = snap(P);
-  if (!P.dead && P.mode === "dka" && P.glucose < 200 && P.insulin > 0 && !P.dextrose && P.rate !== "d5half" && Math.round(P.t) % 30 === 0) P.note = "Glucose is under 200 and insulin is still on. Add dextrose or the next number is a hypo.";
-  if (P.mode === "hhs" && P.glucose < 300 && P.insulin > 0 && !P.dextrose && Math.round(P.t) % 30 === 0) P.note = "Glucose is under 300. Add dextrose so the insulin does not overshoot.";
+  if (!P.dead && P.mode === "dka" && P.glucose < 250 && P.insulin > 0 && !P.dextrose && P.rate !== "d5half" && Math.round(P.t) % 30 === 0) P.note = "Glucose is under 250 and insulin is still on. Add dextrose or the next number is a hypo.";
+  if (P.mode === "hhs" && P.glucose < 250 && P.insulin > 0 && !P.dextrose && Math.round(P.t) % 30 === 0) P.note = "Glucose is under 250. Add dextrose so the insulin does not overshoot.";
   if (P.k > 5.2 && P.kcl > 0) P.note = "Potassium is " + P.k.toFixed(1) + ". Stop the replacement.";
   if (P.fastDrop && !P.fastNoted && P.id === "classic") { P.fastNoted = true; P.note = "Glucose fell faster than 100 mg/dL in an hour. In a young patient, slow the drop — cerebral edema is the risk."; }
   paint();
@@ -425,7 +425,7 @@ function paint() {
   if (!clockEl) return;
   clockEl.textContent = clock(p.t) + " h   " + (running ? "running" : "paused");
   document.getElementById("run").textContent = running ? "Pause" : "Run";
-  const kCls = p.k < 3.3 ? "hi" : p.k > 5.2 ? "warn" : "ok";
+  const kCls = p.k < 3.5 ? "hi" : p.k > 5.2 ? "warn" : "ok";
   const gCls = p.glucose < 70 ? "hi" : p.glucose > 250 ? "warn" : "ok";
   const phCls = s.ph < 7.2 ? "hi" : s.ph < 7.3 ? "warn" : "ok";
   document.getElementById("sev").innerHTML = `<span class="chip" style="background:#e9f2ff;color:#1457a6">${s.sev}</span>`;

@@ -133,9 +133,9 @@ const titles={
 function plan(p){
   const kind=kindOf(p);
   const dka=['severe','moderate','mild','mixed','euglycemic'].includes(kind);
-  const hold=p.k<3.3;
+  const hold=p.k<3.5;
   const highK=p.k>5.2;
-  const dextroseAt=kind==='hhs'?300:(dka?200:null);
+  const dextroseAt=(kind==='hhs'||dka)?250:null;
   const hyperosm=kind==='hhs'||kind==='mixed';
   let fluid;
   if(p.overload){
@@ -143,7 +143,7 @@ function plan(p){
     if(hold) fluid+=' Add 20–30 mmol of potassium to that bag. A plain balanced bag has only about 4 mmol/L.';
   } else if(p.shock){
     fluid='Shocked. Give isotonic boluses until the perfusion recovers, then replace the deficit.';
-    if(hold) fluid+=' Add 20–30 mmol of potassium per hour to the fluid. A plain balanced bag has only about 4 mmol/L, so do not count it as the replacement.';
+    if(hold) fluid+=' Replace potassium at 10–20 mmol/h through the fluid. A plain balanced bag has only about 4 mmol/L, so do not count it as the replacement.';
     else if(highK) fluid+=' Use 0.9% saline with no potassium in the bag.';
     else fluid+=' Use a balanced crystalloid, and put 20–30 mmol of potassium in each litre.';
   } else {
@@ -152,7 +152,7 @@ function plan(p){
     const laterHi=Math.max(laterLo, Math.min(500, Math.round(p.wt*6)));
     let firstBag, next;
     if(hold){
-      firstBag='0.9% saline with 20–30 mmol of potassium added per hour';
+      firstBag='0.9% saline with potassium added to run at 10–20 mmol/h';
       next='A plain balanced bag has only about 4 mmol/L. Do not count it as the replacement. Keep the ECG on, and do not give 40 mmol/h through a peripheral vein.';
     } else if(hyperosm){
       firstBag=highK?'0.9% saline with no potassium added':'a balanced crystalloid';
@@ -175,23 +175,23 @@ function plan(p){
   let dextrose='';
   if(dextroseAt&&!hold){
     dextrose=kind==='euglycemic'
-      ? 'The glucose is already under 200. Start dextrose with the insulin. Do not wait for it to fall further, and do not stop the insulin.'
+      ? 'The glucose is already under 250. Start dextrose with the insulin. Do not wait for it to fall further, and do not stop the insulin.'
       : 'When the glucose reaches '+dextroseAt+' mg/dL, add dextrose and keep the insulin running. '+(kind==='hhs'?'Do not stop the insulin only because the glucose has fallen.':'Stopping the insulin here is how the ketoacidosis returns.');
     if(kind==='hhs'||kind==='mixed') dextrose+=' In HHS, do not let the effective osmolality fall faster than about 3 mOsm/kg per hour.';
   } else if(hold&&dextroseAt) dextrose='Insulin is held, so do not start dextrose yet.';
   let potassium;
-  if(hold) potassium='Give 20–30 mmol/h of potassium with the ECG monitored until the potassium is above 3.3. Do not put 40 mmol/h through a peripheral vein. Then start insulin.';
+  if(hold) potassium='Give 10–20 mmol/h of potassium with the ECG monitored until the potassium is above 3.5. Do not put 40 mmol/h through a peripheral vein. Then start insulin.';
   else if(highK) potassium='Potassium is '+p.k.toFixed(1)+'. Put no potassium in the fluid. Check it again within 2 hours. Insulin will bring it down.';
   else potassium='Potassium is '+p.k.toFixed(1)+'. Put 20–30 mmol of potassium in each litre so the level stays about 4–5.';
   let bicarb='';
-  if(dka&&p.ph<6.9){
+  if(dka&&p.ph<7.0){
     bicarb=highK
-      ? 'pH is under 6.90. Give 100 mmol of sodium bicarbonate in 400 mL of water over 2 hours. Do not add potassium while the potassium is high. Check the pH again. Do not give bicarbonate once the pH is 6.90 or higher.'
-      : 'pH is under 6.90. Give 100 mmol of sodium bicarbonate in 400 mL of water over 2 hours, with 20 mmol of potassium chloride. Check the pH again. Do not give bicarbonate once the pH is 6.90 or higher.';
+      ? 'pH is under 7.0. Bicarbonate is not routine, but it is reasonable here: 100 mmol of sodium bicarbonate in 400 mL of water over 2 hours. Do not add potassium while the potassium is high. Check the pH again. Do not give bicarbonate once the pH is 7.0 or higher. Follow your local protocol.'
+      : 'pH is under 7.0. Bicarbonate is not routine, but it is reasonable here: 100 mmol of sodium bicarbonate in 400 mL of water over 2 hours, with 20 mmol of potassium chloride. Check the pH again. Do not give bicarbonate once the pH is 7.0 or higher. Follow your local protocol.';
   } else if(dka) bicarb='Bicarbonate is not indicated. The pH is '+p.ph.toFixed(2)+'.';
   const resolved=kind==='hhs'
     ? 'HHS is settling when the glucose is near 250 mg/dL, the effective osmolality is under 300, and the patient is more awake.'
-    : (dka ? 'DKA is resolved only when the glucose is under 200 mg/dL and two of these are true: bicarbonate at least 18, venous pH at least 7.30, anion gap 12 or less. Overlap subcutaneous basal insulin for 1–2 hours before the infusion stops.' : '');
+    : (dka ? 'DKA is resolved when the beta-hydroxybutyrate is under 0.6 mmol/L and either the venous pH is at least 7.30 or the bicarbonate is at least 18 mmol/L (2024 consensus; glucose and the anion gap are no longer the criteria). Overlap subcutaneous basal insulin for 1–2 hours before the infusion stops.' : '');
   const alerts=[];
   if(kind==='other') alerts.push(['bad','The pH is low but the beta-hydroxybutyrate is under 3 mmol/L. This is not DKA. Look for lactate, a toxin, or kidney failure.']);
   if(p.pending&&dka) alerts.push(['warn','The ketone is not back. This is being treated as DKA because the gap is high. Confirm the beta-hydroxybutyrate.']);
@@ -201,12 +201,12 @@ function plan(p){
   alerts.push([hold?'bad':'', insulin]);
   if(dextrose) alerts.push(['warn', dextrose]);
   alerts.push([hold||highK?'bad':'ok', potassium]);
-  if(bicarb) alerts.push([p.ph<6.9?'bad':'ok', bicarb]);
+  if(bicarb) alerts.push([p.ph<7.0?'bad':'ok', bicarb]);
   if(resolved) alerts.push(['', resolved]);
   const orders=[
     titles[kind],
     '1. Fluids: '+fluid,
-    '2. Insulin: '+(hold?'HOLD until potassium is above 3.3.':insulin),
+    '2. Insulin: '+(hold?'HOLD until potassium is above 3.5.':insulin),
     dextrose?('3. Dextrose: '+dextrose):null,
     '4. Potassium: '+potassium,
     bicarb?('5. Bicarbonate: '+bicarb):'5. Bicarbonate: not indicated.',
