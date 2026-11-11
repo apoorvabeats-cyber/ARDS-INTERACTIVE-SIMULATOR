@@ -267,14 +267,14 @@ const SYNDROMES = {
     covers:["hypoBP","tachypnea","tachy","lowGCS","hypergly","desat"],
     abx:[], source:"ketoacid",
     hint:"The rate is high because of acid, not because the lung is the whole story. Know the potassium before any insulin. Do not stop insulin just because the glucose falls.",
-    expert:["Fluid first. A balanced crystalloid or saline is acceptable.","Measure potassium. If it is under 3.3 mmol/L, replace potassium and hold insulin.","Insulin infusion at 0.1 units/kg/h once potassium is safe.","Add dextrose when glucose is near 200 mg/dL and keep insulin running until the gap closes.","Bicarbonate is not routine. Look for a trigger. Protect the airway if consciousness fails."]
+    expert:["Fluid first. A balanced crystalloid or saline is acceptable.","Measure potassium. If it is under 3.5 mmol/L, replace potassium (10 to 20 mmol/h) and hold insulin.","Insulin infusion at 0.1 units/kg/h once potassium is 3.5 mmol/L or more.","Add 5 to 10% dextrose when glucose falls below about 250 mg/dL (14 mmol/L) and keep insulin running until the ketosis resolves.","Bicarbonate only if the pH is below 7.0. Look for a trigger. Protect the airway if consciousness fails."]
   },
   hhs:{
     bp:"low", glucose:"high", preload:"empty", oxygen:"good", shock:"hypovolemic", resp:"none",
     covers:["hypoBP","tachy","lowGCS","hypergly"],
     abx:[], source:"hyperosm",
     hint:"The glucose is extreme and the patient is dry. Fluid is the resuscitation. Insulin is slower and smaller than in ketoacidosis. Know the potassium.",
-    expert:["Fluid is the main resuscitation. Replace the deficit over hours, not as one uncontrolled pour.","Potassium before and during insulin.","Insulin at a lower rate than ketoacidosis, once fluid has started and potassium is safe.","Glucose falls slowly. Watch sodium and osmolality.","Find the trigger. Protect the airway if consciousness is lost."]
+    expert:["Fluid is the main resuscitation. Replace the deficit over hours, not as one uncontrolled pour.","Potassium before and during insulin.","Insulin at a lower rate than ketoacidosis (0.05 units/kg/h), once fluid has started and potassium is 3.5 mmol/L or more.","Glucose should fall slowly, no faster than about 90 to 120 mg/dL an hour. Watch sodium and osmolality.","Find the trigger. Protect the airway if consciousness is lost."]
   },
   hypogly:{
     bp:"normal", glucose:"low", preload:"normal", oxygen:"good", shock:"none", resp:"none",
@@ -288,7 +288,7 @@ const SYNDROMES = {
     covers:["hyperBP","lowGCS","tachy","desat"],
     abx:[], source:"brain",
     hint:"The pressure is high and the consciousness is low. This is a brain until a scan says otherwise. Do not drop the pressure off a cliff, and do not send this patient for a lumbar puncture.",
-    expert:["Airway and oxygen. Head up, neck straight, carbon dioxide in the normal range.","Non-contrast CT.","Lower a very high systolic pressure toward about 140 to 160, smoothly, with nicardipine or labetalol. Not a nitrate.","Reverse anticoagulation if it is present. Hypertonic saline or mannitol only for herniation, not as a standing drip.","Keep saturation and glucose in range. Fever and hypotension both hurt."]
+    expert:["Airway and oxygen. Head up, neck straight, carbon dioxide in the normal range.","Non-contrast CT.","Lower a high systolic pressure (150 to 220) toward about 140, keeping it between 130 and 150, smoothly, with nicardipine or labetalol. Do not drop it below 130. Not a nitrate.","Reverse anticoagulation if it is present. Hypertonic saline or mannitol only for herniation, not as a standing drip.","Keep saturation and glucose in range. Fever and hypotension both hurt."]
   },
   gib:{
     bp:"low", glucose:"normal", preload:"empty", oxygen:"good", shock:"hypovolemic", resp:"none",
@@ -868,8 +868,8 @@ function tick(min){
     raiseEvent("New event. Mottling is worse and the lactate has not turned.", "New event. The infection is untreated. Lactate is climbing because the first antibiotic is not in.");
   if(id==="pe" && !patient.anticoag && !patient.lytic && patient.t>=30 && patient.map<70)
     raiseEvent("New event. The neck veins are still up and the pressure is falling again.", "New event. Shock is persisting with a strained right heart and no treatment for clot.");
-  if(id==="dka" && patient.insulin && !patient.dextrose && patient.glucose<220 && patient.glucose>=70)
-    raiseEvent("New event. Glucose is nearing 200 mg/dL and insulin is still running.", "New event. Glucose is nearing 200 mg/dL. Add dextrose and keep insulin until the gap closes.");
+  if(id==="dka" && patient.insulin && !patient.dextrose && patient.glucose<250 && patient.glucose>=70)
+    raiseEvent("New event. Glucose has fallen below 250 mg/dL and insulin is still running.", "New event. Glucose is below 250 mg/dL. Add 5 to 10% dextrose and keep insulin running until the ketosis resolves.");
   if(id==="gib" && patient.bloodU===0 && patient.t>=20 && patient.map<70)
     raiseEvent("New event. Still pale. The pressure did not hold.", "New event. Still pale and hypotensive. Crystalloid is not a substitute for blood.");
   if(id==="ich" && !patient.results.ct && patient.t>=25)
@@ -1181,8 +1181,7 @@ function givePressor(which){
     note("Adrenaline raised the pressure and the rate. It is reasonable when the mean pressure is low. Watch the lactate and the fingers.", "Pressure and rate rose.");
   } else if(which==="dopa" && patient.map<70){
     nudgeBP(10,6); patient.hr += 18;
-    once(patient.good, "Dopamine while the mean pressure was low");
-    note("Dopamine raised the pressure and the heart rate. Noradrenaline is the cleaner first vasopressor. Dopamine is an option when you also want the rate up.", "Pressure rose. The rate rose more.");
+    note("Dopamine raised the pressure and the heart rate, with more arrhythmia than noradrenaline in shock (SOAP II). Noradrenaline is the first vasopressor. Dopamine is a rare option, for a slow rate with a low risk of arrhythmia.", "Pressure rose. The rate rose more.");
   } else if(which==="adr"||which==="dopa"){
     nudgeBP(which==="adr"?8:4, which==="adr"?6:2);
     patient.hr += which==="dopa"?16:8;
@@ -1222,7 +1221,7 @@ function giveBPDrug(which){
     }
   } else if(which==="labetalol"){
     lineOn("lab","Labetalol","IV bolus");
-    if(patient.id==="ich" && patient.sbp>160){
+    if(patient.id==="ich" && patient.sbp>150){
       nudgeBP(-22,-14); patient.hr -= 12;
       once(patient.good, "Controlled blood-pressure fall in hemorrhage");
       note("A smooth fall, not a collapse. The target is a safer systolic pressure, not a normal one in five minutes.", "Pressure and rate came down.");
@@ -1233,7 +1232,7 @@ function giveBPDrug(which){
     } else { nudgeBP(-12,-8); note("Pressure fell.", "Pressure fell."); }
   } else if(which==="nicardipine"){
     lineOn("nic","Nicardipine","infusion");
-    if(patient.id==="ich" && patient.sbp>160){
+    if(patient.id==="ich" && patient.sbp>150){
       nudgeBP(-20,-12);
       once(patient.good, "Nicardipine in intracranial hemorrhage");
       note("Nicardipine lowers the pressure without the beta-blocker hit on contractility.", "Pressure came down in a controlled way.");
@@ -1349,18 +1348,18 @@ function giveMetabolic(which){
     if(!patient.results.labs){
       once(patient.critical, "Insulin before the potassium was known");
       note("You have not seen the potassium. Insulin can stop the heart if the potassium is low.", "Insulin started without a potassium.");
-    } else if(patient.k<3.3){
-      once(patient.critical, "Insulin while potassium was under 3.3");
+    } else if(patient.k<3.5){
+      once(patient.critical, "Insulin while potassium was under 3.5");
       patient.hr = 140; patient.k = Math.max(2.2, patient.k-0.4);
-      note("Potassium was under 3.3. Insulin drives it lower. Replace potassium and hold the infusion.", "Rhythm became unstable.");
+      note("Potassium was under 3.5. Insulin drives it lower. Replace potassium at 10 to 20 mmol/h and hold the infusion until it is above 3.5.", "Rhythm became unstable.");
     } else if(patient.id==="dka"||patient.id==="hhs"||patient.glucose>250){
       patient.insulin = true;
-      lineOn("insulin","Insulin","0.1 unit/kg/h");
-      patient.glucose = Math.round(patient.glucose*0.75);
+      lineOn("insulin","Insulin", patient.id==="hhs" ? "0.05 unit/kg/h" : "0.1 unit/kg/h");
+      patient.glucose = Math.round(patient.glucose*(patient.id==="hhs" ? 0.88 : 0.75));
       patient.k = Math.max(2.8, +(patient.k-0.4).toFixed(1));
       patient.hco3 = Math.min(22, patient.hco3+3);
       once(patient.good, "Insulin after a safe potassium");
-      note("Insulin is running. Potassium will fall. Add dextrose as the glucose nears 200 and do not stop insulin while the gap is open.", "Glucose is falling.");
+      note("Insulin is running. Potassium will fall. Add dextrose when the glucose falls below about 250 mg/dL and do not stop insulin while the ketosis is open.", "Glucose is falling.");
     } else {
       patient.glucose = Math.max(40, patient.glucose-60);
       once(patient.bad, "Insulin when glucose was not high");
@@ -1375,7 +1374,7 @@ function giveMetabolic(which){
     patient.dextrose = true;
     hangBag("d5","5D");
     lineOn("d5","5D","infusion");
-    if(patient.insulin && patient.glucose<220){
+    if(patient.insulin && patient.glucose<250){
       patient.glucose = Math.max(140, patient.glucose);
       once(patient.good, "Dextrose infusion while insulin continues");
       note("Dextrose lets the insulin keep closing the gap after the glucose has fallen.", "Dextrose running beside insulin.");
@@ -1384,7 +1383,7 @@ function giveMetabolic(which){
     }
   } else if(which==="bicarb"){
     lineOn("bic","Sodium bicarbonate","IV");
-    if(patient.id==="dka" && phOf(patient.hco3, patient.pco2)<6.9){
+    if(patient.id==="dka" && phOf(patient.hco3, patient.pco2)<7.0){
       patient.hco3 += 2; once(patient.good, "Bicarbonate only at a very low pH");
     } else {
       once(patient.bad, "Bicarbonate without a severe acidemia");
@@ -1658,7 +1657,7 @@ function resultCards(){
       "Bilirubin "+l.lft.bili+" · AST "+hi(l.lft.ast, l.lft.ast>40)+" · ALT "+l.lft.alt+" · albumin "+l.lft.alb+" g/dL<br>"+
       "PT "+l.coags.pt+" · INR "+hi(l.coags.inr, l.coags.inr>1.4)+" · aPTT "+hi(l.coags.aptt, l.coags.aptt>40)+"<br>"+
       "CRP "+hi(l.inflam.crp+" mg/L", l.inflam.crp>10)+" · procalcitonin "+hi(l.inflam.pct+" ng/mL", l.inflam.pct>0.5)+
-      (isLab() && patient.id==="dka"?"<p class='lead'>In ketoacidosis, insulin waits if potassium is under 3.3 mmol/L.</p>":"")+
+      (isLab() && patient.id==="dka"?"<p class='lead'>In ketoacidosis, insulin waits if potassium is under 3.5 mmol/L.</p>":"")+
       "</div>";
   }
   if(r.cxr){
@@ -1699,7 +1698,7 @@ function abxHtml(){
     return "<details><summary>Antibiotics</summary><p class='lead'>"+lead+"</p></details>";
   }
   return "<details open><summary>Antibiotic selection</summary><p class='lead'>"+escapeHtml(patient.cultureReport.sens)+"</p><label class='check'><input id='renal' type='checkbox' "+(patient.renal?"checked":"")+"> Renal dose</label><div class='opts'>"+
-    btn("ctx-azi","Ceftriaxone 2 g daily + azithromycin 500 mg")+btn("piptazo","Piperacillin-tazobactam 4.5 g every 6 h")+btn("mero","Meropenem 1 g every 8 h")+btn("vanc","Vancomycin alone, 15 mg/kg")+
+    btn("ctx-azi","Ceftriaxone 2 g daily + azithromycin 500 mg")+btn("piptazo","Piperacillin-tazobactam 4.5 g every 6 h")+btn("mero","Meropenem 1 g every 8 h")+btn("vanc","Vancomycin alone, 25 mg/kg load")+
     "</div></details>";
 }
 function btn(id, label){ return "<button type='button' data-act='"+id+"'>"+label+"</button>"; }
@@ -2519,7 +2518,7 @@ function labZoom(which){
       rowPoint("Sodium", l.rft.na+" mmol/L", "135–145", l.rft.na<135||l.rft.na>145)+
       rowPoint("Potassium", l.rft.k+" mmol/L", "3.5–5.0", l.rft.k<3.5||l.rft.k>5)+
       rowPoint("eGFR", l.rft.egfr+" mL/min", "about 90–120", l.rft.egfr<60)+
-      "</ul>"+(isLab() && l.rft.k<3.3 ? "<p class='lead'>Insulin waits if the potassium is under 3.3 mmol/L.</p>" : "");
+      "</ul>"+(isLab() && l.rft.k<3.5 ? "<p class='lead'>Insulin waits if the potassium is under 3.5 mmol/L.</p>" : "");
   }
   if(which==="lft"){
     return "<h2 class='stage-no'>LFT</h2><ul class='points'>"+
@@ -2652,16 +2651,16 @@ function abxSheet(){
   }
   return "<h2 class='stage-no'>8. Antibiotics</h2><ul class='points'><li class='stack'><b>Report</b>"+escapeHtml(patient.cultureReport.sens)+"</li></ul>"+
     "<label class='check'><input id='renal' type='checkbox' "+(patient.renal?"checked":"")+"> Renal dose</label><div class='opts'>"+
-    btn("ctx-azi","Ceftriaxone 2 g daily + azithromycin 500 mg")+btn("piptazo","Piperacillin-tazobactam 4.5 g every 6 h")+btn("mero","Meropenem 1 g every 8 h")+btn("vanc","Vancomycin alone, 15 mg/kg")+
+    btn("ctx-azi","Ceftriaxone 2 g daily + azithromycin 500 mg")+btn("piptazo","Piperacillin-tazobactam 4.5 g every 6 h")+btn("mero","Meropenem 1 g every 8 h")+btn("vanc","Vancomycin alone, 25 mg/kg load")+
     "</div>";
 }
 function procSheet(){
   return "<h2 class='stage-no'>9. Drugs and procedures</h2><div class='opts'>"+
-    btn("diuretic","Furosemide 40 mg IV")+btn("gtn","GTN infusion, start 10 mcg/min")+btn("nicardipine","Nicardipine infusion")+btn("labetalol","Labetalol bolus")+btn("vaso","Vasopressin 0.03 units/min")+btn("crrt", patient.crrt?"CRRT is running":"Start CRRT")+
-    btn("sedation","Fentanyl, then propofol if the airway is secure")+btn("d50","Dextrose 50%, 50 mL")+btn("insulin","Insulin infusion 0.1 units/kg/h")+btn("kcl","Potassium chloride replacement")+btn("dexinf","Dextrose infusion beside insulin")+btn("bicarb","Sodium bicarbonate")+
-    btn("blood","One unit of blood")+btn("pcc","Reverse warfarin")+btn("ppi","Proton-pump inhibitor infusion")+btn("aspirin","Aspirin 300 mg")+btn("heparin","Treatment-dose heparin")+btn("lytic","Thrombolysis")+
-    btn("prone", patient.prone?"Return to supine":"Prone position")+btn("nmb","Cisatracurium, neuromuscular blockade")+btn("ecmo","Refer for ECMO")+
-    btn("decompress","Decompress the pleura")+btn("drain","Chest drain")+btn("naloxone","Naloxone, titrated")+btn("head","Head up, neck straight")+btn("osmotic","Hypertonic saline or mannitol")+
+    btn("diuretic","Furosemide 40 mg IV")+btn("gtn","GTN infusion, start 10 mcg/min")+btn("nicardipine","Nicardipine infusion, start 5 mg/h")+btn("labetalol","Labetalol 10–20 mg IV bolus")+btn("vaso","Vasopressin 0.03 units/min")+btn("crrt", patient.crrt?"CRRT is running":"Start CRRT")+
+    btn("sedation","Fentanyl, then propofol if the airway is secure")+btn("d50","Dextrose 50%, 50 mL")+btn("insulin","Insulin infusion 0.1 units/kg/h")+btn("kcl","Potassium chloride, 10–20 mmol/h")+btn("dexinf","Dextrose infusion beside insulin")+btn("bicarb","Sodium bicarbonate")+
+    btn("blood","One unit of blood")+btn("pcc","Reverse warfarin: PCC and vitamin K 5–10 mg IV")+btn("ppi","Pantoprazole 80 mg IV, then infusion")+btn("aspirin","Aspirin 300 mg")+btn("heparin","Unfractionated heparin, 80 units/kg bolus")+btn("lytic","Thrombolysis: alteplase 100 mg over 2 h")+
+    btn("prone", patient.prone?"Return to supine":"Prone position")+btn("nmb","Cisatracurium 15 mg, then 37 mg/h")+btn("ecmo","Refer for ECMO")+
+    btn("decompress","Decompress the pleura")+btn("drain","Chest drain")+btn("naloxone","Naloxone 0.1–0.4 mg IV, titrated")+btn("head","Head up, neck straight")+btn("osmotic","Hypertonic saline or mannitol")+
     "</div>";
 }
 function courseSheet(){
@@ -2690,10 +2689,10 @@ function nextSteps(){
   if((id==="edema"||id==="cardiogenic") && p.gcs>=9 && p.spo2<94 && p.support!=="cpap" && p.support!=="bipap" && p.support!=="imv") add("If the patient is awake and working, set NIV and apply it.");
   if(id==="ich" && !p.results.ct) add("Order a non-contrast CT of the head.");
   if(id==="ich" && !p.headUp) add("Head up, neck straight.");
-  if(id==="ich" && p.sbp>160 && !hasLine("nic") && !hasLine("lab")) add("Lower the systolic pressure smoothly with nicardipine or labetalol, under Drugs and procedures. Not a nitrate.");
+  if(id==="ich" && p.sbp>150 && !hasLine("nic") && !hasLine("lab")) add("Lower the systolic pressure smoothly with nicardipine or labetalol, under Drugs and procedures. Not a nitrate.");
   if(id==="gib" && p.bloodU===0) add("Transfuse blood. Crystalloid is only a bridge.");
   if((id==="dka"||id==="hhs") && !p.results.labs) add("Check the potassium before insulin.");
-  else if((id==="dka"||id==="hhs") && p.k<3.3) add("Replace potassium and hold insulin until it is safe.");
+  else if((id==="dka"||id==="hhs") && p.k<3.5) add("Replace potassium and hold insulin until it is 3.5 or more.");
   else if((id==="dka"||id==="hhs") && !p.insulin) add("Start the insulin infusion now that potassium is known.");
   if(lungInfect(id) && !p.cultures) add("Send cultures from Investigations, then read the microbiology report before the antibiotic.");
   else if(lungInfect(id) && !p.cultureReport) add("Open the microbiology report, then choose the antibiotic.");
