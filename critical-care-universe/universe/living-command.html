@@ -29,11 +29,11 @@ input[type=range]{width:100%}
 #photo.on{opacity:1}
 #pw{position:relative;width:min(100%,960px);aspect-ratio:16/9;margin:calc(46px + env(safe-area-inset-top,0px)) auto 0}
 #pb,#pc{position:absolute;inset:0;background-size:100% 100%}
+#iv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 #pc{-webkit-mask-image:radial-gradient(ellipse 32% 20% at 50% 58%,#000 42%,transparent 78%);mask-image:radial-gradient(ellipse 32% 20% at 50% 58%,#000 42%,transparent 78%);transform-origin:50% 58%}
 #pl{position:absolute;left:7.66%;top:13.9%;width:16.8%;height:21.1%}
 #pr{position:absolute}
 #pi{position:absolute;left:74.7%;top:61.9%;width:23.9%;height:34.5%;box-sizing:border-box;background:rgba(14,22,30,.95);border:2px solid #3f6a85;border-radius:10px;padding:1.2% 1.8%;display:grid;grid-template-columns:auto 1fr;align-content:space-evenly;gap:0 .6em;font:calc(min(100vw,960px)*.0235)/1.25 system-ui,sans-serif;color:#d8ecff}#pi b{text-align:right;color:#fff}
-#drip{position:absolute;left:43.6%;top:18%;width:.55%;aspect-ratio:1;border-radius:50%;background:#bfe3ff;opacity:0;animation:dr 1.1s linear infinite}@keyframes dr{0%{transform:translateY(0);opacity:0}15%,80%{opacity:.9}100%{transform:translateY(700%);opacity:0}}
 #door{position:fixed;inset:0;z-index:9;background:#050b18;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity .9s .6s}
 #door.open{opacity:0;pointer-events:none}
 #door h1{margin:0;font-size:22px}#door p{margin:0;color:#7fa6c8}
@@ -52,7 +52,7 @@ input[type=range]{width:100%}
 <div id="top"><b>Living ICU</b><button id="home" type="button">Universe</button><button data-m="cmd">Command center</button><button data-m="ward">Ward</button><span id="hud">0:00 · 0/6</span></div>
 <div id="toast"></div>
 <div id="hint"></div>
-<div id="photo"><div id="pw"><div id="pb"></div><div id="pc"></div><canvas id="pl" width="360" height="254"></canvas><canvas id="pr" width="300" height="200"></canvas><div id="drip"></div><div id="pi"></div></div></div>
+<div id="photo"><div id="pw"><div id="pb"></div><div id="pc"></div><canvas id="iv" width="1280" height="720" aria-hidden="true"></canvas><canvas id="pl" width="360" height="254"></canvas><canvas id="pr" width="300" height="200"></canvas><div id="pi"></div></div></div>
 <div id="panel">
 <h3 id="pn"></h3><small id="hx" style="display:block;color:#9fc3e4;margin-bottom:6px"></small>
 <section class="approach" aria-label="Patient assessment approach"><b>Patient approach</b><ol><li><b>Assess:</b> scan ABCDE and identify immediate threats.</li><li><b>Stabilize:</b> verify airway, breathing, circulation, monitor trends, and escalate instability.</li><li><b>Investigate:</b> use focused examination and indicated tests.</li><li><b>Act and reassess:</b> choose the case action, check the response, and update the plan.</li></ol><small>Educational simulation only. Timed alerts and bed order are game mechanics, not acuity rankings. Choosing an option is the scored decision; medication and support controls are simplified demonstrations. Starting settings are model values, not clinical orders. Use local protocols and qualified supervision.</small></section>
@@ -201,7 +201,7 @@ function go(m,i){
   [['fi',p.fio2],['pe',p.peep]].forEach(([id,v])=>{const e=$('#'+id);e.value=v;e.previousElementSibling.textContent=v});$('#pe').parentElement.style.display=p.iv?'block':'none';$('#ev').dataset.s='';evu();rd();sup()}
  else cur=null;
  $('#panel').style.display=m=='bed'?'block':'none';
- const ph=$('#photo');if(m=='bed'){$('#drip').style.display=P[i].sx=='f'?'none':'block';$('#pb').style.backgroundImage=$('#pc').style.backgroundImage='url('+IM[P[i].sx=='f'?1:0]+')';const r=RR[i],s=$('#pr').style;s.left=r[0]+'%';s.top=r[1]+'%';s.width=r[2]+'%';s.height=r[3]+'%';ph.style.display='block';requestAnimationFrame(()=>ph.classList.add('on'))}else{ph.classList.remove('on');setTimeout(()=>{if(mode!='bed')ph.style.display='none'},500)}
+ const ph=$('#photo');if(m=='bed'){$('#pb').style.backgroundImage=$('#pc').style.backgroundImage='url('+IM[P[i].sx=='f'?1:0]+')';const r=RR[i],s=$('#pr').style;s.left=r[0]+'%';s.top=r[1]+'%';s.width=r[2]+'%';s.height=r[3]+'%';ph.style.display='block';requestAnimationFrame(()=>ph.classList.add('on'))}else{ph.classList.remove('on');setTimeout(()=>{if(mode!='bed')ph.style.display='none'},500)}
  $('#hint').textContent=m=='ward'?'Drag to look around · tap a bed to step in':m=='cmd'?'Drag to look left and right · tap a live monitor':''}
 document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>go(b.dataset.m));
 go('cmd');
@@ -251,7 +251,8 @@ const RR=Array(6).fill([81,35.8,9.2,12.8]),PC=$('#pc'),PI=$('#pi');
 function rdr(c,p){if(p.iv)return vw(c,p,300,200);c.fillStyle='#0a1830';c.fillRect(0,0,300,200);c.fillStyle='#39e6ff';c.font='bold 34px monospace';c.fillText('O2 '+p.fio2+'%',20,80);c.font='22px monospace';c.fillStyle='#d8ecff';c.fillText('SpO2 '+Math.min(100,Math.round(p.v.spo2)),20,130)}
 function phd(p){mon($('#pl').getContext('2d'),p,360,254,0,0);rdr($('#pr').getContext('2d'),p);
  const r=prow(p);
- const t=r.map(x=>'<span>'+x[0]+'</span><b>'+x[1]+'</b>').join('');if(PI.dataset.t!=t){PI.dataset.t=t;PI.innerHTML=t}}
+ const t=r.map(x=>'<span>'+x[0]+'</span><b>'+x[1]+'</b>').join('');if(PI.dataset.t!=t){PI.dataset.t=t;PI.innerHTML=t}
+ const iv=$('#iv'),c=iv.getContext('2d');c.clearRect(0,0,iv.width,iv.height);drawGiven(c,p,iv.width,iv.height)}
 // drug formulary: infusions (dose up/down) and boluses
 const IN=[['nor','Norepinephrine','mcg/min',0,30,2,'Raises MAP. First-line vasopressor.'],['vas','Vasopressin','U/min',0,.04,.01,'Second vasopressor. Spares norepinephrine.'],['dob','Dobutamine','mcg/kg/min',0,15,2.5,'Raises output and heart rate. Can lower BP.'],['ins','Insulin','U/h',0,10,1,'Lowers glucose and K\u207a. Check K\u207a first.'],['mid','Midazolam','mg/h',0,8,1,'Sedation. Lowers BP and breathing drive.'],['gtn','Nitroglycerin','mcg/min',0,20,2,'Lowers BP and eases lung congestion.']],
 BO=[['fl','Ringer lactate 250 mL','Volume. Watch the lungs.'],['hs','3% saline 100 mL','Raises Na\u207a and lowers ICP.'],['ca','Calcium gluconate 10 mL','Protects the heart in high K\u207a.'],['dx','Insulin 10 U + dextrose 25 g','Shifts K\u207a into cells.'],['kcl','KCl 20 mEq','Replaces potassium.'],['ls','Furosemide 40 mg','Removes lung and body water.'],['ab','Meropenem 1 g','Antibiotic for infection.'],['atr','Atropine 2 mg','Dries secretions, raises heart rate.'],['lz','Lorazepam 4 mg','Stops seizures.'],['alt','Alteplase 50 mg','Dissolves clot. Bleeding risk.'],['blood','Packed red cells 2 units','Replaces blood loss.'],['sb','Salbutamol + ipratropium neb','Opens the airways.']];
@@ -291,22 +292,58 @@ var door=document.getElementById('door');
 if(door)door.style.display='none';
 var home=document.getElementById('home');
 if(home)home.onclick=function(){parent.postMessage('universe-home','*')};
-function activeDrugs(p){
- var z=p.dz||{}, out=[];
- [['nor','Norepinephrine'],['vas','Vasopressin'],['dob','Dobutamine'],['ins','Insulin'],['mid','Midazolam'],['gtn','GTN'],['fl','IV fluid'],['hs','3% saline'],['ca','Calcium'],['dx','Insulin bolus'],['kcl','Potassium'],['ls','Furosemide'],['ab','Antibiotic'],['atr','Atropine'],['lz','Lorazepam'],['alt','Alteplase'],['blood','Blood'],['sb','Nebulizer']].forEach(function(d){if((z[d[0]]||0)>0)out.push(d[1]);});
- return out;
+const IV_ART={};
+[['pump','../../sim/bed/iv-pump.png'],['ns','../../sim/bed/iv-ns.png'],['rl','../../sim/bed/iv-rl.png'],['d5','../../sim/bed/iv-d5.png'],['blood','../../sim/bed/iv-blood.png']].forEach(([key,src])=>{IV_ART[key]=new Image();IV_ART[key].src=src});
+function ivEquipment(p){
+ const z=p.dz||{},bags=[],pumps=[],doses=[];
+ if(z.fl>0)bags.push({key:'rl',name:'Ringer lactate',count:z.fl});
+ if(z.hs>0)bags.push({key:'ns',name:'3% saline',count:z.hs,tag:'3%'});
+ if(z.blood>0)bags.push({key:'blood',name:'Packed red cells',count:z.blood});
+ IN.forEach(d=>{const dose=z[d[0]]||0;if(dose>0)pumps.push({name:d[1],dose:dose,unit:d[2]})});
+ BO.forEach(d=>{const count=z[d[0]]||0;if(count>0&&!['fl','hs','blood','sb'].includes(d[0]))doses.push({name:d[1],count:count})});
+ return{bags,pumps,doses};
 }
 function drawGiven(c,p,W,H){
- var bags=activeDrugs(p); if(!bags.length) return;
- bags.forEach(function(name,n){
-  var x=W*(0.34+n*0.07), y=H*0.05;
-  c.fillStyle='rgba(8,18,32,.88)'; c.fillRect(x,y,W*0.06,H*0.16);
-  c.strokeStyle='#9fd0ff'; c.strokeRect(x,y,W*0.06,H*0.16);
-  c.fillStyle='#d8ecff'; c.font='9px system-ui'; c.textAlign='center';
-  c.fillText(name.slice(0,8), x+W*0.03, y+H*0.09);
-  var f=(performance.now()%1100)/1100;
-  c.fillStyle='rgba(191,227,255,.95)'; c.beginPath(); c.arc(x+W*0.03, y+H*(0.2+0.08*f), 2.2, 0, 7); c.fill();
+ const gear=ivEquipment(p),bags=gear.bags.slice(0,4),pumps=gear.pumps.slice(0,6),doses=gear.doses;
+ if(!bags.length&&!pumps.length&&!doses.length)return;
+ c.save();c.scale(W/1280,H/720);
+ const px=440,barEnd=bags.length?([560,632,704,776][Math.min(bags.length,4)-1]+46):px+30;
+ const pole=c.createLinearGradient(px-4,0,px+4,0);pole.addColorStop(0,'#7d8a93');pole.addColorStop(.45,'#f0f4f6');pole.addColorStop(1,'#6f7c85');
+ c.fillStyle=pole;c.fillRect(px-4,18,8,306);c.fillStyle='#cfd8dd';c.beginPath();c.arc(px,17,6,0,Math.PI*2);c.fill();
+ const bar=c.createLinearGradient(0,23,0,30);bar.addColorStop(0,'#f0f4f6');bar.addColorStop(1,'#7d8a93');c.fillStyle=bar;c.fillRect(px-22,23,barEnd-px+22,7);
+ c.strokeStyle='rgba(111,135,148,.75)';c.lineWidth=3.4;c.lineCap='round';
+ const hooks=[560,632,704,776];
+ bags.forEach((bag,i)=>{
+  const cx=hooks[i],img=IV_ART[bag.key],height=150,width=bag.key==='blood'?62:Math.round(65*height/300),x=cx-width/2,y=34;
+  c.strokeStyle='#cfd8dd';c.lineWidth=2;c.beginPath();c.moveTo(cx,y);c.lineTo(cx,y-7);c.stroke();
+  if(img&&img.complete&&img.naturalWidth)c.drawImage(img,x,y,width,height);
+  else{c.fillStyle='rgba(210,230,240,.85)';c.fillRect(x,y,width,height);c.strokeStyle='#7794a3';c.strokeRect(x,y,width,height);c.fillStyle='#152a3a';c.font='bold 20px system-ui';c.textAlign='center';c.fillText(bag.key==='rl'?'RL':bag.key==='blood'?'BLOOD':'NS',cx,y+height*.55)}
+  if(bag.tag){c.fillStyle='#b3342a';c.fillRect(cx-18,y+height*.42,36,19);c.fillStyle='#fff';c.font='bold 13px system-ui';c.textAlign='center';c.fillText(bag.tag,cx,y+height*.42+14)}
+  if(bag.count>1){c.fillStyle='#071018';c.fillRect(cx-25,y+height-24,50,20);c.fillStyle='#fff';c.font='bold 12px system-ui';c.textAlign='center';c.fillText('x'+bag.count,cx,y+height-10)}
+  c.beginPath();c.moveTo(cx,y+height);c.bezierCurveTo(cx,y+height+24,500,236,470,252);c.strokeStyle='rgba(111,135,148,.8)';c.stroke();
+  c.fillStyle='#cfeeff';const drip=(performance.now()/550+i*.35)%1;c.beginPath();c.arc(cx,y+height+5+drip*18,2.4,0,Math.PI*2);c.fill();
  });
+ const shownPumps=pumps.slice(0,6),n=shownPumps.length,ph=n?Math.min(112,Math.floor(300/n)-4):0,pw=Math.round(ph*164/200);
+ shownPumps.forEach((pump,i)=>{
+  const x=Math.min(px-12-pw,424-pw),y=18+i*(ph+4),img=IV_ART.pump;
+  c.strokeStyle='#71828c';c.lineWidth=2;c.beginPath();c.moveTo(x+pw*.5,y);c.lineTo(x+pw*.5,y-7);c.stroke();
+  if(img&&img.complete&&img.naturalWidth)c.drawImage(img,x,y,pw,ph);
+  else{c.fillStyle='#aeb8bf';c.fillRect(x,y,pw,ph);c.fillStyle='#06161c';c.fillRect(x+pw*.1,y+ph*.14,pw*.8,ph*.44)}
+  c.fillStyle='#e8fbff';c.font='bold 12px system-ui';c.textAlign='center';c.fillText(pump.name.length>14?pump.name.slice(0,13)+'…':pump.name,x+pw*.5,y+ph*.34, pw*.8);
+  c.fillStyle='#7fe3a0';c.font='bold 10px system-ui';c.fillText(pump.dose+' '+pump.unit,x+pw*.5,y+ph*.52,pw*.8);
+  c.fillStyle='#43e08a';c.beginPath();c.arc(x+pw*.82,y+ph*.2,4,0,Math.PI*2);c.fill();
+  c.beginPath();c.moveTo(x+pw*.5,y+ph);c.lineTo(x+pw*.5,y+ph+14);c.bezierCurveTo(x+pw*.5,y+ph+22,470,y+ph+22,470,252);c.strokeStyle='rgba(111,135,148,.8)';c.stroke();
+ });
+ const shownDoses=doses.slice(0,8);
+ shownDoses.forEach((dose,i)=>{
+  const x=840,y=30+i*38,w=105,h=31;
+  c.beginPath();c.moveTo(px+4,35);c.lineTo(x,y+h/2);c.strokeStyle='rgba(111,135,148,.65)';c.lineWidth=1.5;c.stroke();
+  c.fillStyle='rgba(5,15,32,.94)';c.fillRect(x,y,w,h);c.strokeStyle='#9fc3e4';c.lineWidth=1;c.strokeRect(x,y,w,h);
+  c.fillStyle='#d8ecff';c.font='bold 10px system-ui';c.textAlign='left';c.fillText(dose.name.length>14?dose.name.slice(0,13)+'…':dose.name,x+5,y+13,w-10);
+  c.fillStyle='#7fa6c8';c.font='bold 9px system-ui';c.fillText('IV DOSE · x'+dose.count,x+5,y+26,w-10);
+ });
+ if(doses.length>shownDoses.length){c.fillStyle='#071018';c.fillRect(840,30+shownDoses.length*38,105,23);c.fillStyle='#e8fbff';c.font='bold 10px system-ui';c.textAlign='center';c.fillText('+'+(doses.length-shownDoses.length)+' more',892,45+shownDoses.length*38)}
+ c.restore();
 }
 var SHOT={};
 [['imv','/universe/bed/imv.jpg'],['wimv','/universe/bed/woman-imv.jpg'],['niv','/universe/bed/niv.jpg'],['wniv','/universe/bed/woman-niv.jpg'],['mask','/universe/bed/mask.jpg'],['wmask','/universe/bed/woman-mask.jpg'],['room','/universe/bed/room.jpg'],['wroom','/universe/bed/woman-room.jpg']].forEach(function(pair){var im=new Image(); im.src='bed/'+pair[1].split('/').pop(); SHOT[pair[0]]=im;});
@@ -352,11 +389,14 @@ scr.visible=true;
    mon(ctx, pt, w, top, x, y);
    var img=bedShot(pt), py=y+top, ph=h-top;
    ctx.fillStyle='#071018'; ctx.fillRect(x,py,w,ph);
+   var s=img&&img.naturalWidth?Math.max(w/img.naturalWidth, ph/img.naturalHeight):0, dw=1280*s, dh=720*s;
    if(img&&img.complete&&img.naturalWidth){
-    var s=Math.max(w/img.naturalWidth, ph/img.naturalHeight);
-    var dw=img.naturalWidth*s, dh=img.naturalHeight*s;
     ctx.save(); ctx.beginPath(); ctx.rect(x,py,w,ph); ctx.clip();
     ctx.drawImage(img, x+(w-dw)/2, py+(ph-dh)/2, dw, dh); ctx.restore();
+   }
+   if(img&&img.complete&&img.naturalWidth){
+    ctx.save(); ctx.beginPath(); ctx.rect(x,py,w,ph); ctx.clip();
+    ctx.translate(x+(w-dw)/2,py+(ph-dh)/2);ctx.scale(s,s);drawGiven(ctx,pt,1280,720);ctx.restore();
    }
   });
   wallTex.needsUpdate=true;
@@ -375,7 +415,6 @@ scr.visible=true;
  function chase(){
   requestAnimationFrame(chase);
   if(mode==='cmd'){arriving=null; paint();}
-  if(cur!=null){var drip=document.getElementById('drip'); if(drip) drip.style.display=activeDrugs(P[cur]).length?'block':'none';}
   if(arriving!=null && dist2()<1.6){var i=arriving; arriving=null; go('bed', i);}
  }
  requestAnimationFrame(chase);
@@ -390,7 +429,6 @@ go=function(m,i){
   document.getElementById('pb').style.backgroundImage=url;
   document.getElementById('pc').style.backgroundImage=url;
  }
- document.getElementById('drip').style.display=activeDrugs(P[i]).length?'block':'none';
  var line=P[i].n+'. '+P[i].dx+'. '+P[i].hx;
  if(window.speechSynthesis){var u=new SpeechSynthesisUtterance(line); u.lang='en-IN'; u.rate=0.92; speechSynthesis.cancel(); speechSynthesis.speak(u);}
 };
