@@ -99,9 +99,8 @@ const SCAN = {
   ]}
 };
 function scanStep(spec){
-  return {kind:"scan", prompt:"Open ultrasound, then place the probe.", lead:spec.ct?"The radiological finding is on the screen. Ultrasound is a separate step. If CT is suggested, it does not replace the probe. The findings are filed with the case.":"The radiological finding is on the screen. Ultrasound is a separate step. Place the probe on each side. The sonogram is filed like a film.", film:spec.film, sites:spec.sites, seen:{}, focus:"", armed:false, scored:false, teach:"Both sides are scanned. The findings are filed. You can go on."};
+  return {kind:"scan", phase:"Ultrasound", prompt:"Open ultrasound, then place the probe.", lead:"Radiology is filed. Ultrasound is next. Place the probe on each side. The sonogram is filed, and then you treat.", film:spec.film, sites:spec.sites, seen:{}, focus:"", armed:false, scored:false, teach:"Both sides are scanned and filed. Treatment is next."};
 }
-CASES.forEach(function(c){ if(SCAN[c.id]) c.steps.unshift(scanStep(SCAN[c.id])); });
 const CASES = [
   {id:"effusion", title:"Pleural effusion", discuss:"A basal opacity on a radiograph is not a diagnosis. A meniscus makes fluid likely and still does not prove it. The probe does: anechoic fluid, a diaphragm, and a spine sign. Consolidation is tissue with air bronchograms. Tap under ultrasound, above the diaphragm. An exudate with pH 7.34, glucose 88, and no organisms is not a drain tonight.",
     steps:[
@@ -596,6 +595,26 @@ const CASES = [
       ], "The probe bought urgency. The CT names the blood, the shift, and the lesion. A sheath diameter does none of those.")
     ]}
 ];
+const PLAN = {
+  effusion:{at:4, ranges:[[0,1,"Clinical case"],[1,4,"Radiology"],[4,6,"Ultrasound"],[6,10,"Treatment"]]},
+  consol:{at:4, ranges:[[0,1,"Clinical case"],[1,4,"Radiology"],[4,6,"Ultrasound"],[6,10,"Treatment"]]},
+  ptx:{at:4, ranges:[[0,1,"Clinical case"],[1,3,"Radiology"],[3,6,"Ultrasound"],[6,10,"Treatment"]]},
+  edema:{at:4, ranges:[[0,1,"Clinical case"],[1,3,"Radiology"],[3,6,"Ultrasound"],[6,10,"Treatment"]]},
+  abscess:{at:3, ranges:[[0,1,"Clinical case"],[1,3,"Radiology"],[3,3,"Ultrasound"],[3,10,"Treatment"]]},
+  ascites:{at:3, ranges:[[0,1,"Clinical case"],[1,3,"Radiology"],[3,3,"Ultrasound"],[3,10,"Treatment"]]},
+  bladder:{at:3, ranges:[[0,1,"Clinical case"],[1,3,"Radiology"],[3,3,"Ultrasound"],[3,10,"Treatment"]]},
+  dvt:{at:1, ranges:[[0,1,"Clinical case"],[1,5,"Ultrasound"],[5,10,"Treatment"]]},
+  onsd:{at:2, ranges:[[0,2,"Clinical case"],[2,5,"Ultrasound"],[5,10,"Treatment"]]}
+};
+CASES.forEach(function(c){
+  const plan = PLAN[c.id];
+  if(!plan) return;
+  c.steps.forEach(function(step, i){
+    const band = plan.ranges.filter(function(r){ return i>=r[0] && i<r[1]; })[0];
+    step.phase = band ? band[2] : "Clinical case";
+  });
+  if(SCAN[c.id]) c.steps.splice(plan.at, 0, scanStep(SCAN[c.id]));
+});
 let voiceOn = true;
 let order = [];
 let casePos = 0;
@@ -652,7 +671,7 @@ function render(){
   locked = false;
   marks = 0;
   app.innerHTML =
-    '<p class="kicker">Patient '+(casePos+1)+' of '+order.length+' · Decision '+(stepPos+1)+' of '+c.steps.length+'</p>'+
+    '<p class="kicker">'+(s.phase||"Clinical case")+' · Patient '+(casePos+1)+' of '+order.length+'</p>'+
     '<p class="prompt">'+c.title+'</p>'+
     dotRow()+
     '<p class="lead">'+s.lead+'</p>'+
