@@ -45,10 +45,7 @@ input[type=range]{width:100%}
 .tabs{display:flex;gap:6px;margin:8px 0}.tabs button{flex:1;padding:6px 2px}.tabs .on{border-color:var(--c);color:var(--c)}
 .tb{display:none}.tb.on{display:block}
 #lab table{width:100%;border-collapse:collapse}#lab td{padding:4px 6px;border-bottom:1px solid #16305a}#lab td:last-child{text-align:right;font-variant-numeric:tabular-nums}.hi{color:var(--r)}
-.approach{margin:8px 0;padding:9px 10px;border:1px solid #2a5a8c;border-radius:8px;background:#0a1830}.approach ol{margin:6px 0 0;padding-left:22px}.approach li{margin:3px 0}.approach small{display:block;margin-top:7px;color:#9fc3e4}
-#triage{position:fixed;right:10px;top:52px;z-index:2;width:min(280px,38vw);max-height:calc(100vh - 100px);overflow:auto;background:rgba(5,15,32,.93);border:1px solid #315776;border-radius:8px;padding:8px}
-#triage b,#triage small{display:block}#triage small{color:#9fc3e4}#triage button{display:block;width:100%;text-align:left;margin-top:5px;padding:6px 8px}#triage button.urgent{border-left:4px solid var(--r)}#triage button.watch{border-left:4px solid var(--a)}#triage button.stable{border-left:4px solid var(--g)}
-@media(max-width:600px){#triage{top:auto;bottom:40px;width:min(260px,70vw);max-height:30vh}#triage button{padding:3px 6px}}
+.approach{margin:8px 0;padding:8px 10px;border:1px solid #2a5a8c;border-radius:8px;background:#0a1830}.approach summary{cursor:pointer;color:var(--c)}.approach ol{margin:6px 0 0;padding-left:22px}.approach li{margin:3px 0}.approach small{display:block;margin-top:7px;color:#9fc3e4}
 </style></head><body>
 <canvas id="gl"></canvas>
 <div id="door"><h1>Intensive Care Unit</h1><div class="frame" id="dr" style="background:radial-gradient(#39e6ff66,#02060f)"><div class="leaf l"></div><div class="leaf r"></div></div><p>Six patients. One doctor.</p><button id="enter">Enter the ICU</button></div>
@@ -56,18 +53,22 @@ input[type=range]{width:100%}
 <div id="toast"></div>
 <div id="hint"></div>
 <div id="photo"><div id="pw"><div id="pb"></div><canvas id="pc" width="640" height="360" aria-hidden="true"></canvas><canvas id="iv" width="1280" height="720" aria-hidden="true"></canvas><canvas id="pl" width="720" height="508"></canvas><canvas id="pr" width="300" height="200"></canvas><div id="pi"></div></div></div>
-<aside id="triage" aria-label="Simulation priority list"></aside>
 <div id="panel">
 <h3 id="pn"></h3><small id="hx" style="display:block;color:#9fc3e4;margin-bottom:6px"></small>
-<section class="approach" aria-label="Patient assessment approach"><b>Assess → stabilize → investigate → act → reassess</b><ol><li>Check ABCDE, immediate threats and monitor trends; call for help when unstable.</li><li>Choose the priority action, then use the support and drug controls where available.</li><li>Recheck simulated vitals and labs, consider treatment hazards, and revise the plan.</li></ol><small>Educational simulation only, not clinical decision support. Priority flags use limited simulated vitals and do not replace assessment. A quiz choice does not administer treatment. Controls and physiological responses are simplified; some actions in the cases cannot be performed here, and the deterioration model does not simulate recovery. Use local protocols and qualified supervision.</small></section>
+<details class="approach"><summary>Patient approach · educational simulation, not patient care</summary><ol><li>Check ABCDE, immediate threats and monitor trends; call for help when unstable.</li><li>Choose the priority action, then use the support and drug controls where available.</li><li>Recheck simulated vitals and labs, consider treatment hazards, and revise the plan.</li></ol><small>Triage flags and physiological responses are unvalidated heuristics, not a validated patient model or dosing guide. Disease progression, recovery and many treatments are not modeled; a quiz choice does not administer treatment. Never use for patient care. Follow current guidance, local protocols and qualified supervision.</small></details>
 <div id="ev"></div>
 <div class="tabs"><button data-t="0" class="on">Drugs</button><button data-t="1">Support</button><button data-t="2">Labs</button></div>
 <div class="tb on" id="t0"></div>
-<div class="tb" id="t1"><div class="row">
+<div class="tb" id="t1"><div id="vent-mode" class="approach"></div><p id="vent-hint" style="color:#9fc3e4"></p><div class="row">
 <label>FiO₂ <output>50</output>%<input id="fi" type="range" min="21" max="100" value="50"></label>
-<label>PEEP or EPAP <output>8</output> cmH₂O<input id="pe" type="range" min="0" max="20" value="8"></label></div>
+<label><span id="pe-label">PEEP or EPAP</span> <output>8</output> cmH₂O<input id="pe" type="range" min="0" max="20" value="8"></label></div>
+<div id="imv-controls" class="row">
+<label>Set respiratory rate <output>20</output>/min<input id="rrset" type="range" min="6" max="40" value="20"></label>
+<label>Target tidal volume <output>400</output> mL<input id="vtset" type="range" min="200" max="800" step="10" value="400"></label></div>
+<div id="niv-controls" class="row">
+<label>IPAP <output>18</output> cmH₂O<input id="ipap" type="range" min="8" max="30" value="18"></label></div>
 <div class="row" style="margin-top:10px"><button id="hu"></button><button id="pr"></button></div>
-<p style="color:#7fa6c8">Head-up 30° protects the brain. Prone position improves oxygenation in severe ARDS and is unsafe with raised ICP.</p></div>
+<p style="color:#7fa6c8">Ventilator controls are simplified educational settings, not prescriptions. Use predicted body weight, gas exchange, mechanics, patient synchrony and local protocols. Head-up positioning may help; prone positioning is unsafe with raised ICP.</p></div>
 <div class="tb" id="t2"><div id="lab"></div></div>
 </div>
 <div id="end"></div>
@@ -76,23 +77,22 @@ input[type=range]{width:100%}
 import * as THREE from '../../vendor/three/three.module.js';
 const $=s=>document.querySelector(s),V=THREE.Vector3,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const NM={m:['Ravi Kumar','Imran Khan','Anil Sharma','Gopal Das','Suresh Yadav','Mohan Lal','Arjun Singh','Karan Mehta','Vijay Nair','Rafiq Ahmed'],f:['Sunita Devi','Meena Iyer','Fatima Begum','Lakshmi Rao','Kavita Gupta','Anjali Verma','Rukhsar Ali','Pooja Mishra']};
-// Disease pool. Each case carries its own physiology: slow = drugs that slow deterioration, kd = key-lab change per dose,
-// haz = harmful drug and lab limit, fl/ls = oxygen effect of fluid and furosemide, prs = prone effect, hyp = hypertensive, hrd = bradycardic
+// Case-specific teaching data: kd and haz are illustrative lab effects and safety flags, not validated dose-response models.
 const POOL=[
-{sx:'m',dx:'ARDS',hx:'54M. Day 3 of severe pneumonia, intubated for hypoxemic failure. Lung-protective ventilation at 6 mL/kg.',hr:104,sbp:118,spo2:91,rr:28,t:38.4,ab:[7.32,50,24,2.1],lb:'WBC 19.2 · Hb 10.4 · Plt 140 · Cr 1.0',lk:['CRP',186,120,'mg/L'],dr:24,vt:400,slow:{ab:.4},prs:8,fl:-.1,q:'SpO₂ down to 84%. P/F ratio 90 on FiO₂ 80%, PEEP 10. Next step?',o:[['Prone positioning and neuromuscular blockade',1,'Correct. Early prolonged proning lowers mortality in severe ARDS.'],['Raise tidal volume to 10 mL/kg, lower PEEP',0,'Harmful. Keep 6 mL/kg predicted weight and plateau pressure under 30.'],['Wean sedation and extubate',0,'Premature with severe hypoxemia.']]},
-{sx:'f',dx:'Septic shock',hx:'61F. Urosepsis from an obstructing stone, day 1. Fluids given, cultures sent, antibiotics started.',hr:118,sbp:96,spo2:96,rr:24,t:39.1,ab:[7.28,30,14,5.2],lb:'WBC 24 · Hb 9.8 · Plt 82 · Cr 2.1',lk:['Procalcitonin',48,30,'ng/mL'],dr:14,vt:380,slow:{ab:.4},q:'MAP 52 after 30 mL/kg crystalloid. Lactate 5.2. Next step?',o:[['Start norepinephrine, target MAP 65 or more',1,'Correct. Norepinephrine is the first-line vasopressor.'],['Give another 2 L bolus without reassessing',0,'Unchecked fluid risks overload. Assess responsiveness first.'],['Start dopamine first-line',0,'More arrhythmias. Norepinephrine is preferred.']]},
-{sx:'m',dx:'DKA',hx:'22M. Type 1 diabetes, stopped insulin 3 days ago. Vomiting, deep Kussmaul breathing. Oxygen by mask.',iv:0,hr:112,sbp:104,spo2:98,rr:26,t:37.2,ab:[7.05,18,5,3],lb:'Glucose 520 · Na⁺ 131 · Ketones 6.1 · Cr 1.3',lk:['K⁺',2.9,3.8,'mmol/L'],kd:{kcl:.5,ins:-.12},haz:[['ins','lt',3.3,'insulin running with K⁺ under 3.3. Arrhythmia risk.']],dr:12,vt:480,q:'Glucose 520, pH 7.05, K⁺ 2.9 mmol/L. Insulin infusion is ready.',o:[['Hold insulin and replace potassium first',1,'Correct. Insulin with K⁺ under 3.3 can cause fatal arrhythmia.'],['Start insulin 0.1 U/kg/h now',0,'Dangerous with K⁺ 2.9.'],['Give a bicarbonate bolus',0,'Not routine above pH 6.9.']]},
-{sx:'m',dx:'Severe TBI',hx:'35M. Road accident 8 hours ago, brain contusion. Intubated, head up, ICP monitor in place.',hr:62,sbp:150,spo2:97,rr:14,t:37,ab:[7.4,38,24,1.4],lb:'WBC 12 · Hb 12.8 · Plt 210 · INR 1.1',lk:['Na⁺',138,146,'mmol/L'],kd:{hs:3},slow:{hs:.5},neuro:1,prh:1,hu:1,dr:16,vt:520,q:'GCS fell from 8 to 6. Right pupil blown, ICP 32 mmHg. Next step?',o:[['3% saline or mannitol, head up 30°, urgent CT and neurosurgery',1,'Correct. Treat herniation first, then decide on surgery.'],['Prolonged hyperventilation to PaCO₂ 20',0,'Causes cerebral ischemia. Only a brief bridge.'],['Lay the head flat for perfusion',0,'Raises ICP. Keep the head up.']]},
-{sx:'f',dx:'Cardiogenic shock',hx:'68F. Anterior STEMI 14 hours ago, stent to LAD done. Now hypotensive with lung congestion, on NIV.',hr:110,sbp:88,spo2:92,rr:26,t:36.8,ab:[7.3,34,16,4],lb:'WBC 13 · Hb 11.2 · Cr 1.6 · Troponin I 12.4 ng/mL',lk:['ScvO₂',48,66,'%'],fl:-.25,ls:2,dr:14,vt:360,q:'SBP 78, cold peripheries, crackles, lactate 4. Next step?',o:[['Start inotrope or vasopressor, urgent revascularization, consider mechanical support',1,'Correct. Restore output and treat the culprit lesion.'],['Give a 1 L fluid bolus',0,'She is congested. Fluid worsens pulmonary edema.'],['Start an IV beta-blocker',0,'Negative inotropy is dangerous in shock.']]},
-{sx:'m',dx:'AKI, hyperkalemia',hx:'70M. Diabetes and CKD, a week of NSAIDs, now AKI and anuric. Not ventilated.',iv:0,hr:58,sbp:130,spo2:95,rr:18,t:36.9,tw:3,twc:[3,1.4,'ca'],ab:[7.22,32,13,2.4],lb:'Urea 148 · Cr 6.8 · Hb 9.1 · Urine output 0',lk:['K⁺',7.2,5.4,'mmol/L'],kd:{dx:-1},slow:{ca:.4,dx:.7},dr:12,vt:450,q:'K⁺ 7.2, peaked T waves, QRS widening. Anuric for 12 hours. Next step?',o:[['IV calcium gluconate now, then insulin with dextrose, arrange dialysis',1,'Correct. Calcium stabilizes the myocardium, insulin shifts K⁺, dialysis removes it.'],['Oral resin and recheck in 6 hours',0,'Far too slow with ECG changes.'],['Potassium-free fluids only',0,'Does not protect the heart.']]},
-{sx:'f',dx:'Severe asthma',hx:'28F. Status asthmaticus, intubated 2 hours ago. Wheeze, high pressures, air trapping.',hr:130,sbp:100,spo2:88,rr:20,t:37.2,ab:[7.18,68,25,3.2],lb:'WBC 14 · Hb 13.1 · K⁺ 3.2 · Glucose 190',lk:['Auto-PEEP',9,3,'cmH₂O'],slow:{sb:.4},dr:28,vt:350,q:'Peak pressure 48, plateau 31, expiratory flow does not return to zero before the next breath. Next step?',o:[['Lower the rate and tidal volume, lengthen expiration, continue bronchodilators',1,'Correct. Permissive hypercapnia and a long expiratory time limit air trapping.'],['Raise the rate to clear CO₂ faster',0,'Less expiratory time means more air trapping.'],['Add external PEEP of 15',0,'It adds to the trapped air when auto-PEEP is high.']]},
-{sx:'m',dx:'Massive pulmonary embolism',hx:'47M. Sudden collapse after a long flight. Right heart strain on echo. Oxygen by mask.',iv:0,hr:126,sbp:82,spo2:86,rr:30,t:37,ab:[7.46,28,20,3.8],lb:'Troponin 0.9 · BNP 780 · D-dimer 12 · Hb 13.5',lk:['RV/LV ratio',1.4,.9,''],slow:{alt:.2},fl:-.15,dr:12,vt:450,q:'BP 82/50, SpO₂ 86%, dilated right ventricle. Next step?',o:[['Systemic thrombolysis with alteplase, heparin on board',1,'Correct. Massive PE with shock needs reperfusion.'],['Give 2 L fluid to fill the right heart',0,'A strained right ventricle dilates further and output falls.'],['Start oral anticoagulant and observe',0,'Too slow for a patient in shock.']]},
-{sx:'f',dx:'Hypertensive pulmonary edema',hx:'66F. Sudden breathlessness, pink frothy sputum. BP 210/120. On NIV.',hr:118,sbp:210,spo2:84,rr:34,t:36.9,hyp:1,ed:1,ab:[7.3,48,22,2.2],lb:'Creatinine 1.8 · Troponin 0.04 · BNP 1400 · Hb 11.8',lk:['NT-proBNP',9200,6500,'pg/mL'],ls:2,fl:-.3,slow:{ls:.5,gtn:.3},dr:16,vt:400,q:'BP 210/120, crackles to the apices, SpO₂ 84% on NIV. Next step?',o:[['IV nitroglycerin and furosemide, continue NIV',1,'Correct. Nitrate cuts preload and afterload, the diuretic clears the lungs.'],['Give a 500 mL fluid bolus',0,'She is already overloaded.'],['Start an IV beta-blocker first',0,'Can worsen acute pulmonary edema.']]},
-{sx:'m',dx:'Variceal bleed',hx:'58M. Alcohol cirrhosis, vomiting blood. Two large-bore lines, not ventilated.',iv:0,hr:124,sbp:84,spo2:95,rr:24,t:36.6,ab:[7.33,32,17,4.1],lb:'Plt 70 · INR 1.8 · Bilirubin 3.1 · Albumin 2.2',lk:['Hb',6.4,8.4,'g/dL'],kd:{blood:1},slow:{blood:.3},ls:-2,dr:12,vt:450,q:'Hb 6.4, BP 84/50, ongoing hematemesis. Next step?',o:[['Blood transfusion, IV terlipressin, ceftriaxone, urgent endoscopy',1,'Correct. Restrictive transfusion, vasoactive drug and early endoscopy.'],['Large crystalloid volume to MAP 90',0,'Dilution and a higher portal pressure promote rebleeding.'],['Start propranolol to slow the heart rate',0,'Hides shock and worsens it.']]},
-{sx:'m',dx:'Dengue shock',hx:'19M. Day 5 of fever, platelets falling, now cold hands and a narrow pulse pressure.',iv:0,hr:128,sbp:88,spo2:96,rr:26,t:37.8,ab:[7.34,28,15,3],lb:'Platelets 18 · WBC 2.4 · AST 220 · Albumin 2.4',lk:['Hematocrit',48,40,'%'],kd:{fl:-1.5},slow:{fl:.5},ls:-2,dr:12,vt:450,q:'Hematocrit rising to 48%, pulse pressure 15, platelets 18. Next step?',o:[['Isotonic crystalloid 10 mL/kg bolus with close reassessment',1,'Correct. Cautious fluid for plasma leakage, then reassess.'],['Prophylactic platelet transfusion',0,'It does not treat shock and can add to overload.'],['IV steroids to raise platelets',0,'No benefit in dengue.']]},
-{sx:'m',dx:'Organophosphate poisoning',hx:'32M. Drank a pesticide 3 hours ago. Sweating, small pupils, secretions in the chest. Intubated.',hr:48,sbp:88,spo2:86,rr:22,t:36.8,hrd:1,ab:[7.28,52,22,2],lb:'Pseudocholinesterase 480 · K⁺ 3.4 · Glucose 168 · Amylase 210',lk:['Secretion score',3,1,'/3'],slow:{atr:.2},dr:22,vt:420,q:'Heart rate 48, wet chest, pinpoint pupils. Next step?',o:[['Titrate IV atropine until the chest is dry, decontaminate, ICU support',1,'Correct. Atropine to drying of secretions is the endpoint.'],['Give neostigmine to reverse the weakness',0,'It adds to the cholinergic crisis.'],['Pralidoxime alone, no atropine',0,'Atropine must come first.']]},
-{sx:'f',dx:'Status epilepticus',hx:'40F. Epilepsy, missed doses. Seizing for 15 minutes on arrival, airway open, oxygen by mask.',iv:0,hr:136,sbp:160,spo2:90,rr:30,t:38.6,hyp:1,ab:[7.2,34,13,6],lb:'Glucose 110 · Na⁺ 138 · Ca²⁺ 8.8 · CK 640',lk:['CK',640,520,'U/L'],slow:{lz:.2,mid:.5},dr:12,vt:420,q:'Generalized seizure for 15 minutes, no response so far. Next step?',o:[['IV lorazepam 4 mg now, then a second antiseizure drug',1,'Correct. A benzodiazepine first, then a second-line drug if it continues.'],['Wait 10 more minutes for it to stop',0,'Delay causes brain injury.'],['Oral carbamazepine loading',0,'Unsafe during a seizure and far too slow.']]},
-{sx:'m',dx:'COPD, hypercapnic failure',hx:'66M. Long-term COPD, infection, drowsy. Pulled his mask off at home. On NIV.',hr:112,sbp:140,spo2:84,rr:30,t:37.4,co2s:1,ab:[7.22,86,34,1.8],lb:'WBC 16 · Hb 15.2 · Bicarbonate 34 · Troponin normal',lk:['CRP',90,60,'mg/L'],slow:{ab:.5,sb:.5},dr:14,vt:420,q:'pH 7.22, PaCO₂ 86, drowsy, SpO₂ 84% despite current NIV. Next step?',o:[['Continue NIV (BiPAP), titrate oxygen to SpO₂ 88 to 92%, nebulizers, antibiotics',1,'Correct. Controlled oxygen avoids CO₂ narcosis.'],['High-flow 100% oxygen to normalize SpO₂',0,'Can push CO₂ higher and deepen the coma.'],['Sedate with midazolam to settle him',0,'Depresses breathing.']]}
+{sx:'m',dx:'ARDS',hx:'54M. Day 3 of severe pneumonia, intubated for hypoxemic failure. Lung-protective ventilation at 6 mL/kg.',hr:104,sbp:118,spo2:84,rr:28,t:38.4,ab:[7.32,50,24,2.1],lb:'WBC 19.2 · Hb 10.4 · Plt 140 · Cr 1.0',lk:['CRP',186,120,'mg/L'],dr:24,vt:400,prs:8,fl:-.1,q:'SpO₂ 84% on FiO₂ 80% and PEEP 10. Obtain an ABG and address severe hypoxemia. Next step?',o:[['Prone for at least 12 hours/day; consider paralysis only for selected indications',1,'Correct. Prolonged proning is recommended in severe ARDS; neuromuscular blockade is individualized, not routine.'],['Raise tidal volume to 10 mL/kg, lower PEEP',0,'Harmful. Use 4–8 mL/kg predicted body weight and keep plateau pressure below 30 cm H₂O.'],['Wean sedation and extubate',0,'Premature with severe hypoxemia.']]},
+{sx:'f',dx:'Septic shock',hx:'61F. Urosepsis from an obstructing stone, day 1. Fluids given, cultures sent, antibiotics started.',hr:118,sbp:82,dbp:37,spo2:96,rr:24,t:39.1,ab:[7.28,30,14,5.2],lb:'WBC 24 · Hb 9.8 · Plt 82 · Cr 2.1',lk:['Procalcitonin',48,30,'ng/mL'],dr:14,vt:380,q:'MAP 52 after initial crystalloid resuscitation; lactate 5.2. Next step?',o:[['Start norepinephrine to an initial MAP target of 65 mm Hg and arrange urgent urinary source control',1,'Correct. Norepinephrine is first-line for persistent hypotension; obstructed infected systems require urgent source control.'],['Give another 2 L bolus without reassessing',0,'Unassessed fluid can cause overload. Reassess fluid responsiveness and perfusion.'],['Start dopamine first-line',0,'Norepinephrine is preferred; dopamine can cause more arrhythmias.']]},
+{sx:'m',dx:'DKA',hx:'22M. Type 1 diabetes, stopped insulin 3 days ago. Vomiting, deep Kussmaul breathing. Oxygen by mask.',iv:0,hr:112,sbp:104,spo2:98,rr:26,t:37.2,ab:[7.05,18,5,3],lb:'Glucose 520 · Na⁺ 131 · Ketones 6.1 · Cr 1.3',lk:['K⁺',2.9,3.8,'mmol/L'],kd:{kcl:.5,ins:-.12},haz:[['ins','lt',3.5,'insulin with K⁺ below 3.5 mmol/L; defer insulin and continue potassium replacement.']],dr:12,vt:480,q:'Glucose 520, pH 7.05, K⁺ 2.9 mmol/L. Insulin infusion is ready.',o:[['Hold insulin; replace potassium and recheck until K⁺ is above 3.5 mmol/L',1,'Correct. The 2024 adult DKA consensus advises delaying insulin when K⁺ is below 3.5 mmol/L.'],['Start insulin 0.1 U/kg/h now',0,'Dangerous with K⁺ 2.9; insulin can worsen hypokalemia.'],['Give a bicarbonate bolus',0,'Bicarbonate is not routine for DKA at this pH.']]},
+{sx:'m',dx:'Severe TBI',hx:'35M. Road accident 8 hours ago, brain contusion. Intubated, head up, ICP monitor in place.',hr:62,sbp:150,spo2:97,rr:14,t:37,ab:[7.4,38,24,1.4],lb:'WBC 12 · Hb 12.8 · Plt 210 · INR 1.1',lk:['Na⁺',138,146,'mmol/L'],kd:{hs:1.5},neuro:1,prh:1,hu:1,dr:16,vt:520,q:'GCS fell from 8 to 6. Right pupil blown, ICP 32 mmHg. Next step?',o:[['Treat suspected herniation with hyperosmolar therapy, head-up positioning, urgent imaging and neurosurgical review',1,'Correct. Stabilize and urgently treat suspected herniation; select hyperosmolar therapy with specialist guidance.'],['Prolonged hyperventilation to PaCO₂ 20',0,'Prolonged marked hypocapnia can reduce cerebral blood flow; hyperventilation is only a brief rescue bridge when indicated.'],['Lay the head flat for perfusion',0,'This can worsen intracranial pressure; maintain head-up positioning when feasible.']]},
+{sx:'f',dx:'Cardiogenic shock',hx:'68F. Anterior STEMI 14 hours ago, stent to LAD done. Now hypotensive with lung congestion, on NIV.',hr:110,sbp:78,dbp:50,spo2:92,rr:26,t:36.8,ab:[7.3,34,16,4],lb:'WBC 13 · Hb 11.2 · Cr 1.6 · Troponin I 12.4 ng/mL',lk:['ScvO₂',48,66,'%'],fl:-.25,ls:2,dr:14,vt:360,q:'SBP 78, cold peripheries, crackles, lactate 4. Next step?',o:[['Urgent shock-team review; support perfusion and assess for ongoing ischemia or mechanical complications',1,'Correct. Cardiogenic shock needs immediate specialist-led stabilization, evaluation of the cause and individualized vasoactive or mechanical support.'],['Give a 1 L fluid bolus',0,'She is congested. Unselected fluid can worsen pulmonary edema.'],['Start an IV beta-blocker',0,'Negative inotropy can worsen shock.']]},
+{sx:'m',dx:'AKI, hyperkalemia',hx:'70M. Diabetes and CKD, a week of NSAIDs, now AKI and anuric. Not ventilated.',iv:0,hr:58,sbp:130,spo2:95,rr:18,t:36.9,tw:3,twc:[3,1.4,'ca'],ab:[7.22,32,13,2.4],lb:'Urea 148 · Cr 6.8 · Hb 9.1 · Urine output 0',lk:['K⁺',7.2,5.4,'mmol/L'],kd:{dx:-1},dr:12,vt:450,q:'K⁺ 7.2, peaked T waves, QRS widening. Anuric for 12 hours. Next step?',o:[['IV calcium gluconate now, then insulin with dextrose, arrange dialysis',1,'Correct. Calcium stabilizes the myocardium, insulin shifts K⁺, dialysis removes it.'],['Oral resin and recheck in 6 hours',0,'Far too slow with ECG changes.'],['Potassium-free fluids only',0,'Does not protect the heart.']]},
+{sx:'f',dx:'Severe asthma',hx:'28F. Status asthmaticus, intubated 2 hours ago. Wheeze, high pressures, air trapping.',hr:130,sbp:100,spo2:88,rr:20,t:37.2,ab:[7.18,68,25,3.2],lb:'WBC 14 · Hb 13.1 · K⁺ 3.2 · Glucose 190',lk:['Auto-PEEP',9,3,'cmH₂O'],dr:40,vt:350,q:'Peak pressure 48, plateau 31, and expiratory flow does not return to zero before the next breath. Next step?',o:[['Reduce minute ventilation, lengthen expiratory time, check for dynamic hyperinflation and continue bronchodilators',1,'Correct. Prioritize a long expiratory time and accept permissive hypercapnia; reassess airway pressures and hemodynamics.'],['Raise the rate to clear CO₂ faster',0,'Shorter expiratory time can worsen dynamic hyperinflation.'],['Apply PEEP 15 without reassessing auto-PEEP',0,'External PEEP needs individualized assessment; a fixed high setting can worsen hyperinflation or hemodynamics.']]},
+{sx:'m',dx:'Massive pulmonary embolism',hx:'47M. Sudden collapse after a long flight. Right heart strain on echo. Oxygen by mask.',iv:0,hr:126,sbp:82,spo2:86,rr:30,t:37,ab:[7.46,28,20,3.8],lb:'Troponin 0.9 · BNP 780 · D-dimer 12 · Hb 13.5',lk:['RV/LV ratio',1.4,.9,''],fl:-.15,dr:12,vt:450,q:'BP 82/50, SpO₂ 86%, dilated right ventricle. Next step?',o:[['Urgent reperfusion for high-risk PE; give systemic thrombolysis if eligible and manage anticoagulation per protocol',1,'Correct. Shock with suspected PE requires urgent reperfusion assessment; thrombolysis has major bleeding risks and anticoagulation timing must follow the chosen protocol.'],['Give 2 L fluid to fill the right heart',0,'Large empiric fluid loads can overdistend a failing right ventricle.'],['Start oral anticoagulant and observe',0,'Too slow for a patient in shock.']]},
+{sx:'f',dx:'Hypertensive pulmonary edema',hx:'66F. Sudden breathlessness, pink frothy sputum. BP 210/120. On NIV.',hr:118,sbp:210,spo2:84,rr:34,t:36.9,hyp:1,ed:1,ab:[7.3,48,22,2.2],lb:'Creatinine 1.8 · Troponin 0.04 · BNP 1400 · Hb 11.8',lk:['NT-proBNP',9200,6500,'pg/mL'],ls:2,fl:-.3,dr:16,vt:400,q:'BP 210/120, crackles to the apices, SpO₂ 84% on NIV. Next step?',o:[['IV nitroglycerin and NIV; assess volume and give a loop diuretic if overloaded',1,'Correct. Vasodilator therapy and NIV address hypertensive pulmonary edema; diuresis depends on volume status.'],['Give a 500 mL fluid bolus',0,'She is already overloaded.'],['Start an IV beta-blocker first',0,'Can worsen acute pulmonary edema.']]},
+{sx:'m',dx:'Variceal bleed',hx:'58M. Alcohol cirrhosis, vomiting blood. Two large-bore lines, not ventilated.',iv:0,hr:124,sbp:84,spo2:95,rr:24,t:36.6,ab:[7.33,32,17,4.1],lb:'Plt 70 · INR 1.8 · Bilirubin 3.1 · Albumin 2.2',lk:['Hb',6.4,8.4,'g/dL'],kd:{blood:1},ls:-2,dr:12,vt:450,q:'Hb 6.4, BP 84/50, ongoing hematemesis. Next step?',o:[['Blood transfusion, IV terlipressin, ceftriaxone, urgent endoscopy after stabilization',1,'Correct. Use cautious, restrictive transfusion and start vasoactive therapy and antibiotics early; perform endoscopy after initial resuscitation.'],['Large crystalloid volume to MAP 90',0,'Excessive fluid and overtransfusion can increase portal pressure and rebleeding risk.'],['Start propranolol to slow the heart rate',0,'Nonselective beta-blockers are not started to treat acute hemorrhagic shock.']]},
+{sx:'m',dx:'Dengue shock',hx:'19M. Day 5 of fever, platelets falling, now cold hands and a narrow pulse pressure.',iv:0,hr:128,sbp:88,dbp:73,spo2:96,rr:26,t:37.8,ab:[7.34,28,15,3],lb:'Platelets 18 · WBC 2.4 · AST 220 · Albumin 2.4',lk:['Hematocrit',48,40,'%'],ls:-2,dr:12,vt:450,q:'Hematocrit rising to 48%, pulse pressure 15 mmHg, cold extremities. Next step?',o:[['Give a cautious isotonic crystalloid bolus and reassess perfusion, hematocrit and fluid overload promptly',1,'Correct. Treat shock with carefully titrated fluid and frequent reassessment; avoid a fixed repeated-volume strategy.'],['Prophylactic platelet transfusion',0,'It does not treat shock and can add to overload.'],['IV steroids to raise platelets',0,'Steroids do not treat dengue shock.']]},
+{sx:'m',dx:'Organophosphate poisoning',hx:'32M. Drank a pesticide 3 hours ago. Sweating, small pupils, secretions in the chest. Intubated.',hr:48,sbp:88,spo2:86,rr:22,t:36.8,hrd:1,ab:[7.28,52,22,2],lb:'Pseudocholinesterase 480 · K⁺ 3.4 · Glucose 168 · Amylase 210',lk:['Secretion score',3,1,'/3'],dr:22,vt:420,q:'Heart rate 48, wet chest, pinpoint pupils. Next step?',o:[['Titrate IV atropine until secretions are controlled; decontaminate and provide ICU support',1,'Correct. Titrate atropine to control bronchial secretions and improve ventilation; use pralidoxime when indicated.'],['Give neostigmine to reverse the weakness',0,'It adds to the cholinergic crisis.'],['Pralidoxime alone, no atropine',0,'Atropine is needed to control the muscarinic secretions.']]},
+{sx:'f',dx:'Status epilepticus',hx:'40F. Epilepsy, missed doses. Seizing for 15 minutes on arrival, airway open, oxygen by mask.',iv:0,hr:136,sbp:160,spo2:90,rr:30,t:38.6,hyp:1,ab:[7.2,34,13,6],lb:'Glucose 110 · Na⁺ 138 · Ca²⁺ 8.8 · CK 640',lk:['CK',640,520,'U/L'],dr:12,vt:420,q:'Generalized seizure for 15 minutes, no response so far. Next step?',o:[['Give an appropriately dosed IV benzodiazepine now; if seizure persists, promptly give a second-line antiseizure medicine',1,'Correct. Treat convulsive status promptly with a benzodiazepine followed by second-line therapy if it continues.'],['Wait 10 more minutes for it to stop',0,'Delay risks ongoing seizure-related injury.'],['Oral carbamazepine loading',0,'Unsafe during a seizure and too slow.']]},
+{sx:'m',dx:'COPD, hypercapnic failure',hx:'66M. Long-term COPD with infection; drowsy but arousable, with persistent hypoxemia despite NIV.',hr:112,sbp:140,spo2:84,rr:30,t:37.4,co2s:1,ab:[7.22,86,34,1.8],lb:'WBC 16 · Hb 15.2 · Bicarbonate 34 · Troponin normal',lk:['CRP',90,60,'mg/L'],dr:14,vt:420,q:'pH 7.22, PaCO₂ 86, drowsy, SpO₂ 84% despite NIV. What is the priority?',o:[['Urgent senior/ICU airway review; optimize NIV and controlled oxygen while preparing to intubate if NIV is failing',1,'Correct. Persistent hypoxemia and altered alertness require immediate escalation and close reassessment; do not persist with failing NIV. Target controlled oxygen, commonly SpO₂ 88–92% in COPD at risk of hypercapnia.'],['Continue unchanged NIV without reassessment',0,'Persistent hypoxemia and drowsiness may signal NIV failure.'],['Give high-flow 100% oxygen or sedate him',0,'Uncontrolled oxygen can worsen hypercapnia, and sedation can impair ventilation and airway protection.']]}
 ];
 function pick(){let seen=[];try{seen=JSON.parse(localStorage.getItem('licu')||'[]')}catch(_){}
  let f=POOL.map((c,i)=>i).filter(i=>!seen.includes(i));if(f.length<6){seen=[];f=POOL.map((c,i)=>i)}
@@ -121,7 +121,7 @@ const P=D.map((d,i)=>{
  const support=SUPPORT[d.dx];
  if(!support)throw new Error('Missing support settings for '+d.dx);
  const [air,fio2,peep]=support;
- return{...d,i,air,lf:0,vp:0,iv:air==='imv'||air==='niv',dz:{},sev:.05,pend:0,done:0,ok:0,fio2,peep,initialFio2:fio2,initialPeep:peep,pump:0,bol:0,ph:0,st:0,v:{hr:d.hr,sbp:d.sbp,dbp:d.sbp*.6,spo2:d.spo2,rr:d.rr,t:d.t}}
+ return{...d,i,air,vp:0,ipap:peep+(d.dr||10),setRate:d.rr,iv:air==='imv'||air==='niv',dz:{},sev:.05,pend:0,done:0,ok:0,fio2,peep,initialFio2:fio2,initialPeep:peep,pump:0,bol:0,ph:0,st:0,v:{hr:d.hr,sbp:d.sbp,dbp:d.dbp??d.sbp*.6,spo2:d.spo2,rr:d.rr,t:d.t}}
 });
 const ecg=(f,tw)=>{const g=(m,s,a)=>a*Math.exp(-(((f-m)/s)**2));return g(.2,.03,.13)+g(.4,.012,1)-g(.375,.01,.15)-g(.43,.012,.2)+g(.65,.05,.25*tw)};
 function mon(c,p,w,h,x,y){
@@ -176,8 +176,8 @@ scr.position.set(100,.5+RW*2,-8);S.add(scr);
 // ward
 const BA=[-44,0,44,136,180,224].map(d=>d*Math.PI/180),RD=7,BP=i=>[RD*Math.sin(BA[i]),-RD*Math.cos(BA[i])];
 const PH=[new Image(),new Image()];PH[0].src=IM[0];PH[1].src=IM[1];
-const TM=document.createElement('canvas'),TR=document.createElement('canvas');TM.width=360;TM.height=254;TR.width=300;TR.height=200;
-const breathLayer=document.createElement('canvas');breathLayer.width=640;breathLayer.height=360;
+const TM=document.createElement('canvas'),TR=document.createElement('canvas');TM.width=720;TM.height=508;TR.width=300;TR.height=200;
+const breathLayer=document.createElement('canvas');breathLayer.width=1280;breathLayer.height=720;
 function drawBreathing(c,im,p,x,y,w,h){
  if(!im||!im.complete||!im.naturalWidth)return;
  const b=breathLayer.getContext('2d'),bw=breathLayer.width,bh=breathLayer.height,cx=bw*.5,cy=bh*.57;
@@ -189,16 +189,16 @@ function drawBreathing(c,im,p,x,y,w,h){
 }
 // each bed is the patient photograph itself, kept live with the monitor, ventilator, panel and breathing
 const B=P.map((p,i)=>{
- const [x,z]=BP(i),cvs=document.createElement('canvas');cvs.width=640;cvs.height=360;
+const [x,z]=BP(i),cvs=document.createElement('canvas');cvs.width=1280;cvs.height=720;
  const tex=new THREE.CanvasTexture(cvs),g=new THREE.Mesh(new THREE.PlaneGeometry(5.2,2.925),new THREE.MeshBasicMaterial({map:tex}));
  g.position.set(x,1.55,z);g.lookAt(0,1.55,0);g.userData.bed=i;S.add(g);
  const lamp=new THREE.Mesh(new THREE.SphereGeometry(.12,12,8),new THREE.MeshBasicMaterial({color:0x3dff9a}));lamp.position.set(x*.98,3.25,z*.98);S.add(lamp);
  return{g,ctx:cvs.getContext('2d'),tex,lamp}});
-function prow(p){const ip=p.peep+p.dr+p.sev*6;return p.iv?[[(p.air==='imv'?'IMV':'NIV'),(p.air==='imv'?'tube':'mask')],[p.air==='imv'?'PIP':'IPAP',Math.round(ip)],[p.air==='imv'?'PEEP':'EPAP',p.peep],...(p.air==='imv'?[['Vt',p.vt+' mL']]:[]),['RR',Math.round(p.v.rr)],['FiO2',p.fio2+'%']]:[['O2 support',p.air==='room'?'Room air':'Oxygen mask'],['FiO2',p.fio2+'%'],['SpO2',Math.min(100,Math.round(p.v.spo2))],['RR',Math.round(p.v.rr)]]}
-function drawBed(i){const p=P[i],b=B[i],c=b.ctx,W=640,H=360,im=(typeof bedShot==='function'?bedShot(p):PH[p.sx=='f'?1:0]);if(!im||!im.complete||!im.naturalWidth)return;
+function prow(p){const ip=p.air==='niv'?p.ipap:p.peep+p.dr+p.sev*6;return p.iv?[[(p.air==='imv'?'IMV':'NIV'),(p.air==='imv'?'tube':'mask')],[p.air==='imv'?'PIP (model)':'IPAP',Math.round(ip)],[p.air==='imv'?'PEEP':'EPAP',p.peep],...(p.air==='imv'?[['Vt target',p.vt+' mL'],['RR set',p.setRate+'/min']]:[]),['RR measured',Math.round(p.v.rr)+'/min'],['FiO2',p.fio2+'%']]:[['O2 support',p.air==='room'?'Room air':'Oxygen mask'],['FiO2',p.fio2+'%'],['SpO2',Math.min(100,Math.round(p.v.spo2))],['RR',Math.round(p.v.rr)]]}
+function drawBed(i){const p=P[i],b=B[i],c=b.ctx,W=1280,H=720,im=(typeof bedShot==='function'?bedShot(p):PH[p.sx=='f'?1:0]);if(!im||!im.complete||!im.naturalWidth)return;
  c.clearRect(0,0,W,H);c.drawImage(im,0,0,W,H);
  drawBreathing(c,im,p,0,0,W,H);
- mon(TM.getContext('2d'),p,360,254,0,0);c.drawImage(TM,W*.0766,H*.139,W*.168,H*.211);
+ mon(TM.getContext('2d'),p,720,508,0,0);c.drawImage(TM,W*.0766,H*.139,W*.168,H*.211);
  rdr(TR.getContext('2d'),p);c.drawImage(TR,W*.81,H*.358,W*.092,H*.128);
  const r=prow(p),px=W*.747,py=H*.619,pw=W*.239,ph=H*.345;c.fillStyle='rgba(14,22,30,.95)';c.fillRect(px,py,pw,ph);c.strokeStyle='#3f6a85';c.lineWidth=2;c.strokeRect(px,py,pw,ph);c.font='11px system-ui';
  r.forEach((x,n)=>{const y=py+ph*(n+.65)/(r.length+.3);c.fillStyle='#d8ecff';c.textAlign='left';c.fillText(x[0],px+6,y);c.fillStyle='#fff';c.textAlign='right';c.fillText(x[1],px+pw-6,y)});
@@ -210,17 +210,19 @@ function drawBed(i){const p=P[i],b=B[i],c=b.ctx,W=640,H=360,im=(typeof bedShot==
 // camera modes
 let ent=0,mode='cmd',yaw=0,pit=0,cmdYaw=0,cmdPit=0,cur=null;const tp=new V(),tl=new V(),lk=new V(100,4,-8);
 function tgt(){
- if(mode=='cmd'){const W=14,H=14*(845/1500),half=Math.tan(36*Math.PI/180),fit=Math.max(H/2/half,W/2/(half*Math.max(.45,cam.aspect))),d=fit*1.08;tp.set(100,H/2,-8+d);tl.set(100+Math.sin(cmdYaw)*W*0.48,H/2+Math.sin(cmdPit)*H*0.3,-8)}
+ if(mode=='cmd'){const W=14,H=14*(845/1500),half=Math.tan(36*Math.PI/180),fit=Math.max(H/2/half,W/2/(half*Math.max(.45,cam.aspect))),d=innerWidth<innerHeight?H/(2*half)*1.12:fit*1.08;tp.set(100,H/2,-8+d);tl.set(100+Math.sin(cmdYaw)*W*0.48,H/2+Math.sin(cmdPit)*H*0.3,-8)}
  else if(mode=='ward'){tp.set(0,1.6,0);tl.set(Math.sin(yaw)*Math.cos(pit),1.6+Math.sin(pit),-Math.cos(yaw)*Math.cos(pit))}
  else{const g=B[cur].g;tp.copy(g.position).multiplyScalar(-0.18);tp.y=1.62;tl.copy(g.position);tl.y=1.5}}
 function go(m,i){
  mode=m;if(m=='bed'){cur=i;const p=P[i];$('#pn').textContent=(i+1)+'. '+p.n+' · '+p.dx;$('#hx').textContent=p.hx;
-  [['fi',p.fio2],['pe',p.peep]].forEach(([id,v])=>{const e=$('#'+id);e.value=v;e.previousElementSibling.textContent=v});$('#pe').parentElement.style.display=p.iv?'block':'none';$('#ev').dataset.s='';evu();rd();sup()}
+  [['fi',p.fio2],['pe',p.peep],['rrset',p.setRate],['vtset',p.vt],['ipap',p.ipap]].forEach(([id,v])=>{const e=$('#'+id);e.value=v;if(e.previousElementSibling)e.previousElementSibling.textContent=v});
+  $('#pe').parentElement.style.display=p.iv?'block':'none';updateVentControls(p);$('#ev').dataset.s='';evu();rd();sup();
+  document.querySelector('[data-t="'+(p.iv?1:0)+'"]').click()}
  else cur=null;
  if(m=='cmd'||m=='ward'){tgt();cam.position.copy(tp);lk.copy(tl);cam.lookAt(lk)}
- $('#panel').style.display=m=='bed'?'block':'none';$('#triage').style.display=m=='cmd'?'block':'none';
+ $('#panel').style.display=m=='bed'?'block':'none';
  const ph=$('#photo');if(m=='bed'){$('#pb').style.backgroundImage='url('+IM[P[i].sx=='f'?1:0]+')';const r=RR[i],s=$('#pr').style;s.left=r[0]+'%';s.top=r[1]+'%';s.width=r[2]+'%';s.height=r[3]+'%';ph.style.display='block';requestAnimationFrame(()=>ph.classList.add('on'))}else{ph.classList.remove('on');setTimeout(()=>{if(mode!='bed')ph.style.display='none'},500)}
- $('#hint').textContent=m=='ward'?'Drag to look around · tap a bed to step in':m=='cmd'?'Drag to look left and right · tap a live monitor':''}
+ $('#hint').textContent=m=='ward'?'Drag to look around · tap a bed to step in':m=='cmd'?'Swipe to scan the command wall · tap a patient monitor':''}
 document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>go(b.dataset.m));
 go('cmd');
 
@@ -234,7 +236,10 @@ cv.onpointerup=e=>{dn=0;if(mv>8)return;const r=cv.getBoundingClientRect();mv2.se
  if(mode=='cmd'&&h.object.userData&&h.object.userData.command&&h.uv){var uu=h.uv.x,vv=1-h.uv.y,sc=h.object.userData.screens||[];for(var kk=0;kk<sc.length;kk++){var rr=sc[kk];if(uu>=rr.x&&uu<=rr.x+rr.w&&vv>=rr.y&&vv<=rr.y+rr.h){openFromWall(rr.bed);break}}}
  else if(h.object===scr){const u=h.uv,i=Math.floor((1-u.y)*RW)*C+Math.floor(u.x*C);if(P[i])openFromWall(i)}
  else if(mode=='ward')go('bed',h.object.userData.bed)};
-[['fi','fio2'],['pe','peep']].forEach(([id,k])=>{const el=$('#'+id);el.oninput=()=>{P[cur][k]=+el.value;el.previousElementSibling.textContent=el.value}});
+const setControl=(id,key)=>{const el=$('#'+id);el.oninput=()=>{const p=P[cur];p[key]=+el.value;el.previousElementSibling.textContent=el.value}};
+setControl('fi','fio2');setControl('rrset','setRate');setControl('vtset','vt');
+$('#pe').oninput=()=>{const p=P[cur],el=$('#pe');p.peep=+el.value;if(p.air==='niv'&&p.ipap<p.peep+2)p.ipap=Math.min(30,p.peep+2);el.previousElementSibling.textContent=el.value;$('#ipap').value=p.ipap;$('#ipap').previousElementSibling.textContent=p.ipap};
+$('#ipap').oninput=()=>{const p=P[cur],el=$('#ipap');p.ipap=Math.max(+el.value,p.peep+2);el.value=p.ipap;el.previousElementSibling.textContent=el.value};
 $('#t0').onclick=e=>{const t=e.target,p=P[cur];if(t.dataset.d){const d=IN.find(x=>x[0]==t.dataset.d);p.dz[d[0]]=Math.round(clamp((p.dz[d[0]]||0)+(+t.dataset.a)*d[5],d[3],d[4])*100)/100}else if(t.dataset.b){const k=t.dataset.b;p.dz[k]=(p.dz[k]||0)+1;const BV={fl:14,blood:18};if(BV[k])p.bol=Math.min(30,p.bol+BV[k])}else return;rd()};
 $('#hu').onclick=()=>{P[cur].hu=!P[cur].hu;sup()};$('#pr').onclick=()=>{P[cur].pr=!P[cur].pr;sup()};
 document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button,.tb').forEach(e=>e.classList.remove('on'));b.classList.add('on');$('#t'+b.dataset.t).classList.add('on');if(b.dataset.t=='2')labs()});
@@ -242,7 +247,7 @@ $('#enter').onclick=$('#dr').onclick=()=>{ent=1;$('#door').classList.add('open')
 
 // decisions
 function evu(){const p=P[cur],e=$('#ev'),k=cur+'-'+p.pend+p.done;if(e.dataset.s==k)return;e.dataset.s=k;
- e.innerHTML=p.done?p.fb+'<p>Reassess the patient and use the available controls as appropriate. Your answer did not administer treatment.</p>':p.pend?'<small>Scenario question: values may differ from the live simulated monitor.</small><br><b>'+p.q+'</b><p>Choose the immediate priority, then act and reassess.</p>'+p.o.map((o,j)=>'<button data-k="'+j+'">'+o[0]+'</button>').join(''):'<i>Review the patient approach and monitor trends.</i>'}
+ e.innerHTML=p.done?p.fb+'<p>Reassess the patient and use the available controls as appropriate. Your answer did not administer treatment.</p>':p.pend?'<small>Synthetic scenario for education; monitor values are heuristic.</small><br><b>'+p.q+'</b><p>Choose the immediate priority, then act and reassess.</p>'+p.o.map((o,j)=>'<button data-k="'+j+'">'+o[0]+'</button>').join(''):'<i>Review the patient approach and monitor trends.</i>'}
 $('#ev').onclick=e=>{const k=e.target.dataset.k;if(k==null)return;const p=P[cur],o=p.o[k];p.choice=+k;p.done=1;p.pend=0;p.ok=o[1];
  p.fb='<b style="color:'+(o[1]?'var(--g)':'var(--r)')+'">'+(o[1]?'Correct':'Not ideal')+'.</b> '+o[2].replace(/^(Correct|Harmful|Dangerous)\.\s*/,'');evu();
  if(P.every(q=>q.done))toast('All decisions recorded. Open the shift debrief from the command center.')};
@@ -251,14 +256,14 @@ function fin(){const n=P.filter(p=>p.ok).length;$('#end').style.display='block';
 function toast(m){const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.opacity=0,4000)}
 function beep(){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.04;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.12)}
 
-function simulatedLabs(p){const v=p.v,[a,c,h,l]=p.ab,s=Math.min(99.5,v.spo2),po=26.6*Math.pow(s/(100-s),.37);
- return{ph:a-p.sev*.07,pc:c+p.sev*6-(v.rr-p.rr)*.4+(p.co2s?(p.fio2-50)*.12:0),hc:h-p.sev*1.5,la:Math.max(.6,l+p.sev*3.2),po,pf:po/(p.fio2/100)}}
+function simulatedLabs(p){const v=p.v,[a,c,h,l]=p.ab;
+ return{ph:a-p.sev*.07,pc:c+p.sev*6-(v.rr-p.rr)*.4+(p.co2s?(p.fio2-50)*.12:0),hc:h-p.sev*1.5,la:Math.max(.6,l+p.sev*3.2)}}
 function labs(){const p=P[cur],a=simulatedLabs(p),k=p.lk,kv=kval(p),f=(x,lo,hi)=>x<lo||x>hi?' class="hi"':'';
- const r=[['pH (simulated)',a.ph.toFixed(2),f(a.ph,7.35,7.45)],['PaCO₂ (simulated) mmHg',Math.round(a.pc),f(a.pc,35,45)],['PaO₂ estimate from SpO₂ mmHg',Math.round(a.po),''],['HCO₃⁻ (simulated) mmol/L',Math.round(a.hc),f(a.hc,22,26)],['Lactate (simulated) mmol/L',a.la.toFixed(1),f(a.la,0,2)],['Estimated PaO₂/FiO₂ (not measured P/F)',Math.round(a.pf),''],[k[0]+' '+k[3],kv.toFixed(kv<20?1:0),'']];
- $('#lab').innerHTML='<table>'+r.map(x=>'<tr><td>'+x[0]+'</td><td'+x[2]+'>'+x[1]+'</td></tr>').join('')+'</table><p>'+p.lb+'</p><small>All values are simulated. PaO₂ and the ratio are estimates derived from SpO₂; a clinical P/F ratio requires an arterial blood gas.</small>'}
+ const r=[['pH (simulated)',a.ph.toFixed(2),f(a.ph,7.35,7.45)],['PaCO₂ (simulated) mmHg',Math.round(a.pc),f(a.pc,35,45)],['HCO₃⁻ (simulated) mmol/L',Math.round(a.hc),f(a.hc,22,26)],['Lactate (simulated) mmol/L',a.la.toFixed(1),f(a.la,0,2)],[k[0]+' '+k[3],kv.toFixed(kv<20?1:0),'']];
+ $('#lab').innerHTML='<table>'+r.map(x=>'<tr><td>'+x[0]+'</td><td'+x[2]+'>'+x[1]+'</td></tr>').join('')+'</table><p>'+p.lb+'</p><small>These are illustrative model outputs, not measured results. Oxygenation requires clinical assessment and an arterial blood gas when indicated; this model does not calculate PaO₂ or a P/F ratio.</small>'}
 function vw(c,p,w,h){c.fillStyle='#03101f';c.fillRect(0,0,w,h);const F=w*.04;c.font='bold '+F+'px monospace';
  if(!p.iv){c.fillStyle='#7fa6c8';c.fillText(p.air==='room'?'Breathing spontaneously on room air.':'Breathing spontaneously with oxygen by mask.',F,h/2);return}
- const pe=p.peep,pip=pe+p.dr+p.sev*6;c.fillStyle='#d8ecff';c.fillText(p.air==='imv'?'IMV · PIP '+Math.round(pip)+' PEEP '+pe+' Vt '+p.vt:'NIV · IPAP '+Math.round(pip)+' EPAP '+pe+' FiO2 '+p.fio2+'%',F*.5,F*1.4);
+ const pe=p.peep,pip=p.air==='niv'?p.ipap:pe+p.dr+p.sev*6;c.fillStyle='#d8ecff';c.fillText(p.air==='imv'?'IMV · Vt '+p.vt+' mL · RR '+p.setRate+' · PEEP '+pe:'NIV · IPAP '+Math.round(pip)+' / EPAP '+pe+' · FiO2 '+p.fio2+'%',F*.5,F*1.4);
  const rh=(h-F*2)/3,W=w*.94,cs=['#ffd24a','#3dff9a','#39e6ff'];
  for(let r=0;r<3;r++){c.strokeStyle=cs[r];c.lineWidth=2;c.beginPath();const y0=F*2+rh*(r+1)-4;
   for(let k=0;k<W;k+=2){const f=(((p.vp-(W-k)/(w*.3))%1)+1)%1,n=f<.33,e=Math.exp(-(f-.33)/.12);
@@ -274,38 +279,60 @@ function phd(p){mon($('#pl').getContext('2d'),p,720,508,0,0);rdr($('#pr').getCon
  const iv=$('#iv'),c=iv.getContext('2d');c.clearRect(0,0,iv.width,iv.height);drawGiven(c,p,iv.width,iv.height)}
 // drug formulary: infusions (dose up/down) and boluses
 const IN=[['nor','Norepinephrine','mcg/min',0,30,2,'Raises MAP. First-line vasopressor.'],['vas','Vasopressin','U/min',0,.04,.01,'Second vasopressor. Spares norepinephrine.'],['dob','Dobutamine','mcg/kg/min',0,15,2.5,'Raises output and heart rate. Can lower BP.'],['ins','Insulin','U/h',0,10,1,'Lowers glucose and K\u207a. Check K\u207a first.'],['mid','Midazolam','mg/h',0,8,1,'Sedation. Lowers BP and breathing drive.'],['gtn','Nitroglycerin','mcg/min',0,20,2,'Lowers BP and eases lung congestion.']],
-BO=[['fl','Ringer lactate 250 mL','Volume. Watch the lungs.'],['hs','3% saline 100 mL','Raises Na\u207a and lowers ICP.'],['ca','Calcium gluconate 10 mL','Protects the heart in high K\u207a.'],['dx','Insulin 10 U + dextrose 25 g','Shifts K\u207a into cells.'],['kcl','KCl 20 mEq','Replaces potassium.'],['ls','Furosemide 40 mg','Removes lung and body water.'],['ab','Meropenem 1 g','Antibiotic for infection.'],['atr','Atropine 2 mg','Dries secretions, raises heart rate.'],['lz','Lorazepam 4 mg','Stops seizures.'],['alt','Alteplase 50 mg','Dissolves clot. Bleeding risk.'],['blood','Packed red cells 2 units','Replaces blood loss.'],['sb','Salbutamol + ipratropium neb','Opens the airways.']];
-function rd(){const z=P[cur].dz;$('#t0').innerHTML='<h4>Infusion pumps</h4>'+IN.map(d=>{const v=z[d[0]]||0;return '<div class="dr"><div><b>'+d[1]+'</b><small>'+d[6]+'</small></div><div class="ct"><button data-d="'+d[0]+'" data-a="-1">\u2212</button><output>'+(d[5]<1?v.toFixed(2):v)+' <small>'+d[2]+'</small></output><button data-d="'+d[0]+'" data-a="1">+</button></div></div>'}).join('')+'<h4>Bolus and push</h4>'+BO.map(d=>'<div class="dr"><div><b>'+d[1]+'</b><small>'+d[2]+'</small></div><div class="ct"><output>'+(z[d[0]]?'\u00d7'+z[d[0]]:'')+'</output><button data-b="'+d[0]+'">Give</button></div></div>').join('')}
+BO=[['fl','Ringer lactate 250 mL','Volume. Watch the lungs.'],['hs','3% saline 100 mL','Raises Na\u207a and lowers ICP.'],['ca','Calcium gluconate 10 mL','Protects the heart in high K\u207a.'],['dx','Insulin 10 U + dextrose 25 g','Shifts K\u207a into cells.'],['kcl','KCl 20 mEq','Replaces potassium.'],['ls','Furosemide 40 mg','Removes lung and body water.'],['ab','Meropenem (example)','Select antibiotics for source, cultures, allergies and local protocols.'],['ctx','Ceftriaxone','Variceal-bleed prophylaxis; follow local protocol.'],['tp','Terlipressin','Vasoactive treatment; follow variceal-bleed protocol.'],['atr','Atropine 2 mg','Dries secretions, raises heart rate.'],['pral','Pralidoxime','Use when indicated; follow toxicology protocol.'],['lz','Lorazepam 4 mg','Stops seizures.'],['lev','Levetiracetam','Second-line status therapy; protocol-based dosing.'],['alt','Alteplase 50 mg','Dissolves clot. Bleeding risk.'],['blood','Packed red cells 2 units','Replaces blood loss.'],['sb','Salbutamol + ipratropium neb','Opens the airways.']];
+const CASE_RX={
+ 'ARDS':['mid'],'Septic shock':['nor','vas','fl','ab'],'DKA':['ins','fl','kcl'],
+ 'Severe TBI':['hs'],'Cardiogenic shock':['nor','dob','gtn','ls'],
+ 'AKI, hyperkalemia':['ca','dx'],'Severe asthma':['sb'],
+ 'Massive pulmonary embolism':['nor','alt'],'Hypertensive pulmonary edema':['gtn','ls'],
+ 'Variceal bleed':['blood','ctx','tp'],'Dengue shock':['fl'],
+ 'Organophosphate poisoning':['atr','pral'],'Status epilepticus':['lz','lev'],
+ 'COPD, hypercapnic failure':['sb']
+};
+function rd(){
+ const z=P[cur].dz,allowed=new Set(CASE_RX[P[cur].dx]||[]),infusions=IN.filter(d=>allowed.has(d[0])),boluses=BO.filter(d=>allowed.has(d[0]));
+ const rows=(list,bolus)=>list.map(d=>{const v=z[d[0]]||0;return '<div class="dr"><div><b>'+d[1]+'</b><small>'+(bolus?d[2]:d[6])+'</small></div><div class="ct">'+(bolus?'<output>'+(v?'\u00d7'+v:'')+'</output><button data-b="'+d[0]+'">Give</button>':'<button data-d="'+d[0]+'" data-a="-1">\u2212</button><output>'+(d[5]<1?v.toFixed(2):v)+' <small>'+d[2]+'</small></output><button data-d="'+d[0]+'" data-a="1">+</button>')+'</div></div>'}).join('');
+ const controls=(infusions.length?'<h4>Infusions</h4>'+rows(infusions,false):'')+(boluses.length?'<h4>Bolus and push</h4>'+rows(boluses,true):'');
+ $('#t0').innerHTML='<small>Case-relevant example controls only; not a complete treatment order or dosing guide. Some actions in the scenario are not simulated.</small>'+(controls||'<p>No medication simulation is provided for this case.</p>')}
 function sup(){const p=P[cur];$('#hu').textContent='Head-up 30\u00b0: '+(p.hu?'on':'off');$('#pr').textContent='Prone position: '+(p.pr?'on':'off')}
+function updateVentControls(p){
+ const invasive=p.air==='imv',noninvasive=p.air==='niv';
+ $('#vent-mode').style.display=p.iv?'block':'none';
+ $('#vent-mode').textContent=invasive?'Invasive ventilation · volume-targeted teaching controls; confirm predicted body weight and lung mechanics.':noninvasive?'Non-invasive ventilation · adjust pressure support and EPAP with close reassessment.':'No ventilator in this case · adjust oxygen only when indicated.';
+ $('#imv-controls').style.display=invasive?'grid':'none';$('#niv-controls').style.display=noninvasive?'grid':'none';
+ $('#pe-label').textContent=noninvasive?'EPAP':'PEEP';$('#pe').min=noninvasive?'4':'0';
+ $('#pe').max=noninvasive?'20':'20';
+ const hints={
+  ARDS:'ARDS: use lung-protective tidal volume based on predicted body weight; monitor plateau pressure. Consider prolonged prone positioning in severe disease.',
+  'Severe asthma':'Severe asthma: prioritize a long expiratory time and monitor for dynamic hyperinflation and hemodynamic effects.',
+  'Severe TBI':'TBI: avoid hypoxemia, hypotension and prolonged hypocapnia; reassess ventilation and neurologic status.',
+  'COPD, hypercapnic failure':'COPD: controlled oxygen is commonly titrated to SpO₂ 88–92%; closely reassess alertness, gas exchange and NIV failure.',
+  'Hypertensive pulmonary edema':'Pulmonary edema: reassess work of breathing, oxygenation and blood pressure promptly during NIV.',
+  'Cardiogenic shock':'Cardiogenic shock: monitor perfusion and blood pressure closely; ventilatory support requires hemodynamic reassessment.'
+ };
+ $('#vent-hint').textContent=hints[p.dx]||'Reassess oxygenation, ventilation, synchrony and hemodynamics after each change.';
+}
 function kval(p){const k=p.lk,z=p.dz;let v=k[1];for(const d in p.kd)v+=p.kd[d]*(z[d]||0);return v}
-function slowf(p){let f=1;for(const k in p.slow)if(p.dz[k]>0)f*=p.slow[k];if(p.neuro&&p.hu)f*=.6;return f}
 function priority(p){
- const v=p.v,map=(v.sbp+2*v.dbp)/3;
- if(v.spo2<85||map<60||v.hr<40||v.hr>140||v.rr<8||v.rr>35||p.sev>=.65)return{level:2,reason:'Marked vital abnormality'};
- if(v.spo2<92||map<65||v.hr<50||v.hr>120||v.rr>30||p.sev>=.3)return{level:1,reason:'Abnormal vitals'};
+ const v=p.v,map=(v.sbp+2*v.dbp)/3,pp=v.sbp-v.dbp;
+ if(v.spo2<85||v.sbp<90||map<60||pp<=20||v.hr<40||v.hr>140||v.rr<8||v.rr>35||p.sev>=.65)return{level:2,reason:'Marked vital abnormality'};
+ if(v.spo2<92||map<65||pp<=30||v.hr<50||v.hr>120||v.rr>30||p.sev>=.3)return{level:1,reason:'Abnormal vitals'};
  return{level:0,reason:'No vital flag'};
 }
-function updateTriage(){
- const rows=P.map(p=>({p,...priority(p)})).sort((a,b)=>b.level-a.level||Number(!b.p.done)-Number(!a.p.done)||a.p.i-b.p.i);
- const html='<b>Simulation priority</b><small>Vital flags only · assess all beds</small>'+rows.map(({p,level,reason})=>'<button class="'+['stable','watch','urgent'][level]+'" data-bed="'+p.i+'"><b>Bed '+(p.i+1)+' · '+p.n+'</b><small>'+['No flag','Watch','Urgent'][level]+' · '+reason+' · '+(p.done?'Decision recorded':'Decision due')+'</small></button>').join('')+(P.every(p=>p.done)?'<button data-debrief="1">View shift debrief</button>':'');
- const el=$('#triage');if(el.innerHTML!==html)el.innerHTML=html;
-}
-$('#triage').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.debrief)fin();else if(b.dataset.bed!=null)openFromWall(+b.dataset.bed)};
 // vitals engine, 1 tick per second
 let T=0;
 setInterval(()=>{if(!ent)return;T++;let red=0;
  P.forEach((p,i)=>{
   if(!p.pend&&!p.done&&T>=p.ev)p.pend=1;
-  p.sev=Math.min(1,p.sev+.006*slowf(p));
   p.bol*=.88;
   (p.haz||[]).forEach(q=>{const kv=kval(p);if(p.dz[q[0]]>0&&(q[1]=='lt'?kv<q[2]:kv>q[2])){p.sev=Math.min(1,p.sev+.05);if(!p.hzs){p.hzs=1;toast('Bed '+(i+1)+': '+q[3])}}});
   if(p.prh&&p.pr)p.sev=Math.min(1,p.sev+.03);if(p.twc)p.tw=p.dz[p.twc[2]]?p.twc[1]:p.twc[0];
   const v=p.v,z=p.dz,n=k=>z[k]||0,sb=p.sbp+p.sev*(p.hyp?25:-36)+n('nor')*1.3+n('vas')*500+n('dob')-n('gtn')*1.5+p.bol-n('mid')*(1.5+p.sev*2)+(p.ls<0?p.ls*n('ls')*6:0);
-  const g={hr:p.hr+p.sev*(p.hrd?-15:30)-p.bol*.4+n('dob')*1.2-n('mid'),sbp:sb,dbp:sb*.6,spo2:clamp(p.spo2-p.sev*13+(p.fio2-p.initialFio2)*.12+(p.peep-p.initialPeep)*.35+(p.pr?(p.prs??2):0)+(p.fl||0)*p.bol+(p.ls>0?Math.min(6,n('ls')*p.ls):0)+(p.ed?Math.min(5,n('gtn')*.5):0),60,100),rr:p.rr+p.sev*8-n('mid')*.6,t:p.t+p.sev*.6};
+  const g={hr:p.hr+p.sev*(p.hrd?-15:30)-p.bol*.4+n('dob')*1.2-n('mid'),sbp:sb,dbp:p.dbp+(sb-p.sbp)*.6,spo2:clamp(p.spo2-p.sev*13+(p.fio2-p.initialFio2)*.12+(p.peep-p.initialPeep)*.35+(p.pr?(p.prs??2):0)+(p.fl||0)*p.bol+(p.ls>0?Math.min(6,n('ls')*p.ls):0)+(p.ed?Math.min(5,n('gtn')*.5):0),60,100),rr:p.iv&&p.air==='imv'?p.setRate:p.rr+p.sev*8-n('mid')*.6,t:p.t+p.sev*.6};
   for(const k in g)v[k]+=(g[k]-v[k])*.3+(Math.random()-.5)*(k=='t'?.02:1.2);
   p.st=priority(p).level;if(p.st==2)red=1;
   B[i].lamp.material.color.set([0x3dff9a,0xffc24a,0xff4d5e][p.st])});
- if(red&&T%10===0)beep();$('#hud').textContent=Math.floor(T/60)+':'+String(T%60).padStart(2,'0')+' · '+P.filter(p=>p.done).length+'/6';updateTriage();
+ if(red&&T%10===0)beep();$('#hud').textContent=Math.floor(T/60)+':'+String(T%60).padStart(2,'0')+' · '+P.filter(p=>p.done).length+'/6';
  if(cur!=null){evu();labs()}},1000);
 
 let last=0,fr=0;
@@ -402,6 +429,8 @@ scr.visible=true;
  wallCanvas.width=3000; wallCanvas.height=1690;
  var base=document.createElement('canvas');
  base.width=3000; base.height=1690;
+ var sharpPhoto=document.createElement('canvas');
+ var sharpContext=sharpPhoto.getContext('2d');
  var wallTex=new THREE.CanvasTexture(wallCanvas);
  wallTex.anisotropy=R.capabilities.getMaxAnisotropy();
  var wall=new THREE.Mesh(new THREE.PlaneGeometry(WALLW,WALLH), new THREE.MeshBasicMaterial({map:wallTex}));
@@ -412,7 +441,15 @@ scr.visible=true;
  scr.visible=false;
  function paint(){
   if(!photo.complete||!photo.naturalWidth) return;
-  if(!base._drawn){ base.getContext('2d').drawImage(photo,0,0,base.width,base.height); base._drawn=1; }
+  if(!base._drawn){
+   sharpPhoto.width=photo.naturalWidth;sharpPhoto.height=photo.naturalHeight;
+   sharpContext.drawImage(photo,0,0);
+   const w=sharpPhoto.width,h=sharpPhoto.height,src=sharpContext.getImageData(0,0,w,h),dst=sharpContext.createImageData(w,h),a=src.data,b=dst.data;
+   b.set(a);
+   for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=(y*w+x)*4;for(let ch=0;ch<3;ch++){const blur=(a[i+ch]*4+a[i-4+ch]+a[i+4+ch]+a[i-w*4+ch]+a[i+w*4+ch])/8;b[i+ch]=Math.max(0,Math.min(255,a[i+ch]+(a[i+ch]-blur)*.8))}}
+   sharpContext.putImageData(dst,0,0);
+   base.getContext('2d').drawImage(sharpPhoto,0,0,base.width,base.height);base._drawn=1;
+  }
   var ctx=wallCanvas.getContext('2d');
   ctx.drawImage(base,0,0);
   SCREENS.forEach(function(r){
