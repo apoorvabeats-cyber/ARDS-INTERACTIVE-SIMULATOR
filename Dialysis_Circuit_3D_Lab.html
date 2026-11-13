@@ -1,0 +1,180 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Dialysis &amp; CRRT Lab</title>
+<style>
+:root{--bg:#f3f6f9;--cd:#fff;--tx:#0b1f33;--mu:#51677d;--ac:#0b8a86;--go:#9a6f00;--bd:#d5dee8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#07121f;--cd:#0e2237;--tx:#e6f0fa;--mu:#8fa6bd;--ac:#2fd0c8;--go:#e6b94a;--bd:#1d3a57}}
+:root[data-theme=dark]{--bg:#07121f;--cd:#0e2237;--tx:#e6f0fa;--mu:#8fa6bd;--ac:#2fd0c8;--go:#e6b94a;--bd:#1d3a57}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.4 system-ui,-apple-system,sans-serif;max-width:900px;margin:auto}
+h1{font-size:17px;margin:10px 12px 2px}h1 small{color:var(--mu);font-weight:400;font-size:12px;display:block}
+#modes{display:flex;gap:6px;padding:8px 12px;overflow-x:auto}
+button{font:inherit;border:1px solid var(--bd);background:var(--cd);color:var(--tx);border-radius:8px;padding:7px 12px;cursor:pointer}
+#modes button.on{background:var(--ac);color:#04141f;border-color:var(--ac);font-weight:700}
+#stage{position:relative;height:min(58vh,520px);min-height:300px;background:#06131f;margin:0 0 0}
+canvas{width:100%;height:100%;display:block;touch-action:pan-y}
+#hs{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+#hs button{position:absolute;left:0;top:0;width:26px;height:26px;padding:0;border-radius:50%;background:#e6b94a;color:#04141f;font-weight:700;font-size:12px;pointer-events:auto;border:2px solid #fff}
+#hs button.on{background:#2fd0c8;box-shadow:0 0 0 4px #2fd0c855}
+#tag{position:absolute;left:8px;bottom:8px;background:#04141fdd;color:#e6b94a;border:1px solid #2fd0c8;border-radius:8px;padding:4px 10px;font-size:12px;pointer-events:none}
+#al{position:absolute;left:8px;right:8px;top:8px;background:#b3261e;color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;display:none}
+#leg{display:flex;flex-wrap:wrap;gap:4px 12px;padding:8px 12px;font-size:12px;color:var(--mu)}
+#leg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}
+#info{margin:0 12px 8px;padding:10px 12px;background:var(--cd);border:1px solid var(--bd);border-left:4px solid var(--ac);border-radius:8px}
+#info b{color:var(--ac)}#info em{display:block;color:var(--go);font-style:normal;margin-top:4px}
+#ro{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:0 12px}
+#ro div{background:var(--cd);border:1px solid var(--bd);border-radius:8px;padding:6px 8px;font-size:11px;color:var(--mu)}
+#ro b{display:block;font-size:16px;color:var(--tx)}#ro small{font-size:10px}
+#ctl{display:grid;gap:8px;padding:12px}
+#ctl label{font-size:12px;color:var(--mu)}#ctl b{color:var(--tx)}#ctl input{width:100%;accent-color:var(--ac)}
+#ch{display:none;margin:8px 12px;padding:10px 12px;border:1px dashed var(--go);border-radius:8px;background:var(--cd)}#ch button{margin:8px 0}
+p.f{font-size:11px;color:var(--mu);margin:0 12px 14px}
+</style></head><body>
+<h1>Dialysis &amp; CRRT Lab<small>Critical Care Hub · tap numbers, change settings, watch the circuit respond</small></h1>
+<div id="modes"></div>
+<div id="stage"><canvas id="c"></canvas><div id="hs"></div><div id="al"></div><div id="tag"></div></div>
+<div id="leg"><span><i style="background:#8a1020"></i>blood out of patient</span><span><i style="background:#ff3a3a"></i>blood returning</span><span><i style="background:#f0d060"></i>dialysate</span><span><i style="background:#2fd0c8"></i>replacement fluid</span><span><i style="background:#e08a2e"></i>effluent</span><span><i style="background:#7fe8ff"></i>ultrafiltrate crossing membrane</span></div>
+<div id="info"></div><div id="ro"></div><div id="ch"></div><div id="ctl"></div>
+<p class="f">Teaching model with simplified kinetics (70 kg patient, urea volume 42 L, 1 s ≈ 10 min). Not for prescribing.</p>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=id=>document.getElementById(id),T=THREE,tx=x=>typeof x=='function'?x():x;
+const M={
+IHD:{h:1,qb:300,qd:30,rf:0,uf:500,r:[200,450],dm:30,t:'Intermittent haemodialysis, 3–5 h on a standard HD machine: Qb 300–400 mL/min, dialysate ~500 mL/min. Diffusion dominates, so solutes and fluid come off fast; haemodynamic instability is the risk.'},
+SLED:{h:1,qb:200,qd:12,rf:0,uf:200,r:[100,300],dm:18,t:'Sustained low-efficiency dialysis, 6–12 h on the same HD machine: Qb ~200, dialysate 100–300 mL/min. Slower solute and fluid shifts than IHD, better tolerated in unstable patients.'},
+CVVH:{h:0,qb:150,qd:0,rf:2,uf:100,r:[50,300],dm:0,t:'Continuous venovenous haemofiltration: convection only. No dialysate; the ultrafiltrate is replaced by replacement fluid, pre- or post-filter. Good middle-molecule clearance.'},
+CVVHD:{h:0,qb:150,qd:2,rf:0,uf:100,r:[50,300],dm:6,t:'Continuous venovenous haemodialysis: diffusion. Dialysate runs counter-current at 1–3 L/h, so small-solute clearance ≈ dialysate flow.'},
+CVVHDF:{h:0,qb:150,qd:1,rf:1,uf:100,r:[50,300],dm:6,t:'Continuous venovenous haemodiafiltration: diffusion plus convection. Dialysate and replacement fluid both run.'},
+PD:{h:0,qb:150,qd:0,rf:0,uf:0,r:[50,300],dm:0,t:'Peritoneal dialysis: no blood circuit. Dialysate dwells in the peritoneal cavity and the peritoneum is the membrane. Diffusion clears solutes; dextrose drives ultrafiltration.'}};
+const S={m:'CVVHDF',pre:0,bc:32,cit:0,fv:2,dx:2.5,dw:4},P={u:120,h:14,v:0,t:0};let C,cur=-1;
+const SL=[['qb','Blood flow','mL/min',10],['qd','Dialysate flow','L/h',.5],['rf','Replacement fluid','L/h',.1],['uf','Net ultrafiltration','mL/h',10],['bc','Bicarbonate buffer','mmol/L',1],['fv','PD fill volume','L',.1],['dx','PD dextrose','%',.25],['dw','PD dwell time','h',.5]];
+$('ctl').innerHTML=SL.map(([k,n,u,s])=>`<label>${n}: <b id=v${k}></b> ${u}<input type=range id=${k} step=${s}></label>`).join('')+'<button id=pp></button><button id=ct></button><button id=rs>Reset patient</button><button id=cb>Clinical challenge</button>';
+$('modes').innerHTML=Object.keys(M).map(m=>`<button data-m=${m}>${m}</button>`).join('');
+$('ro').innerHTML=['Blood flow','Effluent','Net UF','Urea clearance','Filtration fraction','TMP','Patient urea','Patient HCO₃⁻','Fluid removed'].map((n,i)=>`<div>${n}<b id=r${i}></b></div>`).join('');
+function calc(){if(S.m=='PD'){const dp=1-Math.exp(-S.dw/1.2),ue=Math.max(0,(S.dx-1.2)*150*Math.sqrt(S.dw)*(S.dw>6?6/S.dw:1));return{D:0,R:0,U:ue/((S.dw+.5)*60),Qf:0,Kt:S.fv*1000*dp/((S.dw+.5)*60),eff:0,ff:0,tmp:0,pa:0,pv:0,pf:0,dp,ue}}const{qb,qd,rf,uf,pre,m}=S,h=M[m].h,D=qd*1000/60,R=rf*1000/60,U=uf/60,Qf=R+U,A=h?800:400,qp=qb*.7;let K=0;
+if(D>0){const z=A*(1/qb-1/D);K=Math.abs(qb-D)<1?A/(1+A/qb):qb*(Math.exp(z)-1)/(Math.exp(z)-qb/D)}
+const Kc=pre?Qf*qb/(qb+R):Qf,Kt=Math.min(K+Kc,qb*.95),pv=30+.2*qb;
+return{D,R,U,Qf,Kt,eff:D+R+U,ff:Qf/(qp+(pre?R:0)),tmp:12+1.6*Qf,pa:-(15+.35*qb),pv,pf:pv+.25*qb}}
+function rng(k,a,b){const e=$(k);e.min=a;e.max=b;e.value=S[k]}
+function setMode(m){S.m=m;const c=M[m];Object.assign(S,{qb:c.qb,qd:c.qd,rf:c.rf,uf:c.uf});
+rng('qb',...c.r);rng('qd',0,c.dm);rng('rf',0,6);rng('uf',0,c.h?1500:500);rng('bc',20,40);rng('fv',1,3);rng('dx',1.5,4.25);rng('dw',1,8);const pd=m=='PD';SL.forEach(([k])=>{const q=['fv','dx','dw'].includes(k);$(k).parentElement.style.display=(q?!pd:pd&&k!='bc')?'none':''});
+$('qd').disabled=!c.dm;$('rf').disabled=!!c.h||m=='CVVHD';
+document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('on',b.dataset.m==m));
+bagD.material.color.setHex(c.h?0x3d7a99:0xe3c85a);bagD.scale.set(c.h?1.3:1,c.h?1.1:1,c.h?2:1);bagR.visible=!c.h;pdView(pd);
+pnl.material.color.setHex(c.h?0x15324f:0x0d3b3a);cur=-1;sync()}
+function sync(){SL.forEach(([k])=>{S[k]=+$(k).value;$('v'+k).textContent=S[k]});
+C=calc();const h=M[S.m].h;$('pp').textContent='Replacement: '+(S.pre?'pre-dilution':'post-dilution');$('pp').disabled=h||S.rf==0;if(h)S.cit=0;$('ct').textContent='Anticoagulant: '+(S.cit?'regional citrate + calcium':'heparin');$('ct').disabled=h||S.m=='PD';
+scr();$('tag').innerHTML=S.m=='PD'?'<b style="color:#2fd0c8">PD</b> · automated cycler<br>Fill '+S.fv+' L · dextrose '+S.dx+' % · dwell '+S.dw+' h':'<b style="color:#2fd0c8">'+S.m+'</b> · '+(h?'SLED / HD machine':'CRRT machine')+'<br>Qb '+S.qb+' · Qd '+S.qd+' L/h · Qrf '+S.rf+' L/h · UF '+S.uf+' mL/h'+(S.rf>0?' · '+(S.pre?'PRE':'POST'):'');const a=[];if(C.ff>.25)a.push('Filtration fraction '+(C.ff*100|0)+' % (>25 %): clotting risk. Lower UF or replacement, or switch to pre-dilution.');
+if(C.tmp>200)a.push('High TMP: membrane clogging.');if(C.pa<-150)a.push('Access pressure too negative: lower blood flow.');
+$('al').style.display=a.length?'block':'none';$('al').textContent=a.join(' ');info(cur);ro()}
+function ro(){const c=C,pd=S.m=='PD',L=pd?['Fill volume','Dextrose','Dwell time','D/P urea','UF / exchange','Urea clearance','Patient urea','Patient HCO₃⁻','Fluid removed']:['Blood flow','Effluent','Net UF','Urea clearance','Filtration fraction','TMP','Patient urea','Patient HCO₃⁻','Fluid removed'],v=pd?[S.fv+' L',S.dx+' %',S.dw+' h',c.dp.toFixed(2),c.ue.toFixed(0)+' mL',c.Kt.toFixed(1)+' mL/min',P.u.toFixed(0)+' mg/dL',P.h.toFixed(1)+' mmol/L',P.v.toFixed(2)+' L']:[S.qb+' mL/min',(c.eff*.06).toFixed(1)+' L/h <small>('+(c.eff*60/70|0)+' mL/kg/h)</small>',S.uf+' mL/h',c.Kt.toFixed(0)+' mL/min',(c.ff*100).toFixed(0)+' %',c.tmp.toFixed(0)+' mmHg',P.u.toFixed(0)+' mg/dL',P.h.toFixed(1)+' mmol/L',P.v.toFixed(2)+' L'];v.forEach((x,i)=>{$('r'+i).innerHTML=x;$('r'+i).parentNode.firstChild.textContent=L[i]})}
+const HS=[
+[[-5.9,.9,.4],'Vascular access catheter','Double-lumen dialysis catheter (IJ or femoral). One lumen drains blood from the patient (dark red), the other returns it (bright red). Keep the tips apart to limit recirculation.'],
+[[-3.6,-2.7,.4],'Access pressure sensor (Pa)','Sits before the pump and reads negative suction. Very negative = kinked line, poor catheter flow or too high Qb; the machine slows the pump or alarms.',()=>'Pa now '+C.pa.toFixed(0)+' mmHg'],
+[[-1.2,-3.2,.5],'Blood pump','Peristaltic roller pump pushes blood at Qb. Blood flows patient → pump → filter. Roller speed and blood particle speed follow your Qb slider (CRRT 100–250, SLED ~200, IHD 300–400 mL/min).'],
+[[-2.3,-4.3,.4],'Anticoagulation',()=>S.cit?'Regional citrate is infused before the pump (gold beads). It chelates calcium, so the circuit does not clot, and is metabolised to bicarbonate. Calcium is replaced after the filter. Needs ionised Ca monitoring; avoid in severe liver failure.':'Heparin (purple beads) is infused before the pump to delay clotting of lines and filter. Switch to regional citrate when bleeding risk is high.'],
+[[.8,-3.2,.5],'Pre-filter pressure and pre-dilution port','Pressure after the pump. In CVVH/CVVHDF replacement fluid may enter here (pre-dilution): blood is diluted, filtration fraction and clotting fall, clearance per litre falls too. Use the Pre/Post button.',()=>'Pre-filter pressure '+C.pf.toFixed(0)+' mmHg'],
+[[2.3,0,.9],'Haemofilter / dialyser','Hollow fibres: blood flows upward inside, dialysate flows downward outside (counter-current). Small solutes cross by diffusion; plasma water with dissolved solutes crosses by ultrafiltration (cyan beads, their rate = Qf, dragging solutes by convection).',()=>'Qf '+C.Qf.toFixed(1)+' mL/min · TMP '+C.tmp.toFixed(0)+' mmHg'],
+[[5.4,3.5,.4],'Dialysate source and bicarbonate',()=>M[S.m].h?'HD machine proportions RO water, acid concentrate and bicarbonate concentrate online. Bicarbonate (usually 32–35 mmol/L) diffuses into blood and corrects acidosis. Raise the buffer slider to see patient HCO₃⁻ climb.':'Bagged sterile dialysate with bicarbonate buffer (about 32 mmol/L): the main route for correcting acidosis in CRRT. Lactate or citrate buffers are alternatives.',()=>'Buffer delivered '+(S.bc*(S.qd+S.rf)).toFixed(0)+' mmol/h'],
+[[5.4,1.2,.9],'Replacement fluid (convective modes)','Replaces the ultrafiltrate volume. Bicarbonate is added only through these bags: never add calcium and bicarbonate in one bag (precipitation); IV NaHCO₃ can be given separately. Enters pre- or post-filter.'],
+[[4.1,-3.6,.4],'Effluent pump and net UF','Effluent = spent dialysate + ultrafiltrate. Net UF = effluent − dialysate − replacement: the fluid truly removed from the patient. Increase the UF slider and watch Fluid removed rise. HD machines do this with volumetric balancing.',()=>'Effluent '+(C.eff*.06).toFixed(2)+' L/h'],
+[[.3,4.1,.4],'Air trap and venous pressure (Pv)','Returning blood passes a drip chamber: air rises and is detected, venous pressure is read. Post-dilution fluid enters here after the filter, giving higher clearance but a higher filtration fraction.',()=>'Pv now '+C.pv.toFixed(0)+' mmHg'],
+[[-3.4,3.9,.4],'Return line and clamp','Cleaned, concentrated blood returns to the venous lumen. On air or pressure alarms the clamp shuts and the pump stops. Total blood path: patient → access limb → Pa → pump → filter ↑ → air trap → return limb → patient.'],
+[[-3,5.3,.5],'Calcium infusion (citrate protocol)','Calcium chloride or gluconate is infused into the return line after the filter to restore systemic ionised calcium. Rising total:ionised Ca ratio (above 2.5) signals citrate accumulation.'],
+[[1.5,-2.6,.8],'Peritoneal catheter','Tunnelled Tenckhoff catheter. The cycler fills warmed dialysate through it, then drains it after the dwell. Fill, dwell and drain loop automatically (about 24 s here).'],
+[[3.7,.9,.9],'Peritoneal membrane and dwell','Peritoneal capillaries are the membrane. During the dwell urea and creatinine diffuse from blood into the fluid (cyan), so the dialysate:plasma ratio rises toward equilibrium.',()=>'D/P urea '+C.dp.toFixed(2)],
+[[1.5,1.2,.9],'Dextrose and ultrafiltration','Dextrose makes the fluid hyperosmolar, so water moves into the cavity (orange). Glucose is absorbed and the gradient fades, so very long dwells lose UF. Raise dextrose to remove more fluid.',()=>'UF per exchange about '+C.ue.toFixed(0)+' mL'],
+[[5.4,3.4,.6],'Fill bag, drain bag and cycler','Bags carry dextrose and a buffer (lactate or bicarbonate). APD cyclers run several exchanges overnight; CAPD uses manual exchanges 3–4 times a day. Drain is by gravity.']];
+const nP=()=>S.m!='PD',pdv=()=>S.m=='PD',vis=[nP,nP,nP,nP,nP,nP,()=>nP()&&(C.D>0||M[S.m].h),()=>nP()&&C.R>0,nP,nP,nP,()=>nP()&&!!S.cit,pdv,pdv,pdv,pdv];
+HS.forEach((h,i)=>{const b=document.createElement('button');b.textContent=i+1;b.onclick=()=>info(cur==i?-1:i);$('hs').append(b);h.b=b});
+function info(i){cur=i;HS.forEach((h,j)=>h.b.classList.toggle('on',j==i));
+if(i<0){$('info').innerHTML='<b>'+S.m+'</b> · '+M[S.m].t+'<em>'+(S.m=='PD'?'Path: fill bag → catheter → peritoneal cavity (dwell) → catheter → drain bag. The peritoneum is the membrane.':'Blood path: patient → access limb → Pa → blood pump → filter (upward) → air trap → return limb → patient.')+'</em>';return}
+const h=HS[i];$('info').innerHTML='<b>'+(i+1)+'. '+h[1]+'</b><br>'+tx(h[2])+(h[3]?'<em>'+h[3]()+'</em>':'')}
+const cv=$('c'),R=new T.WebGLRenderer({canvas:cv,antialias:true}),sc3=new T.Scene(),cam=new T.PerspectiveCamera(50,1,.1,100),G=new T.Group();sc3.add(G);R.setClearColor(0x06131f);
+sc3.add(new T.AmbientLight(0xffffff,.75));const dl=new T.DirectionalLight(0xffffff,.9);dl.position.set(3,5,10);sc3.add(dl);
+const mat=(c,o)=>new T.MeshPhongMaterial(Object.assign({color:c},o||{})),box=(w,h,d,c,x,y,z,o)=>{const m=new T.Mesh(new T.BoxGeometry(w,h,d),mat(c,o));m.position.set(x,y,z);G.add(m);return m};
+const pnl=box(10.2,13,.4,0x0d3b3a,2.2,.3,-.9);
+const sc=document.createElement('canvas');sc.width=512;sc.height=128;const sx=sc.getContext('2d'),st=new T.CanvasTexture(sc);
+const scrM=new T.Mesh(new T.PlaneGeometry(6.4,1.6),new T.MeshBasicMaterial({map:st}));scrM.position.set(2.2,5.75,-.5);G.add(scrM);
+function scr(){sx.fillStyle='#04141f';sx.fillRect(0,0,512,128);sx.fillStyle='#2fd0c8';sx.font='bold 30px sans-serif';sx.fillText(S.m=='PD'?'PD CYCLER':M[S.m].h?'SLED / HD MACHINE':'CRRT MACHINE',16,38);sx.fillStyle='#e6b94a';sx.font='24px sans-serif';sx.fillText(S.m=='PD'?'Fill '+S.fv+' L  Dextrose '+S.dx+' %':S.m+'  Qb '+S.qb+'  UF '+S.uf+'/h',16,78);sx.fillStyle='#9ab';sx.font='20px sans-serif';sx.fillText(S.m=='PD'?'Dwell '+S.dw+' h':'Qd '+S.qd+' L/h   Qrf '+S.rf+' L/h   '+(S.pre?'PRE':'POST'),16,112);st.needsUpdate=true}
+const bagD=box(1.1,1.5,.35,0xe3c85a,5.4,2.4,-.2,{transparent:true,opacity:.7}),bagR=box(1.1,1.5,.35,0x2fd0c8,5.4,.2,.5,{transparent:true,opacity:.7}),bagE=box(1.1,1.2,.35,0xd98a2b,5.4,-2.6,-.2,{transparent:true,opacity:.7});
+// patient
+const pm=mat(0x3a5f7d,{transparent:true,opacity:.75});let m=new T.Mesh(new T.SphereGeometry(.55,16,16),pm);m.position.set(-6.7,2.1,0);G.add(m);
+m=new T.Mesh(new T.CylinderGeometry(.6,.5,4.2,16),pm);m.position.set(-6.7,-.55,0);G.add(m);
+const heart=new T.Mesh(new T.SphereGeometry(.22,12,12),mat(0xff3a3a,{emissive:0x661010}));heart.position.set(-6.45,.5,.5);G.add(heart);
+// filter
+m=new T.Mesh(new T.CylinderGeometry(.75,.75,4.2,24,1,true),mat(0x99bbdd,{transparent:true,opacity:.22,side:2}));m.position.set(2.3,0,0);G.add(m);
+[-2.1,2.1].forEach(y=>{m=new T.Mesh(new T.CylinderGeometry(.82,.82,.3,24),mat(0x44566a));m.position.set(2.3,y,0);G.add(m)});
+for(let i=0;i<5;i++){m=new T.Mesh(new T.CylinderGeometry(.03,.03,4,5),mat(0xffeecc));m.position.set(1.75+i*.1,0,(i-2)*.12);G.add(m)}
+box(.03,4,1,0xffffff,2.3,0,0,{transparent:true,opacity:.3});
+// dot texture and streams
+const dc=document.createElement('canvas');dc.width=dc.height=32;const dx=dc.getContext('2d'),gr=dx.createRadialGradient(16,16,2,16,16,15);gr.addColorStop(0,'#fff');gr.addColorStop(1,'rgba(255,255,255,0)');dx.fillStyle=gr;dx.fillRect(0,0,32,32);const dot=new T.CanvasTexture(dc);
+const TB=[];
+function mk(pts,col,tube,on){const c=new T.CatmullRomCurve3(pts.map(p=>new T.Vector3(p[0],p[1],p[2]||0)),false,'catmullrom',.2),n=Math.round(c.getLength()*4),g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(new Float32Array(n*3),3));
+const pm=new T.PointsMaterial({color:col,size:.3,map:dot,transparent:true,depthWrite:false}),o=new T.Points(g,pm);o.frustumCulled=false;G.add(o);
+if(tube){const tm=mat(col,{transparent:true,opacity:.4});G.add(new T.Mesh(new T.TubeGeometry(c,60,.08,6),tm));TB.push({tm,on})}
+return{c,n,g,pm,o,ph:Math.random()}}
+const sPA=mk([[-5.9,.7],[-4.6,-.6],[-3.6,-3.2],[.6,-3.2],[2,-3.1],[2,-2]],0x8a1020,1,()=>1),
+sPF=mk([[2,-2],[2,2]],0xd0242f,0),
+sPV=mk([[2,2],[2,3.2],[1,3.3],[-3,3.3],[-4.8,2.4],[-5.9,1.1]],0xff3a3a,1,()=>1),
+sDI=mk([[5,2.4],[3.6,2.4],[2.6,1.8]],0xf0d060,1,()=>C.D>0),
+sDF=mk([[2.6,1.8],[2.6,-1.7]],0xf0d060,0),
+sDE=mk([[2.6,-1.7],[3.3,-2.6],[5,-2.6]],0xe08a2e,1,()=>C.eff>.5),
+sRP=mk([[5,.2,.8],[3.8,.2,.8],[3.8,-3.7,.8],[.8,-3.7,.8],[.8,-3.2,0]],0x2fd0c8,1,()=>C.R>0&&S.pre),
+sRO=mk([[5,.2,.8],[3.8,.2,.8],[3.8,3.7,.8],[1,3.7,.8],[1,3.3,0]],0x2fd0c8,1,()=>C.R>0&&!S.pre),
+sHP=mk([[-2.3,-4.8],[-2.3,-3.3]],0xb28cff,1,()=>1);
+const sCA=mk([[-3,5.3],[-3,3.4]],0x66ff88,1,()=>S.cit);box(.5,.9,.5,0x66ff88,-3,5.7,0,{transparent:true,opacity:.7});
+function adv(s,v,dt,on){if(S.m=='PD'&&!PDK.includes(s.o))return;s.o.visible=on;if(!on)return;s.ph=(s.ph+v*dt/s.c.getLength())%1;const a=s.g.attributes.position;for(let i=0;i<s.n;i++){const p=s.c.getPointAt((i/s.n+s.ph)%1);a.setXYZ(i,p.x,p.y,p.z)}a.needsUpdate=true}
+// ultrafiltrate beads
+const UN=40,ug=new T.BufferGeometry(),up=new Float32Array(UN*3),uu=[],uy=[];for(let i=0;i<UN;i++){uu.push(Math.random());uy.push(-1.8+Math.random()*3.6)}
+ug.setAttribute('position',new T.BufferAttribute(up,3));const uo=new T.Points(ug,new T.PointsMaterial({color:0x7fe8ff,size:.22,map:dot,transparent:true,depthWrite:false}));uo.frustumCulled=false;G.add(uo);
+// pumps
+const PU=[],fl=q=>q>.1?Math.min(q/8,8)+.5:0;
+function pump(x,y,z,f){const g=new T.Group(),b=new T.Mesh(new T.CylinderGeometry(.55,.55,.3,24),mat(0x2a3f55));b.rotation.x=Math.PI/2;g.add(b);const r=new T.Group();for(let i=0;i<3;i++){const s=new T.Mesh(new T.SphereGeometry(.12,8,8),mat(0x2fd0c8,{emissive:0x0a4a48})),a=i*2.094;s.position.set(Math.cos(a)*.32,Math.sin(a)*.32,.2);r.add(s)}g.add(r);g.position.set(x,y,z);G.add(g);PU.push({r,f})}
+pump(-1.2,-3.2,0,()=>S.qb/40);pump(4.1,2.4,0,()=>fl(C.D));pump(4.1,-2.6,0,()=>fl(C.eff));pump(4.4,.2,.8,()=>fl(C.R));
+// bicarbonate halos
+const ha=[bagD,bagR].map(b=>{const r=new T.Mesh(new T.TorusGeometry(.95,.04,8,32),new T.MeshBasicMaterial({color:0x2fd0c8,transparent:true}));r.position.copy(b.position);G.add(r);return r});
+// interaction
+// peritoneal dialysis scene
+const n0=G.children.length;
+box(4.4,4.4,1.4,0xffcc88,1.5,0,0,{transparent:true,opacity:.14});const fluid=box(4.2,4,1.2,0xf0d060,1.5,-2,0,{transparent:true,opacity:.55});box(.12,4.4,1.2,0xc0222f,-.75,0,0);box(.12,4.4,1.2,0xc0222f,3.75,0,0);
+const pF=mk([[5,2.4,.6],[3.9,2.4,.6],[3.9,-3,.6],[1.5,-3.1],[1.5,-2.2]],0xf0d060,1,()=>1),pD=mk([[1.5,-2.2],[1.8,-3.5],[3.4,-3.7],[5,-2.6]],0xe08a2e,1,()=>1);
+const PN=50,pcs=[0x7fe8ff,0xffb347].map(c=>{const g=new T.BufferGeometry(),a=new Float32Array(PN*3);g.setAttribute('position',new T.BufferAttribute(a,3));const o=new T.Points(g,new T.PointsMaterial({color:c,size:.24,map:dot,transparent:true,depthWrite:false}));o.frustumCulled=false;G.add(o);return{g,a,u:[...Array(PN)].map(()=>Math.random())}});
+const PDK=G.children.slice(n0);PDK.forEach(o=>o.visible=false);
+function pdView(pd){G.children.forEach(o=>o.visible=pd?(PDK.includes(o)||o==pnl||o==scrM||o==bagD||o==bagE):!PDK.includes(o));bagR.visible=!pd&&!M[S.m].h}
+function pdLoop(dt){const ph=(tm%24)/24,lv=S.fv/3,l=ph<.2?ph/.2*lv:ph<.75?lv:lv*(1-(ph-.75)/.25),dw=ph>=.2&&ph<.75;fluid.scale.y=Math.max(l,.01);fluid.position.y=-2.1+2*l;adv(pF,1.5,dt,ph<.2);adv(pD,1.5,dt,ph>=.75);
+pcs.forEach((s,k)=>{const n=dw?Math.round((k?(S.dx-1)/3.25:C.dp)*PN):0;s.g.setDrawRange(0,n);for(let i=0;i<PN;i++){s.u[i]=(s.u[i]+dt*.3)%1;s.a[i*3]=1.5+(i%2?1:-1)*(2.1-s.u[i]*1.2);s.a[i*3+1]=-2.1+(.1+.8*((i*37%50)/50))*4*Math.max(l,.05);s.a[i*3+2]=(i%5-2)*.2}s.g.attributes.position.needsUpdate=true})}
+let yaw=0,pit=0,zm=1,ptr={};
+cv.onpointerdown=e=>{cv.setPointerCapture(e.pointerId);ptr[e.pointerId]=[e.clientX,e.clientY]};
+cv.onpointerup=cv.onpointercancel=e=>delete ptr[e.pointerId];
+cv.onpointermove=e=>{const p=ptr[e.pointerId];if(!p)return;const ks=Object.keys(ptr);
+if(ks.length==2){const o=ks.find(k=>k!=e.pointerId),q=ptr[o],d0=Math.hypot(p[0]-q[0],p[1]-q[1]),d1=Math.hypot(e.clientX-q[0],e.clientY-q[1]);zm=Math.min(1.6,Math.max(.5,zm*d0/(d1||1)))}
+else{yaw=Math.max(-.9,Math.min(.9,yaw+(e.clientX-p[0])*.006));pit=Math.max(-.35,Math.min(.35,pit+(e.clientY-p[1])*.004))}
+ptr[e.pointerId]=[e.clientX,e.clientY]};
+cv.onwheel=e=>{e.preventDefault();zm=Math.min(1.6,Math.max(.5,zm*(1+e.deltaY*.001)))};
+let W=1,H=1;function rs(){const r=$('stage').getBoundingClientRect();W=r.width;H=r.height;R.setPixelRatio(Math.min(devicePixelRatio,2));R.setSize(W,H,false);cam.aspect=W/H;cam.updateProjectionMatrix()}
+new ResizeObserver(rs).observe($('stage'));rs();
+document.querySelectorAll('#modes button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+SL.forEach(([k])=>$(k).oninput=sync);$('pp').onclick=()=>{S.pre^=1;sync()};$('ct').onclick=()=>{S.cit^=1;sync()};$('cb').onclick=chal;$('rs').onclick=()=>{Object.assign(P,{u:120,h:14,v:0,t:0})};
+let L=performance.now(),fr=0,tm=0;const V=new T.Vector3();
+function loop(n){requestAnimationFrame(loop);const dt=Math.min((n-L)/1000,.05);L=n;tm+=dt;fr++;
+const t=Math.tan(25*Math.PI/180),z=Math.max(8/(t*cam.aspect),7.4/t)*zm;cam.position.set(-.3,.7,z);
+G.rotation.y=yaw+.12*Math.sin(tm*.3);G.rotation.x=pit;if(S.m=='PD')pdLoop(dt);
+const bv=.5+S.qb/90;adv(sPA,bv,dt,1);adv(sPF,bv,dt,1);adv(sPV,bv,dt,1);
+const dv=.3+Math.sqrt(C.D)/5,ev=.3+Math.sqrt(C.eff)/4,rv=.3+Math.sqrt(C.R)/4;
+adv(sDI,dv,dt,C.D>0);sDF.pm.color.setHex(C.D>0?0xf0d060:0xe08a2e);adv(sDF,C.D>0?dv:ev,dt,C.eff>.5);adv(sDE,ev,dt,C.eff>.5);
+adv(sRP,rv,dt,C.R>0&&S.pre);adv(sRO,rv,dt,C.R>0&&!S.pre);sHP.pm.color.setHex(S.cit?0xffd24d:0xb28cff);adv(sHP,.5,dt,1);adv(sCA,.5,dt,!!S.cit);
+const n2=C.Qf>.2?Math.min(UN,Math.round(C.Qf*1.5)+3):0;ug.setDrawRange(0,n2);
+for(let i=0;i<UN;i++){uu[i]=(uu[i]+dt*(.5+C.Qf/8))%1;up[i*3]=2.1+.4*uu[i];up[i*3+1]=uy[i];up[i*3+2]=(i%5-2)*.1}ug.attributes.position.needsUpdate=true;
+PU.forEach(p=>p.r.rotation.z-=dt*p.f());TB.forEach(b=>b.tm.opacity=b.on()?.4:.1);
+ha.forEach((h,i)=>{h.visible=i?!M[S.m].h&&C.R>0:C.D>0||M[S.m].h;h.material.opacity=.4+.4*Math.sin(tm*3);h.lookAt(cam.position)});
+heart.scale.setScalar(1+.15*Math.sin(tm*6));
+const dm=dt*(S.m=='PD'?60:10);P.u=Math.max(0,P.u-P.u*C.Kt/42000*dm);P.h+=(S.bc-P.h)*C.Kt/40000*dm;P.v+=C.U*dm/1000;P.t+=dm/60;
+HS.forEach((h,i)=>{const on=vis[i]();h.b.style.display=on?'block':'none';if(!on)return;V.set(...h[0]);G.localToWorld(V);V.project(cam);h.b.style.transform=`translate(${(V.x*.5+.5)*W-13}px,${(-V.y*.5+.5)*H-13}px)`});
+if(fr%6==0){ro();if(cur>=0&&HS[cur][3])info(cur)}
+R.render(sc3,cam)}
+const ef=()=>C.eff*60/70>=20&&C.eff*60/70<=35,CH=[
+['Septic shock on noradrenaline, oliguric AKI, pH 7.15, HCO₃⁻ 12, +8 L fluid balance. Set a prescription.',[['Continuous modality (CRRT or SLED), not IHD',()=>S.m!='IHD'&&S.m!='PD'],['Effluent dose 20–35 mL/kg/h',ef],['Gentle net UF 50–200 mL/h',()=>S.uf>=50&&S.uf<=200],['Buffer 32 mmol/L or more',()=>S.bc>=32],['Filtration fraction 25 % or less',()=>C.ff<=.25]]],
+['Hyperkalaemia (K 7.2), stable BP, needs fast clearance, no fluid overload.',[['IHD mode',()=>S.m=='IHD'],['Blood flow 300 mL/min or more',()=>S.qb>=300],['Dialysate 24 L/h or more',()=>S.qd>=24],['Net UF 1000 mL/h or less',()=>S.uf<=1000]]],
+['Post cardiac surgery, bleeding risk, AKI: avoid heparin and run CRRT.',[['A CVV mode',()=>/^CVV/.test(S.m)],['Regional citrate on',()=>S.cit==1],['Effluent dose 20–35 mL/kg/h',ef],['Filtration fraction 25 % or less',()=>C.ff<=.25]]]];
+let ci=-1;function chal(){ci=(ci+1)%CH.length;const c=CH[ci];$('ch').style.display='block';$('ch').innerHTML='<b>Case '+(ci+1)+'</b> · '+c[0]+'<br><button id=ck>Check my prescription</button><div id=cr></div>';$('ck').onclick=()=>{$('cr').innerHTML=c[1].map(([t,f])=>(f()?'✅ ':'❌ ')+t).join('<br>')};$('ch').scrollIntoView({behavior:'smooth',block:'center'})}
+setMode('CVVHDF');requestAnimationFrame(loop);
+</script></body></html>
