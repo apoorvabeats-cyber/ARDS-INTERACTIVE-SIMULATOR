@@ -45,10 +45,7 @@ input[type=range]{width:100%}
 .tabs{display:flex;gap:6px;margin:8px 0}.tabs button{flex:1;padding:6px 2px}.tabs .on{border-color:var(--c);color:var(--c)}
 .tb{display:none}.tb.on{display:block}
 #lab table{width:100%;border-collapse:collapse}#lab td{padding:4px 6px;border-bottom:1px solid #16305a}#lab td:last-child{text-align:right;font-variant-numeric:tabular-nums}.hi{color:var(--r)}
-.approach{margin:8px 0;padding:9px 10px;border:1px solid #2a5a8c;border-radius:8px;background:#0a1830}.approach ol{margin:6px 0 0;padding-left:22px}.approach li{margin:3px 0}.approach small{display:block;margin-top:7px;color:#9fc3e4}
-#triage{position:fixed;right:10px;top:52px;z-index:2;width:min(280px,38vw);max-height:calc(100vh - 100px);overflow:auto;background:rgba(5,15,32,.93);border:1px solid #315776;border-radius:8px;padding:8px}
-#triage b,#triage small{display:block}#triage small{color:#9fc3e4}#triage button{display:block;width:100%;text-align:left;margin-top:5px;padding:6px 8px}#triage button.urgent{border-left:4px solid var(--r)}#triage button.watch{border-left:4px solid var(--a)}#triage button.stable{border-left:4px solid var(--g)}
-@media(max-width:600px){#triage{top:auto;bottom:40px;width:min(260px,70vw);max-height:30vh}#triage button{padding:3px 6px}}
+.approach{margin:8px 0;padding:8px 10px;border:1px solid #2a5a8c;border-radius:8px;background:#0a1830}.approach summary{cursor:pointer;color:var(--c)}.approach ol{margin:6px 0 0;padding-left:22px}.approach li{margin:3px 0}.approach small{display:block;margin-top:7px;color:#9fc3e4}
 </style></head><body>
 <canvas id="gl"></canvas>
 <div id="door"><h1>Intensive Care Unit</h1><div class="frame" id="dr" style="background:radial-gradient(#39e6ff66,#02060f)"><div class="leaf l"></div><div class="leaf r"></div></div><p>Six patients. One doctor.</p><button id="enter">Enter the ICU</button></div>
@@ -56,18 +53,22 @@ input[type=range]{width:100%}
 <div id="toast"></div>
 <div id="hint"></div>
 <div id="photo"><div id="pw"><div id="pb"></div><canvas id="pc" width="640" height="360" aria-hidden="true"></canvas><canvas id="iv" width="1280" height="720" aria-hidden="true"></canvas><canvas id="pl" width="720" height="508"></canvas><canvas id="pr" width="300" height="200"></canvas><div id="pi"></div></div></div>
-<aside id="triage" aria-label="Simulation priority list"></aside>
 <div id="panel">
 <h3 id="pn"></h3><small id="hx" style="display:block;color:#9fc3e4;margin-bottom:6px"></small>
-<section class="approach" aria-label="Patient assessment approach"><b>Assess → stabilize → investigate → act → reassess</b><ol><li>Check ABCDE, immediate threats and monitor trends; call for help when unstable.</li><li>Choose the priority action, then use the support and drug controls where available.</li><li>Recheck simulated vitals and labs, consider treatment hazards, and revise the plan.</li></ol><small>Educational simulation only; not clinical decision support or a dosing guide. Triage flags and physiological responses are unvalidated heuristics, not a validated patient model. Disease progression, recovery and many treatments are not modeled; a quiz choice does not administer treatment. Never use for patient care. Follow current guidance, local protocols and qualified supervision.</small></section>
+<details class="approach"><summary>Patient approach · educational simulation, not patient care</summary><ol><li>Check ABCDE, immediate threats and monitor trends; call for help when unstable.</li><li>Choose the priority action, then use the support and drug controls where available.</li><li>Recheck simulated vitals and labs, consider treatment hazards, and revise the plan.</li></ol><small>Triage flags and physiological responses are unvalidated heuristics, not a validated patient model or dosing guide. Disease progression, recovery and many treatments are not modeled; a quiz choice does not administer treatment. Never use for patient care. Follow current guidance, local protocols and qualified supervision.</small></details>
 <div id="ev"></div>
 <div class="tabs"><button data-t="0" class="on">Drugs</button><button data-t="1">Support</button><button data-t="2">Labs</button></div>
 <div class="tb on" id="t0"></div>
-<div class="tb" id="t1"><div class="row">
+<div class="tb" id="t1"><div id="vent-mode" class="approach"></div><p id="vent-hint" style="color:#9fc3e4"></p><div class="row">
 <label>FiO₂ <output>50</output>%<input id="fi" type="range" min="21" max="100" value="50"></label>
-<label>PEEP or EPAP <output>8</output> cmH₂O<input id="pe" type="range" min="0" max="20" value="8"></label></div>
+<label><span id="pe-label">PEEP or EPAP</span> <output>8</output> cmH₂O<input id="pe" type="range" min="0" max="20" value="8"></label></div>
+<div id="imv-controls" class="row">
+<label>Set respiratory rate <output>20</output>/min<input id="rrset" type="range" min="6" max="40" value="20"></label>
+<label>Target tidal volume <output>400</output> mL<input id="vtset" type="range" min="200" max="800" step="10" value="400"></label></div>
+<div id="niv-controls" class="row">
+<label>IPAP <output>18</output> cmH₂O<input id="ipap" type="range" min="8" max="30" value="18"></label></div>
 <div class="row" style="margin-top:10px"><button id="hu"></button><button id="pr"></button></div>
-<p style="color:#7fa6c8">Head-up 30° protects the brain. Prone position improves oxygenation in severe ARDS and is unsafe with raised ICP.</p></div>
+<p style="color:#7fa6c8">Ventilator controls are simplified educational settings, not prescriptions. Use predicted body weight, gas exchange, mechanics, patient synchrony and local protocols. Head-up positioning may help; prone positioning is unsafe with raised ICP.</p></div>
 <div class="tb" id="t2"><div id="lab"></div></div>
 </div>
 <div id="end"></div>
@@ -120,7 +121,7 @@ const P=D.map((d,i)=>{
  const support=SUPPORT[d.dx];
  if(!support)throw new Error('Missing support settings for '+d.dx);
  const [air,fio2,peep]=support;
- return{...d,i,air,vp:0,iv:air==='imv'||air==='niv',dz:{},sev:.05,pend:0,done:0,ok:0,fio2,peep,initialFio2:fio2,initialPeep:peep,pump:0,bol:0,ph:0,st:0,v:{hr:d.hr,sbp:d.sbp,dbp:d.dbp??d.sbp*.6,spo2:d.spo2,rr:d.rr,t:d.t}}
+ return{...d,i,air,vp:0,ipap:peep+(d.dr||10),setRate:d.rr,iv:air==='imv'||air==='niv',dz:{},sev:.05,pend:0,done:0,ok:0,fio2,peep,initialFio2:fio2,initialPeep:peep,pump:0,bol:0,ph:0,st:0,v:{hr:d.hr,sbp:d.sbp,dbp:d.dbp??d.sbp*.6,spo2:d.spo2,rr:d.rr,t:d.t}}
 });
 const ecg=(f,tw)=>{const g=(m,s,a)=>a*Math.exp(-(((f-m)/s)**2));return g(.2,.03,.13)+g(.4,.012,1)-g(.375,.01,.15)-g(.43,.012,.2)+g(.65,.05,.25*tw)};
 function mon(c,p,w,h,x,y){
@@ -175,8 +176,8 @@ scr.position.set(100,.5+RW*2,-8);S.add(scr);
 // ward
 const BA=[-44,0,44,136,180,224].map(d=>d*Math.PI/180),RD=7,BP=i=>[RD*Math.sin(BA[i]),-RD*Math.cos(BA[i])];
 const PH=[new Image(),new Image()];PH[0].src=IM[0];PH[1].src=IM[1];
-const TM=document.createElement('canvas'),TR=document.createElement('canvas');TM.width=360;TM.height=254;TR.width=300;TR.height=200;
-const breathLayer=document.createElement('canvas');breathLayer.width=640;breathLayer.height=360;
+const TM=document.createElement('canvas'),TR=document.createElement('canvas');TM.width=720;TM.height=508;TR.width=300;TR.height=200;
+const breathLayer=document.createElement('canvas');breathLayer.width=1280;breathLayer.height=720;
 function drawBreathing(c,im,p,x,y,w,h){
  if(!im||!im.complete||!im.naturalWidth)return;
  const b=breathLayer.getContext('2d'),bw=breathLayer.width,bh=breathLayer.height,cx=bw*.5,cy=bh*.57;
@@ -188,16 +189,16 @@ function drawBreathing(c,im,p,x,y,w,h){
 }
 // each bed is the patient photograph itself, kept live with the monitor, ventilator, panel and breathing
 const B=P.map((p,i)=>{
- const [x,z]=BP(i),cvs=document.createElement('canvas');cvs.width=640;cvs.height=360;
+const [x,z]=BP(i),cvs=document.createElement('canvas');cvs.width=1280;cvs.height=720;
  const tex=new THREE.CanvasTexture(cvs),g=new THREE.Mesh(new THREE.PlaneGeometry(5.2,2.925),new THREE.MeshBasicMaterial({map:tex}));
  g.position.set(x,1.55,z);g.lookAt(0,1.55,0);g.userData.bed=i;S.add(g);
  const lamp=new THREE.Mesh(new THREE.SphereGeometry(.12,12,8),new THREE.MeshBasicMaterial({color:0x3dff9a}));lamp.position.set(x*.98,3.25,z*.98);S.add(lamp);
  return{g,ctx:cvs.getContext('2d'),tex,lamp}});
-function prow(p){const ip=p.peep+p.dr+p.sev*6;return p.iv?[[(p.air==='imv'?'IMV':'NIV'),(p.air==='imv'?'tube':'mask')],[p.air==='imv'?'PIP':'IPAP',Math.round(ip)],[p.air==='imv'?'PEEP':'EPAP',p.peep],...(p.air==='imv'?[['Vt',p.vt+' mL']]:[]),['RR',Math.round(p.v.rr)],['FiO2',p.fio2+'%']]:[['O2 support',p.air==='room'?'Room air':'Oxygen mask'],['FiO2',p.fio2+'%'],['SpO2',Math.min(100,Math.round(p.v.spo2))],['RR',Math.round(p.v.rr)]]}
-function drawBed(i){const p=P[i],b=B[i],c=b.ctx,W=640,H=360,im=(typeof bedShot==='function'?bedShot(p):PH[p.sx=='f'?1:0]);if(!im||!im.complete||!im.naturalWidth)return;
+function prow(p){const ip=p.air==='niv'?p.ipap:p.peep+p.dr+p.sev*6;return p.iv?[[(p.air==='imv'?'IMV':'NIV'),(p.air==='imv'?'tube':'mask')],[p.air==='imv'?'PIP (model)':'IPAP',Math.round(ip)],[p.air==='imv'?'PEEP':'EPAP',p.peep],...(p.air==='imv'?[['Vt target',p.vt+' mL'],['RR set',p.setRate+'/min']]:[]),['RR measured',Math.round(p.v.rr)+'/min'],['FiO2',p.fio2+'%']]:[['O2 support',p.air==='room'?'Room air':'Oxygen mask'],['FiO2',p.fio2+'%'],['SpO2',Math.min(100,Math.round(p.v.spo2))],['RR',Math.round(p.v.rr)]]}
+function drawBed(i){const p=P[i],b=B[i],c=b.ctx,W=1280,H=720,im=(typeof bedShot==='function'?bedShot(p):PH[p.sx=='f'?1:0]);if(!im||!im.complete||!im.naturalWidth)return;
  c.clearRect(0,0,W,H);c.drawImage(im,0,0,W,H);
  drawBreathing(c,im,p,0,0,W,H);
- mon(TM.getContext('2d'),p,360,254,0,0);c.drawImage(TM,W*.0766,H*.139,W*.168,H*.211);
+ mon(TM.getContext('2d'),p,720,508,0,0);c.drawImage(TM,W*.0766,H*.139,W*.168,H*.211);
  rdr(TR.getContext('2d'),p);c.drawImage(TR,W*.81,H*.358,W*.092,H*.128);
  const r=prow(p),px=W*.747,py=H*.619,pw=W*.239,ph=H*.345;c.fillStyle='rgba(14,22,30,.95)';c.fillRect(px,py,pw,ph);c.strokeStyle='#3f6a85';c.lineWidth=2;c.strokeRect(px,py,pw,ph);c.font='11px system-ui';
  r.forEach((x,n)=>{const y=py+ph*(n+.65)/(r.length+.3);c.fillStyle='#d8ecff';c.textAlign='left';c.fillText(x[0],px+6,y);c.fillStyle='#fff';c.textAlign='right';c.fillText(x[1],px+pw-6,y)});
@@ -209,17 +210,19 @@ function drawBed(i){const p=P[i],b=B[i],c=b.ctx,W=640,H=360,im=(typeof bedShot==
 // camera modes
 let ent=0,mode='cmd',yaw=0,pit=0,cmdYaw=0,cmdPit=0,cur=null;const tp=new V(),tl=new V(),lk=new V(100,4,-8);
 function tgt(){
- if(mode=='cmd'){const W=14,H=14*(845/1500),half=Math.tan(36*Math.PI/180),fit=Math.max(H/2/half,W/2/(half*Math.max(.45,cam.aspect))),d=fit*1.08;tp.set(100,H/2,-8+d);tl.set(100+Math.sin(cmdYaw)*W*0.48,H/2+Math.sin(cmdPit)*H*0.3,-8)}
+ if(mode=='cmd'){const W=14,H=14*(845/1500),half=Math.tan(36*Math.PI/180),fit=Math.max(H/2/half,W/2/(half*Math.max(.45,cam.aspect))),d=innerWidth<innerHeight?H/(2*half)*1.12:fit*1.08;tp.set(100,H/2,-8+d);tl.set(100+Math.sin(cmdYaw)*W*0.48,H/2+Math.sin(cmdPit)*H*0.3,-8)}
  else if(mode=='ward'){tp.set(0,1.6,0);tl.set(Math.sin(yaw)*Math.cos(pit),1.6+Math.sin(pit),-Math.cos(yaw)*Math.cos(pit))}
  else{const g=B[cur].g;tp.copy(g.position).multiplyScalar(-0.18);tp.y=1.62;tl.copy(g.position);tl.y=1.5}}
 function go(m,i){
  mode=m;if(m=='bed'){cur=i;const p=P[i];$('#pn').textContent=(i+1)+'. '+p.n+' · '+p.dx;$('#hx').textContent=p.hx;
-  [['fi',p.fio2],['pe',p.peep]].forEach(([id,v])=>{const e=$('#'+id);e.value=v;e.previousElementSibling.textContent=v});$('#pe').parentElement.style.display=p.iv?'block':'none';$('#ev').dataset.s='';evu();rd();sup()}
+  [['fi',p.fio2],['pe',p.peep],['rrset',p.setRate],['vtset',p.vt],['ipap',p.ipap]].forEach(([id,v])=>{const e=$('#'+id);e.value=v;if(e.previousElementSibling)e.previousElementSibling.textContent=v});
+  $('#pe').parentElement.style.display=p.iv?'block':'none';updateVentControls(p);$('#ev').dataset.s='';evu();rd();sup();
+  document.querySelector('[data-t="'+(p.iv?1:0)+'"]').click()}
  else cur=null;
  if(m=='cmd'||m=='ward'){tgt();cam.position.copy(tp);lk.copy(tl);cam.lookAt(lk)}
- $('#panel').style.display=m=='bed'?'block':'none';$('#triage').style.display=m=='cmd'?'block':'none';
+ $('#panel').style.display=m=='bed'?'block':'none';
  const ph=$('#photo');if(m=='bed'){$('#pb').style.backgroundImage='url('+IM[P[i].sx=='f'?1:0]+')';const r=RR[i],s=$('#pr').style;s.left=r[0]+'%';s.top=r[1]+'%';s.width=r[2]+'%';s.height=r[3]+'%';ph.style.display='block';requestAnimationFrame(()=>ph.classList.add('on'))}else{ph.classList.remove('on');setTimeout(()=>{if(mode!='bed')ph.style.display='none'},500)}
- $('#hint').textContent=m=='ward'?'Drag to look around · tap a bed to step in':m=='cmd'?'Drag to look left and right · tap a live monitor':''}
+ $('#hint').textContent=m=='ward'?'Drag to look around · tap a bed to step in':m=='cmd'?'Swipe to scan the command wall · tap a patient monitor':''}
 document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>go(b.dataset.m));
 go('cmd');
 
@@ -233,7 +236,10 @@ cv.onpointerup=e=>{dn=0;if(mv>8)return;const r=cv.getBoundingClientRect();mv2.se
  if(mode=='cmd'&&h.object.userData&&h.object.userData.command&&h.uv){var uu=h.uv.x,vv=1-h.uv.y,sc=h.object.userData.screens||[];for(var kk=0;kk<sc.length;kk++){var rr=sc[kk];if(uu>=rr.x&&uu<=rr.x+rr.w&&vv>=rr.y&&vv<=rr.y+rr.h){openFromWall(rr.bed);break}}}
  else if(h.object===scr){const u=h.uv,i=Math.floor((1-u.y)*RW)*C+Math.floor(u.x*C);if(P[i])openFromWall(i)}
  else if(mode=='ward')go('bed',h.object.userData.bed)};
-[['fi','fio2'],['pe','peep']].forEach(([id,k])=>{const el=$('#'+id);el.oninput=()=>{P[cur][k]=+el.value;el.previousElementSibling.textContent=el.value}});
+const setControl=(id,key)=>{const el=$('#'+id);el.oninput=()=>{const p=P[cur];p[key]=+el.value;el.previousElementSibling.textContent=el.value}};
+setControl('fi','fio2');setControl('rrset','setRate');setControl('vtset','vt');
+$('#pe').oninput=()=>{const p=P[cur],el=$('#pe');p.peep=+el.value;if(p.air==='niv'&&p.ipap<p.peep+2)p.ipap=Math.min(30,p.peep+2);el.previousElementSibling.textContent=el.value;$('#ipap').value=p.ipap;$('#ipap').previousElementSibling.textContent=p.ipap};
+$('#ipap').oninput=()=>{const p=P[cur],el=$('#ipap');p.ipap=Math.max(+el.value,p.peep+2);el.value=p.ipap;el.previousElementSibling.textContent=el.value};
 $('#t0').onclick=e=>{const t=e.target,p=P[cur];if(t.dataset.d){const d=IN.find(x=>x[0]==t.dataset.d);p.dz[d[0]]=Math.round(clamp((p.dz[d[0]]||0)+(+t.dataset.a)*d[5],d[3],d[4])*100)/100}else if(t.dataset.b){const k=t.dataset.b;p.dz[k]=(p.dz[k]||0)+1;const BV={fl:14,blood:18};if(BV[k])p.bol=Math.min(30,p.bol+BV[k])}else return;rd()};
 $('#hu').onclick=()=>{P[cur].hu=!P[cur].hu;sup()};$('#pr').onclick=()=>{P[cur].pr=!P[cur].pr;sup()};
 document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button,.tb').forEach(e=>e.classList.remove('on'));b.classList.add('on');$('#t'+b.dataset.t).classList.add('on');if(b.dataset.t=='2')labs()});
@@ -257,7 +263,7 @@ function labs(){const p=P[cur],a=simulatedLabs(p),k=p.lk,kv=kval(p),f=(x,lo,hi)=
  $('#lab').innerHTML='<table>'+r.map(x=>'<tr><td>'+x[0]+'</td><td'+x[2]+'>'+x[1]+'</td></tr>').join('')+'</table><p>'+p.lb+'</p><small>These are illustrative model outputs, not measured results. Oxygenation requires clinical assessment and an arterial blood gas when indicated; this model does not calculate PaO₂ or a P/F ratio.</small>'}
 function vw(c,p,w,h){c.fillStyle='#03101f';c.fillRect(0,0,w,h);const F=w*.04;c.font='bold '+F+'px monospace';
  if(!p.iv){c.fillStyle='#7fa6c8';c.fillText(p.air==='room'?'Breathing spontaneously on room air.':'Breathing spontaneously with oxygen by mask.',F,h/2);return}
- const pe=p.peep,pip=pe+p.dr+p.sev*6;c.fillStyle='#d8ecff';c.fillText(p.air==='imv'?'IMV · PIP '+Math.round(pip)+' PEEP '+pe+' Vt '+p.vt:'NIV · IPAP '+Math.round(pip)+' EPAP '+pe+' FiO2 '+p.fio2+'%',F*.5,F*1.4);
+ const pe=p.peep,pip=p.air==='niv'?p.ipap:pe+p.dr+p.sev*6;c.fillStyle='#d8ecff';c.fillText(p.air==='imv'?'IMV · Vt '+p.vt+' mL · RR '+p.setRate+' · PEEP '+pe:'NIV · IPAP '+Math.round(pip)+' / EPAP '+pe+' · FiO2 '+p.fio2+'%',F*.5,F*1.4);
  const rh=(h-F*2)/3,W=w*.94,cs=['#ffd24a','#3dff9a','#39e6ff'];
  for(let r=0;r<3;r++){c.strokeStyle=cs[r];c.lineWidth=2;c.beginPath();const y0=F*2+rh*(r+1)-4;
   for(let k=0;k<W;k+=2){const f=(((p.vp-(W-k)/(w*.3))%1)+1)%1,n=f<.33,e=Math.exp(-(f-.33)/.12);
@@ -273,9 +279,39 @@ function phd(p){mon($('#pl').getContext('2d'),p,720,508,0,0);rdr($('#pr').getCon
  const iv=$('#iv'),c=iv.getContext('2d');c.clearRect(0,0,iv.width,iv.height);drawGiven(c,p,iv.width,iv.height)}
 // drug formulary: infusions (dose up/down) and boluses
 const IN=[['nor','Norepinephrine','mcg/min',0,30,2,'Raises MAP. First-line vasopressor.'],['vas','Vasopressin','U/min',0,.04,.01,'Second vasopressor. Spares norepinephrine.'],['dob','Dobutamine','mcg/kg/min',0,15,2.5,'Raises output and heart rate. Can lower BP.'],['ins','Insulin','U/h',0,10,1,'Lowers glucose and K\u207a. Check K\u207a first.'],['mid','Midazolam','mg/h',0,8,1,'Sedation. Lowers BP and breathing drive.'],['gtn','Nitroglycerin','mcg/min',0,20,2,'Lowers BP and eases lung congestion.']],
-BO=[['fl','Ringer lactate 250 mL','Volume. Watch the lungs.'],['hs','3% saline 100 mL','Raises Na\u207a and lowers ICP.'],['ca','Calcium gluconate 10 mL','Protects the heart in high K\u207a.'],['dx','Insulin 10 U + dextrose 25 g','Shifts K\u207a into cells.'],['kcl','KCl 20 mEq','Replaces potassium.'],['ls','Furosemide 40 mg','Removes lung and body water.'],['ab','Meropenem 1 g','Antibiotic for infection.'],['atr','Atropine 2 mg','Dries secretions, raises heart rate.'],['lz','Lorazepam 4 mg','Stops seizures.'],['alt','Alteplase 50 mg','Dissolves clot. Bleeding risk.'],['blood','Packed red cells 2 units','Replaces blood loss.'],['sb','Salbutamol + ipratropium neb','Opens the airways.']];
-function rd(){const z=P[cur].dz;$('#t0').innerHTML='<h4>Infusion pumps</h4>'+IN.map(d=>{const v=z[d[0]]||0;return '<div class="dr"><div><b>'+d[1]+'</b><small>'+d[6]+'</small></div><div class="ct"><button data-d="'+d[0]+'" data-a="-1">\u2212</button><output>'+(d[5]<1?v.toFixed(2):v)+' <small>'+d[2]+'</small></output><button data-d="'+d[0]+'" data-a="1">+</button></div></div>'}).join('')+'<h4>Bolus and push</h4>'+BO.map(d=>'<div class="dr"><div><b>'+d[1]+'</b><small>'+d[2]+'</small></div><div class="ct"><output>'+(z[d[0]]?'\u00d7'+z[d[0]]:'')+'</output><button data-b="'+d[0]+'">Give</button></div></div>').join('')}
+BO=[['fl','Ringer lactate 250 mL','Volume. Watch the lungs.'],['hs','3% saline 100 mL','Raises Na\u207a and lowers ICP.'],['ca','Calcium gluconate 10 mL','Protects the heart in high K\u207a.'],['dx','Insulin 10 U + dextrose 25 g','Shifts K\u207a into cells.'],['kcl','KCl 20 mEq','Replaces potassium.'],['ls','Furosemide 40 mg','Removes lung and body water.'],['ab','Meropenem (example)','Select antibiotics for source, cultures, allergies and local protocols.'],['ctx','Ceftriaxone','Variceal-bleed prophylaxis; follow local protocol.'],['tp','Terlipressin','Vasoactive treatment; follow variceal-bleed protocol.'],['atr','Atropine 2 mg','Dries secretions, raises heart rate.'],['pral','Pralidoxime','Use when indicated; follow toxicology protocol.'],['lz','Lorazepam 4 mg','Stops seizures.'],['lev','Levetiracetam','Second-line status therapy; protocol-based dosing.'],['alt','Alteplase 50 mg','Dissolves clot. Bleeding risk.'],['blood','Packed red cells 2 units','Replaces blood loss.'],['sb','Salbutamol + ipratropium neb','Opens the airways.']];
+const CASE_RX={
+ 'ARDS':['mid'],'Septic shock':['nor','vas','fl','ab'],'DKA':['ins','fl','kcl'],
+ 'Severe TBI':['hs'],'Cardiogenic shock':['nor','dob','gtn','ls'],
+ 'AKI, hyperkalemia':['ca','dx'],'Severe asthma':['sb'],
+ 'Massive pulmonary embolism':['nor','alt'],'Hypertensive pulmonary edema':['gtn','ls'],
+ 'Variceal bleed':['blood','ctx','tp'],'Dengue shock':['fl'],
+ 'Organophosphate poisoning':['atr','pral'],'Status epilepticus':['lz','lev'],
+ 'COPD, hypercapnic failure':['sb']
+};
+function rd(){
+ const z=P[cur].dz,allowed=new Set(CASE_RX[P[cur].dx]||[]),infusions=IN.filter(d=>allowed.has(d[0])),boluses=BO.filter(d=>allowed.has(d[0]));
+ const rows=(list,bolus)=>list.map(d=>{const v=z[d[0]]||0;return '<div class="dr"><div><b>'+d[1]+'</b><small>'+(bolus?d[2]:d[6])+'</small></div><div class="ct">'+(bolus?'<output>'+(v?'\u00d7'+v:'')+'</output><button data-b="'+d[0]+'">Give</button>':'<button data-d="'+d[0]+'" data-a="-1">\u2212</button><output>'+(d[5]<1?v.toFixed(2):v)+' <small>'+d[2]+'</small></output><button data-d="'+d[0]+'" data-a="1">+</button>')+'</div></div>'}).join('');
+ const controls=(infusions.length?'<h4>Infusions</h4>'+rows(infusions,false):'')+(boluses.length?'<h4>Bolus and push</h4>'+rows(boluses,true):'');
+ $('#t0').innerHTML='<small>Case-relevant example controls only; not a complete treatment order or dosing guide. Some actions in the scenario are not simulated.</small>'+(controls||'<p>No medication simulation is provided for this case.</p>')}
 function sup(){const p=P[cur];$('#hu').textContent='Head-up 30\u00b0: '+(p.hu?'on':'off');$('#pr').textContent='Prone position: '+(p.pr?'on':'off')}
+function updateVentControls(p){
+ const invasive=p.air==='imv',noninvasive=p.air==='niv';
+ $('#vent-mode').style.display=p.iv?'block':'none';
+ $('#vent-mode').textContent=invasive?'Invasive ventilation · volume-targeted teaching controls; confirm predicted body weight and lung mechanics.':noninvasive?'Non-invasive ventilation · adjust pressure support and EPAP with close reassessment.':'No ventilator in this case · adjust oxygen only when indicated.';
+ $('#imv-controls').style.display=invasive?'grid':'none';$('#niv-controls').style.display=noninvasive?'grid':'none';
+ $('#pe-label').textContent=noninvasive?'EPAP':'PEEP';$('#pe').min=noninvasive?'4':'0';
+ $('#pe').max=noninvasive?'20':'20';
+ const hints={
+  ARDS:'ARDS: use lung-protective tidal volume based on predicted body weight; monitor plateau pressure. Consider prolonged prone positioning in severe disease.',
+  'Severe asthma':'Severe asthma: prioritize a long expiratory time and monitor for dynamic hyperinflation and hemodynamic effects.',
+  'Severe TBI':'TBI: avoid hypoxemia, hypotension and prolonged hypocapnia; reassess ventilation and neurologic status.',
+  'COPD, hypercapnic failure':'COPD: controlled oxygen is commonly titrated to SpO₂ 88–92%; closely reassess alertness, gas exchange and NIV failure.',
+  'Hypertensive pulmonary edema':'Pulmonary edema: reassess work of breathing, oxygenation and blood pressure promptly during NIV.',
+  'Cardiogenic shock':'Cardiogenic shock: monitor perfusion and blood pressure closely; ventilatory support requires hemodynamic reassessment.'
+ };
+ $('#vent-hint').textContent=hints[p.dx]||'Reassess oxygenation, ventilation, synchrony and hemodynamics after each change.';
+}
 function kval(p){const k=p.lk,z=p.dz;let v=k[1];for(const d in p.kd)v+=p.kd[d]*(z[d]||0);return v}
 function priority(p){
  const v=p.v,map=(v.sbp+2*v.dbp)/3,pp=v.sbp-v.dbp;
@@ -283,12 +319,6 @@ function priority(p){
  if(v.spo2<92||map<65||pp<=30||v.hr<50||v.hr>120||v.rr>30||p.sev>=.3)return{level:1,reason:'Abnormal vitals'};
  return{level:0,reason:'No vital flag'};
 }
-function updateTriage(){
- const rows=P.map(p=>({p,...priority(p)})).sort((a,b)=>b.level-a.level||Number(!b.p.done)-Number(!a.p.done)||a.p.i-b.p.i);
- const html='<b>Simulation priority</b><small>Vital flags only · assess all beds</small>'+rows.map(({p,level,reason})=>'<button class="'+['stable','watch','urgent'][level]+'" data-bed="'+p.i+'"><b>Bed '+(p.i+1)+' · '+p.n+'</b><small>'+['No flag','Watch','Urgent'][level]+' · '+reason+' · '+(p.done?'Decision recorded':'Decision due')+'</small></button>').join('')+(P.every(p=>p.done)?'<button data-debrief="1">View shift debrief</button>':'');
- const el=$('#triage');if(el.innerHTML!==html)el.innerHTML=html;
-}
-$('#triage').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.debrief)fin();else if(b.dataset.bed!=null)openFromWall(+b.dataset.bed)};
 // vitals engine, 1 tick per second
 let T=0;
 setInterval(()=>{if(!ent)return;T++;let red=0;
@@ -298,11 +328,11 @@ setInterval(()=>{if(!ent)return;T++;let red=0;
   (p.haz||[]).forEach(q=>{const kv=kval(p);if(p.dz[q[0]]>0&&(q[1]=='lt'?kv<q[2]:kv>q[2])){p.sev=Math.min(1,p.sev+.05);if(!p.hzs){p.hzs=1;toast('Bed '+(i+1)+': '+q[3])}}});
   if(p.prh&&p.pr)p.sev=Math.min(1,p.sev+.03);if(p.twc)p.tw=p.dz[p.twc[2]]?p.twc[1]:p.twc[0];
   const v=p.v,z=p.dz,n=k=>z[k]||0,sb=p.sbp+p.sev*(p.hyp?25:-36)+n('nor')*1.3+n('vas')*500+n('dob')-n('gtn')*1.5+p.bol-n('mid')*(1.5+p.sev*2)+(p.ls<0?p.ls*n('ls')*6:0);
-  const g={hr:p.hr+p.sev*(p.hrd?-15:30)-p.bol*.4+n('dob')*1.2-n('mid'),sbp:sb,dbp:p.dbp+(sb-p.sbp)*.6,spo2:clamp(p.spo2-p.sev*13+(p.fio2-p.initialFio2)*.12+(p.peep-p.initialPeep)*.35+(p.pr?(p.prs??2):0)+(p.fl||0)*p.bol+(p.ls>0?Math.min(6,n('ls')*p.ls):0)+(p.ed?Math.min(5,n('gtn')*.5):0),60,100),rr:p.rr+p.sev*8-n('mid')*.6,t:p.t+p.sev*.6};
+  const g={hr:p.hr+p.sev*(p.hrd?-15:30)-p.bol*.4+n('dob')*1.2-n('mid'),sbp:sb,dbp:p.dbp+(sb-p.sbp)*.6,spo2:clamp(p.spo2-p.sev*13+(p.fio2-p.initialFio2)*.12+(p.peep-p.initialPeep)*.35+(p.pr?(p.prs??2):0)+(p.fl||0)*p.bol+(p.ls>0?Math.min(6,n('ls')*p.ls):0)+(p.ed?Math.min(5,n('gtn')*.5):0),60,100),rr:p.iv&&p.air==='imv'?p.setRate:p.rr+p.sev*8-n('mid')*.6,t:p.t+p.sev*.6};
   for(const k in g)v[k]+=(g[k]-v[k])*.3+(Math.random()-.5)*(k=='t'?.02:1.2);
   p.st=priority(p).level;if(p.st==2)red=1;
   B[i].lamp.material.color.set([0x3dff9a,0xffc24a,0xff4d5e][p.st])});
- if(red&&T%10===0)beep();$('#hud').textContent=Math.floor(T/60)+':'+String(T%60).padStart(2,'0')+' · '+P.filter(p=>p.done).length+'/6';updateTriage();
+ if(red&&T%10===0)beep();$('#hud').textContent=Math.floor(T/60)+':'+String(T%60).padStart(2,'0')+' · '+P.filter(p=>p.done).length+'/6';
  if(cur!=null){evu();labs()}},1000);
 
 let last=0,fr=0;
@@ -399,6 +429,8 @@ scr.visible=true;
  wallCanvas.width=3000; wallCanvas.height=1690;
  var base=document.createElement('canvas');
  base.width=3000; base.height=1690;
+ var sharpPhoto=document.createElement('canvas');
+ var sharpContext=sharpPhoto.getContext('2d');
  var wallTex=new THREE.CanvasTexture(wallCanvas);
  wallTex.anisotropy=R.capabilities.getMaxAnisotropy();
  var wall=new THREE.Mesh(new THREE.PlaneGeometry(WALLW,WALLH), new THREE.MeshBasicMaterial({map:wallTex}));
@@ -409,7 +441,15 @@ scr.visible=true;
  scr.visible=false;
  function paint(){
   if(!photo.complete||!photo.naturalWidth) return;
-  if(!base._drawn){ base.getContext('2d').drawImage(photo,0,0,base.width,base.height); base._drawn=1; }
+  if(!base._drawn){
+   sharpPhoto.width=photo.naturalWidth;sharpPhoto.height=photo.naturalHeight;
+   sharpContext.drawImage(photo,0,0);
+   const w=sharpPhoto.width,h=sharpPhoto.height,src=sharpContext.getImageData(0,0,w,h),dst=sharpContext.createImageData(w,h),a=src.data,b=dst.data;
+   b.set(a);
+   for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=(y*w+x)*4;for(let ch=0;ch<3;ch++){const blur=(a[i+ch]*4+a[i-4+ch]+a[i+4+ch]+a[i-w*4+ch]+a[i+w*4+ch])/8;b[i+ch]=Math.max(0,Math.min(255,a[i+ch]+(a[i+ch]-blur)*.8))}}
+   sharpContext.putImageData(dst,0,0);
+   base.getContext('2d').drawImage(sharpPhoto,0,0,base.width,base.height);base._drawn=1;
+  }
   var ctx=wallCanvas.getContext('2d');
   ctx.drawImage(base,0,0);
   SCREENS.forEach(function(r){
