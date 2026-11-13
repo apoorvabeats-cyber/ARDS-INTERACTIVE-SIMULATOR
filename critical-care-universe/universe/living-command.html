@@ -151,22 +151,22 @@ const P=D.map((d,i)=>{
  const [air,fio2,peep]=support;
  return{...d,i,air,vp:0,ipap:peep+(d.dr||10),setRate:d.rr,iv:air==='imv'||air==='niv',dz:{},sev:.05,pend:0,done:0,ok:0,step:0,level:0,sub:0,recovered:0,answers:[],feedback:null,orderProgress:0,orderLog:[],orderBenzo:false,hintLevel:'basic',fio2,peep,initialFio2:fio2,initialPeep:peep,pump:0,bol:0,ph:0,st:0,v:{hr:d.hr,sbp:d.sbp,dbp:d.dbp??d.sbp*.6,spo2:d.spo2,rr:d.rr,t:d.t}}
 });
-const ecg=(f,tw)=>{const g=(m,s,a)=>a*Math.exp(-(((f-m)/s)**2));return g(.2,.03,.13)+g(.4,.018,1)-g(.375,.01,.15)-g(.43,.012,.2)+g(.65,.05,.25*tw)};
-const pulse=(f,offset)=>{const t=(f-offset+1)%1;return Math.max(0,(Math.exp(-t/.18)-Math.exp(-t/.025))/.67-.06*Math.exp(-(((t-.34)/.04)**2)))};
+const ecg=(f,tw)=>{const g=(m,s,a)=>a*Math.exp(-(((f-m)/s)**2));return g(.2,.03,.13)+g(.4,.012,1)-g(.375,.01,.15)-g(.43,.012,.2)+g(.65,.05,.25*tw)};
 function mon(c,p,w,h,x,y){
  const v=p.v,F=w*.062,col=['#3dff9a','#ffc24a','#ff4d5e'][p.st],sb=v.sbp,db=v.dbp,rh=(h-F*1.7)/4,W=w*.55,amp=clamp((sb-50)/70,.25,1);
  c.save();c.translate(x,y);c.fillStyle='#020b12';c.fillRect(0,0,w,h);c.fillStyle='#122b3b';c.fillRect(0,0,w,F*1.55);
  c.fillStyle=col;c.fillRect(0,0,w*.015,h);c.font='bold '+F+'px system-ui';c.textAlign='left';c.fillStyle='#e2f5ff';c.fillText('BED '+(p.i+1)+'  '+p.n+(p.done?' · COMPLETE':''),F*.5,F*1.05,w*.78);
  c.textAlign='right';c.fillStyle=col;c.font='bold '+F*.65+'px system-ui';c.fillText(['●','▲','▲'][p.st],w-F*.4,F*1.05);c.textAlign='left';
+ const art=f=>{const t=(f-.42+1)%1,q=t<.08?t/.08:.12+.88*Math.exp(-(t-.08)/.22);return q*amp};
  const cs=[['#53ef98',(f,g)=>ecg(f,p.tw||1)*.8+.04+.02*Math.sin(2*Math.PI*g),'HR',Math.round(v.hr),''],
-  ['#ff4d5e',f=>pulse(f,.42)*amp,'BP',Math.round(sb)+'/'+Math.round(db),''],
-  ['#48d9ff',f=>pulse(f,.46)*amp,'SpO₂',Math.round(Math.min(100,v.spo2)),'%'],
+  ['#ff8fa3',art,'BP',Math.round(sb)+'/'+Math.round(db),''],
+  ['#48d9ff',f=>{const t=(f-.46+1)%1;return (t<.12?Math.sin(t/.12*Math.PI/2):.12+.88*Math.exp(-(t-.12)/.2))*amp},'SpO₂',Math.round(Math.min(100,v.spo2)),'%'],
   ['#f4d45a',(f,g)=>.5-.5*Math.cos(2*Math.PI*g),'RR',Math.round(v.rr),'']];
  cs.forEach(([cl,fn,lb,val,unit],ri)=>{
   const y=F*1.6+rh*ri,y0=y+rh*.78;
   c.strokeStyle='#173044';c.lineWidth=Math.max(.5,w*.002);c.beginPath();c.moveTo(w*.03,y0);c.lineTo(w*.58,y0);c.stroke();
   c.strokeStyle=cl;c.lineWidth=Math.max(1,w*.005);c.lineJoin='round';c.beginPath();
-  for(let k=0;k<W;k++){const f=(((p.ph-(W-k)/(w*.2))%1)+1)%1,g=(((p.vp-(W-k)/(w*.4))%1)+1)%1,yy=y0-fn(f,g)*rh*.5;k?c.lineTo(w*.03+k,yy):c.moveTo(w*.03+k,yy)}
+  for(let k=0;k<W;k+=2){const f=(((p.ph-(W-k)/(w*.2))%1)+1)%1,g=(((p.vp-(W-k)/(w*.4))%1)+1)%1,yy=y0-fn(f,g)*rh*.5;k?c.lineTo(w*.03+k,yy):c.moveTo(w*.03+k,yy)}
   c.stroke();c.fillStyle=cl;c.font='bold '+F*.62+'px system-ui';c.fillText(lb,w*.6,y+rh*.28);
   c.font='bold '+F*1.05+'px monospace';c.fillText(String(val),w*.6,y+rh*.78,w*.38)});
  c.restore()}
@@ -241,14 +241,14 @@ const BA=[-44,0,44,136,180,224].map(d=>d*Math.PI/180),RD=7,BP=i=>[RD*Math.sin(BA
 const PH=[new Image(),new Image()];PH[0].src=IM[0];PH[1].src=IM[1];
 const TM=document.createElement('canvas'),TR=document.createElement('canvas');TM.width=720;TM.height=508;TR.width=300;TR.height=200;
 const breathLayer=document.createElement('canvas');breathLayer.width=1280;breathLayer.height=720;
-function drawBreathing(c,im,p,x,y,w,h,layer=breathLayer){
+function drawBreathing(c,im,p,x,y,w,h){
  if(!im||!im.complete||!im.naturalWidth)return;
- const b=layer.getContext('2d'),bw=layer.width,bh=layer.height,cx=bw*.5,cy=bh*.6;
+ const b=breathLayer.getContext('2d'),bw=breathLayer.width,bh=breathLayer.height,cx=bw*.5,cy=bh*.6;
  const rise=p.vo||0;b.clearRect(0,0,bw,bh);b.save();b.translate(cx,cy-bh*.024*rise);b.scale(1+(.007*rise),1+(.02*rise));b.translate(-cx,-cy);b.drawImage(im,0,0,bw,bh);b.restore();
  b.globalCompositeOperation='destination-in';b.save();b.translate(cx,cy);b.scale(bw*.17,bh*.1);
  const mask=b.createRadialGradient(0,0,.2,0,0,1);mask.addColorStop(0,'rgba(0,0,0,1)');mask.addColorStop(1,'rgba(0,0,0,0)');
  b.fillStyle=mask;b.fillRect(-1,-1,2,2);b.restore();b.globalCompositeOperation='source-over';
- c.drawImage(layer,x,y,w,h);
+ c.drawImage(breathLayer,x,y,w,h);
 }
 // each bed is the patient photograph itself, kept live with the monitor, ventilator, panel and breathing
 const B=P.map((p,i)=>{
@@ -322,7 +322,7 @@ $('#voice').onclick=()=>{voiceOn=!voiceOn;$('#voice').textContent=voiceOn?'Voice
 if(!('speechSynthesis' in window)){$('#voice').disabled=true;$('#voice').textContent='Voice unavailable';voiceOn=false}
 $('#alarm').onclick=()=>{alarmOn=!alarmOn;$('#alarm').textContent=alarmOn?'Alarms on':'Alarms off';$('#alarm').setAttribute('aria-pressed',String(alarmOn));if(alarmOn)unlockAudio();scheduleAlarm()};
 function setTreatmentEnabled(enabled){document.querySelectorAll('#t0 button,#t1 input,#t1 button,#order-submit').forEach(e=>e.disabled=!enabled)}
-// One journey. Primary, then secondary, then tertiary only if the patient is still refractory.
+// One journey. Primary, then secondary, then tertiary for every case. A correct step steadies the patient. Tertiary is the advanced stage, not a penalty.
 const LEVELS=[
  {name:'Primary care',steps:[0]},
  {name:'Secondary care',steps:[1,2]},
@@ -340,15 +340,15 @@ function currentDecision(p){
  return p.followOptions;
 }
 function evu(){const p=P[cur],e=$('#ev'),lv=levelOf(p),k=[cur,p.level,p.sub,p.step,p.pend,p.done,!!p.feedback].join('-');if(e.dataset.s===k)return;e.dataset.s=k;
- if(p.feedback){const more=(p.sub||0)+1<lv.steps.length;e.innerHTML='<small style="color:var(--a)">'+lv.name+'</small><p>'+p.feedback+'</p>'+(p.done?'<p><b>'+(p.recovered?'Recovering.':'Not recovered.')+'</b> This case is stopped. The other levels stay closed.</p>'+(P.every(q=>q.done)?'<button data-debrief="1">Open shift debrief</button>':''):'<button data-next="1">'+(more?'Continue this level':'Reassess')+'</button>');return}
- if(!p.pend){e.innerHTML='<p>'+(p.level?'Watch the monitor. The next level opens only if the picture still needs it.':'Review the patient and watch the monitor.')+'</p>';return}
+ if(p.feedback){const more=(p.sub||0)+1<lv.steps.length;e.innerHTML='<small style="color:var(--a)">'+lv.name+'</small><p>'+p.feedback+'</p>'+(p.done?'<p><b>'+(p.recovered?'Recovering.':'Not recovered.')+'</b></p>'+(P.every(q=>q.done)?'<button data-debrief="1">Open shift debrief</button>':''):'<button data-next="1">'+(more?'Continue this level':'Reassess')+'</button>');return}
+ if(!p.pend){e.innerHTML='<p>'+(p.level?levelOf(p).name+' is the next stage. Watch the monitor.':'Review the patient and watch the monitor.')+'</p>';return}
  const d=currentDecision(p);e.innerHTML='<small style="color:var(--a)">'+lv.name+'</small><br><b>'+d.q+'</b>'+d.o.map((o,j)=>'<button data-k="'+j+'">'+o[0]+'</button>').join('')}
 function closeCase(p,recovered){p.done=1;p.pend=0;p.recovered=recovered?1:0;if(recovered)p.sev=clamp(p.sev-.15,.02,1);setTreatmentEnabled(false)}
 $('#ev').onclick=e=>{const p=P[cur],t=e.target;if(t.dataset.debrief){fin();return}if(t.dataset.next){const lv=levelOf(p),sub=(p.sub||0)+1;
  if(sub<lv.steps.length){p.sub=sub;p.step=lv.steps[sub];p.feedback=null;p.narration=null;p.followOptions=null;evu();speak(lv.name+'. '+currentDecision(p).q);return}
  const asked=p.answers.slice(-lv.steps.length),missed=asked.some(a=>!a.correct);
- if((p.level||0)>=2||((p.level||0)===1&&!missed)){closeCase(p,!missed);p.feedback=(p.feedback||'')+(missed?' <b>Tertiary care has not reversed this.</b>':' <b>Holding. Tertiary care is not required.</b>');evu();speak(missed?'The patient has not recovered.':'The patient is recovering. Tertiary care is not required.');if(P.every(q=>q.done))toast('All cases complete. Open the shift debrief below.');return}
- p.level=(p.level||0)+1;p.sub=0;p.step=levelOf(p).steps[0];p.followOptions=null;p.feedback=null;p.narration=null;p.pend=0;p.ev=T+8;p.bad=missed?1:0;evu();return}
+ if((p.level||0)>=2){closeCase(p,!missed);p.feedback=(p.feedback||'')+(missed?' <b>Tertiary care has not reversed this.</b>':' <b>Tertiary care is holding. The patient is recovering.</b>');evu();speak(missed?'The patient has not recovered.':'The patient is recovering.');if(P.every(q=>q.done))toast('All cases complete. Open the shift debrief below.');return}
+ p.level=(p.level||0)+1;p.sub=0;p.step=levelOf(p).steps[0];p.followOptions=null;p.feedback=null;p.narration=null;p.pend=0;p.ev=T+8;p.bad=missed?1:0;if(!missed)p.sev=clamp(p.sev-.05,.02,1);evu();return}
  const k=t.dataset.k;if(k==null||p.done||p.feedback)return;
  const d=currentDecision(p),o=d.o[+k],best=d.o.find(x=>x[1]);applyChoice(p,!!o[1]);p.answers.push({question:d.q,selected:o[0],best:best[0],correct:!!o[1],level:levelOf(p).name});p.ok=p.answers.filter(a=>a.correct).length;
  const message=(o[1]?'The patient steadies. ':'The patient is worse. ')+o[2].replace(/^(Correct|Harmful|Dangerous)\.\s*/,'');p.narration=message;p.feedback='<b style="color:'+(o[1]?'var(--g)':'var(--r)')+'">'+(o[1]?'Right for this level.':'That made the patient worse.')+'</b> '+o[2].replace(/^(Correct|Harmful|Dangerous)\.\s*/,'');
@@ -496,8 +496,8 @@ setInterval(()=>{if(!ent)return;T++;
  $('#hud').textContent=Math.floor(T/60)+':'+String(T%60).padStart(2,'0')+' · '+P.filter(p=>p.done).length+'/6';
  if(cur!=null){evu();labs();renderOrders(false)}},1000);
 
-let last=0,fr=0,updateWall=()=>{};
-function loop(t){requestAnimationFrame(loop);if(t-last<1000/30-.5)return;const dt=Math.min((t-last)/1000,.1);last=t;
+let last=0,fr=0;
+function loop(t){requestAnimationFrame(loop);if(t-last<1000/30)return;const dt=Math.min((t-last)/1000,.1);last=t;
  if(transit){
   const progress=clamp((t-transit.start)/transit.duration,0,1),ease=progress*progress*(3-2*progress);
   if(transit.stage==='turn'){yaw=transit.fromYaw+(transit.toYaw-transit.fromYaw)*ease;tl.set(Math.sin(yaw),1.6,-Math.cos(yaw));lk.copy(tl)}
@@ -509,7 +509,6 @@ function loop(t){requestAnimationFrame(loop);if(t-last<1000/30-.5)return;const d
  }else{tgt();cam.position.lerp(tp,.07);lk.lerp(tl,.1)}
  cam.lookAt(lk);
  P.forEach(p=>{p.ph+=dt*p.v.hr/60;p.vp+=dt*p.v.rr/60;const f=((p.vp%1)+1)%1;p.vo=f<.38?.5-.5*Math.cos(Math.PI*f/.38):.5+.5*Math.cos(Math.PI*(f-.38)/.62)});
- if(mode==='cmd')updateWall(t);
  if(fr++%2==0){
   P.forEach((p,i)=>{if((mode=='ward'||mode=='travel')&&Math.abs(((BA[i]-yaw+Math.PI*3)%(Math.PI*2))-Math.PI)<1.3)drawBed(i);if(scr.visible)mon(sx,p,340,256,(i%C)*340,Math.floor(i/C)*256)});
   if(scr.visible)stex.needsUpdate=true;if(cur!=null)phd(P[cur])}
@@ -616,52 +615,52 @@ scr.visible=true;
  var base=document.createElement('canvas');
  base.width=1920; base.height=1080;
  var wallTex=new THREE.CanvasTexture(wallCanvas);wallTex.colorSpace=THREE.SRGBColorSpace;
- wallTex.generateMipmaps=false;wallTex.minFilter=THREE.LinearFilter;
+ wallTex.anisotropy=R.capabilities.getMaxAnisotropy();
  var wall=new THREE.Mesh(new THREE.PlaneGeometry(WALLW,WALLH), new THREE.MeshBasicMaterial({map:wallTex}));
  wall.position.set(100, WALLH/2, -8);
  wall.userData.command=1;
  wall.userData.screens=SCREENS;
  S.add(wall);
  scr.visible=false;
- var portraits=SCREENS.map(()=>document.createElement('canvas')),lastPortrait=0,nextPortrait=0;
- var wallBreath=document.createElement('canvas');wallBreath.width=640;wallBreath.height=360;
- function paint(t,force){
+ function paint(){
   if(!photo.complete||!photo.naturalWidth) return;
   if(!base._drawn){
-   base.getContext('2d').drawImage(photo,0,0,base.width,base.height);
-   wallCanvas.getContext('2d').drawImage(base,0,0);base._drawn=1;
+   base.getContext('2d').drawImage(photo,0,0,base.width,base.height);base._drawn=1;
   }
   var ctx=wallCanvas.getContext('2d');
-  var refreshPortrait=force||t-lastPortrait>=60;if(refreshPortrait)lastPortrait=t;
+  ctx.drawImage(base,0,0);
   SCREENS.forEach(function(r){
    var pt=P[r.bed]; if(!pt) return;
    var x=r.x*wallCanvas.width, y=r.y*wallCanvas.height, w=r.w*wallCanvas.width, h=r.h*wallCanvas.height, top=h*0.52;
    mon(ctx, pt, w, top, x, y);
    var img=bedShot(pt), py=y+top, ph=h-top;
-   if(refreshPortrait&&(force||r.bed===nextPortrait)){
-    var portrait=portraits[r.bed],pw=Math.ceil(w),height=Math.ceil(ph);
-    if(portrait.width!==pw||portrait.height!==height){portrait.width=pw;portrait.height=height}
-    var pc=portrait.getContext('2d');pc.fillStyle='#071018';pc.fillRect(0,0,pw,height);
-    if(img&&img.complete&&img.naturalWidth){
-     var s=Math.max(pw/img.naturalWidth,height/img.naturalHeight),dw=img.naturalWidth*s,dh=img.naturalHeight*s,ix=(pw-dw)/2,iy=(height-dh)/2;
-     pc.drawImage(img,ix,iy,dw,dh);drawBreathing(pc,img,pt,ix,iy,dw,dh,wallBreath);
-     pc.save();pc.translate(ix,iy);pc.scale(s,s);drawGiven(pc,pt,1280,720);pc.restore();
-    }
+   ctx.fillStyle='#071018'; ctx.fillRect(x,py,w,ph);
+   var s=img&&img.naturalWidth?Math.max(w/img.naturalWidth, ph/img.naturalHeight):0, dw=img.naturalWidth*s, dh=img.naturalHeight*s;
+   if(img&&img.complete&&img.naturalWidth){
+    ctx.save(); ctx.beginPath(); ctx.rect(x,py,w,ph); ctx.clip();
+    ctx.drawImage(img, x+(w-dw)/2, py+(ph-dh)/2, dw, dh);drawBreathing(ctx,img,pt,x+(w-dw)/2,py+(ph-dh)/2,dw,dh);ctx.restore();
    }
-   ctx.drawImage(portraits[r.bed],x,py,w,ph);
+   if(img&&img.complete&&img.naturalWidth){
+    ctx.save(); ctx.beginPath(); ctx.rect(x,py,w,ph); ctx.clip();
+    ctx.translate(x+(w-dw)/2,py+(ph-dh)/2);ctx.scale(s,s);drawGiven(ctx,pt,1280,720);ctx.restore();
+   }
   });
-  if(refreshPortrait&&!force)nextPortrait=(nextPortrait+1)%portraits.length;
   wallTex.needsUpdate=true;
   wallReady=true;
  }
- updateWall=paint;
- photo.onload=()=>paint(performance.now(),true);
+ photo.onload=paint;
  photo.onerror=()=>{console.error('Unable to load the command centre image:',photo.src);toast('Unable to load the command centre image. Check your connection and reload.')};
  window.openFromWall=function(i){
   if(!P[i]||mode!=='cmd') return;
   const r=SCREENS.find(s=>s.bed===i),x=100+(r.x+r.w/2-.5)*WALLW,y=(1-r.y-r.h/2)*WALLH;
   mode='transit';transit={bed:i,stage:'wall',start:performance.now(),duration:850,from:cam.position.clone(),to:new V(x,y,-6.5),lookFrom:lk.clone(),lookTo:new V(x,y,-8)};
  };
+ var lastPaint=0;
+ function chase(t){
+  requestAnimationFrame(chase);
+  if(mode==='cmd'&&t-lastPaint>=250){lastPaint=t;paint()}
+ }
+ requestAnimationFrame(chase);
 })();
 var _goBeds=go;
 go=function(m,i){
