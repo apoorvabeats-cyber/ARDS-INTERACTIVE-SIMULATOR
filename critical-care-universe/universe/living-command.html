@@ -12,7 +12,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--c)}
 #top b{margin-right:auto;font-size:15px;letter-spacing:.04em}
 #top button[data-m],#home{width:clamp(72px,10vw,112px);min-height:44px;padding:4px;line-height:1.15}
 #audio-controls{display:flex;gap:4px;flex-shrink:0}#audio-controls button{padding:5px;font-size:11px}
-@media(max-width:600px){#top{gap:3px;padding:5px}#top b{font-size:11px}#top button[data-m],#home{width:clamp(55px,16vw,80px)}#audio-controls{position:fixed;right:5px;top:56px}#hud{font-size:10px}}
+@media(max-width:600px){#top{gap:3px;padding:5px;flex-wrap:wrap}#top b{font-size:11px}#top button[data-m],#home{width:clamp(55px,16vw,80px)}#audio-controls{width:100%;justify-content:flex-end}#hud{font-size:10px}#photo #pw{margin-top:calc(var(--top-height,84px) + 6px + env(safe-area-inset-top,0px))}#toast{top:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px))}}
 #hud{font-variant-numeric:tabular-nums;color:var(--c)}
 #toast{position:fixed;top:56px;left:50%;transform:translateX(-50%);background:#3a0d16;border:1px solid var(--r);padding:8px 14px;border-radius:6px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%;text-align:center}
 #hint{position:fixed;bottom:14px;left:0;right:0;text-align:center;color:#7fa6c8;pointer-events:none}
@@ -52,13 +52,13 @@ input[type=range]{width:100%}
 </style></head><body>
 <canvas id="gl"></canvas>
 <div id="door"><h1>Intensive Care Unit</h1><div class="frame" id="dr" style="background:radial-gradient(#39e6ff66,#02060f)"><div class="leaf l"></div><div class="leaf r"></div></div><p>Six patients. One doctor.</p><button id="enter">Enter the ICU</button></div>
-<div id="top"><b>Living ICU</b><button id="home" type="button">Universe</button><button data-m="cmd">Command center</button><button data-m="ward">Ward</button><span id="hud">0:00 · 0/6</span><div id="audio-controls"><button id="voice" type="button" aria-pressed="true">Voice on</button><button id="alarm" type="button" aria-pressed="true">Alarms on</button></div></div>
+<div id="top"><b>ICU · Sim</b><button id="home" type="button">Universe</button><button data-m="cmd">Command center</button><button data-m="ward">Ward</button><span id="hud">0:00 · 0/6</span><div id="audio-controls"><button id="voice" type="button" aria-pressed="true">Voice on</button><button id="alarm" type="button" aria-pressed="true">Alarms on</button></div></div>
 <div id="toast"></div>
 <div id="hint"></div>
 <div id="photo"><div id="pw"><div id="pb"></div><canvas id="pc" width="640" height="360" aria-hidden="true"></canvas><canvas id="iv" width="1280" height="720" aria-hidden="true"></canvas><canvas id="pl" width="720" height="508"></canvas><canvas id="pr" width="300" height="200"></canvas><div id="pi"></div></div></div>
 <div id="panel">
 <h3 id="pn"></h3><small id="hx" style="display:block;color:#9fc3e4;margin-bottom:6px"></small>
-<details class="approach"><summary>Patient approach · educational simulation, not patient care</summary><ol><li>Check ABCDE, immediate threats and monitor trends; call for help when unstable.</li><li>Choose the priority action, then use the support and drug controls where available.</li><li>Recheck simulated vitals and labs, consider treatment hazards, and revise the plan.</li></ol><small>Triage flags and physiological responses are unvalidated heuristics, not a validated patient model or dosing guide. Disease progression, recovery and many treatments are not modeled; a quiz choice does not administer treatment. Never use for patient care. Follow current guidance, local protocols and qualified supervision.</small></details>
+<details class="approach"><summary>Patient approach</summary><ol><li>Check ABCDE, immediate threats and monitor trends; call for help when unstable.</li><li>Choose the priority action, then use the support and drug controls where available.</li><li>Recheck simulated vitals and labs, consider treatment hazards, and revise the plan.</li></ol></details>
 <div id="ev"></div>
 <div class="tabs"><button data-t="0" class="on">Drugs</button><button data-t="1">Support</button><button data-t="2">Labs</button></div>
 <div class="tb on" id="t0"></div>
@@ -71,7 +71,7 @@ input[type=range]{width:100%}
 <div id="niv-controls" class="row">
 <label>IPAP <output>18</output> cmH₂O<input id="ipap" type="range" min="8" max="30" value="18"></label></div>
 <div class="row" style="margin-top:10px"><button id="hu"></button><button id="prone"></button></div>
-<p style="color:#7fa6c8">Ventilator controls are simplified educational settings, not prescriptions. Use predicted body weight, gas exchange, mechanics, patient synchrony and local protocols. Head-up positioning may help; prone positioning is unsafe with raised ICP.</p></div>
+<p style="color:#7fa6c8">Use predicted body weight, gas exchange, mechanics, patient synchrony and local protocols. Head-up positioning may help; prone positioning is unsafe with raised ICP.</p></div>
 <div class="tb" id="t2"><div id="lab"></div></div>
 </div>
 <div id="end"></div>
@@ -80,6 +80,7 @@ input[type=range]{width:100%}
 import * as THREE from '../../vendor/three/three.module.js';
 import {FOLLOW_UPS,DISTRACTORS} from './case-decisions.js';
 const $=s=>document.querySelector(s),V=THREE.Vector3,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>document.documentElement.style.setProperty('--top-height',$('#top').getBoundingClientRect().height+'px')).observe($('#top'));
 const NM={m:['Ravi Kumar','Imran Khan','Anil Sharma','Gopal Das','Suresh Yadav','Mohan Lal','Arjun Singh','Karan Mehta','Vijay Nair','Rafiq Ahmed'],f:['Sunita Devi','Meena Iyer','Fatima Begum','Lakshmi Rao','Kavita Gupta','Anjali Verma','Rukhsar Ali','Pooja Mishra']};
 // Case-specific teaching data: kd and haz are illustrative lab effects and safety flags, not validated dose-response models.
 const POOL=[
@@ -244,11 +245,12 @@ go('cmd');
 // input
 const ray=new THREE.Raycaster(),mv2=new THREE.Vector2();let dn=0,mv=0,lx=0,ly=0,ac;
 function unlockAudio(){try{const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;ac=ac||new Audio();if(ac.state==='suspended')ac.resume().catch(e=>console.warn('Unable to enable alarm audio:',e))}catch(e){console.warn('Unable to enable alarm audio:',e)}}
-cv.onpointerdown=e=>{dn=1;mv=0;lx=e.clientX;ly=e.clientY;unlockAudio()};
+document.addEventListener('pointerdown',unlockAudio,{once:true});
+cv.onpointerdown=e=>{dn=1;mv=0;lx=e.clientX;ly=e.clientY};
 cv.onpointermove=e=>{if(!dn)return;const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;mv+=Math.abs(dx)+Math.abs(dy);if(mode=='ward'){yaw-=dx*.006;pit=clamp(pit+dy*.004,-.5,.5)}else if(mode=='cmd'){cmdYaw=clamp(cmdYaw-dx*.0032,-1.05,1.05);cmdPit=clamp(cmdPit-dy*.002,-.42,.42)}};
 cv.onpointercancel=()=>dn=0;
 cv.onpointerup=e=>{dn=0;if(mv>8)return;const r=cv.getBoundingClientRect();mv2.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(mv2,cam);
- const h=ray.intersectObjects(S.children,true).find(o=>o.object===scr||o.object.userData.bed!=null||o.object.userData.command);if(!h)return;
+ const h=ray.intersectObjects(S.children,true).find(o=>o.object.visible&&((mode==='cmd'&&(o.object===scr||o.object.userData.command))||(mode==='ward'&&o.object.userData.bed!=null)));if(!h)return;
  if(mode=='cmd'&&h.object.userData&&h.object.userData.command&&h.uv){var uu=h.uv.x,vv=1-h.uv.y,sc=h.object.userData.screens||[];for(var kk=0;kk<sc.length;kk++){var rr=sc[kk];if(uu>=rr.x&&uu<=rr.x+rr.w&&vv>=rr.y&&vv<=rr.y+rr.h){openFromWall(rr.bed);break}}}
  else if(h.object===scr){const u=h.uv,i=Math.floor((1-u.y)*RW)*C+Math.floor(u.x*C);if(P[i])openFromWall(i)}
  else if(mode=='ward')go('bed',h.object.userData.bed)};
@@ -266,7 +268,7 @@ function stopVoice(){if('speechSynthesis' in window)window.speechSynthesis.cance
 function speak(text){stopVoice();if(!voiceOn||!('speechSynthesis' in window))return;const u=new SpeechSynthesisUtterance(text);u.lang='en-IN';u.rate=.92;window.speechSynthesis.speak(u)}
 $('#voice').onclick=()=>{voiceOn=!voiceOn;$('#voice').textContent=voiceOn?'Voice on':'Voice off';$('#voice').setAttribute('aria-pressed',String(voiceOn));if(!voiceOn)stopVoice();else if(cur!=null&&!P[cur].done)speak(P[cur].n+'. '+P[cur].dx+'. '+P[cur].hx+'. '+(P[cur].narration||currentDecision(P[cur]).q))};
 if(!('speechSynthesis' in window)){$('#voice').disabled=true;$('#voice').textContent='Voice unavailable';voiceOn=false}
-$('#alarm').onclick=()=>{alarmOn=!alarmOn;$('#alarm').textContent=alarmOn?'Alarms on':'Alarms off';$('#alarm').setAttribute('aria-pressed',String(alarmOn));if(alarmOn)unlockAudio()};
+$('#alarm').onclick=()=>{alarmOn=!alarmOn;$('#alarm').textContent=alarmOn?'Alarms on':'Alarms off';$('#alarm').setAttribute('aria-pressed',String(alarmOn));if(alarmOn)unlockAudio();scheduleAlarm()};
 function setTreatmentEnabled(enabled){document.querySelectorAll('#t0 button,#t1 input,#t1 button').forEach(e=>e.disabled=!enabled)}
 function currentDecision(p){
  if(p.step===0)return{q:p.q,o:p.o};
@@ -274,7 +276,7 @@ function currentDecision(p){
  return p.followOptions;
 }
 function evu(){const p=P[cur],e=$('#ev'),k=[cur,p.step,p.pend,p.done,!!p.feedback].join('-');if(e.dataset.s===k)return;e.dataset.s=k;
- const prefix='<small>Synthetic teaching scenario; responses are unvalidated. Decisions do not administer treatment.</small>';
+ const prefix='';
  if(p.feedback){e.innerHTML=prefix+'<p>'+p.feedback+'</p>'+(p.done?'<p><b>Case complete.</b> This case is stopped; treatments and alarms are disabled.</p>'+(P.every(q=>q.done)?'<button data-debrief="1">Open shift debrief</button>':''):'<button data-next="1">Next decision</button>');return}
  if(!p.pend){e.innerHTML=prefix+'<p>Review the patient approach and monitor trends.</p>';return}
  const d=currentDecision(p);e.innerHTML=prefix+'<p>Decision '+(p.step+1)+' of 5</p><b>'+d.q+'</b>'+d.o.map((o,j)=>'<button data-k="'+j+'">'+o[0]+'</button>').join('')}
@@ -292,7 +294,7 @@ function simulatedLabs(p){const v=p.v,[a,c,h,l]=p.ab;
  return{ph:a-p.sev*.07,pc:c+p.sev*6-(v.rr-p.rr)*.4+(p.co2s?(p.fio2-50)*.12:0),hc:h-p.sev*1.5,la:Math.max(.6,l+p.sev*3.2)}}
 function labs(){const p=P[cur],a=simulatedLabs(p),k=p.lk,kv=kval(p),f=(x,lo,hi)=>x<lo||x>hi?' class="hi"':'';
  const r=[['pH (simulated)',a.ph.toFixed(2),f(a.ph,7.35,7.45)],['PaCO₂ (simulated) mmHg',Math.round(a.pc),f(a.pc,35,45)],['HCO₃⁻ (simulated) mmol/L',Math.round(a.hc),f(a.hc,22,26)],['Lactate (simulated) mmol/L',a.la.toFixed(1),f(a.la,0,2)],[k[0]+' '+k[3],kv.toFixed(kv<20?1:0),'']];
- $('#lab').innerHTML='<table>'+r.map(x=>'<tr><td>'+x[0]+'</td><td'+x[2]+'>'+x[1]+'</td></tr>').join('')+'</table><p>'+p.lb+'</p><small>These are illustrative model outputs, not measured results. Oxygenation requires clinical assessment and an arterial blood gas when indicated; this model does not calculate PaO₂ or a P/F ratio.</small>'}
+ $('#lab').innerHTML='<table>'+r.map(x=>'<tr><td>'+x[0]+'</td><td'+x[2]+'>'+x[1]+'</td></tr>').join('')+'</table><p>'+p.lb+'</p><small>Oxygenation requires clinical assessment and an arterial blood gas when indicated; this model does not calculate PaO₂ or a P/F ratio.</small>'}
 function vw(c,p,w,h){c.fillStyle='#03101f';c.fillRect(0,0,w,h);const F=w*.04;c.font='bold '+F+'px monospace';
  if(!p.iv){c.fillStyle='#7fa6c8';c.fillText(p.air==='room'?'Breathing spontaneously on room air.':'Breathing spontaneously with oxygen by mask.',F,h/2);return}
  const pe=p.peep,pip=p.air==='niv'?p.ipap:pe+p.dr+p.sev*6;c.fillStyle='#d8ecff';c.fillText(p.air==='imv'?'IMV · Vt '+p.vt+' mL · RR '+p.setRate+' · PEEP '+pe:'NIV · IPAP '+Math.round(pip)+' / EPAP '+pe+' · FiO2 '+p.fio2+'%',F*.5,F*1.4);
@@ -325,7 +327,7 @@ function rd(){
  const z=P[cur].dz,allowed=new Set(CASE_RX[P[cur].dx]||[]),infusions=IN.filter(d=>allowed.has(d[0])),boluses=BO.filter(d=>allowed.has(d[0]));
  const rows=(list,bolus)=>list.map(d=>{const v=z[d[0]]||0;return '<div class="dr"><div><b>'+d[1]+'</b><small>'+(bolus?d[2]:d[6])+'</small></div><div class="ct">'+(bolus?'<output>'+(v?'\u00d7'+v:'')+'</output><button data-b="'+d[0]+'">Give</button>':'<button data-d="'+d[0]+'" data-a="-1">\u2212</button><output>'+(d[5]<1?v.toFixed(2):v)+' <small>'+d[2]+'</small></output><button data-d="'+d[0]+'" data-a="1">+</button>')+'</div></div>'}).join('');
  const controls=(infusions.length?'<h4>Infusions</h4>'+rows(infusions,false):'')+(boluses.length?'<h4>Bolus and push</h4>'+rows(boluses,true):'');
- $('#t0').innerHTML='<small>Case-relevant example controls only; not a complete treatment order or dosing guide. Some actions in the scenario are not simulated.</small>'+(controls||'<p>No medication simulation is provided for this case.</p>');if(P[cur].done)setTreatmentEnabled(false)}
+ $('#t0').innerHTML=controls||'<p>No medication simulation is provided for this case.</p>';if(P[cur].done)setTreatmentEnabled(false)}
 function sup(){const p=P[cur];$('#hu').textContent='Head-up 30\u00b0: '+(p.hu?'on':'off');$('#prone').textContent='Prone position: '+(p.pr?'on':'off')}
 function updateVentControls(p){
  const invasive=p.air==='imv',noninvasive=p.air==='niv';
@@ -352,7 +354,19 @@ function priority(p){
  return{level:0,reason:'No vital flag'};
 }
 // vitals engine, 1 tick per second
-let T=0,lastAlarmAt=performance.now(),lastAlarmBed=-1;
+let T=0,lastAlarmAt=performance.now(),lastAlarmBed=-1,alarmTimer;
+function scheduleAlarm(){
+ clearTimeout(alarmTimer);
+ if(!alarmOn)return;
+ const remaining=12000-(performance.now()-lastAlarmAt);
+ if(remaining>0){alarmTimer=setTimeout(scheduleAlarm,remaining);return}
+ const candidates=ent?P.filter(p=>!p.done&&p.st>0):[];
+ if(!candidates.length){alarmTimer=setTimeout(scheduleAlarm,1000);return}
+ const p=candidates.find(p=>p.i>lastAlarmBed)||candidates[0];
+ lastAlarmAt=performance.now();lastAlarmBed=p.i;beep();toast('Alarm · bed '+(p.i+1)+' · '+p.n+': '+priority(p).reason+' (simulated)');
+ alarmTimer=setTimeout(scheduleAlarm,12000);
+}
+scheduleAlarm();
 setInterval(()=>{if(!ent)return;T++;
  P.forEach((p,i)=>{
   if(p.done)return;
@@ -365,7 +379,6 @@ setInterval(()=>{if(!ent)return;T++;
   for(const k in g)v[k]+=(g[k]-v[k])*.3+(Math.random()-.5)*(k=='t'?.02:1.2);
   p.st=priority(p).level;
   B[i].lamp.material.color.set([0x3dff9a,0xffc24a,0xff4d5e][p.st])});
- if(alarmOn&&performance.now()-lastAlarmAt>=15000){const candidates=P.filter(p=>!p.done&&p.st>0);if(candidates.length){const p=candidates.find(p=>p.i>lastAlarmBed)||candidates[0];lastAlarmAt=performance.now();lastAlarmBed=p.i;beep();toast('Alarm · bed '+(p.i+1)+' · '+p.n+': '+priority(p).reason+' (simulated)')}}
  $('#hud').textContent=Math.floor(T/60)+':'+String(T%60).padStart(2,'0')+' · '+P.filter(p=>p.done).length+'/6';
  if(cur!=null){evu();labs()}},1000);
 
@@ -373,8 +386,12 @@ let last=0,fr=0;
 function loop(t){requestAnimationFrame(loop);if(t-last<1000/30)return;const dt=Math.min((t-last)/1000,.1);last=t;
  if(transit){
   const progress=clamp((t-transit.start)/transit.duration,0,1),ease=progress*progress*(3-2*progress);
-  cam.position.lerpVectors(transit.from,transit.to,ease);lk.lerpVectors(transit.lookFrom,transit.lookTo,ease);
-  if(progress===1){const i=transit.bed;if(transit.stage==='wall'){const pose=BP(i);yaw=Math.atan2(pose[0],-pose[1]);pit=0;go('ward');mode='travel';transit={bed:i,stage:'ward',start:t,duration:1500,from:cam.position.clone(),to:new V(pose[0]*.7,1.6,pose[1]*.7),lookFrom:lk.clone(),lookTo:new V(pose[0],1.5,pose[1])}}else go('bed',i)}
+  if(transit.stage==='turn'){yaw=transit.fromYaw+(transit.toYaw-transit.fromYaw)*ease;tl.set(Math.sin(yaw),1.6,-Math.cos(yaw));lk.copy(tl)}
+  else{cam.position.lerpVectors(transit.from,transit.to,ease);lk.lerpVectors(transit.lookFrom,transit.lookTo,ease)}
+  if(progress===1){const i=transit.bed,pose=BP(i);
+   if(transit.stage==='wall'){const targetYaw=Math.atan2(pose[0],-pose[1]);yaw=targetYaw-Math.PI*2;pit=0;go('ward');mode='travel';transit={bed:i,stage:'turn',start:t,duration:2400,fromYaw:yaw,toYaw:targetYaw}}
+   else if(transit.stage==='turn')transit={bed:i,stage:'ward',start:t,duration:1500,from:cam.position.clone(),to:new V(pose[0]*.7,1.6,pose[1]*.7),lookFrom:lk.clone(),lookTo:new V(pose[0],1.5,pose[1])};
+   else go('bed',i)}
  }else{tgt();cam.position.lerp(tp,.07);lk.lerp(tl,.1)}
  cam.lookAt(lk);
  P.forEach(p=>{p.ph+=dt*p.v.hr/60;p.vp+=dt*p.v.rr/60;const f=((p.vp%1)+1)%1;p.vo=f<.38?.5-.5*Math.cos(Math.PI*f/.38):.5+.5*Math.cos(Math.PI*(f-.38)/.62)});
