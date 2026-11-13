@@ -6,15 +6,17 @@
 :root{--c:#39e6ff;--g:#3dff9a;--a:#ffc24a;--r:#ff4d5e;--t:#d8ecff;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 html,body{height:100%;margin:0;background:#050b18;color:var(--t);font:13px/1.4 system-ui,sans-serif;overflow:hidden}
 #gl{display:block;width:100%;height:100%;touch-action:none}
+#flat-gl{display:none;position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
 button{font:inherit;color:var(--t);background:#0d2140;border:1px solid #2a5a8c;border-radius:6px;padding:8px 12px;cursor:pointer}
 button:focus-visible,input:focus-visible{outline:2px solid var(--c)}
 #top{position:fixed;top:env(safe-area-inset-top,0px);left:0;right:0;display:flex;gap:8px;align-items:center;padding:8px 10px;background:linear-gradient(#050b18,transparent)}
 #top b{margin-right:auto;font-size:15px;letter-spacing:.04em}
 #top button[data-m],#home{width:clamp(72px,10vw,112px);min-height:44px;padding:4px;line-height:1.15}
 #audio-controls{display:flex;gap:4px;flex-shrink:0}#audio-controls button{padding:5px;font-size:11px}
-@media(max-width:600px){#top{gap:3px;padding:5px;flex-wrap:wrap}#top b{font-size:11px}#top button[data-m],#home{width:clamp(55px,16vw,80px)}#audio-controls{width:100%;justify-content:flex-end}#hud{font-size:10px}#photo #pw{margin-top:calc(var(--top-height,84px) + 6px + env(safe-area-inset-top,0px))}#toast{top:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px))}}
+@media(max-width:600px){#top{gap:3px;padding:5px;flex-wrap:wrap}#top b{font-size:11px}#top button[data-m],#home{width:clamp(55px,16vw,80px)}#audio-controls{width:100%;justify-content:flex-end}#hud{font-size:10px}#photo #pw{margin-top:calc(var(--top-height,84px) + 6px + env(safe-area-inset-top,0px))}}
 #hud{font-variant-numeric:tabular-nums;color:var(--c)}
 #toast{position:fixed;top:56px;left:50%;transform:translateX(-50%);background:#3a0d16;border:1px solid var(--r);padding:8px 14px;border-radius:6px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%;text-align:center}
+@media(max-width:600px){#toast{top:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px))}}
 #hint{position:fixed;bottom:14px;left:0;right:0;text-align:center;color:#7fa6c8;pointer-events:none}
 #panel{position:fixed;left:0;right:0;bottom:0;display:none;max-height:64%;overflow:auto;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));background:rgba(5,15,32,.94);border-top:1px solid var(--c)}
 #panel h3{margin:0 0 6px;font-size:15px}
@@ -51,8 +53,9 @@ input[type=range]{width:100%}
 .approach{margin:8px 0;padding:8px 10px;border:1px solid #2a5a8c;border-radius:8px;background:#0a1830}.approach summary{cursor:pointer;color:var(--c)}.approach ol{margin:6px 0 0;padding-left:22px}.approach li{margin:3px 0}.approach small{display:block;margin-top:7px;color:#9fc3e4}
 </style></head><body>
 <canvas id="gl"></canvas>
+<canvas id="flat-gl" aria-hidden="true"></canvas>
 <div id="door"><h1>Intensive Care Unit</h1><div class="frame" id="dr" style="background:radial-gradient(#39e6ff66,#02060f)"><div class="leaf l"></div><div class="leaf r"></div></div><p>Six patients. One doctor.</p><button id="enter">Enter the ICU</button></div>
-<div id="top"><b>ICU · Sim</b><button id="home" type="button">Universe</button><button data-m="cmd">Command center</button><button data-m="ward">Ward</button><span id="hud">0:00 · 0/6</span><div id="audio-controls"><button id="voice" type="button" aria-pressed="true">Voice on</button><button id="alarm" type="button" aria-pressed="true">Alarms on</button></div></div>
+<div id="top"><b>ICU · Sim</b><button id="home" type="button">Universe</button><button data-m="cmd">Command center</button><button data-m="ward">Ward</button><span id="hud">0:00 · 0/6</span><div id="audio-controls"><button id="flat-toggle" type="button" aria-pressed="false">2D view</button><button id="voice" type="button" aria-pressed="true">Voice on</button><button id="alarm" type="button" aria-pressed="true">Alarms on</button></div></div>
 <div id="toast"></div>
 <div id="hint"></div>
 <div id="photo"><div id="pw"><div id="pb"></div><canvas id="pc" width="640" height="360" aria-hidden="true"></canvas><canvas id="iv" width="1280" height="720" aria-hidden="true"></canvas><canvas id="pl" width="720" height="508"></canvas><canvas id="pr" width="300" height="200"></canvas><div id="pi"></div></div></div>
@@ -172,6 +175,32 @@ const cv=$('#gl'),S=new THREE.Scene();S.background=new THREE.Color(0x050b18);
 const cam=new THREE.PerspectiveCamera(72,1,.1,200);
 function rs(){const w=cv.clientWidth,h=cv.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
 addEventListener('resize',rs);rs();
+const flatCanvas=$('#flat-gl'),flatContext=flatCanvas.getContext('2d');
+let flatMode=false,wallReady=false,blackFrames=0,graphicsChecked=false;
+function setFlatMode(enabled){
+ flatMode=enabled;flatCanvas.style.display=enabled?'block':'none';
+ $('#flat-toggle').textContent=enabled?'3D view':'2D view';
+ $('#flat-toggle').setAttribute('aria-pressed',String(enabled));
+}
+$('#flat-toggle').onclick=()=>setFlatMode(!flatMode);
+function renderFlat(){
+ const width=cv.clientWidth,height=cv.clientHeight,scale=Math.min(devicePixelRatio,1.5);
+ const w=Math.round(width*scale),h=Math.round(height*scale);
+ if(flatCanvas.width!==w||flatCanvas.height!==h){flatCanvas.width=w;flatCanvas.height=h}
+ flatContext.fillStyle='#050b18';flatContext.fillRect(0,0,w,h);
+ S.updateMatrixWorld();cam.updateMatrixWorld();
+ const planes=mode==='cmd'?S.children.filter(o=>o.userData.command):mode==='ward'||mode==='travel'?B.map(b=>b.g):[];
+ planes.forEach(plane=>{
+  const image=plane.material.map.image;
+  const width=plane.geometry.parameters.width,height=plane.geometry.parameters.height;
+  const corners=[[-width/2,height/2],[width/2,height/2],[-width/2,-height/2],[width/2,-height/2]].map(([x,y])=>plane.localToWorld(new V(x,y,0)).project(cam));
+  if(corners.some(p=>p.z< -1||p.z>1))return;
+  const xs=corners.map(p=>(p.x+1)*w/2),ys=corners.map(p=>(1-p.y)*h/2);
+  const left=Math.min(...xs),top=Math.min(...ys),right=Math.max(...xs),bottom=Math.max(...ys);
+  if(right<=0||left>=w||bottom<=0||top>=h)return;
+  flatContext.drawImage(image,left,top,right-left,bottom-top);
+ });
+}
 S.add(new THREE.HemisphereLight(0xffffff,0x6a7a88,1.15));
 [[0,4.5,0],[100,6,5]].forEach(p=>{const l=new THREE.PointLight(0xe6f6ff,1.2,40);l.position.set(...p);S.add(l)});
 const box=(w,h,d,c,x,y,z,side)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:c,roughness:.7,side}));m.position.set(x,y,z);return m};
@@ -398,7 +427,18 @@ function loop(t){requestAnimationFrame(loop);if(t-last<1000/30)return;const dt=M
  if(fr++%2==0){
   P.forEach((p,i)=>{if((mode=='ward'||mode=='travel')&&Math.abs(((BA[i]-yaw+Math.PI*3)%(Math.PI*2))-Math.PI)<1.3)drawBed(i);if(scr.visible)mon(sx,p,340,256,(i%C)*340,Math.floor(i/C)*256)});
   if(scr.visible)stex.needsUpdate=true;if(cur!=null)phd(P[cur])}
- R.render(S,cam)}
+ if(!flatMode)R.render(S,cam);
+ if(!graphicsChecked&&!flatMode&&wallReady&&mode==='cmd'&&R.getContext().drawingBufferWidth&&R.getContext().drawingBufferHeight){
+  const gl=R.getContext(),pixel=new Uint8Array(4),w=gl.drawingBufferWidth,h=gl.drawingBufferHeight;
+  let visible=false;
+  for(const x of [.25,.5,.75])for(const y of [.25,.5,.75]){
+   gl.readPixels(Math.floor(x*(w-1)),Math.floor(y*(h-1)),1,1,gl.RGBA,gl.UNSIGNED_BYTE,pixel);
+   if(pixel[0]+pixel[1]+pixel[2]>8)visible=true;
+  }
+  if(visible)graphicsChecked=true;
+  else if(++blackFrames>=3){graphicsChecked=true;setFlatMode(true);console.warn('3D rendering returned a black screen; using the 2D view.');toast('3D graphics unavailable. Switched to 2D view.')}
+ }
+ if(flatMode)renderFlat()}
 requestAnimationFrame(loop);
 
 ent=1;
@@ -521,8 +561,10 @@ scr.visible=true;
    }
   });
   wallTex.needsUpdate=true;
+  wallReady=true;
  }
  photo.onload=paint;
+ photo.onerror=()=>{console.error('Unable to load the command centre image:',photo.src);toast('Unable to load the command centre image. Check your connection and reload.')};
  window.openFromWall=function(i){
   if(!P[i]||mode!=='cmd') return;
   const r=SCREENS.find(s=>s.bed===i),x=100+(r.x+r.w/2-.5)*WALLW,y=(1-r.y-r.h/2)*WALLH;
