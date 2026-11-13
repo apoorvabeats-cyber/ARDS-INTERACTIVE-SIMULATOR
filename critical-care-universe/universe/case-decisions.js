@@ -1,5 +1,17 @@
 // Educational prompts only. They do not represent measured outcomes or clinical orders.
 export const FOLLOW_UPS = {
+  'Regular SVT': [
+    ['What should be checked first?', 'Assess perfusion and review the ECG to confirm a regular narrow-complex rhythm.'],
+    ['What can be attempted if the patient remains stable?', 'Consider vagal manoeuvres and adenosine with monitoring when appropriate.'],
+    ['What if the patient becomes unstable?', 'Arrange immediate synchronized cardioversion and urgent help.'],
+    ['What should guide further treatment?', 'Reassess rhythm, perfusion, recurrence and potential causes with senior support.']
+  ],
+  'Symptomatic bradycardia': [
+    ['What should be assessed immediately?', 'Assess perfusion and rhythm, call for help and consider reversible causes.'],
+    ['What is an initial treatment?', 'Consider atropine for symptomatic bradycardia while preparing escalation.'],
+    ['What if atropine is ineffective?', 'Prepare pacing or consider an adrenaline or dopamine infusion with senior support.'],
+    ['What should guide ongoing care?', 'Reassess rhythm, perfusion and response while treating reversible causes.']
+  ],
   'ARDS': [
     ['How should oxygenation be assessed?', 'Check an arterial blood gas and reassess oxygenation; do not infer PaO2 from the monitor alone.'],
     ['What ventilation strategy should be checked?', 'Check tidal volume against predicted body weight and measure plateau pressure for lung-protective ventilation.'],
@@ -87,6 +99,18 @@ export const FOLLOW_UPS = {
 };
 
 export const DISTRACTORS = {
+  'Regular SVT': [
+    'Treat the heart rate without checking perfusion or rhythm.',
+    'Give an unselected antiarrhythmic without reviewing the ECG.',
+    'Continue observing despite worsening hypotension and altered consciousness.',
+    'Stop monitoring immediately after the heart rate slows.'
+  ],
+  'Symptomatic bradycardia': [
+    'Ignore hypotension because the pulse is regular.',
+    'Give a beta-blocker to increase the heart rate.',
+    'Delay pacing and escalation despite persistent instability.',
+    'Stop assessing reversible causes once atropine has been given.'
+  ],
   'ARDS': [
     'Calculate PaO2 directly from the pulse oximeter reading.',
     'Increase tidal volume to 10 mL/kg without checking plateau pressure.',

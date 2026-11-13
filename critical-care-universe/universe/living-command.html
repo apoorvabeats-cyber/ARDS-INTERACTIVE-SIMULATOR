@@ -52,6 +52,7 @@ input[type=range]{width:100%}
 .tb{display:none}.tb.on{display:block}
 #lab table{width:100%;border-collapse:collapse}#lab td{padding:4px 6px;border-bottom:1px solid #16305a}#lab td:last-child{text-align:right;font-variant-numeric:tabular-nums}.hi{color:var(--r)}
 .approach{margin:8px 0;padding:8px 10px;border:1px solid #2a5a8c;border-radius:8px;background:#0a1830}.approach summary{cursor:pointer;color:var(--c)}.approach ol{margin:6px 0 0;padding-left:22px}.approach li{margin:3px 0}.approach small{display:block;margin-top:7px;color:#9fc3e4}
+#orders select{max-width:100%;width:100%;padding:8px;margin:5px 0;color:var(--t);background:#0d2140;border:1px solid #2a5a8c;border-radius:6px}#orders button{margin:4px 0}#order-history{margin:6px 0;padding-left:20px}#order-feedback{color:var(--c)}
 </style></head><body>
 <canvas id="gl"></canvas>
 <canvas id="flat-gl" aria-hidden="true"></canvas>
@@ -63,6 +64,12 @@ input[type=range]{width:100%}
 <div id="panel">
 <h3 id="pn"></h3><small id="hx" style="display:block;color:#9fc3e4;margin-bottom:6px"></small>
 <details class="approach"><summary>Patient approach</summary><ol><li>Check ABCDE, immediate threats and monitor trends; call for help when unstable.</li><li>Choose the priority action, then use the support and drug controls where available.</li><li>Recheck simulated vitals and labs, consider treatment hazards, and revise the plan.</li></ol></details>
+<details class="approach" id="orders" open><summary>Clinical hints and simulated orders</summary>
+<small>Educational simulation only. Responses are illustrative, not validated clinical predictions. Some orders update existing controls; others have only a simplified vital-sign effect.</small>
+<label for="hint-level">Hint level</label><select id="hint-level"><option value="basic">Basic</option><option value="advanced">Advanced</option><option value="expert">Expert</option></select>
+<p id="order-hint"></p><div id="order-form"><label for="order-choice">Choose an intervention or investigation</label><select id="order-choice"></select><button id="order-submit" type="button">Place simulated order</button></div>
+<p id="order-feedback" aria-live="polite"></p><ol id="order-history"></ol>
+</details>
 <div id="ev"></div>
 <div class="tabs"><button data-t="0" class="on">Drugs</button><button data-t="1">Support</button><button data-t="2">Labs</button></div>
 <div class="tb on" id="t0"></div>
@@ -83,6 +90,7 @@ input[type=range]{width:100%}
 <script type="module">
 import * as THREE from './three.module.js';
 import {FOLLOW_UPS,DISTRACTORS} from './case-decisions.js';
+import {ORDER_CASES,assessOrder} from './clinical-orders.js';
 const $=s=>document.querySelector(s),V=THREE.Vector3,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 function updateLayout(){
  document.documentElement.style.setProperty('--top-height',$('#top').getBoundingClientRect().height+'px');
@@ -94,6 +102,8 @@ updateLayout();
 const NM={m:['Ravi Kumar','Imran Khan','Anil Sharma','Gopal Das','Suresh Yadav','Mohan Lal','Arjun Singh','Karan Mehta','Vijay Nair','Rafiq Ahmed'],f:['Sunita Devi','Meena Iyer','Fatima Begum','Lakshmi Rao','Kavita Gupta','Anjali Verma','Rukhsar Ali','Pooja Mishra']};
 // Case-specific teaching data: kd and haz are illustrative lab effects and safety flags, not validated dose-response models.
 const POOL=[
+{sx:'m',dx:'Regular SVT',hx:'45M. Palpitations; alert with a regular narrow-complex tachycardia. No signs of shock at presentation.',iv:0,hr:170,sbp:120,dbp:75,spo2:97,rr:20,t:37,ab:[7.4,39,24,1.3],lb:'ECG: regular narrow-complex tachycardia · K⁺ 4.1',lk:['K⁺',4.1,4.1,'mmol/L'],dr:12,vt:450,q:'Regular narrow-complex tachycardia with stable perfusion. What is the next step?',o:[['Assess the ECG and perfusion; consider vagal manoeuvres and adenosine if appropriate',1,'Correct. Confirm rhythm and stability, then use a monitored approach.'],['Ignore perfusion and give an unselected antiarrhythmic',0,'Rhythm and stability determine treatment.'],['Wait without monitoring despite palpitations',0,'Monitor and reassess the rhythm and perfusion.']]},
+{sx:'f',dx:'Symptomatic bradycardia',hx:'72F. Dizziness and cool skin with sinus bradycardia and hypotension. No known high-grade block.',iv:0,hr:38,hrd:1,sbp:78,dbp:46,spo2:95,rr:20,t:36.8,ab:[7.36,40,22,2.4],lb:'ECG: sinus bradycardia · K⁺ 4.2',lk:['K⁺',4.2,4.2,'mmol/L'],dr:12,vt:400,q:'Heart rate 38 with hypotension and dizziness. What is the priority?',o:[['Assess perfusion and reversible causes; give atropine and prepare escalation',1,'Correct. Treat symptomatic bradycardia and prepare pacing or vasoactive support if needed.'],['Give an IV beta-blocker',0,'A beta-blocker can worsen bradycardia and hypotension.'],['Ignore the hypotension and observe without monitoring',0,'Poor perfusion needs urgent assessment and treatment.']]},
 {sx:'m',dx:'ARDS',hx:'54M. Day 3 of severe pneumonia, intubated for hypoxemic failure. Lung-protective ventilation at 6 mL/kg.',hr:104,sbp:118,spo2:84,rr:28,t:38.4,ab:[7.32,50,24,2.1],lb:'WBC 19.2 · Hb 10.4 · Plt 140 · Cr 1.0',lk:['CRP',186,120,'mg/L'],dr:24,vt:400,prs:8,fl:-.1,q:'SpO₂ 84% on FiO₂ 80% and PEEP 10. Obtain an ABG and address severe hypoxemia. Next step?',o:[['Prone for at least 12 hours/day; consider paralysis only for selected indications',1,'Correct. Prolonged proning is recommended in severe ARDS; neuromuscular blockade is individualized, not routine.'],['Raise tidal volume to 10 mL/kg, lower PEEP',0,'Harmful. Use 4–8 mL/kg predicted body weight and keep plateau pressure below 30 cm H₂O.'],['Wean sedation and extubate',0,'Premature with severe hypoxemia.']]},
 {sx:'f',dx:'Septic shock',hx:'61F. Urosepsis from an obstructing stone, day 1. Fluids given, cultures sent, antibiotics started.',hr:118,sbp:82,dbp:37,spo2:96,rr:24,t:39.1,ab:[7.28,30,14,5.2],lb:'WBC 24 · Hb 9.8 · Plt 82 · Cr 2.1',lk:['Procalcitonin',48,30,'ng/mL'],dr:14,vt:380,q:'MAP 52 after initial crystalloid resuscitation; lactate 5.2. Next step?',o:[['Start norepinephrine to an initial MAP target of 65 mm Hg and arrange urgent urinary source control',1,'Correct. Norepinephrine is first-line for persistent hypotension; obstructed infected systems require urgent source control.'],['Give another 2 L bolus without reassessing',0,'Unassessed fluid can cause overload. Reassess fluid responsiveness and perfusion.'],['Start dopamine first-line',0,'Norepinephrine is preferred; dopamine can cause more arrhythmias.']]},
 {sx:'m',dx:'DKA',hx:'22M. Type 1 diabetes, stopped insulin 3 days ago. Vomiting, deep Kussmaul breathing. Oxygen by mask.',iv:0,hr:112,sbp:104,spo2:98,rr:26,t:37.2,ab:[7.05,18,5,3],lb:'Glucose 520 · Na⁺ 131 · Ketones 6.1 · Cr 1.3',lk:['K⁺',2.9,3.8,'mmol/L'],kd:{kcl:.5,ins:-.12},haz:[['ins','lt',3.5,'insulin with K⁺ below 3.5 mmol/L; defer insulin and continue potassium replacement.']],dr:12,vt:480,q:'Glucose 520, pH 7.05, K⁺ 2.9 mmol/L. Insulin infusion is ready.',o:[['Hold insulin; replace potassium and recheck until K⁺ is above 3.5 mmol/L',1,'Correct. The 2024 adult DKA consensus advises delaying insulin when K⁺ is below 3.5 mmol/L.'],['Start insulin 0.1 U/kg/h now',0,'Dangerous with K⁺ 2.9; insulin can worsen hypokalemia.'],['Give a bicarbonate bolus',0,'Bicarbonate is not routine for DKA at this pH.']]},
@@ -118,6 +128,8 @@ function pick(){let seen=[];try{seen=JSON.parse(localStorage.getItem('licu')||'[
 const D=pick();
 for(const p of POOL)if(!FOLLOW_UPS[p.dx]||FOLLOW_UPS[p.dx].length!==4||!DISTRACTORS[p.dx]||DISTRACTORS[p.dx].length!==4)throw new Error('Missing follow-up decisions for '+p.dx);
 const SUPPORT={
+ 'Regular SVT':['room',21,0],
+ 'Symptomatic bradycardia':['room',21,0],
  'ARDS':['imv',80,10],
  'Septic shock':['room',21,0],
  'DKA':['mask',50,0],
@@ -137,7 +149,7 @@ const P=D.map((d,i)=>{
  const support=SUPPORT[d.dx];
  if(!support)throw new Error('Missing support settings for '+d.dx);
  const [air,fio2,peep]=support;
- return{...d,i,air,vp:0,ipap:peep+(d.dr||10),setRate:d.rr,iv:air==='imv'||air==='niv',dz:{},sev:.05,pend:0,done:0,ok:0,step:0,answers:[],feedback:null,fio2,peep,initialFio2:fio2,initialPeep:peep,pump:0,bol:0,ph:0,st:0,v:{hr:d.hr,sbp:d.sbp,dbp:d.dbp??d.sbp*.6,spo2:d.spo2,rr:d.rr,t:d.t}}
+ return{...d,i,air,vp:0,ipap:peep+(d.dr||10),setRate:d.rr,iv:air==='imv'||air==='niv',dz:{},sev:.05,pend:0,done:0,ok:0,step:0,answers:[],feedback:null,orderProgress:0,orderLog:[],orderBenzo:false,hintLevel:'basic',fio2,peep,initialFio2:fio2,initialPeep:peep,pump:0,bol:0,ph:0,st:0,v:{hr:d.hr,sbp:d.sbp,dbp:d.dbp??d.sbp*.6,spo2:d.spo2,rr:d.rr,t:d.t}}
 });
 const ecg=(f,tw)=>{const g=(m,s,a)=>a*Math.exp(-(((f-m)/s)**2));return g(.2,.03,.13)+g(.4,.012,1)-g(.375,.01,.15)-g(.43,.012,.2)+g(.65,.05,.25*tw)};
 function mon(c,p,w,h,x,y){
@@ -271,7 +283,7 @@ function go(m,i){
  mode=m;updateFov();if(m=='bed'){cur=i;const p=P[i];$('#pn').textContent=(i+1)+'. '+p.n+' · '+p.dx;$('#hx').textContent=p.hx;
   [['fi',p.fio2],['pe',p.peep],['rrset',p.setRate],['vtset',p.vt],['ipap',p.ipap]].forEach(([id,v])=>{const e=$('#'+id);e.value=v;if(e.previousElementSibling)e.previousElementSibling.textContent=v});
   $('#pe').parentElement.style.display=p.iv?'block':'none';updateVentControls(p);$('#ev').dataset.s='';evu();rd();sup();
-  document.querySelector('[data-t="'+(p.iv?1:0)+'"]').click();setTreatmentEnabled(!p.done);
+  document.querySelector('[data-t="'+(p.iv?1:0)+'"]').click();setTreatmentEnabled(!p.done);renderOrders(true);
   if(!p.done)speak(p.n+'. '+p.dx+'. '+p.hx+'. '+(p.narration||currentDecision(p).q))}
  else cur=null;
  if(m=='cmd'||m=='ward'){tgt();cam.position.copy(tp);lk.copy(tl);cam.lookAt(lk)}
@@ -308,7 +320,7 @@ function speak(text){stopVoice();if(!voiceOn||!('speechSynthesis' in window))ret
 $('#voice').onclick=()=>{voiceOn=!voiceOn;$('#voice').textContent=voiceOn?'Voice on':'Voice off';$('#voice').setAttribute('aria-pressed',String(voiceOn));if(!voiceOn)stopVoice();else if(cur!=null&&!P[cur].done)speak(P[cur].n+'. '+P[cur].dx+'. '+P[cur].hx+'. '+(P[cur].narration||currentDecision(P[cur]).q))};
 if(!('speechSynthesis' in window)){$('#voice').disabled=true;$('#voice').textContent='Voice unavailable';voiceOn=false}
 $('#alarm').onclick=()=>{alarmOn=!alarmOn;$('#alarm').textContent=alarmOn?'Alarms on':'Alarms off';$('#alarm').setAttribute('aria-pressed',String(alarmOn));if(alarmOn)unlockAudio();scheduleAlarm()};
-function setTreatmentEnabled(enabled){document.querySelectorAll('#t0 button,#t1 input,#t1 button').forEach(e=>e.disabled=!enabled)}
+function setTreatmentEnabled(enabled){document.querySelectorAll('#t0 button,#t1 input,#t1 button,#order-submit').forEach(e=>e.disabled=!enabled)}
 function currentDecision(p){
  if(p.step===0)return{q:p.q,o:p.o};
  if(!p.followOptions){const [question,answer]=FOLLOW_UPS[p.dx][p.step-1];const o=[[answer,1,answer],[DISTRACTORS[p.dx][p.step-1],0,answer],['Delay review and continue unchanged despite deterioration.',0,'Escalate and reassess rather than delaying; '+answer]];for(let i=o.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[o[i],o[j]]=[o[j],o[i]]}p.followOptions={q:question,o}}
@@ -325,7 +337,7 @@ $('#ev').onclick=e=>{const p=P[cur],t=e.target;if(t.dataset.debrief){fin();retur
  if(p.step===4){p.done=1;p.pend=0;setTreatmentEnabled(false);evu();speak(message+' Case complete. This simulation has stopped.');if(P.every(q=>q.done))toast('All cases complete. Open the shift debrief below.')}
  else{evu();speak(message+' Your answer did not administer treatment. Use the available controls and reassess before continuing.')}}
 function fin(){stopVoice();const n=P.reduce((sum,p)=>sum+p.ok,0);$('#end').style.display='block';
- $('#end').innerHTML='<h2>Shift debrief: '+n+' of 30 decisions correct</h2><ol>'+P.map(p=>'<li><b>'+p.n+' · '+p.dx+'</b><ul>'+p.answers.map(a=>'<li>'+a.question+'<br>Your choice: '+a.selected+'<br>Suggested priority: '+a.best+'</li>').join('')+'</ul></li>').join('')+'</ol><button onclick="document.getElementById(\'end\').style.display=\'none\'">Return to shift</button> <button onclick="location.reload()">Restart shift</button>'}
+ $('#end').innerHTML='<h2>Shift debrief: '+n+' of 30 decisions correct</h2><ol>'+P.map(p=>'<li><b>'+p.n+' · '+p.dx+'</b><ul>'+p.answers.map(a=>'<li>'+a.question+'<br>Your choice: '+a.selected+'<br>Suggested priority: '+a.best+'</li>').join('')+'</ul>'+(p.orderLog.length?'<b>Simulated orders</b><ul>'+p.orderLog.map(o=>'<li>'+o.label+' — '+o.level+': '+o.text+'</li>').join('')+'</ul>':'')+'</li>').join('')+'</ol><button onclick="document.getElementById(\'end\').style.display=\'none\'">Return to shift</button> <button onclick="location.reload()">Restart shift</button>'}
 function toast(m){const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.opacity=0,4000)}
 function beep(){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.04;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.12)}
 
@@ -386,6 +398,51 @@ function updateVentControls(p){
  $('#vent-hint').textContent=hints[p.dx]||'Reassess oxygenation, ventilation, synchrony and hemodynamics after each change.';
 }
 function kval(p){const k=p.lk,z=p.dz;let v=k[1];for(const d in p.kd)v+=p.kd[d]*(z[d]||0);return v}
+function orderContext(p){
+ return{sbp:p.v.sbp,map:(p.v.sbp+2*p.v.dbp)/3,k:kval(p),ph:simulatedLabs(p).ph,
+  norepinephrine:p.dz.nor||0,insulin:p.dz.ins||0,nitrate:p.dz.gtn||0,
+  benzo:p.orderBenzo||!!p.dz.lz,atropine:p.orderLog.some(o=>o.id==='atropine'&&o.level==='appropriate')};
+}
+function renderOrders(reset){
+ const p=P[cur],profile=ORDER_CASES[p.dx],form=$('#order-form'),select=$('#order-choice');
+ $('#hint-level').value=p.hintLevel;
+ if(reset){
+  select.replaceChildren();
+  if(profile)profile.actions.forEach(a=>{const option=document.createElement('option');option.value=a.id;option.textContent=a.label;select.appendChild(option)});
+  form.style.display=profile?'block':'none';
+  $('#order-feedback').textContent=p.orderFeedback||'';
+  const history=$('#order-history');history.replaceChildren();
+  p.orderLog.forEach(o=>{const li=document.createElement('li');li.textContent=o.label+' — '+o.level+': '+o.text;history.appendChild(li)});
+ }
+ const v=p.v,map=Math.round((v.sbp+2*v.dbp)/3),basic='BP '+Math.round(v.sbp)+'/'+Math.round(v.dbp)+', MAP '+map+', HR '+Math.round(v.hr)+', SpO₂ '+Math.round(v.spo2)+'%, RR '+Math.round(v.rr)+'/min.';
+ $('#order-hint').textContent=!profile?basic+' Context-sensitive orders are not available for this case; use the existing decisions and controls.':
+  p.hintLevel==='basic'?basic:p.hintLevel==='advanced'?basic+' '+profile.advanced+' Current simulated '+p.lk[0]+': '+kval(p).toFixed(kval(p)<20?1:0)+' '+p.lk[3]+'.':basic+' '+profile.expert;
+ $('#order-submit').disabled=p.done||!profile;
+}
+$('#hint-level').onchange=e=>{P[cur].hintLevel=e.target.value;renderOrders(false)};
+$('#order-submit').onclick=()=>{
+ const p=P[cur];if(p.done)return;
+ const {choice,level,text}=assessOrder(p.dx,$('#order-choice').value,orderContext(p));
+ if(choice.kind==='treatment'&&choice.effect!=='kcl'&&p.orderLog.some(o=>o.id===choice.id&&o.level==='appropriate')){
+  p.orderFeedback='This treatment has already been ordered. Reassess the patient rather than repeating it automatically.';$('#order-feedback').textContent=p.orderFeedback;return;
+ }
+ let result,recordText=text;
+ if(level==='conditional')result='Conditional: '+text+' No simulated treatment effect was applied.';
+ else if(choice.kind==='investigation'){
+  recordText+=' Initial case findings: '+p.lb+'. Current simulated '+p.lk[0]+': '+kval(p).toFixed(kval(p)<20?1:0)+' '+p.lk[3]+'.';
+  result='Appropriate investigation: '+recordText+' Investigations do not immediately change the patient.';
+ }
+ else{
+  p.orderProgress=clamp(p.orderProgress+(level==='appropriate'?.2:-.25),-1,1);
+  if(level==='appropriate'&&choice.effect==='kcl')p.dz.kcl=(p.dz.kcl||0)+1;
+  if(level==='appropriate'&&choice.effect==='benzo')p.orderBenzo=true;
+  if(level==='appropriate'&&choice.effect==='vent'){p.setRate=Math.max(6,p.setRate-4);$('#rrset').value=p.setRate;$('#rrset').previousElementSibling.textContent=p.setRate}
+  const modeled={'DKA':{insulin:['ins',1],fluid:['fl',1]},'Septic shock':{norepinephrine:['nor',2]},'Hypertensive pulmonary edema':{nitrate:['gtn',2],furosemide:['ls',1]},'Status epilepticus':{lorazepam:['lz',1],levetiracetam:['lev',1]},'AKI, hyperkalemia':{calcium:['ca',1],'insulin-glucose':['dx',1]}};
+  const drug=modeled[p.dx]?.[choice.id];if(level==='appropriate'&&drug){const infusion=IN.find(d=>d[0]===drug[0]),dose=(p.dz[drug[0]]||0)+drug[1];p.dz[drug[0]]=infusion?clamp(dose,infusion[3],infusion[4]):dose;if(drug[0]==='fl')p.bol=Math.min(30,p.bol+14)}
+  result=(level==='appropriate'?'Appropriate: ':'Inappropriate: ')+text+' The model will '+(level==='appropriate'?'trend toward improvement':'trend toward deterioration')+'.';
+ }
+ p.orderFeedback=result;p.orderLog.push({id:choice.id,label:choice.label,level,text:recordText});renderOrders(true);rd();labs();
+};
 function priority(p){
  const v=p.v,map=(v.sbp+2*v.dbp)/3,pp=v.sbp-v.dbp;
  if(v.spo2<85||v.sbp<90||map<60||pp<=20||v.hr<40||v.hr>140||v.rr<8||v.rr>35||p.sev>=.65)return{level:2,reason:'Marked vital abnormality'};
@@ -415,11 +472,12 @@ setInterval(()=>{if(!ent)return;T++;
   if(p.prh&&p.pr)p.sev=Math.min(1,p.sev+.03);if(p.twc)p.tw=p.dz[p.twc[2]]?p.twc[1]:p.twc[0];
   const v=p.v,z=p.dz,n=k=>z[k]||0,sb=p.sbp+p.sev*(p.hyp?25:-36)+n('nor')*1.3+n('vas')*500+n('dob')-n('gtn')*1.5+p.bol-n('mid')*(1.5+p.sev*2)+(p.ls<0?p.ls*n('ls')*6:0);
   const g={hr:p.hr+p.sev*(p.hrd?-15:30)-p.bol*.4+n('dob')*1.2-n('mid'),sbp:sb,dbp:(p.dbp??p.sbp*.6)+(sb-p.sbp)*.6,spo2:clamp(p.spo2-p.sev*13+(p.fio2-p.initialFio2)*.12+(p.peep-p.initialPeep)*.35+(p.pr?(p.prs??2):0)+(p.fl||0)*p.bol+(p.ls>0?Math.min(6,n('ls')*p.ls):0)+(p.ed?Math.min(5,n('gtn')*.5):0),60,100),rr:p.iv&&p.air==='imv'?p.setRate:p.rr+p.sev*8-n('mid')*.6,t:p.t+p.sev*.6};
+  const profile=ORDER_CASES[p.dx];if(profile&&p.orderProgress){const oldSbp=g.sbp;for(const k of ['hr','sbp','spo2','rr'])g[k]+=p.orderProgress*(profile.target[k]-g[k]);g.hr=clamp(g.hr,20,220);g.sbp=clamp(g.sbp,40,250);g.dbp=clamp(g.dbp+(g.sbp-oldSbp)*.6,20,g.sbp);g.spo2=clamp(g.spo2,60,100);g.rr=clamp(g.rr,6,45)}
   for(const k in g)v[k]+=(g[k]-v[k])*.3+(Math.random()-.5)*(k=='t'?.02:1.2);
   p.st=priority(p).level;
   B[i].lamp.material.color.set([0x3dff9a,0xffc24a,0xff4d5e][p.st])});
  $('#hud').textContent=Math.floor(T/60)+':'+String(T%60).padStart(2,'0')+' · '+P.filter(p=>p.done).length+'/6';
- if(cur!=null){evu();labs()}},1000);
+ if(cur!=null){evu();labs();renderOrders(false)}},1000);
 
 let last=0,fr=0;
 function loop(t){requestAnimationFrame(loop);if(t-last<1000/30)return;const dt=Math.min((t-last)/1000,.1);last=t;
