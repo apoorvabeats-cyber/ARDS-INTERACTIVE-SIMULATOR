@@ -157,8 +157,16 @@ function mon0(c,p,w,h,x,y){
  [['HR '+Math.round(v.hr),'#3dff9a',0,.72],['SpO2 '+Math.min(100,Math.round(v.spo2)),'#39e6ff',1,.72],['BP '+Math.round(v.sbp)+'/'+Math.round(v.dbp),'#ff9ad0',0,.9],['RR '+Math.round(v.rr),'#ffc24a',1,.9]].forEach(([s,cl,a,b])=>{c.fillStyle=cl;c.fillText(s,w*(.05+a*.5),h*b)});
  c.restore()}
 
-let R;try{R=new THREE.WebGLRenderer({canvas:$('#gl'),antialias:true})}catch(e){document.body.insertAdjacentHTML('beforeend','<p style="padding:70px 20px">WebGL is not available on this device. Open this page in a current browser.</p>');throw e}
-R.setPixelRatio(Math.min(devicePixelRatio,2));
+let R;try{R=new THREE.WebGLRenderer({canvas:$('#gl'),antialias:true})}catch(e){
+ const notice=document.createElement('section');
+ notice.style.cssText='position:fixed;inset:0;z-index:20;display:grid;align-content:center;justify-items:center;gap:12px;padding:24px;background:#050b18;color:#d8ecff;text-align:center;font:16px/1.5 system-ui,sans-serif';
+ const title=document.createElement('h1');title.textContent='Command Centre needs WebGL';
+ const message=document.createElement('p');message.textContent='This browser or device could not start 3D graphics. Try an up-to-date browser with hardware acceleration enabled.';
+ const back=document.createElement('button');back.type='button';back.textContent='Back to Universe';back.style.cssText='padding:10px 16px;border:1px solid #39e6ff;border-radius:6px;background:#0d2140;color:inherit;font:inherit';
+ back.onclick=()=>parent.postMessage('universe-home','*');
+ notice.append(title,message,back);document.body.appendChild(notice);throw e;
+}
+R.setPixelRatio(Math.min(devicePixelRatio,1.5));
 const cv=$('#gl'),S=new THREE.Scene();S.background=new THREE.Color(0x050b18);
 const cam=new THREE.PerspectiveCamera(72,1,.1,200);
 function rs(){const w=cv.clientWidth,h=cv.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
@@ -362,7 +370,7 @@ setInterval(()=>{if(!ent)return;T++;
  if(cur!=null){evu();labs()}},1000);
 
 let last=0,fr=0;
-function loop(t){requestAnimationFrame(loop);const dt=Math.min((t-last)/1000,.1);last=t;
+function loop(t){requestAnimationFrame(loop);if(t-last<1000/30)return;const dt=Math.min((t-last)/1000,.1);last=t;
  if(transit){
   const progress=clamp((t-transit.start)/transit.duration,0,1),ease=progress*progress*(3-2*progress);
   cam.position.lerpVectors(transit.from,transit.to,ease);lk.lerpVectors(transit.lookFrom,transit.lookTo,ease);
@@ -435,7 +443,11 @@ function drawGiven(c,p,W,H){
  c.restore();
 }
 var SHOT={};
-[['imv','/universe/bed/imv.jpg'],['wimv','/universe/bed/woman-imv.jpg'],['niv','/universe/bed/niv.jpg'],['wniv','/universe/bed/woman-niv.jpg'],['mask','/universe/bed/mask.jpg'],['wmask','/universe/bed/woman-mask.jpg'],['room','/universe/bed/room.jpg'],['wroom','/universe/bed/woman-room.jpg']].forEach(function(pair){var im=new Image(); im.src='bed/'+pair[1].split('/').pop(); SHOT[pair[0]]=im;});
+P.forEach(function(p){
+ const woman=p.sx==='f',key=p.air==='imv'?(woman?'wimv':'imv'):p.air==='niv'?(woman?'wniv':'niv'):p.air==='mask'?(woman?'wmask':'mask'):(woman?'wroom':'room');
+ if(SHOT[key])return;
+ var im=new Image();im.src='bed/'+(woman?'woman-':'')+(p.air||'room')+'.jpg';SHOT[key]=im;
+});
 function bedShot(p){
  var woman=p.sx==='f';
  if(p.air==='imv') return woman?SHOT.wimv:SHOT.imv;
@@ -457,11 +469,9 @@ scr.visible=true;
   {bed:5,x:0.748,y:0.188,w:0.124,h:0.362}
  ];
  var wallCanvas=document.createElement('canvas');
- wallCanvas.width=3000; wallCanvas.height=1690;
+ wallCanvas.width=1920; wallCanvas.height=1080;
  var base=document.createElement('canvas');
- base.width=3000; base.height=1690;
- var sharpPhoto=document.createElement('canvas');
- var sharpContext=sharpPhoto.getContext('2d');
+ base.width=1920; base.height=1080;
  var wallTex=new THREE.CanvasTexture(wallCanvas);
  wallTex.anisotropy=R.capabilities.getMaxAnisotropy();
  var wall=new THREE.Mesh(new THREE.PlaneGeometry(WALLW,WALLH), new THREE.MeshBasicMaterial({map:wallTex}));
@@ -473,13 +483,7 @@ scr.visible=true;
  function paint(){
   if(!photo.complete||!photo.naturalWidth) return;
   if(!base._drawn){
-   sharpPhoto.width=photo.naturalWidth;sharpPhoto.height=photo.naturalHeight;
-   sharpContext.drawImage(photo,0,0);
-   const w=sharpPhoto.width,h=sharpPhoto.height,src=sharpContext.getImageData(0,0,w,h),dst=sharpContext.createImageData(w,h),a=src.data,b=dst.data;
-   b.set(a);
-   for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=(y*w+x)*4;for(let ch=0;ch<3;ch++){const blur=(a[i+ch]*4+a[i-4+ch]+a[i+4+ch]+a[i-w*4+ch]+a[i+w*4+ch])/8;b[i+ch]=Math.max(0,Math.min(255,a[i+ch]+(a[i+ch]-blur)*.8))}}
-   sharpContext.putImageData(dst,0,0);
-   base.getContext('2d').drawImage(sharpPhoto,0,0,base.width,base.height);base._drawn=1;
+   base.getContext('2d').drawImage(photo,0,0,base.width,base.height);base._drawn=1;
   }
   var ctx=wallCanvas.getContext('2d');
   ctx.drawImage(base,0,0);
@@ -510,7 +514,7 @@ scr.visible=true;
  var lastPaint=0;
  function chase(t){
   requestAnimationFrame(chase);
-  if(mode==='cmd'&&t-lastPaint>=100){lastPaint=t;paint()}
+  if(mode==='cmd'&&t-lastPaint>=250){lastPaint=t;paint()}
  }
  requestAnimationFrame(chase);
 })();
