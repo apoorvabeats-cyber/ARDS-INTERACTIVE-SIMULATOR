@@ -40,6 +40,13 @@ main{max-width:720px;margin:0 auto;padding:12px 12px 28px}
 .teach{background:#141a16;border:1px solid rgba(143,208,168,.4);border-radius:12px;padding:12px;line-height:1.45}
 .teach.miss{background:#241818;border-color:rgba(231,163,163,.45)}
 .foot{margin:16px 0 0;color:var(--muted);font-size:12px}
+.torso{position:relative;width:min(100%,280px);margin:8px auto 12px}
+.torso svg{width:100%;height:auto;display:block}
+.zone{position:absolute;width:34%;min-height:44px;border:1px dashed var(--cool);border-radius:10px;background:rgba(16,18,20,.35);font-size:12px}
+.zone.a{left:8%;top:36%}
+.zone.b{right:8%;top:36%}
+.zone.on{background:rgba(127,212,230,.28);border-style:solid}
+.filed{margin:0 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#141a16;line-height:1.4}
 </style>
 </head>
 <body>
@@ -53,6 +60,48 @@ main{max-width:720px;margin:0 auto;padding:12px 12px 28px}
 const R = function(cx,cy,rx,ry){ return {cx:cx,cy:cy,rx:rx,ry:ry}; };
 function choice(prompt, lead, options, teach){ return {kind:"choice", prompt:prompt, lead:lead, options:options, teach:teach}; }
 function mark(prompt, lead, src, alt, cap, regions, teach){ return {kind:"mark", prompt:prompt, lead:lead, src:src, alt:alt, cap:cap, regions:regions, teach:teach}; }
+const SCAN = {
+  effusion:{ct:true, film:{src:"sim/rad/effusion.jpg", alt:"Frontal chest radiograph with a white right base", cap:"Chest radiograph. The patient's right base is white."}, sites:[
+    {id:"R", side:"a", name:"Right chest", src:"pocus/effusion.jpg", alt:"Ultrasound of a pleural effusion", cap:"Right chest. Anechoic fluid above the diaphragm, with a spine sign."},
+    {id:"L", side:"b", name:"Left chest", src:"pocus/alines.jpg", alt:"Lung ultrasound with A-lines", cap:"Left chest. The lung slides. A-lines. No fluid."}
+  ]},
+  consol:{ct:true, film:{src:"xrays/pneumonia.jpg", alt:"Frontal chest radiograph with a right-sided opacity", cap:"Chest radiograph. Opacity at the patient's right base."}, sites:[
+    {id:"R", side:"a", name:"Right chest", src:"pocus/consol.jpg", alt:"Ultrasound of consolidated lung", cap:"Right chest. Tissue-like lung with air bronchograms. Nothing to tap."},
+    {id:"L", side:"b", name:"Left chest", src:"pocus/alines.jpg", alt:"Lung ultrasound with A-lines", cap:"Left chest. Sliding lung and A-lines."}
+  ]},
+  ptx:{ct:false, film:{src:"xrays/ptx.jpg", alt:"Frontal chest radiograph with a left pneumothorax", cap:"Chest radiograph. The lucent side is the patient's left."}, sites:[
+    {id:"R", side:"a", name:"Right chest", src:"pocus/seashore.jpg", alt:"M-mode seashore sign", cap:"Right chest. Seashore sign. The lung is sliding."},
+    {id:"L", side:"b", name:"Left chest", src:"pocus/barcode.jpg", alt:"M-mode barcode sign", cap:"Left chest. Barcode sign. No lung sliding."}
+  ]},
+  edema:{ct:false, film:{src:"xrays/edema.jpg", alt:"Frontal chest radiograph with bilateral edema", cap:"Chest radiograph. Both lungs are wet."}, sites:[
+    {id:"R", side:"a", name:"Right chest", src:"pocus/blines.jpg", alt:"Lung ultrasound with B-lines", cap:"Right chest. B-lines from the pleural line."},
+    {id:"L", side:"b", name:"Left chest", src:"pocus/blines.jpg", alt:"Lung ultrasound with B-lines", cap:"Left chest. The same B-lines. Both sides are wet."}
+  ]},
+  abscess:{ct:true, film:{src:"liver/scans/abscess.jpg", alt:"Axial CT of a liver abscess", cap:"CT. A low-density lesion in the right lobe. Ultrasound still has to be done, and the finding is filed."}, sites:[
+    {id:"R", side:"a", name:"Right upper quadrant", src:"liver/scans/abscess.jpg", alt:"Right-lobe abscess", cap:"Right upper quadrant. The lesion is in the right lobe. Filed."},
+    {id:"L", side:"b", name:"Left upper quadrant", src:"liver/scans/ascites.jpg", alt:"Left upper quadrant", cap:"Left upper quadrant. No second collection. The spleen side is clear."}
+  ]},
+  ascites:{ct:false, film:{src:"liver/scans/ascites.jpg", alt:"Ultrasound of ascites", cap:"Free fluid is already on the image. Confirm both sides with the probe."}, sites:[
+    {id:"R", side:"a", name:"Right flank", src:"liver/scans/ascites.jpg", alt:"Ascites", cap:"Right flank. Free fluid over the liver."},
+    {id:"L", side:"b", name:"Left lower quadrant", src:"liver/scans/ascites.jpg", alt:"Ascites", cap:"Left lower quadrant. This is the tap site. Fluid is here too. Filed."}
+  ]},
+  bladder:{ct:false, film:{src:"pocus/bladder.jpg", alt:"Distended bladder", cap:"The bladder is full. Scan it, then the kidney."}, sites:[
+    {id:"B", side:"a", name:"Bladder", src:"pocus/bladder.jpg", alt:"Bladder ultrasound", cap:"Suprapubic. A full bladder. The balloon is inside it."},
+    {id:"K", side:"b", name:"Right kidney", src:"pocus/hydro.jpg", alt:"Hydronephrosis", cap:"Right kidney. The collecting system is dilated. Filed."}
+  ]},
+  dvt:{ct:false, film:{src:"pocus/dvt.jpg", alt:"Groin vein thrombus", cap:"The swollen leg is the left. Compress both sides."}, sites:[
+    {id:"R", side:"a", name:"Right groin", src:"pocus/vein.jpg", alt:"A vein that compresses", cap:"Right groin. The vein flattens. No thrombus."},
+    {id:"L", side:"b", name:"Left groin", src:"pocus/dvt.jpg", alt:"Thrombosed groin vein", cap:"Left groin. The vein stays open and is filled. Thrombus. Filed."}
+  ]},
+  onsd:{ct:true, film:{src:"pocus/onsd.jpg", alt:"Optic nerve sheath", cap:"This is not a CT. Measure both eyes, then the CT can still be done."}, sites:[
+    {id:"R", side:"a", name:"Right eye", src:"pocus/onsd.jpg", alt:"Right optic nerve sheath", cap:"Right eye. Sheath measured 3 mm behind the globe. Wide. Filed."},
+    {id:"L", side:"b", name:"Left eye", src:"pocus/onsd.jpg", alt:"Left optic nerve sheath", cap:"Left eye. The same measurement. Both are filed. A CT, if you ask for one, does not replace this."}
+  ]}
+};
+function scanStep(spec){
+  return {kind:"scan", prompt:"Open ultrasound, then place the probe.", lead:spec.ct?"The radiological finding is on the screen. Ultrasound is a separate step. If CT is suggested, it does not replace the probe. The findings are filed with the case.":"The radiological finding is on the screen. Ultrasound is a separate step. Place the probe on each side. The sonogram is filed like a film.", film:spec.film, sites:spec.sites, seen:{}, focus:"", armed:false, scored:false, teach:"Both sides are scanned. The findings are filed. You can go on."};
+}
+CASES.forEach(function(c){ if(SCAN[c.id]) c.steps.unshift(scanStep(SCAN[c.id])); });
 const CASES = [
   {id:"effusion", title:"Pleural effusion", discuss:"A basal opacity on a radiograph is not a diagnosis. A meniscus makes fluid likely and still does not prove it. The probe does: anechoic fluid, a diaphragm, and a spine sign. Consolidation is tissue with air bronchograms. Tap under ultrasound, above the diaphragm. An exudate with pH 7.34, glucose 88, and no organisms is not a drain tonight.",
     steps:[
@@ -603,12 +652,35 @@ function render(){
   locked = false;
   marks = 0;
   app.innerHTML =
-    '<p class="kicker">Patient '+(casePos+1)+' of '+order.length+' · Decision '+(stepPos+1)+' of 10</p>'+
+    '<p class="kicker">Patient '+(casePos+1)+' of '+order.length+' · Decision '+(stepPos+1)+' of '+c.steps.length+'</p>'+
     '<p class="prompt">'+c.title+'</p>'+
     dotRow()+
     '<p class="lead">'+s.lead+'</p>'+
     '<p class="prompt">'+s.prompt+'</p>';
-  if(s.kind === "mark"){
+  if(s.kind === "scan"){
+    const film = s.film ? '<div class="film"><img alt="'+s.film.alt+'" src="'+s.film.src+'"></div><p class="cap">'+s.film.cap+'</p>' : "";
+    const focus = s.sites.filter(function(site){ return site.id===s.focus; })[0];
+    const sono = focus ? '<div class="film"><img alt="'+focus.alt+'" src="'+focus.src+'"></div><p class="cap">'+focus.cap+'</p><p class="filed">Filed. '+focus.cap+'</p>' : "";
+    app.innerHTML += film+'<button class="next" id="armUs" type="button">'+(s.armed?"Ultrasound open":"Ultrasound")+'</button>';
+    if(s.armed){
+      app.innerHTML += '<div class="torso"><svg viewBox="0 0 200 260" aria-hidden="true"><ellipse cx="100" cy="32" rx="22" ry="24" fill="#1c242c" stroke="#7fd4e6"/><path d="M38 78 Q100 58 162 78 L176 168 Q100 188 24 168 Z" fill="#171e26" stroke="#3d4e5c"/><path d="M70 168 H130 L122 230 H78 Z" fill="#171e26" stroke="#3d4e5c"/><line x1="100" y1="78" x2="100" y2="168" stroke="#7fd4e6"/></svg>'+
+        s.sites.map(function(site){ return '<button type="button" class="zone '+site.side+(s.focus===site.id?' on':'')+'" data-site="'+site.id+'">'+site.name+'</button>'; }).join("")+
+        '</div>'+sono;
+    }
+    const arm = document.getElementById("armUs");
+    arm.onclick = function(){ s.armed = true; render(); };
+    app.querySelectorAll("[data-site]").forEach(function(btn){
+      btn.onclick = function(){
+        if(locked) return;
+        const site = s.sites.filter(function(item){ return item.id===btn.getAttribute("data-site"); })[0];
+        s.focus = site.id;
+        s.seen[site.id] = true;
+        const both = s.sites.every(function(item){ return s.seen[item.id]; });
+        if(both && !s.scored){ s.scored = true; caseScore++; showTeach(true, s.teach); return; }
+        render();
+      };
+    });
+  } else if(s.kind === "mark"){
     app.innerHTML += '<div class="film" id="film"><img alt="'+s.alt+'" src="'+s.src+'"><svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="none"></svg></div><p class="cap">'+s.cap+' Tap the finding.</p>';
     const film = document.getElementById("film");
     film.onclick = function(ev){
@@ -663,7 +735,7 @@ function discuss(){
   const last = casePos === order.length-1;
   app.innerHTML =
     '<p class="kicker">'+c.title+'</p>'+
-    '<p class="prompt">'+caseScore+' of 10</p>'+
+    '<p class="prompt">'+caseScore+' of '+c.steps.length+'</p>'+
     '<div class="teach">'+c.discuss+'</div>'+
     '<button class="next" id="go" type="button">'+(last?'Start the pool again':'Next patient')+'</button>'+
     '<p class="foot">Teaching cases. Not a prescription for a named patient.</p>';
