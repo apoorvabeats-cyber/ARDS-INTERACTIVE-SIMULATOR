@@ -12,11 +12,11 @@
 :root{--fg:#f3efe6;--muted:#b7b1a4;--line:rgba(226,180,138,.4);--warm:#e2b48a}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:#101820;color:var(--fg);font-family:Figtree,ui-sans-serif,sans-serif}
-button{font:inherit;color:inherit;cursor:pointer}
+button{font:inherit;color:#f3efe6;cursor:pointer;background:#102028}
 header{display:flex;gap:10px;align-items:center;padding:8px 10px 0}
 h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:20px;margin:0}
-#file{margin-left:auto;background:#2a2118;border:1px solid var(--warm);border-radius:999px;min-height:36px;padding:0 12px}
-#file[hidden]{display:none}
+#back,#next{background:#102028;color:#f3efe6;border:1px solid #e2b48a;border-radius:999px;min-height:40px;padding:0 14px}
+#next{margin-left:auto}
 .bar{display:flex;gap:6px;overflow:auto;padding:8px 8px 0}
 .bar button{flex:none;background:#102028;border:1px solid var(--line);border-radius:999px;min-height:36px;padding:0 10px;font-size:13px}
 .bar button.on{background:#2a2118;border-color:var(--warm);color:#fff8ee}
@@ -35,7 +35,7 @@ h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:20px;margin:0}
 <header>
   <button type="button" id="back">Back</button>
   <h1>Ultrasound</h1>
-  <button type="button" id="file" hidden>Findings filed</button>
+  <button type="button" id="next">Next</button>
 </header>
 <p class="note" id="hint">The finger is the probe. Move it on the body. Only this patient's finding appears.</p>
 <div class="stage">
@@ -107,8 +107,24 @@ const SHOTS = {
   hydro:{title:"Hydronephrosis", src:"pocus/hydro.jpg", motion:"still", labels:[], note:"The collecting system is dilated. The bladder was the blockage."}
 };
 
-let compressed = false;
+let midX = 0;
+let said = "";
+function speak(text){
+  if(!text || text===said || !window.speechSynthesis) return;
+  said = text;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 0.96;
+  window.speechSynthesis.speak(u);
+}
+function tag(shot, title, say){
+  const next = Object.assign({}, shot);
+  next.title = title;
+  next.say = say;
+  return next;
+}
 let zoneKey = "";
+let compressed = false;
 const CASE = new URLSearchParams(location.search).get("case") || "effusion";
 const seen = {};
 const WAIT = {
@@ -277,80 +293,68 @@ function frameCamera(){
 }
 let activeShot = null;
 function classify(p){
-  const side = p.x >= 0 ? "left" : "right";
+  const side = p.x >= midX ? "left" : "right";
+  const chestCase = CASE==="effusion"||CASE==="consol"||CASE==="ptx"||CASE==="edema";
   if(haveEyes && eyeBox.containsPoint(p)) return { zone: "eye", side: side };
+  if(chestCase && p.y >= 1.02 && p.y < 1.72 && Math.abs(p.x - midX) < 0.38 && p.z > -0.14) return { zone: "chest", side: side };
   if(p.y >= 0.14 && p.y < 0.46 && Math.abs(p.x) > 0.05) return { zone: "calf", side: side };
   if(p.y >= 0.46 && p.y < 0.72 && Math.abs(p.x) > 0.06) return { zone: "knee", side: side };
-  if(p.y >= 0.78 && p.y < 1.02 && Math.abs(p.x) >= 0.11 && Math.abs(p.x) < 0.42) return { zone: "groin", side: side };
-  if(p.y >= 0.90 && p.y < 1.08 && Math.abs(p.x) < 0.11 && p.z > -0.02) return { zone: "bladder" };
-  if(p.y >= 1.12 && p.y < 1.32 && p.x < -0.02 && p.z > -0.06) return { zone: "ruq" };
-  if(p.y >= 1.30 && p.y < 1.64 && Math.abs(p.x) < 0.32 && p.z > -0.08) return { zone: "chest" };
+  if(p.y >= 0.78 && p.y < 1.02 && Math.abs(p.x - midX) >= 0.11 && Math.abs(p.x - midX) < 0.42) return { zone: "groin", side: side };
+  if(p.y >= 0.90 && p.y < 1.08 && Math.abs(p.x - midX) < 0.12 && p.z > -0.02) return { zone: "bladder" };
+  if(p.y >= 1.05 && p.y < 1.34 && p.x < midX - 0.02 && p.z > -0.08) return { zone: "ruq" };
+  if(p.y >= 1.30 && p.y < 1.64 && Math.abs(p.x - midX) < 0.34 && p.z > -0.08) return { zone: "chest", side: side };
   return { zone: "off" };
 }
+function chestOf(side, diseaseSide, disease, diseaseName, clearShot){
+  if(side===diseaseSide) return tag(SHOTS[disease], "Patient's "+side+" chest. "+diseaseName, "Yes. This is "+diseaseName+".");
+  return tag(clearShot || SHOTS.normal, "Patient's "+side+" chest. Normal sliding.", "This side is normal. The lung is sliding.");
+}
 function shotFor(info){
-  if(!info || info.zone === "off") return { wait: WAIT[CASE] || "Move the probe onto the relevant part of this patient." };
+  if(!info || info.zone === "off") return { wait: WAIT[CASE] || "Move the probe onto this patient's finding." };
   if(CASE==="effusion"){
     if(info.zone!=="chest") return { wait: WAIT.effusion };
-    return info.side==="right" ? SHOTS.effusion : SHOTS.normal;
+    return chestOf(info.side, "right", "effusion", "a pleural effusion");
   }
   if(CASE==="consol"){
     if(info.zone!=="chest") return { wait: WAIT.consol };
-    return info.side==="right" ? SHOTS.consol : SHOTS.normal;
+    return chestOf(info.side, "right", "consol", "consolidation");
   }
   if(CASE==="ptx"){
     if(info.zone!=="chest") return { wait: WAIT.ptx };
-    return info.side==="left" ? SHOTS.ptx : SHOTS.seashore;
+    return chestOf(info.side, "left", "ptx", "a pneumothorax", SHOTS.seashore);
   }
   if(CASE==="edema"){
     if(info.zone!=="chest") return { wait: WAIT.edema };
-    const shot = Object.assign({}, SHOTS.blines);
-    shot.title = (info.side==="left" ? "Left chest, " : "Right chest, ") + "B-lines";
-    return shot;
+    return tag(SHOTS.blines, "Patient's "+info.side+" chest. B-lines.", "Yes. This is pulmonary edema. Both lungs have B-lines.");
   }
   if(CASE==="abscess"){
     if(info.zone!=="ruq") return { wait: WAIT.abscess };
-    return SHOTS.abscess;
+    return tag(SHOTS.abscess, "Right upper abdomen. Liver abscess.", "Yes. This is a liver abscess.");
   }
   if(CASE==="ascites"){
     if(info.zone!=="ruq" && info.zone!=="bladder") return { wait: WAIT.ascites };
-    return SHOTS.ascites;
+    return tag(SHOTS.ascites, "Ascites.", "Yes. This is ascites.");
   }
   if(CASE==="bladder"){
-    if(info.zone==="bladder") return SHOTS.bladder;
-    if(info.zone==="ruq") return SHOTS.hydro;
+    if(info.zone==="bladder") return tag(SHOTS.bladder, "Bladder. Full, with the balloon inside.", "Yes. The bladder is full. This is urinary retention.");
+    if(info.zone==="ruq") return tag(SHOTS.hydro, "Right kidney. Hydronephrosis.", "Yes. The kidney is dilated.");
     return { wait: WAIT.bladder };
   }
   if(CASE==="dvt"){
     if(info.zone!=="groin" && info.zone!=="knee" && info.zone!=="calf") return { wait: WAIT.dvt };
     const clot = info.side==="left";
     const key = info.zone==="groin" ? "inguinal" : info.zone==="knee" ? "pop" : "calf";
-    if(!clot && compressed){
-      const shut = Object.assign({}, SHOTS.shut);
-      shut.title = "Patient's right " + info.zone + ", compressed";
-      return shut;
-    }
-    return SHOTS[clot ? key + "Clot" : key];
+    if(!clot && compressed) return tag(SHOTS.shut, "Right "+info.zone+". The vein compresses.", "This side compresses. There is no thrombus.");
+    if(clot) return tag(SHOTS[key+"Clot"], "Left "+info.zone+". Thrombus.", "Yes. This is deep-vein thrombosis. The vein does not compress.");
+    return tag(SHOTS[key], "Right "+info.zone+". Vein open, no thrombus.", "This side is open. Slide down to compress. There is no thrombus.");
   }
   if(CASE==="onsd"){
     if(info.zone!=="eye") return { wait: WAIT.onsd };
-    const shot = Object.assign({}, SHOTS.onsd);
-    shot.title = (info.side==="left" ? "Left eye, " : "Right eye, ") + "optic nerve sheath";
-    return shot;
+    return tag(SHOTS.onsd, (info.side==="left"?"Left":"Right")+" eye. Optic nerve sheath.", "Yes. The optic nerve sheath is wide.");
   }
   return { wait: "Move the probe onto this patient's finding." };
 }
-function noteSeen(info){
-  if(!info || info.zone==="off") return;
-  if(info.zone==="chest" || info.zone==="eye") seen[info.zone+"-"+(info.side||"")] = 1;
-  else seen[info.zone] = 1;
-  const ready = (CASE==="effusion"||CASE==="consol"||CASE==="ptx"||CASE==="edema") ? seen["chest-right"] && seen["chest-left"]
-    : CASE==="onsd" ? seen["eye-right"] && seen["eye-left"]
-    : CASE==="abscess" || CASE==="ascites" ? !!seen.ruq
-    : CASE==="bladder" ? !!seen.bladder
-    : CASE==="dvt" ? !!seen.groin
-    : false;
-  document.getElementById("file").hidden = !ready;
-}
+function noteSeen(){}
 let hitPoint = null;
 function placeProbe(clientX, clientY){
   if(!bodyMesh) return;
@@ -374,9 +378,9 @@ function placeProbe(clientX, clientY){
 function show(){
   const info = hitPoint ? classify(hitPoint) : { zone: "off" };
   const key = info.zone + (info.side || "");
-  if(key !== zoneKey){ zoneKey = key; compressed = false; }
+  if(key !== zoneKey){ zoneKey = key; compressed = false; said = ""; }
   activeShot = hitPoint ? shotFor(info) : null;
-  noteSeen(info);
+  if(activeShot && activeShot.say) speak(activeShot.say);
   const title = document.getElementById("title");
   const legendEl = document.getElementById("legend");
   const noteEl = document.getElementById("note");
@@ -437,7 +441,7 @@ document.getElementById("back").onclick = function(){
   if(window.parent && window.parent !== window){ window.parent.postMessage({type:"pocus-scan", done:false}, "*"); return; }
   location.href = "index.html?doors=pocus";
 };
-document.getElementById("file").onclick = function(){
+document.getElementById("next").onclick = function(){
   if(window.parent && window.parent !== window){ window.parent.postMessage({type:"pocus-scan", done:true}, "*"); return; }
   location.href = "index.html?doors=pocus";
 };
@@ -517,6 +521,7 @@ new GLTFLoader().load("models/anatomy/human-reference.glb", function(gltf){
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
+  midX = center.x;
   target.copy(center);
   const vFov = THREE.MathUtils.degToRad(camera.fov);
   dist = distTo = (size.y * 0.55) / Math.tan(vFov / 2);
