@@ -672,33 +672,21 @@ function render(){
   marks = 0;
   app.innerHTML =
     '<p class="kicker">'+(s.phase||"Clinical case")+' · Patient '+(casePos+1)+' of '+order.length+'</p>'+
-    '<p class="prompt">'+c.title+'</p>'+
     dotRow()+
     '<p class="lead">'+s.lead+'</p>'+
     '<p class="prompt">'+s.prompt+'</p>';
   if(s.kind === "scan"){
-    const film = s.film ? '<div class="film"><img alt="'+s.film.alt+'" src="'+s.film.src+'"></div><p class="cap">'+s.film.cap+'</p>' : "";
-    const focus = s.sites.filter(function(site){ return site.id===s.focus; })[0];
-    const sono = focus ? '<div class="film"><img alt="'+focus.alt+'" src="'+focus.src+'"></div><p class="cap">'+focus.cap+'</p><p class="filed">Filed. '+focus.cap+'</p>' : "";
-    app.innerHTML += film+'<button class="next" id="armUs" type="button">'+(s.armed?"Ultrasound open":"Ultrasound")+'</button>';
-    if(s.armed){
-      app.innerHTML += '<div class="torso"><svg viewBox="0 0 200 260" aria-hidden="true"><ellipse cx="100" cy="32" rx="22" ry="24" fill="#1c242c" stroke="#7fd4e6"/><path d="M38 78 Q100 58 162 78 L176 168 Q100 188 24 168 Z" fill="#171e26" stroke="#3d4e5c"/><path d="M70 168 H130 L122 230 H78 Z" fill="#171e26" stroke="#3d4e5c"/><line x1="100" y1="78" x2="100" y2="168" stroke="#7fd4e6"/></svg>'+
-        s.sites.map(function(site){ return '<button type="button" class="zone '+site.side+(s.focus===site.id?' on':'')+'" data-site="'+site.id+'">'+site.name+'</button>'; }).join("")+
-        '</div>'+sono;
-    }
-    const arm = document.getElementById("armUs");
-    arm.onclick = function(){ s.armed = true; render(); };
-    app.querySelectorAll("[data-site]").forEach(function(btn){
-      btn.onclick = function(){
-        if(locked) return;
-        const site = s.sites.filter(function(item){ return item.id===btn.getAttribute("data-site"); })[0];
-        s.focus = site.id;
-        s.seen[site.id] = true;
-        const both = s.sites.every(function(item){ return s.seen[item.id]; });
-        if(both && !s.scored){ s.scored = true; caseScore++; showTeach(true, s.teach); return; }
-        render();
-      };
-    });
+    app.innerHTML += '<button class="next" id="armUs" type="button">Ultrasound</button>';
+    document.getElementById("armUs").onclick = function(){
+      const old = document.getElementById("scanframe");
+      if(old) old.remove();
+      const frame = document.createElement("iframe");
+      frame.id = "scanframe";
+      frame.title = "Ultrasound";
+      frame.src = "pocus-scan.html?case="+encodeURIComponent(c.id);
+      frame.style.cssText = "position:fixed;inset:0;width:100%;height:100%;border:0;z-index:30;background:#101820";
+      document.body.appendChild(frame);
+    };
   } else if(s.kind === "mark"){
     app.innerHTML += '<div class="film" id="film"><img alt="'+s.alt+'" src="'+s.src+'"><svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="none"></svg></div><p class="cap">'+s.cap+' Tap the finding.</p>';
     const film = document.getElementById("film");
@@ -768,9 +756,19 @@ function discuss(){
   };
 }
 document.getElementById("back").onclick = function(){
-  if(history.length > 1){ history.back(); return; }
-  location.href = "index.html";
+  location.href = "index.html?doors=pocus";
 };
+window.addEventListener("message", function(event){
+  if(!event.data || event.data.type !== "pocus-scan") return;
+  const frame = document.getElementById("scanframe");
+  if(frame) frame.remove();
+  if(!event.data.done) return;
+  const step = currentCase() && currentCase().steps[stepPos];
+  if(!step || step.kind !== "scan" || step.scored) return;
+  step.scored = true;
+  caseScore++;
+  showTeach(true, step.teach);
+});
 document.getElementById("voice").onclick = function(){
   voiceOn = !voiceOn;
   this.setAttribute("aria-pressed", voiceOn?"true":"false");
