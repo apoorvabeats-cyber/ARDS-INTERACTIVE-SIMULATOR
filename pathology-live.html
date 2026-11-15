@@ -1,0 +1,1020 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#05070c">
+<title>Pathology live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700&family=Fraunces:opsz,wght@9..144,520;9..144,600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#05070c;--fg:#f3efe6;--muted:#b7b1a4;--faint:#8a8478;--line:rgba(243,239,230,.18);--cool:#7fd4e6;--warm:#e2b48a;--panel:#0c141c}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:Figtree,ui-sans-serif,sans-serif}
+button,a,input{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+body{min-height:100dvh;padding:14px 14px 28px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.back{text-decoration:none;letter-spacing:.12em;text-transform:uppercase;font-size:12px;color:var(--cool)}
+h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:28px;letter-spacing:-.03em;margin:10px 0 0}
+.sub{margin:4px 0 0;color:var(--muted);font-size:14px;line-height:1.4}
+.modes,.views,.presets,.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.modes button,.views button,.presets button,.acts button,.tog{
+  min-height:40px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:#0c1823
+}
+.modes button.on,.views button.on,.tog.on{border-color:var(--cool);color:var(--cool)}
+.diseases{display:flex;gap:6px;overflow:auto;margin-top:14px;padding-bottom:4px}
+.diseases button{flex:0 0 auto;min-height:38px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted)}
+.diseases button.on{color:var(--fg);border-color:var(--fg)}
+.lead{margin:12px 0 0;color:var(--muted);font-size:14px;line-height:1.45}
+.stage{position:relative;margin-top:12px;min-height:280px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 132px minmax(0,1fr);gap:8px;align-items:center}
+#wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.col{display:flex;flex-direction:column;gap:6px;position:relative;z-index:1}
+.bodybox{position:relative;z-index:1}
+.bodybox svg{width:100%;height:auto;display:block}
+.skin{fill:none;stroke:rgba(243,239,230,.35);stroke-width:1.4}
+.organ{fill:rgba(243,239,230,.03);stroke:rgba(243,239,230,.28);stroke-width:1.3;transition:stroke .3s ease,fill .3s ease}
+.organ.possible{stroke:var(--warm);stroke-dasharray:3 2;fill:rgba(226,180,138,.08)}
+.organ.forming{stroke:var(--cool);stroke-dasharray:3 2;fill:rgba(127,212,230,.06)}
+.organ.on{stroke:var(--cool);fill:rgba(127,212,230,.14)}
+.organ.severe,.organ.locked{stroke:var(--warm);fill:rgba(226,180,138,.16)}
+[data-organ].possible .organ{stroke:var(--warm);stroke-dasharray:3 2;fill:rgba(226,180,138,.08)}
+[data-organ].forming .organ{stroke:var(--cool);stroke-dasharray:3 2;fill:rgba(127,212,230,.08)}
+[data-organ].on .organ{stroke:var(--cool);fill:rgba(127,212,230,.16)}
+[data-organ].severe .organ,[data-organ].locked .organ{stroke:var(--warm);fill:rgba(226,180,138,.18)}
+.node{display:block;width:100%;text-align:left;border:1px solid var(--line);background:rgba(8,14,20,.88);border-radius:10px;padding:7px 8px;min-height:46px}
+.node b{display:block;font-size:12.5px;font-weight:600;line-height:1.2}
+.node small{display:block;margin-top:2px;color:var(--faint);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.node.on{border-color:var(--cool)}
+.node.severe{border-color:var(--warm)}
+.node.possible,.node.forming{border-style:dashed;border-color:var(--warm)}
+.node.forming{border-color:var(--cool)}
+.node.locked{border-color:var(--warm);background:rgba(226,180,138,.1)}
+.node.off{opacity:.45}
+.node.sel{box-shadow:inset 0 0 0 1px var(--fg)}
+.sheet{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.kicker{margin:0;color:var(--cool);letter-spacing:.14em;text-transform:uppercase;font-size:11px}
+.sheet h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:24px;margin:4px 0 8px;letter-spacing:-.03em}
+.why{margin:0 0 10px;color:var(--fg);font-size:15px;line-height:1.45}
+.sheet h3{margin:12px 0 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.sheet p{margin:0;color:var(--muted);font-size:14.5px;line-height:1.45}
+.kids{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.kids button{text-align:left;min-height:42px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:transparent}
+.clock{display:flex;align-items:center;gap:8px;margin-top:14px}
+.clock b{font-family:Fraunces,Georgia,serif;font-size:20px;font-weight:520}
+.clock button{min-height:40px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:#0c1823}
+.sliders{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin-top:12px}
+.slider span{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted)}
+.slider b{color:var(--fg);font-size:15px}
+.slider input{width:100%;margin-top:4px;accent-color:#7fd4e6}
+.note{margin:10px 0 0;min-height:1.3em;color:var(--warm);font-size:14px;line-height:1.4}
+.chart{list-style:none;margin:12px 0 0;padding:0}
+.chart li{margin:0 0 8px 0}
+.chart .twig{margin-left:16px;border-left:1px solid var(--line);padding-left:10px}
+.fine{margin:16px 0 0;color:var(--faint);font-size:12px;line-height:1.45}
+@media(max-width:380px){.sliders{grid-template-columns:1fr}.layout{grid-template-columns:minmax(0,1fr) 104px minmax(0,1fr)}}
+</style>
+</head>
+<body>
+  <div class="top">
+    <a class="back" href="hub.html">Hub</a>
+    <div class="views" id="views">
+      <button type="button" data-view="organs" class="on">Organs</button>
+      <button type="button" data-view="chart">Chart</button>
+    </div>
+  </div>
+  <h1>Pathology live</h1>
+  <p class="sub">One disease. The organs it actually reaches. A pathway lights only when its own criteria are met.</p>
+  <div class="diseases" id="diseases"></div>
+  <div class="modes" id="modes">
+    <button type="button" data-mode="learn" class="on">Learn</button>
+    <button type="button" data-mode="live">Live</button>
+    <button type="button" data-mode="treat">Treat</button>
+  </div>
+  <p class="lead" id="lead"></p>
+  <div id="mapwrap">
+    <div class="stage" id="stage">
+      <svg id="wires"></svg>
+      <div class="layout">
+      <div class="col" id="colL"></div>
+      <div class="bodybox" id="bodybox">
+        <svg viewBox="0 0 120 280" aria-hidden="true">
+          <ellipse class="skin" cx="60" cy="28" rx="16" ry="18"></ellipse>
+          <path class="skin" d="M36 54h48l10 16-4 62 12 96H26L38 132l-8-62 6-16z"></path>
+          <ellipse class="organ" data-organ="brain" cx="60" cy="28" rx="9" ry="7"></ellipse>
+          <g data-organ="lung">
+            <ellipse class="organ" cx="46" cy="100" rx="13" ry="24"></ellipse>
+            <ellipse class="organ" cx="76" cy="100" rx="13" ry="24"></ellipse>
+          </g>
+          <ellipse class="organ" data-organ="heart" cx="66" cy="112" rx="10" ry="12"></ellipse>
+          <ellipse class="organ" data-organ="liver" cx="48" cy="148" rx="16" ry="12"></ellipse>
+          <ellipse class="organ" data-organ="pancreas" cx="70" cy="156" rx="12" ry="5"></ellipse>
+          <g data-organ="kidney">
+            <ellipse class="organ" cx="46" cy="186" rx="8" ry="14"></ellipse>
+            <ellipse class="organ" cx="76" cy="186" rx="8" ry="14"></ellipse>
+          </g>
+          <path class="organ" data-organ="blood" d="M60 70v150" fill="none"></path>
+        </svg>
+      </div>
+      <div class="col" id="colR"></div>
+      </div>
+    </div>
+  </div>
+  <ol class="chart" id="chart" hidden></ol>
+  <article class="sheet" id="sheet"></article>
+  <div class="clock">
+    <b id="hour">Hour 0</b>
+    <button type="button" id="back6">−6 h</button>
+    <button type="button" id="fwd6">+6 h</button>
+    <button type="button" id="play" hidden>Play</button>
+  </div>
+  <div class="presets" id="presets"></div>
+  <div class="sliders" id="sliders"></div>
+  <div class="acts" id="acts"></div>
+  <p class="note" id="note"></p>
+  <p class="fine">Teaching model. Thresholds are simplified from Sepsis-3, Berlin, KDIGO and the bedside patterns used in the ICU. A single abnormal number is not a diagnosis. This is not a score and not a device.</p>
+<script>
+const on = (level, why) => ({state:"on", level:Math.max(0.25, Math.min(1, level)), why});
+const maybe = (why) => ({state:"possible", level:0.35, why});
+const off = (why) => ({state:"off", level:0, why});
+const hot = (r) => r && (r.state==="on" || r.state==="locked" || r.state==="forming");
+const ORGAN = {brain:"Brain", lung:"Lung", heart:"Heart", liver:"Liver", pancreas:"Pancreas", kidney:"Kidney", blood:"Blood"};
+const SIDE = {brain:"R", lung:"L", heart:"R", liver:"L", pancreas:"L", kidney:"L", blood:"R"};
+
+const DISEASES = [
+  {
+    id:"sepsis", name:"Sepsis",
+    line:"Infection with a dysregulated host response. Shock is two criteria, not a low number on its own.",
+    params:[
+      {id:"map", label:"MAP", unit:"mmHg", min:40, max:110, value:74, step:1},
+      {id:"lactate", label:"Lactate", unit:"mmol/L", min:0.5, max:12, value:1.6, step:0.1},
+      {id:"pf", label:"PaO2/FiO2", unit:"", min:50, max:500, value:340, step:5},
+      {id:"cr", label:"Creatinine", unit:"mg/dL", min:0.4, max:8, value:1.0, step:0.1},
+      {id:"urine", label:"Urine", unit:"mL/h", min:0, max:120, value:50, step:5},
+      {id:"platelets", label:"Platelets", unit:"×10⁹/L", min:10, max:400, value:180, step:5},
+      {id:"inr", label:"INR", unit:"", min:0.8, max:4, value:1.1, step:0.1},
+      {id:"gcs", label:"GCS", unit:"", min:3, max:15, value:15, step:1},
+      {id:"k", label:"Potassium", unit:"mmol/L", min:2.2, max:8, value:4.2, step:0.1},
+      {id:"hco3", label:"Bicarbonate", unit:"mmol/L", min:6, max:32, value:22, step:1}
+    ],
+    presets:{
+      Arrival:{map:74,lactate:1.6,pf:340,cr:1.0,urine:50,platelets:180,inr:1.1,gcs:15,k:4.2,hco3:22},
+      Deteriorating:{map:58,lactate:4.8,pf:140,cr:2.4,urine:12,platelets:62,inr:1.9,gcs:12,k:5.6,hco3:14},
+      Recovering:{map:72,lactate:1.8,pf:260,cr:1.3,urine:45,platelets:110,inr:1.3,gcs:15,k:4.0,hco3:20}
+    },
+    drift(p,s){
+      if(s.flags.pressor) p.map = Math.min(78, p.map+4); else p.map = Math.max(52, p.map-2);
+      if(s.flags.antibiotic) p.lactate = Math.max(1.1, p.lactate-0.35); else p.lactate = Math.min(10, p.lactate+0.3);
+      if(s.hours>8) p.pf = Math.max(70, p.pf - (s.flags.fluid>1?22:10));
+      if(p.map<65){ p.cr = Math.min(6, p.cr+0.18); p.urine = Math.max(0, p.urine-6); p.hco3 = Math.max(8, p.hco3-0.7); }
+      if(s.hours>18){ p.platelets = Math.max(20, p.platelets-10); p.inr = Math.min(3.2, p.inr+0.1); }
+      if(p.pf<150 || p.map<58) p.gcs = Math.max(8, p.gcs-1);
+    },
+    nodes:[
+      {id:"shock", name:"Septic shock", organ:"heart", delay:2,
+        rule(p){ if(p.map<65 && p.lactate>=2) return on((65-p.map)/30+(p.lactate-2)/8, "MAP is under 65 and lactate is at least 2. Sepsis-3 shock needs both, after fluid, with a vasopressor in use."); if(p.map<65) return maybe("MAP is under 65. Lactate is not above 2, so this is hypotension, not yet septic shock."); if(p.lactate>=2) return maybe("Lactate is raised. MAP is still held. Shock is not called from lactate alone."); return off("MAP and lactate are short of shock criteria."); },
+        mechanism:"Vasodilation and a variable loss of cardiac contractility. Tissue flow falls while the cardiac output may still look high.",
+        diagnose:"Persisting MAP under 65 despite fluid, lactate at least 2, and a vasopressor requirement.",
+        tests:"Lactate, arterial pressure, bedside heart function if the shock looks mixed.",
+        manage:"Fluid if the circulation will take it, then noradrenaline. Find and treat the source. Lactate is a trend, not a target to chase to zero."},
+      {id:"ards", name:"ARDS", organ:"lung", delay:2,
+        rule(p){ if(p.pf<=100) return on(0.9, "PaO2/FiO2 is 100 or under. That is severe on the Berlin oxygenation cut, if the film is bilateral and the oedema is not purely cardiac."); if(p.pf<200) return on(0.65, "PaO2/FiO2 is under 200. Moderate oxygenation failure. The film and a non-cardiac cause still have to be true."); if(p.pf<300) return on(0.4, "PaO2/FiO2 is under 300. Mild Berlin criterion only. Lactate does not make this ARDS."); return off("Oxygenation is above the Berlin line. Sepsis has not become ARDS on these numbers."); },
+        mechanism:"Capillary leak into alveoli. Surfactant is lost. Blood is shunted past unventilated lung.",
+        diagnose:"Acute bilateral opacities, not fully explained by heart failure, with PaO2/FiO2 at or under 300 on at least 5 cmH2O of PEEP.",
+        tests:"Arterial gas, chest film or ultrasound, a look at the left atrial pressure if cardiogenic oedema is plausible.",
+        manage:"Low tidal volume, plateau pressure under 30, PEEP to the oxygenation, prone if severe. Fluid is not free once the lung is wet."},
+      {id:"aki", name:"AKI", organ:"kidney", delay:2,
+        rule(p){ const x=p.cr/1; if(x>=3) return on(0.9, "Creatinine is at least three times the baseline of 1.0. That is KDIGO stage 3. Urine output is a separate criterion."); if(x>=2) return on(0.7, "Creatinine has doubled. KDIGO stage 2. A single low MAP does not, by itself, make this diagnosis."); if(x>=1.5) return on(0.45, "Creatinine is at least 1.5 times baseline. KDIGO stage 1."); return off("Creatinine is under 1.5 times baseline. There is no AKI on the number yet."); },
+        mechanism:"The early fall is often perfusion. Sustained shock adds tubular injury that fluid will not immediately undo.",
+        diagnose:"KDIGO: creatinine rise to 1.5 times baseline within a week, or oliguria. Baseline here is taken as 1.0 mg/dL.",
+        tests:"Creatinine, hourly urine, potassium, bicarbonate, a bladder scan if obstruction is possible.",
+        manage:"Restore pressure. Stop the nephrotoxin. Replace potassium and bicarbonate only as the blood shows. Dialysis is for the complication, not for the creatinine figure."},
+      {id:"prerenal", name:"Prerenal injury", organ:"kidney", parent:"aki",
+        rule(p,s,ev){ if(!hot(ev.aki)) return off("No AKI to classify."); if(p.map<75 && p.cr<2.5 && !s.locked.atn) return on(0.5, "Pressure is low and the creatinine rise is still modest. This pattern can still be perfusion."); return off("The rise is no longer a simple perfusion picture."); },
+        mechanism:"Glomerular filtration falls because the driving pressure falls. The tubule is intact.",
+        diagnose:"A short creatinine rise with low pressure or low volume, and a response when that is corrected.",
+        tests:"The creatinine trend after pressure is restored. Bladder scan so post-renal failure is not missed.",
+        manage:"Restore MAP. A fluid bolus only if the lung will accept it. Do not keep pouring saline into a rising creatinine."},
+      {id:"atn", name:"Tubular injury", organ:"kidney", parent:"aki", lock:true,
+        rule(p,s,ev){ if(!hot(ev.aki)) return off("No AKI upstream."); if(p.cr>=2.5 || (s.ever.shock && p.cr>=2)) return on(0.8, "Creatinine is high in the setting of shock. Treat this as established tubular injury. It will not reverse on the next hour's MAP."); return maybe("AKI is present. Tubular injury is not assumed until the rise is large or shock has already occurred."); },
+        mechanism:"Ischaemia and inflammation damage tubular cells. Filtration stays low after the blood pressure is repaired.",
+        diagnose:"A creatinine that keeps rising after perfusion is restored, often after a documented shock.",
+        tests:"Creatinine trend, urine output, potassium, acid-base. Microscopy is supportive, not required to act.",
+        manage:"Hold nephrotoxins. Match fluid to losses. Prepare renal replacement for potassium, acid, fluid or uraemia, not for a number."},
+      {id:"oliguria", name:"Oliguria", organ:"kidney", parent:"aki",
+        rule(p,s,ev){ if(!hot(ev.aki)) return off("No AKI upstream."); if(p.urine<20) return on(0.8, "Urine is under 20 mL/h. That is oliguria measured, not inferred from creatinine."); if(p.urine<30) return on(0.5, "Urine is under 30 mL/h."); return off("Urine output is adequate. Creatinine does not prove oliguria."); },
+        mechanism:"Filtration and tubular handling both fall. A blocked catheter mimics this.",
+        diagnose:"Under 0.5 mL/kg/h for six hours is KDIGO. Here the panel uses mL/h, so the cut is explicit.",
+        tests:"Hourly urine, a flush or a change of catheter before the diagnosis is believed.",
+        manage:"Correct the pressure. Do not give a diuretic to 'make a number' unless the patient is fluid overloaded."},
+      {id:"hyperk", name:"Hyperkalemia", organ:"kidney", parent:"aki",
+        rule(p,s,ev){ if(p.k>=6.5) return on(0.9, "Potassium is at least 6.5. This is urgent whether or not the AKI label is the main problem."); if(p.k>=5.5 && hot(ev.aki)) return on(0.6, "Potassium is at least 5.5 in AKI."); if(p.k>=5.5) return maybe("Potassium is high. Without AKI this may be a shift, a drug, or a sample. Do not assume renal failure."); return off("Potassium is under 5.5."); },
+        mechanism:"Failed excretion, plus acidosis pushing potassium out of cells.",
+        diagnose:"A venous or arterial sample, looked at against the ECG. Haemolysis is excluded before a wild number is treated as real.",
+        tests:"Potassium, ECG, bicarbonate.",
+        manage:"Calcium if the ECG is toxic. Insulin with glucose shifts potassium. The excess leaves only through the kidney, the gut, or the filter."},
+      {id:"acidosis", name:"Metabolic acidosis", organ:"kidney", parent:"aki",
+        rule(p,s,ev){ if(p.hco3<12) return on(0.85, "Bicarbonate is under 12."); if(p.hco3<18 && hot(ev.aki)) return on(0.55, "Bicarbonate is under 18 with AKI."); if(p.hco3<18) return maybe("Bicarbonate is low. The anion gap and the lactate decide whether this is AKI, shock, or both."); return off("Bicarbonate is in a safe range."); },
+        mechanism:"Retained acids and lost bicarbonate. Lactate from shock is a different acid and can coexist.",
+        diagnose:"Low bicarbonate with a low pH. The anion gap separates renal acidosis from lactic acidosis.",
+        tests:"Blood gas, electrolytes, lactate.",
+        manage:"Treat the cause. Bicarbonate replacement is for severe acidaemia or renal losses, not a reflex."},
+      {id:"rrt", name:"Need for renal replacement", organ:"kidney", parent:"aki",
+        rule(p,s,ev){ const urgent=p.k>=6.5 || p.hco3<12 || (hot(ev.ards)&&p.urine<20); if(urgent && hot(ev.aki)) return on(0.8, "A dialysis indication is present: dangerous potassium, severe acidosis, or a wet lung that is not making urine."); if(p.cr>=4) return maybe("Creatinine is very high. A number alone is not an indication to start the filter."); return off("No urgent indication for renal replacement on this panel."); },
+        mechanism:"The filter replaces excretion the kidney is not doing. It does not repair the tubule.",
+        diagnose:"Refractory hyperkalemia, refractory acidosis, pulmonary oedema with oliguria, or a uraemic complication.",
+        tests:"Potassium, gas, chest findings, a uremic review. Dose is prescribed, not guessed.",
+        manage:"Start for the indication. Stop the nephrotoxin. The modality follows the blood pressure: intermittent if stable, continuous if shocked."},
+      {id:"dic", name:"DIC", organ:"blood", delay:3,
+        rule(p){ if(p.platelets<50 && p.inr>=1.8) return on(0.85, "Platelets are under 50 and the INR is at least 1.8. This is highly suggestive. Fibrinogen and D-dimer are not on the panel, so an ISTH score is not complete."); if(p.platelets<100 && p.inr>=1.5) return on(0.6, "Platelets are under 100 and the INR is prolonged. Possible overt DIC. One of these two is not enough."); if(p.platelets<100) return maybe("Platelets are low. DIC is not diagnosed from the platelet count alone."); if(p.inr>=1.5) return maybe("INR is prolonged. That can be liver, warfarin, or sampling. It is not DIC by itself."); return off("Platelets and INR do not suggest DIC."); },
+        mechanism:"Tissue factor drives thrombin. Platelets and fibrinogen are consumed. Clot and bleeding happen together.",
+        diagnose:"A falling platelet count plus a clotting-time change, in a disease that can cause DIC. Confirm with fibrinogen and a fibrin marker.",
+        tests:"Platelets, INR, fibrinogen, D-dimer. A blood film if a microangiopathy is also possible.",
+        manage:"Treat the sepsis. Transfuse platelets or plasma for bleeding or a procedure, not to paint a normal number."},
+      {id:"enceph", name:"Encephalopathy", organ:"brain", delay:2,
+        rule(p,s,ev){ if(p.gcs<=8) return on(0.9, "GCS is 8 or under."); if(p.gcs<=13 && (hot(ev.shock)||p.pf<200)) return on(0.6, "GCS has fallen and either shock or severe hypoxaemia is present."); if(p.gcs<=13) return maybe("GCS is under 14. Sepsis-associated encephalopathy is possible. Exclude glucose, a drug, CO2 and a structural cause before you blame the sepsis."); return off("GCS is clear. Encephalopathy is not present."); },
+        mechanism:"Inflammatory mediators and low perfusion alter cortical function. This is usually not a stroke.",
+        diagnose:"A new fall in consciousness during sepsis, after glucose, gas, sodium and sedative drugs are accounted for.",
+        tests:"Glucose, blood gas, sodium, a drug review. Image if the story is focal or the coma is deep.",
+        manage:"Treat the shock and the gas. Stop deliriogenic drugs. Do not hyperventilate a septic brain as a routine."},
+      {id:"myocard", name:"Myocardial dysfunction", organ:"heart", delay:2,
+        rule(p,s,ev){ if(hot(ev.shock) && p.lactate>=4) return on(0.7, "Shock is established and lactate is at least 4. Septic cardiomyopathy is now plausible. The blood pressure alone did not make this call."); if(p.map<65) return maybe("Pressure is low. Contractility has not been shown to be the reason."); return off("No support for septic myocardial dysfunction."); },
+        mechanism:"Inflammatory mediators depress both ventricles. The ventricles often recover if the patient does.",
+        diagnose:"Shock plus a poorly moving ventricle on echo, after ischaemia and a mechanical cause are considered.",
+        tests:"Bedside echo. An ECG and troponin if coronary occlusion is in the differential.",
+        manage:"Noradrenaline first. Add an inotrope only if the ventricle is failing and the pressure is still low. Do not flood a failing right ventricle."},
+      {id:"mods", name:"Multiorgan failure", organ:"blood", delay:2,
+        rule(p,s,ev){ const ids=["shock","ards","aki","dic","enceph","myocard"]; const n=ids.filter(id=>hot(ev[id])).length; if(n>=3) return on(n/6, n+" of the organ pathways are on together. That is multiorgan failure."); if(n===2) return maybe("Two organs are involved. Multiorgan failure is not the name for two."); return off("Fewer than two extra organs are failing."); },
+        mechanism:"The same inflammatory injury expressed in more than one organ. It is a count of failures, not a new disease.",
+        diagnose:"Two or more organ failures beyond the original infection. This map calls it at three active pathways so a single shock is not relabelled.",
+        tests:"The panels of each failing organ, repeated. A new source if the count is rising despite treatment.",
+        manage:"Support each organ. The outcome follows source control more than any one drug."}
+    ],
+    actions:[
+      {id:"pressor", name:"Noradrenaline", run(s){ s.flags.pressor=1; s.params.map=Math.min(80, s.params.map+14); return "Noradrenaline is on. MAP rises. Lactate does not clear in the same minute."; }},
+      {id:"fluid", name:"Fluid bolus", run(s){ s.flags.fluid=(s.flags.fluid||0)+1; if(s.params.pf<200){ s.params.pf=Math.max(60, s.params.pf-35); return "The lung is already wet. This bolus dropped PaO2/FiO2. More saline is the wrong next litre."; } s.params.map=Math.min(82, s.params.map+6); return "A bolus was given while the lung still had room. MAP rises a little."; }},
+      {id:"abx", name:"Antibiotic and source", run(s){ s.flags.antibiotic=1; return "Source treatment is in. Lactate can now fall over the next hours. It will not fall because a vasopressor was raised."; }},
+      {id:"vent", name:"Lung-protective ventilation", run(s){ if(s.params.pf>=300) return "Oxygenation is not in the ARDS range. The ventilator is not the treatment for the lactate."; s.params.pf=Math.min(280, s.params.pf+25); return "Tidal volume is limited and PEEP is set to the oxygen. PaO2/FiO2 improves. The sepsis is not cured."; }}
+    ]
+  },
+  {
+    id:"ards", name:"ARDS",
+    line:"Berlin oxygenation is not the same injury as a high plateau pressure, and neither of those is fibrosis on day one.",
+    params:[
+      {id:"pf", label:"PaO2/FiO2", unit:"", min:40, max:400, value:180, step:5},
+      {id:"pplat", label:"Plateau", unit:"cmH2O", min:15, max:45, value:26, step:1},
+      {id:"peep", label:"PEEP", unit:"cmH2O", min:5, max:24, value:10, step:1},
+      {id:"map", label:"MAP", unit:"mmHg", min:40, max:110, value:74, step:1},
+      {id:"cr", label:"Creatinine", unit:"mg/dL", min:0.4, max:8, value:1.1, step:0.1},
+      {id:"platelets", label:"Platelets", unit:"×10⁹/L", min:10, max:400, value:160, step:5}
+    ],
+    presets:{
+      Arrival:{pf:210,pplat:24,peep:8,map:76,cr:1.0,platelets:180},
+      Deteriorating:{pf:85,pplat:34,peep:16,map:62,cr:2.2,platelets:70},
+      Recovering:{pf:240,pplat:24,peep:10,map:75,cr:1.2,platelets:150}
+    },
+    drift(p,s){ if(!s.flags.protect){ p.pf=Math.max(55,p.pf-8); p.pplat=Math.min(40,p.pplat+1);} else { p.pf=Math.min(260,p.pf+6); p.pplat=Math.max(22,p.pplat-1);} if(p.pf<120) p.map=Math.max(55,p.map-1); if(p.map<65) p.cr=Math.min(6,p.cr+0.15); if(s.hours>24) p.platelets=Math.max(40,p.platelets-6); },
+    nodes:[
+      {id:"hypox", name:"Refractory hypoxaemia", organ:"lung",
+        rule(p){ if(p.pf<100) return on(0.9,"PaO2/FiO2 is under 100. Oxygenation has failed despite the usual rise in inspired oxygen."); if(p.pf<150) return on(0.6,"PaO2/FiO2 is under 150."); return off("Oxygenation is not in the refractory range. A moderate Berlin ARDS is not the same sentence."); },
+        mechanism:"Shunt. Raising FiO2 cannot oxygenate blood that never meets an alveolus.",
+        diagnose:"PaO2/FiO2 under 150, and under 100 when it is truly refractory, on adequate PEEP.",
+        tests:"Arterial gas on the current FiO2 and PEEP. A film or ultrasound for recruitable lung.",
+        manage:"PEEP, prone position, a check that the tube and the circuit are not the cause. ECMO is a rescue, not a first turn of the FiO2 knob."},
+      {id:"baro", name:"Barotrauma", organ:"lung",
+        rule(p){ if(p.pplat>30) return on(Math.min(1,(p.pplat-30)/12), "Plateau pressure is over 30 cmH2O. That is the strain that injures lung. A low PaO2/FiO2 does not, by itself."); return off("Plateau pressure is 30 or under. Over-distension is not shown."); },
+        mechanism:"Alveoli that are still open are stretched. Air can then leave into the pleura or the mediastinum.",
+        diagnose:"Plateau pressure over 30, or pneumothorax, pneumomediastinum, or subcutaneous air on a stiff chest.",
+        tests:"Plateau pressure, driving pressure, a chest film or ultrasound if the pressure suddenly falls.",
+        manage:"Lower the tidal volume. Accept a higher CO2. Do not chase a normal gas by raising the volume."},
+      {id:"fibrosis", name:"Fibrosis", organ:"lung", lock:true,
+        rule(p,s){ if(s.hours>=72 && p.pf<200) return on(0.7,"It is day three or later and oxygenation is still poor. Fibroproliferation is now plausible. It is not a day-one finding."); if(p.pf<200) return maybe("Oxygenation is poor, but it is too early to call fibrosis."); return off("No late fibrotic phase on this clock."); },
+        mechanism:"Persistent injury is followed by fibroblast growth. The lung gets stiff in a different way from the first oedematous day.",
+        diagnose:"A course measured in many days, persistent poor compliance, and a film that is no longer simple oedema.",
+        tests:"The time course, compliance, CT if it changes management.",
+        manage:"Keep the tidal volume safe. Steroids are a selected late decision, not an opening move. This pathway does not switch off when today's gas improves."},
+      {id:"rv", name:"RV dysfunction", organ:"heart",
+        rule(p){ if(p.pf<150 || (p.peep>=14 && p.pplat>=28)) return on(0.7,"Either oxygenation is severe or PEEP and plateau are both high. The right ventricle is afterloaded."); if(p.peep>=14) return maybe("PEEP is high. The right ventricle is not presumed to be failing from PEEP alone."); return off("No strong driver of acute right-ventricular failure."); },
+        mechanism:"Hypoxic pulmonary vessels constrict. High lung pressure adds a mechanical load. The right ventricle dilates and the left fills less.",
+        diagnose:"A dilated, poorly moving right ventricle on echo, in severe hypoxaemia or high airway pressure.",
+        tests:"Bedside echo. The arterial pressure for a falling MAP.",
+        manage:"Oxygenation and a lower plateau. Noradrenaline if the pressure falls. Do not volume-load a dilated right ventricle."},
+      {id:"ph", name:"Pulmonary hypertension", organ:"heart",
+        rule(p,s,ev){ if(hot(ev.rv) && p.pf<150) return on(0.65,"Right-ventricular strain and severe hypoxaemia are both present. Pulmonary pressure is up on that basis."); if(p.pf<200) return maybe("Oxygenation is reduced. Pulmonary hypertension is not automatic."); return off("No pathway into acute pulmonary hypertension."); },
+        mechanism:"Hypoxia and high lung volume raise pulmonary vascular resistance.",
+        diagnose:"Echo signs of pressure overload. A catheter number is rarely needed to start the right treatment.",
+        tests:"Echo. Arterial gas.",
+        manage:"Treat the hypoxaemia and the plateau pressure. An inhaled pulmonary vasodilator is rescue, not routine."},
+      {id:"shock", name:"Shock", organ:"heart",
+        rule(p,s,ev){ if(p.map<65 && hot(ev.rv)) return on(0.75,"MAP is under 65 and the right ventricle is failing. This shock is obstructive, not a reason to give more fluid."); if(p.map<65) return maybe("MAP is low. Without right-ventricular failure this may be sedation, sepsis, or bleeding. It is not labelled RV shock."); return off("Blood pressure is held."); },
+        mechanism:"A pressure-loaded right ventricle underfills the left. Cardiac output falls.",
+        diagnose:"Hypotension with a failing right ventricle, high airway pressure, or a sudden fall that suggests tension.",
+        tests:"Echo, airway pressures, a lung ultrasound for pneumothorax.",
+        manage:"Reduce the lung pressure. Vasopressor. Look for tension. Fluid is usually wrong."},
+      {id:"aki", name:"AKI", organ:"kidney",
+        rule(p){ if(p.cr>=2 && p.map<70) return on(0.7,"Creatinine is at least 2 with a low-normal or low MAP."); if(p.cr>=1.5) return on(0.45,"Creatinine is at least 1.5 times a baseline of 1."); return off("Creatinine has not reached an AKI threshold."); },
+        mechanism:"Venous congestion and a low perfusion pressure both reduce filtration.",
+        diagnose:"KDIGO creatinine rise. Do not call it from hypoxia alone.",
+        tests:"Creatinine, urine output, potassium.",
+        manage:"A perfusing pressure without a flooded lung. Stop nephrotoxins."},
+      {id:"fluid", name:"Fluid overload", organ:"kidney",
+        rule(p,s){ if((s.flags.fluid||0)>=2 && p.pf<200) return on(0.8,"Repeated fluid is on the chart and the lung is worse. Overload is present."); if((s.flags.fluid||0)>=1) return maybe("Fluid has been given. Overload is not declared until the lung or the balance says so."); return off("No cumulative fluid injury is recorded."); },
+        mechanism:"Extra salt water stays in the interstitium once the endothelium leaks.",
+        diagnose:"A positive balance with worsening oxygenation or oedema.",
+        tests:"The fluid balance, daily weight, the gas, lung ultrasound.",
+        manage:"Stop the input. A diuretic if the kidney responds and the pressure allows."},
+      {id:"lytes", name:"Electrolyte loss", organ:"kidney",
+      rule(p,s){ if((s.flags.diuretic||0)>0 && p.cr>=1.5) return on(0.5,"A diuretic has been used on an injured kidney. Potassium and magnesium fall. They are not abnormal because the PaO2/FiO2 is low."); return off("No diuretic loss is in play."); },
+        mechanism:"Loop diuresis wastes potassium and magnesium.",
+        diagnose:"A fall after the diuretic, not a guess from the ventilator.",
+        tests:"Potassium, magnesium, phosphate.",
+        manage:"Replace what is low. Do not treat a normal potassium because the lung is sick."},
+      {id:"sepsis", name:"Sepsis", organ:"blood",
+        rule(p,s){ if(s.flags.infection && p.map<70) return on(0.6,"A new infectious source is flagged and the pressure is soft."); if(s.flags.infection) return maybe("Infection is suspected. Sepsis is a clinical syndrome, not a blood pressure."); return off("ARDS has not been given a new infectious source. Sepsis is not assumed."); },
+        mechanism:"The lung injury may be the sepsis, or a second infection may arrive later.",
+        diagnose:"A new source, fever or rising vasopressor need, not the Berlin number.",
+        tests:"Cultures before the next antibiotic, a review of lines and the chest.",
+        manage:"Source and the right drug. Do not add an antibiotic because the plateau pressure is high."},
+      {id:"dic", name:"DIC", organ:"blood",
+        rule(p){ if(p.platelets<100) return maybe("Platelets are low. DIC needs a clotting time and a fibrin marker. The platelet count of ARDS is not that diagnosis."); return off("Platelets do not suggest DIC."); },
+        mechanism:"Usually the underlying sepsis, not the ventilator.",
+        diagnose:"The same incomplete panel as in sepsis. Do not complete it from imagination.",
+        tests:"Platelets, INR, fibrinogen.",
+        manage:"Treat the cause if it is real. Do not transfuse a number."},
+      {id:"mods", name:"Multiorgan failure", organ:"blood",
+        rule(p,s,ev){ const n=["hypox","rv","shock","aki","dic"].filter(id=>hot(ev[id])).length; if(n>=3) return on(0.8, n+" downstream pathways are on."); if(n===2) return maybe("Two complications. Not multiorgan failure yet."); return off("The injury is still mostly the lung."); },
+        mechanism:"The lung injury plus shock or kidney failure.",
+        diagnose:"A count of organ failures, not a synonym for a low PaO2/FiO2.",
+        tests:"Each organ's own test.",
+        manage:"Support each one. Do not add a drug that has no organ to treat."}
+    ],
+    actions:[
+      {id:"protect", name:"Lower tidal volume", run(s){ s.flags.protect=1; s.params.pplat=Math.max(22,s.params.pplat-6); s.params.pf=Math.max(50,s.params.pf-5); return "Plateau pressure falls. Carbon dioxide will rise. A small fall in oxygen can happen and is acceptable."; }},
+      {id:"bigvt", name:"Raise tidal volume", run(s){ s.flags.protect=0; s.params.pplat=Math.min(42,s.params.pplat+6); s.params.pf=Math.min(400,s.params.pf+15); return "The gas looks a little better and the plateau pressure is higher. That trade injures the lung."; }},
+      {id:"prone", name:"Prone", run(s){ if(s.params.pf>=150) return "Prone position is for severe hypoxaemia, not for a moderate gas."; s.params.pf=Math.min(220,s.params.pf+40); return "PaO2/FiO2 rises with prone position. The tidal volume still has to stay safe."; }},
+      {id:"fluid", name:"Fluid bolus", run(s){ s.flags.fluid=(s.flags.fluid||0)+1; s.params.pf=Math.max(50,s.params.pf-30); s.params.map=Math.min(85,s.params.map+3); return "Oxygenation fell. In ARDS a bolus is paid for by the lung."; }},
+      {id:"diuretic", name:"Diuretic", run(s){ s.flags.diuretic=1; if(s.params.map<65) return "The pressure is already low. A diuretic now lowers it further and does not fix shunt."; s.params.pf=Math.min(320,s.params.pf+20); return "Balance moves negative and oxygenation can improve, if the kidney answers and the pressure holds."; }},
+      {id:"infection", name:"Flag a new infection", run(s){ s.flags.infection=1; return "A source is now part of the case. Sepsis can be considered. It was not implied by the ventilator."; }}
+    ]
+  },
+  {
+    id:"dka", name:"DKA / HHS",
+    line:"Cerebral oedema is a fall in tonicity, not a low pH. Insulin waits if potassium is under 3.3.",
+    params:[
+      {id:"glucose", label:"Glucose", unit:"mmol/L", min:4, max:50, value:32, step:1},
+      {id:"ph", label:"pH", unit:"", min:6.8, max:7.5, value:7.12, step:0.01},
+      {id:"k", label:"Potassium", unit:"mmol/L", min:2.2, max:8, value:5.2, step:0.1},
+      {id:"na", label:"Sodium", unit:"mmol/L", min:110, max:170, value:132, step:1},
+      {id:"osm", label:"Osmolality", unit:"mOsm", min:270, max:400, value:320, step:1},
+      {id:"gcs", label:"GCS", unit:"", min:3, max:15, value:15, step:1},
+      {id:"map", label:"MAP", unit:"mmHg", min:40, max:110, value:78, step:1},
+      {id:"cr", label:"Creatinine", unit:"mg/dL", min:0.4, max:8, value:1.3, step:0.1}
+    ],
+    presets:{
+      Arrival:{glucose:32,ph:7.12,k:5.2,na:132,osm:320,gcs:15,map:78,cr:1.3},
+      Deteriorating:{glucose:40,ph:6.95,k:6.2,na:128,osm:340,gcs:13,map:60,cr:2.4},
+      Recovering:{glucose:12,ph:7.32,k:4.0,na:138,osm:300,gcs:15,map:78,cr:1.1}
+    },
+    drift(p){ p.glucose=Math.min(50,p.glucose+1); p.osm=Math.min(390,p.osm+2); p.map=Math.max(55,p.map-2); p.cr=Math.min(5,p.cr+0.1); p.ph=Math.max(6.85,p.ph-0.02); },
+    nodes:[
+      {id:"edema", name:"Cerebral oedema", organ:"brain", lock:true,
+        rule(p,s){ const drop=(s.osm0||p.osm)-p.osm; if(drop>=12 && p.gcs<15) return on(0.85,"Tonicity has fallen by "+drop+" mOsm and consciousness has fallen with it. That is the oedema pathway. The pH is not."); if(drop>=8) return maybe("Tonicity is falling. Oedema is not called while the patient is still fully alert."); if(p.ph<7.1) return off("The pH is low. Acidosis without a fall in tonicity is not cerebral oedema."); return off("Tonicity is not falling quickly, and consciousness is held."); },
+        mechanism:"A rapid fall in extracellular tonicity pulls water into brain cells. It is a treatment injury more often than a presentation.",
+        diagnose:"A fall in osmolality, usually early in treatment, with headache, a falling GCS, or a pupil. A low pH at arrival is not this diagnosis.",
+        tests:"Paired osmolality or calculated tonicity, sodium, GCS, glucose.",
+        manage:"Stop the fall. Hypertonic saline if signs are present. Do not give free water. Mannitol is a selected next step, not the opening reflex."},
+      {id:"shock", name:"Shock", organ:"heart",
+        rule(p){ if(p.map<65 && p.ph<7.1) return on(0.8,"MAP is under 65 in severe acidosis. This is hypovolaemic shock, not septic shock by default."); if(p.map<65) return on(0.55,"MAP is under 65."); if(p.ph<7) return maybe("The pH is very low. Shock is a blood-pressure diagnosis, and the pressure is still held."); return off("Blood pressure is adequate. Severe acidosis is not shock."); },
+        mechanism:"Osmotic losses empty the extracellular space. Acidosis depresses the ventricle on top.",
+        diagnose:"Hypotension with clear losses. Look for sepsis only if the story adds a source.",
+        tests:"Pressure, lactate if the picture is mixed, an examination for infection.",
+        manage:"Isotonic fluid. Potassium according to the serum. A vasopressor only if fluid does not restore the pressure."},
+      {id:"aki", name:"AKI", organ:"kidney",
+        rule(p){ if(p.cr>=2) return on(0.7,"Creatinine is at least 2."); if(p.cr>=1.5) return on(0.45,"Creatinine is at least 1.5 times a baseline of 1."); return off("Creatinine is under the KDIGO line. Dehydration on the history is not yet AKI."); },
+        mechanism:"Low perfusion. It is often prerenal and it recovers with volume, unless shock was prolonged.",
+        diagnose:"The creatinine rise. Ketones do not diagnose it.",
+        tests:"Creatinine, urine output, potassium.",
+        manage:"Fluid and a restored pressure. No nephrotoxin. Most do not need a filter."},
+      {id:"rhythm", name:"Arrhythmia risk", organ:"heart",
+        rule(p){ if(p.k<3.3) return on(0.9,"Potassium is under 3.3. The ventricle is irritable, and insulin must not start."); if(p.k>=6) return on(0.7,"Potassium is at least 6. The arrival value in DKA is often high. The danger is the fall once insulin starts, and a value this high still needs an ECG."); return off("Potassium is between 3.3 and 6. A value of 5 is expected at presentation. It is not an arrhythmia."); },
+        mechanism:"Total body potassium is low even when the serum is high. Insulin and rising pH drive it into cells.",
+        diagnose:"The serum potassium, and the ECG if it is outside a safe band.",
+        tests:"Potassium before insulin, then repeated. ECG if under 3.3 or over 6.",
+        manage:"Replace potassium first if it is under 3.3. Add potassium to the fluid once insulin is running and the serum is in range. Do not give bicarbonate as a routine."}
+    ],
+    actions:[
+      {id:"insulin", name:"Start insulin", run(s){ if(s.params.k<3.3){ s.params.k=Math.round((s.params.k-0.5)*10)/10; return "Insulin was started with potassium under 3.3. The serum falls further. The infusion should have waited."; } s.params.glucose=Math.max(8,s.params.glucose-8); s.params.k=Math.round((s.params.k-0.4)*10)/10; s.params.ph=Math.min(7.4,s.params.ph+0.05); s.params.osm=Math.max(280,s.params.osm-6); return "Insulin is running. Glucose and potassium both fall. A fall of this size in osmolality is expected, and it is not oedema."; }},
+      {id:"saline", name:"Isotonic fluid", run(s){ s.params.map=Math.min(85,s.params.map+8); s.params.cr=Math.max(0.7,s.params.cr-0.2); return "Isotonic fluid restores pressure. Tonicity is not pulled down."; }},
+      {id:"water", name:"Hypotonic fluid", run(s){ s.params.osm=Math.max(270,s.params.osm-14); s.params.na=Math.max(112,s.params.na-6); return "Free water dropped the tonicity quickly. This is how treatment causes cerebral oedema."; }},
+      {id:"kcl", name:"Replace potassium", run(s){ s.params.k=Math.min(5.2,Math.round((s.params.k+0.6)*10)/10); return "Potassium is replaced. Insulin is safe only once the serum is at least 3.3."; }}
+    ]
+  },
+  {
+    id:"pancreatitis", name:"Acute pancreatitis",
+    line:"Necrosis is a later structural event. A low calcium marks severity. It does not prove necrosis on the first morning.",
+    params:[
+      {id:"map", label:"MAP", unit:"mmHg", min:40, max:110, value:70, step:1},
+      {id:"pf", label:"PaO2/FiO2", unit:"", min:50, max:500, value:280, step:5},
+      {id:"cr", label:"Creatinine", unit:"mg/dL", min:0.4, max:8, value:1.2, step:0.1},
+      {id:"ca", label:"Ionised calcium", unit:"mmol/L", min:0.6, max:1.4, value:1.05, step:0.01},
+      {id:"lactate", label:"Lactate", unit:"mmol/L", min:0.5, max:12, value:1.8, step:0.1}
+    ],
+    presets:{
+      Arrival:{map:70,pf:280,cr:1.2,ca:1.05,lactate:1.8},
+      Deteriorating:{map:58,pf:130,cr:2.6,ca:0.85,lactate:4.2},
+      Recovering:{map:76,pf:300,cr:1.1,ca:1.12,lactate:1.2}
+    },
+    drift(p,s){ if(!s.flags.fluid) p.map=Math.max(52,p.map-2); p.lactate=Math.min(8,p.lactate+0.2); if(s.hours>12) p.pf=Math.max(80,p.pf-8); if(p.map<65) p.cr=Math.min(6,p.cr+0.15); if(s.hours>6) p.ca=Math.max(0.7,p.ca-0.02); },
+    nodes:[
+      {id:"shock", name:"Shock", organ:"heart",
+        rule(p){ if(p.map<65 && p.lactate>=2) return on(0.8,"MAP is under 65 and lactate is raised. Early pancreatitis shock is third-space loss and inflammation."); if(p.map<65) return on(0.5,"MAP is under 65."); if(p.lactate>=4) return maybe("Lactate is high and the pressure is held. Watch it. Shock is not declared."); return off("Pressure is adequate."); },
+        mechanism:"Fluid leaves the vessels around the pancreas. Inflammatory vasodilation adds to it.",
+        diagnose:"Hypotension in the first days. Infected necrosis is a later, different shock.",
+        tests:"Pressure, lactate, a haematocrit as a crude sign of haemoconcentration.",
+        manage:"Measured isotonic fluid, then a vasopressor. The old habit of many litres an hour floods the lung."},
+      {id:"ards", name:"ARDS", organ:"lung",
+        rule(p){ if(p.pf<300) return on(p.pf<150?0.8:0.5,"PaO2/FiO2 is under 300. Lung injury is present on the oxygenation criterion."); return off("Oxygenation is above 300. Abdominal pain is not ARDS."); },
+        mechanism:"The same inflammatory leak as other causes of ARDS.",
+        diagnose:"Berlin criteria. The lipase does not replace the gas and the film.",
+        tests:"Arterial gas and a chest film.",
+        manage:"Lung-protective ventilation if intubated. Restrict fluid once the pulse pressure is acceptable."},
+      {id:"aki", name:"AKI", organ:"kidney",
+        rule(p){ if(p.cr>=1.5) return on(p.cr>=3?0.85:0.5,"Creatinine has crossed the KDIGO line."); return off("Creatinine is under 1.5."); },
+        mechanism:"Hypovolaemia first. Abdominal hypertension can add a second hit.",
+        diagnose:"The creatinine rise, not the amylase.",
+        tests:"Creatinine, urine, abdominal pressure if the belly is tense.",
+        manage:"Restore the circulation. Look at the abdominal pressure before you blame the kidney alone."},
+      {id:"necrosis", name:"Necrosis", organ:"pancreas", lock:true,
+        rule(p,s){ if(s.hours>=48 && (p.map<65 || p.cr>=2.5)) return on(0.75,"It is after 48 hours and either shock or significant AKI has occurred. Necrosis is now plausible."); if(p.ca<0.9) return maybe("Calcium is low. That marks a severe course. It does not show necrosis on the morning of admission."); return off("Too early, or the course is not severe enough, to call necrosis."); },
+        mechanism:"Part of the gland dies. Infection of that tissue is a second event, usually after the first week.",
+        diagnose:"Contrast CT when the result will change a plan, not as a reflex on hour one. Gas in the collection means infection.",
+        tests:"CT after 48 to 72 hours if the patient is severe. Cultures only if infection is suspected.",
+        manage:"No prophylactic antibiotic. Drain or debride only infected, walled-off necrosis, and usually not in week one. This pathway stays once it has occurred."}
+    ],
+    actions:[
+      {id:"fluid", name:"Measured fluid", run(s){ s.flags.fluid=1; s.params.map=Math.min(80,s.params.map+8); s.params.lactate=Math.max(0.8,s.params.lactate-0.4); return "A measured bolus restored pressure. The litre-per-hour regimen was not used."; }},
+      {id:"flood", name:"Large unguided fluid", run(s){ s.params.map=Math.min(78,s.params.map+4); s.params.pf=Math.max(70,s.params.pf-40); return "Pressure rose a little and oxygenation fell. The lung paid for the fluid."; }},
+      {id:"abx", name:"Prophylactic antibiotic", run(s){ return "An antibiotic was given with no infected necrosis. Necrosis does not shrink because a drug was started early."; }}
+    ]
+  },
+  {
+    id:"aki", name:"AKI",
+    line:"Dialysis is for a complication the kidney cannot handle. Creatinine is not that complication.",
+    params:[
+      {id:"k", label:"Potassium", unit:"mmol/L", min:2.5, max:8.5, value:5.2, step:0.1},
+      {id:"ph", label:"pH", unit:"", min:6.9, max:7.5, value:7.28, step:0.01},
+      {id:"hco3", label:"Bicarbonate", unit:"mmol/L", min:4, max:32, value:16, step:1},
+      {id:"cr", label:"Creatinine", unit:"mg/dL", min:0.6, max:12, value:3.2, step:0.1},
+      {id:"urea", label:"Urea", unit:"mmol/L", min:4, max:70, value:22, step:1},
+      {id:"balance", label:"Fluid balance", unit:"L", min:-3, max:8, value:1.2, step:0.2},
+      {id:"spo2", label:"SpO2", unit:"%", min:70, max:100, value:96, step:1}
+    ],
+    presets:{
+      Arrival:{k:5.2,ph:7.28,hco3:16,cr:3.2,urea:22,balance:1.2,spo2:96},
+      Deteriorating:{k:6.8,ph:7.12,hco3:10,cr:6.4,urea:42,balance:4.5,spo2:88},
+      Recovering:{k:4.4,ph:7.36,hco3:22,cr:2.2,urea:14,balance:0.2,spo2:97}
+    },
+    drift(p){ p.k=Math.min(8,p.k+0.15); p.hco3=Math.max(8,p.hco3-0.4); p.ph=Math.max(7,p.ph-0.01); p.urea=Math.min(60,p.urea+1.2); p.balance=Math.min(8,p.balance+0.3); if(p.balance>3) p.spo2=Math.max(80,p.spo2-1); },
+    nodes:[
+      {id:"hyperk", name:"Hyperkalemia", organ:"heart",
+        rule(p){ if(p.k>=6.5) return on(0.9,"Potassium is at least 6.5. Treat the heart first if the ECG is abnormal."); if(p.k>=5.5) return on(0.55,"Potassium is at least 5.5."); return off("Potassium is under 5.5. A high creatinine is not hyperkalemia."); },
+        mechanism:"Excretion has failed. Acidosis and insulin deficiency shift more potassium out of cells.",
+        diagnose:"A true serum value and the ECG. A haemolysed sample is repeated before calcium is given for a number alone.",
+        tests:"Potassium, ECG, bicarbonate.",
+        manage:"Intravenous calcium for ECG toxicity. Insulin and glucose to shift. Remove the potassium with a resin, a diuretic, or dialysis."},
+      {id:"ecg", name:"Toxic ECG", organ:"heart", parent:"hyperk",
+        rule(p,s,ev){ if(!hot(ev.hyperk)) return off("Potassium is not in a range that threatens the ECG."); if(p.k>=6.5) return on(0.8,"At this potassium the ECG is treated as toxic until you have seen that it is not."); if(p.k>=5.5) return maybe("Potassium is high. The ECG decides urgency. The number does not describe the trace."); return off(""); },
+        mechanism:"Potassium lowers resting membrane potential. Conduction slows, then the rhythm stops.",
+        diagnose:"Peaked T, flat P, wide QRS, or a sine wave.",
+        tests:"A 12-lead, or the monitor if the patient is collapsing.",
+        manage:"Calcium immediately for a wide QRS. It does not lower the potassium."},
+      {id:"acidosis", name:"Metabolic acidosis", organ:"blood",
+        rule(p){ if(p.ph<7.2 || p.hco3<12) return on(0.8,"pH is under 7.2 or bicarbonate is under 12."); if(p.ph<7.3 || p.hco3<18) return on(0.45,"There is a moderate metabolic acidosis."); return off("pH and bicarbonate are not in an acidotic danger range."); },
+        mechanism:"Retained metabolic acids. This is not lactate unless the lactate says so.",
+        diagnose:"A blood gas. The anion gap should be high in intrinsic renal failure.",
+        tests:"Arterial or venous gas, electrolytes, lactate so a second acid is not missed.",
+        manage:"Treat shock if it is there. Bicarbonate if acidaemia is severe. Dialysis if it will not turn."},
+      {id:"edema", name:"Pulmonary oedema", organ:"lung",
+        rule(p){ if(p.balance>=3 && p.spo2<94) return on(0.8,"The balance is at least 3 litres positive and saturation is under 94."); if(p.balance>=3) return maybe("The balance is strongly positive. The lung has not declared itself. Saturation is still acceptable."); if(p.spo2<94) return maybe("Saturation is low. Fluid is not the only cause of a low saturation, and the balance is not large."); return off("Neither the balance nor the saturation shows pulmonary oedema."); },
+        mechanism:"Salt water that cannot be excreted fills the lung.",
+        diagnose:"Oedema on the film or ultrasound, a positive balance, and hypoxaemia.",
+        tests:"Saturation, the balance, lung ultrasound.",
+        manage:"Stop input. A loop diuretic if the kidney can respond. Dialysis if it cannot and the lung is failing."},
+      {id:"uremia", name:"Uraemia", organ:"kidney",
+        rule(p){ if(p.urea>=36) return on(0.7,"Urea is at least 36 mmol/L. The number supports uraemia. Pericarditis or encephalopathy would confirm a clinical syndrome, and they are not on this panel."); if(p.urea>=25) return maybe("Urea is raised. A raised urea is not a dialysis indication."); return off("Urea is under 25 mmol/L."); },
+        mechanism:"Retained nitrogenous waste. The symptoms, not the urea, are the disease.",
+        diagnose:"Encephalopathy, pericarditis, bleeding or intractable nausea, with a high urea.",
+        tests:"Urea, a clinical review for those complications.",
+        manage:"Dialyse for the complication. Do not start a filter because creatinine crossed a private threshold."}
+    ],
+    actions:[
+      {id:"calcium", name:"Calcium for the heart", run(s){ if(s.params.k<6) return "Potassium is not in the range where calcium is the first move. Look at the ECG before you treat a moderate number."; return "Calcium stabilises the membrane. The potassium itself is unchanged, so the shift and the removal still have to happen."; }},
+      {id:"shift", name:"Insulin and glucose", run(s){ s.params.k=Math.max(3.5,Math.round((s.params.k-0.7)*10)/10); return "Potassium shifts into cells. The total body potassium is the same. Watch the glucose."; }},
+      {id:"flood", name:"Maintenance fluid, unreviewed", run(s){ s.params.balance=Math.min(8,Math.round((s.params.balance+1.5)*10)/10); s.params.spo2=Math.max(75,s.params.spo2-3); return "Another litre was given to a kidney that is not excreting it. The balance and the saturation move the wrong way."; }}
+    ]
+  },
+  {
+    id:"alf", name:"Acute liver failure",
+    line:"A high INR is the disease, not a surprise. Cerebral oedema follows ammonia and coma, not the INR.",
+    params:[
+      {id:"inr", label:"INR", unit:"", min:0.9, max:8, value:2.4, step:0.1},
+      {id:"glucose", label:"Glucose", unit:"mmol/L", min:1.5, max:15, value:4.2, step:0.1},
+      {id:"ammonia", label:"Ammonia", unit:"µmol/L", min:20, max:300, value:80, step:5},
+      {id:"gcs", label:"GCS", unit:"", min:3, max:15, value:14, step:1},
+      {id:"map", label:"MAP", unit:"mmHg", min:40, max:110, value:72, step:1},
+      {id:"na", label:"Sodium", unit:"mmol/L", min:110, max:160, value:136, step:1}
+    ],
+    presets:{
+      Arrival:{inr:2.4,glucose:4.2,ammonia:80,gcs:14,map:72,na:136},
+      Deteriorating:{inr:5.5,glucose:2.4,ammonia:180,gcs:8,map:58,na:128},
+      Recovering:{inr:1.6,glucose:6,ammonia:50,gcs:15,map:75,na:140}
+    },
+    drift(p){ p.inr=Math.min(8,p.inr+0.15); p.ammonia=Math.min(280,p.ammonia+8); p.glucose=Math.max(1.6,p.glucose-0.2); if(p.ammonia>120) p.gcs=Math.max(6,p.gcs-1); p.map=Math.max(52,p.map-1); },
+    nodes:[
+      {id:"coag", name:"Coagulopathy", organ:"liver",
+        rule(p){ if(p.inr>=2.5) return on(0.8,"INR is at least 2.5. Coagulopathy is severe. It is part of the definition of acute liver failure once encephalopathy is present, not a separate surprise."); if(p.inr>=1.5) return on(0.5,"INR is at least 1.5."); return off("INR is under 1.5. This is not the coagulopathy of acute liver failure."); },
+        mechanism:"Hepatocytes stop making clotting factors. The INR rises. The patient may still not be bleeding.",
+        diagnose:"INR at least 1.5 in an acute liver injury, with no other anticoagulant.",
+        tests:"INR, fibrinogen, a clinical look for bleeding. Do not 'correct' a number before a procedure without a plan.",
+        manage:"Give plasma for bleeding or a procedure. An INR that is high and stable, in a patient who is not bleeding, is not a reason for reflex plasma."},
+      {id:"hypogly", name:"Hypoglycaemia", organ:"liver",
+        rule(p){ if(p.glucose<2.8) return on(0.9,"Glucose is under 2.8 mmol/L."); if(p.glucose<3.9) return on(0.55,"Glucose is under 3.9 mmol/L."); return off("Glucose is safe. The INR does not tell you the glucose."); },
+        mechanism:"The failing liver cannot release glucose.",
+        diagnose:"A bedside glucose. Encephalopathy is not hypoglycaemia until the stick says so, and both can be true.",
+        tests:"Hourly glucose while the course is severe.",
+        manage:"A continuous glucose infusion. Do not wait for a seizure."},
+      {id:"edema", name:"Cerebral oedema", organ:"brain", lock:true,
+        rule(p){ if(p.gcs<=8 && p.ammonia>=100) return on(0.9,"GCS is 8 or under and ammonia is at least 100. Oedema is a real risk."); if(p.ammonia>=150 && p.gcs<=13) return on(0.7,"Ammonia is at least 150 and consciousness has fallen."); if(p.ammonia>=150) return maybe("Ammonia is high. Oedema is not called while the GCS is still clear."); if(p.inr>=4) return off("The INR is very high. That is coagulopathy, not cerebral oedema."); return off("Ammonia and GCS do not meet an oedema pattern."); },
+        mechanism:"Astrocytes swell as they metabolise ammonia. Cerebral blood flow then becomes unstable.",
+        diagnose:"A falling GCS with high ammonia, or signs of herniation. CT is late and should not delay care.",
+        tests:"Ammonia, GCS, pupils, sodium. CT if a bleed is also possible.",
+        manage:"Raise the sodium toward 145 to 150. Head up, sedation, treat fever and seizures. This injury is not undone by a better INR."},
+      {id:"shock", name:"Vasoplegic shock", organ:"heart",
+        rule(p){ if(p.map<65) return on(0.7,"MAP is under 65. Acute liver failure causes a high-output, vasodilated circulation."); return off("MAP is held. A high INR is not shock."); },
+        mechanism:"The same inflammatory vasodilation as sepsis, with adrenal and cardiac contributions.",
+        diagnose:"Hypotension that needs a vasopressor.",
+        tests:"Arterial pressure, lactate, a cortisol only if it will change a stuck shock.",
+        manage:"Noradrenaline. Volume only if there is a loss. Look for bleeding and for infection."}
+    ],
+    actions:[
+      {id:"dextrose", name:"Glucose infusion", run(s){ s.params.glucose=Math.min(8,s.params.glucose+2.5); return "Glucose is supported. The INR is untouched, which is correct."; }},
+      {id:"salt", name:"Hypertonic saline", run(s){ if(s.params.gcs>12 && s.params.ammonia<120) return "Consciousness and ammonia do not currently justify osmotic therapy."; s.params.na=Math.min(152,s.params.na+6); return "Sodium is raised toward the range used to protect the brain. The ammonia is not cleared by the saline."; }},
+      {id:"water", name:"Hypotonic fluid", run(s){ s.params.na=Math.max(118,s.params.na-7); return "Sodium fell. In acute liver failure that favours cerebral oedema."; }},
+      {id:"plasma", name:"Plasma for the INR", run(s){ if(s.flags.bleeding){ s.params.inr=Math.max(1.4,s.params.inr-0.6); return "Plasma was given for bleeding. The number moves. The liver does not recover because of it."; } return "There is no bleeding. Plasma was given at a number. The INR may fall for a few hours and the diagnosis becomes harder to follow. No pathway improves."; }}
+    ]
+  },
+  {
+    id:"ahf", name:"Acute heart failure",
+    line:"A low saturation is pulmonary oedema. Cardiogenic shock needs a low pressure and a high lactate, not the saturation alone.",
+    params:[
+      {id:"map", label:"MAP", unit:"mmHg", min:40, max:120, value:78, step:1},
+      {id:"spo2", label:"SpO2", unit:"%", min:70, max:100, value:88, step:1},
+      {id:"lactate", label:"Lactate", unit:"mmol/L", min:0.5, max:12, value:1.4, step:0.1},
+      {id:"cr", label:"Creatinine", unit:"mg/dL", min:0.4, max:8, value:1.4, step:0.1}
+    ],
+    presets:{
+      Arrival:{map:78,spo2:88,lactate:1.4,cr:1.4},
+      Deteriorating:{map:58,spo2:82,lactate:3.6,cr:2.6},
+      Recovering:{map:75,spo2:96,lactate:1.1,cr:1.3}
+    },
+    drift(p,s){ if(!s.flags.support){ p.spo2=Math.max(75,p.spo2-1); if(p.spo2<90) p.map=Math.max(50,p.map-1);} if(p.map<65) p.lactate=Math.min(8,p.lactate+0.25); if(p.map<70) p.cr=Math.min(6,p.cr+0.12); },
+    nodes:[
+      {id:"lung", name:"Pulmonary oedema", organ:"lung",
+        rule(p){ if(p.spo2<90) return on(0.8,"Saturation is under 90. In this disease that is oedema until a different cause is shown."); if(p.spo2<94) return on(0.5,"Saturation is under 94."); return off("Saturation is acceptable. Congestion is not being read from the creatinine."); },
+        mechanism:"Left atrial pressure is high. Fluid crosses into the alveoli.",
+        diagnose:"Hypoxaemia, a wet lung on ultrasound or film, and a heart that explains it.",
+        tests:"Saturation, lung ultrasound, an ECG for the cause, echo.",
+        manage:"Oxygen or pressure support. A vasodilator if the pressure is high. A diuretic. Not a fluid bolus."},
+      {id:"cshock", name:"Cardiogenic shock", organ:"heart",
+        rule(p){ if(p.map<65 && p.lactate>=2) return on(0.85,"MAP is under 65 and lactate is at least 2. Hypoxaemia was not required for this call, and hypoxaemia alone would not have made it."); if(p.map<65) return maybe("MAP is low. Lactate is under 2, so tissue shock is not confirmed."); if(p.lactate>=2) return maybe("Lactate is raised and the pressure is held. This is not cardiogenic shock."); return off("Pressure and lactate are short of cardiogenic shock."); },
+        mechanism:"The pump does not deliver. Lactate rises because flow is low, which is the opposite of warm septic shock.",
+        diagnose:"Hypotension plus hypoperfusion, with a cardiac cause.",
+        tests:"Lactate, echo, ECG. A cold periphery and a narrow pulse pressure support it.",
+        manage:"A carefully chosen inotrope or mechanical support. Fluid only if the ventricle is empty, which this disease usually is not."},
+      {id:"aki", name:"Cardiorenal AKI", organ:"kidney",
+        rule(p){ if(p.cr>=1.5 && p.map<70) return on(0.7,"Creatinine is raised and the pressure is low. Venous congestion and low perfusion are both plausible."); if(p.cr>=1.5) return maybe("Creatinine is raised but the pressure is acceptable. Congestion can still injure the kidney. It is not assumed from a mild rise alone."); return off("Creatinine is under 1.5. Hypoxaemia has not been relabelled as AKI."); },
+        mechanism:"High venous pressure and low arterial pressure both reduce filtration.",
+        diagnose:"A KDIGO rise during heart failure.",
+        tests:"Creatinine, urine, the venous congestion on echo or the neck veins.",
+        manage:"Decongest if the patient is wet. Do not give a fluid challenge for a rising creatinine in a full patient."}
+    ],
+    actions:[
+      {id:"diuretic", name:"Diuretic", run(s){ s.flags.support=1; s.params.spo2=Math.min(99,s.params.spo2+5); if(s.params.map<65) return "A diuretic in cardiogenic shock does not restore flow. Oxygenation may change. The shock does not."; return "Fluid leaves and saturation can rise, if the kidney answers."; }},
+      {id:"fluid", name:"Fluid bolus", run(s){ s.params.spo2=Math.max(70,s.params.spo2-6); s.params.map=Math.min(90,s.params.map+2); return "The bolus worsened the oedema. A full left ventricle does not need preload."; }},
+      {id:"ino", name:"Inotrope", run(s){ if(s.params.map>=65 || s.params.lactate<2) return "Shock criteria are not both present. An inotrope is not the treatment for a low saturation."; s.flags.support=1; s.params.map=Math.min(75,s.params.map+10); s.params.lactate=Math.max(1,s.params.lactate-0.6); return "Flow is supported. Lactate can fall. The lung still needs the congestion treated."; }}
+    ]
+  },
+  {
+    id:"tbi", name:"Traumatic brain injury",
+    line:"Raised ICP is not herniation. A PaCO2 of 25 is an injury, even when the ICP number falls.",
+    params:[
+      {id:"icp", label:"ICP", unit:"mmHg", min:5, max:60, value:18, step:1},
+      {id:"map", label:"MAP", unit:"mmHg", min:50, max:120, value:85, step:1},
+      {id:"gcs", label:"GCS", unit:"", min:3, max:15, value:8, step:1},
+      {id:"paco2", label:"PaCO2", unit:"mmHg", min:20, max:55, value:38, step:1},
+      {id:"na", label:"Sodium", unit:"mmol/L", min:120, max:170, value:140, step:1}
+    ],
+    presets:{
+      Arrival:{icp:18,map:85,gcs:8,paco2:38,na:140},
+      Deteriorating:{icp:36,map:70,gcs:5,paco2:45,na:136},
+      Recovering:{icp:14,map:88,gcs:10,paco2:38,na:146}
+    },
+    drift(p,s){ if(!s.flags.tier) p.icp=Math.min(55,p.icp+2); if(p.icp>25) p.gcs=Math.max(3,p.gcs-1); },
+    nodes:[
+      {id:"raised", name:"Raised ICP", organ:"brain",
+        rule(p){ const cpp=Math.round(p.map-p.icp); if(p.icp>22) return on(Math.min(1,(p.icp-22)/20),"ICP is over 22. CPP is "+cpp+" mmHg. The threshold for treatment of ICP is not the threshold for herniation."); return off("ICP is 22 or under."); },
+        mechanism:"Blood, swelling or CSF occupies the fixed skull. Pressure rises, then flow falls.",
+        diagnose:"A measured ICP over 22 mmHg, sustained.",
+        tests:"The monitor, the scan that explains the pressure, a check for a tight collar or a high CO2.",
+        manage:"Head up, sedation, drain CSF if a drain is in, osmotic therapy. Open the skull when the tier is failing."},
+      {id:"herniation", name:"Herniation", organ:"brain", lock:true,
+        rule(p){ if(p.icp>=40) return on(0.95,"ICP is 40 or more. Herniation is threatened. A pupil would confirm it. The number is already enough to treat it as such."); if(p.icp>25 && p.gcs<=8) return maybe("ICP is high and the coma is deep. Herniation is a clinical event. Pupils and posturing are not on this panel, so it is not declared."); return off("ICP is under the range where herniation is called from the number."); },
+        mechanism:"Brain shifts across a fixed edge. The third nerve and then the brainstem are compressed.",
+        diagnose:"A new dilated pupil, posturing, or a Cushing response, usually with a very high ICP.",
+        tests:"Pupils, the ICP, an urgent scan if the monitor was not already in.",
+        manage:"Immediate osmotic therapy, drain, and a surgical decision. A herniation that has occurred is not erased by the next normal ICP."},
+      {id:"ischemia", name:"Cerebral ischaemia", organ:"brain",
+        rule(p){ const cpp=p.map-p.icp; if(p.paco2<30) return on(0.8,"PaCO2 is under 30. Vessels constrict. This ischaemia is iatrogenic, even if the ICP looks better."); if(cpp<60) return on(0.75,"CPP is "+Math.round(cpp)+" mmHg. Flow fails below about 60. That is a pressure problem."); return off("CPP is at least 60 and carbon dioxide is not in the constricting range."); },
+        mechanism:"Flow is perfusion pressure divided by vessel tone. A low CPP or a very low PaCO2 both cut flow.",
+        diagnose:"CPP under 60, or PaCO2 under 30, or a tissue-oxygen monitor if one is in use.",
+        tests:"MAP, ICP, the blood gas.",
+        manage:"Raise the MAP if CPP is low. Put PaCO2 back to the mid 30s. Do not hyperventilate as a standing order."}
+    ],
+    actions:[
+      {id:"tier", name:"Sedation, head-up, drain", run(s){ s.flags.tier=1; s.params.icp=Math.max(8,s.params.icp-8); return "The first tier lowers ICP. Carbon dioxide was left alone."; }},
+      {id:"osm", name:"Osmotherapy", run(s){ if(s.params.icp<=22) return "ICP is not above 22. Osmotherapy is not a routine infusion."; s.params.icp=Math.max(8,s.params.icp-7); s.params.na=Math.min(160,s.params.na+4); return "ICP falls and sodium rises. The cause of the pressure is still there."; }},
+      {id:"hyper", name:"Hyperventilate to 25", run(s){ s.params.paco2=25; s.params.icp=Math.max(8,s.params.icp-4); return "ICP falls a little. PaCO2 at 25 reduces cerebral blood flow. This is how a treatment creates ischaemia."; }},
+      {id:"pressure", name:"Raise MAP", run(s){ s.params.map=Math.min(100,s.params.map+12); return "MAP is higher, so CPP rises if the ICP does not rise with it."; }}
+    ]
+  },
+  {
+    id:"status", name:"Status epilepticus",
+    line:"Aspiration is a risk once the seizure passes five minutes and the airway is open. The CK of rhabdomyolysis comes later.",
+    params:[
+      {id:"min", label:"Seizure", unit:"min", min:1, max:90, value:8, step:1},
+      {id:"spo2", label:"SpO2", unit:"%", min:60, max:100, value:96, step:1},
+      {id:"ck", label:"CK", unit:"U/L", min:50, max:20000, value:220, step:50},
+      {id:"ph", label:"pH", unit:"", min:6.9, max:7.5, value:7.34, step:0.01}
+    ],
+    presets:{
+      Arrival:{min:8,spo2:96,ck:220,ph:7.34},
+      Deteriorating:{min:40,spo2:84,ck:6500,ph:7.1},
+      Recovering:{min:2,spo2:98,ck:400,ph:7.38}
+    },
+    drift(p,s){ p.min=Math.min(90,p.min+4); if(!s.flags.airway) p.spo2=Math.max(70,p.spo2-2); p.ck=Math.min(20000,p.ck+p.min*8); p.ph=Math.max(6.95,p.ph-0.02); },
+    nodes:[
+      {id:"hypoxia", name:"Hypoxia", organ:"lung",
+        rule(p,s){ if(p.spo2<92) return on(0.8,"Saturation is under 92."); if(p.min>20 && !s.flags.airway) return maybe("The seizure has run past 20 minutes and the airway is not secured. Hypoxia is expected soon. It is not declared while the saturation holds."); return off("Saturation is held."); },
+        mechanism:"Ventilation fails during a generalised seizure, and oxygen demand is high.",
+        diagnose:"The saturation, or a blood gas.",
+        tests:"Pulse oximetry and a gas once an airway exists.",
+        manage:"Oxygen, then a tube if the seizure or the stomach contents demand it. The benzodiazepine is still the first drug for the seizure itself."},
+      {id:"aspiration", name:"Aspiration", organ:"lung",
+        rule(p,s){ if(p.min>=5 && !s.flags.airway && p.spo2<92) return on(0.75,"The seizure has passed five minutes, the airway is unprotected, and saturation has fallen. Aspiration is now likely."); if(p.min>=5 && !s.flags.airway) return maybe("Five minutes have passed and the airway is open to the stomach. Aspiration is a risk, not yet a finding."); if(s.flags.airway) return off("The airway is secured. Ongoing aspiration is no longer the open pathway."); return off("The seizure has not reached the window where aspiration is expected."); },
+        mechanism:"The airway is unprotected and the stomach contents move.",
+        diagnose:"A falling saturation, new crackles, or a dependent opacity after a witnessed seizure.",
+        tests:"The chest, the saturation, a film if it will change the airway plan.",
+        manage:"Position, suction, a tube. An antibiotic is for an infection that declares itself, not for the moment of aspiration."},
+      {id:"rhabdo", name:"Rhabdomyolysis", organ:"kidney",
+        rule(p){ if(p.ck>=5000) return on(0.85,"CK is at least 5000. Muscle has broken down in a way that threatens the kidney."); if(p.ck>=1000) return on(0.5,"CK is at least 1000."); if(p.min>15) return maybe("The seizure is long. CK has not risen into the range that is called rhabdomyolysis. Time alone is not that diagnosis."); return off("CK is under 1000."); },
+        mechanism:"Sustained contraction breaks muscle. Myoglobin injures the tubule.",
+        diagnose:"A CK several times the upper limit, rising, with a matching story.",
+        tests:"CK, potassium, creatinine, urine for blood without red cells.",
+        manage:"Volume if the lung allows, to wash myoglobin. Watch the potassium. The seizure still has to be stopped."}
+    ],
+    actions:[
+      {id:"airway", name:"Secure the airway", run(s){ s.flags.airway=1; s.params.spo2=Math.min(99,s.params.spo2+6); return "The airway is protected and saturation can recover. The seizure itself is a separate problem."; }},
+      {id:"benzo", name:"Benzodiazepine", run(s){ if(s.params.min<5){ s.params.min=1; return "The seizure stops. Given this early, the downstream injuries do not have time to form."; } s.params.min=Math.max(1,s.params.min-10); return "The seizure is treated. Damage already done, such as a risen CK, does not fall in the same minute."; }},
+      {id:"wait", name:"Delay the airway", run(s){ s.params.min=Math.min(90,s.params.min+10); s.params.spo2=Math.max(70,s.params.spo2-6); return "Time was spent without an airway. Saturation falls and the aspiration risk matures."; }}
+    ]
+  },
+  {
+    id:"dic", name:"DIC",
+    line:"A low platelet count is not bleeding, and bleeding is not the same pathway as microvascular thrombosis.",
+    params:[
+      {id:"platelets", label:"Platelets", unit:"×10⁹/L", min:5, max:400, value:48, step:5},
+      {id:"inr", label:"INR", unit:"", min:0.8, max:5, value:1.7, step:0.1},
+      {id:"fib", label:"Fibrinogen", unit:"g/L", min:0.3, max:5, value:1.2, step:0.1},
+      {id:"lactate", label:"Lactate", unit:"mmol/L", min:0.5, max:12, value:1.6, step:0.1},
+      {id:"map", label:"MAP", unit:"mmHg", min:40, max:110, value:74, step:1},
+      {id:"bleeding", label:"Overt bleeding", kind:"toggle", value:0}
+    ],
+    presets:{
+      Arrival:{platelets:48,inr:1.7,fib:1.2,lactate:1.6,map:74,bleeding:0},
+      Deteriorating:{platelets:18,inr:2.6,fib:0.7,lactate:4.5,map:60,bleeding:1},
+      Recovering:{platelets:90,inr:1.3,fib:2.2,lactate:1.2,map:76,bleeding:0}
+    },
+    drift(p,s){ if(!s.flags.cause){ p.platelets=Math.max(8,p.platelets-6); p.fib=Math.max(0.4,p.fib-0.08); p.inr=Math.min(4,p.inr+0.08);} },
+    nodes:[
+      {id:"bleed", name:"Bleeding", organ:"blood",
+        rule(p){ if(p.bleeding && (p.platelets<50 || p.fib<1.5)) return on(0.85,"Bleeding is seen, and either platelets are under 50 or fibrinogen is under 1.5."); if(p.platelets<50 || p.fib<1) return maybe("The labs are in a range where bleeding happens. No overt bleeding is recorded, so the pathway stays possible rather than present."); return off("There is no recorded bleeding, and the labs are not in the most dangerous range."); },
+        mechanism:"Clotting factors and platelets have been consumed.",
+        diagnose:"Blood from a line, a wound, or a mucosa, with a matching lab. A lab without blood is coagulopathy, not bleeding.",
+        tests:"Platelets, INR, fibrinogen, a look at the patient.",
+        manage:"Platelets and fibrinogen for the bleeding patient. Treating the cause is what stops the consumption."},
+      {id:"thrombus", name:"Microvascular thrombosis", organ:"blood",
+        rule(p){ if(p.platelets<100 && p.fib<1) return on(0.7,"Platelets are low and fibrinogen is under 1 g/L. Clot is being consumed in small vessels. This can exist with no external bleeding at all."); if(p.fib<1.5 && p.platelets<150) return maybe("Fibrinogen is falling. Thrombosis is not called from a mild change."); return off("The consumption pattern for microvascular clot is not present."); },
+        mechanism:"Fibrin is laid down in small vessels and then lysed. Organs lose flow while the skin may or may not bleed.",
+        diagnose:"Falling platelets and fibrinogen, a rising fibrin marker, and organ injury. D-dimer is not on this panel.",
+        tests:"Platelets, fibrinogen, D-dimer, the organ that is failing.",
+        manage:"Treat the driver. Heparin is a specialist decision when thrombosis dominates and bleeding does not. It is not a reflex."},
+      {id:"ischemia", name:"Organ ischaemia", organ:"kidney",
+        rule(p,s,ev){ if(hot(ev.thrombus) && p.lactate>=2) return on(0.75,"The thrombotic pathway is on and lactate is at least 2. Ischaemia is then a fair reading."); if(p.lactate>=2) return maybe("Lactate is raised. Without the thrombotic pathway this lactate belongs to the cause of the DIC, not to a new ischaemic organ."); if(p.map<65) return maybe("Pressure is low. That is shock from the underlying disease until the clotting pathway says otherwise."); return off("No ischaemic organ pathway is active."); },
+        mechanism:"Microvascular fibrin reduces downstream flow.",
+        diagnose:"A failing organ plus laboratory consumption. Lactate alone is not enough, because the original disease also raises it.",
+        tests:"Lactate, creatinine, the mental state, the clotting panel.",
+        manage:"Restore flow by treating the cause. Support the organ. Do not anticoagulate a patient who is bleeding."}
+    ],
+    actions:[
+      {id:"cause", name:"Treat the cause", run(s){ s.flags.cause=1; return "The driver is being treated. Consumption can slow over hours. Products do not do that job."; }},
+      {id:"products", name:"Platelets and fibrinogen", run(s){ if(!s.params.bleeding && s.params.platelets>=20){ return "There is no bleeding. Products were given to chase a number. The pathway does not turn off."; } s.params.platelets=Math.min(80,s.params.platelets+30); s.params.fib=Math.min(2.5,s.params.fib+0.8); return "Products were given for bleeding. The labs improve for a while. They fall again if the cause is still running."; }},
+      {id:"see", name:"Record overt bleeding", run(s){ s.params.bleeding=s.params.bleeding?0:1; return s.params.bleeding?"Overt bleeding is now part of the case.":"Overt bleeding is cleared. The labs stay what they are."; }}
+    ]
+  }
+];
+
+const LEADS = {
+  learn:"Every pathway is drawn. Colour follows the numbers. A dashed line is a criterion that is only half met.",
+  live:"Pathways appear only after their criteria have held. One abnormal value does not open a complication.",
+  treat:"A right action can close a pathway. A wrong one can open another. Injury that has already happened stays marked."
+};
+const state = {id:"sepsis", mode:"learn", view:"organs", params:{}, hours:0, flags:{}, ever:{}, locked:{}, armed:{}, osm0:0, note:"", selected:null, playing:false};
+let timer = 0;
+let evals = {};
+
+function disease(){ return DISEASES.find(d=>d.id===state.id); }
+function esc(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    if(c==="&") return "&"+"amp;";
+    if(c==="<") return "&"+"lt;";
+    if(c===">") return "&"+"gt;";
+    if(c==='"') return "&"+"quot;";
+    return "&"+"#39;";
+  });
+}
+function round(n, step){ const d=String(step).includes(".")?String(step).split(".")[1].length:0; return Number(n.toFixed(d)); }
+
+function boot(id){
+  const d = DISEASES.find(x=>x.id===id) || DISEASES[0];
+  state.id = d.id;
+  state.params = {};
+  d.params.forEach(p=>{ state.params[p.id]=p.value; });
+  state.hours = 0;
+  state.flags = {};
+  state.ever = {};
+  state.locked = {};
+  state.armed = {};
+  state.osm0 = state.params.osm || 0;
+  state.note = "";
+  state.selected = null;
+  stop();
+  render();
+}
+
+function evaluate(){
+  const d = disease();
+  const out = {};
+  d.nodes.forEach(n=>{
+    let r = n.rule(state.params, state, out);
+    if(n.parent && !hot(out[n.parent]) && r.state!=="on"){
+      if(!(n.id==="hyperk" && state.params.k>=6.5)) r = off(r.state==="off"?r.why:"This sits downstream, and that pathway is not active.");
+    }
+    if(r.state==="on") state.ever[n.id]=true;
+    const need = n.delay || 1;
+    if(state.mode==="live"){
+      if(r.state==="on"){ if(state._advance) state.armed[n.id]=(state.armed[n.id]||0)+1; }
+      else if(r.state!=="possible") state.armed[n.id]=0;
+      if(r.state==="on" && (state.armed[n.id]||0) < need && !state.locked[n.id]){
+        r = {state:"forming", level:0.4, why:r.why+" The criteria are met. Live mode waits "+(need*2)+" hours before the pathway is called."};
+      }
+    }
+    if(n.lock && (r.state==="on" || r.state==="locked") && (state.mode!=="live" || (state.armed[n.id]||0)>=need)) state.locked[n.id]=true;
+    if(state.locked[n.id] && n.lock){
+      r = {state:"locked", level:1, why:(r.why||"")+" It has already happened, so a better number does not switch it off."};
+    }
+    out[n.id]=r;
+  });
+  evals = out;
+  return out;
+}
+
+function klass(r){
+  if(!r || r.state==="off") return "off";
+  if(r.state==="possible") return "possible";
+  if(r.state==="forming") return "forming";
+  if(r.state==="locked") return "locked";
+  return r.level>=0.7?"severe":"on";
+}
+
+function render(){
+  const d = disease();
+  evaluate();
+  document.getElementById("lead").textContent = d.line+" "+LEADS[state.mode];
+  document.querySelectorAll("#modes button").forEach(b=>b.classList.toggle("on", b.dataset.mode===state.mode));
+  document.querySelectorAll("#views button").forEach(b=>b.classList.toggle("on", b.dataset.view===state.view));
+  document.querySelectorAll("#diseases button").forEach(b=>b.classList.toggle("on", b.dataset.id===state.id));
+  document.getElementById("hour").textContent = "Hour "+state.hours;
+  document.getElementById("play").hidden = state.mode!=="live";
+  document.getElementById("play").textContent = state.playing?"Pause":"Play";
+  document.getElementById("note").textContent = state.note;
+  const tops = d.nodes.filter(n=>!n.parent);
+  const show = n=>{
+    const r = evals[n.id];
+    if(state.mode==="live" && (!r || r.state==="off")) return false;
+    return true;
+  };
+  if(state.view==="organs"){
+    document.getElementById("mapwrap").hidden = false;
+    document.getElementById("chart").hidden = true;
+    paintOrgans(tops.filter(show));
+  }else{
+    document.getElementById("mapwrap").hidden = true;
+    document.getElementById("chart").hidden = false;
+    paintChart();
+  }
+  paintOrgansHeat(d);
+  paintSheet();
+  paintControls();
+}
+
+function paintOrgans(nodes){
+  const L = document.getElementById("colL");
+  const R = document.getElementById("colR");
+  L.innerHTML = ""; R.innerHTML = "";
+  nodes.forEach(n=>{
+    const r = evals[n.id];
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "node "+klass(r)+(state.selected===n.id?" sel":"");
+    b.dataset.id = n.id;
+    b.dataset.organ = n.organ;
+    b.innerHTML = "<b>"+esc(n.name)+"</b><small>"+esc(labelOf(r))+"</small>";
+    (SIDE[n.organ]==="R"?R:L).appendChild(b);
+  });
+  if(state.mode==="live" && !nodes.length){
+    L.innerHTML = "<p class='fine'>Nothing has declared itself.</p>";
+  }
+  requestAnimationFrame(drawWires);
+}
+
+function labelOf(r){
+  if(!r || r.state==="off") return "Not active";
+  if(r.state==="possible") return "Possible";
+  if(r.state==="forming") return "Forming";
+  if(r.state==="locked") return "Established";
+  return r.level>=0.7?"Severe":"Active";
+}
+
+function paintOrgansHeat(){
+  const rank = {off:0, possible:1, forming:2, on:3, severe:4, locked:5};
+  const best = {};
+  disease().nodes.forEach(n=>{
+    if(n.parent) return;
+    const k = klass(evals[n.id]);
+    if((rank[k]||0) >= (rank[best[n.organ]]||-1)) best[n.organ]=k;
+  });
+  document.querySelectorAll("[data-organ]").forEach(el=>{
+    el.classList.remove("possible","forming","on","severe","locked");
+    const k = best[el.getAttribute("data-organ")];
+    if(k && k!=="off") el.classList.add(k);
+  });
+}
+
+function drawWires(){
+  const stage = document.getElementById("stage");
+  const svg = document.getElementById("wires");
+  const box = stage.getBoundingClientRect();
+  svg.setAttribute("viewBox", "0 0 "+box.width+" "+box.height);
+  svg.innerHTML = "";
+  document.querySelectorAll(".node").forEach(btn=>{
+    const organ = document.querySelector('[data-organ="'+btn.dataset.organ+'"]');
+    if(!organ) return;
+    const a = btn.getBoundingClientRect();
+    const b = organ.getBoundingClientRect();
+    const x1 = a.left + a.width/2 - box.left;
+    const y1 = a.top + a.height/2 - box.top;
+    const x2 = b.left + b.width/2 - box.left;
+    const y2 = b.top + b.height/2 - box.top;
+    const line = document.createElementNS("http://www.w3.org/2000/svg","path");
+    const mid = (x1+x2)/2;
+    line.setAttribute("d", "M"+x1+" "+y1+" C"+mid+" "+y1+", "+mid+" "+y2+", "+x2+" "+y2);
+    line.setAttribute("fill","none");
+    line.setAttribute("stroke", btn.classList.contains("off")?"rgba(243,239,230,.18)": btn.classList.contains("severe")||btn.classList.contains("locked")||btn.classList.contains("possible")?"#e2b48a":"#7fd4e6");
+    line.setAttribute("stroke-width", btn.classList.contains("off")?"1":"1.6");
+    if(btn.classList.contains("possible")||btn.classList.contains("forming")||btn.classList.contains("off")) line.setAttribute("stroke-dasharray","4 4");
+    svg.appendChild(line);
+  });
+}
+
+function paintChart(){
+  const root = document.getElementById("chart");
+  const d = disease();
+  const tops = d.nodes.filter(n=>!n.parent);
+  root.innerHTML = "<li><button type='button' class='node on' data-id=''><b>"+esc(d.name)+"</b><small>Primary</small></button></li>"+
+    tops.map(n=>chartItem(n, d)).join("");
+}
+
+function chartItem(n, d){
+  const r = evals[n.id];
+  if(state.mode==="live" && (!r || r.state==="off")) return "";
+  const kids = d.nodes.filter(c=>c.parent===n.id).map(c=>chartItem(c, d)).join("");
+  return "<li><button type='button' class='node "+klass(r)+(state.selected===n.id?" sel":"")+"' data-id='"+n.id+"'><b>"+esc(n.name)+"</b><small>"+esc(labelOf(r))+"</small></button>"+
+    (kids?"<ol class='twig'>"+kids+"</ol>":"")+"</li>";
+}
+
+function paintSheet(){
+  const d = disease();
+  const n = d.nodes.find(x=>x.id===state.selected) || null;
+  const el = document.getElementById("sheet");
+  if(!n){
+    const bits = d.nodes.filter(x=>!x.parent).map(x=>{
+      const r = evals[x.id];
+      return "<button type='button' data-id='"+x.id+"'>"+esc(x.name)+"<small> · "+esc(labelOf(r))+"</small></button>";
+    }).join("");
+    el.innerHTML = "<p class='kicker'>"+esc(d.name)+"</p><h2>What is active</h2><p class='why'>"+esc(d.line)+"</p><div class='kids'>"+bits+"</div>";
+    return;
+  }
+  const r = evals[n.id] || off("");
+  const kids = d.nodes.filter(c=>c.parent===n.id);
+  el.innerHTML = "<p class='kicker'>"+esc((ORGAN[n.organ]||"")+" · "+labelOf(r))+"</p><h2>"+esc(n.name)+"</h2><p class='why'>"+esc(r.why||"")+"</p>"+
+    "<h3>Mechanism</h3><p>"+esc(n.mechanism)+"</p><h3>How it is recognised</h3><p>"+esc(n.diagnose)+"</p>"+
+    "<h3>Investigations</h3><p>"+esc(n.tests)+"</p><h3>Management</h3><p>"+esc(n.manage)+"</p>"+
+    (kids.length?"<div class='kids'>"+kids.map(c=>"<button type='button' data-id='"+c.id+"'>"+esc(c.name)+"<small> · "+esc(labelOf(evals[c.id]))+"</small></button>").join("")+"</div>":"");
+}
+
+function paintControls(){
+  const d = disease();
+  document.getElementById("presets").innerHTML = Object.keys(d.presets).map(name=>"<button type='button' data-preset='"+esc(name)+"'>"+esc(name)+"</button>").join("");
+  document.getElementById("sliders").innerHTML = d.params.map(p=>{
+    if(p.kind==="toggle"){
+      return "<div class='slider'><button type='button' class='tog"+(state.params[p.id]?" on":"")+"' data-toggle='"+p.id+"'>"+esc(p.label)+": "+(state.params[p.id]?"yes":"no")+"</button></div>";
+    }
+    return "<label class='slider'><span>"+esc(p.label)+" <b>"+esc(state.params[p.id])+"</b> <i>"+esc(p.unit)+"</i></span><input data-param='"+p.id+"' type='range' min='"+p.min+"' max='"+p.max+"' step='"+p.step+"' value='"+state.params[p.id]+"'></label>";
+  }).join("");
+  const acts = document.getElementById("acts");
+  acts.hidden = state.mode!=="treat";
+  acts.innerHTML = state.mode==="treat" ? d.actions.map(a=>"<button type='button' data-act='"+a.id+"'>"+esc(a.name)+"</button>").join("") : "";
+}
+
+function stop(){ state.playing=false; if(timer){ clearInterval(timer); timer=0; } }
+function tick(){
+  const d = disease();
+  state.hours += 2;
+  d.drift(state.params, state);
+  d.params.forEach(p=>{ if(p.kind!=="toggle") state.params[p.id]=round(Math.max(p.min, Math.min(p.max, state.params[p.id])), p.step); });
+  state._advance = true;
+  render();
+  state._advance = false;
+}
+
+document.getElementById("diseases").innerHTML = DISEASES.map(d=>"<button type='button' data-id='"+d.id+"'>"+esc(d.name)+"</button>").join("");
+document.getElementById("diseases").onclick = e=>{ const b=e.target.closest("[data-id]"); if(!b) return; boot(b.dataset.id); };
+document.getElementById("modes").onclick = e=>{ const b=e.target.closest("[data-mode]"); if(!b) return; state.mode=b.dataset.mode; if(state.mode!=="live") stop(); render(); };
+document.getElementById("views").onclick = e=>{ const b=e.target.closest("[data-view]"); if(!b) return; state.view=b.dataset.view; render(); };
+document.getElementById("back6").onclick = ()=>{ state.hours=Math.max(0,state.hours-6); render(); };
+document.getElementById("fwd6").onclick = ()=>{ state.hours+=6; render(); };
+document.getElementById("play").onclick = ()=>{
+  if(state.playing){ stop(); render(); return; }
+  state.playing = true; render(); timer = setInterval(tick, 1400);
+};
+document.body.addEventListener("click", e=>{
+  const id = e.target.closest("[data-id]") && e.target.closest("#sheet, #chart, .col") && e.target.closest("[data-id]").dataset.id;
+  if(id!==undefined && id!==null && e.target.closest("#sheet, #chart, .col")){ state.selected = id || null; render(); }
+});
+document.getElementById("presets").onclick = e=>{
+  const b=e.target.closest("[data-preset]"); if(!b) return;
+  const set = disease().presets[b.dataset.preset];
+  Object.assign(state.params, set);
+  if(b.dataset.preset==="Arrival"){ state.locked={}; state.armed={}; state.ever={}; state.flags={}; state.hours=0; state.osm0=state.params.osm||state.osm0; }
+  state.note = b.dataset.preset+" numbers are on the panel.";
+  render();
+};
+document.getElementById("sliders").onclick = e=>{
+  const t=e.target.closest("[data-toggle]"); if(!t) return;
+  state.params[t.dataset.toggle] = state.params[t.dataset.toggle]?0:1;
+  state.note = "";
+  render();
+};
+document.getElementById("sliders").oninput = e=>{
+  const input=e.target.closest("[data-param]"); if(!input) return;
+  const p = disease().params.find(x=>x.id===input.dataset.param);
+  state.params[p.id] = round(Number(input.value), p.step);
+  state.note = "";
+  render();
+};
+document.getElementById("acts").onclick = e=>{
+  const b=e.target.closest("[data-act]"); if(!b) return;
+  const act = disease().actions.find(a=>a.id===b.dataset.act);
+  state.note = act.run(state);
+  render();
+};
+window.addEventListener("resize", ()=>{ if(state.view==="organs") requestAnimationFrame(drawWires); });
+
+const q = new URLSearchParams(location.search).get("d");
+boot(q && DISEASES.some(d=>d.id===q) ? q : "sepsis");
+</script>
+</body>
+</html>
