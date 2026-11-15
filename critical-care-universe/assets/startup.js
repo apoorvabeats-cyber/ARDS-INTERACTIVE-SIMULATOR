@@ -18,7 +18,8 @@
     app.onerror = () => {
       startup.setAttribute("role", "alert");
       startup.setAttribute("aria-label", "The app could not be loaded. Please reload the page.");
-      startup.querySelector("p").textContent = "The app could not be loaded. Please reload the page.";
+      musicError.textContent = "The app could not be loaded. Please reload the page.";
+      musicError.hidden = false;
     };
     app.onload = () => {
       startup.classList.add("is-finished");
