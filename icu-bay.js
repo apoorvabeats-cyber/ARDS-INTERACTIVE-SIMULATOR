@@ -289,8 +289,8 @@
       '<h2>Dialysis</h2>'+
       '<p class="lede">The machine is on. The learning lab is the circuit and the ten modalities. Practice is one skill, or a whole session.</p>'+
       '<button type="button" class="card" data-mod="Dialysis_Learning_Lab.html?v=20261104a"><b>Dialysis Learning Lab</b><span>IHD, SLED, PIKRT, the continuous modes, ultrafiltration and the peritoneum. SLED sits inside prolonged intermittent therapy.</span></button>'+
-      '<button type="button" class="card" data-mod="Dialysis_Practice_Simulator.html?v=20261029a"><b>Practice by module</b><span>Indication, modality, prescription, the machine, alarms, fluids and anticoagulation.</span></button>'+
-      '<button type="button" class="card" data-mod="Dialysis_Practice_Simulator.html?mode=full&v=20261029a"><b>Full clinical cases</b><span>Shock, missed dialysis with wet lungs, and an injured brain. The whole session.</span></button>';
+      '<button type="button" class="card" data-mod="Dialysis_Practice_Simulator.html?v=20261109c"><b>Practice by module</b><span>Indication, modality, prescription, the machine, alarms, fluids and anticoagulation.</span></button>'+
+      '<button type="button" class="card" data-mod="Dialysis_Practice_Simulator.html?mode=full&v=20261109c"><b>Full clinical cases</b><span>Shock, missed dialysis with wet lungs, and an injured brain. The whole session.</span></button>';
     document.getElementById("back").onclick = function(){
       document.body.classList.remove("in", "enter");
       room.innerHTML = "";
@@ -328,9 +328,9 @@
       '<button type="button" class="back" id="back">Back</button>'+
       '<h2>Monitor</h2>'+
       '<p class="lede">The wall monitor is a simulation. Choose the shock module that already exists.</p>'+
-      '<button type="button" class="card" data-mod="Shock_Bay.html?v=20261024e"><b>Shock bay</b><span>Phenotypes of shock, and a ventilator you control.</span></button>'+
-      '<button type="button" class="card" data-mod="Shock_Combined_Simulator.html?v=20261105a"><b>Shock simulator</b><span>Identify the pattern, read the arterial line and IVC, then treat.</span></button>'+
-      '<button type="button" class="card" data-mod="Practice_Simulator.html?focus=circulation&v=20261104a"><b>Shock practice</b><span>Septic shock. The small ventricle, the full vena cava, then norepinephrine.</span></button>';
+      '<button type="button" class="card" data-mod="Shock_Bay.html?v=20261109b"><b>Shock bay</b><span>Phenotypes of shock, and a ventilator you control.</span></button>'+
+      '<button type="button" class="card" data-mod="Shock_Combined_Simulator.html?v=20261115a"><b>Shock simulator</b><span>Identify the pattern, read the arterial line and IVC, then treat.</span></button>'+
+      '<button type="button" class="card" data-mod="Practice_Simulator.html?focus=circulation&v=20261109c"><b>Shock practice</b><span>Septic shock. The small ventricle, the full vena cava, then norepinephrine.</span></button>';
     document.getElementById("back").onclick = function(){
       document.body.classList.remove("in", "enter");
       room.innerHTML = "";
@@ -370,7 +370,7 @@
     const go = hit.getAttribute("data-go");
     if(go === "cart") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261102e", "Crash cart");
     else if(go === "defib") openModule("ACLS_Interactive_Simulator_2025_AHA_v2.html?v=20261102e", "Defibrillator");
-    else if(go === "vent") openModule("Ventilator_Waveform_Troubleshooting.html?v=20261025a", "Ventilator");
+    else if(go === "vent") openModule("Ventilator_Waveform_Troubleshooting.html?v=20261102d", "Ventilator");
     else if(go === "monitor") openShock();
     else if(go === "dialysis") openDialysis();
     else if(go === "patient") leaveForBody();

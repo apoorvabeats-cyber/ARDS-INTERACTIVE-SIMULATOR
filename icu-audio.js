@@ -8,7 +8,7 @@
   btn.type = "button";
   btn.textContent = "Sound off";
   btn.setAttribute("aria-pressed", "false");
-  btn.style.cssText = "position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:99999;border:0;border-radius:999px;padding:14px 22px;min-width:148px;font:800 16px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:#b72b39;color:#fff;box-shadow:0 8px 24px #0006";
+  btn.style.cssText = "position:fixed;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:99999;border:0;border-radius:999px;padding:8px 14px;min-width:0;font:700 12px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:#b72b39;color:#fff;box-shadow:0 4px 14px #0005;opacity:.94";
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
   function ensure() {
