@@ -469,6 +469,7 @@ body.icu-gate #icu-gate .lobby-home{position:absolute;z-index:4;top:calc(10px + 
 body.icu-open .path-link{display:none !important}
 #hall-back{display:none}
 body.icu-open #hall-back{display:inline-flex;align-items:center;position:fixed;z-index:500;top:max(12px, env(safe-area-inset-top));left:10px;min-height:44px;padding:0 16px;border-radius:999px;border:1px solid rgba(243,239,230,.55);background:rgba(8,12,16,.94);color:#f3efe6;font-size:15px;touch-action:manipulation;pointer-events:auto}
+body.in #hall-back,body.picking #hall-back,body.mod-frame #hall-back,body.body-only #hall-back,body.mod-frame.in #icu-return{display:none !important}
 #icu-enter{position:absolute;width:1px;height:1px;padding:0;border:0;clip:rect(0 0 0 0);overflow:hidden}
 .organ-find{width:100%;min-height:36px;margin:0 0 8px;border:0;border-bottom:1px solid rgba(127,212,230,.35);background:transparent;color:#e7e1d6;font-size:14px}
 </style>
@@ -487,7 +488,7 @@ body.icu-open #hall-back{display:inline-flex;align-items:center;position:fixed;z
   <a class="path-link" href="pathology-live.html?v=20261116a">Pathology</a>
   <button type="button" class="sound" id="sound" aria-pressed="true" aria-label="Sound"></button>
 </header>
-<button type="button" id="icu-return">Back</button>
+<button type="button" id="icu-return">Back to ICU</button>
 <p class="touch" id="touch"></p>
 <div class="invite" id="invite">
   <p>Critical care • body scan</p>
@@ -1154,7 +1155,7 @@ function referenceShelf(){
     const link = item.link ? '<a class="card" href="'+esc(item.link[1])+'"><b>'+esc(item.link[0])+'</b><span>Opens in the atlas.</span></a>' : "";
     return "<article class='station'><h3 class='refhead'>"+esc(item.title)+"</h3>"+item.body.map(function(line){ return "<p class='lede'>"+esc(line)+"</p>"; }).join("")+link+"</article>";
   }).join("");
-  return '<button type="button" class="back" id="ref-back">All sections</button>'+articles;
+  return articles;
 }
 function markStation(station){
   const boxes = Array.prototype.slice.call(document.querySelectorAll("[data-tick]"));
@@ -1219,8 +1220,17 @@ function renderRoom(){
     shelfBody = referenceShelf();
   }
   document.body.classList.toggle("doors", !inside);
+  const organDoors = "Back to "+organ.name;
+  let prevLabel = "Back to Train your brain";
+  let doorLabel = "";
+  if(osceStation || refSection){
+    prevLabel = inside==="arena" ? "Back to Practice Arena" : "Back to Learning Lab";
+    doorLabel = organDoors;
+  } else if(inside){
+    prevLabel = organDoors;
+  }
   room.innerHTML =
-    '<button type="button" class="back" id="back">Back</button>'+
+    backButtons(prevLabel, doorLabel)+
     '<p class="lede" style="letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--faint)">'+esc(organ.room)+'</p>'+
     '<h2>'+esc(inside==="lab"?"Learning Lab":inside==="arena"?"Practice Arena":organ.name)+'</h2>'+
     (inside
@@ -1231,8 +1241,13 @@ function renderRoom(){
   document.getElementById("back").onclick = function(){
     stopSpoken();
     if(tryFrameBack()) return;
-    if(osceStation){ osceStation = null; mockCircuit = null; renderRoom(); return; }
-    if(refSection){ refSection = null; renderRoom(); return; }
+    if(osceStation || refSection){
+      osceStation = null;
+      mockCircuit = null;
+      refSection = null;
+      renderRoom();
+      return;
+    }
     if(inside){
       inside = null;
       document.body.classList.remove("inside","lab","arena","osce","reference");
@@ -1240,6 +1255,16 @@ function renderRoom(){
       return;
     }
     leave();
+  };
+  const doorBtn = document.getElementById("back-doors");
+  if(doorBtn) doorBtn.onclick = function(){
+    stopSpoken();
+    osceStation = null;
+    mockCircuit = null;
+    refSection = null;
+    inside = null;
+    document.body.classList.remove("inside","lab","arena","osce","reference");
+    renderRoom();
   };
   if(!inside){
     const lab = document.getElementById("openLab");
@@ -2029,6 +2054,11 @@ function formulaBlock(){
     return "<article class='station'><h3 class='refhead'>"+esc(item.title)+"</h3>"+item.body.map(function(line){ return "<p class='lede'>"+esc(line)+"</p>"; }).join("")+"</article>";
   }).join("");
 }
+function backButtons(prev, doors){
+  return '<div class="backrow"><button type="button" class="back" id="back">'+esc(prev)+'</button>'+
+    (doors && doors!==prev ? '<button type="button" class="back" id="back-doors">'+esc(doors)+'</button>' : '')+
+    '</div>';
+}
 function closePage(){
   stopSpoken();
   document.body.classList.remove("in","enter","inside","lab","arena","osce","reference","doors","formula-doors");
@@ -2053,15 +2083,11 @@ function showOrganTabs(){
   }).map(function(organ){
     return '<button type="button" class="bubble-btn" data-organ="'+organ.id+'"><img src="'+esc(organ.plate)+'" alt=""><span>'+esc(organ.name)+'</span></button>';
   }).join("");
-  nav.innerHTML = '<button type="button" class="backbub" id="organs-back">Sections</button><input class="organ-find" id="organ-find" type="search" placeholder="Find an organ" aria-label="Find an organ">'+buttons;
+  nav.innerHTML = '<button type="button" class="backbub" id="organs-back">Back to ICU</button><input class="organ-find" id="organ-find" type="search" placeholder="Find an organ" aria-label="Find an organ">'+buttons;
   document.getElementById("rail-tabs").hidden = true;
   nav.hidden = false;
   document.body.classList.add("picking");
-  document.getElementById("organs-back").onclick = function(){
-    nav.hidden = true;
-    document.getElementById("rail-tabs").hidden = false;
-    document.body.classList.remove("picking");
-  };
+  document.getElementById("organs-back").onclick = function(){ returnToIcu(); };
   document.getElementById("organ-find").addEventListener("input", function(event){
     const query = event.target.value.trim().toLowerCase();
     nav.querySelectorAll(".bubble-btn").forEach(function(btn){
@@ -2082,8 +2108,8 @@ function mcqPool(){
 }
 function renderTest(){
   if(!window.MCQ_BANK){
-    room.innerHTML = '<button type="button" class="back" id="back">Back</button><h2>Test the brain</h2><p class="empty">Loading the questions…</p>';
-    document.getElementById("back").onclick = closePage;
+    room.innerHTML = backButtons("Back to ICU")+'<h2>Test the brain</h2><p class="empty">Loading the questions…</p>';
+    document.getElementById("back").onclick = returnToIcu;
     if(!window.__mcqLoading){
       window.__mcqLoading = true;
       const s = document.createElement("script");
@@ -2091,8 +2117,8 @@ function renderTest(){
       s.onload = function(){ window.__mcqLoading = false; renderTest(); };
       s.onerror = function(){
         window.__mcqLoading = false;
-        room.innerHTML = '<button type="button" class="back" id="back">Back</button><h2>Test the brain</h2><p class="empty">The questions did not load. Reload the page.</p>';
-        document.getElementById("back").onclick = closePage;
+        room.innerHTML = backButtons("Back to ICU")+'<h2>Test the brain</h2><p class="empty">The questions did not load. Reload the page.</p>';
+        document.getElementById("back").onclick = returnToIcu;
       };
       document.body.appendChild(s);
     }
@@ -2112,13 +2138,13 @@ function renderTest(){
       return '<button type="button" class="portal lab" data-mcq-system="'+esc(name)+'"><span>'+count+' questions</span><strong>'+esc(name)+'</strong><em>Commit to one answer. Then read why.</em><i class="go" aria-hidden="true"></i></button>';
     }).join("");
     room.innerHTML =
-      '<button type="button" class="back" id="back">Back</button>'+
+      backButtons("Back to ICU")+
       '<p class="lede" style="letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--faint)">Critical care</p>'+
       '<h2>Test the brain</h2>'+
       '<p class="lede">'+total+' single-best-answer questions. Choose before the explanation.</p>'+
       '<div class="portals">'+systems+
       '<button type="button" class="portal arena" data-mcq-system="all"><span>'+total+' questions</span><strong>All systems</strong><em>The full bank, in order.</em><i class="go" aria-hidden="true"></i></button></div>';
-    document.getElementById("back").onclick = closePage;
+    document.getElementById("back").onclick = returnToIcu;
     room.querySelectorAll("[data-mcq-system]").forEach(function(btn){
       btn.onclick = function(){
         mcqSystem = btn.getAttribute("data-mcq-system");
@@ -2134,12 +2160,10 @@ function renderTest(){
   const pool = mcqPool();
   if(!pool.length || mcqIndex>=pool.length){
     room.innerHTML =
-      '<button type="button" class="back" id="back">Back</button>'+
+      backButtons("Back to Test the brain")+
       '<h2>Test the brain</h2>'+
-      '<p class="lede">'+mcqScore+' of '+(pool.length||0)+' correct.</p>'+
-      '<button type="button" class="portal lab" id="mcq-systems"><strong>Choose another system</strong></button>';
+      '<p class="lede">'+mcqScore+' of '+(pool.length||0)+' correct.</p>';
     document.getElementById("back").onclick = function(){ mcqSystem=null; renderTest(); };
-    document.getElementById("mcq-systems").onclick = function(){ mcqSystem=null; renderTest(); };
     room.scrollTop = 0;
     return;
   }
@@ -2158,12 +2182,11 @@ function renderTest(){
     ? '<div class="mcq-note"><p class="lede"><b>'+(mcqPicked===q.answer?"Correct. ":"That is incorrect. The correct answer is "+esc(q.options[letters.indexOf(q.answer)] || q.answer)+". ")+'</b>'+esc(q.explain)+'</p><button type="button" class="portal lab" id="mcq-next"><strong>'+(mcqIndex+1===pool.length?"See the score":"Next question")+'</strong></button></div>'
     : "";
   room.innerHTML =
-    '<button type="button" class="back" id="back">Back</button>'+
+    backButtons("Back to Test the brain")+
     '<p class="lede" style="letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--faint)">'+esc(q.system)+' · '+(mcqIndex+1)+' of '+pool.length+'</p>'+
     '<h2 class="mcq-stem">'+esc(q.stem)+'</h2>'+
     '<div class="mcq-opts">'+opts+'</div>'+note;
   document.getElementById("back").onclick = function(){
-    if(mcqIndex>0){ mcqIndex -= 1; mcqPicked = null; renderTest(); return; }
     mcqSystem=null; mcqPicked=null; renderTest();
   };
   room.querySelectorAll("[data-letter]").forEach(function(btn){
@@ -2196,9 +2219,9 @@ function renderAbg(){
   document.body.classList.add("in","enter");
   document.body.classList.remove("inside","lab","arena","osce","reference","opening","scanning","doors");
   room.innerHTML =
-    '<button type="button" class="back" id="back">Back</button>'+
+    backButtons("Back to ICU")+
     '<iframe class="abg-frame" title="ABG photo simulator" src="ABG_Photo_Interpreter_Simulator.html?embed=1&v=20261109b" allow="camera"></iframe>';
-  document.getElementById("back").onclick = closePage;
+  document.getElementById("back").onclick = returnToIcu;
   room.scrollTop = 0;
 }
 function renderFormulaDoors(){
@@ -2210,13 +2233,13 @@ function renderFormulaDoors(){
   document.body.classList.add("in","enter","doors","formula-doors");
   document.body.classList.remove("inside","lab","arena","osce","reference","opening","scanning");
   room.innerHTML =
-    '<button type="button" class="back" id="back">Back</button>'+
+    backButtons("Back to ICU")+
     '<div class="portals doors">'+
       '<button type="button" class="portal lab" id="door-formulas"><span>01</span><strong>Formulas</strong><em>Enter the values. The result sits under the formula.</em></button>'+
       '<button type="button" class="portal arena" id="door-criteria"><span>02</span><strong>Criterias</strong><em>The cut-off, the class, and the use, in a table.</em></button>'+
     '</div>';
   room.scrollTop = 0;
-  document.getElementById("back").onclick = closePage;
+  document.getElementById("back").onclick = returnToIcu;
   document.getElementById("door-formulas").onclick = function(){ openFormulaPane("formulas"); };
   document.getElementById("door-criteria").onclick = function(){ openFormulaPane("criteria"); };
 }
@@ -2228,7 +2251,7 @@ function openFormulaPane(which){
     : "formulas.html?embed=1&v=20261102c";
   const title = which==="criteria" ? "Criteria" : "Formulas";
   room.innerHTML =
-    '<button type="button" class="back" id="back">Back</button>'+
+    backButtons("Back to Formulas and criteria")+
     '<iframe class="abg-frame" title="'+title+'" src="'+src+'" style="min-height:82dvh"></iframe>';
   room.scrollTop = 0;
   document.getElementById("back").onclick = renderFormulaDoors;
@@ -2242,13 +2265,13 @@ function renderPocusDoors(){
   document.body.classList.add("in","enter","doors");
   document.body.classList.remove("inside","lab","arena","osce","reference","opening","scanning","formula-doors");
   room.innerHTML =
-    '<button type="button" class="back" id="back">Back</button>'+
+    backButtons("Back to ICU")+
     '<div class="portals doors">'+
       '<button type="button" class="portal lab" id="door-pocus-lab"><span>01</span><strong>Learning Lab</strong><em>The probe on the body. Chest, abdomen, the leg veins, and the optic nerve sheath.</em></button>'+
       '<button type="button" class="portal arena" id="door-pocus-arena"><span>02</span><strong>Practice Arena</strong><em>One patient at a time. Mark the film, then confirm it with the probe.</em></button>'+
     '</div>';
   room.scrollTop = 0;
-  document.getElementById("back").onclick = closePage;
+  document.getElementById("back").onclick = returnToIcu;
   document.getElementById("door-pocus-lab").onclick = function(){ location.href = "pocus-lab.html?v=20261114e"; };
   document.getElementById("door-pocus-arena").onclick = function(){ location.href = "pocus-practice.html?v=20261114e"; };
 }
@@ -2261,13 +2284,13 @@ function renderScenarioDoors(){
   document.body.classList.add("in","enter","doors");
   document.body.classList.remove("inside","lab","arena","osce","reference","opening","scanning","formula-doors");
   room.innerHTML =
-    '<button type="button" class="back" id="back">Back</button>'+
+    backButtons("Back to ICU")+
     '<div class="portals doors">'+
       '<button type="button" class="portal lab" id="door-scenario-lab"><span>01</span><strong>Learning Lab</strong><em>Pick the alarms. The reason is said after every decision.</em></button>'+
       '<button type="button" class="portal arena" id="door-scenario-arena"><span>02</span><strong>Practice Arena</strong><em>No hints. Twelve minutes. One patient, then the score.</em></button>'+
     '</div>';
   room.scrollTop = 0;
-  document.getElementById("back").onclick = closePage;
+  document.getElementById("back").onclick = returnToIcu;
   document.getElementById("door-scenario-lab").onclick = function(){ location.href = "cc-scenario.html?mode=lab&v=20261111a"; };
   document.getElementById("door-scenario-arena").onclick = function(){ location.href = "cc-scenario.html?mode=arena&v=20261111a"; };
 }
@@ -2296,11 +2319,11 @@ function openRail(which){
     return;
   }
   room.innerHTML =
-    '<button type="button" class="back" id="back">Back</button>'+
+    backButtons("Back to ICU")+
     '<h2>'+esc(title)+'</h2>'+
     '<p class="lede">'+esc(lede)+'</p>'+bodyHtml;
   room.scrollTop = 0;
-  document.getElementById("back").onclick = closePage;
+  document.getElementById("back").onclick = returnToIcu;
 }
 document.getElementById("rail-tabs").addEventListener("click", function(event){
   const btn = event.target.closest("[data-tab]");
@@ -2378,6 +2401,18 @@ if(new URLSearchParams(location.search).get("doors")==="pocus"){
   setSpin(false);
   renderPocusDoors();
 }
+(function openSavedTab(){
+  const tab = new URLSearchParams(location.search).get("tab");
+  if(!tab) return;
+  document.body.classList.remove("icu-gate");
+  document.body.classList.add("icu-open");
+  if(tab==="test"){ mcqSystem=null; mcqPicked=null; renderTest(); }
+  else if(tab==="abg") renderAbg();
+  else if(tab==="pocus") renderPocusDoors();
+  else if(tab==="formulas") renderFormulaDoors();
+  else if(tab==="scenario") renderScenarioDoors();
+  else if(tab==="osce" || tab==="drugs") openRail(tab);
+})();
 if(!reduced) requestAnimationFrame(drawDust);
 if(document.body.classList.contains("icu-gate")){
   if(window.playHubVoice) window.playHubVoice();
@@ -2386,7 +2421,7 @@ if(document.body.classList.contains("icu-gate")){
 </script>
 <!-- pages-build 20261029a -->
 <script src="bed-bridge.js?v=20261029a"></script>
-<script src="icu-bay.js?v=20261118c"></script>
+<script src="icu-bay.js?v=20261118d"></script>
 <script type="module" src="hud-body.js?v=20261115b"></script>
 </body>
 </html>

@@ -18,7 +18,7 @@ header{position:static;display:flex;gap:8px;align-items:center;flex-wrap:wrap;pa
 h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:15px;line-height:1.2;margin:0;letter-spacing:-.03em;flex:1 1 160px}
 #stick{position:static;background:#101214}
 h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:20px;margin:0 0 8px}
-#back,#voice{background:#171c22;border:1px solid var(--line);border-radius:999px;min-height:36px;padding:0 12px}
+#back,#back-doors,#voice{background:#171c22;border:1px solid var(--line);border-radius:999px;min-height:36px;padding:0 12px}
 #voice[aria-pressed="false"]{opacity:.5}
 .modechip{margin-left:auto;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm)}
 main{max-width:860px;margin:0 auto;padding:12px 12px 36px}
@@ -138,7 +138,8 @@ textarea{min-height:84px;resize:vertical}
 <body>
 <div id="stick">
 <header>
-  <button type="button" id="back">Back</button>
+  <button type="button" id="back">Back to scenario doors</button>
+  <button type="button" id="back-doors" hidden>Back to scenario doors</button>
   <h1>Multi-Parameter Critical Care Scenario Simulator</h1>
   <button type="button" id="voice" aria-pressed="true">Voice</button>
   <button type="button" id="soundbed" aria-pressed="true">Sound</button>
@@ -2826,6 +2827,7 @@ function renderPick(){
     }).join("")+"</div>"+
     (notes.length?"<p class='lead'>"+notes.join(" ")+"</p>":"")+
     "<button class='go' id='gen' type='button'"+(selected.length?"":" disabled")+">Generate the patient</button>";
+  if(window.paintScenarioBack) window.paintScenarioBack("pick");
   app.querySelectorAll("[data-flag]").forEach(function(b){
     b.onclick = function(){
       var id = b.getAttribute("data-flag");
@@ -2890,6 +2892,7 @@ function maybePromptReassess(){
 }
 function render(){
   if(!patient) return renderPick();
+  if(window.paintScenarioBack) window.paintScenarioBack("case");
   ardsSet();
   var p = patient;
   var app = document.getElementById("app");
@@ -3093,8 +3096,24 @@ function start(){
   document.getElementById("back").onclick = function(){
     hushVoice();
     if(timer) clearInterval(timer);
-    if(history.length>1){ history.back(); return; }
-    location.href = "index.html";
+    if(document.getElementById("back").textContent === "Back to cases"){ renderPick(); paintScenarioBack("pick"); return; }
+    location.href = "index.html?tab=scenario";
+  };
+  document.getElementById("back-doors").onclick = function(){
+    hushVoice();
+    location.href = "index.html?tab=scenario";
+  };
+  window.paintScenarioBack = function(where){
+    const prev = document.getElementById("back");
+    const doors = document.getElementById("back-doors");
+    if(where === "case"){
+      prev.textContent = "Back to cases";
+      doors.hidden = false;
+      doors.textContent = "Back to scenario doors";
+    } else {
+      prev.textContent = "Back to scenario doors";
+      doors.hidden = true;
+    }
   };
   const voiceBtn = document.getElementById("voice");
   voiceBtn.onclick = function(){

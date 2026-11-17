@@ -13,8 +13,8 @@ button,a{font:inherit;color:inherit;-webkit-appearance:none;appearance:none}
 button{cursor:pointer}
 button:focus-visible,a:focus-visible{outline:2px solid #f3efe6;outline-offset:3px}
 header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:12px 14px;position:sticky;top:0;background:#071018;z-index:2}
-header a, #icuBack{color:#b7b1a4;text-decoration:none;min-height:44px;display:flex;align-items:center}
-#icuBack{border:0;background:none;padding:0;border-radius:0}
+header a, #icuBack, #osceDoors{color:#b7b1a4;text-decoration:none;min-height:44px;display:flex;align-items:center}
+#icuBack, #osceDoors{border:0;background:none;padding:0 8px 0 0;border-radius:0}
 header strong{flex:1;font-family:Fraunces,Georgia,serif;font-weight:520;font-size:20px;min-width:120px}
 .tools{display:flex;gap:8px}
 header button{min-height:44px;border-radius:999px;border:1px solid rgba(243,239,230,.28);background:transparent;padding:0 14px}
@@ -69,7 +69,8 @@ a.tablet{text-decoration:none;color:inherit}
 </head>
 <body>
 <header>
-  <button type="button" id="icuBack">Back</button>
+  <button type="button" id="icuBack">Back to previous page</button>
+  <button type="button" id="osceDoors">Back to OSCE World</button>
   <strong>OSCE World</strong>
   <div id="clock" role="timer" aria-live="polite" aria-label="Twenty seconds for each answer">20</div>
   <div class="tools">
@@ -98,18 +99,17 @@ voiceBtn.onclick = function(){
   if(!voiceOn && window.speechSynthesis) speechSynthesis.cancel();
   else say("Voice on.");
 };
+document.getElementById("osceDoors").onclick = function(){
+  location.href = "index.html?tab=osce";
+};
 document.getElementById("icuBack").onclick = function(){
   if(pageBack()) return;
-  try{
-    if(window.parent && window.parent !== window && typeof window.parent.returnFromModule === "function"){
-      window.parent.returnFromModule();
-      return;
-    }
-  }catch(err){}
-  if(history.length > 1){ history.back(); return; }
-  location.href = "index.html";
+  location.href = "index.html?tab=osce";
 };
-if(/(?:^|[?&])embed=1(?:&|$)/.test(location.search)) document.getElementById("icuBack").hidden = true;
+if(/(?:^|[?&])embed=1(?:&|$)/.test(location.search)){
+  document.getElementById("icuBack").hidden = true;
+  document.getElementById("osceDoors").hidden = true;
+}
 document.getElementById("stations").onclick = function(){
   mode = "";
   history.replaceState(null, "", "osce.html?v=20261021q");
@@ -307,6 +307,7 @@ function home(){
     };
   });
   say("OSCE World. Choose a gas, a drug, a trace, an instrument, or a film.");
+  markOsceNav();
 }
 
 let abgOrder = [];
@@ -1172,6 +1173,13 @@ function pageBack(){
   return false;
 }
 window.__pageBack = pageBack;
+function markOsceNav(){
+  const doors = document.getElementById("osceDoors");
+  const prev = document.getElementById("icuBack");
+  if(!doors || !prev) return;
+  doors.hidden = !mode;
+  prev.textContent = mode ? "Back to previous page" : "Back to OSCE World";
+}
 function start(){
   if(mode==="abg") startAbg();
   else if(mode==="drug") startDrug();
@@ -1179,6 +1187,7 @@ function start(){
   else if(mode==="kit") startKit();
   else if(mode==="film") startFilm();
   else home();
+  markOsceNav();
 }
 start();
 </script>

@@ -285,7 +285,7 @@
     const room = document.getElementById("room");
     document.body.classList.add("in", "enter");
     room.innerHTML =
-      '<button type="button" class="back" id="back">Back</button>'+
+      '<button type="button" class="back" id="back">Back to ICU</button>'+
       '<h2>Dialysis</h2>'+
       '<p class="lede">The machine is on. The learning lab is the circuit and the ten modalities. Practice is one skill, or a whole session.</p>'+
       '<button type="button" class="card" data-mod="Dialysis_Learning_Lab.html?v=20261104a"><b>Dialysis Learning Lab</b><span>IHD, SLED, PIKRT, the continuous modes, ultrafiltration and the peritoneum. SLED sits inside prolonged intermittent therapy.</span></button>'+
@@ -295,7 +295,7 @@
       document.body.classList.remove("in", "enter");
       room.innerHTML = "";
     };
-    bindModules(room, {label:"Dialysis index", fn: openDialysis});
+    bindModules(room, {label:"Back to Dialysis", fn: openDialysis});
     holdRoom(room);
   }
   function openModule(url, title, back){
@@ -304,7 +304,7 @@
     document.body.classList.add("in", "enter");
     const dialysis = /Dialysis_/.test(url || "");
     room.innerHTML =
-      '<button type="button" class="back" id="back">Back</button>'+
+      '<button type="button" class="back" id="back">'+(back && back.label ? back.label : "Back to ICU")+'</button>'+
       (dialysis ? "" : '<h2>'+title+'</h2>')+
       '<iframe class="abg-frame" title="'+title+'" src="'+url+'"></iframe>';
     document.getElementById("back").onclick = function(){
@@ -325,7 +325,7 @@
     const room = document.getElementById("room");
     document.body.classList.add("in", "enter");
     room.innerHTML =
-      '<button type="button" class="back" id="back">Back</button>'+
+      '<button type="button" class="back" id="back">Back to ICU</button>'+
       '<h2>Monitor</h2>'+
       '<p class="lede">The wall monitor is a simulation. Choose the shock module that already exists.</p>'+
       '<button type="button" class="card" data-mod="Shock_Bay.html?v=20261109b"><b>Shock bay</b><span>Phenotypes of shock, and a ventilator you control.</span></button>'+
@@ -335,7 +335,7 @@
       document.body.classList.remove("in", "enter");
       room.innerHTML = "";
     };
-    bindModules(room, {label:"Back to monitor", fn: openShock});
+    bindModules(room, {label:"Back to Monitor", fn: openShock});
     holdRoom(room);
   }
   function loadBody(){}
@@ -400,7 +400,7 @@
     quietLine();
     if(typeof window.releaseOrgan === "function") window.releaseOrgan();
     document.body.classList.add("icu-open");
-    document.body.classList.remove("in", "enter", "inside", "lab", "arena", "osce", "reference", "picking", "body-only");
+    document.body.classList.remove("in", "enter", "inside", "lab", "arena", "osce", "reference", "picking", "body-only", "doors", "formula-doors", "mod-frame");
     const bubbles = document.getElementById("organ-bubbles");
     const tabs = document.getElementById("rail-tabs");
     if(bubbles) bubbles.hidden = true;
