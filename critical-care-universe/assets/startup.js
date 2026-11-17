@@ -30,52 +30,33 @@
     document.body.appendChild(app);
   };
 
+  let brandAt = 0;
+
   const syncIntro = () => {
     if (loading) return;
-    if (audio.error || audio.ended) {
-      musicError.textContent = "Background music could not be played.";
-      musicError.hidden = false;
-      skipButton.hidden = false;
-      return;
-    }
-    const time = audio.currentTime * 1000;
+    const heard = !audio.paused && audio.currentTime > 0.05;
+    const time = heard ? audio.currentTime * 1000 : performance.now() - brandAt;
     animations.forEach((animation) => { animation.currentTime = time; });
-    if (time >= 8000) {
-      loadApp();
-    } else {
-      window.requestAnimationFrame(syncIntro);
-    }
+    if (heard) musicButton.hidden = true;
+    if (time >= 8000) loadApp();
+    else window.requestAnimationFrame(syncIntro);
   };
 
   const startMusic = async () => {
     try {
       await audio.play();
-      if (started || loading) return;
-      started = true;
-      musicButton.hidden = true;
-      skipButton.hidden = true;
       musicError.hidden = true;
-      if (reducedMotion) {
-        window.setTimeout(loadApp, 400);
-      } else {
-        window.requestAnimationFrame(syncIntro);
-      }
+      if (!audio.paused) musicButton.hidden = true;
     } catch (error) {
-      if (loading) return;
-      skipButton.hidden = false;
-      if (error.name === "NotAllowedError") {
-        musicButton.hidden = false;
-      } else {
-        musicButton.hidden = true;
+      musicButton.hidden = false;
+      if (error.name !== "NotAllowedError") {
         musicError.textContent = "Background music could not be played.";
         musicError.hidden = false;
-        console.error("Background music could not be played:", error);
       }
     }
   };
 
   audio.volume = 0.48;
-  musicButton.addEventListener("click", startMusic);
   skipButton.addEventListener("click", loadApp);
 
   const legal1 = document.getElementById("legal-1");
@@ -86,14 +67,26 @@
   const showBrand = () => {
     if (branded || go.disabled) return;
     branded = true;
+    const pending = audio.play();
     startup.classList.add("is-brand");
     legal1.hidden = true;
     legal2.hidden = true;
     if (!animations.length) animations.push(...logo.getAnimations({ subtree: true }));
-    try { audio.currentTime = 0; } catch (err) {}
-    startMusic();
+    brandAt = performance.now();
+    musicButton.hidden = false;
+    skipButton.hidden = true;
+    if (pending && pending.then) {
+      pending.then(() => { if (!audio.paused) musicButton.hidden = true; }).catch(() => { musicButton.hidden = false; });
+    }
+    if (reducedMotion) window.setTimeout(loadApp, 400);
+    else window.requestAnimationFrame(syncIntro);
   };
   go.addEventListener("click", showBrand);
+  musicButton.addEventListener("click", () => {
+    brandAt = performance.now();
+    try { audio.currentTime = 0; } catch (err) {}
+    startMusic();
+  });
   window.setTimeout(() => {
     legal1.hidden = true;
     legal2.hidden = false;
