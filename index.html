@@ -1728,8 +1728,19 @@ if(window.speechSynthesis){
   speechSynthesis.getVoices();
   speechSynthesis.addEventListener("voiceschanged", function(){ speechSynthesis.getVoices(); });
 }
+function hushVoice(id){
+  const node = document.getElementById(id);
+  if(!node) return;
+  const wasPlaying = !node.paused;
+  node.onended = null;
+  node.pause();
+  try{ node.currentTime = 0; }catch(err){}
+  if(wasPlaying && window.resumeBed) window.resumeBed();
+}
 function playNamed(id){
   if(window.soundOn === false) return;
+  ["voice-hub","voice-icu"].forEach(function(other){ if(other !== id) hushVoice(other); });
+  if(window.speechSynthesis){ try{ speechSynthesis.cancel(); }catch(err){} }
   const node = document.getElementById(id);
   if(!node) return;
   if(window.pauseBedForVoice) window.pauseBedForVoice();
@@ -1745,12 +1756,15 @@ function playNamed(id){
 }
 let icuVoiceAt = 0;
 window.playHubVoice = function(){
+  hushVoice("voice-icu");
   const node = document.getElementById("voice-hub");
   if(node && !node.paused && node.currentTime > 0.2) return;
   playNamed("voice-hub");
 };
 window.playIcuVoice = function(){
-  if(Date.now() - icuVoiceAt < 5000) return;
+  hushVoice("voice-hub");
+  const node = document.getElementById("voice-icu");
+  if(node && !node.paused && node.currentTime > 0.2) return;
   icuVoiceAt = Date.now();
   playNamed("voice-icu");
 };
