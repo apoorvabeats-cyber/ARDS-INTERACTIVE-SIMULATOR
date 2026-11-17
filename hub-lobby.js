@@ -188,7 +188,11 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       location.replace(location.pathname);
       return;
     }
-    if (!raf) frame();
+    window.doorChosen = false;
+    if (window.playHubVoice) window.playHubVoice();
+    if (window.startWave) window.startWave();
+    raf = 0;
+    frame();
   };
 
   function choose(kind) {
@@ -250,8 +254,9 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
 
   const clock = new THREE.Clock();
   function frame() {
-    if (mode === "done") return;
+    if (mode === "done") { raf = 0; return; }
     step();
+    if (mode === "done") { raf = 0; return; }
     raf = requestAnimationFrame(frame);
   }
   function step() {

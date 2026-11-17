@@ -466,6 +466,7 @@ body.icu-gate #icu-gate canvas.lobby{position:absolute;inset:0;width:100%;height
 body.icu-gate #icu-gate .lobby-note{position:absolute;left:16px;right:16px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:2;margin:0;text-align:center;color:#14181c;font-size:13px;letter-spacing:.02em;text-shadow:0 1px 0 rgba(255,255,255,.55);pointer-events:none}
 body.icu-gate #icu-gate .lobby-fade{position:absolute;inset:0;background:#05070c;opacity:0;pointer-events:none;z-index:3}
 body.icu-gate #icu-gate .lobby-home{position:absolute;z-index:4;top:calc(10px + env(safe-area-inset-top));right:12px;min-height:40px;padding:0 14px;display:inline-flex;align-items:center;border-radius:999px;background:#14181c;color:#f3efe6;text-decoration:none;font-size:14px}
+body.icu-open .path-link{display:none !important}
 #hall-back{display:none}
 body.icu-open #hall-back{display:inline-flex;align-items:center;position:fixed;z-index:500;top:max(12px, env(safe-area-inset-top));left:10px;min-height:44px;padding:0 16px;border-radius:999px;border:1px solid rgba(243,239,230,.55);background:rgba(8,12,16,.94);color:#f3efe6;font-size:15px;touch-action:manipulation;pointer-events:auto}
 #icu-enter{position:absolute;width:1px;height:1px;padding:0;border:0;clip:rect(0 0 0 0);overflow:hidden}
@@ -560,7 +561,7 @@ body.icu-open #hall-back{display:inline-flex;align-items:center;position:fixed;z
   <p class="lobby-note">Drag to look. Left door, pathophysiology live. Door ahead, the ICU.</p>
   <button type="button" id="icu-enter">Enter the ICU</button>
 </div>
-<script type="module" src="hub-lobby.js?v=20261118b"></script>
+<script type="module" src="hub-lobby.js?v=20261118c"></script>
 <script>
 const ORGANS = [
   {
@@ -1605,6 +1606,7 @@ function startWave(){
   if(pending) pending.catch(function(){});
   waveOn = true;
 }
+window.startWave = startWave;
 function stopWave(){
   waveOn = false;
   clearTimeout(waveTimer);
@@ -1742,7 +1744,11 @@ function playNamed(id){
   }
 }
 let icuVoiceAt = 0;
-window.playHubVoice = function(){ playNamed("voice-hub"); };
+window.playHubVoice = function(){
+  const node = document.getElementById("voice-hub");
+  if(node && !node.paused && node.currentTime > 0.2) return;
+  playNamed("voice-hub");
+};
 window.playIcuVoice = function(){
   if(Date.now() - icuVoiceAt < 5000) return;
   icuVoiceAt = Date.now();
@@ -1902,9 +1908,7 @@ document.addEventListener("pointerdown", function(){
   if(document.body.classList.contains("icu-gate") && !gateSaid){
     gateSaid = true;
     if(soundOn) startWave();
-    window.hubVoiceTimer = setTimeout(function(){
-      if(!window.doorChosen && document.body.classList.contains("icu-gate") && window.playHubVoice) window.playHubVoice();
-    }, 350);
+    if(window.playHubVoice) window.playHubVoice();
     return;
   }
   if(!welcomed) playWelcome();
@@ -2339,7 +2343,7 @@ document.getElementById("icu-enter").onclick = function(){
   const line = document.getElementById("line");
   if(line) line.pause();
   if(window.speechSynthesis) speechSynthesis.getVoices();
-  document.body.classList.remove("icu-gate");
+  document.body.classList.remove("icu-gate", "tabs-in");
   document.body.classList.add("icu-open");
   if(soundOn) startWave();
   if(window.playIcuVoice) window.playIcuVoice();
@@ -2361,10 +2365,14 @@ if(new URLSearchParams(location.search).get("doors")==="pocus"){
   renderPocusDoors();
 }
 if(!reduced) requestAnimationFrame(drawDust);
+if(document.body.classList.contains("icu-gate")){
+  if(window.playHubVoice) window.playHubVoice();
+  if(soundOn) startWave();
+}
 </script>
 <!-- pages-build 20261029a -->
 <script src="bed-bridge.js?v=20261029a"></script>
-<script src="icu-bay.js?v=20261104a"></script>
+<script src="icu-bay.js?v=20261118c"></script>
 <script type="module" src="hud-body.js?v=20261115b"></script>
 </body>
 </html>

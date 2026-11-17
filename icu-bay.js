@@ -414,5 +414,4 @@
   document.addEventListener("pointerdown", unlock, true);
   boot();
   bedOn();
-  setTimeout(function(){ document.body.classList.add("tabs-in"); }, 1900);
 })();
