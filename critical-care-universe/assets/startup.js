@@ -79,12 +79,12 @@
 
   const legal1 = document.getElementById("legal-1");
   const legal2 = document.getElementById("legal-2");
-  let brandTimer = 0;
+  const go = document.getElementById("legal-continue");
   let branded = false;
+  go.disabled = true;
   const showBrand = () => {
-    if (branded) return;
+    if (branded || go.disabled) return;
     branded = true;
-    window.clearTimeout(brandTimer);
     startup.classList.add("is-brand");
     legal1.hidden = true;
     legal2.hidden = true;
@@ -93,10 +93,21 @@
       startMusic();
     });
   };
-  document.getElementById("legal-continue").addEventListener("click", showBrand);
+  go.addEventListener("click", showBrand);
   window.setTimeout(() => {
     legal1.hidden = true;
     legal2.hidden = false;
-    brandTimer = window.setTimeout(showBrand, 5000);
-  }, 7000);
+    let left = 7;
+    go.textContent = "Continue in " + left;
+    const tick = window.setInterval(() => {
+      left -= 1;
+      if (left > 0) {
+        go.textContent = "Continue in " + left;
+        return;
+      }
+      window.clearInterval(tick);
+      go.disabled = false;
+      go.textContent = "Continue";
+    }, 1000);
+  }, 9000);
 })();
