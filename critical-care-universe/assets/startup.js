@@ -5,7 +5,7 @@
   const musicButton = startup.querySelector(".startup-music");
   const skipButton = startup.querySelector(".startup-skip");
   const musicError = startup.querySelector(".startup-music-error");
-  const animations = startup.getAnimations({ subtree: true });
+  const animations = [];
   let started = false;
   let loading = false;
 
@@ -22,6 +22,7 @@
       musicError.hidden = false;
     };
     app.onload = () => {
+      document.body.classList.add("app-ready");
       startup.classList.add("is-finished");
       window.setTimeout(() => startup.remove(), reducedMotion ? 0 : 350);
     };
@@ -75,5 +76,27 @@
   audio.volume = 0.48;
   musicButton.addEventListener("click", startMusic);
   skipButton.addEventListener("click", loadApp);
-  startMusic();
+
+  const legal1 = document.getElementById("legal-1");
+  const legal2 = document.getElementById("legal-2");
+  let brandTimer = 0;
+  let branded = false;
+  const showBrand = () => {
+    if (branded) return;
+    branded = true;
+    window.clearTimeout(brandTimer);
+    startup.classList.add("is-brand");
+    legal1.hidden = true;
+    legal2.hidden = true;
+    window.requestAnimationFrame(() => {
+      animations.splice(0, animations.length, ...startup.querySelector(".startup-logo").getAnimations({ subtree: true }));
+      startMusic();
+    });
+  };
+  document.getElementById("legal-continue").addEventListener("click", showBrand);
+  window.setTimeout(() => {
+    legal1.hidden = true;
+    legal2.hidden = false;
+    brandTimer = window.setTimeout(showBrand, 5000);
+  }, 7000);
 })();

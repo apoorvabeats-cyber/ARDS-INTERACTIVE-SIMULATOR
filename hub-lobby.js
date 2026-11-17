@@ -178,7 +178,16 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     document.body.classList.remove("icu-open", "in", "enter", "inside", "lab", "arena", "osce", "reference", "picking", "body-only");
     const room = document.getElementById("room");
     if (room) room.innerHTML = "";
-    try { placeCamera(); } catch (err) { location.href = location.pathname; return; }
+    const gl = renderer.getContext();
+    if (!gl || gl.isContextLost()) {
+      location.replace(location.pathname);
+      return;
+    }
+    fit();
+    try { placeCamera(); renderer.render(scene, camera); } catch (err) {
+      location.replace(location.pathname);
+      return;
+    }
     if (!raf) frame();
   };
 
