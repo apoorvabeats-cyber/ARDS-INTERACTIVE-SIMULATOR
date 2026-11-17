@@ -31,9 +31,6 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   const glassMat = new THREE.MeshStandardMaterial({
     color: 0xd5e6e4, transparent: true, opacity: 0.34, roughness: 0.08, metalness: 0.04, side: THREE.DoubleSide
   });
-  const cloth = new THREE.MeshStandardMaterial({ color: 0xf3efe6, roughness: 0.72 });
-  const scrubs = new THREE.MeshStandardMaterial({ color: 0x1e4a52, roughness: 0.62 });
-  const skin = new THREE.MeshStandardMaterial({ color: 0xc4a484, roughness: 0.58 });
 
   function box(w, h, d, mat, x, y, z) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -66,7 +63,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     g.fillStyle = "#14181c";
     g.fillRect(0, 0, 640, 128);
     g.fillStyle = "#f3efe6";
-    g.font = "600 46px Figtree, sans-serif";
+  g.font = (text.length > 18 ? "600 34px " : "600 46px ") + "Figtree, sans-serif";
     g.textAlign = "center";
     g.textBaseline = "middle";
     g.fillText(text, 320, 66);
@@ -110,7 +107,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
 
   const front = door("icu", "ENTER THE ICU");
   front.position.set(0, 0, 4.82);
-  const leftDoor = door("path", "PATHOPHYSIOLOGY");
+  const leftDoor = door("path", "PATHOPHYSIOLOGY LIVE");
   leftDoor.position.set(-4.82, 0, 0);
   leftDoor.rotation.y = Math.PI / 2;
 
@@ -118,32 +115,19 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   backSign.position.set(0, 2.15, -4.88);
   scene.add(backSign);
 
-  const person = new THREE.Group();
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.48, 4, 12), cloth);
-  torso.position.y = 1.18;
-  const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.42, 4, 10), scrubs);
-  legs.position.y = 0.48;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 20, 16), skin);
-  head.position.y = 1.68;
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.155, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), scrubs);
-  cap.position.y = 1.7;
-  const armL = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.38, 3, 8), cloth);
-  const armR = armL.clone();
-  armL.position.set(-0.34, 1.12, 0);
-  armR.position.set(0.34, 1.12, 0);
-  person.add(torso, legs, head, cap, armL, armR);
-  person.position.set(0, 0, 0);
-  scene.add(person);
-
   const ray = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
-  let yaw = 0.42;
+  const eye = new THREE.Vector3(0, 1.62, 0);
+  let yaw = 0;
+  let pit = 0;
   let dragging = false;
   let moved = 0;
   let lastX = 0;
+  let lastY = 0;
   let mode = "look";
   let job = null;
   let raf = 0;
+  let leaveTimer = 0;
   const fade = document.getElementById("lobby-fade");
 
   function fit() {
@@ -157,32 +141,55 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   fit();
 
   function placeCamera() {
-    const dist = 2.85;
-    camera.position.set(Math.sin(yaw) * dist, 1.62, -Math.cos(yaw) * dist);
-    camera.lookAt(Math.sin(yaw) * 0.15, 1.22, Math.cos(yaw) * 0.4);
+    camera.position.copy(eye);
+    camera.lookAt(eye.x + Math.sin(yaw), eye.y + pit, eye.z + Math.cos(yaw));
+  }
+
+  function shut(door) {
+    door.userData.open = 0;
+    door.userData.left.position.x = -0.48;
+    door.userData.right.position.x = 0.48;
   }
 
   function finish(kind) {
     if (mode === "done") return;
     mode = "done";
     cancelAnimationFrame(raf);
+    raf = 0;
     if (kind === "icu") {
       const btn = document.getElementById("icu-enter");
       if (btn) btn.click();
     } else {
-      location.href = "pathology-live.html?v=20261117a";
+      location.href = "pathology-live.html?v=20261117c";
     }
-    try { renderer.dispose(); } catch (err) { /* the next room is already open */ }
   }
+
+  window.returnToHall = function () {
+    clearTimeout(leaveTimer);
+    mode = "look";
+    job = null;
+    yaw = 0;
+    pit = 0;
+    eye.set(0, 1.62, 0);
+    shut(front);
+    shut(leftDoor);
+    if (fade) fade.style.opacity = "0";
+    document.body.classList.add("icu-gate");
+    document.body.classList.remove("icu-open", "in", "enter", "inside", "lab", "arena", "osce", "reference", "picking", "body-only");
+    const room = document.getElementById("room");
+    if (room) room.innerHTML = "";
+    placeCamera();
+    if (!raf) frame();
+  };
 
   function choose(kind) {
     if (mode !== "look") return;
     mode = "go";
-    setTimeout(() => finish(kind), calm ? 40 : 2200);
-    canvas.dataset.choice = kind;
+    clearTimeout(leaveTimer);
+    leaveTimer = setTimeout(() => finish(kind), calm ? 40 : 1800);
     const door = kind === "icu" ? front : leftDoor;
-    const face = kind === "icu" ? 0 : Math.PI / 2;
-    const dest = kind === "icu" ? new THREE.Vector3(0, 0, 6.1) : new THREE.Vector3(-6.1, 0, 0);
+    const face = kind === "icu" ? 0 : -Math.PI / 2;
+    const dest = kind === "icu" ? new THREE.Vector3(0, 1.62, 5.5) : new THREE.Vector3(-5.5, 1.62, 0);
     job = { kind, door, face, dest, t: 0 };
     if (calm) finish(kind);
   }
@@ -191,14 +198,18 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     dragging = true;
     moved = 0;
     lastX = ev.clientX;
+    lastY = ev.clientY;
     canvas.setPointerCapture(ev.pointerId);
   });
   canvas.addEventListener("pointermove", (ev) => {
     if (!dragging || mode !== "look") return;
     const dx = ev.clientX - lastX;
-    moved += Math.abs(dx);
+    const dy = ev.clientY - lastY;
+    moved += Math.abs(dx) + Math.abs(dy);
     lastX = ev.clientX;
-    yaw -= dx * 0.008;
+    lastY = ev.clientY;
+    yaw += dx * 0.012;
+    pit = Math.max(-0.45, Math.min(0.35, pit - dy * 0.004));
   });
   canvas.addEventListener("pointerup", (ev) => {
     dragging = false;
@@ -231,32 +242,23 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   }
   function step() {
     const dt = Math.min(clock.getDelta(), 0.05);
-    if (!calm && mode === "look") {
-      const b = 1 + Math.sin(clock.elapsedTime * 1.6) * 0.012;
-      torso.scale.y = b;
-    }
     if (job) {
       job.t += dt;
-      const turn = Math.min(1, job.t / 0.45);
-      person.rotation.y += (job.face - person.rotation.y) * (calm ? 1 : 0.12);
-      if (turn > 0.7) job.door.userData.open = Math.min(1, job.door.userData.open + dt * 1.4);
+      const gap = job.face - yaw;
+      yaw += gap * (calm ? 1 : 0.14);
+      pit += (0 - pit) * 0.1;
+      if (job.t > 0.25) job.door.userData.open = Math.min(1, job.door.userData.open + dt * 1.8);
       const o = job.door.userData.open;
       job.door.userData.left.position.x = -0.48 - o * 0.85;
       job.door.userData.right.position.x = 0.48 + o * 0.85;
-      if (o > 0.55) {
-        person.position.lerp(job.dest, calm ? 1 : 0.1);
-      }
-      const along = job.kind === "icu" ? person.position.z : -person.position.x;
-      if (fade) fade.style.opacity = String(Math.max(0, (along - 3.2) / 2.2));
-      if (along > 4.4 || job.t > 2.6) {
+      if (o > 0.45) eye.lerp(job.dest, calm ? 1 : 0.08);
+      const along = job.kind === "icu" ? eye.z : -eye.x;
+      if (fade) fade.style.opacity = String(Math.max(0, (along - 2.4) / 2.4));
+      if (along > 4.2 || job.t > 2.2) {
         finish(job.kind);
         return;
       }
-      const behind = person.position.clone();
-      if (job.kind === "icu") behind.z -= 2.4;
-      else behind.x += 2.4;
-      camera.position.lerp(new THREE.Vector3(behind.x, 1.6, behind.z), 0.08);
-      camera.lookAt(person.position.x, 1.25, person.position.z);
+      placeCamera();
     } else {
       placeCamera();
     }
@@ -264,4 +266,6 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   }
   placeCamera();
   frame();
+  const hallBack = document.getElementById("hall-back");
+  if (hallBack) hallBack.onclick = () => window.returnToHall();
 }
