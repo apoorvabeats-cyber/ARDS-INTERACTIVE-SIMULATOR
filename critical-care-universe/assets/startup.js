@@ -5,7 +5,8 @@
   const musicButton = startup.querySelector(".startup-music");
   const skipButton = startup.querySelector(".startup-skip");
   const musicError = startup.querySelector(".startup-music-error");
-  const animations = [];
+  const logo = startup.querySelector(".startup-logo");
+  const animations = logo.getAnimations({ subtree: true });
   let started = false;
   let loading = false;
 
@@ -88,10 +89,9 @@
     startup.classList.add("is-brand");
     legal1.hidden = true;
     legal2.hidden = true;
-    window.requestAnimationFrame(() => {
-      animations.splice(0, animations.length, ...startup.querySelector(".startup-logo").getAnimations({ subtree: true }));
-      startMusic();
-    });
+    if (!animations.length) animations.push(...logo.getAnimations({ subtree: true }));
+    try { audio.currentTime = 0; } catch (err) {}
+    startMusic();
   };
   go.addEventListener("click", showBrand);
   window.setTimeout(() => {
