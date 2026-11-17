@@ -190,7 +190,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     }
     window.doorChosen = false;
     if (window.playHubVoice) window.playHubVoice();
-    if (window.startWave) window.startWave();
+    if (window.stopWave) window.stopWave();
     raf = 0;
     frame();
   };

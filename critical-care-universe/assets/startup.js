@@ -61,6 +61,13 @@
 
   const legal1 = document.getElementById("legal-1");
   const legal2 = document.getElementById("legal-2");
+  if (new URLSearchParams(location.search).get("home") === "1") {
+    legal1.hidden = true;
+    legal2.hidden = true;
+    startup.classList.add("is-finished");
+    loadApp();
+    return;
+  }
   const go = document.getElementById("legal-continue");
   let branded = false;
   go.disabled = true;
