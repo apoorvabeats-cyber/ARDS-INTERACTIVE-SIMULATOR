@@ -166,25 +166,27 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
 
   window.returnToHall = function () {
     clearTimeout(leaveTimer);
+    window.hallLock = Date.now() + 900;
     mode = "look";
     job = null;
     yaw = 0;
     pit = 0;
     eye.set(0, 1.62, 0);
-    shut(front);
-    shut(leftDoor);
+    try { shut(front); shut(leftDoor); } catch (err) {}
     if (fade) fade.style.opacity = "0";
     document.body.classList.add("icu-gate");
     document.body.classList.remove("icu-open", "in", "enter", "inside", "lab", "arena", "osce", "reference", "picking", "body-only");
     const room = document.getElementById("room");
     if (room) room.innerHTML = "";
-    placeCamera();
+    try { placeCamera(); } catch (err) { location.href = location.pathname; return; }
     if (!raf) frame();
   };
 
   function choose(kind) {
     if (mode !== "look") return;
     mode = "go";
+    window.doorChosen = true;
+    clearTimeout(window.hubVoiceTimer);
     clearTimeout(leaveTimer);
     leaveTimer = setTimeout(() => finish(kind), calm ? 40 : 1800);
     const door = kind === "icu" ? front : leftDoor;
@@ -192,9 +194,11 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     const dest = kind === "icu" ? new THREE.Vector3(0, 1.62, 5.5) : new THREE.Vector3(-5.5, 1.62, 0);
     job = { kind, door, face, dest, t: 0 };
     if (calm) finish(kind);
+    if (kind === "icu" && window.playIcuVoice) window.playIcuVoice();
   }
 
   canvas.addEventListener("pointerdown", (ev) => {
+    if (Date.now() < (window.hallLock || 0)) return;
     dragging = true;
     moved = 0;
     lastX = ev.clientX;
@@ -213,6 +217,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   });
   canvas.addEventListener("pointerup", (ev) => {
     dragging = false;
+    if (Date.now() < (window.hallLock || 0)) return;
     if (moved > 12 || mode !== "look") return;
     const rect = canvas.getBoundingClientRect();
     pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
@@ -266,6 +271,4 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   }
   placeCamera();
   frame();
-  const hallBack = document.getElementById("hall-back");
-  if (hallBack) hallBack.onclick = () => window.returnToHall();
 }

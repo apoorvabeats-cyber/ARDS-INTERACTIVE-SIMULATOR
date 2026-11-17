@@ -466,7 +466,7 @@ body.icu-gate #icu-gate .lobby-note{position:absolute;left:16px;right:16px;botto
 body.icu-gate #icu-gate .lobby-fade{position:absolute;inset:0;background:#05070c;opacity:0;pointer-events:none;z-index:3}
 body.icu-gate #icu-gate .lobby-home{position:absolute;z-index:4;top:calc(10px + env(safe-area-inset-top));right:12px;min-height:40px;padding:0 14px;display:inline-flex;align-items:center;border-radius:999px;background:#14181c;color:#f3efe6;text-decoration:none;font-size:14px}
 #hall-back{display:none}
-body.icu-open #hall-back{display:inline-flex;align-items:center;position:fixed;z-index:80;top:max(10px, env(safe-area-inset-top));left:10px;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid rgba(243,239,230,.45);background:rgba(8,12,16,.92);color:#f3efe6;font-size:14px}
+body.icu-open #hall-back{display:inline-flex;align-items:center;position:fixed;z-index:500;top:max(12px, env(safe-area-inset-top));left:10px;min-height:44px;padding:0 16px;border-radius:999px;border:1px solid rgba(243,239,230,.55);background:rgba(8,12,16,.94);color:#f3efe6;font-size:15px;touch-action:manipulation;pointer-events:auto}
 #icu-enter{position:absolute;width:1px;height:1px;padding:0;border:0;clip:rect(0 0 0 0);overflow:hidden}
 .organ-find{width:100%;min-height:36px;margin:0 0 8px;border:0;border-bottom:1px solid rgba(127,212,230,.35);background:transparent;color:#e7e1d6;font-size:14px}
 </style>
@@ -476,6 +476,8 @@ body.icu-open #hall-back{display:inline-flex;align-items:center;position:fixed;z
 <canvas class="dust" id="dust" aria-hidden="true"></canvas>
 <audio id="bed" src="scan-bed.mp3" loop preload="none" playsinline></audio>
 <audio id="line" preload="none"></audio>
+<audio id="voice-hub" src="voice-hub.mp3?v=20261118a" preload="auto" playsinline></audio>
+<audio id="voice-icu" src="voice-icu.mp3?v=20261118a" preload="auto" playsinline></audio>
 <div class="glow" aria-hidden="true"></div>
 <button type="button" class="skip" id="skip" aria-label="Skip" hidden></button>
 <header class="hud-header">
@@ -557,7 +559,7 @@ body.icu-open #hall-back{display:inline-flex;align-items:center;position:fixed;z
   <p class="lobby-note">Drag to look. Left door, pathophysiology live. Door ahead, the ICU.</p>
   <button type="button" id="icu-enter">Enter the ICU</button>
 </div>
-<script type="module" src="hub-lobby.js?v=20261117c"></script>
+<script type="module" src="hub-lobby.js?v=20261118a"></script>
 <script>
 const ORGANS = [
   {
@@ -1709,6 +1711,28 @@ if(window.speechSynthesis){
   speechSynthesis.getVoices();
   speechSynthesis.addEventListener("voiceschanged", function(){ speechSynthesis.getVoices(); });
 }
+function playNamed(id){
+  if(window.soundOn === false) return;
+  const node = document.getElementById(id);
+  if(!node) return;
+  if(window.pauseBedForVoice) window.pauseBedForVoice();
+  node.onended = function(){ if(window.resumeBed) window.resumeBed(); };
+  try{
+    node.volume = 1;
+    node.currentTime = 0;
+    const pending = node.play();
+    if(pending && pending.catch) pending.catch(function(){ if(window.resumeBed) window.resumeBed(); });
+  }catch(err){
+    if(window.resumeBed) window.resumeBed();
+  }
+}
+let icuVoiceAt = 0;
+window.playHubVoice = function(){ playNamed("voice-hub"); };
+window.playIcuVoice = function(){
+  if(Date.now() - icuVoiceAt < 5000) return;
+  icuVoiceAt = Date.now();
+  playNamed("voice-icu");
+};
 function speakSoft(text){
   if(!soundOn || !text || !window.speechSynthesis) return;
   const line = document.getElementById("line");
@@ -1863,7 +1887,9 @@ document.addEventListener("pointerdown", function(){
   if(document.body.classList.contains("icu-gate") && !gateSaid){
     gateSaid = true;
     if(soundOn) startWave();
-    if(!event.target.closest || !event.target.closest("#icu-enter")) speakSoft("Two doors. Pathophysiology live is on the left. The ICU is ahead.");
+    window.hubVoiceTimer = setTimeout(function(){
+      if(!window.doorChosen && document.body.classList.contains("icu-gate") && window.playHubVoice) window.playHubVoice();
+    }, 350);
     return;
   }
   if(!welcomed) playWelcome();
@@ -2301,7 +2327,15 @@ document.getElementById("icu-enter").onclick = function(){
   document.body.classList.remove("icu-gate");
   document.body.classList.add("icu-open");
   if(soundOn) startWave();
-  speakSoft("Welcome to Critical Care Hub. The screen panel is interactive, or press the tabs.");
+  if(window.playIcuVoice) window.playIcuVoice();
+};
+document.getElementById("hall-back").onclick = function(event){
+  event.preventDefault();
+  event.stopPropagation();
+  if(typeof window.returnToHall === "function"){
+    try{ window.returnToHall(); return; }catch(err){}
+  }
+  location.href = location.pathname;
 };
 if(location.search.indexOf("open=1") !== -1){
   document.getElementById("icu-enter").click();
