@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Complication 3D lab</title>
+<style>
+:root{--bg:#eef3f8;--ink:#0c1b2e;--mute:#546579;--panel:#fff;--line:#b9c8d8;--acc:#0a7f8f;--bad:#c0392b;--ok:#1d8a5a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#06111f;--ink:#e6f1fb;--mute:#8fa5bb;--panel:#0d2036;--line:#24435f;--acc:#3fe0f0;--bad:#ef5b52;--ok:#3ccf8a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#06111f;--ink:#e6f1fb;--mute:#8fa5bb;--panel:#0d2036;--line:#24435f;--acc:#3fe0f0;--bad:#ef5b52;--ok:#3ccf8a;color-scheme:dark}
+html{background:var(--bg);scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Avenir Next","Segoe UI",Roboto,system-ui,sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px 14px 28px}
+h1{margin:0 0 2px;font-size:23px;letter-spacing:-.01em}
+#sub{color:var(--mute);font-size:13px;margin:0 0 10px}
+#cv{position:relative;height:56vh;min-height:320px;border-radius:14px;overflow:hidden;background:#06111f;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+#lbl{position:absolute;left:12px;right:12px;bottom:10px;color:#e6f1fb;font-size:13px;line-height:1.35;text-shadow:0 1px 4px #000;pointer-events:none}
+#lbl b{display:block;font-size:15px}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+button{font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 12px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button[aria-pressed="true"]{border-color:var(--acc);color:var(--acc)}
+#rx button.helps[aria-pressed="true"]{border-color:var(--ok);color:var(--ok)}
+#rx button.harms[aria-pressed="true"]{border-color:var(--bad);color:var(--bad)}
+label{display:block;margin:12px 0 2px;color:var(--mute);font-size:13px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+.panel ul{margin:4px 0 0;padding-left:18px}.warn{color:var(--bad);font-weight:600}
+.hint{color:var(--mute);font-size:13px;margin:8px 0 0}
+.kv{color:var(--mute);font-size:13px}.kv b{color:var(--ink)}
+</style></head><body><main>
+<h1 id="ttl">Loading</h1><p id="sub"></p>
+<div id="cv"><div id="lbl"></div></div>
+<div class="row" id="stages"></div>
+<div class="row" id="dz"></div>
+<label for="sev"><span id="sevn">Severity</span>: <span id="v0"></span></label><input id="sev" type="range" min="0" max="100" value="55">
+<div class="row" id="rx"></div>
+<div class="panel" id="out"></div>
+<div class="panel"><canvas id="sp" width="480" height="90" style="width:100%;height:90px" role="img" aria-label="Key outputs over simulated hours"></canvas><div class="hint" style="margin:2px 0 0"><span id="leg"></span> Hour <span id="hr">0</span>.</div></div>
+<div class="panel" id="info">Tap any part of the 3D scene to inspect it.</div>
+<div class="panel kv" id="meta"></div>
+<p class="hint">Drag to orbit. Scroll or pinch to zoom. Stage buttons fly you in. Presets replay the disease over simulated hours.</p>
+</main>
+<script src="engine.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),clamp=CCE.clamp;
+const calm=matchMedia('(prefers-reduced-motion:reduce)').matches;
+const QS=new URLSearchParams(location.search),DID=QS.get('d')||'ards',CID=QS.get('c');
+const VOq=(t,q)=>{if(parent!==window)parent.postMessage({vo:t,q:!!q},'*')};
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+fetch('db.json?v='+(QS.get('v')||'')).then(r=>r.json()).then(db=>{
+ const dz=db.diseases.find(x=>x.id===DID),c=dz&&(dz.complications.find(x=>x.id===CID)||dz.complications[0]);
+ if(!c){$('#ttl').textContent='Complication not found';return}
+ if(!window.THREE){$('#ttl').textContent=c.name.join('');$('#lbl').innerHTML='<b>3D engine could not load</b>Check your connection and reload.';return}
+ boot(dz,c)}).catch(()=>{$('#ttl').textContent='Could not load the database'});
+
+function boot(DIS,C){
+const V=(x,y,z)=>new THREE.Vector3(x,y,z),PI=Math.PI,rnd=Math.random,TITLE=C.name.join(' ').replace(/- /g,'');
+document.title=TITLE+' 3D lab';$('#ttl').textContent=TITLE+': 3D lab';$('#sub').textContent=DIS.name;$('#sevn').textContent=DIS.name+' severity';
+const cv=$('#cv'),R=new THREE.WebGLRenderer({antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));R.setClearColor(0x06111f);cv.prepend(R.domElement);
+const S=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,.01,400);S.add(new THREE.AmbientLight(0x8899bb,.9));cam.add(new THREE.PointLight(0xffffff,1.3,0));S.add(cam);
+const M=(c,o=.8,x={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,transparent:true,opacity:o,roughness:.45,depthWrite:o>=.7},x));
+const add=(m,p,par=S)=>{if(p)m.position.copy(p);par.add(m);return m};
+const CR=a=>new THREE.CatmullRomCurve3(a),tube=(c,r,mt)=>new THREE.Mesh(new THREE.TubeGeometry(c,60,r,12,false),mt);
+const dotTex=(()=>{const k=document.createElement('canvas');k.width=k.height=32;const g=k.getContext('2d');if(g){g.beginPath();g.arc(16,16,15,0,7);g.fillStyle='#fff';g.fill()}return new THREE.CanvasTexture(k)})();
+const mkp=(par,n,c,s)=>{const a=new Float32Array(n*3).fill(-1e4),g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(a,3));const p=new THREE.Points(g,new THREE.PointsMaterial({color:c,size:s,map:dotTex,alphaTest:.4,transparent:true}));p.frustumCulled=false;par.add(p);return{a,g,p,n,
+ put(i,x,y,z){a[i*3]=x;a[i*3+1]=y;a[i*3+2]=z},hide(i){a[i*3+1]=-1e4},done(){g.attributes.position.needsUpdate=true}}};
+const col=(a,b,t)=>new THREE.Color(a).lerp(new THREE.Color(b),clamp(t));
+const sc=C.scene,CE=CCE;let sev=.55,rx={},v=CE.vars(C,sev,rx),bph=0;
+const T=(k,o)=>{o.userData.k=k;return o};
+
+/* ---------- archetypes: each returns {st,lv,frame(dt,v),tag(),parts,leg} ---------- */
+const AR={};
+
+AR.vessel=()=>{
+ const P=CR([V(-12,-1,0),V(-6,1.2,0),V(0,-.8,0),V(6,1,0),V(12,-.6,0)]),PL=P.getLength();
+ T('wall',add(tube(P,1.8,M(0xe58a8a,.2,{side:THREE.DoubleSide}))));
+ const NR=110,rt=[],ro=[];for(let i=0;i<NR;i++){rt.push(rnd());const a=rnd()*PI*2,r=Math.sqrt(rnd())*1.25;ro.push([Math.cos(a)*r,Math.sin(a)*r])}
+ const rb=mkp(S,NR,0xff3b4a,.6);
+ const NC=12,cl=[];for(let i=0;i<NC;i++){const g=new THREE.Group(),t=.08+.84*((i*5)%NC+.5)/NC,p=P.getPointAt(t);g.position.set(p.x,p.y+(rnd()-.5)*.8,p.z+(rnd()-.5)*.8);
+  for(let j=0;j<4;j++)T('plt',add(new THREE.Mesh(new THREE.IcosahedronGeometry(.42+rnd()*.25,1),M(0xf0c040,.95)),V((rnd()-.5)*1,(rnd()-.5)*1,(rnd()-.5)*1),g));S.add(g);cl.push(g)}
+ const NL=90,lk=[];for(let i=0;i<NL;i++)lk.push([rnd(),rnd()*PI*2,rnd()]);const pl=mkp(S,NL,0xa8dcff,.5);
+ const NB=70,bd=[];for(let i=0;i<NB;i++)bd.push([[.18,.35,.52,.7,.85][i%5]+(rnd()-.5)*.04,[0,1.6,3.3,4.7,2.2][i%5],rnd()]);const bl=mkp(S,NB,0xe01a35,.62);
+ const holes=bd.slice(0,5).map(h=>{const p=P.getPointAt(h[0]),a=h[1],m=add(new THREE.Mesh(new THREE.CircleGeometry(.38,14),M(0x2a0508,.95,{side:2})),V(p.x,p.y+Math.cos(a)*1.82,p.z+Math.sin(a)*1.82));m.lookAt(p.x,p.y+Math.cos(a)*4,p.z+Math.sin(a)*4);return m});
+ const NT=30,ts=[];for(let i=0;i<NT;i++){const t=(i+.5)/NT*.9+.05,p=P.getPointAt(t),a=rnd()*PI*2,r=4.2+rnd()*2.4;ts.push(T('tis',add(new THREE.Mesh(new THREE.SphereGeometry(.85,14,10),M(sc.tc,.85)),V(p.x+(rnd()-.5)*2,p.y+Math.cos(a)*r,p.z+Math.sin(a)*r))))}
+ const rbc=new THREE.Color();
+ return{lv:['Organ level','Vessel level','Cell level'],leg:'Red: blood cells. Yellow: platelet clots. Pale blue: leaked plasma. Dark red outside: bleeding. Tissue cells fade with ischaemia.',
+ st:[['Vascular bed',V(0,0,0),24,.4,.15,'A capillary bed and the tissue it feeds. Flow, leak, clots and bleeding change as the disease progresses.'],['Vessel wall',V(0,0,0),7.5,.5,.1,'The wall and lumen. Cells flow through; plasma and cells escape when the wall fails.'],['Tissue cells',V(5,5,0),6,.3,.1,'The cells that depend on this vessel for oxygen. They swell, dim and die when supply fails.']],
+ parts:{wall:['Vessel wall','The endothelium holds plasma in and keeps blood fluid. Injury makes it leaky and procoagulant.','Treat the cause first; supportive fluids and products target the specific defect.'],tis:['Tissue cells','Cells downstream swell from leaked fluid and darken when oxygen delivery falls.','Restore perfusion and oxygen delivery early.'],plt:['Platelets and fibrin','Platelets and fibrin form clots. Too many block small vessels; too few let blood escape.','Balance clotting against bleeding for the specific cause.']},
+ tag(){},
+ frame(dt,v){const sp=(.25+4.2*v.flow*(1-.7*v.clot))/PL;rbc.set(0x3a3a9a).lerp(new THREE.Color(0xff3b4a),v.sat);rb.p.material.color.copy(rbc);
+  for(let i=0;i<NR;i++){if(!calm)rt[i]=(rt[i]+dt*sp)%1;const p=P.getPointAt(rt[i]);rb.put(i,p.x,p.y+ro[i][0],p.z+ro[i][1])}rb.done();
+  const nc=Math.round(NC*v.clot);cl.forEach((g,i)=>{g.visible=i<nc;g.scale.setScalar(.7+.7*v.clot)});
+  const n1=Math.round(NL*v.leak);for(let i=0;i<NL;i++){if(i>=n1){pl.hide(i);continue}const L=lk[i],u=(L[2]+(calm?0:bph*.08))%1,p=P.getPointAt(.04+.92*L[0]),r=1.8+3.4*u;pl.put(i,p.x+(L[1]-3)*.25,p.y+Math.cos(L[1])*r,p.z+Math.sin(L[1])*r)}pl.done();
+  const n2=Math.round(NB*v.bleed);for(let i=0;i<NB;i++){if(i>=n2){bl.hide(i);continue}const B=bd[i],u=(B[2]+(calm?0:bph*.06))%1,p=P.getPointAt(B[0]),r=1.8+3.2*Math.min(1,u*1.4);bl.put(i,p.x+(rnd()-.5)*.4+(B[2]-.5)*2*u,p.y+Math.cos(B[1])*r,p.z+Math.sin(B[1])*r)}bl.done();
+  holes.forEach(h=>h.visible=v.bleed>.12);
+  ts.forEach((m,i)=>{m.material.color.copy(col(sc.tc,0x3a3440,v.isch));m.material.opacity=.88-.4*v.isch;m.scale.setScalar((1+.55*v.leak)*(1-.3*v.isch)*(1+.012*Math.sin(bph*2+i)))})}}};
+
+AR.heart=()=>{
+ const rvO=T('rv',add(new THREE.Mesh(new THREE.SphereGeometry(1,32,24),M(0x3a8fd8,.38,{side:THREE.DoubleSide})),V(-2.6,0,0))),rvI=T('rv',add(new THREE.Mesh(new THREE.SphereGeometry(1,28,20),M(0x5aa8ff,.45)),V(-2.6,0,0)));
+ const lvO=T('lv',add(new THREE.Mesh(new THREE.SphereGeometry(1,32,24),M(0xc0392b,.4,{side:THREE.DoubleSide})),V(2.4,0,0))),lvI=T('lv',add(new THREE.Mesh(new THREE.SphereGeometry(1,28,20),M(0xe0405a,.5)),V(2.4,0,0)));
+ const sept=T('sept',add(new THREE.Mesh(new THREE.SphereGeometry(1,20,16),M(0xe8c0a0,.8)),V(0,0,0)));
+ add(new THREE.Mesh(new THREE.SphereGeometry(1.1,18,14),M(0x5aa8ff,.3)),V(-3.8,3.8,0));add(new THREE.Mesh(new THREE.SphereGeometry(1.1,18,14),M(0xe0405a,.3)),V(3.2,3.9,0));
+ const PA=CR([V(-1.8,2.6,0),V(-.8,5.5,0),V(.4,7.4,0),V(2.2,7,0)]);add(tube(PA,.55,M(0x5aa8ff,.3)));
+ const AO=CR([V(3,2.4,0),V(4.4,5.5,0),V(6,8,0),V(8,9,0)]);add(tube(AO,.75,M(0xe0405a,.3)));
+ const veinM=M(0x6a7ad8,.35),vein=add(tube(CR([V(-9,7,0),V(-6.5,5,0),V(-4.2,3.8,0)]),.7,veinM));T('vein',vein);
+ const P=CR([V(-9,7,0),V(-6.5,5,0),V(-3.8,3.8,0),V(-2.6,0,0),V(-1.6,4.6,0),V(.4,7.4,0),V(2.4,6.6,0),V(3.2,3.9,0),V(2.4,0,0),V(3.4,4.6,0),V(5.4,8,0),V(8.4,9,0)]),PL=P.getLength();
+ const NB=70,bt=[];for(let i=0;i<NB;i++)bt.push(rnd());const bb=mkp(S,NB,0x4a7ae8,.55),br=mkp(S,NB,0xff5060,.55);
+ const NG=40,gg=[];for(let i=0;i<NG;i++)gg.push([rnd()-.5,rnd()-.5,rnd()-.5,rnd()]);const cg=mkp(S,NG,0x8a5ad8,.6);
+ return{lv:['Organ level','Chamber level','Wall level'],leg:'Blue: venous blood into the right heart. Red: oxygenated blood to the body. Purple: congested venous blood.',
+ st:[['Heart',V(0,3.5,0),25,.3,.1,'Right and left ventricles, atria and great vessels. Output falls as chambers dilate and fail.'],['Right ventricle',V(-2.6,0,0),7,0,.1,'The thin walled right ventricle pumps against the lung circulation. It dilates when that load rises.'],['Septum',V(0,0,0),6,0,.15,'The septum bows toward the left ventricle when right pressures exceed left, which also lowers left filling.']],
+ parts:{rv:['Right ventricle','Thin walled and built for low pressure. Pressure overload dilates it and cuts output.','Reduce right ventricular afterload and support perfusion.'],lv:['Left ventricle','Supplies the body. Output falls when it is underfilled, squeezed by the septum, or weak.','Match preload and support contractility.'],sept:['Interventricular septum','Shifts toward the left ventricle as right pressure rises, reducing left filling.','Lowering right sided pressure lets the septum return.'],vein:['Systemic veins','Pressure backs up here, causing congestion of the liver, kidneys and gut.','Relieve congestion with careful decongestion once perfusion is safe.']},
+ tag(){},
+ frame(dt,v){const hr=60+90*v.rate;if(!calm)bph+=dt*hr/60*PI*2*.4;const sy=.5+.5*Math.sin(bph);
+  const rc=1-.16*v.rvf*sy,lc=1-.16*v.con*sy,ra=2*(1+.65*v.rvdil),rb=2.8*(1+.5*v.rvdil),la=1.9*(1+.4*v.lvdil),lb=3*(1+.35*v.lvdil),wt=.8-.3*v.rvdil;
+  rvO.scale.set(ra*rc,rb*rc,ra*rc);rvI.scale.set(Math.max(.2,ra-wt)*rc,Math.max(.2,rb-wt)*rc,Math.max(.2,ra-wt)*rc);lvO.scale.set(la*lc,lb*lc,la*lc);lvI.scale.set((la-.8)*lc,(lb-.8)*lc,(la-.8)*lc);
+  rvO.position.x=rvI.position.x=-2.6-.35*v.rvdil;lvO.position.x=lvI.position.x=2.4+.25*v.lvdil;
+  sept.position.x=1.5*v.sept+.05;sept.scale.set(.32,3.4,2.2);sept.material.color.copy(col(0xe8c0a0,0xd08a70,v.sept));
+  vein.scale.set(1,1+.9*v.congest,1+.9*v.congest);vein.material.color.copy(col(0x6a7ad8,0x9a4ad8,v.congest));
+  const sb=(.15+2.6*v.rvf*(1-.4*v.congest))/PL*.5,sr=(.15+2.8*v.con)/PL*.5;
+  for(let i=0;i<NB;i++){if(!calm)bt[i]=(bt[i]+dt*(i%2?sb:sr))%1;const u=bt[i];
+   if(i%2){const p=P.getPointAt(u*.5);bb.put(i,p.x,p.y,p.z+(rnd()-.5)*.1)}else{const p=P.getPointAt(.5+u*.5);br.put(i,p.x,p.y,p.z)}
+   if(i%2)br.hide(i);else bb.hide(i)}bb.done();br.done();
+  const n=Math.round(NG*v.congest);for(let i=0;i<NG;i++){if(i>=n){cg.hide(i);continue}const q=gg[i];cg.put(i,-8+q[0]*3.5+(calm?0:Math.sin(bph+i)*.25),6+q[1]*3,q[2]*1.2)}cg.done()}}};
+
+AR.alveolus=()=>{
+ const C0=V(4,0,0),offs=[[0,0,0]];for(let i=0;i<6;i++){const a=i*PI/3;offs.push([(i%2?.9:-.9),3.4*Math.cos(a),3.4*Math.sin(a)])}
+ T('airway',add(tube(CR([V(-11,0,0),V(-6,.5,0),V(-2,0,0),V(1,0,0)]),.9,M(0xf0d8c0,.3,{side:2}))));
+ const al=offs.map(o=>{const g=new THREE.Group();g.position.set(C0.x+o[0],o[1],o[2]);S.add(g);
+  const air=T('alv',add(new THREE.Mesh(new THREE.SphereGeometry(1.9,24,18),M(0xbfe8ff,.16)),null,g)),wall=T('wall',add(new THREE.Mesh(new THREE.SphereGeometry(2,24,18),M(0xf4a0b8,.3,{side:2})),null,g)),
+  fl=T('fluid',add(new THREE.Mesh(new THREE.SphereGeometry(1,20,14),M(0xd890a8,.78)),null,g)),fib=T('fibro',add(new THREE.Mesh(new THREE.IcosahedronGeometry(2.1,2),M(0xb8a890,.5,{wireframe:true})),null,g)),
+  shell=T('fibro',add(new THREE.Mesh(new THREE.SphereGeometry(2.2,20,14),M(0xa89880,.1,{side:THREE.BackSide})),null,g)),
+  cap=T('cap',add(new THREE.Mesh(new THREE.TorusGeometry(2.02,.13,8,36),M(0xd03a4a,.85)),null,g));cap.rotation.x=PI/2+rnd();cap.rotation.y=rnd()*PI;
+  return{g,air,wall,fl,fib,shell,cap,o}});
+ const pleura=T('pleura',add(new THREE.Mesh(new THREE.SphereGeometry(10.5,28,20),M(0x6aa8c8,.1,{side:THREE.BackSide})),C0)),lung=T('pleura',add(new THREE.Mesh(new THREE.SphereGeometry(7.6,28,20),M(0xe0b0b0,.08,{side:THREE.BackSide})),C0));
+ const NA=60,at=[];for(let i=0;i<NA;i++)at.push([rnd(),rnd()*.9]);const air=mkp(S,NA,0xcfeeff,.45),aw=CR([V(-11,0,0),V(-6,.5,0),V(-2,0,0),V(2,0,0)]);
+ const NI=50,ni=[];for(let i=0;i<NI;i++)ni.push([Math.floor(rnd()*7),rnd()*PI*2,rnd()*PI]);const nu=mkp(S,NI,0xf0d040,.5);
+ const NK=70,kk=[];for(let i=0;i<NK;i++)kk.push([1+Math.floor(rnd()*6),rnd(),(rnd()-.5)*.7,(rnd()-.5)*.7]);const lk=mkp(S,NK,0xeaf6ff,.8);
+ return{lv:['Organ level','Alveolar level','Barrier level'],leg:'White: air. Pink fill: alveolar fluid. Grey web: collagen. Yellow: neutrophils. Bubbles outside: air leak.',
+ st:[['Lung unit',V(3,0,0),21,.5,.2,'A bronchiole feeding a cluster of alveoli, with the pleural space around them.'],['Alveolus',V(4,0,0),8,.4,.1,'Air fills the sac and capillaries wrap the wall. Stretch, fluid and scarring change how it behaves.'],['Air blood barrier',V(5.8,0,2.2),4,.2,.1,'A thin wall lets gas pass from air to blood. Fluid or collagen thickens it and gas exchange falls.']],
+ parts:{alv:['Alveolus','The gas exchange sac. Overstretch tears it; fluid floods it; scarring stiffens it.','Protect the alveoli with limited volume and pressure, and treat the cause.'],wall:['Alveolar wall','Thin and stretchy when healthy. Becomes leaky, torn or thickened in disease.','Limit injury and let the wall recover.'],cap:['Capillary','Carries blood past the air. Leaks fluid into the alveolus when pressure or permeability rises.','Lower capillary pressure for cardiogenic edema; treat permeability injury supportively.'],pleura:['Pleural space','Air that escapes from torn alveoli collects here and can collapse the lung.','Decompress a tension pneumothorax urgently.'],fluid:['Alveolar fluid','Fluid fills the sac so no gas exchange happens there.','Remove fluid by lowering pressure or clearing the cause.'],fibro:['Collagen','Scar tissue stiffens the wall and thickens the barrier. It does not reverse quickly.','Early injury prevention matters most.'],airway:['Bronchiole','Air passes here to reach the sacs.','Keep the airway clear and protected.']},
+ tag(){},
+ frame(dt,v){if(!calm)bph+=dt*(.8+1.4*v.vent)*PI*2*.35;const ph=Math.sin(bph);
+  al.forEach((a,i)=>{const k=(1-.22*v.fibro)*(1+.1*v.vent*ph*(1-.7*v.fibro))*(1+.35*v.stretch);a.g.scale.setScalar(k);a.wall.material.opacity=.32-.18*v.stretch;a.wall.material.color.copy(col(0xf4a0b8,0xf8e8ee,v.stretch));
+   a.fl.scale.setScalar(Math.max(.01,v.fluid*1.75));a.fl.visible=v.fluid>.03;a.fl.position.y=-(1.9-v.fluid*1.75)*.55;a.fib.material.opacity=.55*v.fibro;a.fib.visible=v.fibro>.05;a.shell.material.opacity=.45*v.fibro;a.cap.material.color.copy(col(0xd03a4a,0x8a3a90,v.fluid*.6))});
+  lung.scale.setScalar(1-.22*v.leak);lung.material.opacity=.08+.12*v.leak;pleura.material.opacity=.1;
+  for(let i=0;i<NA;i++){const p=aw.getPointAt(clamp(at[i][0]*.5+.5*(.5+.5*ph)*at[i][1]+.04,0,.99));air.put(i,p.x,p.y+(at[i][1]-.45)*.7,p.z+(at[i][0]-.5)*.7)}air.done();
+  const nn=Math.round(NI*v.inflam);for(let i=0;i<NI;i++){if(i>=nn){nu.hide(i);continue}const q=ni[i],a=al[q[0]],r=2.15,ang=q[1]+(calm?0:bph*.1);nu.put(i,a.g.position.x+r*Math.sin(q[2])*Math.cos(ang)*a.g.scale.x,a.g.position.y+r*Math.cos(q[2])*a.g.scale.x,a.g.position.z+r*Math.sin(q[2])*Math.sin(ang)*a.g.scale.x)}nu.done();
+  const nk=Math.round(NK*v.leak);for(let i=0;i<NK;i++){if(i>=nk){lk.hide(i);continue}const q=kk[i],a=al[q[0]],u=(q[1]+(calm?0:bph*.05))%1,d=a.o,l=Math.hypot(d[0],d[1],d[2])||1,r=2.6+u*5.5;lk.put(i,C0.x+d[0]/l*(3.4+r)+q[2]*3,d[1]/l*(3.4+r)+q[3]*3,d[2]/l*(3.4+r))}lk.done()}}};
+
+AR.nephron=()=>{
+ const P=CR([V(-8,2,0),V(-5,4,0),V(-2,2.5,0),V(0,-.5,0),V(3,.5,0),V(6,-2,0),V(9,-1,0),V(12,-3,0)]),PL=P.getLength();
+ T('tub',add(tube(P,1,M(0xd8c0a0,.2,{side:2}))));
+ const gl=T('glom',add(new THREE.Mesh(new THREE.SphereGeometry(2.1,20,16),M(0xd05060,.3)),V(-9.5,3.2,0)));const tuft=T('glom',add(new THREE.Mesh(new THREE.TorusKnotGeometry(.9,.28,48,8),M(0xe05068,.9)),V(-9.5,3.2,0)));
+ add(tube(CR([V(-9,-3,0),V(-7,-3.4,0),V(0,-3.6,0),V(7,-5,0),V(12,-6,0)]),.5,M(0xd03a4a,.4)));
+ const NCl=36,cells=[];for(let i=0;i<NCl;i++){const t=.05+.9*i/NCl,p=P.getPointAt(t),tg=P.getTangentAt(t),n1=V(0,0,1).cross(tg).normalize(),a=(i%2?0:PI)+rnd()*.8;const q=p.clone().add(n1.multiplyScalar(Math.cos(a)).add(V(0,0,Math.sin(a))).multiplyScalar(.98));cells.push(T('tub',add(new THREE.Mesh(new THREE.SphereGeometry(.36,12,8),M(0x2ab8b0,.9)),q)));}
+ const NF=80,ft=[];for(let i=0;i<NF;i++)ft.push([rnd(),rnd()*PI*2,rnd()*.6]);const fi=mkp(S,NF,0x9fd8ff,.42);
+ const NJ=40,jt=[];for(let i=0;i<NJ;i++)jt.push([rnd(),rnd()*PI*2,rnd()*.6]);const ca=mkp(S,NJ,0x7a4a20,.55);
+ const mk=(n,c,s)=>({n,s:mkp(S,n,c,s),q:[...Array(n)].map(()=>[rnd(),rnd()*PI*2,2+rnd()*2.2,rnd()])}),ur=mk(70,0xf0a030,.55),kp=mk(60,0xb060f0,.6),hp=mk(60,0xff6070,.55);
+ const orb=(o,f,dt)=>{const n=Math.round(o.n*f);o.q.forEach((q,i)=>{if(i>=n){o.s.hide(i);return}const p=P.getPointAt(.05+.9*q[0]),a=q[1]+(calm?0:bph*.15*(q[3]+.3));o.s.put(i,p.x,p.y+Math.cos(a)*q[2],p.z+Math.sin(a)*q[2])});o.s.done()};
+ return{lv:['Organ level','Tubule level','Glomerular level'],leg:'Pale blue: filtrate. Brown: casts and sloughed cells. Orange: urea. Purple: potassium. Pink: acid.',
+ st:[['Nephron',V(2,-.5,0),22,.4,.15,'A glomerulus filters blood and the tubule shapes the urine. Injury and retained solutes show here.'],['Tubule cells',V(0,-.5,0),6.5,.3,.1,'Tubule cells do the work of reabsorption and acid and potassium handling. They are very sensitive to low flow.'],['Glomerulus',V(-9.5,3.2,0),5,.2,.1,'Blood is filtered here. Falling pressure or injury lowers filtration, so solutes build up.']],
+ parts:{tub:['Tubule cells','Energy hungry cells that reabsorb solutes and secrete acid and potassium. They die first when perfusion falls.','Restore perfusion and avoid nephrotoxins.'],glom:['Glomerulus','The filter. Filtration falls when perfusion pressure or the filter itself is injured.','Restore perfusion pressure; avoid agents that drop it.'],lumen:['Tubular lumen','Filtrate flows here. Sloughed cells and casts can block it.','Maintain flow; dialyse for refractory overload.']},
+ tag(){},
+ frame(dt,v){if(!calm)bph+=dt*1.5;const sp=(.2+.9*v.gfr)/PL*3;
+  gl.material.opacity=.3;tuft.rotation.y=bph*.2;tuft.material.color.copy(col(0xe05068,0x805060,v.injury*.6+(1-v.gfr)*.4));
+  cells.forEach((c,i)=>{c.material.color.copy(col(0x2ab8b0,0x6a4a2a,v.injury));c.material.opacity=.92-.4*v.injury*((i%3)/2);c.scale.setScalar(1+.35*v.injury*Math.sin(i))});
+  for(let i=0;i<NF;i++){const q=ft[i];if(!calm)q[0]=(q[0]+dt*sp)%1;const p=P.getPointAt(q[0]);fi.put(i,p.x,p.y+Math.cos(q[1])*q[2],p.z+Math.sin(q[1])*q[2])}fi.done();
+  const nj=Math.round(NJ*v.injury);for(let i=0;i<NJ;i++){if(i>=nj){ca.hide(i);continue}const q=jt[i];if(!calm)q[0]=(q[0]+dt*sp*.4)%1;const p=P.getPointAt(q[0]);ca.put(i,p.x,p.y+Math.cos(q[1])*q[2]*.7,p.z+Math.sin(q[1])*q[2]*.7)}ca.done();
+  orb(ur,v.urea);orb(kp,v.k);orb(hp,v.acid)}}};
+
+AR.brain=()=>{
+ const skull=T('skull',add(new THREE.Mesh(new THREE.SphereGeometry(6.4,32,24),M(0xe8e0d0,.1,{side:THREE.DoubleSide}))));
+ const gy=(()=>{const g=new THREE.SphereGeometry(1,48,36),p=g.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),d=1+.055*Math.sin(9*x+2)*Math.sin(8*y)*Math.sin(9*z+1)+.03*Math.sin(15*y+4*x);p.setXYZ(i,x*d,y*d,z*d)}g.computeVertexNormals();return g})(),hm=x=>T('brain',add(new THREE.Mesh(gy,M(0xe8a8b8,.78)),V(x,0,0))),Lh=hm(-2.5),Rh=hm(2.5);
+ const vent=x=>T('vent',add(new THREE.Mesh(new THREE.SphereGeometry(1,16,12),M(0x4aa8ff,.85)),V(x,.3,0))),Lv=vent(-.9),Rv=vent(.9);
+ const mass=T('mass',add(new THREE.Mesh(new THREE.SphereGeometry(1,20,14),M(0x7a0f18,.92)),V(3.3,.9,.5)));
+ const tent=T('skull',add(new THREE.Mesh(new THREE.CylinderGeometry(5.4,5.4,.1,32),M(0x9a9080,.35)),V(0,-2.3,-.6)));
+ const cer=T('stem',add(new THREE.Mesh(new THREE.SphereGeometry(1,20,14),M(0xc08a98,.6)),V(0,-4,-2)));cer.scale.set(2.4,1.5,2);
+ const stem=T('stem',add(new THREE.Mesh(new THREE.CylinderGeometry(.7,.7,3.2,16),M(0xd8a0a8,.85)),V(0,-3.4,.4)));
+ const unc=T('stem',add(new THREE.Mesh(new THREE.SphereGeometry(.9,16,12),M(0xe0909a,.85)),V(1.2,-1.5,0)));
+ const NR=70,rr=[];for(let i=0;i<NR;i++)rr.push([i%2?-1:1,rnd()*PI,rnd()*PI*2,rnd()]);const bf=mkp(S,NR,0xff4050,.45);
+ const NP=50,pr=[];for(let i=0;i<NP;i++){const d=V(rnd()-.5,rnd()-.2,rnd()-.5).normalize();pr.push([d,rnd()])}const pp=mkp(S,NP,0xffd040,.6);
+ const cg=new THREE.Group();cg.position.set(16,0,0);S.add(cg);
+ const ast=T('astro',add(new THREE.Mesh(new THREE.SphereGeometry(1.4,20,14),M(0x3fb8a8,.8)),null,cg)),feet=[...Array(6)].map((_,i)=>{const a=i*PI/3,f=T('astro',add(new THREE.Mesh(new THREE.SphereGeometry(.5,12,8),M(0x3fb8a8,.8)),V(2.6*Math.cos(a),2.6*Math.sin(a),0),cg));const l=add(new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,1.6,8),M(0x3fb8a8,.8)),V(1.5*Math.cos(a),1.5*Math.sin(a),0),cg);l.rotation.z=a+PI/2;return f});
+ const neu=T('neuron',add(new THREE.Mesh(new THREE.SphereGeometry(1,18,12),M(0xf0c860,.9)),V(-1,-3.6,0),cg));add(new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,5,8),M(0xf0c860,.8)),V(-1,-6,0),cg);
+ add(tube(CR([V(5,4,0),V(4,1,0),V(4,-2,0),V(5,-5,0)]),.35,M(0xd03a4a,.5)),null,cg);
+ const NM=40,mm=[];for(let i=0;i<NM;i++)mm.push([rnd()*PI*2,rnd()*PI,rnd()]);const am=mkp(cg,NM,0x70e070,.34);
+ return{lv:['Organ level','Midline level','Brainstem level','Cell level'],leg:'Pink: brain tissue. Blue: ventricles. Dark red: bleed. Yellow arrows of dots: pressure on the brain. Green: ammonia in the cell view.',
+ st:[['Brain',V(0,-.5,0),19,.5,.15,'The brain inside the skull. Swelling or a mass raises pressure because the skull cannot expand.'],['Midline',V(0,.5,0),15,0,.05,'Seen from the front. Ventricles squeeze and the midline shifts away from a mass.'],['Brainstem',V(0,-3,0),7,.2,.05,'The brainstem sits below the tentorium. High pressure pushes brain down through the gap, which is herniation.'],['Brain cells',V(16,0,0),8,0,.05,'An astrocyte beside a capillary and a neuron. Astrocytes swell first in edema, and neurons fail without oxygen.']],
+ parts:{brain:['Brain tissue','Fixed inside a rigid skull. Added volume raises pressure and lowers perfusion.','Keep head up, sedate, treat the cause and osmotherapy if needed.'],vent:['Ventricles','Fluid spaces that squeeze shut as the brain swells and shift away from a mass.','CSF drainage lowers pressure when an external drain is in place.'],mass:['Mass lesion','A bleed or contusion takes space and pushes the brain across the midline.','Surgical evacuation for a significant mass.'],skull:['Skull and tentorium','A rigid box. The tentorium divides it, and brain can be forced through its opening.','Do not wait for imaging if signs of herniation appear.'],stem:['Brainstem','Controls breathing and consciousness. Herniation squeezes it, causing coma and pupil changes.','Emergency osmotherapy, brief hyperventilation as a bridge, and surgery.'],astro:['Astrocyte','Swells first in cytotoxic edema. Takes up ammonia and converts it to glutamine, which draws water.','Lower the cause: ammonia, osmolality or hypoxia.'],neuron:['Neuron','Needs a constant supply of oxygen and glucose. Fails within minutes of ischaemia.','Maintain perfusion and oxygenation.']},
+ tag(){},
+ frame(dt,v){if(!calm)bph+=dt;const k=1+.26*v.swell,sh=v.shift*1.5,tone=col(0xe8a8b8,0x5a4a6a,v.isch);
+  [Lh,Rh].forEach((h,i)=>{h.scale.set(2.5*k,2.7*k,3.3*k);h.position.x=(i?2.5:-2.5)*k*.97-sh;h.material.color.copy(tone)});
+  [Lv,Rv].forEach((h,i)=>{h.scale.set(.45*(1-.55*v.swell),1.1*(1-.5*v.swell),1.5*(1-.4*v.swell));h.position.x=(i?.9:-.9)-sh*1.25});
+  mass.visible=v.mass>.03;mass.scale.setScalar(.2+1.9*v.mass);mass.position.x=3.3*k-sh*.4;
+  skull.material.color.copy(col(0xe8e0d0,0xff5040,v.swell*.6+v.mass*.4));skull.material.opacity=.1+.12*(v.swell+v.mass)*.5;
+  unc.position.y=-1.5-2.6*v.hern;unc.position.x=1.2-.6*v.hern-sh*.3;unc.scale.setScalar(1+.5*v.hern);stem.scale.set(1-.45*v.hern,1,1-.45*v.hern);stem.material.color.copy(col(0xd8a0a8,0xc03040,v.hern));
+  const n=Math.round(NR*v.perf);for(let i=0;i<NR;i++){if(i>=n){bf.hide(i);continue}const q=rr[i],a=q[2]+(calm?0:bph*.3*v.perf*(q[3]+.5));bf.put(i,q[0]*2.5*k-sh+Math.sin(q[1])*Math.cos(a)*2.9*k,Math.cos(q[1])*2.8*k,Math.sin(q[1])*Math.sin(a)*3.4*k)}bf.done();
+  const np=Math.round(NP*clamp(v.swell*.7+v.mass*.5));for(let i=0;i<NP;i++){if(i>=np){pp.hide(i);continue}const q=pr[i],u=(q[1]+(calm?0:bph*.4))%1,r=6.4-u*1.8;pp.put(i,q[0].x*r,q[0].y*r,q[0].z*r)}pp.done();
+  ast.scale.setScalar(1+.7*v.swell);feet.forEach((f,i)=>f.scale.setScalar(1+.9*v.swell));ast.material.color.copy(col(0x3fb8a8,0x80e0d0,v.swell));
+  neu.scale.setScalar(1-.3*v.isch);neu.material.color.copy(col(0xf0c860,0x706858,v.isch));
+  const na=Math.round(NM*v.amm);for(let i=0;i<NM;i++){if(i>=na){am.hide(i);continue}const q=mm[i],a=q[0]+(calm?0:bph*.4*(q[2]+.3));am.put(i,(2+q[2]*2.2)*Math.cos(a)*Math.sin(q[1]+.4),(2+q[2]*2.2)*Math.sin(a)*Math.sin(q[1]+.4),(q[2]-.5)*3)}am.done()}}};
+
+AR.cell=()=>{
+ const cyl=sc.shape==='cyl',cg=new THREE.Group();S.add(cg);
+ const mem=T('mem',add(new THREE.Mesh(cyl?new THREE.CylinderGeometry(2.4,2.4,10,28):new THREE.SphereGeometry(4,36,28),M(sc.col,.26,{side:2})),null,cg));if(cyl)mem.rotation.z=PI/2;
+ const nuc=T('nuc',add(new THREE.Mesh(new THREE.SphereGeometry(1.2,20,14),M(0x6a5acd,.9)),V(cyl?-2.5:0,0,0),cg));
+ const NM=10,mt=[...Array(NM)].map((_,i)=>{const m=T('mito',add(new THREE.Mesh(new THREE.SphereGeometry(.5,12,8),M(0xf0a030,.95)),V(cyl?(i-4.5)*.9:(rnd()-.5)*5,(rnd()-.5)*(cyl?2.4:5),(rnd()-.5)*(cyl?2.4:5)),cg));m.scale.set(1.4,1,1);return m});
+ const NG=40,gr=[...Array(NG)].map(()=>{const g=T('gran',add(new THREE.Mesh(new THREE.SphereGeometry(.22,8,6),M(sc.gr||0xe8d890,.9)),V(cyl?(rnd()-.5)*8.6:(rnd()-.5)*6.4,(rnd()-.5)*(cyl?3.4:6.4),(rnd()-.5)*(cyl?3.4:6.4)),cg));return g});
+ const surf=d=>{if(!cyl)return d.clone().normalize().multiplyScalar(4);const yz=V(0,d.y,d.z).normalize().multiplyScalar(2.4);return V(Math.max(-4.6,Math.min(4.6,d.x*10)),yz.y,yz.z)};
+ const NH=8,hd=[...Array(NH)].map((_,i)=>{const d=V(rnd()-.5,rnd()-.5,rnd()-.5).normalize(),p=surf(d),h=add(new THREE.Mesh(new THREE.CircleGeometry(.45,14),M(0x1a0508,.95,{side:2})),p,cg);h.lookAt(p.clone().multiplyScalar(2));return{m:h,p,d:p.clone().normalize()}});
+ const NI=50,ii=[...Array(NI)].map(()=>V(cyl?(rnd()-.5)*8.6:(rnd()-.5)*6.4,(rnd()-.5)*(cyl?3.6:6.4),(rnd()-.5)*(cyl?3.6:6.4))),pi_=mkp(cg,NI,sc.ion||0xffe060,.5);
+ const NO=70,oo=[...Array(NO)].map(()=>[rnd()*PI*2,rnd()*PI,rnd()]),po=mkp(cg,NO,sc.out||0x9be8ff,.6);
+ const NK=60,kk=[...Array(NK)].map((_,i)=>[i%NH,rnd(),(rnd()-.5)*.6]),pk=mkp(cg,NK,sc.lk||0xff7050,.7);
+ const NX=40,xx=[...Array(NX)].map(()=>[rnd()*PI*2,rnd()*PI,rnd()]),px=mkp(cg,NX,sc.tx||0x70e070,.7);
+ return{lv:['Tissue level','Membrane level','Organelle level'],leg:sc.lg||'Dark discs: membrane damage. Orange: mitochondria. Small dots: ions and contents.',
+ st:[['Cell',V(0,0,0),17,.4,.15,sc.s0||'A cell and the ions and contents around it. The membrane holds the difference between inside and outside.'],['Membrane',V(0,3.2,2.6),5,.3,.15,sc.s1||'Pumps, channels and the lipid bilayer. Energy failure or injury makes the membrane leak.'],['Mitochondria',V(0,-.5,0),6.5,.3,.1,sc.s2||'Mitochondria make the energy the pumps need. When they fail, the cell swells and leaks.']],
+ parts:{mem:['Cell membrane','Holds ions and contents inside. Energy failure or direct injury makes it leak.','Treat the cause and restore energy supply.'],nuc:['Nucleus','Holds the genes. Late in injury the nucleus condenses and the cell dies.','Early reversal prevents cell death.'],mito:['Mitochondria','Make ATP. Failure starves the pumps that hold the membrane potential.','Restore oxygen and substrate delivery.'],gran:['Energy stores','Glycogen granules. They fall when demand is high or the cell cannot refill them.','Replace substrate while the cell recovers.']},
+ tag(){},
+ frame(dt,v){if(!calm)bph+=dt;cg.scale.setScalar(1+.3*v.swell+.012*Math.sin(bph*2)*(.5+v.mem));
+  mem.material.opacity=.27-.14*v.mem;mem.material.color.copy(col(sc.col,0xc06060,v.mem*.6));nuc.scale.setScalar(1-.25*v.mem);
+  mt.forEach((m,i)=>{m.material.color.copy(col(0xf0a030,0x5a5048,1-v.mito));m.scale.set(1.4*(1+.7*(1-v.mito)),1+.7*(1-v.mito),1+.7*(1-v.mito))});
+  const ng=Math.round(NG*v.store);gr.forEach((g,i)=>g.visible=i<ng);
+  hd.forEach((h,i)=>h.m.visible=v.mem>.1+i*.08);
+  const n1=Math.round(NI*v.inner);for(let i=0;i<NI;i++){if(i>=n1){pi_.hide(i);continue}const p=ii[i];pi_.put(i,p.x+(calm?0:Math.sin(bph+i)*.12),p.y,p.z)}pi_.done();
+  const n2=Math.round(NO*v.outer);for(let i=0;i<NO;i++){if(i>=n2){po.hide(i);continue}const q=oo[i],a=q[0]+(calm?0:bph*.12*(q[2]+.3)),r=(cyl?3.6:5.6)+q[2]*3,b=q[1],p=cyl?V((q[1]-1.57)*3.6,Math.sin(a)*r,Math.cos(a)*r):V(r*Math.sin(b)*Math.cos(a),r*Math.cos(b),r*Math.sin(b)*Math.sin(a));po.put(i,p.x,p.y,p.z)}po.done();
+  const n3=Math.round(NK*v.leak);for(let i=0;i<NK;i++){if(i>=n3){pk.hide(i);continue}const q=kk[i],h=hd[q[0]],u=(q[1]+(calm?0:bph*.18))%1,p=h.p.clone().add(h.d.clone().multiplyScalar(.4+u*6));pk.put(i,p.x+q[2]*2,p.y+q[2]*2,p.z)}pk.done();
+  const n4=Math.round(NX*v.tox);for(let i=0;i<NX;i++){if(i>=n4){px.hide(i);continue}const q=xx[i],a=q[0]+(calm?0:bph*.1),b=q[1],r=(cyl?2.9:4.5),p=cyl?V((q[1]-1.57)*3.6,Math.sin(a)*r,Math.cos(a)*r):V(r*Math.sin(b)*Math.cos(a),r*Math.cos(b),r*Math.sin(b)*Math.sin(a));px.put(i,p.x,p.y,p.z)}px.done()}}};
+
+/* ---------- shared lab shell ---------- */
+const A=AR[sc.a](),ST=A.st.map((s,i)=>(C.st&&C.st[i])?[s[0],s[1],s[2],s[3],s[4],C.st[i]]:s);
+const PARTS=Object.assign({},A.parts,C.parts||{}),RX=C.rx,DZ=CE.presets(C);
+const goal={t:ST[0][1].clone(),r:ST[0][2],y:null,p:null};let yaw=.5,pit=.15,rad=ST[0][2],tgt=ST[0][1].clone(),stage=0;
+function go(i){stage=i;const s=ST[i];goal.t.copy(s[1]);goal.r=s[2];goal.y=s[3];goal.p=s[4];$('#lbl').innerHTML=`<b>${s[0]}</b>${esc(s[5])}`;document.querySelectorAll('[data-s]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.s===i))}
+function model(){v=CE.vars(C,sev,rx);const w=C.outs.map((o,j)=>CE.warn(C,v,j)),on=RX.filter(d=>rx[d.id]);
+ $('#out').innerHTML=C.outs.map((o,j)=>`<span class="${w[j]?'warn':''}">${CE.fmt(C,v,j)}</span>`).join(', ')+(on.length?'<ul>'+on.map(d=>`<li><b style="color:var(${d.t==='harms'?'--bad':'--ok'})">${d.t==='harms'?'Harms':'Helps'}</b> ${esc(d.n)}: ${esc(d.note)}</li>`).join('')+'</ul>':'')}
+function refresh(){model();$('#v0').textContent=Math.round(sev*100)+'%';document.querySelectorAll('[data-rx]').forEach(b=>b.setAttribute('aria-pressed',!!rx[b.dataset.rx]))}
+$('#stages').innerHTML=ST.map((s,i)=>`<button data-s="${i}">${esc(s[0])}</button>`).join('')+'<button data-next="1">Next stage</button>';
+$('#rx').innerHTML=RX.map(d=>`<button class="${d.t}" data-rx="${d.id}" aria-pressed="false">${esc(d.n)}</button>`).join('');
+$('#dz').innerHTML=DZ.map((d,i)=>`<button data-i="${i}" aria-pressed="false">${esc(d[0])}</button>`).join('');
+$('#leg').textContent=A.leg;
+$('#meta').innerHTML=`<b>Triggers.</b> ${esc(C.trig)}<br><b>Reversibility.</b> ${esc(C.rev)}`;
+$('#stages').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;go(b.dataset.next?(stage+1)%ST.length:+b.dataset.s);VOq(A.lv[stage]+'. '+ST[stage][0]+'. '+ST[stage][5])});
+$('#rx').addEventListener('click',ev=>{const b=ev.target.closest('[data-rx]');if(!b)return;const d=RX.find(x=>x.id===b.dataset.rx);rx[d.id]=!rx[d.id];refresh();
+ const w=[...$('#out').querySelectorAll('.warn')].map(e=>e.textContent).join('. ');VOq(d.n+(rx[d.id]?' switched on. ':' switched off. ')+(d.t==='harms'?'This harms. ':'This helps. ')+d.note+'. '+(rx[d.id]?CE.effect(C,d):'')+w)});
+$('#sev').addEventListener('input',ev=>{sev=ev.target.value/100;ramp=false;refresh()});
+const ptr=new Map(),zoomBy=f=>{goal.r=clamp(goal.r*f,.3,110)};
+cv.addEventListener('pointerdown',ev=>{try{cv.setPointerCapture(ev.pointerId)}catch(e){}ptr.set(ev.pointerId,[ev.clientX,ev.clientY]);dn[0]=ev.clientX;dn[1]=ev.clientY;dn[2]=1});
+cv.addEventListener('pointermove',ev=>{const o=ptr.get(ev.pointerId);if(!o)return;
+ if(ptr.size===1){goal.y=goal.p=null;yaw-=(ev.clientX-o[0])*.008;pit=clamp(pit+(ev.clientY-o[1])*.008,-1.3,1.3)}
+ else if(ptr.size===2){const q=[...ptr.entries()].find(([id])=>id!==ev.pointerId)[1];zoomBy(Math.hypot(o[0]-q[0],o[1]-q[1])/Math.hypot(ev.clientX-q[0],ev.clientY-q[1]))}
+ ptr.set(ev.pointerId,[ev.clientX,ev.clientY])});
+['pointerup','pointercancel'].forEach(t=>cv.addEventListener(t,ev=>ptr.delete(ev.pointerId)));
+cv.addEventListener('wheel',ev=>{ev.preventDefault();zoomBy(1+ev.deltaY*.001)},{passive:false});
+function fit(){const w=cv.clientWidth,h=cv.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+new ResizeObserver(fit).observe(cv);fit();
+let tsev=sev,ramp=false,hr=0,hist=[],lh=0;const ray=new THREE.Raycaster(),dn=[0,0,0];
+function spark(){const c=$('#sp'),g=c.getContext('2d');if(!g)return;const w=c.width,h=c.height;g.clearRect(0,0,w,h);g.strokeStyle='#8886';g.beginPath();g.moveTo(0,h-1);g.lineTo(w,h-1);g.stroke();
+ [0,1].forEach(s=>{const o=C.outs[s];if(!o)return;g.lineWidth=2;g.strokeStyle=s?'#f0a030':'#2ad4c0';g.beginPath();hist.forEach((p,j)=>{const x=j/79*w,y=h-4-(h-8)*clamp(p[s])*1;j?g.lineTo(x,y):g.moveTo(x,y)});g.stroke()})}
+function step(dt){if(ramp&&Math.abs(sev-tsev)>.003){sev+=(tsev-sev)*(1-Math.exp(-dt*.5));$('#sev').value=Math.round(sev*100);refresh()}
+ if(!calm)hr+=dt*3;lh+=dt;if(lh>.5){lh=0;hist.push(C.outs.map((o,j)=>{const lo=Math.min(o[2],o[3]),hi=Math.max(o[2],o[3]);return(CE.val(C,v,j)-lo)/((hi-lo)||1)}));if(hist.length>80)hist.shift();spark();$('#hr').textContent=Math.floor(hr)}}
+const phase=()=>CE.phase(sev);let lastPh=phase(),vt_=0;
+$('#dz').addEventListener('click',ev=>{const b=ev.target.closest('[data-i]');if(!b)return;const d=DZ[+b.dataset.i];
+ Object.keys(rx).forEach(x=>delete rx[x]);d[2].forEach(x=>rx[x]=true);tsev=d[1];sev=calm?tsev:0;ramp=!calm;hr=0;hist.length=0;$('#sev').value=Math.round(sev*100);refresh();
+ document.querySelectorAll('#dz button').forEach(x=>x.setAttribute('aria-pressed',x===b));$('#info').innerHTML=`<strong>${esc(d[0])}</strong><br>${esc(d[3])}`;
+ lastPh=-1;if(!ramp){lastPh=phase();VOq(C.prog[lastPh],true)}});
+$('#sev').addEventListener('input',()=>{clearTimeout(vt_);vt_=setTimeout(()=>{lastPh=phase();VOq(C.prog[lastPh])},700)});
+setInterval(()=>{if(!ramp)return;const p=phase();if(p!==lastPh){lastPh=p;VOq(C.prog[p],true)}},400);
+const plain=h=>h.replace(/<br>/g,'. ').replace(/<[^>]+>/g,'');
+new MutationObserver(()=>VOq(plain($('#info').innerHTML))).observe($('#info'),{childList:true});
+cv.addEventListener('pointerup',ev=>{if(!dn[2]||Math.hypot(ev.clientX-dn[0],ev.clientY-dn[1])>6)return;dn[2]=0;const r=cv.getBoundingClientRect();
+ ray.setFromCamera({x:(ev.clientX-r.left)/r.width*2-1,y:-(ev.clientY-r.top)/r.height*2+1},cam);
+ const hs=ray.intersectObjects(S.children,true).filter(h=>h.object.isMesh&&h.object.visible&&h.object.userData.k&&PARTS[h.object.userData.k]),bgk=['skull','pleura','mem','tub'],h=hs.find(x=>!bgk.includes(x.object.userData.k))||hs[0];
+ const i=h&&PARTS[h.object.userData.k];if(!i)return;$('#info').innerHTML=`<strong>${esc(i[0])}</strong><br>${esc(i[1])}<br><em>Care:</em> ${esc(i[2])}`});
+const clock=new THREE.Clock();
+function tick(){const dt=Math.min(clock.getDelta(),.05);step(dt);const k=calm?1:1-Math.exp(-dt*3);
+ tgt.lerp(goal.t,k);rad+=(goal.r-rad)*k;if(goal.y!==null){yaw+=(goal.y-yaw)*k;pit+=(goal.p-pit)*k}
+ cam.position.set(tgt.x+rad*Math.sin(yaw)*Math.cos(pit),tgt.y+rad*Math.sin(pit),tgt.z+rad*Math.cos(yaw)*Math.cos(pit));cam.lookAt(tgt);
+ A.frame(dt,v);R.render(S,cam);requestAnimationFrame(tick)}
+window.CCLAB={set(s,on){sev=s;tsev=s;ramp=false;Object.keys(rx).forEach(x=>delete rx[x]);(on||[]).forEach(x=>rx[x]=true);$('#sev').value=Math.round(s*100);refresh()},go,vars:()=>v};
+refresh();go(0);tick();
+}
+</script></body></html>
