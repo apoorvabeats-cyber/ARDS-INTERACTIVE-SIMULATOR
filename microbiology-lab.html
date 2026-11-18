@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Microbiology Lab · NDM and meropenem · 3D molecular simulation</title>
+<meta name="description" content="Interactive 3D molecular simulation: how an NDM metallo-β-lactamase in the periplasm of Pseudomonas aeruginosa hydrolyses meropenem, plus a second experiment with cefiderocol, ceftazidime-avibactam, colistin and amikacin.">
+<style>
+:root{--bg:#06101a;--ink:#e8f1f8;--mute:#8fa6b8;--panel:#0c1c2b;--line:#1f3a52;--acc:#4de3d0;--acc2:#7fb7ff;--bad:#ff6a5e;--ok:#4dffa0;--warn:#ffc857;color-scheme:dark;box-sizing:border-box}
+*,*::before,*::after{box-sizing:inherit}
+html{background:var(--bg)}
+body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#0d2a3a 0,transparent 60%),var(--bg);color:var(--ink);font:15px/1.5 "Avenir Next","Segoe UI",Roboto,system-ui,sans-serif;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+main{max-width:1040px;margin:0 auto;padding:14px 16px 40px}
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.top a,.top button{font:inherit;font-size:13px;color:var(--ink);text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 14px;min-height:38px;display:inline-flex;align-items:center;cursor:pointer}
+.top .sp{flex:1}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);margin:6px 0 2px}
+h1{margin:0 0 4px;font-size:clamp(21px,3.4vw,30px);letter-spacing:-.01em;line-height:1.2}
+.sub{color:var(--mute);margin:0 0 12px;font-size:14px;max-width:70ch}
+.stage{position:relative;border-radius:16px;overflow:hidden;background:#07101c;border:1px solid var(--line);aspect-ratio:16/10;touch-action:none;user-select:none}
+@media (max-width:700px){.stage{aspect-ratio:4/5;max-height:74vh}}
+canvas{display:block;width:100%;height:100%;cursor:grab}
+.ml{position:absolute;left:0;top:0;pointer-events:none;font-size:11.5px;line-height:1.2;color:#e9fbff;background:rgba(5,16,28,.72);border:1px solid rgba(127,232,255,.45);border-radius:6px;padding:3px 7px;white-space:nowrap;opacity:0;transition:opacity .35s;will-change:transform;max-width:60vw}
+.ml.on{opacity:1}
+#labels{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.hud{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;gap:8px;pointer-events:none;font-size:12px}
+.chip{background:rgba(5,16,28,.72);border:1px solid var(--line);border-radius:999px;padding:5px 11px;backdrop-filter:blur(4px)}
+.chip b{color:var(--acc);font-weight:600}
+.cap{position:absolute;left:0;right:0;bottom:0;padding:34px 14px 12px;background:linear-gradient(transparent,rgba(3,9,16,.86) 55%);pointer-events:none}
+.cap b{display:block;font-size:15px;margin-bottom:2px}
+.cap span{display:block;font-size:13px;color:#cfe0ec;max-width:92ch}
+.tag{position:absolute;left:50%;top:16%;transform:translate(-50%,0);background:rgba(8,26,40,.88);border:1px solid var(--acc);color:var(--acc);border-radius:999px;padding:7px 18px;font-weight:600;font-size:14px;letter-spacing:.03em;opacity:0;pointer-events:none;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis}
+.tag.show{animation:tag 3.2s ease both}
+.tag.bad{border-color:var(--bad);color:var(--bad)}
+@keyframes tag{0%{opacity:0;transform:translate(-50%,10px)}12%,78%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-6px)}}
+.flash{position:absolute;inset:0;background:radial-gradient(circle,#c8fff6,#58d6c3 60%,#0a2b33);opacity:0;pointer-events:none}
+.start{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(3,9,16,.55);backdrop-filter:blur(2px);text-align:center;padding:20px}
+.start[hidden]{display:none}
+.start p{margin:0;max-width:46ch;color:#d3e4ef;font-size:14px}
+.big{font:inherit;font-size:16px;font-weight:600;color:#04201f;background:var(--acc);border:0;border-radius:999px;padding:12px 26px;cursor:pointer;min-height:46px}
+.big:focus-visible,button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--acc2);outline-offset:2px}
+.transport{display:flex;align-items:center;gap:10px;margin:10px 0 2px}
+.transport button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;min-width:44px;min-height:40px;padding:0 12px;cursor:pointer}
+.scrub{position:relative;flex:1}
+.scrub input{width:100%;accent-color:var(--acc);margin:0}
+.ticks{position:absolute;left:0;right:0;top:-4px;height:6px;pointer-events:none}
+.ticks i{position:absolute;top:0;width:2px;height:6px;background:var(--line)}
+.time{font-variant-numeric:tabular-nums;color:var(--mute);font-size:13px;min-width:92px;text-align:right}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:12px}
+.panel h2{margin:0 0 8px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px 18px}
+.grp{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font:inherit;font-size:14px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:999px;padding:7px 14px;min-height:38px;cursor:pointer}
+.pill[aria-pressed="true"]{border-color:var(--acc);color:var(--acc);background:rgba(77,227,208,.09)}
+.sw{display:flex;align-items:center;gap:10px;font-size:14px;min-height:38px;cursor:pointer}
+.sw input{width:20px;height:20px;accent-color:var(--acc)}
+.apply{font:inherit;font-weight:600;font-size:14px;color:#04201f;background:var(--acc2);border:0;border-radius:999px;padding:10px 18px;min-height:42px;cursor:pointer;margin-top:4px}
+.apply.pending{box-shadow:0 0 0 3px rgba(127,183,255,.35)}
+.note{color:var(--mute);font-size:12.5px;margin:8px 0 0}
+.res h2{color:var(--acc)}
+.rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 16px;margin:0}
+.rows div{border-left:2px solid var(--line);padding-left:10px}
+.rows dt{font-size:11.5px;color:var(--mute);letter-spacing:.06em;text-transform:uppercase}
+.rows dd{margin:0;font-weight:600}
+.learn{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:rgba(77,227,208,.08);border:1px solid rgba(77,227,208,.35)}
+.learn b{color:var(--acc)}
+.path{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0 0;padding:0;list-style:none;font-size:12.5px}
+.path li{background:#0a2236;border:1px solid var(--line);border-radius:8px;padding:5px 9px}
+.path li+li::before{content:"→";color:var(--acc);margin-right:6px;margin-left:-3px}
+.path li{display:inline-flex}
+.drugs{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.drug{font:inherit;text-align:left;color:var(--ink);background:#0a2236;border:1px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer;min-height:64px}
+.drug b{display:block}
+.drug span{font-size:12.5px;color:var(--mute)}
+.drug[aria-pressed="true"]{border-color:var(--acc);box-shadow:0 0 0 2px rgba(77,227,208,.2)}
+details{margin-top:12px;color:var(--mute);font-size:13.5px}
+details summary{cursor:pointer;color:var(--ink)}
+details li{margin:4px 0}
+[hidden]{display:none !important}
+.err{padding:22px;color:#ffd3cf}
+</style></head>
+<body><main>
+<div class="top"><a href="index.html" id="back">← Back to hall</a><span class="sp"></span><button id="voice" aria-pressed="true">Voice on</button></div>
+<div class="eyebrow">Microbiology Lab · 3D molecular simulation</div>
+<h1 id="h1">Pseudomonas aeruginosa: NDM-mediated carbapenem resistance</h1>
+<p class="sub" id="sub">What happens when meropenem meets a Pseudomonas aeruginosa producing NDM (New Delhi metallo-β-lactamase)? Watch entry, enzyme recognition, hydrolysis of the β-lactam ring, loss of activity and survival. Drag to orbit, scroll or pinch to zoom.</p>
+
+<div class="stage" id="stage">
+  <canvas id="cv" aria-label="3D molecular simulation of meropenem and NDM in the periplasm of Pseudomonas aeruginosa"></canvas>
+  <div id="labels"></div>
+  <div class="hud"><span class="chip" id="sceneChip"><b>Scene 1</b> · Bacterial introduction</span><span class="chip" id="clock">0:00</span></div>
+  <div class="tag" id="tag"></div>
+  <div class="cap"><b id="capT"></b><span id="capD"></span></div>
+  <div class="flash" id="flash"></div>
+  <div class="start" id="start"><button class="big" id="go">▶ Start experiment</button><p id="startP">About 60 seconds · cinematic 3D · narrated. Molecular scale is schematic, not to scale.</p></div>
+</div>
+
+<div class="transport">
+  <button id="restart" aria-label="Restart">⏮</button><button id="play" aria-label="Play or pause">▶</button>
+  <div class="scrub"><div class="ticks" id="ticks"></div><input id="seek" type="range" min="0" max="60" step="0.1" value="0" aria-label="Timeline"></div>
+  <span class="time" id="time">0:00 / 1:00</span>
+</div>
+
+<section class="panel" aria-labelledby="ctl">
+  <h2 id="ctl">Molecular experiment controls</h2>
+  <div class="grid">
+    <div><div class="note" style="margin:0 0 6px">Animation speed</div><div class="grp" id="gSpeed"><button class="pill" data-v="0.5" aria-pressed="false">0.5×</button><button class="pill" data-v="1" aria-pressed="true">1×</button><button class="pill" data-v="2" aria-pressed="false">2×</button></div></div>
+    <div><div class="note" style="margin:0 0 6px">Camera view</div><div class="grp" id="gView"><button class="pill" data-v="auto" aria-pressed="true">Cinematic</button><button class="pill" data-v="cell" aria-pressed="false">Whole cell</button><button class="pill" data-v="peri" aria-pressed="false">Periplasm</button><button class="pill" data-v="mol" aria-pressed="false">Molecular</button></div></div>
+    <div><label class="sw"><input type="checkbox" id="swLabels" checked> Show molecular labels</label><label class="sw"><input type="checkbox" id="swNdm" checked> NDM enzyme active</label><button class="apply" id="apply">Apply experiment settings</button></div>
+  </div>
+  <p class="note" id="applyNote">Speed, camera and labels change instantly. Switching NDM on or off starts a new run when you press Apply. With NDM off the same bacterium is a susceptible control, so you can see what NDM prevents. Other resistance mechanisms (efflux, porin loss) stay switched off.</p>
+</section>
+
+<section class="panel res" id="result" hidden aria-live="polite">
+  <h2 id="resT">Experiment result</h2>
+  <dl class="rows" id="resRows"></dl>
+  <p class="learn"><b>Learning point.</b> <span id="resLearn"></span></p>
+  <ol class="path" id="resPath" aria-label="Final molecular pathway"></ol>
+</section>
+
+<section class="panel" id="exp2" hidden>
+  <h2>Second experiment</h2>
+  <p style="margin:0 0 10px"><b>What happens when we introduce a different antibiotic?</b> The same NDM-producing bacterium, with NDM active. Choose an agent:</p>
+  <div class="drugs" id="drugs">
+    <button class="drug" data-id="cfdc" aria-pressed="false"><b>Cefiderocol</b><span>Siderophore cephalosporin</span></button>
+    <button class="drug" data-id="cazavi" aria-pressed="false"><b>Ceftazidime-avibactam</b><span>Cephalosporin + non-β-lactam inhibitor</span></button>
+    <button class="drug" data-id="colistin" aria-pressed="false"><b>Colistin</b><span>Polymyxin (targets LPS)</span></button>
+    <button class="drug" data-id="amikacin" aria-pressed="false"><b>Amikacin</b><span>Aminoglycoside (targets 30S)</span></button>
+  </div>
+  <p class="note">NDM does not automatically confer resistance to all of these. Their activity depends on other resistance mechanisms and on the isolate-specific susceptibility profile. Avibactam does not inhibit NDM.</p>
+</section>
+
+<details><summary>Scientific notes and limits of this model</summary>
+<ul>
+<li>NDM is a zinc-dependent metallo-β-lactamase found in the periplasm of Gram-negative bacteria. It is <b>not</b> a porin and it does <b>not</b> pump antibiotics out: it hydrolyses susceptible β-lactams. Zn²⁺ ions activate a water molecule (hydroxide) that attacks the β-lactam carbonyl.</li>
+<li>Real NDM-producing Pseudomonas can also carry efflux, porin loss, AmpC and other mechanisms. They are all switched off here.</li>
+<li>Structures are schematic and not to scale (1 unit ≈ 0.25 nm; the periplasm is compressed). Zn²⁺ and water are enlarged for visibility.</li>
+<li>Educational model written for teaching, not for treatment decisions. Susceptibility must come from the isolate’s antimicrobial susceptibility testing.</li>
+</ul></details>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="micro/engine.js?v=20261118m"></script>
+<script src="micro/world.js?v=20261118m"></script>
+<script src="micro/lab.js?v=20261118m"></script>
+<script src="micro/scenarios.js?v=20261118m"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const fmt=s=>{s=Math.max(0,Math.floor(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+if(!window.THREE||!window.MICRO||!MICRO.Lab){document.querySelector('.stage').innerHTML='<div class="err">The 3D engine could not load. Check your connection and reload.</div>';return;}
+let lab;
+try{lab=MICRO.Lab($('cv'),$('stage'),$('labels'));}catch(e){document.querySelector('.stage').innerHTML='<div class="err">This device could not start WebGL, which the 3D simulation needs.</div>';return;}
+window.__lab=lab;
+const st={exp:'ndm_on',ndmApplied:true,exp1Done:false};
+/* ---------- soft male voice-over (Web Speech API) ---------- */
+const Voice={on:true,v:null,
+  pick(){const vs=speechSynthesis.getVoices();if(!vs.length)return;const en=vs.filter(x=>/^en/i.test(x.lang));const male=/(daniel|alex|fred|oliver|arthur|google uk english male|microsoft (guy|ryan|david|mark|george)|male)/i;this.v=en.find(x=>male.test(x.name))||en.find(x=>/en-(GB|IN|US)/i.test(x.lang))||en[0]||null;},
+  say(t){if(!this.on||!('speechSynthesis' in window))return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);if(this.v)u.voice=this.v;u.lang=(this.v&&this.v.lang)||'en-GB';u.rate=lab.speed>1?1.05:.88;u.pitch=.8;u.volume=.8;speechSynthesis.speak(u);}catch(e){}},
+  stop(){try{speechSynthesis.cancel();}catch(e){}}};
+if('speechSynthesis' in window){Voice.pick();speechSynthesis.onvoiceschanged=()=>Voice.pick();}else{$('voice').hidden=true;}
+$('voice').onclick=()=>{Voice.on=!Voice.on;$('voice').setAttribute('aria-pressed',Voice.on);$('voice').textContent=Voice.on?'Voice on':'Voice off';if(!Voice.on)Voice.stop();else if(lab.playing&&cur)Voice.say(cur.voice);};
+/* ---------- load an experiment ---------- */
+let cur=null,tagTimer=0;
+const TITLES={ndm_on:['Pseudomonas aeruginosa: NDM-mediated carbapenem resistance','What happens when meropenem meets a Pseudomonas aeruginosa producing NDM (New Delhi metallo-β-lactamase)? Watch entry, enzyme recognition, hydrolysis of the β-lactam ring, loss of activity and survival. Drag to orbit, scroll or pinch to zoom.'],
+ ndm_off:['Control run: the same bacterium without NDM','NDM is switched off, so meropenem is not hydrolysed in the periplasm. Compare with the NDM run: this shows what the enzyme prevents. Efflux and porin loss remain switched off.'],
+ cfdc:['Second experiment: cefiderocol','Same NDM-producing bacterium, NDM active. A siderophore cephalosporin takes a different route in.'],
+ cazavi:['Second experiment: ceftazidime-avibactam','Same NDM-producing bacterium, NDM active. Does the β-lactamase inhibitor rescue ceftazidime?'],
+ colistin:['Second experiment: colistin','Same NDM-producing bacterium, NDM active. A polymyxin attacks the outer membrane itself.'],
+ amikacin:['Second experiment: amikacin','Same NDM-producing bacterium, NDM active. An aminoglycoside has to reach the ribosome.']};
+function load(id,autoplay){
+  st.exp=id;Voice.stop();const sc=MICRO.scenarios[id]();lab.setScenario(sc);lab.view=curView;
+  $('h1').textContent=TITLES[id][0];$('sub').textContent=TITLES[id][1];
+  $('seek').max=sc.duration;$('seek').value=0;
+  $('ticks').innerHTML=sc.scenes.slice(1).map(s=>'<i style="left:'+(s.t0/sc.duration*100)+'%"></i>').join('');
+  $('result').hidden=true;cur=null;$('tag').classList.remove('show');
+  document.querySelectorAll('.drug').forEach(b=>b.setAttribute('aria-pressed',b.dataset.id===id));
+  lab.renderNow();$('start').hidden=!!autoplay;$('play').textContent=autoplay?'⏸':'▶';
+  if(autoplay){lab.playing=true;}
+  syncClock();
+}
+let curView='auto';
+function showResult(){
+  const r=lab.sc.result;if(!r)return;
+  $('resT').textContent=st.exp==='ndm_on'||st.exp==='ndm_off'?'Experiment result':'Experiment 2 result · '+TITLES[st.exp][0].replace('Second experiment: ','');
+  $('resRows').innerHTML=r.rows.map(x=>'<div><dt>'+x[0]+'</dt><dd>'+x[1]+'</dd></div>').join('');
+  $('resLearn').textContent=r.learn;$('resPath').innerHTML=r.path.map(x=>'<li>'+x+'</li>').join('');
+  $('result').hidden=false;
+  if(st.exp==='ndm_on'||st.exp==='ndm_off'){st.exp1Done=true;}
+  if(st.exp1Done)$('exp2').hidden=false;
+  setTimeout(()=>{try{$('result').scrollIntoView({behavior:'smooth',block:'nearest'});}catch(e){}},300);
+}
+lab.onScene=(i,s)=>{
+  cur=s;$('sceneChip').innerHTML='<b>Scene '+(i+1)+'</b> · '+s.title;$('capT').textContent=s.title;$('capD').textContent=s.cap;
+  const tg=$('tag');tg.classList.remove('show');void tg.offsetWidth;
+  if(s.tag&&lab.playing){tg.textContent=s.tag;tg.classList.toggle('bad',/blocked|PBP inhibited/i.test(s.tag));tg.classList.add('show');}
+  if(lab.playing)Voice.say(s.voice);
+};
+function syncClock(){const d=lab.sc?lab.sc.duration:60;$('clock').textContent=fmt(lab.t);$('time').textContent=fmt(lab.t)+' / '+fmt(d);$('seek').value=lab.t;$('flash').style.opacity=lab.flash||0;}
+lab.onTime=syncClock;
+lab.onEnd=()=>{$('play').textContent='▶';showResult();};
+/* ---------- transport ---------- */
+function play(){if(lab.t>=lab.sc.duration-.05){lab.seek(0);$('result').hidden=true;}lab.playing=true;$('start').hidden=true;$('play').textContent='⏸';if(cur)Voice.say(cur.voice);}
+function pause(){lab.playing=false;$('play').textContent='▶';Voice.stop();}
+$('go').onclick=play;$('play').onclick=()=>lab.playing?pause():play();
+$('restart').onclick=()=>{Voice.stop();lab.seek(0);$('result').hidden=true;lab.playing=true;$('start').hidden=true;$('play').textContent='⏸';};
+$('seek').oninput=e=>{Voice.stop();lab.seek(parseFloat(e.target.value));$('result').hidden=true;if(!lab.playing)lab.renderNow();syncClock();};
+document.addEventListener('keydown',e=>{if(e.code==='Space'&&!/INPUT|BUTTON|SUMMARY/.test(document.activeElement.tagName)){e.preventDefault();lab.playing?pause():play();}});
+/* ---------- controls ---------- */
+function pills(id,fn){const g=$(id);g.addEventListener('click',e=>{const b=e.target.closest('.pill');if(!b)return;g.querySelectorAll('.pill').forEach(x=>x.setAttribute('aria-pressed',x===b));fn(b.dataset.v);});}
+pills('gSpeed',v=>{lab.speed=parseFloat(v);});
+pills('gView',v=>{curView=v;lab.view=v;lab.resetUser();lab.snap();if(!lab.playing)lab.renderNow();});
+$('swLabels').onchange=e=>{lab.labels=e.target.checked;if(!lab.playing)lab.renderNow();};
+function pend(){$('apply').classList.toggle('pending',$('swNdm').checked!==st.ndmApplied);}
+$('swNdm').onchange=pend;
+$('apply').onclick=()=>{st.ndmApplied=$('swNdm').checked;pend();load(st.ndmApplied?'ndm_on':'ndm_off',true);Voice.say(cur?cur.voice:'');};
+$('drugs').addEventListener('click',e=>{const b=e.target.closest('.drug');if(!b)return;load(b.dataset.id,true);try{$('stage').scrollIntoView({behavior:'smooth',block:'nearest'});}catch(x){}});
+window.addEventListener('pagehide',Voice.stop);
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&lab.playing)pause();});
+/* ---------- boot ---------- */
+const q=new URLSearchParams(location.search);
+load(MICRO.scenarios[q.get('x')]?q.get('x'):'ndm_on',false);
+lab.start();
+if(q.get('t')){lab.seek(parseFloat(q.get('t')));lab.renderNow();$('start').hidden=true;}
+})();
+</script>
+</body></html>

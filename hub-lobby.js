@@ -40,8 +40,9 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   }
   box(10, 0.12, 10, floorMat, 0, 0, 0);
   box(10, 0.1, 10, ceilMat, 0, 3.15, 0);
-  box(0.16, 3.1, 3.3, wallMat, 5, 1.55, -3.2);
-  box(0.16, 3.1, 3.3, wallMat, 5, 1.55, 3.2);
+  box(0.16, 3.1, 3.9, wallMat, 5, 1.55, -3.05);
+  box(0.16, 3.1, 3.9, wallMat, 5, 1.55, 3.05);
+  box(0.16, 0.62, 2.2, wallMat, 5, 2.79, 0);
   box(3.3, 3.1, 0.16, wallMat, -3.2, 1.55, -5);
   box(3.3, 3.1, 0.16, wallMat, 3.2, 1.55, -5);
   box(3.9, 3.1, 0.16, wallMat, -3.05, 1.55, 5);
@@ -110,6 +111,9 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   const leftDoor = door("path", "PATHOPHYSIOLOGY LIVE");
   leftDoor.position.set(-4.82, 0, 0);
   leftDoor.rotation.y = Math.PI / 2;
+  const rightDoor = door("micro", "MICROBIOLOGY LAB");
+  rightDoor.position.set(4.82, 0, 0);
+  rightDoor.rotation.y = -Math.PI / 2;
 
   const backSign = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.42, 0.04), sign("CRITICAL CARE HUB"));
   backSign.position.set(0, 2.15, -4.88);
@@ -159,6 +163,8 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     if (kind === "icu") {
       const btn = document.getElementById("icu-enter");
       if (btn) btn.click();
+    } else if (kind === "micro") {
+      location.href = "microbiology-lab.html?v=20261118m";
     } else {
       location.href = "pathology-live.html?v=20261118k";
     }
@@ -172,7 +178,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     yaw = 0;
     pit = 0;
     eye.set(0, 1.62, 0);
-    try { shut(front); shut(leftDoor); } catch (err) {}
+    try { shut(front); shut(leftDoor); shut(rightDoor); } catch (err) {}
     if (fade) fade.style.opacity = "0";
     document.body.classList.add("icu-gate");
     document.body.classList.remove("icu-open", "in", "enter", "inside", "lab", "arena", "osce", "reference", "picking", "body-only");
@@ -202,9 +208,9 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     clearTimeout(window.hubVoiceTimer);
     clearTimeout(leaveTimer);
     leaveTimer = setTimeout(() => finish(kind), calm ? 40 : 1800);
-    const door = kind === "icu" ? front : leftDoor;
-    const face = kind === "icu" ? 0 : -Math.PI / 2;
-    const dest = kind === "icu" ? new THREE.Vector3(0, 1.62, 5.5) : new THREE.Vector3(-5.5, 1.62, 0);
+    const door = kind === "icu" ? front : kind === "micro" ? rightDoor : leftDoor;
+    const face = kind === "icu" ? 0 : kind === "micro" ? Math.PI / 2 : -Math.PI / 2;
+    const dest = kind === "icu" ? new THREE.Vector3(0, 1.62, 5.5) : kind === "micro" ? new THREE.Vector3(5.5, 1.62, 0) : new THREE.Vector3(-5.5, 1.62, 0);
     job = { kind, door, face, dest, t: 0 };
     if (calm) finish(kind);
     if (kind === "icu" && window.playIcuVoice) window.playIcuVoice();
@@ -271,7 +277,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       job.door.userData.left.position.x = -0.48 - o * 0.85;
       job.door.userData.right.position.x = 0.48 + o * 0.85;
       if (o > 0.45) eye.lerp(job.dest, calm ? 1 : 0.08);
-      const along = job.kind === "icu" ? eye.z : -eye.x;
+      const along = job.kind === "icu" ? eye.z : job.kind === "micro" ? eye.x : -eye.x;
       if (fade) fade.style.opacity = String(Math.max(0, (along - 2.4) / 2.4));
       if (along > 4.2 || job.t > 2.2) {
         finish(job.kind);
