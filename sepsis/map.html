@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sepsis: living complication map</title>
+<style>
+:root{--bg:#eef3f8;--ink:#0c1b2e;--mute:#546579;--panel:#fff;--line:#b9c8d8;--acc:#0a7f8f;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#06111f;--ink:#e6f1fb;--mute:#8fa5bb;--panel:#0d2036;--line:#24435f;--acc:#3fe0f0;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#06111f;--ink:#e6f1fb;--mute:#8fa5bb;--panel:#0d2036;--line:#24435f;--acc:#3fe0f0;color-scheme:dark}
+html{background:var(--bg);scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Avenir Next","Segoe UI",Roboto,system-ui,sans-serif}
+main{max-width:460px;margin:0 auto;padding:16px 14px 28px}
+h1{margin:0;font-size:26px;letter-spacing:-.01em}
+#stage{color:var(--acc);font-weight:600;margin:2px 0 12px}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 12px;cursor:pointer}
+button:focus-visible,.node:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button[aria-pressed="true"]{border-color:var(--acc);color:var(--acc)}
+label{display:block;margin:12px 0 2px;color:var(--mute);font-size:13px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+svg{width:100%;height:auto;display:block}
+.node{cursor:pointer}.node text{fill:var(--ink);font-size:10.5px;font-weight:600;text-anchor:middle;pointer-events:none}
+.hub text{fill:var(--ink);font-size:16px;font-weight:700;text-anchor:middle}
+.flow{animation:dash 1.1s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-12}}
+.hot .glow{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.1}}
+.t1{fill:var(--ink);font-size:13.5px;font-weight:700}.t2{fill:var(--mute);font-size:11px}
+.chips{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}
+.chip{border-radius:12px;text-align:left;padding:8px 10px;font-size:13px}
+.chip b{display:block;font-size:12px;color:var(--mute);font-weight:500}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+.panel ul{margin:4px 0 0;padding-left:18px}.panel li{margin:3px 0}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin:6px 0}.bar i{display:block;height:100%}
+h2{margin:6px 0 0;font-size:21px}
+a.lab3d{display:inline-block;margin:8px 6px 0 0;padding:8px 14px;border:1px solid var(--acc);border-radius:999px;color:var(--acc);text-decoration:none;font-weight:600;font-size:14px}
+a.lab3d:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.hint{color:var(--mute);font-size:13px;text-align:center;margin:4px 0 0}
+@keyframes beat{50%{transform:scale(var(--a))}}
+.rx ul{padding-left:0}.rx li{list-style:none;margin:5px 0}.rx b{display:inline-block;min-width:46px;font-size:12px}.up b{color:#2bb673}.dn b{color:#ef5b52}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style></head><body><main>
+<h1>Sepsis</h1><div id="stage"></div>
+<div class="row" id="presets">
+<button data-p="15">Early sepsis</button><button data-p="35">Organ dysfunction</button><button data-p="65">Septic shock</button><button data-p="95">Multi-organ failure</button></div>
+<label for="prog">Disease progression</label>
+<input id="prog" type="range" min="0" max="100" value="35">
+<div class="row" style="margin-top:8px"><button id="rx" aria-pressed="false">Source control and resuscitation</button></div>
+<div id="view"></div>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const C=[
+{id:'shock',n:['Septic','shock'],a:-90,on:.25,val:s=>'MAP '+Math.round(88-42*s)+' mmHg',st:[
+["Cytokine and nitric oxide surge","Mediators flood the circulation"],
+["Vasoplegia","Arterioles dilate and stop answering pressors"],
+["Capillary leak","Plasma escapes: relative hypovolaemia"],
+["Hypoperfusion","MAP below 65, lactate rising, organs starve"]]},
+{id:'cardiac',n:['Myocardial','dysfunction'],a:-30,on:.35,val:s=>'EF '+Math.round(62-32*s)+'%',st:[
+["Cytokines depress contractility","TNF, IL-1 and NO act on the myocyte"],
+["Cellular energy failure","Mitochondrial injury, β-receptor loss"],
+["Ventricular dilatation","EF falls, usually reversible in days"],
+["Low output state","Troponin rises, cardiac output drops"]]},
+{id:'ards',n:['ARDS'],a:30,on:.3,val:s=>'P/F '+Math.round(430-330*s),st:[
+["Alveolar-capillary injury","Neutrophils damage endothelium and epithelium"],
+["Protein-rich oedema","Leak floods alveoli, surfactant is lost"],
+["Atelectasis and shunt","Perfused alveoli without ventilation"],
+["Hypoxaemia","P/F falls, compliance drops, PEEP needed"]]},
+{id:'aki',n:['AKI'],a:90,on:.4,val:s=>'UO '+(1-.9*s).toFixed(1)+' ml/kg/h',st:[
+["Renal hypoperfusion","Low MAP and microvascular shunting"],
+["Tubular cell injury","Mitochondrial dysfunction in the PCT"],
+["Tubular obstruction","Casts and debris, filtrate back-leaks"],
+["GFR falls","Oliguria, creatinine and potassium rise"]]},
+{id:'dic',n:['DIC'],a:150,on:.5,val:s=>'Plt '+Math.round(250-200*s)+' ×10⁹/L',st:[
+["Tissue factor expressed","Monocytes and endothelium trigger clotting"],
+["Thrombin burst","Fibrin microthrombi form in small vessels"],
+["Natural anticoagulants fail","Antithrombin and protein C depleted"],
+["Consumption","Platelets fall: bleeding plus ischaemia"]]},
+{id:'enceph',n:['Encephalo-','pathy'],a:210,on:.2,val:s=>'GCS '+Math.round(15-8*s),st:[
+["Neuroinflammation","Microglia activate, blood-brain barrier leaks"],
+["Autoregulation lost","Brain flow follows blood pressure passively"],
+["Neurotransmitter imbalance","Cortical energy failure"],
+["Altered consciousness","Delirium, then coma; GCS falls"]]}];
+const M=Object.fromEntries(C.map(c=>[c.id,c]));
+const E=[
+['shock','cardiac','Hypotension cuts coronary flow; cytokines depress the myocardium'],
+['cardiac','ards','LV failure adds hydrostatic oedema to the inflammatory leak'],
+['ards','aki','Fluid overload and hypoxaemia worsen renal injury'],
+['aki','dic','Microthrombi lodge in glomerular capillaries'],
+['dic','enceph','Microvascular thrombosis and haemorrhage in the brain'],
+['enceph','shock','Hypotension strips cerebral perfusion'],
+['shock','dic','Hypoperfusion and endothelial injury feed coagulopathy'],
+['shock','ards','Hypoxaemia deepens vasoplegia and lactate'],
+['cardiac','aki','Low output and venous congestion: cardiorenal injury']];
+let p=.35,rx=false,open=null,zoom=0,seg=null,dg={};
+const clamp=x=>Math.max(0,Math.min(1,x));
+const sev=c=>clamp((p-c.on)/(1-c.on))**.8*(rx?.65:1);
+const col=s=>`hsl(${175-175*s} 85% 52%)`;
+const stage=()=>p<.25?'Early sepsis':p<.5?'Sepsis with organ dysfunction':p<.8?'Septic shock':'Multi-organ failure';
+const pos=c=>[200+138*Math.cos(c.a*Math.PI/180),200+138*Math.sin(c.a*Math.PI/180)];
+const calm=matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+function wheel(){
+ let g='';
+ C.forEach(c=>{const[x,y]=pos(c);g+=`<line x1="200" y1="200" x2="${x}" y2="${y}" stroke="${col(sev(c))}" stroke-opacity=".4" stroke-width="1.5"/>`});
+ E.forEach(([a,b])=>{const s=Math.min(sev(M[a]),sev(M[b])),[x1,y1]=pos(M[a]),[x2,y2]=pos(M[b]);
+  g+=`<line class="${s>.12?'flow':''}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col(s)}" stroke-width="${.8+4*s}" stroke-opacity="${.12+.88*s}" stroke-dasharray="${s>.12?'6 6':'2 6'}"/>`});
+ C.forEach(c=>{const[x,y]=pos(c),s=sev(c),k=col(s),l=c.n.length;
+  g+=`<g class="node ${s>.6?'hot':''}" tabindex="0" role="button" data-id="${c.id}" aria-label="${c.n.join(' ')}: ${c.val(s)}">
+  <circle r="39" cx="${x}" cy="${y}" fill="var(--panel)"/><circle class="glow" r="39" cx="${x}" cy="${y}" fill="${k}" fill-opacity="${.08+.3*s}"/>
+  <circle r="39" cx="${x}" cy="${y}" fill="none" stroke="${k}" stroke-width="${2+2.5*s}"/>
+  ${c.n.map((t,i)=>`<text x="${x}" y="${y+4+(i-(l-1)/2)*13}">${t}</text>`).join('')}</g>`});
+ g+=`<g class="hub"><circle cx="200" cy="200" r="48" fill="var(--panel)" stroke="${col(p)}" stroke-width="3.5"/><text x="200" y="206">Sepsis</text></g>`;
+ const act=E.map(([a,b,t])=>[Math.min(sev(M[a]),sev(M[b])),t]).filter(e=>e[0]>.15).sort((a,b)=>b[0]-a[0]).slice(0,3);
+ return `<svg viewBox="0 0 400 400" role="img" aria-label="Sepsis and six complications">${g}</svg>
+ <div class="chips">${C.map(c=>`<button class="chip" data-id="${c.id}" style="border-color:${col(sev(c))}"><b>${c.n.join('').replace('-','')}</b>${c.val(sev(c))}</button>`).join('')}</div>
+ <div class="panel"><strong>Active links</strong>${act.length?`<ul>${act.map(e=>`<li>${e[1]}</li>`).join('')}</ul>`:'<div>No organ links are active yet. Advance the disease to see them.</div>'}</div>
+ <p class="hint">Tap a complication to open its mechanism and its 3D lab.</p>`;
+}
+
+function detail(c){
+ const s=sev(c),k=col(s),TH=[.04,.3,.55,.8];let g='';
+ c.st.forEach((t,i)=>{const on=s>=TH[i],y=6+i*108;
+  g+=`<rect x="24" y="${y}" width="312" height="72" rx="12" fill="${on?k:'none'}" fill-opacity="${on?.16:0}" stroke="${on?k:'var(--line)'}" stroke-width="${on?2:1}"/>
+  <text class="t1" x="40" y="${y+31}" opacity="${on?1:.5}">${t[0]}</text><text class="t2" x="40" y="${y+52}" opacity="${on?1:.6}">${t[1]}</text>`;
+  if(i<3){const a=y+72,b=y+108,live=s>=TH[i+1];
+   g+=`<line x1="180" y1="${a}" x2="180" y2="${b}" stroke="${live?k:'var(--line)'}" stroke-width="2.5" ${live?'':'stroke-dasharray="3 5"'}/>`;
+   if(live&&!calm)for(let j=0;j<3;j++)g+=`<circle r="3.5" fill="${k}"><animateMotion dur="${(1.7-s).toFixed(2)}s" begin="${j*.5}s" repeatCount="indefinite" path="M180 ${a} L180 ${b}"/></circle>`;}
+ });
+ const links=E.filter(e=>e[0]===c.id||e[1]===c.id);
+ return `<button data-back style="margin-top:12px">← Sepsis map</button>
+ <h2>${c.n.join('').replace('-','')}</h2><div style="color:${k};font-weight:600">${c.val(s)}</div><a class="lab3d" href="lab-${c.id}.html" data-lab="${c.id}">Open the 3D lab</a>${c.id==='aki'?'<a class="lab3d" href="../nephrology-lab.html" target="_top">Full Nephrology Learning Lab</a>':''}
+ <div class="bar"><i style="width:${Math.round(s*100)}%;background:${k}"></i></div>
+ <div class="row" style="margin:10px 0 4px"><button data-z="0" aria-pressed="${!zoom}">Organ view</button><button data-z="1" aria-pressed="${zoom===1}">Cell view</button>${c.id==='aki'?`<button data-z="2" aria-pressed="${zoom===2}">Nephron lab</button>`:''}</div>${c.id==='aki'&&zoom===2?nephView(s):`<svg viewBox="0 0 360 250" role="img" aria-label="Animated anatomy">${(zoom?CELL:A)[c.id](s,k)}</svg>`}${drugs(c)}<h3 style="margin:14px 0 0;font-size:16px">Mechanism chain</h3><svg viewBox="0 0 360 428" role="img" aria-label="Mechanism chain">${g}</svg>
+ <div class="panel"><strong>Linked complications</strong><ul>${links.map(e=>{const o=M[e[0]===c.id?e[1]:e[0]];return `<li><a href="#${o.id}" data-id="${o.id}" style="color:var(--acc)">${o.n.join('').replace('-','')}</a>: ${e[2]}</li>`}).join('')}</ul></div>`;
+}
+
+const dots=(path,n,dur,fill,r=3.5)=>calm?'':Array.from({length:n},(_,i)=>`<circle r="${r}" fill="${fill}"><animateMotion dur="${dur.toFixed(2)}s" begin="${(i*dur/n).toFixed(2)}s" repeatCount="indefinite" path="${path}"/></circle>`).join('');
+const T=(x,y,t)=>`<text class="t2" x="${x}" y="${y}" text-anchor="middle">${t}</text>`;
+const RB='#e0405a',WT='#4aa8ff',PL='#f0c040';
+const A={
+shock:(s,k)=>{const h=18+26*s;return `<rect x="10" y="${110-h}" width="340" height="3" fill="#c0564f"/><rect x="10" y="${110+h}" width="340" height="3" fill="#c0564f"/>${dots(`M-10 ${110-h*.4} H370`,5,1.4+3.5*s,RB,6)}${dots(`M-10 ${110+h*.4} H370`,4,1.4+3.5*s,RB,6)}${s>.2?[90,180,270].map(x=>dots(`M${x} ${113+h} v45`,1,1.6,WT)).join(''):''}${T(180,110-h-10,'Vasodilation: wider, slower flow')}${s>.2?T(180,200,'Plasma leaks into tissue'):''}${T(180,228,'Low flow: lactate rises')}`},
+cardiac:(s,k)=>{const rx=58+26*s,ry=66+16*s,a=(1.015+.14*(1-s)).toFixed(3);return `<g style="--a:${a};animation:beat ${(.8+.3*s).toFixed(2)}s ease-in-out infinite;transform-box:fill-box;transform-origin:center"><ellipse cx="180" cy="120" rx="${rx}" ry="${ry}" fill="${RB}" fill-opacity=".25" stroke="${RB}" stroke-width="4"/><ellipse cx="180" cy="120" rx="${rx*.55}" ry="${ry*.55}" fill="${RB}" fill-opacity=".35"/></g>${T(180,124,'LV')}${s>.35?dots('M180 50 v-45',3,1.8,PL,3)+T(250,20,'Troponin leak'):''}${T(180,238,`EF ${Math.round(62-32*s)}%: weaker beat, dilated ventricle`)}`},
+ards:(s,k)=>`<defs><clipPath id="al"><circle cx="150" cy="120" r="78"/></clipPath></defs><rect x="60" y="${200-120*s}" width="180" height="140" fill="${WT}" fill-opacity=".45" clip-path="url(#al)"/><circle cx="150" cy="120" r="78" fill="none" stroke="${k}" stroke-width="4"/><path d="M300 20 Q250 120 300 220" fill="none" stroke="${RB}" stroke-width="16" stroke-opacity=".3"/>${dots('M150 5 V110',Math.max(1,Math.round(4*(1-s))),1.6,'#9be08a')}${dots('M300 40 Q250 120 300 200',3,2.4,RB,4)}${dots('M268 120 H170',Math.round(5*s),1.2,WT)}${T(150,100,'Alveolus')}${T(318,125,'Capillary')}${T(150,15,'Air in')}${T(180,238,s>.3?'Oedema fills the alveolus: less gas exchange':'Normal gas exchange')}`,
+aki:(s,k)=>`<circle cx="90" cy="60" r="34" fill="none" stroke="${k}" stroke-width="3"/><circle cx="90" cy="60" r="16" fill="${k}" fill-opacity=".25"/><path d="M90 94 V150 H250 V205" fill="none" stroke="var(--line)" stroke-width="22" stroke-linecap="round"/>${dots('M90 94 V150 H250 V205',5,2+5*s,WT,4)}${Array.from({length:Math.round(5*s)},(_,i)=>`<circle cx="${110+i*30}" cy="150" r="8" fill="#8a7a6a"/>`).join('')}${dots('M250 205 v30',s<.6?2:1,1.5,'#e8d070',3)}${T(150,50,'Glomerulus')}${T(150,185,s>.1?'Casts block the tubule':'Tubule')}${T(300,225,'Urine falls')}`,
+dic:(s,k)=>`<rect x="10" y="85" width="340" height="3" fill="#c0564f"/><rect x="10" y="135" width="340" height="3" fill="#c0564f"/>${dots('M-10 100 H370',5,2+4*s,RB,6)}${dots('M-10 122 H370',4,2+4*s,PL,3)}${Array.from({length:Math.round(4*s)},(_,i)=>`<g stroke="${PL}"><line x1="${70+i*70}" y1="88" x2="${100+i*70}" y2="135"/><line x1="${100+i*70}" y1="88" x2="${70+i*70}" y2="135"/><circle cx="${85+i*70}" cy="111" r="9" fill="${PL}" fill-opacity=".5"/></g>`).join('')}${s>.55?dots('M200 138 v55',3,1.4,RB,3)+T(180,215,'Bleeding: platelets and factors used up'):''}${T(180,70,s>.1?'Fibrin and platelet clots':'Normal clotting balance')}`,
+enceph:(s,k)=>{const f=Math.max(2,9-6*s),am=8+16*s,N=[[130,70],[180,50],[230,75],[150,110],[210,115],[120,130],[245,130]];let d='M10 215';for(let x=10;x<=350;x+=4)d+=` L${x} ${(215+am*Math.sin((x-10)/340*f*6.283)).toFixed(1)}`;return `<ellipse cx="180" cy="95" rx="120" ry="70" fill="none" stroke="${k}" stroke-width="3"/><path d="M318 30 V160" stroke="${RB}" stroke-width="10" stroke-opacity=".3"/>${N.map((a,i)=>i?`<line x1="${N[i-1][0]}" y1="${N[i-1][1]}" x2="${a[0]}" y2="${a[1]}" stroke="${k}" stroke-opacity=".4"/>`:'').join('')}${N.map(([x,y],i)=>`<circle cx="${x}" cy="${y}" r="7" fill="${k}" fill-opacity=".6" style="animation:pulse ${(.8+i*.15+2*s).toFixed(2)}s ease-in-out infinite"/>`).join('')}${s>.2?dots('M318 95 H262',3,1.6,WT):''}${T(180,98,'Neurons')}${T(300,185,'Barrier leak')}${T(180,242,`EEG: slower, larger waves (GCS ${Math.round(15-8*s)})`)}`}};
+const CELL={
+shock:(s,k)=>{const g=20+26*s;return `<rect x='0' y='30' width='360' height='50' fill='${RB}' fill-opacity='.12'/>${T(40,48,'Lumen')}${Array.from({length:12},(_,i)=>`<line x1='${15+i*30}' y1='88' x2='${15+i*30}' y2='${88-18*(1-s)}' stroke='${PL}' stroke-width='2'/>`).join('')}<rect x='10' y='90' width='${170-g/2}' height='26' rx='8' fill='${k}' fill-opacity='.35' stroke='${k}'/><rect x='${190+g/2}' y='90' width='${160-g/2}' height='26' rx='8' fill='${k}' fill-opacity='.35' stroke='${k}'/>${dots('M180 70 V170',Math.round(5*s),1.6,WT)}<ellipse cx='180' cy='190' rx='${70+70*s}' ry='24' fill='${k}' fill-opacity='.3' stroke='${k}'/>${dots('M300 92 L250 180',3,2,PL,3)}${T(180,194,'Smooth muscle')}${T(285,75,'NO')}${T(180,240,'Glycocalyx lost, junctions open, muscle relaxes')}`},
+cardiac:(s,k)=>{const a=(1-.12*(1-s)).toFixed(3);return `<rect x='20' y='70' width='320' height='110' rx='44' fill='${RB}' fill-opacity='.15' stroke='${k}' stroke-width='3'/><g style='--a:${a};animation:beat ${(.8+.3*s).toFixed(2)}s ease-in-out infinite;transform-box:fill-box;transform-origin:center'>${Array.from({length:9},(_,i)=>`<line x1='${60+i*30}' y1='90' x2='${60+i*30}' y2='160' stroke='${RB}' stroke-width='3' stroke-opacity='.6'/>`).join('')}</g>${[0,1,2,3].map(i=>`<ellipse cx='${75+i*70}' cy='125' rx='${12+10*s}' ry='${7+8*s}' fill='${PL}' fill-opacity='${(.9-.6*s).toFixed(2)}'/>`).join('')}${Array.from({length:1+Math.round(6*(1-s))},(_,i)=>`<circle cx='${50+i*40}' cy='70' r='5' fill='${WT}'/>`).join('')}${T(180,50,'β-receptors on the membrane fall')}${T(180,205,'Mitochondria swell and dim')}${T(180,232,'Sarcomeres contract weakly')}`},
+ards:(s,k)=>{const g=8+34*s;return `${T(60,25,'Air space')}${Array.from({length:Math.round(6*(1-s))+1},(_,i)=>`<circle cx='${40+i*38}' cy='62' r='4' fill='#9be08a'/>`).join('')}<rect x='10' y='72' width='${170-g/2}' height='14' rx='5' fill='${k}' fill-opacity='.4' stroke='${k}'/><rect x='${190+g/2}' y='72' width='${100-g/2}' height='14' rx='5' fill='${k}' fill-opacity='.4' stroke='${k}'/><ellipse cx='315' cy='78' rx='28' ry='18' fill='#9be08a' fill-opacity='.3' stroke='#9be08a'/>${T(315,82,'Type II')}<rect x='10' y='150' width='${170-g/2}' height='14' rx='5' fill='${k}' fill-opacity='.4' stroke='${k}'/><rect x='${190+g/2}' y='150' width='${160-g/2}' height='14' rx='5' fill='${k}' fill-opacity='.4' stroke='${k}'/>${dots('M180 175 V62',Math.round(5*s),1.8,WT)}<rect x='0' y='170' width='360' height='45' fill='${RB}' fill-opacity='.15'/>${dots('M-10 192 H370',5,3,RB,6)}<circle cx='80' cy='148' r='13' fill='${PL}'/>${T(80,126,'Neutrophil')}${T(180,240,'Junctions open: fluid floods in, surfactant lost')}`},
+aki:(s,k)=>`${dots('M-10 50 H370',5,2+4*s,WT,4)}${Array.from({length:Math.round(3*s)},(_,i)=>`<circle cx='${60+i*110}' cy='62' r='10' fill='#8a7a6a'/>`).join('')}${[0,1,2,3].map(i=>`<rect x='${15+i*88}' y='80' width='80' height='90' rx='10' fill='${k}' fill-opacity='.22' stroke='${k}'/>${Array.from({length:6},(_,j)=>`<line x1='${25+i*88+j*12}' y1='80' x2='${25+i*88+j*12}' y2='${80-12*(1-s)}' stroke='${WT}' stroke-width='2'/>`).join('')}<ellipse cx='${55+i*88}' cy='135' rx='${12+10*s}' ry='${8+8*s}' fill='${PL}' fill-opacity='${(.9-.6*s).toFixed(2)}'/>`).join('')}<rect x='0' y='185' width='360' height='35' fill='${RB}' fill-opacity='.15'/>${dots('M-10 202 H370',4,2+5*s,RB,6)}${T(180,20,'Filtrate slows; dead cells and debris form casts')}${T(180,240,'Brush border lost, mitochondria swell, cells slough off')}`,
+dic:(s,k)=>`<circle cx='60' cy='100' r='38' fill='${k}' fill-opacity='.3' stroke='${k}' stroke-width='3'/>${Array.from({length:3+Math.round(6*s)},(_,i)=>`<line x1='${60+38*Math.cos(i*.7)}' y1='${100+38*Math.sin(i*.7)}' x2='${60+50*Math.cos(i*.7)}' y2='${100+50*Math.sin(i*.7)}' stroke='${k}' stroke-width='3'/>`).join('')}<rect x='130' y='85' width='80' height='30' rx='8' fill='none' stroke='var(--line)'/><rect x='240' y='85' width='90' height='30' rx='8' fill='${PL}' fill-opacity='${(.1+.4*s).toFixed(2)}' stroke='${PL}'/>${T(170,104,'Thrombin')}${T(285,104,'Fibrin mesh')}${T(60,170,'Tissue factor')}${dots('M100 100 H240',Math.round(6*s)+1,2.8-2*s,PL)}<rect x='30' y='200' width='300' height='10' rx='5' fill='var(--line)'/><rect x='30' y='200' width='${300*(1-s)}' height='10' rx='5' fill='${k}'/>${T(180,232,'Antithrombin and protein C used up: clotting runs unchecked')}`,
+enceph:(s,k)=>{const g=6+28*s;return `<circle cx='80' cy='70' r='24' fill='${k}' fill-opacity='.3' stroke='${k}' stroke-width='2' style='animation:pulse ${(1+2*s).toFixed(1)}s ease-in-out infinite'/>${T(80,108,'Neuron')}<circle cx='280' cy='70' r='${12+10*s}' fill='${PL}' fill-opacity='.5' stroke='${PL}'/>${T(280,108,'Microglia')}${s>.2?dots('M255 70 L110 70',3,2,PL,3):''}<ellipse cx='180' cy='140' rx='130' ry='14' fill='${WT}' fill-opacity='.2' stroke='${WT}'/>${T(60,145,'Astrocyte')}<rect x='10' y='162' width='${170-g/2}' height='18' rx='6' fill='${k}' fill-opacity='.4' stroke='${k}'/><rect x='${190+g/2}' y='162' width='${160-g/2}' height='18' rx='6' fill='${k}' fill-opacity='.4' stroke='${k}'/>${dots('M180 200 V120',Math.round(5*s),1.8,WT)}<rect x='0' y='182' width='360' height='36' fill='${RB}' fill-opacity='.15'/>${dots('M-10 200 H370',4,3,RB,6)}${T(180,240,'Tight junctions open, microglia activate, neurons slow')}`}};
+const SEG=[['pct','Proximal tubule','M60 76 V110 Q60 135 90 135 H130',1,'Most vulnerable: high energy use. Mitochondria swell, the brush border sloughs and casts form.'],
+['loop','Loop of Henle','M130 135 V215 H190 V135',.7,'The thick ascending limb works at the edge of hypoxia in the medulla.'],
+['dct','Distal tubule','M190 135 H230 V90 H270',.5,'Less delivery, so tubuloglomerular feedback constricts the afferent arteriole and cuts GFR.'],
+['cd','Collecting duct','M270 60 V215',.4,'Casts and debris obstruct flow; concentrating ability is lost.']];
+const DG=[['nor','Noradrenaline',-.15,'restores renal perfusion pressure'],['bal','Balanced crystalloid',-.08,'fewer kidney events than saline'],['nsaid','NSAID',.2,'constricts the afferent arteriole'],['nephro','Vancomycin + pip-tazo',.15,'injures proximal tubule cells']];
+function nephView(s){
+ const e=clamp(s+DG.reduce((a,d)=>a+(dg[d[0]]?d[2]:0),0)),sg=SEG.find(x=>x[0]===seg),col=w=>`hsl(${175-175*clamp(e*w)} 85% 52%)`;
+ let g=`<circle cx='60' cy='50' r='26' fill='none' stroke='${col(.8)}' stroke-width='4'/><circle cx='60' cy='50' r='11' fill='${col(.8)}' fill-opacity='.3'/>${T(60,14,'Glomerulus')}`;
+ SEG.forEach(([id,n,d,w])=>{g+=`<g data-seg='${id}' style='cursor:pointer'><path d='${d}' fill='none' stroke='var(--line)' stroke-width='18' stroke-linecap='round'/><path d='${d}' fill='none' stroke='${col(w)}' stroke-width='${seg===id?14:9}' stroke-linecap='round' stroke-opacity='${(.5+.5*clamp(e*w)).toFixed(2)}'/>${dots(d,4,2+5*e*w,WT,3)}</g>`});
+ [[60,100],[100,135],[130,170],[160,215],[190,180],[230,120],[270,110],[270,160]].slice(0,Math.round(8*e)).forEach(([x,y])=>{g+=`<circle cx='${x}' cy='${y}' r='5' fill='#8a7a6a'/>`});
+ g+=`<rect x='252' y='222' width='36' height='30' rx='6' fill='none' stroke='var(--line)'/>${dots('M270 215 V245',Math.max(1,Math.round(3*(1-e))),1.4,'#e8d070',3)}${T(270,260,'Urine')}${T(160,100,'Tap a segment')}`;
+ const gfr=Math.round(100*(1-.85*e)),uo=(1-.9*e).toFixed(1),cr=(1/(1-.85*e)).toFixed(1),on=DG.filter(d=>dg[d[0]]);
+ return `<svg viewBox='0 0 360 262' role='img' aria-label='Nephron lab'>${g}</svg><div class='row'>${SEG.map(x=>`<button data-seg='${x[0]}' aria-pressed='${seg===x[0]}'>${x[1]}</button>`).join('')}</div><div class='panel'><strong>${sg?sg[1]:'Nephron under sepsis'}</strong><div>${sg?sg[4]:'Each segment glows by how injured it is. Toggle drugs to see the nephron respond.'}</div></div><div class='panel'>GFR about ${gfr} ml/min, urine ${uo} ml/kg/h, creatinine ×${cr}${on.length?'<ul>'+on.map(d=>`<li>${d[1]}: ${d[3]}</li>`).join('')+'</ul>':''}</div><div class='row' style='margin-top:8px'>${DG.map(d=>`<button data-dg='${d[0]}' aria-pressed='${!!dg[d[0]]}'>${d[1]}</button>`).join('')}</div>`;
+}
+const D={
+shock:[[1,'Noradrenaline','first-line pressor, restores MAP'],[1,'Vasopressin','added when pressor needs climb'],[1,'Balanced crystalloid','volume guided by fluid responsiveness'],[1,'Hydrocortisone','refractory shock'],[0,'Excess saline','chloride load, oedema, kidney injury'],[0,'High-dose catecholamines','arrhythmia, digital ischaemia'],[0,'Propofol bolus or other sedatives','vasodilation, hypotension']],
+cardiac:[[1,'Noradrenaline','maintains coronary perfusion pressure'],[1,'Dobutamine','if low output persists after MAP is restored'],[1,'Levosimendan','calcium sensitiser, limited evidence'],[0,'High-dose adrenaline','tachyarrhythmia, raised lactate'],[0,'Beta-blockers, diltiazem','blunt compensation (esmolol only in selected tachycardia)'],[0,'Fluid overload','raises filling pressure of a failing ventricle']],
+ards:[[1,'Low tidal volume ventilation','6 ml/kg predicted weight, limit plateau pressure'],[1,'Prone positioning','improves oxygenation in severe ARDS'],[1,'Short-course neuromuscular blockade','severe early ARDS'],[1,'Dexamethasone','may help in moderate to severe ARDS'],[0,'Positive fluid balance','worsens alveolar oedema'],[0,'IV beta-2 agonists','no benefit, possible harm'],[0,'Deep benzodiazepine sedation','longer ventilation, delirium']],
+aki:[[1,'Noradrenaline to MAP 65 or more','restores renal perfusion'],[1,'Balanced crystalloids','fewer kidney events than saline'],[1,'Renal dose adjustment','of antibiotics and other drugs'],[0,'NSAIDs','afferent vasoconstriction'],[0,'Aminoglycosides, vancomycin with piperacillin-tazobactam','nephrotoxic'],[0,'IV contrast, colistin, amphotericin','tubular injury'],[0,'Hydroxyethyl starch','more AKI and dialysis'],[0,'Furosemide','no protection; only for volume overload']],
+dic:[[1,'Source control and antibiotics','the only definitive treatment'],[1,'Platelets, FFP, cryoprecipitate','only for bleeding or procedures'],[1,'Prophylactic heparin','VTE prevention if not bleeding'],[1,'Antithrombin, thrombomodulin','mixed evidence'],[0,'Tranexamic acid','thrombosis risk unless hyperfibrinolytic bleeding'],[0,'Platelets without bleeding','no benefit'],[0,'Full-dose heparin in active bleeding','worsens haemorrhage']],
+enceph:[[1,'Restore MAP and oxygenation','first-line brain protection'],[1,'Correct glucose, sodium, liver and kidney causes','treat the reversible'],[1,'Dexmedetomidine','lighter sedation, less delirium than benzodiazepines'],[0,'Benzodiazepines','deepen delirium'],[0,'Morphine in AKI','metabolite accumulation'],[0,'Anticholinergics, e.g. promethazine','worsen confusion'],[0,'High-dose cefepime or carbapenem in renal failure','seizures, neurotoxicity']]};
+const drugs=c=>`<div class="panel rx"><strong>Medications and measures</strong> <span style="color:var(--mute);font-size:12px">(tap one to hear it)</span><ul>${D[c.id].map(([g,n,t])=>`<li class="${g?'up':'dn'}"><b>${g?'Helps':'Harms'}</b> ${n}: ${t}</li>`).join('')}</ul><div style="color:var(--mute);font-size:12px;margin-top:6px">Teaching summary. Follow your unit protocol and current Surviving Sepsis guidance.</div></div>`;
+const U3={shock:'https://claude.ai/artifact/8nAX95mGv3KfVVbKbjwo7G',cardiac:'https://claude.ai/artifact/HECgvsCUtti6wAE7BmXrCd',ards:'https://claude.ai/artifact/FAkfQJsmLMqfqujW4WdU8k',aki:'https://claude.ai/artifact/SzV6FhUEutnirgzTF2aBsX',dic:'https://claude.ai/artifact/TLp2UYi5ZAmsq2qivTpxmH',enceph:'https://claude.ai/artifact/2EfS34i2MJiP34gha5NDff'};
+function render(){
+ $('#stage').textContent=stage();
+ $('#view').innerHTML=open?detail(M[open]):wheel();
+}
+$('#view').addEventListener('click',e=>{
+ const n=e.target.closest('[data-id]');
+ if(n){e.preventDefault();open=n.dataset.id;if(zoom===2&&open!=='aki')zoom=1;render();scrollTo(0,0)}
+ else if(e.target.closest('[data-back]')){open=null;render()}
+ else if(e.target.closest('[data-z]')){zoom=+e.target.closest('[data-z]').dataset.z;render()}
+ else if(e.target.closest('[data-seg]')){seg=e.target.closest('[data-seg]').dataset.seg;render()}
+ else if(e.target.closest('[data-dg]')){const i=e.target.closest('[data-dg]').dataset.dg;dg[i]=!dg[i];render()}
+});
+$('#view').addEventListener('keydown',e=>{
+ const n=e.target.closest('.node');
+ if(n&&(e.key==='Enter'||e.key===' ')){e.preventDefault();open=n.dataset.id;if(zoom===2&&open!=='aki')zoom=1;render()}
+});
+$('#prog').addEventListener('input',e=>{p=e.target.value/100;render()});
+$('#presets').addEventListener('click',e=>{
+ const b=e.target.closest('[data-p]');if(!b)return;
+ p=b.dataset.p/100;$('#prog').value=b.dataset.p;render();
+});
+$('#rx').addEventListener('click',e=>{
+ rx=!rx;e.currentTarget.setAttribute('aria-pressed',rx);render();
+});
+render();
+</script><script>
+const MV={ph:["Early sepsis. At organ level, the body compensates with a fast heart rate and fever. At cellular level, immune cells recognise the infection and release cytokines.",
+"Sepsis with organ dysfunction. At organ level, the brain, kidneys and lungs begin to show dysfunction. At cellular level, the endothelium becomes leaky and mitochondria begin to fail.",
+"Septic shock. At organ level, blood pressure falls and several organs are under perfused at once. At cellular level, nitric oxide relaxes vessels and the coagulation system switches on.",
+"Multi organ failure. At organ level, the lungs, kidneys, brain, heart and clotting system all fail together. At cellular level, energy production collapses across tissues."],
+org:{shock:"Septic shock, organ level. Widened vessels and leaking capillaries drop the blood pressure, so organs receive too little flow. Noradrenaline restores the pressure.",
+cardiac:"Myocardial dysfunction, organ level. The ventricle dilates and ejects less blood with each beat, so cardiac output falls even though the heart rate rises.",
+ards:"ARDS, organ level. Both lungs fill with protein rich fluid and become stiff, so oxygen cannot cross into the blood. Lung protective ventilation is the key treatment.",
+aki:"Acute kidney injury, organ level. Filtration falls, urine output drops, and waste, potassium and acid accumulate in the blood.",
+dic:"D I C, organ level. Tiny clots block small vessels and starve organs, while platelets and clotting factors are used up, which causes bleeding.",
+enceph:"Encephalopathy, organ level. The whole brain is disturbed without a structural lesion, which causes delirium, drowsiness and a slow E E G."},
+rs:"Source control and resuscitation. Antibiotics, source control and fluids lower the severity of every complication."};
+const vq=(t,q)=>{if(parent!==window)parent.postMessage({vo:t,q:!!q},'*')};
+const ph4=()=>p<.25?0:p<.5?1:p<.75?2:3;let vtm=0;
+document.head.insertAdjacentHTML('beforeend','<style>.rx li{cursor:pointer}</style>');
+document.getElementById('prog').addEventListener('input',()=>{clearTimeout(vtm);vtm=setTimeout(()=>vq(MV.ph[ph4()]),700)});
+document.getElementById('presets').addEventListener('click',()=>vq(MV.ph[ph4()]));
+document.getElementById('rx').addEventListener('click',()=>vq(MV.rs));
+const cellText=c=>'Cell level. '+c.st.map((t,i)=>'Step '+(i+1)+'. '+t[0]+'. '+t[1]+'.').join(' ');
+document.getElementById('view').addEventListener('click',e=>{
+ const T=s=>e.target.closest(s);
+ if(T('[data-id]')&&open&&!T('[data-z]')&&!T('[data-seg]')&&!T('[data-dg]'))vq(MV.org[open]);
+ else if(T('[data-z]')&&open){const c=M[open];vq(zoom===1?cellText(c):zoom===2?'Nephron lab. Tap a segment to hear what happens there, and switch drugs on to see the nephron respond.':MV.org[open])}
+ else if(T('[data-seg]')){const g=SEG.find(x=>x[0]===seg);if(g)vq(g[1]+'. '+g[4])}
+ else if(T('[data-dg]')){const d=DG.find(x=>x[0]===T('[data-dg]').dataset.dg);if(d)vq(d[1]+(dg[d[0]]?' switched on. ':' switched off. ')+d[3])}
+ else if(T('.rx li'))vq(T('.rx li').textContent)});
+document.addEventListener('click',e=>{const a=e.target.closest('a[data-lab]');if(a&&parent!==window){e.preventDefault();parent.postMessage({lab:a.dataset.lab},'*')}});
+</script>
+</body></html>
