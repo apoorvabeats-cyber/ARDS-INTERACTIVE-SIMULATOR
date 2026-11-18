@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Microbiology Lab · Clinical microbiology workstation</title>
+<meta name="description" content="Gram stain, culture plate, disc diffusion, MIC and antibiogram for simulated ICU isolates, linked to the resistance mechanisms behind them, with editable breakpoints.">
+<link rel="stylesheet" href="micro/ui.css?v=20261119c">
+<style>
+main{max-width:1280px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:12px}
+.card h2{margin:0 0 6px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:600}
+.card canvas{width:100%;height:auto;aspect-ratio:1/1;border-radius:10px;cursor:default;background:#000}
+.cases{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px}
+.case{font:inherit;color:var(--ink);text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 12px;cursor:pointer;min-height:64px}
+.case[aria-pressed="true"]{border-color:var(--acc);background:rgba(77,227,208,.07)}
+.case b{display:block;font-size:14px}.case span{font-size:12.5px;color:var(--mute)}
+.rep{display:grid;grid-template-columns:130px 1fr;gap:4px 12px;font-size:13.5px}.rep dt{color:var(--mute)}.rep dd{margin:0}
+.bp{width:62px;font:inherit;font-size:13px;color:var(--ink);background:#06121c;border:1px solid var(--line);border-radius:6px;padding:4px 6px;min-height:32px}
+.fl{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}.fl label{font-size:12px;color:var(--mute);display:flex;flex-direction:column;gap:3px}
+.mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:2px 14px}.mg label{display:flex;gap:8px;font-size:13.5px;min-height:32px;align-items:center;cursor:pointer}.mg input{width:18px;height:18px;accent-color:var(--acc)}
+.warn{border-left:3px solid var(--warn);padding-left:10px;color:#ffe3a3;font-size:13px}
+.hid{filter:blur(6px);user-select:none}
+a.go{display:inline-flex;align-items:center;text-decoration:none;color:#04201f;background:var(--acc);border-radius:999px;padding:8px 16px;font-weight:600;min-height:40px;margin:4px 6px 0 0}
+</style></head>
+<body><main>
+<div class="top"><a href="index.html">← Hall</a><a href="microbiology.html?v=20261119c" id="toOrg">← Organisms</a><span class="sp"></span><span class="badge">Microbiology Lab · Clinical workstation</span></div>
+<h1>Clinical microbiology workstation</h1>
+<p class="sub">Culture · Gram stain · disc diffusion · MIC · antibiogram · cases</p>
+<div class="card" style="margin-top:0"><h2>Choose a case</h2><div class="cases" id="cases"></div>
+  <details style="margin-top:10px" id="custom"><summary style="cursor:pointer;font-size:14px">Build your own isolate</summary><div class="fl" style="margin-top:8px"><label>Organism<select id="cOrg"></select></label><label>Specimen<select id="cSpec"></select></label></div><div class="note" style="margin-top:8px">Resistance mechanisms present</div><div class="mg" id="cMech"></div></details></div>
+<div class="card"><h2>Report</h2><dl class="rep" id="rep"></dl><p class="warn" id="task"></p></div>
+<div class="row">
+  <div class="card"><h2>Gram stain (direct smear)</h2><canvas id="cvG" width="480" height="480" aria-label="Gram stain"></canvas><p class="note" id="gnote"></p></div>
+  <div class="card"><h2>Culture plate</h2><div class="chips" style="margin-bottom:6px"><button class="pill" id="mBlood" aria-pressed="true">Blood agar</button><button class="pill" id="mMac" aria-pressed="false">MacConkey</button></div><canvas id="cvC" width="480" height="480" aria-label="Culture plate"></canvas><p class="note" id="cnote"></p></div>
+  <div class="card"><h2>Disc diffusion (Mueller-Hinton)</h2><canvas id="cvD" width="480" height="480" aria-label="Disc diffusion plate"></canvas><p class="note">Zones are illustrative (derived from the MIC); category is assigned from the MIC and the breakpoints below, not from zone sizes.</p></div>
+</div>
+<div class="card"><h2>Antibiogram: MIC and interpretation</h2>
+  <div class="fl"><label>Breakpoint set (name and version)<input class="bp" id="bpName" style="width:min(100%,360px)" value="Teaching set v1, CLSI-style categories"></label><button class="btn" id="bpReset">Reset to teaching set v1</button></div>
+  <p class="note">The breakpoints in the table are illustrative teaching values you can edit. Real interpretation must use the current CLSI M100 or EUCAST breakpoint table for the organism, site and dosing. Susceptibility is isolate-specific, not a property of the species.</p>
+  <div class="tbl-wrap"><table class="t" id="abg"></table></div></div>
+<div class="card"><h2>Interpretation</h2><div id="interp"></div><div class="btns" id="links"></div></div>
+<p class="foot">All isolates, patients and results here are simulated for teaching. MICs are generated from an illustrative model and are not real laboratory data. Content is educational and not for clinical decision-making.</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="micro/organisms.js?v=20261119c"></script>
+<script src="micro/pharm.js?v=20261119c"></script>
+<script src="micro/common.js?v=20261119c"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id),U=MICRO.ui,esc=U.esc,P=MICRO.pharm,O=MICRO.orgs;
+const GRP={pa:'pa',kp:'ent',ec:'ent',en:'ent',sm:'ent',ab:'ab'};
+const BASE={pa:{tzp:4,caz:2,fep:2,mem:.5,ipm:1,ctz:.5,cza:2,fdc:.12,amk:4,tob:1,cip:.12,col:1,pmb:1},
+ ent:{cro:.06,fep:.06,tzp:2,mem:.03,etp:.015,cza:.25,fdc:.12,amk:2,gen:.5,cip:.015,sxt:.25,col:.5,tgc:.5},
+ ab:{mem:.5,ipm:.5,fdc:.06,amk:4,tob:1,cip:.5,col:.5,pmb:.5,tgc:.5,sxt:.25}};
+/* teaching breakpoints: [S<=, R>=]; colistin / polymyxin have no S category (I <= value) */
+const BP0={pa:{tzp:[16,128],caz:[8,32],fep:[8,32],mem:[2,8],ipm:[2,8],ctz:[4,16],cza:[8,16],fdc:[4,16],amk:[16,64],tob:[1,4],cip:[.5,2],col:[0,4],pmb:[0,4]},
+ ent:{cro:[1,4],fep:[2,16],tzp:[8,32],mem:[1,4],etp:[.5,2],cza:[8,16],fdc:[4,16],amk:[4,16],gen:[2,8],cip:[.25,1],sxt:[2,4],col:[0,4],tgc:[2,8]},
+ ab:{mem:[2,8],ipm:[2,8],fdc:[1,4],amk:[16,64],tob:[4,16],cip:[1,4],col:[0,4],pmb:[0,4],tgc:[2,8],sxt:[2,4]}};
+let BP=JSON.parse(JSON.stringify(BP0));
+const GRID=[.008,.015,.03,.06,.12,.25,.5,1,2,4,8,16,32,64,128,256];
+const SPEC={blood:'Blood culture',urine:'Urine culture',eta:'Endotracheal aspirate',bal:'Bronchoalveolar lavage',pus:'Pus / wound swab'};
+const CASES=[
+ {id:1,t:'Ventilator-associated pneumonia',s:'ICU day 9, new fever, purulent secretions, rising oxygen need',org:'ab',spec:'eta',m:['oxa23','eff'],task:'The ETA grows a non-fermenter. Read the antibiogram: which classes are left, and what mechanism pattern is likely?'},
+ {id:2,t:'Bacteraemia after abdominal surgery',s:'Post-op day 6, septic shock, central line in place',org:'kp',spec:'blood',m:['kpc','porin'],task:'Blood culture flagged positive at 15 h. Which drugs are lost, and would a β-lactamase inhibitor combination help?'},
+ {id:3,t:'Bloodstream infection in neutropenia',s:'Haematology patient with prolonged admission and fever',org:'pa',spec:'blood',m:['ndm','eff'],task:'Compare meropenem, ceftazidime-avibactam and cefiderocol. Why does the combination fail here?'},
+ {id:4,t:'Complicated urinary tract infection',s:'Elderly patient, catheter, previous fluoroquinolone course',org:'ec',spec:'urine',m:['esbl','gyr'],task:'Which classes remain active? Which mechanisms explain cephalosporin and quinolone resistance together?'},
+ {id:5,t:'Post-operative abdominal collection',s:'Day 8 after bowel resection; ceftriaxone given from day 2',org:'en',spec:'pus',m:['ampc'],task:'Ceftriaxone was given early and the isolate is now resistant. What happened, and which agents are relatively AmpC-stable?'},
+ {id:6,t:'Bronchiectasis exacerbation, ICU',s:'Chronic Pseudomonas colonisation, repeated carbapenem courses',org:'pa',spec:'bal',m:['porin','eff'],task:'Imipenem and meropenem behave differently. Why?'},
+ {id:7,t:'Colistin-resistant carbapenemase producer',s:'Long-stay ICU patient after prolonged colistin exposure',org:'kp',spec:'blood',m:['kpc','lipa'],task:'Almost every standard option is lost. Which agents remain, and what mechanism explains colistin resistance?'},
+ {id:8,t:'Serratia in the ventilator circuit',s:'Cluster of three ICU patients with the same isolate',org:'sm',spec:'eta',m:['ampc'],task:'Note the colistin result. Is it a mechanism the isolate acquired?'},
+ {id:9,t:'Pan-aminoglycoside and carbapenem resistance',s:'Referral from another hospital with transfer of a resistant strain',org:'ec',spec:'blood',m:['ndm','rmt','gyr'],task:'Which mechanisms combine here, and which agents might still be options?'}];
+let cur=null,medium='blood';
+const hash=s=>{let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return h>>>0;};
+function mic(org,drug,set,seed){const g=GRP[org],base=BASE[g][drug],ev=P.evaluate(org,drug,set),eff=Math.max(.004,ev.kill);let v=base/eff;let i=GRID.findIndex(x=>x>=v*.97);if(i<0)i=GRID.length;const h=hash(seed+drug)%10;if(h<2&&i>0)i--;else if(h>7&&i<GRID.length)i++;return i>=GRID.length?'>256':GRID[i];}
+const num=v=>v==='>256'?512:v;
+function cat(org,drug,m){const bp=BP[GRP[org]][drug];if(!bp)return'';const v=num(m);if(bp[0]===0)return v<bp[1]?'I':'R';return v<=bp[0]?'S':v>=bp[1]?'R':'I';}
+const fmtM=v=>v==='>256'?'>256':(v<1?String(v):String(v));
+function build(){
+  const o=cur.org,set=new Set(cur.m),dr=P.ORGS[o].drugs.filter(d=>BASE[GRP[o]][d]),rows=dr.map(d=>({d,mic:mic(o,d,set,cur.id+o)}));
+  cur.rows=rows;return rows;
+}
+function renderTable(){
+  const o=cur.org,g=GRP[o];
+  $('abg').innerHTML='<tr><th>Antibiotic</th><th>MIC (mg/L)</th><th>Zone (mm)</th><th>S ≤</th><th>R ≥</th><th>Category</th></tr>'+cur.rows.map(r=>{const bp=BP[g][r.d],c=cat(o,r.d,r.mic),zone=zoneOf(o,r.d,r.mic),noS=bp[0]===0;
+   return '<tr><td>'+esc(P.DRUG[r.d].name)+'</td><td>'+fmtM(r.mic)+'</td><td>'+(zone<=6?'6 (no zone)':zone)+'</td><td>'+(noS?'<span class="note" style="margin:0">no S</span>':'<input class="bp" type="number" step="any" data-d="'+r.d+'" data-k="0" value="'+bp[0]+'" aria-label="Susceptible breakpoint">')+'</td><td><input class="bp" type="number" step="any" data-d="'+r.d+'" data-k="1" value="'+bp[1]+'" aria-label="Resistant breakpoint"></td><td class="s-'+c+'">'+(c==='S'?'S susceptible':c==='R'?'R resistant':noS?'I (intermediate)':'I intermediate')+'</td></tr>';}).join('');
+}
+const zoneOf=(org,d,m)=>Math.max(6,Math.min(36,Math.round(28-3*Math.log2(num(m)/BASE[GRP[org]][d]))));
+function rng(seed){let a=seed>>>0;return()=>{a=(a+0x6D2B79F5)|0;let t=Math.imul(a^a>>>15,1|a);t=(t+Math.imul(t^t>>>7,61|t))^t;return((t^t>>>14)>>>0)/4294967296;};}
+/* ---------- canvases ---------- */
+function gram(){
+  const c=$('cvG'),x=c.getContext('2d'),W=c.width,r=rng(hash('g'+cur.id+cur.org+cur.spec));x.fillStyle='#f3ecf2';x.fillRect(0,0,W,W);
+  const pus=cur.spec!=='blood'?(cur.spec==='urine'?10:34):0;
+  for(let i=0;i<pus;i++){const px=r()*W,py=r()*W;x.fillStyle='rgba(110,70,170,.85)';for(let k=0;k<3;k++){x.beginPath();x.arc(px+(k-1)*9,py+(k%2)*6,7,0,6.3);x.fill();}x.fillStyle='rgba(225,200,225,.5)';x.beginPath();x.arc(px,py+3,18,0,6.3);x.fill();}
+  const org=cur.org,n=cur.spec==='blood'?55:cur.spec==='urine'?120:95;x.fillStyle='#d6366f';x.strokeStyle='#d6366f';x.lineCap='round';
+  for(let i=0;i<n;i++){const px=r()*W,py=r()*W,a=r()*6.3;
+    if(org==='ab'){for(let k=0;k<2;k++){x.beginPath();x.ellipse(px+Math.cos(a)*5*(k?1:-1),py+Math.sin(a)*5*(k?1:-1),7,4.5,a,0,6.3);x.fill();}}
+    else{const L=org==='pa'?16:org==='kp'?11:13,w=org==='pa'?4:org==='kp'?6:5;if(org==='kp'){x.fillStyle='rgba(230,200,215,.5)';x.beginPath();x.ellipse(px,py,L/2+7,w/2+6,a,0,6.3);x.fill();x.fillStyle='#d6366f';}x.lineWidth=w;x.beginPath();x.moveTo(px-Math.cos(a)*L/2,py-Math.sin(a)*L/2);x.lineTo(px+Math.cos(a)*L/2,py+Math.sin(a)*L/2);x.stroke();}}
+  $('gnote').textContent=({ab:'Gram-negative coccobacilli in pairs',pa:'Slender Gram-negative bacilli',kp:'Plump Gram-negative bacilli with clear halos (capsule)',ec:'Gram-negative bacilli',en:'Gram-negative bacilli',sm:'Gram-negative bacilli'})[org]+(pus?(cur.spec==='urine'?' with white cells':' with many polymorphonuclear cells'):' (positive blood-culture bottle, no host cells)')+'.';
+}
+const COL={pa:{blood:['#b8c7a8','#8fa88a'],mac:['#efe4d0','#d9c9ae']},kp:{blood:['#e6e1d6','#cfc8b8'],mac:['#e86a9c','#c84a7c']},ec:{blood:['#d9d5ca','#bdb8aa'],mac:['#e0508a','#b8306a']},ab:{blood:['#e4e0d8','#cfc9bd'],mac:['#dccfe0','#c0b0c8']},en:{blood:['#ddd8cc','#c4bfb0'],mac:['#e8608f','#c8406f']},sm:{blood:['#e9b0a8','#d48a80'],mac:['#efe0d0','#d8c8b4']}};
+function plate(){
+  const c=$('cvC'),x=c.getContext('2d'),W=c.width,cx=W/2,r=rng(hash('p'+cur.id+cur.org+medium));x.fillStyle='#0a1218';x.fillRect(0,0,W,W);
+  x.fillStyle='#d8d8d8';x.beginPath();x.arc(cx,cx,W*.47,0,6.3);x.fill();
+  const bg=medium==='blood'?'#8a2a2e':'#f2c9c0';const gr=x.createRadialGradient(cx,cx,10,cx,cx,W*.45);gr.addColorStop(0,medium==='blood'?'#9a3338':'#f8d6cc');gr.addColorStop(1,bg);x.fillStyle=gr;x.beginPath();x.arc(cx,cx,W*.45,0,6.3);x.fill();
+  const [c1,c2]=COL[cur.org][medium];
+  if(cur.org==='pa'){x.fillStyle='rgba(60,190,150,.18)';x.beginPath();x.arc(cx,cx,W*.4,0,6.3);x.fill();}
+  const q=[[-1,-1,90],[1,-1,40],[1,1,18],[-1,1,5]];
+  q.forEach(([sx,sy,n],qi)=>{for(let i=0;i<n;i++){const d=r()*W*.38,a=r()*1.45,px=cx+sx*(12+Math.cos(a)*d),py=cx+sy*(12+Math.sin(a)*d),rad=(cur.org==='kp'?(qi===3?9:4.5):cur.org==='pa'?(qi===3?8:4):(qi===3?6:3.5))*(.7+r()*.6);const g=x.createRadialGradient(px-rad*.3,py-rad*.3,1,px,py,rad);g.addColorStop(0,c1);g.addColorStop(1,c2);x.fillStyle=g;x.beginPath();x.arc(px,py,rad,0,6.3);x.fill();if(cur.org==='pa'&&medium==='blood'){x.strokeStyle='rgba(200,170,90,.4)';x.lineWidth=1;x.stroke();}}});
+  x.strokeStyle='#bbb';x.lineWidth=5;x.beginPath();x.arc(cx,cx,W*.46,0,6.3);x.stroke();
+  $('cnote').textContent=({pa:medium==='blood'?'Flat grey-green colonies with metallic sheen, β-haemolysis and a blue-green pigment (pyocyanin); grape-like smell.':'Pale non-lactose-fermenting colonies; oxidase positive.',kp:medium==='blood'?'Large grey-white mucoid colonies.':'Pink mucoid lactose-fermenting colonies.',ec:medium==='blood'?'Grey colonies, some β-haemolytic.':'Pink lactose-fermenting colonies.',ab:medium==='blood'?'Small smooth cream-grey colonies, non-haemolytic.':'Pale to slightly violet non-lactose-fermenting colonies; oxidase negative.',en:medium==='blood'?'Grey moist colonies.':'Pink lactose-fermenting colonies.',sm:medium==='blood'?'Grey colonies, some with red pigment (prodigiosin).':'Pale non-lactose-fermenting colonies.'})[cur.org];
+}
+function disc(){
+  const c=$('cvD'),x=c.getContext('2d'),W=c.width,cx=W/2,sc=W*.45/45;x.fillStyle='#0a1218';x.fillRect(0,0,W,W);x.fillStyle='#d8d8d8';x.beginPath();x.arc(cx,cx,W*.47,0,6.3);x.fill();x.fillStyle='#d9c58c';x.beginPath();x.arc(cx,cx,W*.45,0,6.3);x.fill();
+  const rows=cur.rows.filter(r=>P.DRUG[r.d].entry!=='lps'),n=Math.min(8,rows.length),pick=rows.slice(0,n);const R0=W*.28;
+  const r=rng(hash('d'+cur.id));x.fillStyle='rgba(235,225,190,.55)';x.beginPath();x.arc(cx,cx,W*.45,0,6.3);x.fill();
+  pick.forEach((rw,i)=>{const a=i/n*6.283-1.57,px=cx+Math.cos(a)*R0,py=cx+Math.sin(a)*R0,z=zoneOf(cur.org,rw.d,rw.mic);const zr=Math.max(3,z/2*sc);
+    x.fillStyle='rgba(215,198,140,.95)';x.beginPath();x.arc(px,py,zr,0,6.3);x.fill();x.strokeStyle='rgba(60,50,20,.35)';x.lineWidth=1;x.stroke();
+    x.fillStyle='#fff';x.beginPath();x.arc(px,py,3*sc,0,6.3);x.fill();x.fillStyle='#222';x.font='bold '+(9*sc/1.4)+'px sans-serif';x.textAlign='center';x.fillText(rw.d.toUpperCase(),px,py+3);
+    x.fillStyle='#143';x.font=(8)+'px sans-serif';});
+  x.strokeStyle='#bbb';x.lineWidth=5;x.beginPath();x.arc(cx,cx,W*.46,0,6.3);x.stroke();
+}
+/* ---------- report and interpretation ---------- */
+function interp(){
+  const o=cur.org,R=d=>{const r=cur.rows.find(x=>x.d===d);return r?cat(o,d,r.mic):null;},any=(l,c)=>l.some(d=>R(d)===c),has=d=>R(d)!==null;
+  const carb=['mem','ipm','etp'].filter(has),L=[];
+  const cr=carb.length&&carb.some(d=>R(d)==='R');
+  if(cr){const czaR=R('cza')==='R',tested=has('cza');L.push('<b>Carbapenem-resistant isolate.</b> '+(o==='ab'?'In Acinetobacter this is most often an OXA-type carbapenemase (OXA-23, OXA-24 / 40, OXA-58), sometimes with efflux or NDM.':tested?(czaR?'Resistance to ceftazidime-avibactam as well suggests a metallo-β-lactamase (NDM, VIM, IMP), because avibactam does not inhibit these. Cefiderocol and colistin results then guide the options.':'Susceptibility to ceftazidime-avibactam points toward a serine carbapenemase (KPC, OXA-48-like) or ESBL / AmpC with porin loss, rather than a metallo-enzyme.'):'Confirm the carbapenemase type with a molecular or immunochromatographic test.'));}
+  else if(carb.length)L.push('<b>Carbapenems remain active</b> by the breakpoints in use.');
+  if((any(['cro','caz','fep'],'R')||R('tzp')==='R')&&!cr)L.push('<b>Cephalosporin resistance with a carbapenem-susceptible result</b> fits an ESBL or an AmpC enzyme (derepressed AmpC in Enterobacter and Serratia).');
+  if(R('cip')==='R')L.push('<b>Ciprofloxacin resistance</b> suggests gyrA / parC mutations, Qnr or efflux; fluoroquinolone resistance often accompanies ESBL.');
+  if(R('amk')==='R'&&(R('gen')==='R'||R('tob')==='R'))L.push('<b>Resistance to amikacin as well as gentamicin / tobramycin</b> raises a 16S rRNA methyltransferase (RmtB, ArmA).');
+  else if(any(['gen','tob'],'R')&&R('amk')!=='R')L.push('<b>Gentamicin / tobramycin resistance with amikacin spared</b> fits an aminoglycoside-modifying enzyme.');
+  if(any(['col','pmb'],'R'))L.push('<b>Polymyxin resistance</b> '+(o==='sm'?'is intrinsic in Serratia (arn operon), not an acquired change.':'suggests lipid A modification (mcr plasmid or chromosomal pmrAB / mgrB). Broth microdilution is the reference method for colistin.'));
+  if(R('sxt')==='R')L.push('<b>Trimethoprim-sulfamethoxazole resistance</b> suggests acquired dfr / sul genes.');
+  if(!L.length)L.push('No resistance pattern stands out with the breakpoints in use.');
+  const spec={blood:'Blood culture: a true positive is always significant; contaminants are usually skin flora, not Gram-negative rods.',urine:'Urine: interpret with symptoms and colony count; asymptomatic bacteriuria should not be treated in most patients.',eta:'Endotracheal aspirate: growth may be colonisation; interpret with clinical signs, imaging and quantity.',bal:'BAL: a quantitative threshold (commonly 10⁴ CFU/mL) helps separate infection from colonisation.',pus:'Pus / wound: a good sample from the deep part of the collection; source control matters as much as the antibiotic.'}[cur.spec];
+  $('interp').innerHTML='<ul style="margin:0;padding-left:18px;font-size:13.5px">'+L.map(s=>'<li style="margin:5px 0">'+s+'</li>').join('')+'</ul><p class="note">'+esc(spec)+' Choice of treatment depends on the site, severity, dosing and local guidance and should be discussed with the microbiology and infection-control team. Patterns here are suggestions: confirm mechanisms with the appropriate tests.</p><p class="note"><b>True mechanisms in this simulated isolate:</b> <span id="truth" class="hid">'+cur.m.map(m=>esc(P.MECH[m].name)).join('; ')+'</span> <button class="btn" id="rev" style="min-height:30px;padding:3px 10px">Reveal</button></p>';
+  $('rev').onclick=()=>{$('truth').classList.toggle('hid');};
+  const D=o==='ab'?['mem','fdc','col']:['mem','cza','fdc'];const ok=D.filter(d=>P.ORGS[o].drugs.includes(d));while(ok.length<3){const e=P.ORGS[o].drugs.find(d=>!ok.includes(d));ok.push(e);}
+  $('links').innerHTML='<a class="go" href="microbiology-compare.html?org='+o+'&d='+ok.join(',')+'&m='+cur.m.join(',')+'&v=20261119c">Watch these mechanisms in 3D, three drugs</a><a class="go" style="background:var(--acc2)" href="microbiology-resistance.html?org='+o+(cur.m[0]?'&m='+cur.m[0]:'')+'&v=20261119c">Explore the mechanism</a>';
+}
+function report(){
+  const o=cur.org,od=O.byId(o),sp=cur.spec,r=rng(hash('r'+cur.id));
+  const growth={blood:'Positive in '+(8+Math.floor(r()*14))+' h; 2 of 2 sets',urine:'> 10⁵ CFU/mL, single organism',eta:'Heavy growth (3+), predominant organism',bal:'≥ 10⁵ CFU/mL (above the usual 10⁴ CFU/mL threshold)',pus:'Heavy growth, single organism'}[sp];
+  $('rep').innerHTML='<dt>Specimen</dt><dd>'+esc(SPEC[sp])+'</dd><dt>Clinical details</dt><dd>'+esc(cur.s||'Custom simulated isolate')+'</dd><dt>Direct Gram stain</dt><dd>Gram-negative '+(o==='ab'?'coccobacilli':'bacilli')+(sp==='blood'?'':' with polymorphonuclear cells')+'</dd><dt>Growth</dt><dd>'+esc(growth)+'</dd><dt>Identification</dt><dd><i>'+esc(P.ORGS[o].name)+'</i></dd>';
+  $('task').textContent=cur.task||'Interpret the antibiogram, then use the links below to see the mechanisms in 3D.';
+  $('toOrg').href='microbiology.html?org='+o+'&v=20261119c';
+}
+function show(){build();report();gram();plate();disc();renderTable();interp();document.querySelectorAll('.case').forEach(b=>b.setAttribute('aria-pressed',cur.id===+b.dataset.id));
+  try{history.replaceState(null,'','?case='+cur.id+(cur.id==='c'?'&org='+cur.org+'&spec='+cur.spec+'&m='+cur.m.join(','):''));}catch(e){}}
+$('cases').innerHTML=CASES.map(c=>'<button class="case" data-id="'+c.id+'" aria-pressed="false"><b>'+c.id+'. '+esc(c.t)+'</b><span>'+esc(SPEC[c.spec])+' · <i>'+esc(O.byId(c.org).short)+'</i></span></button>').join('');
+$('cases').onclick=e=>{const b=e.target.closest('.case');if(!b)return;cur=Object.assign({},CASES.find(c=>c.id===+b.dataset.id));show();};
+$('cOrg').innerHTML=Object.keys(P.ORGS).map(k=>'<option value="'+k+'">'+esc(P.ORGS[k].name)+'</option>').join('');$('cSpec').innerHTML=Object.entries(SPEC).map(([k,v])=>'<option value="'+k+'">'+v+'</option>').join('');
+function customMg(){const o=$('cOrg').value;$('cMech').innerHTML=P.mechsFor(o).map(m=>'<label><input type="checkbox" data-m="'+m+'"'+((cur&&cur.id==='c'&&cur.m.includes(m))?' checked':'')+'><span>'+esc(P.MECH[m].name)+'</span></label>').join('');}
+function custom(){cur={id:'c',t:'Custom isolate',s:'Custom simulated isolate',org:$('cOrg').value,spec:$('cSpec').value,m:[...document.querySelectorAll('#cMech input:checked')].map(i=>i.dataset.m),task:'Custom isolate: read the antibiogram, then compare it with the mechanisms you ticked.'};show();}
+$('cOrg').onchange=()=>{cur={id:'c',org:$('cOrg').value,m:[]};customMg();custom();};$('cSpec').onchange=custom;$('cMech').onchange=custom;
+$('mBlood').onclick=()=>{medium='blood';$('mBlood').setAttribute('aria-pressed',true);$('mMac').setAttribute('aria-pressed',false);plate();};$('mMac').onclick=()=>{medium='mac';$('mMac').setAttribute('aria-pressed',true);$('mBlood').setAttribute('aria-pressed',false);plate();};
+$('abg').addEventListener('change',e=>{const i=e.target.closest('input.bp');if(!i)return;BP[GRP[cur.org]][i.dataset.d][+i.dataset.k]=parseFloat(i.value);renderTable();interp();});
+$('bpReset').onclick=()=>{BP=JSON.parse(JSON.stringify(BP0));$('bpName').value='Teaching set v1, CLSI-style categories';renderTable();interp();};
+const q=new URLSearchParams(location.search);
+if(q.get('case')==='c'||(q.get('org')&&q.get('m')!==null&&!q.get('case'))){const o=P.ORGS[q.get('org')]?q.get('org'):'pa';$('cOrg').value=o;if(SPEC[q.get('spec')])$('cSpec').value=q.get('spec');cur={id:'c',org:o,m:[]};customMg();(q.get('m')||'').split(',').filter(m=>P.MECH[m]).forEach(m=>{const i=document.querySelector('#cMech input[data-m="'+m+'"]');if(i)i.checked=true;});$('custom').open=true;custom();}
+else{cur=Object.assign({},CASES.find(c=>c.id===+q.get('case'))||CASES[2]);customMg();show();}
+if(q.get('medium')==='mac')$('mMac').click();
+window.__ws={show,get cur(){return cur;}};
+})();
+</script>
+</body></html>

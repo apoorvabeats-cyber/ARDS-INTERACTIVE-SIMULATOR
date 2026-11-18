@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Microbiology Lab · Three-antibiotic comparison</title>
+<meta name="description" content="Choose three antibiotics and switch resistance mechanisms on and off to see side by side how each drug enters, which target it hits and whether killing occurs.">
+<link rel="stylesheet" href="micro/ui.css?v=20261119c">
+<style>.wrap{grid-template-columns:200px minmax(0,1fr)}@media (max-width:760px){.wrap{grid-template-columns:1fr}}
+.sel{display:flex;gap:8px;flex-wrap:wrap}.sel label{font-size:12px;color:var(--mute);display:flex;flex-direction:column;gap:3px;flex:1;min-width:150px}
+.mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:2px 14px}
+.mg h3{grid-column:1/-1;margin:8px 0 0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:600}
+.mg label{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;min-height:34px;cursor:pointer;padding:4px 0}.mg input{width:18px;height:18px;margin-top:2px;accent-color:var(--acc)}
+.pre{margin:8px 0 0}</style></head>
+<body><main>
+<div class="top"><a href="index.html">← Hall</a><a href="microbiology.html?v=20261119c" id="toOrg">← Organisms</a><span class="sp"></span><span class="badge">Microbiology Lab · Antibiotic comparison</span></div>
+<h1 id="h1">Three-antibiotic comparison</h1>
+<p class="sub">Same bacterium, three drugs, one set of resistance mechanisms</p>
+<div class="wrap">
+  <nav class="list" id="list" aria-label="Organisms"></nav>
+  <section class="center">
+    <div class="panelbox" style="padding:10px 12px"><div class="sel" id="sel"></div><div class="chips pre" id="pre" role="group" aria-label="Presets"></div></div>
+    <div class="pgrid" id="pgrid" style="margin-top:10px"><canvas id="cv" aria-label="Three-drug comparison"></canvas>
+      <div class="pcols c3"><div class="pn" id="p0"><div class="pt"></div><div class="pc"></div><div class="po"></div></div><div class="pn" id="p1"><div class="pt"></div><div class="pc"></div><div class="po"></div></div><div class="pn" id="p2"><div class="pt"></div><div class="pc"></div><div class="po"></div></div></div></div>
+    <div class="transport"><button class="btn" id="play">Play</button><button class="btn" id="replay">Replay</button><input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Timeline"><span class="time" id="time">0:00</span>
+      <span class="chips" id="speed" role="group" aria-label="Speed"><button class="pill" data-v=".5" aria-pressed="false">0.5×</button><button class="pill" data-v="1" aria-pressed="true">1×</button><button class="pill" data-v="2" aria-pressed="false">2×</button></span></div>
+    <div class="panelbox" style="padding:10px 12px;margin-top:8px"><div class="note" style="margin:0 0 4px">Resistance mechanisms present (switch on and off, then the animation reruns)</div><div class="mg" id="mg"></div></div>
+    <div class="panelbox" style="padding:10px 12px;margin-top:8px"><div class="tbl-wrap"><table class="t" id="tbl"></table></div></div>
+  </section>
+</div>
+<p class="foot">Illustrative teaching model, not a clinical susceptibility prediction. A mechanism that is present does not guarantee a susceptibility result: the actual phenotype depends on expression level and the isolate's other characteristics, and comes from its susceptibility report (CLSI / EUCAST). Educational content.</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="micro/organisms.js?v=20261119c"></script>
+<script src="micro/pharm.js?v=20261119c"></script>
+<script src="micro/common.js?v=20261119c"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id),U=MICRO.ui,esc=U.esc,P=MICRO.pharm,O=MICRO.orgs;
+const mark=U.orgList($('list'),id=>pickOrg(id),Object.keys(P.ORGS));
+const S=P.Stage($('cv'),$('pgrid'));
+let org='pa',drugs=['mem','cza','fdc'],set=new Set(['ndm']),pn=[];
+const PRE={pa:[['Susceptible (none)',[]],['NDM producer',['ndm']],['OprD loss + efflux',['porin','eff']],['NDM + efflux + porin loss + altered PBP',['ndm','eff','porin','pbp']],['Colistin resistance (lipid A)',['lipa']]],
+ kp:[['Susceptible (none)',[]],['ESBL only',['esbl']],['KPC producer',['kpc']],['NDM producer',['ndm']],['KPC + porin loss',['kpc','porin']],['NDM + 16S methylase + gyrA',['ndm','rmt','gyr']]],
+ ec:[['Susceptible (none)',[]],['ESBL only',['esbl']],['ESBL + gyrA + dfr',['esbl','gyr','dfr']],['NDM producer',['ndm']]],
+ ab:[['Susceptible (none)',[]],['OXA-23 producer',['oxa23']],['OXA-23 + efflux',['oxa23','eff']],['Colistin resistance',['lipa']]],
+ en:[['Susceptible (none)',[]],['Derepressed AmpC',['ampc']],['AmpC + porin loss',['ampc','porin']]],
+ sm:[['Susceptible (none)',[]],['Derepressed AmpC',['ampc']],['KPC producer',['kpc']]]};
+if(!S)$('cv').style.display='none';
+else{pn=[S.add($('p0')),S.add($('p1')),S.add($('p2'))];const upd=P.transport(S,{play:'play',replay:'replay',scrub:'scrub',time:'time',speed:'speed'});S.onTick=()=>{upd();caps();};}
+function caps(){pn.forEach((p,i)=>{const el=$('p'+i);if(!p.st)return;el.querySelector('.pc').textContent=P.caption(p,S.t);const po=el.querySelector('.po');po.className='po '+(S.t>6?p.st.level:'');po.textContent=S.t>6?P.OUT[p.st.level]:'';});}
+function drawSel(){const o=P.ORGS[org];$('sel').innerHTML=[0,1,2].map(i=>'<label>Antibiotic '+(i+1)+'<select data-i="'+i+'">'+o.drugs.map(id=>'<option value="'+id+'"'+(id===drugs[i]?' selected':'')+'>'+esc(P.DRUG[id].name)+'</option>').join('')+'</select></label>').join('');
+  $('pre').innerHTML=(PRE[org]||[]).map((p,i)=>'<button class="pill" data-i="'+i+'">'+esc(p[0])+'</button>').join('');}
+function drawMg(){const ms=P.mechsFor(org);$('mg').innerHTML=P.CATS.map(([c,n])=>{const l=ms.filter(m=>P.MECH[m].cat===c);return l.length?'<h3>'+esc(n)+'</h3>'+l.map(m=>'<label><input type="checkbox" data-m="'+m+'"'+(set.has(m)?' checked':'')+'><span><b>'+esc(P.MECH[m].name)+'</b></span></label>').join(''):'';}).join('');}
+function run(restart){
+  drugs=drugs.map((d,i)=>P.ORGS[org].drugs.includes(d)?d:P.ORGS[org].drugs[i]);
+  if(S){pn.forEach((p,i)=>{p.set(org,drugs[i],set);const d=P.DRUG[drugs[i]];$('p'+i).querySelector('.pt').innerHTML=esc(d.name)+'<small>'+esc(d.cls)+'</small>';});S.dirty=30;if(restart){S.t=0;S.playing=true;}caps();}
+  const rows=drugs.map(id=>{const ev=P.evaluate(org,id,set),d=P.DRUG[id];const ms=ev.notes.filter(n=>n.w>0);return '<tr><td><b>'+esc(d.name)+'</b><br><span class="note" style="margin:0">'+esc(d.cls)+'</span></td><td>'+esc({porin:'Porin channel',sider:'Siderophore receptor + iron transport',diffuse:'Diffusion through membranes',self:'Self-promoted uptake',lps:'Binds lipid A (surface)'}[d.entry])+'</td><td>'+esc(P.TGT[d.tgt])+'</td><td>'+(ms.length?ms.map(n=>esc(n.name)+' ('+Math.round(n.w*100)+'% of drug)').join('<br>'):'<span class="note" style="margin:0">none interfering</span>')+'</td><td><span class="po '+ev.level+'" style="position:static;display:inline-block">'+esc(P.OUT[ev.level])+'</span><br><span class="note" style="margin:0">'+Math.round(ev.kill*100)+'% of molecules effective</span></td></tr>';}).join('');
+  $('tbl').innerHTML='<tr><th>Drug</th><th>Entry route</th><th>Target</th><th>Interfering mechanism</th><th>Model outcome</th></tr>'+rows;
+  const m=[...set].join(',');try{history.replaceState(null,'','?org='+org+'&d='+drugs.join(',')+(m?'&m='+m:''));}catch(e){}
+}
+function pickOrg(id){org=id;mark(id);set=new Set([...set].filter(m=>P.mechsFor(org).includes(m)));$('h1').innerHTML='Three-antibiotic comparison · <i>'+esc(O.byId(id).short)+'</i>';$('toOrg').href='microbiology.html?org='+id+'&v=20261119c';drugs=drugs.map((d,i)=>P.ORGS[org].drugs.includes(d)?d:P.ORGS[org].drugs[i*3%P.ORGS[org].drugs.length]);drawSel();drawMg();run(true);}
+$('sel').onchange=e=>{const s=e.target.closest('select');if(!s)return;drugs[+s.dataset.i]=s.value;run(true);};
+$('mg').onchange=e=>{const c=e.target.closest('input');if(!c)return;c.checked?set.add(c.dataset.m):set.delete(c.dataset.m);run(true);};
+$('pre').onclick=e=>{const b=e.target.closest('.pill');if(!b)return;set=new Set(PRE[org][+b.dataset.i][1]);drawMg();run(true);};
+const q=new URLSearchParams(location.search);if(P.ORGS[q.get('org')])org=q.get('org');
+if(q.get('d')){const d=q.get('d').split(',').filter(x=>P.DRUG[x]);if(d.length===3)drugs=d;}else if(org!=='pa'){drugs=org==='ab'?['mem','fdc','col']:['mem','cza','fdc'];}
+if(q.has('m')||q.get('d'))set=new Set((q.get('m')||'').split(',').filter(x=>P.MECH[x]));else set=new Set(org==='pa'?['ndm']:['kpc']);
+if(org==='ab'&&!q.get('d'))set=new Set(['oxa23']);
+mark(org);$('h1').innerHTML='Three-antibiotic comparison · <i>'+esc(O.byId(org).short)+'</i>';$('toOrg').href='microbiology.html?org='+org+'&v=20261119c';drawSel();drawMg();run(false);
+if(S){if(q.get('t'))S.seek(parseFloat(q.get('t')));else S.playing=true;}
+window.__cmp={S,run};
+})();
+</script>
+</body></html>

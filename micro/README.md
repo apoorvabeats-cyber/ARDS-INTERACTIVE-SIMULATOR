@@ -55,4 +55,30 @@ World switches (`world.js`): `W.pump` (efflux, filler `W.fillPump` when absent),
 - All weights are teaching values, not MICs. Real susceptibility is isolate-specific (AST, CLSI / EUCAST).
 
 ## Entrance (`microbiology.html`, file 1 step 1)
-`micro/organisms.js` holds 19 organisms in 6 groups (data plus a procedural three.js model for each: clusters, chains, lancet diplococci with capsule, rods with flagella and pili, spore-former, wall-less Mycoplasma, Chlamydia inclusion, Candida, Aspergillus conidiophore, mycobacterial cord). To add one: add a record to `O` and a builder to `MODEL`. Models are schematic; text is teaching content needing specialist review. The Resistance Explorer card links to `microbiology-lab.html?org=<id>` for P. aeruginosa, K. pneumoniae, E. coli and A. baumannii only.
+`micro/organisms.js` holds 19 organisms in 6 groups (data plus a procedural three.js model for each: clusters, chains, lancet diplococci with capsule, rods with flagella and pili, spore-former, wall-less Mycoplasma, Chlamydia inclusion, Candida, Aspergillus conidiophore, mycobacterial cord). To add one: add a record to `O` and a builder to `MODEL`. Models are schematic; text is teaching content needing specialist review. The six module cards in the info panel (`MODS` in `microbiology.html`) link to the pages below with `?org=<id>`. Anatomy and Infection cover all 19 organisms. Antibiotic Laboratory, Resistance Explorer and the workstation cover six Gram-negatives only (pa, kp, ec, ab, en, sm); other organisms show "Not yet". The original Resistance Lab is still linked for pa, kp, ec and ab.
+
+
+## Microbiology Lab pages (file 1 steps 2 to 8)
+
+| Page | Needs | Deep link |
+|---|---|---|
+| `microbiology-anatomy.html` | `organisms.js`, `anatomy.js`, `common.js` | `?org=&view=env&sel=` |
+| `microbiology-infection.html` | `organisms.js`, `infection.js` | `?org=&t=` |
+| `microbiology-antibiotics.html` | `pharm.js` | `?org=&drug=&m=&t=` |
+| `microbiology-compare.html` | `pharm.js` | `?org=&d=a,b,c&m=x,y&t=` |
+| `microbiology-resistance.html` | `pharm.js`, `hgt.js` | `?org=&cat=&m=&drug=&tab=hgt&k=&t=` |
+| `microbiology-workstation.html` | `pharm.js` | `?case=1..9` or `?org=&spec=&m=a,b` (custom isolate) |
+
+Shared code: `micro/ui.css` (theme), `micro/common.js` (`MICRO.ui`: organism list, orbit stage). All animations are pure functions of time, so scrub, pause and speed work. Scripts use `?v=` cache-busters; bump them together when editing a shared file.
+
+### Fate model (`micro/pharm.js`)
+`MICRO.pharm.evaluate(org, drug, mechanisms)` returns the fraction of drug that is excluded (porin), pumped out, hydrolysed, blocked at the target, bypassed, or kills. Kill of 0.6 or more is "effective", 0.25 to 0.6 "reduced", below that "fails". To add a drug, add it to `DRUGS` and to each organism's panel in `ORGS`, then give it weights in `W`. To add an organism, add an `ORGS` record (drug panel, enzyme list) and a group in the workstation (`GRP`, `BASE`, `BP0`).
+
+### Workstation
+MIC = reference MIC divided by the modelled kill fraction, rounded to doubling dilutions with a seeded +/- 1 dilution jitter. Zone diameter is illustrative and derived from the MIC. Categories (S / I / R) use editable breakpoints from "Teaching set v1" (CLSI-style, illustrative). They are not CLSI or EUCAST values: verify against the current CLSI M100 or EUCAST table before any real use. The page states that a simulated organism's mechanism is a modelling input and that a real patient's mechanism must be confirmed by testing. The antibiogram is generated, not measured.
+
+### Known gaps
+- No Gram-positive drug panels (MRSA PBP2a, VRE van operon), anaerobes, mycobacteria, atypicals or fungi in the drug, resistance or workstation modules.
+- Altered PBP in Gram-negatives is a hypothetical teaching mechanism.
+- All text and numbers are teaching content written without specialist review. They are not a clinical susceptibility prediction.
+- Tested with software WebGL (desktop) and a 390 px emulated viewport; not tested on real phones.

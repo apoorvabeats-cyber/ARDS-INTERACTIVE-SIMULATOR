@@ -145,6 +145,7 @@
   };
   const FALLBACK = id => MODEL.ec();
 
+  M.gx = { capsuleGeo, lancetGeo, tubeAlong, nucleoid, std, glass, rngf, flagellum, capPoint, hairs, wrinkle, dots };
   M.orgs = {
     GROUPS, LIST: O, byId: id => O.find(o => o.id === id),
     build(id) {

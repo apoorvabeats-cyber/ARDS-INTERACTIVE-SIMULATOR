@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Microbiology Lab · Bacterial anatomy explorer</title>
+<meta name="description" content="Rotate a cutaway 3D cell for 19 organisms, tap capsule, wall, membrane, ribosome, DNA, plasmid, porin, pump, flagella and pili, and zoom to the molecular envelope.">
+<link rel="stylesheet" href="micro/ui.css?v=20261119c">
+<style>
+.pills{margin:8px 0 0}
+.pill i.d{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--acc);margin-right:7px}
+.pill.off i.d{background:var(--mute)}
+.lab{position:absolute;left:0;top:0;pointer-events:none;font-size:12px;color:#04201f;background:var(--acc);border-radius:999px;padding:3px 10px;font-weight:600;white-space:nowrap;transform:translate(-50%,-160%);opacity:0;transition:opacity .2s}
+.absent{border-left:3px solid var(--warn);padding-left:10px;color:#ffe3a3}
+</style></head>
+<body><main>
+<div class="top"><a href="index.html">← Hall</a><a href="microbiology.html?v=20261119c" id="toOrg">← Organisms</a><span class="sp"></span><span class="badge">Microbiology Lab · Bacterial anatomy</span></div>
+<h1 id="h1">Bacterial anatomy</h1>
+<p class="sub">Tap a structure to zoom and see what it does</p>
+<div class="wrap">
+  <nav class="list" id="list" aria-label="Organisms"></nav>
+  <section class="center">
+    <div class="stage" id="stage"><canvas id="cv" aria-label="3D cutaway model"></canvas>
+      <div class="hint"><span id="gtag"><b>3D MODE</b> · drag to orbit, scroll or pinch to zoom</span><span id="orgname"></span></div>
+      <div class="lab" id="lab"></div>
+    </div>
+    <div class="btns"><button class="btn" id="vWhole" aria-pressed="true">Whole cell</button><button class="btn" id="vEnv" aria-pressed="false">Envelope close-up (molecular)</button><button class="btn" id="bCut" aria-pressed="true">Cutaway</button><button class="btn" id="bRot" aria-pressed="false">Auto-rotate</button><button class="btn" id="bReset">Reset view</button></div>
+    <div class="chips pills" id="parts" role="group" aria-label="Structures"></div>
+  </section>
+  <aside class="info" id="info" aria-live="polite"></aside>
+</div>
+<p class="foot">Schematic teaching models, not to scale. Structures marked "not present" are shown so you can see why a drug that needs them does or does not work. Content is educational.</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="micro/organisms.js?v=20261119c"></script>
+<script src="micro/anatomy.js?v=20261119c"></script>
+<script src="micro/common.js?v=20261119c"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id),U=MICRO.ui,esc=U.esc,A=MICRO.anat,O=MICRO.orgs;
+const mark=U.orgList($('list'),id=>pick(id));
+const S=U.stage($('cv'),{clip:true,dist:12,auto:false,min:2.5,max:26,onTap:tap});
+let org=null,view='whole',cur=null,sel=null,cut=true,tSel=0,spins=[];
+if(!S){$('cv').style.display='none';$('stage').insertAdjacentHTML('beforeend','<p style="padding:30px;color:#8fa6b8">3D view needs WebGL. Structure information below still works.</p>');}
+const ray=S?new THREE.Raycaster():null;if(ray)ray.params.Points.threshold=.14;
+function clear(){if(cur){S.scene.remove(cur.root);cur.root.traverse(o=>{if(o.geometry)o.geometry.dispose();});cur=null;}sel=null;}
+function build(){
+  if(!S)return;clear();cur=view==='whole'?A.whole(org):A.env(org);S.scene.add(cur.root);spins=cur.spins||[];
+  cur.clipMats.forEach(m=>{m.clippingPlanes=cut?[cur.plane]:[];m.needsUpdate=true;});
+  $('bCut').style.display=view==='whole'?'':'none';
+  const d=view==='whole'?Math.max(10,cur.size*1.75):11;S.reset(d,view==='whole'?.35:0,view==='whole'?.12:0);S.st.auto=false;$('bRot').setAttribute('aria-pressed',false);
+  renderParts();
+}
+function renderParts(){
+  $('parts').innerHTML=cur.list.map(p=>{const off=view==='whole'&&!p.present;return '<button class="pill'+(off?' off':'')+'" data-id="'+p.id+'" aria-pressed="false"><i class="d"></i>'+esc(p.label||p.name)+(off?' (not present)':'')+'</button>';}).join('');
+  showIntro();
+}
+function showIntro(){
+  const o=O.byId(org);
+  $('info').innerHTML='<p class="k">'+esc(view==='whole'?'Whole cell':'Envelope close-up')+'</p><h2><i>'+esc(o.name)+'</i></h2><p>'+(view==='whole'?'Pick a structure from the buttons or tap it in the model. The camera zooms to it and the text explains its role and which drugs depend on it.':'A molecular slice through the envelope. Tap a protein or layer to zoom in.')+'</p><p class="note">'+esc(o.desc)+'</p>';
+}
+function select(id,fromTap){
+  if(!cur)return;const p=cur.list.find(x=>x.id===id);if(!p)return;
+  if(sel&&cur.parts[sel])A.highlight(cur.parts[sel],0);
+  sel=id;tSel=performance.now();document.querySelectorAll('#parts .pill').forEach(b=>b.setAttribute('aria-pressed',b.dataset.id===id));
+  const present=view==='env'||p.present;
+  $('info').innerHTML='<p class="k">'+(view==='whole'?'Whole cell':'Envelope close-up')+'</p><h2>'+esc(p.name)+'</h2>'+
+   (present?'<h3>What it does</h3><p>'+esc(p.func)+'</p><h3>Why it matters for drugs</h3><p>'+esc(p.drug)+'</p>'+(p.note?'<p class="note">'+esc(p.note)+'</p>':''):'<p class="absent">'+esc(p.absent)+'</p><h3>For reference</h3><p>'+esc(p.func)+'</p>');
+  if(S&&present){const a=p.anchor.clone();S.st.auto=false;S.focus(a,p.dist);const l=$('lab');l.textContent=p.name;l.dataset.x=a.x;l.dataset.y=a.y;l.dataset.z=a.z;l.style.opacity=1;}
+  else if(S){S.focus(new THREE.Vector3(),view==='whole'?Math.max(10,cur.size*1.75):11);$('lab').style.opacity=0;}
+}
+function tap(e){
+  if(!cur)return;const r=$('cv').getBoundingClientRect(),m=new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(m,S.cam);
+  const objs=[];cur.root.traverse(o=>{if((o.isMesh||o.isPoints)&&o.userData.part&&cur.parts[o.userData.part])objs.push(o);});
+  const hits=ray.intersectObjects(objs,false).filter(h=>!(cut&&view==='whole'&&cur.parts[h.object.userData.part].pri===5&&h.point.z>.05));
+  if(!hits.length)return;
+  let best=null,bs=1e9;hits.forEach(h=>{const pr=cur.parts[h.object.userData.part].pri||1,s=pr*100+h.distance;if(s<bs){bs=s;best=h;}});
+  const id=best.object.userData.part;if(cur.list.find(x=>x.id===id))select(id,true);
+}
+$('parts').addEventListener('click',e=>{const b=e.target.closest('.pill');if(b)select(b.dataset.id);});
+if(S)S.onFrame((t,dt)=>{
+  spins.forEach((s,i)=>{s.rotation.z=t*(5+(i%4)*.8);});
+  if(sel&&cur){const p=cur.parts[sel];const k=.5+.5*Math.sin((performance.now()-tSel)/260);if(p)A.highlight(p,.35+.4*k);}
+  const l=$('lab');if(l.style.opacity==='1'){const v=new THREE.Vector3(+l.dataset.x,+l.dataset.y,+l.dataset.z).project(S.cam),w=$('stage');l.style.left=((v.x+1)/2*w.clientWidth)+'px';l.style.top=((1-v.y)/2*w.clientHeight)+'px';}
+});
+function pick(id){
+  org=id;mark(id);const o=O.byId(id);$('h1').innerHTML='Bacterial anatomy · <i>'+esc(o.short)+'</i>';$('orgname').innerHTML='<b><i>'+esc(o.short)+'</i></b>';$('lab').style.opacity=0;
+  try{history.replaceState(null,'','?org='+id+(view==='env'?'&view=env':''));}catch(e){}
+  $('toOrg').href='microbiology.html?org='+id+'&v=20261119c';build();
+}
+function setView(v){view=v;$('vWhole').setAttribute('aria-pressed',v==='whole');$('vEnv').setAttribute('aria-pressed',v==='env');$('lab').style.opacity=0;build();}
+$('vWhole').onclick=()=>setView('whole');$('vEnv').onclick=()=>setView('env');
+$('bCut').onclick=e=>{cut=!cut;e.currentTarget.setAttribute('aria-pressed',cut);if(cur)cur.clipMats.forEach(m=>{m.clippingPlanes=cut?[cur.plane]:[];m.needsUpdate=true;});};
+$('bRot').onclick=e=>{if(!S)return;S.st.auto=!S.st.auto;e.currentTarget.setAttribute('aria-pressed',S.st.auto);};
+$('bReset').onclick=()=>{if(!S||!cur)return;S.reset(view==='whole'?Math.max(10,cur.size*1.75):11,view==='whole'?.35:0,view==='whole'?.12:0);$('lab').style.opacity=0;if(sel&&cur.parts[sel])A.highlight(cur.parts[sel],0);sel=null;document.querySelectorAll('#parts .pill').forEach(b=>b.setAttribute('aria-pressed',false));showIntro();};
+const q=new URLSearchParams(location.search);if(q.get('view')==='env'){view='env';$('vWhole').setAttribute('aria-pressed',false);$('vEnv').setAttribute('aria-pressed',true);}
+pick(O.byId(q.get('org'))?q.get('org'):'pa');if(q.get('sel'))select(q.get('sel'));
+window.__anat={select,pick,setView,get cur(){return cur;}};
+})();
+</script>
+</body></html>
