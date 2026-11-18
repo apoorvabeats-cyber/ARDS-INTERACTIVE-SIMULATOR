@@ -219,7 +219,7 @@
     vre: { name: 'Vancomycin-resistant Enterococcus (VRE)', env: 'gp', sx: .66, drugs: ['amp', 'cro', 'vam', 'tei', 'lzd', 'dap', 'gen', 'tgc', 'lvx', 'dox'], mech: ['pbp5', 'rrlz', 'mprf', 'ame', 'gyr', 'tetm'],
       intr: { vam: IN(.95, 'VRE carries a van cluster (vanA type): D-Ala-D-Lac precursors bind vancomycin about 1000-fold less.'), tei: IN(.95, 'A vanA-type cluster also blocks teicoplanin (a vanB-type isolate would stay teicoplanin-susceptible).'), cro: IN(.97, 'Enterococci have low-affinity PBPs, so cephalosporins are intrinsically inactive.') } },
     sp: { name: 'Streptococcus pneumoniae', env: 'gp', sx: .66, drugs: ['pen', 'cro', 'azm', 'cli', 'lvx', 'mox', 'dox', 'vam', 'lzd', 'sxt'], mech: ['pbpmos', 'erm', 'mef', 'gyr', 'tetm', 'dfr'] },
-    cd: { name: 'Clostridioides difficile', env: 'gp', sx: 1, drugs: ['vam', 'fdx', 'mtz', 'mox'], mech: ['nim', 'rpob', 'gyr'], note: 'Oral vancomycin and fidaxomicin act in the gut lumen; they are barely absorbed. Fidaxomicin is the preferred first-line drug in current IDSA/SHEA guidance, with vancomycin as the alternative. Metronidazole is no longer first-line, and moxifloxacin is shown only because quinolone resistance marks epidemic strains; it is not a treatment.' },
+    cd: { name: 'Clostridioides difficile', env: 'gp', sx: 1, drugs: ['vam', 'fdx', 'mtz', 'mox'], mech: ['nim', 'rpob', 'gyr'], note: 'Oral vancomycin and fidaxomicin act in the gut lumen; they are barely absorbed. Fidaxomicin is the preferred first-line drug in IDSA/SHEA (2021, with the 2022 update) and AGA 2026 guidance, with vancomycin as the alternative. Metronidazole is for fulminant disease only, and moxifloxacin is shown only because quinolone resistance marks epidemic strains; it is not a treatment.' },
     bf: { name: 'Bacteroides fragilis', env: 'gn', sx: 1, drugs: ['tzp', 'mem', 'mtz', 'cli', 'mox', 'tgc', 'gen'], mech: ['cfia', 'nim', 'erm', 'gyr', 'eff'], intr: { gen: IN(.95, 'Aminoglycoside uptake needs oxygen-dependent energy, so strict anaerobes are intrinsically resistant.') } },
     mp: { name: 'Mycoplasma pneumoniae', env: 'wl', sx: .6, drugs: ['azm', 'dox', 'lvx', 'amx'], mech: ['rrlm', 'gyr'], intr: { amx: IN(.98, 'Mycoplasma has no cell wall and no PBPs, so β-lactams have no target.') } },
     lp: { name: 'Legionella pneumophila', env: 'gn', sx: 1, drugs: ['azm', 'lvx', 'dox', 'amx'], mech: ['rrlm', 'gyr', 'eff'], intr: { amx: IN(.95, 'Legionella lives inside host cells (β-lactams penetrate poorly) and makes its own β-lactamase.') }, note: 'The drug must also enter the host cell: macrolides, quinolones and tetracyclines accumulate inside cells.' },
@@ -258,6 +258,19 @@
     const out = []; FATE.forEach((k, i) => { for (let j = 0; j < c[i]; j++) out.push(k); }); return out;
   }
   const dominant = fr => FATE.filter(k => k !== 'kill').concat(['kill']).reduce((a, k) => fr[k] > fr[a] + 1e-9 ? k : a, 'kill');
+  /* Availability in India (checked Nov 2026). y = marketed; p = supplied through the national TB programme (NTEP);
+     u = marketing in India could not be confirmed. Stock varies by hospital and state: check your formulary. */
+  const INDIA = {};
+  'tzp caz cro fep mem ipm etp amk tob gen cip col pmb tgc sxt pen cox cfz amp amx vam tei dap lzd cli azm dox lvx mox rif mtz inh emb flc vor itz pos amb mfg cas'.split(' ').forEach(k => INDIA[k] = ['y', 'Marketed in India.']);
+  INDIA.cza = ['y', 'Marketed in India (Zavicefta and lower-priced Indian generics).'];
+  INDIA.fdx = ['y', 'Approved by the Indian drug regulator (prescription only); confirm stock locally.'];
+  INDIA.bdq = ['p', 'Supplied through the national TB programme (NTEP); private-market sale is restricted.'];
+  INDIA.fdc = ['u', 'Not confirmed as marketed in India. A sublicence to an Indian maker is still awaiting local approval.'];
+  INDIA.ctz = ['u', 'Marketing in India could not be confirmed.'];
+  INDIA.cpt = ['u', 'Marketing in India could not be confirmed.'];
+  INDIA.isa = ['u', 'Marketing in India could not be confirmed.'];
+  INDIA.fcy = ['u', 'Marketing in India could not be confirmed; flucytosine is hard to obtain in many countries.'];
+  const INDIA_LBL = { y: 'Available in India', p: 'Through the national TB programme', u: 'India availability not confirmed' };
   const OUT = { effective: 'Killing likely in this model', reduced: 'Reduced activity in this model', fails: 'Fails in this model' };
 
   /* ------------------------------------------------------------ panel (3D mini cell) */
@@ -423,5 +436,5 @@
   }
   /* current caption for a panel at time t */
   function caption(p, t) { let c = ''; (p.cap || []).forEach(a => { if (t >= a[0]) c = a[1]; }); return c; }
-  M.pharm = { DRUGS, DRUG, ORGS, MECH, MECH_ORDER, CATS, W, TGT, KILL, FATE, FATE_TXT, OUT, evaluate, tokens, mechsFor, killSteps, Stage, transport, caption, DUR: D_ };
+  M.pharm = { INDIA, INDIA_LBL, DRUGS, DRUG, ORGS, MECH, MECH_ORDER, CATS, W, TGT, KILL, FATE, FATE_TXT, OUT, evaluate, tokens, mechsFor, killSteps, Stage, transport, caption, DUR: D_ };
 })();

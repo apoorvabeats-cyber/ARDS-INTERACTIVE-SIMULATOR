@@ -164,7 +164,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       const btn = document.getElementById("icu-enter");
       if (btn) btn.click();
     } else if (kind === "micro") {
-      location.href = "microbiology.html?v=20261119f";
+      location.href = "microbiology.html?v=20261119g";
     } else {
       location.href = "pathology-live.html?v=20261118k";
     }
