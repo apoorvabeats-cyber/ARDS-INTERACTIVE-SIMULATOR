@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DKA and HHS: kidney and volume lab</title>
+<style>
+:root{--bg:#eef3f8;--ink:#0c1b2e;--mute:#546579;--panel:#fff;--line:#b9c8d8;--acc:#0a7f8f;--bad:#c0392b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#06111f;--ink:#e6f1fb;--mute:#8fa5bb;--panel:#0d2036;--line:#24435f;--acc:#3fe0f0;--bad:#ef5b52;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#06111f;--ink:#e6f1fb;--mute:#8fa5bb;--panel:#0d2036;--line:#24435f;--acc:#3fe0f0;--bad:#ef5b52;color-scheme:dark}
+html{background:var(--bg);scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Avenir Next","Segoe UI",Roboto,system-ui,sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px 14px 28px}
+h1{margin:0 0 10px;font-size:24px}
+#cv{position:relative;height:56vh;min-height:320px;border-radius:14px;overflow:hidden;background:#06111f;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+#lbl{position:absolute;left:12px;right:12px;bottom:10px;color:#e6f1fb;font-size:13px;line-height:1.35;text-shadow:0 1px 4px #000;pointer-events:none}
+#lbl b{display:block;font-size:15px}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+button{font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 12px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button[aria-pressed="true"]{border-color:var(--acc);color:var(--acc)}
+label{display:block;margin:12px 0 2px;color:var(--mute);font-size:13px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+.panel ul{margin:4px 0 0;padding-left:18px}.warn{color:var(--bad);font-weight:600}
+.hint{color:var(--mute);font-size:13px;margin:8px 0 0}
+</style></head><body><main>
+<h1>DKA and HHS: kidney and volume lab</h1>
+<div id="cv"><div id="lbl"></div></div>
+<div class="row" id="stages"></div>
+<div class="row" id="dz"></div>
+<label for="sev">Disease severity: <span id="v0"></span></label><input id="sev" type="range" min="0" max="100" value="55">
+<div class="row" id="rx"></div>
+<div class="panel" id="out"></div>
+<div class="panel"><canvas id="sp" width="480" height="90" style="width:100%;height:90px" role="img" aria-label="Key outputs over simulated hours"></canvas><div class="hint" style="margin:2px 0 0"><span id="leg"></span> Hour <span id="hr">0</span>.</div></div>
+<div class="panel" id="info">Tap any part of the 3D scene to inspect it.</div>
+<p class="hint">Drag to orbit. Scroll or pinch to zoom. Stage buttons fly you in. Presets replay the disease over simulated hours.</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+
+const $=s=>document.querySelector(s),clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const calm=matchMedia('(prefers-reduced-motion:reduce)').matches;
+if(!window.THREE){$('#lbl').innerHTML='<b>3D engine could not load</b>Check your connection and reload.'}else{
+const V=(x,y,z)=>new THREE.Vector3(x,y,z),PI=Math.PI,rnd=Math.random;
+const cv=$('#cv'),R=new THREE.WebGLRenderer({antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));R.setClearColor(0x06111f);cv.prepend(R.domElement);
+const S=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,.01,400);S.add(new THREE.AmbientLight(0x8899bb,.9));cam.add(new THREE.PointLight(0xffffff,1.3,0));S.add(cam);
+const M=(c,o=.8,x={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,transparent:true,opacity:o,roughness:.45},x));
+const add=(m,p,par=S)=>{if(p)m.position.copy(p);par.add(m);return m};
+const CR=a=>new THREE.CatmullRomCurve3(a),tube=(c,r,mt)=>new THREE.Mesh(new THREE.TubeGeometry(c,60,r,12,false),mt);
+const dirv=()=>V(rnd()-.5,rnd()-.5,rnd()-.5).normalize();
+const mkp=(par,n,c,s)=>{const a=new Float32Array(n*3),g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(a,3));const p=new THREE.Points(g,new THREE.PointsMaterial({color:c,size:s}));p.frustumCulled=false;par.add(p);return{a,g}};
+let sev=.55,rx={},m={};
+const grp=p=>{const g=new THREE.Group();g.position.copy(p);g.scale.setScalar(.12);S.add(g);return g};
+const bo=(g,c,p,s)=>{const o=add(new THREE.Mesh(g,M(c,.6)),p);if(s)o.scale.set(s[0],s[1],s[2]);return o};
+let tm=0;const dotsAt=(o,n,f)=>{for(let i=0;i<o.a.length/3;i++){if(i>=n){o.a[i*3+1]=-1e4;continue}f(i,o.a)}o.g.attributes.position.needsUpdate=true};
+
+const BG='none',LEG='Teal: blood pressure. Amber: urine output.';
+const kid=bo(new THREE.SphereGeometry(1,24,18),0xb5483f,V(0,0,0),[3,4.5,2]);
+const NP=new THREE.CatmullRomCurve3([V(10,5,0),V(10,2,0),V(11.5,0,0),V(13,2,0),V(13,-2,0),V(14,-4.5,0)]),NL=NP.getLength();add(tube(NP,.35,M(0x2ad4c0,.35)));
+const gm=add(new THREE.Mesh(new THREE.SphereGeometry(.9,16,12),M(0xe0405a,.5)),V(10,5.6,0));
+const NG=110,NW=90,gl=mkp(S,NG,0xffffff,.2),wt=mkp(S,NW,0x4aa8ff,.2),gt=[],wt_=[];for(let i=0;i<NG;i++)gt.push(rnd());for(let i=0;i<NW;i++)wt_.push(rnd());
+const CP=V(10,-8,0),cg=grp(CP);add(new THREE.Mesh(new THREE.BoxGeometry(5,2.4,2),M(0x2ad4c0,.35)),null,cg);
+const st2=[...Array(8)].map((_,i)=>add(new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,.5,8),M(0xf0c040,.95)),V(-2+i*.57,1.2,0),cg));
+const gx=mkp(cg,50,0xffffff,.03),gy=mkp(cg,30,0xffffff,.03),x1=[],x2=[];for(let i=0;i<50;i++)x1.push(rnd());for(let i=0;i<30;i++)x2.push(rnd());
+const ST=[['Kidney',V(2,0,0),20,null,null,'Filtered glucose in the urine drags water, sodium and potassium with it, so the patient loses litres of fluid.'],
+['Nephron',V(12,0,0),8,null,null,'Above about 180 mg per dL the tubule cannot reabsorb all the glucose, so it flows on carrying water.'],
+['Tubule cell',CP,1.9,0,0,'The SGLT2 transporters are saturated. Glucose is left in the lumen and holds water there.']];
+const RX=[['ins','IV insulin','lowers glucose, so the osmotic diuresis eases'],['fl','IV fluids','refill the vessels and protect the kidney'],['sglt','SGLT2 inhibitor','harms: more glucose in the urine and more fluid loss'],['loop','Loop diuretic','harms: deepens dehydration'],['hhs','HHS pattern','larger fluid deficit, extreme glucose']];
+const DZ=[['Early DKA',.35,[],'Glycosuria starts and urine output rises.'],['Severe DKA',.85,[],'A large fluid deficit and falling pressure.'],['HHS',.8,['hhs'],'The deepest dehydration, up to nine litres.'],['Fluids only',.85,['fl'],'Volume improves, glucose still spills.'],['Fluids and insulin',.85,['fl','ins'],'Volume restored and the diuresis stops.'],['Diuretic error',.8,['loop'],'Furosemide deepens the dehydration.']];
+const INFO={kid:['Kidney','Osmotic diuresis removes water, sodium and potassium. Low volume then reduces kidney perfusion and can cause pre renal injury.','Fluids first, then insulin.'],gm:['Glomerulus','Filters glucose freely. Falling volume cuts filtration and creatinine rises.','Restore volume with balanced fluids.'],tub:['Tubule','Reabsorption is saturated, so glucose and water pass on to the urine.','Insulin lowers glucose and stops the diuresis.'],sg:['SGLT2 transporters','All transporters are busy, so extra glucose stays in the lumen and holds water.','SGLT2 inhibitor drugs make this worse and can cause euglycaemic DKA.']};
+const KEY=()=>[[m.map,120,'#2ad4c0'],[m.uo,6,'#f0a030']];
+const TAG=()=>{kid.userData.k='kid';gm.userData.k='gm';st2.forEach(x=>x.userData.k='sg');S.traverse(o=>{if(o.isMesh&&o.geometry.type==='TubeGeometry')o.userData.k='tub'})};
+function model(){const h=!!rx.hhs,u=clamp(sev*(rx.ins?.15:1)),g=Math.round(clamp(100+(h?900:600)*u,70,1200)),gly=clamp((g-180)/700)+(rx.sglt?.25:0),
+ uo=+(.8+5*gly+(rx.loop?1.5:0)).toFixed(1),def=+(((h?9:6)*clamp(sev))*(rx.fl?.45:1)+(rx.loop?1.5*sev:0)).toFixed(1),map=Math.round(clamp(92-4.5*def,35,95)),cr=+(1+.8*def/3).toFixed(1);
+ Object.assign(m,{g,gly,uo,def,map});const on=RX.filter(d=>rx[d[0]]);
+ $('#out').innerHTML=`Glucose ${g} mg/dL, glycosuria ${Math.round(gly*100)}%, <span class="${uo>3?'warn':''}">urine ${uo} ml/kg/h</span>, <span class="${def>4?'warn':''}">fluid deficit ${def} L</span>, <span class="${map<65?'warn':''}">MAP ${map} mmHg</span>, creatinine ${cr}`+(map<65?'<br><span class="warn">Hypovolaemic shock: give fluids</span>':'')+(rx.loop?'<br><span class="warn">Diuretic deepens the dehydration</span>':'')+(rx.sglt?'<br><span class="warn">SGLT2 inhibitor: more glucose loss, euglycaemic DKA risk</span>':'')+(on.length?'<ul>'+on.map(d=>`<li>${d[1]}: ${d[2]}</li>`).join('')+'</ul>':'');
+ kid.material.color.setHSL(.03,.5,.3+.2*clamp(1-def/9));gm.material.opacity=.3+.5*clamp(m.map/92);st2.forEach((x,i)=>{x.material.opacity=i<Math.round(8*clamp(gly+.15))?.95:.3})}
+function frame(dt){tm+=calm?0:dt;const sp=calm?0:dt*2.4/NL;
+ dotsAt(gl,Math.round(NG*clamp(m.g/900)),(i,a)=>{gt[i]=(gt[i]+sp*(1+m.gly))%1;const p=NP.getPointAt(gt[i]);a[i*3]=p.x;a[i*3+1]=p.y+.15;a[i*3+2]=p.z});
+ dotsAt(wt,Math.round(NW*clamp(m.uo/5)),(i,a)=>{wt_[i]=(wt_[i]+sp*(1+m.gly))%1;const p=NP.getPointAt(wt_[i]);a[i*3]=p.x;a[i*3+1]=p.y-.15;a[i*3+2]=p.z});
+ dotsAt(gx,Math.round(50*clamp(m.g/900)),(i,a)=>{x1[i]=(x1[i]+(calm?0:dt*.3))%1;a[i*3]=-2.2+4.4*((i*.37)%1);a[i*3+1]=3.2-1.7*x1[i];a[i*3+2]=0});
+ dotsAt(gy,Math.round(30*clamp(1-m.gly)),(i,a)=>{x2[i]=(x2[i]+(calm?0:dt*.3))%1;a[i*3]=-2+4*((i*.53)%1);a[i*3+1]=.9-1.8*x2[i];a[i*3+2]=0})}
+
+const goal={t:ST[0][1].clone(),r:ST[0][2],y:null,p:null};let yaw=.5,pit=.15,rad=ST[0][2],tgt=ST[0][1].clone(),stage=0;
+function go(i){stage=i;const s=ST[i];goal.t.copy(s[1]);goal.r=s[2];goal.y=s[3];goal.p=s[4];$('#lbl').innerHTML=`<b>${s[0]}</b>${s[5]}`;
+ document.querySelectorAll('[data-s]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.s===i))}
+function refresh(){model();$('#v0').textContent=Math.round(sev*100)+'%';document.querySelectorAll('[data-rx]').forEach(b=>b.setAttribute('aria-pressed',!!rx[b.dataset.rx]))}
+$('#stages').innerHTML=ST.map((s,i)=>`<button data-s="${i}">${s[0]}</button>`).join('')+'<button data-next="1">Next stage</button>';
+$('#rx').innerHTML=RX.map(d=>`<button data-rx="${d[0]}" aria-pressed="false">${d[1]}</button>`).join('');
+$('#stages').addEventListener('click',ev=>{const b=ev.target.closest('button');if(b)go(b.dataset.next?(stage+1)%ST.length:+b.dataset.s)});
+$('#rx').addEventListener('click',ev=>{const b=ev.target.closest('[data-rx]');if(b){rx[b.dataset.rx]=!rx[b.dataset.rx];refresh()}});
+$('#sev').addEventListener('input',ev=>{sev=ev.target.value/100;refresh()});
+const ptr=new Map(),zoomBy=f=>{goal.r=clamp(goal.r*f,.3,110)};
+cv.addEventListener('pointerdown',ev=>{cv.setPointerCapture(ev.pointerId);ptr.set(ev.pointerId,[ev.clientX,ev.clientY])});
+cv.addEventListener('pointermove',ev=>{const o=ptr.get(ev.pointerId);if(!o)return;
+ if(ptr.size===1){goal.y=goal.p=null;yaw-=(ev.clientX-o[0])*.008;pit=clamp(pit+(ev.clientY-o[1])*.008,-1.3,1.3)}
+ else if(ptr.size===2){const q=[...ptr.entries()].find(([id])=>id!==ev.pointerId)[1];zoomBy(Math.hypot(o[0]-q[0],o[1]-q[1])/Math.hypot(ev.clientX-q[0],ev.clientY-q[1]))}
+ ptr.set(ev.pointerId,[ev.clientX,ev.clientY])});
+['pointerup','pointercancel'].forEach(t=>cv.addEventListener(t,ev=>ptr.delete(ev.pointerId)));
+cv.addEventListener('wheel',ev=>{ev.preventDefault();zoomBy(1+ev.deltaY*.001)},{passive:false});
+function fit(){const w=cv.clientWidth,h=cv.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+new ResizeObserver(fit).observe(cv);fit();
+
+const LAB={go:refresh,tg:rx,bg:BG,leg:LEG,key:KEY,tag:TAG,dz:DZ,info:INFO};
+let tsev=sev,ramp=false,hr=0,hist=[],lh=0;const ray=new THREE.Raycaster(),dn=[0,0,0];
+$('#leg').textContent=LAB.leg;
+function spark(){const c=$('#sp'),g=c.getContext('2d'),w=c.width,h=c.height;g.clearRect(0,0,w,h);g.strokeStyle='#8886';g.beginPath();g.moveTo(0,h-1);g.lineTo(w,h-1);g.stroke();
+ [0,1].forEach(s=>{g.lineWidth=2;g.beginPath();hist.forEach((p,j)=>{g.strokeStyle=p[s][2];const x=j/79*w,y=h-4-(h-8)*clamp(p[s][0]/p[s][1]);j?g.lineTo(x,y):g.moveTo(x,y)});g.stroke()})}
+function step(dt){if(ramp&&Math.abs(sev-tsev)>.003){sev+=(tsev-sev)*(1-Math.exp(-dt*.5));$('#sev').value=Math.round(sev*100);LAB.go()}
+ if(!calm)hr+=dt*3;lh+=dt;if(lh>.5){lh=0;hist.push(LAB.key());if(hist.length>80)hist.shift();spark();$('#hr').textContent=Math.floor(hr)}}
+$('#dz').innerHTML=LAB.dz.map((d,i)=>`<button data-i="${i}" aria-pressed="false">${d[0]}</button>`).join('');
+$('#dz').addEventListener('click',ev=>{const b=ev.target.closest('[data-i]');if(!b)return;const d=LAB.dz[+b.dataset.i];
+ Object.keys(LAB.tg).forEach(x=>delete LAB.tg[x]);d[2].forEach(x=>LAB.tg[x]=true);tsev=d[1];sev=calm?tsev:0;ramp=!calm;hr=0;hist.length=0;
+ $('#sev').value=Math.round(sev*100);LAB.go();
+ document.querySelectorAll('#dz button').forEach(x=>x.setAttribute('aria-pressed',x===b));$('#info').innerHTML=`<strong>${d[0]}</strong><br>${d[3]}`});
+$('#sev').addEventListener('input',()=>{ramp=false});
+cv.addEventListener('pointerdown',ev=>{dn[0]=ev.clientX;dn[1]=ev.clientY;dn[2]=1});
+cv.addEventListener('pointerup',ev=>{if(!dn[2]||Math.hypot(ev.clientX-dn[0],ev.clientY-dn[1])>6)return;dn[2]=0;LAB.tag();const r=cv.getBoundingClientRect();
+ ray.setFromCamera({x:(ev.clientX-r.left)/r.width*2-1,y:-(ev.clientY-r.top)/r.height*2+1},cam);
+ const hs=ray.intersectObjects(S.children,true).filter(h=>h.object.isMesh&&h.object.visible&&h.object.userData.k),h=hs.find(x=>x.object.userData.k!==LAB.bg)||hs[0];
+ const i=h&&LAB.info[h.object.userData.k];if(!i)return;$('#info').innerHTML=`<strong>${i[0]}</strong><br>${i[1]}<br><em>Drugs and care:</em> ${i[2]}`});
+
+const VOD={lv:["Organ level", "Nephron level", "Cell level"],ph:["Early hyperglycaemia. At organ level, urine output starts to rise. At cellular level, the tubule transporters are working at their limit.", "Osmotic diuresis. At organ level, the kidney loses water, sodium and potassium in the urine. At cellular level, the glucose transporters are saturated, so glucose holds water in the tubule.", "Marked dehydration. At organ level, blood pressure falls and creatinine rises. At cellular level, the tubule cells are short of perfusion and oxygen.", "Severe volume depletion. At organ level, the patient is in shock with a fluid deficit of many litres. At cellular level, tubule injury can begin if perfusion is not restored."]};
+const VOq=(t,q)=>{if(parent!==window)parent.postMessage({vo:t,q:!!q},'*')};
+const phase=()=>sev<.25?0:sev<.5?1:sev<.75?2:3;let lastPh=phase(),vt_=0;
+const plain=h=>h.replace(/<br>/g,'. ').replace(/<[^>]+>/g,'');
+$('#stages').addEventListener('click',()=>VOq(VOD.lv[stage]+'. '+ST[stage][0]+'. '+(ST[stage][5]||ST[stage][3])));
+document.querySelector('#rx,#drugs').addEventListener('click',ev=>{const b=ev.target.closest('[data-rx],[data-dg]');if(!b)return;const k=b.dataset.rx||b.dataset.dg,L=(typeof RX!=='undefined'?RX:DG).find(d=>d[0]===k);if(!L)return;
+ const w=[...$('#out').querySelectorAll('.warn')].map(e=>e.textContent).join('. ');VOq(L[1]+(LAB.tg[k]?' switched on. ':' switched off. ')+(L[3]||L[2])+'. '+w)});
+new MutationObserver(()=>VOq(plain($('#info').innerHTML))).observe($('#info'),{childList:true});
+$('#sev').addEventListener('input',()=>{clearTimeout(vt_);vt_=setTimeout(()=>{lastPh=phase();VOq(VOD.ph[lastPh])},700)});
+$('#dz').addEventListener('click',()=>{lastPh=-1;if(!ramp){lastPh=phase();VOq(VOD.ph[lastPh],true)}});
+setInterval(()=>{if(!ramp)return;const p=phase();if(p!==lastPh){lastPh=p;VOq(VOD.ph[p],true)}},400);
+const clock=new THREE.Clock();
+function tick(){const dt=Math.min(clock.getDelta(),.05);step(dt);const k=calm?1:1-Math.exp(-dt*3);
+ tgt.lerp(goal.t,k);rad+=(goal.r-rad)*k;if(goal.y!==null){yaw+=(goal.y-yaw)*k;pit+=(goal.p-pit)*k}
+ cam.position.set(tgt.x+rad*Math.sin(yaw)*Math.cos(pit),tgt.y+rad*Math.sin(pit),tgt.z+rad*Math.cos(yaw)*Math.cos(pit));cam.lookAt(tgt);
+ frame(dt);R.render(S,cam);requestAnimationFrame(tick)}
+refresh();go(0);tick();
+}
+</script></body></html>

@@ -94,22 +94,26 @@ body.sepsis #sepsis-lab{display:block}
     <button type="button" id="voice" aria-pressed="true">Voice on</button>
   </div>
   <h1>Pathophysiology live</h1>
-  <p class="sub">Pick a disease. Sepsis is live: follow it from the organ to the cell, and open each complication in 3D.</p>
+  <p class="sub">Pick a disease. Sepsis and DKA / HHS are live: follow each from the organ to the cell, and open its complications in 3D.</p>
   <div class="diseases" id="diseases"></div>
-  <div id="sepsisPane" hidden>
-    <div class="subtabs" id="subtabs"><button type="button" data-t="map">Sepsis map</button><button type="button" data-t="lab">3D lab</button></div>
-    <iframe id="frame" title="Sepsis"></iframe>
+  <div id="pane" hidden>
+    <div class="subtabs" id="subtabs"><button type="button" data-t="map" id="mapTab">Map</button><button type="button" data-t="lab">3D lab</button></div>
+    <div class="labpick" id="labpick" hidden></div>
+    <iframe id="frame" title="Live module"></iframe>
   </div>
   <p class="soon" id="soon" hidden></p>
 <script>
-const VER = "20261118d";
+const VER = "20261118h";
 const TABS = [["sepsis","Sepsis"],["ards","ARDS"],["dka","DKA / HHS"],["pancreatitis","Acute pancreatitis"],["aki","AKI"],["alf","Acute liver failure"],["ahf","Acute heart failure"],["tbi","Traumatic brain injury"],["status","Status epilepticus"],["dic","DIC"]];
-const LABS = [["shock","Septic shock"],["cardiac","Myocardial dysfunction"],["ards","ARDS"],["aki","AKI"],["dic","DIC"],["enceph","Encephalopathy"]];
-const state = {id:"sepsis", tab:"map", lab:"shock"};
+const MODS = {
+  sepsis:{dir:"sepsis", map:"Sepsis map", def:"shock", labs:[["shock","Septic shock"],["cardiac","Myocardial dysfunction"],["ards","ARDS"],["aki","AKI"],["dic","DIC"],["enceph","Encephalopathy"]]},
+  dka:{dir:"dka", map:"DKA and HHS map", def:"meta", labs:[["meta","Metabolism"],["kidney","Kidney and volume"],["brain","Brain"]]}
+};
+const state = {id:"sepsis", tab:"map", lab:{sepsis:MODS.sepsis.def, dka:MODS.dka.def}};
 const frame = document.getElementById("frame");
 const $ = id => document.getElementById(id);
 
-/* Voice: one soft male voice, shared by the map and every 3D lab through messages. */
+/* Voice: one soft male voice, shared by every map and 3D lab through messages. */
 const VOICE = {on:true};
 function maleVoice(){
   if(!window.speechSynthesis) return null;
@@ -139,28 +143,32 @@ $("voice").onclick = ()=>{
 };
 window.addEventListener("message", e=>{
   if(e.source !== frame.contentWindow) return;
-  const d = e.data || {};
+  const d = e.data || {}, mod = MODS[state.id];
   if(d.vo) speak(d.vo, d.q);
-  if(d.lab){ state.tab = "lab"; state.lab = d.lab; render(); }
+  if(d.lab && mod && mod.labs.some(l=>l[0]===d.lab)){ state.tab = "lab"; state.lab[state.id] = d.lab; render(); }
 });
 
 function render(){
-  const sepsis = state.id === "sepsis";
+  const mod = MODS[state.id];
   document.querySelectorAll("#diseases button").forEach(b=>b.classList.toggle("on", b.dataset.id===state.id));
-  $("sepsisPane").hidden = !sepsis;
-  $("soon").hidden = sepsis;
-  if(!sepsis){
+  $("pane").hidden = !mod;
+  $("soon").hidden = !!mod;
+  if(!mod){
     frame.removeAttribute("src");
-    $("soon").textContent = TABS.find(t=>t[0]===state.id)[1]+" is being rebuilt. Sepsis is ready now.";
+    $("soon").textContent = TABS.find(t=>t[0]===state.id)[1]+" is being rebuilt. Sepsis and DKA / HHS are ready now.";
     return;
   }
+  $("mapTab").textContent = mod.map;
   document.querySelectorAll("#subtabs button").forEach(b=>b.classList.toggle("on", b.dataset.t===state.tab));
-  const src = state.tab==="map" ? "sepsis/map.html?v="+VER : "sepsis/lab-"+state.lab+".html?v="+VER;
+  $("labpick").hidden = state.tab !== "lab";
+  $("labpick").innerHTML = mod.labs.map(l=>"<button type='button' data-l='"+l[0]+"' class='"+(l[0]===state.lab[state.id]?"on":"")+"'>"+l[1]+"</button>").join("");
+  const src = mod.dir+"/"+(state.tab==="map" ? "map.html" : "lab-"+state.lab[state.id]+".html")+"?v="+VER;
   if(frame.getAttribute("src") !== src){ if(window.speechSynthesis) speechSynthesis.cancel(); frame.src = src; }
 }
 $("diseases").innerHTML = TABS.map(t=>"<button type='button' data-id='"+t[0]+"'>"+t[1]+"</button>").join("");
 $("diseases").onclick = e=>{ const b=e.target.closest("[data-id]"); if(b){ state.id=b.dataset.id; render(); } };
 $("subtabs").onclick = e=>{ const b=e.target.closest("[data-t]"); if(b){ state.tab=b.dataset.t; render(); } };
+$("labpick").onclick = e=>{ const b=e.target.closest("[data-l]"); if(b){ state.lab[state.id]=b.dataset.l; render(); } };
 const want = new URLSearchParams(location.search).get("d");
 if(want && TABS.some(t=>t[0]===want)) state.id = want;
 render();

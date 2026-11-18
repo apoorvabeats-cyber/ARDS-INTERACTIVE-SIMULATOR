@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DKA and HHS: metabolism lab</title>
+<style>
+:root{--bg:#eef3f8;--ink:#0c1b2e;--mute:#546579;--panel:#fff;--line:#b9c8d8;--acc:#0a7f8f;--bad:#c0392b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#06111f;--ink:#e6f1fb;--mute:#8fa5bb;--panel:#0d2036;--line:#24435f;--acc:#3fe0f0;--bad:#ef5b52;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#06111f;--ink:#e6f1fb;--mute:#8fa5bb;--panel:#0d2036;--line:#24435f;--acc:#3fe0f0;--bad:#ef5b52;color-scheme:dark}
+html{background:var(--bg);scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Avenir Next","Segoe UI",Roboto,system-ui,sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px 14px 28px}
+h1{margin:0 0 10px;font-size:24px}
+#cv{position:relative;height:56vh;min-height:320px;border-radius:14px;overflow:hidden;background:#06111f;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+#lbl{position:absolute;left:12px;right:12px;bottom:10px;color:#e6f1fb;font-size:13px;line-height:1.35;text-shadow:0 1px 4px #000;pointer-events:none}
+#lbl b{display:block;font-size:15px}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+button{font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 12px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button[aria-pressed="true"]{border-color:var(--acc);color:var(--acc)}
+label{display:block;margin:12px 0 2px;color:var(--mute);font-size:13px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+.panel ul{margin:4px 0 0;padding-left:18px}.warn{color:var(--bad);font-weight:600}
+.hint{color:var(--mute);font-size:13px;margin:8px 0 0}
+</style></head><body><main>
+<h1>DKA and HHS: metabolism lab</h1>
+<div id="cv"><div id="lbl"></div></div>
+<div class="row" id="stages"></div>
+<div class="row" id="dz"></div>
+<label for="sev">Disease severity: <span id="v0"></span></label><input id="sev" type="range" min="0" max="100" value="55">
+<div class="row" id="rx"></div>
+<div class="panel" id="out"></div>
+<div class="panel"><canvas id="sp" width="480" height="90" style="width:100%;height:90px" role="img" aria-label="Key outputs over simulated hours"></canvas><div class="hint" style="margin:2px 0 0"><span id="leg"></span> Hour <span id="hr">0</span>.</div></div>
+<div class="panel" id="info">Tap any part of the 3D scene to inspect it.</div>
+<p class="hint">Drag to orbit. Scroll or pinch to zoom. Stage buttons fly you in. Presets replay the disease over simulated hours.</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+
+const $=s=>document.querySelector(s),clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const calm=matchMedia('(prefers-reduced-motion:reduce)').matches;
+if(!window.THREE){$('#lbl').innerHTML='<b>3D engine could not load</b>Check your connection and reload.'}else{
+const V=(x,y,z)=>new THREE.Vector3(x,y,z),PI=Math.PI,rnd=Math.random;
+const cv=$('#cv'),R=new THREE.WebGLRenderer({antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));R.setClearColor(0x06111f);cv.prepend(R.domElement);
+const S=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,.01,400);S.add(new THREE.AmbientLight(0x8899bb,.9));cam.add(new THREE.PointLight(0xffffff,1.3,0));S.add(cam);
+const M=(c,o=.8,x={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,transparent:true,opacity:o,roughness:.45},x));
+const add=(m,p,par=S)=>{if(p)m.position.copy(p);par.add(m);return m};
+const CR=a=>new THREE.CatmullRomCurve3(a),tube=(c,r,mt)=>new THREE.Mesh(new THREE.TubeGeometry(c,60,r,12,false),mt);
+const dirv=()=>V(rnd()-.5,rnd()-.5,rnd()-.5).normalize();
+const mkp=(par,n,c,s)=>{const a=new Float32Array(n*3),g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(a,3));const p=new THREE.Points(g,new THREE.PointsMaterial({color:c,size:s}));p.frustumCulled=false;par.add(p);return{a,g}};
+let sev=.55,rx={},m={};
+const grp=p=>{const g=new THREE.Group();g.position.copy(p);g.scale.setScalar(.12);S.add(g);return g};
+const bo=(g,c,p,s)=>{const o=add(new THREE.Mesh(g,M(c,.6)),p);if(s)o.scale.set(s[0],s[1],s[2]);return o};
+let tm=0;const dotsAt=(o,n,f)=>{for(let i=0;i<o.a.length/3;i++){if(i>=n){o.a[i*3+1]=-1e4;continue}f(i,o.a)}o.g.attributes.position.needsUpdate=true};
+
+const BG='none',LEG='Teal: glucose. Amber: ketones.';
+const panc=bo(new THREE.SphereGeometry(1,16,12),0xf0c040,V(3,6,0),[1.7,.6,.6]),liv=bo(new THREE.SphereGeometry(1,20,14),0xb5483f,V(-3,5,0),[2.4,1.6,1.4]),mus=bo(new THREE.CylinderGeometry(.8,.8,5,16),0xc0392b,V(-6,-2.5,0)),fat=bo(new THREE.SphereGeometry(1.6,16,12),0xf0d080,V(6,-2.5,0));
+const P=new THREE.CatmullRomCurve3([V(-3,3,0),V(0,1.5,0),V(3,3,0),V(5.5,0,0),V(4,-3.5,0),V(0,-4.5,0),V(-4,-3.5,0),V(-5.5,0,0)],true),PL=P.getLength();add(tube(P,.3,M(0xe0405a,.35)));
+const NG=130,NK=80,NI=24,gl=mkp(S,NG,0xffffff,.22),kp=mkp(S,NK,0xff8a2a,.22),is=mkp(S,NI,0x4fd3ff,.2),gt=[],kt=[];for(let i=0;i<NG;i++)gt.push(rnd());for(let i=0;i<NK;i++)kt.push(rnd());
+const LP=V(14,5,0),lg=grp(LP);add(new THREE.Mesh(new THREE.SphereGeometry(1.8,24,18),M(0xb5483f,.4)),null,lg);
+const mit=[...Array(8)].map((_,i)=>add(new THREE.Mesh(new THREE.SphereGeometry(.28,12,10),M(0xf0a030,.95)),V(Math.cos(i*.8)*.9,Math.sin(i*.8)*.9,(i%3-1)*.4),lg));
+const fa=mkp(lg,40,0xf0e060,.03),kq=mkp(lg,40,0xff8a2a,.03),fd=[],kd=[],ft=[],kt2=[];for(let i=0;i<40;i++){fd.push(dirv());kd.push(dirv());ft.push(rnd());kt2.push(rnd())}
+const MP=V(14,-4,0),mg=grp(MP);add(new THREE.Mesh(new THREE.BoxGeometry(5,2.4,2),M(0xc0392b,.35)),null,mg);
+const g4=[...Array(8)].map((_,i)=>add(new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,.5,8),M(0x4aa8ff,.95)),V(-2+i*.57,1.2,0),mg));
+const gq=mkp(mg,50,0xffffff,.03),gi=mkp(mg,30,0xffffff,.03),kk=mkp(mg,30,0xb070ff,.03),a1=[],a2=[],a3=[];for(let i=0;i<50;i++)a1.push(rnd());for(let i=0;i<30;i++){a2.push(rnd());a3.push(rnd())}
+const ST=[['Body',V(0,1,0),22,null,null,'Pancreas, liver, muscle and fat share one blood stream. Without insulin, glucose piles up in the blood and the liver makes ketones.'],
+['Liver cell',LP,1.9,0,0,'Without insulin, fat breakdown floods the liver, and its mitochondria turn fatty acids into ketone acids.'],
+['Muscle and fat cell',MP,1.9,0,0,'Glucose transporters stay closed without insulin, so glucose cannot enter. Potassium leaks out of the cell.']];
+const RX=[['ins','IV insulin','stops ketone production and lowers glucose; drives potassium into cells'],['fl','IV fluids','restore volume and dilute glucose'],['k','Potassium replacement','prevents the fall in potassium once insulin starts'],['bic','Bicarbonate','usually harms: brain acidosis and low potassium'],['sglt','SGLT2 inhibitor','harms: euglycaemic ketoacidosis'],['hhs','HHS pattern','little ketosis, extreme glucose, high osmolality']];
+const DZ=[['Early DKA',.35,[],'Hyperglycaemia and rising ketones, still compensated.'],['Severe DKA',.85,[],'Deep acidosis with a large anion gap.'],['HHS',.8,['hhs'],'Extreme glucose and osmolality with little ketosis.'],['Standard treatment',.85,['ins','fl','k'],'Fluids, insulin and potassium together.'],['Insulin without potassium',.85,['ins','fl'],'Potassium falls dangerously low.'],['Bicarbonate error',.85,['bic'],'Bicarbonate worsens brain acidosis and potassium.']];
+const INFO={panc:['Pancreas','Beta cells make too little insulin, in type 1 diabetes or under the stress of illness in type 2.','Insulin replaces the missing hormone.'],liv:['Liver','With no insulin and high glucagon, the liver makes glucose and turns fat into ketone acids.','IV insulin switches ketone production off.'],mit:['Mitochondria','Fatty acids are burned to acetyl CoA, which is converted to beta hydroxybutyrate and acetoacetate. These acids lower the pH.','Insulin and fluids; avoid bicarbonate.'],g4:['Glucose transporters','GLUT4 moves to the membrane only when insulin signals. Without it, glucose stays outside the cell.','Insulin opens the transporters and also drives potassium into the cell.'],mus:['Muscle and fat','Cells starve in a sea of glucose, so fat and muscle are broken down further.','Replace potassium before and during insulin.']};
+const KEY=()=>[[m.g,1000,'#2ad4c0'],[m.ket,10,'#f0a030']];
+const TAG=()=>{panc.userData.k='panc';liv.userData.k='liv';mus.userData.k=fat.userData.k='mus';mit.forEach(x=>x.userData.k='mit');g4.forEach(x=>x.userData.k='g4')};
+function model(){const h=!!rx.hhs,u=clamp(sev*(rx.ins?.15:1)+(rx.sglt?.12:0)),g=Math.round(clamp(100+(h?900:600)*u*(rx.fl?.85:1)-(rx.sglt?250*u:0),70,1200)),ket=+(h?(.3+1.2*u):(.2+9*u)).toFixed(1),
+ ph=+(7.4-(h?.04:.38)*u+(rx.bic?.03:0)).toFixed(2),hco=Math.round(24-(h?3:18)*u+(rx.bic?3:0)),ag=Math.round(12+(h?3:20)*u),K=+(4.2+1.3*u-(rx.ins?(rx.k?.6:2.2)*sev:0)).toFixed(1),osm=Math.round(270+g/18);
+ Object.assign(m,{u,g,ket,ph,K,osm});const on=RX.filter(d=>rx[d[0]]);
+ $('#out').innerHTML=`<span class="${g>250?'warn':''}">Glucose ${g} mg/dL</span>, ketones ${ket} mmol/L, <span class="${ph<7.2?'warn':''}">pH ${ph}</span>, HCO3 ${hco}, anion gap ${ag}, <span class="${K<3.5||K>5.5?'warn':''}">potassium ${K}</span>, osmolality ${osm}`+(ph<7.1?'<br><span class="warn">Severe acidosis</span>':'')+(K<3.5?'<br><span class="warn">Low potassium: arrhythmia risk</span>':'')+(rx.ins&&g<250?'<br><span class="warn">Add dextrose to avoid hypoglycaemia</span>':'')+(rx.bic?'<br><span class="warn">Bicarbonate: brain acidosis and falling potassium</span>':'')+(rx.sglt?'<br><span class="warn">SGLT2 inhibitor: euglycaemic ketoacidosis risk</span>':'')+(on.length?'<ul>'+on.map(d=>`<li>${d[1]}: ${d[2]}</li>`).join('')+'</ul>':'');
+ mit.forEach(x=>x.scale.setScalar(1+.6*u));g4.forEach((x,i)=>{x.material.opacity=i<Math.round(8*(1-u))?.95:.2});
+ panc.material.color.setHSL(.13,.8,.3+.3*(1-u));liv.material.color.setHSL(.03,.5,.35+.2*u)}
+function frame(dt){if(!calm)tm+=dt;const sp=calm?0:dt*2.7/PL;
+ dotsAt(gl,Math.round(NG*clamp(m.g/900)),(i,a)=>{gt[i]=(gt[i]+sp)%1;const p=P.getPointAt(gt[i]);a[i*3]=p.x;a[i*3+1]=p.y+.18;a[i*3+2]=p.z});
+ dotsAt(kp,Math.round(NK*clamp(m.ket/9)),(i,a)=>{kt[i]=(kt[i]+sp)%1;const p=P.getPointAt(kt[i]);a[i*3]=p.x;a[i*3+1]=p.y-.18;a[i*3+2]=p.z});
+ dotsAt(is,Math.round(NI*(1-m.u)),(i,a)=>{a[i*3]=3+Math.sin(tm*2+i)*1.2;a[i*3+1]=6.8+Math.cos(tm*1.7+i*2)*.6;a[i*3+2]=Math.sin(i)*.5});
+ dotsAt(fa,Math.round(40*m.u),(i,a)=>{ft[i]=(ft[i]+(calm?0:dt*.4))%1;const r=3.2-2.2*ft[i];a[i*3]=fd[i].x*r;a[i*3+1]=fd[i].y*r;a[i*3+2]=fd[i].z*r});
+ dotsAt(kq,Math.round(40*clamp(m.ket/9)),(i,a)=>{kt2[i]=(kt2[i]+(calm?0:dt*.4))%1;const r=1.2+2.2*kt2[i];a[i*3]=kd[i].x*r;a[i*3+1]=kd[i].y*r;a[i*3+2]=kd[i].z*r});
+ dotsAt(gq,Math.round(50*clamp(m.g/900)),(i,a)=>{a1[i]=(a1[i]+(calm?0:dt*.3))%1;a[i*3]=-2.2+4.4*((i*.37)%1);a[i*3+1]=3.2-1.7*a1[i];a[i*3+2]=0});
+ dotsAt(gi,Math.round(30*(1-m.u)*clamp(m.g/900+.2)),(i,a)=>{a2[i]=(a2[i]+(calm?0:dt*.3))%1;a[i*3]=-2+4*((i*.53)%1);a[i*3+1]=.9-1.8*a2[i];a[i*3+2]=0});
+ dotsAt(kk,Math.round(30*m.u),(i,a)=>{a3[i]=(a3[i]+(calm?0:dt*.4))%1;a[i*3]=-2+4*((i*.41)%1);a[i*3+1]=1.2+2*a3[i];a[i*3+2]=0})}
+
+const goal={t:ST[0][1].clone(),r:ST[0][2],y:null,p:null};let yaw=.5,pit=.15,rad=ST[0][2],tgt=ST[0][1].clone(),stage=0;
+function go(i){stage=i;const s=ST[i];goal.t.copy(s[1]);goal.r=s[2];goal.y=s[3];goal.p=s[4];$('#lbl').innerHTML=`<b>${s[0]}</b>${s[5]}`;
+ document.querySelectorAll('[data-s]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.s===i))}
+function refresh(){model();$('#v0').textContent=Math.round(sev*100)+'%';document.querySelectorAll('[data-rx]').forEach(b=>b.setAttribute('aria-pressed',!!rx[b.dataset.rx]))}
+$('#stages').innerHTML=ST.map((s,i)=>`<button data-s="${i}">${s[0]}</button>`).join('')+'<button data-next="1">Next stage</button>';
+$('#rx').innerHTML=RX.map(d=>`<button data-rx="${d[0]}" aria-pressed="false">${d[1]}</button>`).join('');
+$('#stages').addEventListener('click',ev=>{const b=ev.target.closest('button');if(b)go(b.dataset.next?(stage+1)%ST.length:+b.dataset.s)});
+$('#rx').addEventListener('click',ev=>{const b=ev.target.closest('[data-rx]');if(b){rx[b.dataset.rx]=!rx[b.dataset.rx];refresh()}});
+$('#sev').addEventListener('input',ev=>{sev=ev.target.value/100;refresh()});
+const ptr=new Map(),zoomBy=f=>{goal.r=clamp(goal.r*f,.3,110)};
+cv.addEventListener('pointerdown',ev=>{cv.setPointerCapture(ev.pointerId);ptr.set(ev.pointerId,[ev.clientX,ev.clientY])});
+cv.addEventListener('pointermove',ev=>{const o=ptr.get(ev.pointerId);if(!o)return;
+ if(ptr.size===1){goal.y=goal.p=null;yaw-=(ev.clientX-o[0])*.008;pit=clamp(pit+(ev.clientY-o[1])*.008,-1.3,1.3)}
+ else if(ptr.size===2){const q=[...ptr.entries()].find(([id])=>id!==ev.pointerId)[1];zoomBy(Math.hypot(o[0]-q[0],o[1]-q[1])/Math.hypot(ev.clientX-q[0],ev.clientY-q[1]))}
+ ptr.set(ev.pointerId,[ev.clientX,ev.clientY])});
+['pointerup','pointercancel'].forEach(t=>cv.addEventListener(t,ev=>ptr.delete(ev.pointerId)));
+cv.addEventListener('wheel',ev=>{ev.preventDefault();zoomBy(1+ev.deltaY*.001)},{passive:false});
+function fit(){const w=cv.clientWidth,h=cv.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+new ResizeObserver(fit).observe(cv);fit();
+
+const LAB={go:refresh,tg:rx,bg:BG,leg:LEG,key:KEY,tag:TAG,dz:DZ,info:INFO};
+let tsev=sev,ramp=false,hr=0,hist=[],lh=0;const ray=new THREE.Raycaster(),dn=[0,0,0];
+$('#leg').textContent=LAB.leg;
+function spark(){const c=$('#sp'),g=c.getContext('2d'),w=c.width,h=c.height;g.clearRect(0,0,w,h);g.strokeStyle='#8886';g.beginPath();g.moveTo(0,h-1);g.lineTo(w,h-1);g.stroke();
+ [0,1].forEach(s=>{g.lineWidth=2;g.beginPath();hist.forEach((p,j)=>{g.strokeStyle=p[s][2];const x=j/79*w,y=h-4-(h-8)*clamp(p[s][0]/p[s][1]);j?g.lineTo(x,y):g.moveTo(x,y)});g.stroke()})}
+function step(dt){if(ramp&&Math.abs(sev-tsev)>.003){sev+=(tsev-sev)*(1-Math.exp(-dt*.5));$('#sev').value=Math.round(sev*100);LAB.go()}
+ if(!calm)hr+=dt*3;lh+=dt;if(lh>.5){lh=0;hist.push(LAB.key());if(hist.length>80)hist.shift();spark();$('#hr').textContent=Math.floor(hr)}}
+$('#dz').innerHTML=LAB.dz.map((d,i)=>`<button data-i="${i}" aria-pressed="false">${d[0]}</button>`).join('');
+$('#dz').addEventListener('click',ev=>{const b=ev.target.closest('[data-i]');if(!b)return;const d=LAB.dz[+b.dataset.i];
+ Object.keys(LAB.tg).forEach(x=>delete LAB.tg[x]);d[2].forEach(x=>LAB.tg[x]=true);tsev=d[1];sev=calm?tsev:0;ramp=!calm;hr=0;hist.length=0;
+ $('#sev').value=Math.round(sev*100);LAB.go();
+ document.querySelectorAll('#dz button').forEach(x=>x.setAttribute('aria-pressed',x===b));$('#info').innerHTML=`<strong>${d[0]}</strong><br>${d[3]}`});
+$('#sev').addEventListener('input',()=>{ramp=false});
+cv.addEventListener('pointerdown',ev=>{dn[0]=ev.clientX;dn[1]=ev.clientY;dn[2]=1});
+cv.addEventListener('pointerup',ev=>{if(!dn[2]||Math.hypot(ev.clientX-dn[0],ev.clientY-dn[1])>6)return;dn[2]=0;LAB.tag();const r=cv.getBoundingClientRect();
+ ray.setFromCamera({x:(ev.clientX-r.left)/r.width*2-1,y:-(ev.clientY-r.top)/r.height*2+1},cam);
+ const hs=ray.intersectObjects(S.children,true).filter(h=>h.object.isMesh&&h.object.visible&&h.object.userData.k),h=hs.find(x=>x.object.userData.k!==LAB.bg)||hs[0];
+ const i=h&&LAB.info[h.object.userData.k];if(!i)return;$('#info').innerHTML=`<strong>${i[0]}</strong><br>${i[1]}<br><em>Drugs and care:</em> ${i[2]}`});
+
+const VOD={lv:["Organ level", "Cell level", "Cell level"],ph:["Early DKA. At organ level, the blood glucose climbs. At cellular level, insulin is low, so glucose transporters stay shut and the liver begins to make ketones.", "Established DKA. At organ level, ketones and acid build up in the blood and the breathing deepens. At cellular level, fatty acids are burned in liver mitochondria into ketone acids.", "Severe DKA. At organ level, the pH is very low and potassium shifts out of cells. At cellular level, muscle and fat cells starve in a sea of glucose.", "Critical DKA. At organ level, the patient is drowsy, dehydrated and at risk of arrhythmia. At cellular level, acid inhibits enzymes, and total body potassium is badly depleted."]};
+const VOq=(t,q)=>{if(parent!==window)parent.postMessage({vo:t,q:!!q},'*')};
+const phase=()=>sev<.25?0:sev<.5?1:sev<.75?2:3;let lastPh=phase(),vt_=0;
+const plain=h=>h.replace(/<br>/g,'. ').replace(/<[^>]+>/g,'');
+$('#stages').addEventListener('click',()=>VOq(VOD.lv[stage]+'. '+ST[stage][0]+'. '+(ST[stage][5]||ST[stage][3])));
+document.querySelector('#rx,#drugs').addEventListener('click',ev=>{const b=ev.target.closest('[data-rx],[data-dg]');if(!b)return;const k=b.dataset.rx||b.dataset.dg,L=(typeof RX!=='undefined'?RX:DG).find(d=>d[0]===k);if(!L)return;
+ const w=[...$('#out').querySelectorAll('.warn')].map(e=>e.textContent).join('. ');VOq(L[1]+(LAB.tg[k]?' switched on. ':' switched off. ')+(L[3]||L[2])+'. '+w)});
+new MutationObserver(()=>VOq(plain($('#info').innerHTML))).observe($('#info'),{childList:true});
+$('#sev').addEventListener('input',()=>{clearTimeout(vt_);vt_=setTimeout(()=>{lastPh=phase();VOq(VOD.ph[lastPh])},700)});
+$('#dz').addEventListener('click',()=>{lastPh=-1;if(!ramp){lastPh=phase();VOq(VOD.ph[lastPh],true)}});
+setInterval(()=>{if(!ramp)return;const p=phase();if(p!==lastPh){lastPh=p;VOq(VOD.ph[p],true)}},400);
+const clock=new THREE.Clock();
+function tick(){const dt=Math.min(clock.getDelta(),.05);step(dt);const k=calm?1:1-Math.exp(-dt*3);
+ tgt.lerp(goal.t,k);rad+=(goal.r-rad)*k;if(goal.y!==null){yaw+=(goal.y-yaw)*k;pit+=(goal.p-pit)*k}
+ cam.position.set(tgt.x+rad*Math.sin(yaw)*Math.cos(pit),tgt.y+rad*Math.sin(pit),tgt.z+rad*Math.cos(yaw)*Math.cos(pit));cam.lookAt(tgt);
+ frame(dt);R.render(S,cam);requestAnimationFrame(tick)}
+refresh();go(0);tick();
+}
+</script></body></html>
