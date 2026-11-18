@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ARDS in sepsis: 3D alveolus lab</title>
+<style>
+:root{--bg:#eef3f8;--ink:#0c1b2e;--mute:#546579;--panel:#fff;--line:#b9c8d8;--acc:#0a7f8f;--bad:#c0392b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#06111f;--ink:#e6f1fb;--mute:#8fa5bb;--panel:#0d2036;--line:#24435f;--acc:#3fe0f0;--bad:#ef5b52;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#06111f;--ink:#e6f1fb;--mute:#8fa5bb;--panel:#0d2036;--line:#24435f;--acc:#3fe0f0;--bad:#ef5b52;color-scheme:dark}
+html{background:var(--bg);scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Avenir Next","Segoe UI",Roboto,system-ui,sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px 14px 28px}
+h1{margin:0 0 10px;font-size:24px}
+#cv{position:relative;height:56vh;min-height:320px;border-radius:14px;overflow:hidden;background:#06111f;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+#lbl{position:absolute;left:12px;right:12px;bottom:10px;color:#e6f1fb;font-size:13px;line-height:1.35;text-shadow:0 1px 4px #000;pointer-events:none}
+#lbl b{display:block;font-size:15px}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+button{font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 12px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button[aria-pressed="true"]{border-color:var(--acc);color:var(--acc)}
+label{display:block;margin:12px 0 2px;color:var(--mute);font-size:13px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+.panel ul{margin:4px 0 0;padding-left:18px}.warn{color:var(--bad);font-weight:600}
+.hint{color:var(--mute);font-size:13px;margin:8px 0 0}
+</style></head><body><main>
+<h1>ARDS in sepsis: 3D alveolus lab</h1>
+<div id="cv"><div id="lbl"></div></div>
+<div class="row" id="stages"></div>
+<label for="sev">Sepsis severity: <span id="v0"></span></label><input id="sev" type="range" min="0" max="100" value="55">
+<label for="vt">Tidal volume: <span id="v1"></span> ml/kg predicted weight</label><input id="vt" type="range" min="4" max="12" step=".5" value="8">
+<label for="pp">PEEP: <span id="v2"></span> cmH2O</label><input id="pp" type="range" min="0" max="20" value="5">
+<div class="row" id="rx"></div>
+<div class="row" id="dz"></div><div class="panel" id="out"></div><div class="panel"><canvas id="sp" width="480" height="90" style="width:100%;height:90px" role="img" aria-label="Key outputs over simulated hours"></canvas><div class="hint" style="margin:2px 0 0"><span id="leg"></span> Hour <span id="hr">0</span>.</div></div><div class="panel" id="info">Tap any part of the 3D scene to inspect it.</div>
+<p class="hint">Drag to orbit. Scroll or pinch to zoom. Stage buttons fly you in.</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const calm=matchMedia('(prefers-reduced-motion:reduce)').matches;
+if(!window.THREE){$('#lbl').innerHTML='<b>3D engine could not load</b>Check your connection and reload.'}else{
+const V=(x,y,z)=>new THREE.Vector3(x,y,z),PI=Math.PI;
+const cv=$('#cv'),R=new THREE.WebGLRenderer({antialias:true});
+R.localClippingEnabled=true;R.setPixelRatio(Math.min(devicePixelRatio,2));R.setClearColor(0x06111f);cv.prepend(R.domElement);
+const S=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,.01,400);
+S.add(new THREE.AmbientLight(0x8899bb,.9));cam.add(new THREE.PointLight(0xffffff,1.3,0));S.add(cam);
+const M=(c,o=.8,x={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,transparent:true,opacity:o,roughness:.45},x));
+const add=(m,p,par=S)=>{if(p)m.position.copy(p);par.add(m);return m};
+
+// lungs, trachea, bronchial tree
+const lungM=M(0xd9788a,.2),AM=M(0xcfd8e6,.75),lungs=[];
+[-9,9].forEach(x=>{const l=add(new THREE.Mesh(new THREE.SphereGeometry(1,32,24),lungM),V(x,6,0));l.scale.set(9,16,8);lungs.push(l)});
+function cyl(a,b,r){const d=b.clone().sub(a),m=new THREE.Mesh(new THREE.CylinderGeometry(r*.8,r,d.length(),10),AM);m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(V(0,1,0),d.clone().normalize());S.add(m)}
+const FP=[V(0,22,0),V(0,12,0)];let F;
+cyl(V(0,22,0),V(0,12,0),1);
+function br(a,d,len,r,dep,foc){const b=a.clone().addScaledVector(d,len);cyl(a,b,r);if(foc)FP.push(b);if(!dep){if(foc)F=b;return}
+ [1,-1].forEach(sg=>{const n=d.clone().applyAxisAngle(V(0,0,1),sg*.5).applyAxisAngle(V(0,1,0),sg*.5*(dep%2?1:-1));br(b,n,len*.74,r*.74,dep-1,foc&&sg===1)})}
+br(V(0,12,0),V(.5,-.85,0).normalize(),4.5,.55,4,true);
+br(V(0,12,0),V(-.5,-.85,0).normalize(),4.5,.55,4,false);
+
+// acinus: focus alveolus first, then neighbours (open side faces +z)
+const C0=F.clone().add(V(0,-.55,0)),RAD=.5;
+const OFF=[[0,0,0],[.9,-.5,-.3],[-.9,-.5,-.3],[.7,-1.3,-.3],[-.7,-1.3,-.3],[0,-1.4,-.9],[0,-.5,-1]];
+const alv=OFF.map(o=>{const g=new THREE.Group();g.position.copy(C0).add(V(...o));S.add(g);
+ const sh=new THREE.Mesh(new THREE.SphereGeometry(RAD,28,20),M(0x2ad4c0,.28,{side:THREE.DoubleSide})),pl=new THREE.Plane(V(0,-1,0),0);
+ const fl=new THREE.Mesh(new THREE.SphereGeometry(RAD*.96,24,18),M(0x4aa8ff,.6,{side:THREE.DoubleSide,clippingPlanes:[pl]}));
+ g.add(sh,fl);return{g,sh,pl,col:false}});
+cyl(F.clone().add(V(0,.2,0)),C0.clone().add(V(0,RAD,0)),.14);
+
+// membrane detail at the +z wall of the focus alveolus (local x points toward the capillary)
+const W=C0.clone().add(V(0,0,RAD)),mem=new THREE.Group();mem.position.copy(W);mem.rotation.y=-PI/2;mem.scale.setScalar(.1);S.add(mem);
+const bx=(x,c,o)=>add(new THREE.Mesh(new THREE.BoxGeometry(1,1,1),M(c,o)),V(x,0,0),mem);
+const epi=[bx(0,0x2ad4c0,.55),bx(0,0x2ad4c0,.55)],end=[bx(.9,0x2ad4c0,.55),bx(.9,0x2ad4c0,.55)];
+const hy=add(new THREE.Mesh(new THREE.BoxGeometry(.06,3,2.8),M(0xf0a0c0,0)),V(-.12,0,0),mem);
+add(new THREE.Mesh(new THREE.CylinderGeometry(.75,.75,4,20,1,true),M(0xe0405a,.14,{side:THREE.DoubleSide})),V(1.8,0,0),mem);
+const t2=add(new THREE.Mesh(new THREE.SphereGeometry(.38,16,12),M(0x9be08a,.8)),V(-.1,.9,1.1),mem);
+const neu=add(new THREE.Mesh(new THREE.SphereGeometry(.3,16,12),M(0xf0c040,.95)),V(1.05,.7,-.9),mem);
+const rbc=[...Array(6)].map(()=>{const m=add(new THREE.Mesh(new THREE.SphereGeometry(.22,12,10),M(0xe0405a,.95)),V(1.8,0,0),mem);m.scale.set(.5,1,1);return m});
+const sf=[...Array(10)].map(()=>add(new THREE.Mesh(new THREE.SphereGeometry(.07,8,6),M(0x9be08a,.9)),V(-.22,(Math.random()-.5)*2.6,(Math.random()-.5)*2.6),mem));
+const NF=70,fp=new Float32Array(NF*3),ft=[],fy=[],fz=[];
+for(let i=0;i<NF;i++){ft.push(Math.random());fy.push((Math.random()-.5)*2.4);fz.push(Math.random()*2-1)}
+const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.BufferAttribute(fp,3));
+const fpts=new THREE.Points(fg,new THREE.PointsMaterial({color:0x4aa8ff,size:.014}));fpts.frustumCulled=false;mem.add(fpts);
+
+// air particles along the airway to the focus alveolus
+const curve=new THREE.CatmullRomCurve3([...FP,C0.clone().add(V(0,RAD,0))]);
+const NA=140,ap=new Float32Array(NA*3),ag=new THREE.BufferGeometry();ag.setAttribute('position',new THREE.BufferAttribute(ap,3));
+const apts=new THREE.Points(ag,new THREE.PointsMaterial({color:0x9be08a,size:.14}));apts.frustumCulled=false;S.add(apts);
+
+// controls and model
+const ST=[
+['Lungs',V(0,6,0),60,null,null,'Both lungs and the airway. Sepsis injures the lung from the blood side.'],
+['Airways',V(0,8,0),22,null,null,'Air travels down the bronchial tree to the acini.'],
+['Acinus',C0.clone().add(V(0,-.4,0)),3.5,null,null,'A cluster of alveoli. Dependent units flood or collapse first.'],
+['Alveolus',C0,1.8,null,null,'Oedema fluid rises from the bottom. Collapsed units shrink and barely move.'],
+['Membrane',W.clone().add(V(0,0,.09)),.55,PI/2,0,'Alveolar-capillary membrane in section: epithelium on the left, capillary on the right.']];
+const RX=[['prone','Prone position','more even ventilation, less shunt'],['fl','Conservative fluids','less alveolar fluid'],['dex','Dexamethasone','dampens lung inflammation'],['nmb','Neuromuscular blockade','less injurious patient effort'],['b2','IV beta-2 agonist','no benefit, possible harm']];
+let sev=.55,vt=8,peep=5,rx={},stage=0,m={a:0,st:0,fill:0,gap:0};
+function model(){
+ const e=clamp(sev+(rx.dex?-.1:0)+(rx.b2?.1:0)),rec=clamp(peep/16);
+ m.e=e;m.a=e*(1-.7*rec)*(rx.prone?.75:1);
+ m.st=clamp((vt-6)/4)*(.4+e)*(rx.nmb?.6:1)+(peep>14?.15:0);
+ m.fill=e*.85*(rx.fl?.8:1);m.gap=.05+.6*e*(1+.5*m.st);
+ const comp=60-40*e*(1-.4*rec),dp=vt*70/comp,pl=peep+dp,sh=m.a*(rx.prone?.65:1),pf=Math.round(450-330*sh);
+ const on=RX.filter(d=>rx[d[0]]);
+ $('#out').innerHTML=`P/F about ${pf}, compliance ${Math.round(comp)} ml/cmH2O<br><span class="${dp>15?'warn':''}">Driving pressure ${Math.round(dp)} cmH2O</span>, <span class="${pl>30?'warn':''}">plateau ${Math.round(pl)} cmH2O</span>`+(m.st>.4?'<br><span class="warn">Overdistension: stretch injury is likely</span>':'')+(on.length?'<ul>'+on.map(d=>`<li>${d[1]}: ${d[2]}</li>`).join('')+'</ul>':'');
+ $('#v0').textContent=Math.round(sev*100)+'%';$('#v1').textContent=vt;$('#v2').textContent=peep;
+ document.querySelectorAll('[data-rx]').forEach(b=>b.setAttribute('aria-pressed',!!rx[b.dataset.rx]));
+ const c=new THREE.Color().setHSL((175-175*clamp(.6*e+.8*m.st))/360,.85,.5);
+ alv.forEach((o,i)=>{o.col=i>=alv.length-Math.round(m.a*alv.length);o.sh.material.color.copy(c)});
+ epi.concat(end).forEach(b=>b.material.color.copy(c));
+ hy.material.opacity=.7*e;sf.forEach((s,i)=>s.visible=i<Math.round(10*(1-e)));
+ const g=m.gap,L=(1.5-g/2);
+ [epi,end].forEach(p=>{p[0].scale.set(.12,3,L);p[0].position.z=-(1.5+g/2)/2;p[1].scale.set(.12,3,L);p[1].position.z=(1.5+g/2)/2});
+}
+const goal={t:V(0,6,0),r:60,y:null,p:null};let yaw=.5,pit=.15,rad=60,tgt=V(0,6,0);
+function go(i){stage=i;const s=ST[i];goal.t.copy(s[1]);goal.r=s[2];goal.y=s[3];goal.p=s[4];$('#lbl').innerHTML=`<b>${s[0]}</b>${s[5]}`;
+ document.querySelectorAll('[data-s]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.s===i))}
+$('#stages').innerHTML=ST.map((s,i)=>`<button data-s="${i}">${s[0]}</button>`).join('')+'<button data-next="1">Next stage</button>';
+$('#rx').innerHTML=RX.map(d=>`<button data-rx="${d[0]}" aria-pressed="false">${d[1]}</button>`).join('');
+$('#stages').addEventListener('click',ev=>{const b=ev.target.closest('button');if(b)go(b.dataset.next?(stage+1)%ST.length:+b.dataset.s)});
+$('#rx').addEventListener('click',ev=>{const b=ev.target.closest('[data-rx]');if(b){rx[b.dataset.rx]=!rx[b.dataset.rx];model()}});
+$('#sev').addEventListener('input',ev=>{sev=ev.target.value/100;model()});
+$('#vt').addEventListener('input',ev=>{vt=+ev.target.value;model()});
+$('#pp').addEventListener('input',ev=>{peep=+ev.target.value;model()});
+const ptr=new Map(),zoomBy=f=>{goal.r=clamp(goal.r*f,.3,110)};
+cv.addEventListener('pointerdown',ev=>{cv.setPointerCapture(ev.pointerId);ptr.set(ev.pointerId,[ev.clientX,ev.clientY])});
+cv.addEventListener('pointermove',ev=>{const o=ptr.get(ev.pointerId);if(!o)return;
+ if(ptr.size===1){goal.y=goal.p=null;yaw-=(ev.clientX-o[0])*.008;pit=clamp(pit+(ev.clientY-o[1])*.008,-1.3,1.3)}
+ else if(ptr.size===2){const q=[...ptr.entries()].find(([id])=>id!==ev.pointerId)[1];zoomBy(Math.hypot(o[0]-q[0],o[1]-q[1])/Math.hypot(ev.clientX-q[0],ev.clientY-q[1]))}
+ ptr.set(ev.pointerId,[ev.clientX,ev.clientY])});
+['pointerup','pointercancel'].forEach(t=>cv.addEventListener(t,ev=>ptr.delete(ev.pointerId)));
+cv.addEventListener('wheel',ev=>{ev.preventDefault();zoomBy(1+ev.deltaY*.001)},{passive:false});
+function fit(){const w=cv.clientWidth,h=cv.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+new ResizeObserver(fit).observe(cv);fit();
+
+const LAB={go:model,tg:rx,bg:'lung',leg:'Teal: P/F ratio. Amber: driving pressure.',
+key:()=>{const cp=60-40*m.e*(1-.4*clamp(peep/16));return[[450-330*m.a*(rx.prone?.65:1),500,'#2ad4c0'],[vt*70/cp,30,'#f0a030']]},
+tag:()=>{lungs.forEach(l=>l.userData.k='lung');alv.forEach(a=>{a.sh.userData.k='alveolus';a.fl.userData.k='fluid'});epi.forEach(b=>b.userData.k='epi');end.forEach(b=>b.userData.k='end');hy.userData.k='hyaline'},
+dz:[['Sepsis (indirect)',.55,[],'Endothelial leak dominates. Lung protection is the treatment.'],['Pneumonia',.6,[],'Direct epithelial injury with focal consolidation.'],['Aspiration',.7,[],'Chemical epithelial injury that can progress fast.'],['Severe, proned',.8,['prone','nmb'],'Severe ARDS managed with prone positioning and paralysis.'],['Steroid trial',.65,['dex'],'Dexamethasone in moderate to severe ARDS.'],['Harmful bundle',.65,['b2'],'IV beta-agonist: no benefit, possible harm.']],
+info:{lung:['Lungs','Injury is patchy. Dependent regions flood and collapse first, leaving a small aerated lung to ventilate.','Low tidal volume and prone positioning protect it.'],alveolus:['Alveolus','Type I cells cover most of the surface, Type II cells make surfactant. Flooding raises surface tension and collapses units.','PEEP keeps units open; surfactant replacement failed in adults.'],fluid:['Oedema fluid','Protein-rich, unlike cardiogenic oedema. Epithelial ion transport that clears alveolar fluid is impaired.','Conservative fluid balance lowers lung water.'],epi:['Alveolar epithelium','Tight junctions open and fluid clearance fails. Dominant in direct injury such as pneumonia.','Dexamethasone may help in moderate to severe ARDS.'],end:['Capillary endothelium','Glycocalyx loss and junction disruption make it leaky. Dominant in indirect injury such as sepsis.','Vasopressors do not fix leak; treat the source.'],hyaline:['Hyaline membrane','Fibrin, dead cells and plasma protein lining the alveolus. Hallmark of diffuse alveolar damage.','No drug dissolves it; protect the lung and wait.']}};
+let tsev=sev,ramp=false,hr=0,hist=[],lh=0;const ray=new THREE.Raycaster(),dn=[0,0,0];
+$('#leg').textContent=LAB.leg;
+function spark(){const c=$('#sp'),g=c.getContext('2d'),w=c.width,h=c.height;g.clearRect(0,0,w,h);g.strokeStyle='#8886';g.beginPath();g.moveTo(0,h-1);g.lineTo(w,h-1);g.stroke();
+ [0,1].forEach(s=>{g.lineWidth=2;g.beginPath();hist.forEach((p,j)=>{g.strokeStyle=p[s][2];const x=j/79*w,y=h-4-(h-8)*clamp(p[s][0]/p[s][1]);j?g.lineTo(x,y):g.moveTo(x,y)});g.stroke()})}
+function step(dt){if(ramp&&Math.abs(sev-tsev)>.003){sev+=(tsev-sev)*(1-Math.exp(-dt*.5));$('#sev').value=Math.round(sev*100);LAB.go()}
+ if(!calm)hr+=dt*3;lh+=dt;if(lh>.5){lh=0;hist.push(LAB.key());if(hist.length>80)hist.shift();spark();$('#hr').textContent=Math.floor(hr)}}
+$('#dz').innerHTML=LAB.dz.map((d,i)=>`<button data-i="${i}" aria-pressed="false">${d[0]}</button>`).join('');
+$('#dz').addEventListener('click',ev=>{const b=ev.target.closest('[data-i]');if(!b)return;const d=LAB.dz[+b.dataset.i];
+ Object.keys(LAB.tg).forEach(x=>delete LAB.tg[x]);d[2].forEach(x=>LAB.tg[x]=true);tsev=d[1];sev=calm?tsev:0;ramp=!calm;hr=0;hist.length=0;
+ $('#sev').value=Math.round(sev*100);LAB.go();
+ document.querySelectorAll('#dz button').forEach(x=>x.setAttribute('aria-pressed',x===b));$('#info').innerHTML=`<strong>${d[0]}</strong><br>${d[3]}`});
+$('#sev').addEventListener('input',()=>{ramp=false});
+cv.addEventListener('pointerdown',ev=>{dn[0]=ev.clientX;dn[1]=ev.clientY;dn[2]=1});
+cv.addEventListener('pointerup',ev=>{if(!dn[2]||Math.hypot(ev.clientX-dn[0],ev.clientY-dn[1])>6)return;dn[2]=0;LAB.tag();const r=cv.getBoundingClientRect();
+ ray.setFromCamera({x:(ev.clientX-r.left)/r.width*2-1,y:-(ev.clientY-r.top)/r.height*2+1},cam);
+ const hs=ray.intersectObjects(S.children,true).filter(h=>h.object.isMesh&&h.object.visible&&h.object.userData.k),h=hs.find(x=>x.object.userData.k!==LAB.bg)||hs[0];
+ const i=h&&LAB.info[h.object.userData.k];if(!i)return;$('#info').innerHTML=`<strong>${i[0]}</strong><br>${i[1]}<br><em>Drugs and care:</em> ${i[2]}`});
+const VOD={lv:["Organ level", "Airway level", "Tissue level", "Alveolar level", "Cell level"],ph:["Early lung injury. At organ level, gas exchange is still normal. At cellular level, inflammatory mediators activate the endothelium and neutrophils begin to stick to it.", "Mild ARDS. At organ level, oxygenation starts to fall and the lungs stiffen. At cellular level, junctions between endothelial and epithelial cells open and fluid leaks into the alveoli.", "Moderate ARDS. At organ level, dependent lung regions flood and collapse, which causes shunt. At cellular level, type two cells fail, surfactant is lost, and the alveoli collapse more easily.", "Severe ARDS. At organ level, only a small aerated lung remains to be ventilated. At cellular level, hyaline membranes line the alveoli and gas exchange across them is badly impaired."]};
+const VOq=(t,q)=>{if(parent!==window)parent.postMessage({vo:t,q:!!q},'*')};
+const phase=()=>sev<.25?0:sev<.5?1:sev<.75?2:3;let lastPh=phase(),vt_=0;
+const plain=h=>h.replace(/<br>/g,'. ').replace(/<[^>]+>/g,'');
+$('#stages').addEventListener('click',()=>VOq(VOD.lv[stage]+'. '+ST[stage][0]+'. '+(ST[stage][5]||ST[stage][3])));
+document.querySelector('#rx,#drugs').addEventListener('click',ev=>{const b=ev.target.closest('[data-rx],[data-dg]');if(!b)return;const k=b.dataset.rx||b.dataset.dg,L=(typeof RX!=='undefined'?RX:DG).find(d=>d[0]===k);if(!L)return;
+ const w=[...$('#out').querySelectorAll('.warn')].map(e=>e.textContent).join('. ');VOq(L[1]+(LAB.tg[k]?' switched on. ':' switched off. ')+(L[3]||L[2])+'. '+w)});
+new MutationObserver(()=>VOq(plain($('#info').innerHTML))).observe($('#info'),{childList:true});
+$('#sev').addEventListener('input',()=>{clearTimeout(vt_);vt_=setTimeout(()=>{lastPh=phase();VOq(VOD.ph[lastPh])},700)});
+$('#dz').addEventListener('click',()=>{lastPh=-1;if(!ramp){lastPh=phase();VOq(VOD.ph[lastPh],true)}});
+setInterval(()=>{if(!ramp)return;const p=phase();if(p!==lastPh){lastPh=p;VOq(VOD.ph[p],true)}},400);
+const clock=new THREE.Clock();let ph=0;
+function tick(){
+ const dt=Math.min(clock.getDelta(),.05);step(dt);const k=calm?1:1-Math.exp(-dt*3);
+ tgt.lerp(goal.t,k);rad+=(goal.r-rad)*k;
+ if(goal.y!==null){yaw+=(goal.y-yaw)*k;pit+=(goal.p-pit)*k}
+ cam.position.set(tgt.x+rad*Math.sin(yaw)*Math.cos(pit),tgt.y+rad*Math.sin(pit),tgt.z+rad*Math.cos(yaw)*Math.cos(pit));cam.lookAt(tgt);
+ const o=clamp((rad-24)/30);lungM.opacity=.2*o;lungs.forEach(l=>l.visible=o>.02);
+ if(!calm)ph+=dt*1.6;const b=Math.sin(ph),amp=.02+.05*vt/10;
+ alv.forEach((a,i)=>{const s=(a.col?(i?.45:.85):1)*(1+amp*b*(a.col?.3:1));a.g.scale.setScalar(s);
+  a.pl.constant=a.g.position.y-RAD*s+2*RAD*s*clamp(m.fill)});
+ for(let i=0;i<NA;i++){const p=curve.getPointAt(clamp(i/NA*.92+.04+.5*amp*b));ap[i*3]=p.x;ap[i*3+1]=p.y;ap[i*3+2]=p.z}
+ apts.geometry.attributes.position.needsUpdate=true;
+ const nf=Math.round(NF*clamp(m.e*1.2));
+ for(let i=0;i<NF;i++){if(i>=nf){fp[i*3+1]=-1e4;continue}
+  if(!calm)ft[i]=(ft[i]+dt*.5)%1;fp[i*3]=1.3-1.8*ft[i];fp[i*3+1]=fy[i];fp[i*3+2]=fz[i]*m.gap/2}
+ fg.attributes.position.needsUpdate=true;
+ rbc.forEach((r,i)=>{r.position.y=(((calm?0:ph*.5)*(1-.3*m.e)+i/6)%1)*4-2});
+ neu.scale.setScalar(1+(m.e>.3?.1*Math.sin(ph*3):0));
+ R.render(S,cam);requestAnimationFrame(tick)}
+model();go(0);tick();
+}
+</script></body></html>
