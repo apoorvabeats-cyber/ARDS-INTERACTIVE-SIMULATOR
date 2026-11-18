@@ -76,12 +76,9 @@ h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:28px;letter-spac
 .chart li{margin:0 0 8px 0}
 .chart .twig{margin-left:16px;border-left:1px solid var(--line);padding-left:10px}
 .fine{margin:16px 0 0;color:var(--faint);font-size:12px;line-height:1.45}
-body.sepsis #modes,body.sepsis #views,body.sepsis .clock,body.sepsis #presets,body.sepsis .bodybox{display:none !important}
-#sepsis-tabs{display:none}
-body.sepsis #sepsis-tabs{display:flex}
-#sepsis-lab{display:none;width:100%;height:78dvh;border:0;border-radius:14px;margin-top:12px;background:#071018}
-body.sepsis.lab-on #sepsis-lab{display:block}
-body.sepsis.lab-on #mapwrap,body.sepsis.lab-on #chart,body.sepsis.lab-on #sheet,body.sepsis.lab-on #sliders,body.sepsis.lab-on #acts,body.sepsis.lab-on #note,body.sepsis.lab-on .lead{display:none !important}
+body.sepsis #modes,body.sepsis #views,body.sepsis .clock,body.sepsis #presets,body.sepsis #lead,body.sepsis #mapwrap,body.sepsis #chart,body.sepsis #sheet,body.sepsis #sliders,body.sepsis #acts,body.sepsis #note,body.sepsis .fine,body.sepsis .sub{display:none !important}
+#sepsis-lab{display:none;width:100%;height:calc(100dvh - 148px);min-height:520px;border:0;border-radius:14px;margin-top:10px;background:#071018}
+body.sepsis #sepsis-lab{display:block}
 </style>
 </head>
 <body>
@@ -95,11 +92,8 @@ body.sepsis.lab-on #mapwrap,body.sepsis.lab-on #chart,body.sepsis.lab-on #sheet,
   <h1>Pathophysiology live</h1>
   <p class="sub">One disease. The organs it actually reaches. A pathway lights only when its own criteria are met.</p>
   <div class="diseases" id="diseases"></div>
-  <div class="modes" id="sepsis-tabs" hidden>
-    <button type="button" data-stab="map" class="on">Sepsis map</button>
-    <button type="button" data-stab="lab">3D lab</button>
-  </div>
-  <iframe id="sepsis-lab" title="Sepsis 3D circulation lab" hidden></iframe>
+  <iframe id="sepsis-lab" title="Sepsis" hidden></iframe>
+  <div class="modes" id="modes">
     <button type="button" data-mode="learn" class="on">Learn</button>
     <button type="button" data-mode="live">Live</button>
     <button type="button" data-mode="treat">Treat</button>
@@ -879,13 +873,17 @@ function render(){
   evaluate();
   const sepsis = d.id==="sepsis";
   document.body.classList.toggle("sepsis", sepsis);
-  document.getElementById("sepsis-tabs").hidden = !sepsis;
-  if(!sepsis) document.body.classList.remove("lab-on");
-  if(sepsis) state.view = "chart";
-  document.getElementById("lead").textContent = sepsis ? d.line : d.line+" "+LEADS[state.mode];
+  document.getElementById("sepsis-lab").hidden = !sepsis;
+  document.querySelectorAll("#diseases button").forEach(b=>b.classList.toggle("on", b.dataset.id===state.id));
+  if(sepsis){
+    const frame = document.getElementById("sepsis-lab");
+    frame.hidden = false;
+    if(!frame.getAttribute("src")) frame.src = "septic-circulation-lab.html?embed=1";
+    return;
+  }
+  document.getElementById("lead").textContent = d.line+" "+LEADS[state.mode];
   document.querySelectorAll("#modes button").forEach(b=>b.classList.toggle("on", b.dataset.mode===state.mode));
   document.querySelectorAll("#views button").forEach(b=>b.classList.toggle("on", b.dataset.view===state.view));
-  document.querySelectorAll("#diseases button").forEach(b=>b.classList.toggle("on", b.dataset.id===state.id));
   document.getElementById("hour").textContent = "Hour "+state.hours;
   document.getElementById("play").hidden = state.mode!=="live";
   document.getElementById("play").textContent = state.playing?"Pause":"Play";
@@ -1018,7 +1016,7 @@ function paintSheet(){
       const r = evals[x.id];
       return "<button type='button' data-id='"+x.id+"'>"+esc(x.name)+"<small> · "+esc(labelOf(r))+"</small></button>";
     }).join("");
-    el.innerHTML = "<p class='kicker'>"+esc(d.name)+"</p><h2>What is active</h2><p class='why'>"+esc(d.line)+"</p><div class='kids'>"+bits+"</div>"+(d.id==="sepsis"?"<a class='lab3d' href='https://claude.ai/artifact/XDwKNMvbBNfvU8svkJQ9Bc' target='_blank' rel='noopener'>Open the sepsis map and 3D labs</a>":"");
+    el.innerHTML = "<p class='kicker'>"+esc(d.name)+"</p><h2>What is active</h2><p class='why'>"+esc(d.line)+"</p><div class='kids'>"+bits+"</div>";
     return;
   }
   const r = evals[n.id] || off("");
@@ -1063,19 +1061,6 @@ document.getElementById("fwd6").onclick = ()=>{ state.hours+=6; render(); };
 document.getElementById("play").onclick = ()=>{
   if(state.playing){ stop(); render(); return; }
   state.playing = true; render(); timer = setInterval(tick, 1400);
-};
-document.getElementById("sepsis-tabs").onclick = function(e){
-  const b = e.target.closest("[data-stab]");
-  if(!b) return;
-  document.querySelectorAll("#sepsis-tabs button").forEach(function(btn){ btn.classList.toggle("on", btn===b); });
-  const lab = b.dataset.stab==="lab";
-  document.body.classList.toggle("lab-on", lab);
-  const frame = document.getElementById("sepsis-lab");
-  if(lab){
-    if(!frame.getAttribute("src")) frame.src = "septic-circulation-lab.html?embed=1";
-    if(window.speechSynthesis) speechSynthesis.cancel();
-  }
-  render();
 };
 document.body.addEventListener("click", e=>{
   const id = e.target.closest("[data-id]") && e.target.closest("#sheet, #chart, .col") && e.target.closest("[data-id]").dataset.id;

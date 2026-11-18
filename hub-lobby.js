@@ -160,7 +160,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       const btn = document.getElementById("icu-enter");
       if (btn) btn.click();
     } else {
-      location.href = "pathology-live.html?v=20261118e";
+      location.href = "pathology-live.html?v=20261118f";
     }
   }
 
