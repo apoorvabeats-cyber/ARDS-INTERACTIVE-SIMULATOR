@@ -67,18 +67,36 @@
     const root = new T.Group(), W = { root };
     const P = W.pos = {
       porin: V(-30, 15, 0), tbdt: V(12, 15, 0), ndm: V(-8, -9, 0), p0: V(-12.5, -4, 0), zn1: V(-14, -4.8, 0), zn2: V(-11, -4.8, 0), bridge: V(-12.5, -5.9, .3), dock: V(-12.5, -3.1, 0),
-      pbp: V(32, -29.5, 0), pbpPocket: V(32, -26.4, 0), ser: V(32, -27.7, .2), pgY: -21
+      pbp: V(32, -29.5, 0), pbpPocket: V(32, -26.4, 0), ser: V(32, -27.7, .2), pgY: -21,
+      /* resistance-lab additions: second porin copy (R), efflux pump axis, reference PBP copy, serine beta-lactamase slot */
+      portR: V(-52, 15, 0), pumpX: 52, pbpRef: V(12, -29.5, 0), pbpRefPocket: V(12, -26.4, 0), serRef: V(12, -27.7, .2), enzS: V(-40, -9, 0), p0S: V(-44.5, -4, 0), dockS: V(-44.5, -3.1, 0), serS: V(-44.5, -5.4, .2)
     };
-    const carveOM = (x, z) => { const dp = Math.hypot(x - P.porin.x, z), dt = Math.hypot(x - P.tbdt.x, z); if (dp < 8.3 || dt < 8.8) return true; if ((Math.abs(x - P.porin.x) < 12 || Math.abs(x - P.tbdt.x) < 12.5) && z > 1.2) return true; return false; };
-    const carveIM = (x, z) => Math.hypot(x - 32, z) < 3.6 || (x > -21 && x < -1 && z > 1.5);
-    W.om = leaflet({ y: 22, dir: -1, sp: 3.4, hr: 1.9, hcol: 0x35b8a4, tcol: 0x1d6f66, tails: 4, tw: .8, tl: 6.6, tr: .36, sugar: 3, sr: .7, scol: 0x8fe3d2, seed: 1, carve: carveOM });
-    W.omIn = leaflet({ y: 8, dir: 1, sp: 3.4, hr: 1.45, hcol: 0x79a8dd, tcol: 0x3f6597, tails: 2, tw: 1.0, tl: 6.6, tr: .4, seed: 2, carve: carveOM });
-    W.imOut = leaflet({ y: -38, dir: -1, sp: 3.4, hr: 1.45, hcol: 0xe8a84a, tcol: 0x9a6325, tails: 2, tw: 1.0, tl: 6.6, tr: .4, seed: 3, carve: carveIM });
-    W.imIn = leaflet({ y: -52, dir: 1, sp: 3.4, hr: 1.45, hcol: 0xe8a84a, tcol: 0x9a6325, tails: 2, tw: 1.0, tl: 6.6, tr: .4, seed: 4, carve: carveIM });
+    const regA = (x, z) => Math.hypot(x - P.porin.x, z) < 8.3 || (Math.abs(x - P.porin.x) < 12 && z > 1.2);
+    const regR = (x, z) => Math.hypot(x - P.portR.x, z) < 8.3 || (Math.abs(x - P.portR.x) < 12 && z > 1.2);
+    const regT = (x, z) => Math.hypot(x - P.tbdt.x, z) < 8.8 || (Math.abs(x - P.tbdt.x) < 12.5 && z > 1.2);
+    const regPumpOM = (x, z) => Math.hypot(x - P.pumpX, z) < 7.2 || (Math.abs(x - P.pumpX) < 11 && z > 1.2);
+    const regPumpIM = (x, z) => Math.hypot(x - P.pumpX, z) < 8.4 || (Math.abs(x - P.pumpX) < 11 && z > 2);
+    const carveOM = (x, z) => regA(x, z) || regR(x, z) || regT(x, z) || regPumpOM(x, z);
+    const carveIM = (x, z) => Math.hypot(x - 32, z) < 3.6 || Math.hypot(x - P.pbpRef.x, z) < 3.6 || (x > -21 && x < -1 && z > 1.5) || regPumpIM(x, z);
+    const LO = {
+      om: { y: 22, dir: -1, sp: 3.4, hr: 1.9, hcol: 0x35b8a4, tcol: 0x1d6f66, tails: 4, tw: .8, tl: 6.6, tr: .36, sugar: 3, sr: .7, scol: 0x8fe3d2, seed: 1 },
+      omIn: { y: 8, dir: 1, sp: 3.4, hr: 1.45, hcol: 0x79a8dd, tcol: 0x3f6597, tails: 2, tw: 1.0, tl: 6.6, tr: .4, seed: 2 },
+      imOut: { y: -38, dir: -1, sp: 3.4, hr: 1.45, hcol: 0xe8a84a, tcol: 0x9a6325, tails: 2, tw: 1.0, tl: 6.6, tr: .4, seed: 3 },
+      imIn: { y: -52, dir: 1, sp: 3.4, hr: 1.45, hcol: 0xe8a84a, tcol: 0x9a6325, tails: 2, tw: 1.0, tl: 6.6, tr: .4, seed: 4 }
+    };
+    W.om = leaflet(Object.assign({}, LO.om, { carve: carveOM }));
+    W.omIn = leaflet(Object.assign({}, LO.omIn, { carve: carveOM }));
+    W.imOut = leaflet(Object.assign({}, LO.imOut, { carve: carveIM }));
+    W.imIn = leaflet(Object.assign({}, LO.imIn, { carve: carveIM }));
     root.add(W.om.group, W.omIn.group, W.imOut.group, W.imIn.group);
+    /* lipid fillers: they plug the sites that the Resistance Lab can switch (lost OprD, absent efflux pump) */
+    const only = reg => (x, z) => !reg(x, z);
+    W.fillA = new T.Group(); W.fillA.add(leaflet(Object.assign({}, LO.om, { seed: 11, carve: only(regA) })).group, leaflet(Object.assign({}, LO.omIn, { seed: 12, carve: only(regA) })).group); W.fillA.visible = false; root.add(W.fillA);
+    W.fillPump = new T.Group(); W.fillPump.add(leaflet(Object.assign({}, LO.om, { seed: 13, carve: only(regPumpOM) })).group, leaflet(Object.assign({}, LO.omIn, { seed: 14, carve: only(regPumpOM) })).group, leaflet(Object.assign({}, LO.imOut, { seed: 15, carve: only(regPumpIM) })).group, leaflet(Object.assign({}, LO.imIn, { seed: 16, carve: only(regPumpIM) })).group); root.add(W.fillPump);
 
     /* porins */
     W.oprD = barrel({ r: 6, h: 16, col: 0x6e8fb8, seed: 5, eye: 3.1, eyeY: -1 }); W.oprD.group.position.copy(P.porin); root.add(W.oprD.group);
+    W.oprR = barrel({ r: 6, h: 16, col: 0x6e8fb8, seed: 25, eye: 3.1, eyeY: -1 }); W.oprR.group.position.copy(P.portR); root.add(W.oprR.group);
     W.tbdt = barrel({ r: 6.6, h: 16, col: 0x8a7cc4, seed: 8, eye: 3.4, eyeY: 2 }); W.tbdt.group.position.copy(P.tbdt); root.add(W.tbdt.group);
     W.tbdt.plug = new T.Mesh(new T.SphereGeometry(3.6, 16, 12), std(0xb7a7f0, { roughness: .5 })); W.tbdt.plug.position.set(0, 1, 0); W.tbdt.group.add(W.tbdt.plug);
     const rr = rng(9); W.loops = new T.Group(); for (let i = 0; i < 6; i++) { const a = Math.PI * (.7 + i * .32); const b = new T.Mesh(new T.SphereGeometry(1.15, 10, 8), std(0x9db6d8)); b.position.set(4.6 * Math.cos(a), -2.5 + rr() * 5, 4.6 * Math.sin(a) * (Math.sin(a) > .3 ? 0 : 1) - 1.5); W.loops.add(b); } W.oprD.group.add(W.loops);
@@ -92,7 +110,7 @@
     const barMat = std(0xb487ff, { emissive: 0x3a1c7a, emissiveIntensity: .55, roughness: .5 });
     function beadAt(s, x) { const i = Math.round((x - X0) / 2.5); return bead[s * beadN + clamp(i, 0, beadN - 1)]; }
     function barBetween(p, x, mat) { const a = beadAt(p, x), b = beadAt(p + 1, x), mm = stick(V(a.x, a.y, a.z), V(b.x, b.y, b.z), .3, 0xb487ff, 1); mm.material = mat || barMat.clone(); return { mesh: mm, a, b, p, x, grow: 1, dmg: 1 }; }
-    const stat = []; for (let p = 0; p < 3; p++) for (let x = X0 + 4 + p * 2.5; x < X1 - 2; x += 5) { if (x > 14 && x < 52) continue; if (rr() < .38) continue; stat.push(barBetween(p, x, barMat)); }
+    const stat = []; for (let p = 0; p < 3; p++) for (let x = X0 + 4 + p * 2.5; x < X1 - 2; x += 5) { if (x > 14 && x < 60) continue; if (rr() < .38) continue; stat.push(barBetween(p, x, barMat)); }
     W.pgStatic = new T.InstancedMesh(new T.CylinderGeometry(1, 1, 1, 6, 1, true), barMat, stat.length); const qd = new T.Quaternion();
     stat.forEach((b, i) => { const A = V(b.a.x, b.a.y, b.a.z), B = V(b.b.x, b.b.y, b.b.z), d = B.clone().sub(A), L = d.length(); qd.setFromUnitVectors(Y, d.normalize()); m4.compose(A.clone().add(B).multiplyScalar(.5), qd, sc.set(.3, L, .3)); W.pgStatic.setMatrixAt(i, m4); }); root.add(W.pgStatic);
     W.pg = { bars: [], newBars: [], oldBars: [], damage: 0 };
@@ -107,7 +125,7 @@
     W.pg.apply(0, 0);
 
     /* inner-membrane proteins + PBP3 */
-    [[-52, -9, 0x8b95a3, 5], [-40, 9, 0x8b95a3, 0], [-22, -8, 0x7d8a9a, 4.5], [-2, 8, 0x8b95a3, 0], [14, -10, 0x7d8a9a, 4], [50, 6, 0x8b95a3, 4.5], [56, -10, 0x7d8a9a, 0]].forEach(([x, z, c, b]) => root.add(bundle(x, z, c, b)));
+    [[-52, -9, 0x8b95a3, 5], [-40, 9, 0x8b95a3, 0], [-22, -8, 0x7d8a9a, 4.5], [-2, 8, 0x8b95a3, 0], [14, -10, 0x7d8a9a, 4], [42, 11, 0x8b95a3, 4.5], [56, -10, 0x7d8a9a, 0]].forEach(([x, z, c, b]) => root.add(bundle(x, z, c, b)));
     const tm = new T.Mesh(new T.CylinderGeometry(1.5, 1.5, 15, 10), std(0x8a5ad0)); tm.position.set(32, -45, 0); root.add(tm);
     const stalk = new T.Mesh(new T.CylinderGeometry(.9, .9, 7, 8), std(0x7a4cc0)); stalk.position.set(32, -33, 0); root.add(stalk);
     W.pbp = new T.Group(); W.pbp.add(M.blob({ c: [32, -30, 0], rad: [5.8, 4.4, 4.6], n: 700, sr: 1.1, col1: 0xa56ae0, col2: 0x5b3aa6, seed: 21, cavity: { c: [32, -26.4, 0], r: 3.1, u: [0, 1, 0], open: [0, .15, 1], n: 70 } })); root.add(W.pbp);
@@ -142,6 +160,36 @@
     for (let i = 0; i < 5; i++) {
       const g = new T.Group(), o = new T.Mesh(new T.SphereGeometry(.34, 10, 8), std(0xff5a5a)), h1 = new T.Mesh(new T.SphereGeometry(.2, 8, 6), std(0xffffff)), h2 = h1.clone();
       h1.position.set(.42, .3, 0); h2.position.set(-.42, .3, 0); g.add(o, h1, h2); g.userData.p = V(P.p0.x + (wr() - .5) * 11, P.p0.y + 2.5 + wr() * 4.5, (wr() - .5) * 6); g.userData.s = wr() * 10; root.add(g); W.waters.push(g);
+    }
+
+    /* ---- Resistance Lab structures: RND efflux pump, reference PBP, altered-PBP lid, serine beta-lactamase ---- */
+    {
+      const px = P.pumpX, g = new T.Group(); W.pump = { group: g, lobes: [], pocket: V(px, -27.6, 4.7), axis: V(px, 0, 0) };
+      const outer = barrel({ r: 5.2, h: 15, n: 12, col: 0xf0a35a, seed: 31, eye: 2.6, eyeY: 4 }); outer.group.position.set(px, 15, 0); g.add(outer.group); W.pump.ring = outer.ring;
+      for (let i = 0; i < 12; i++) { const th = i / 12 * Math.PI * 2; if (Math.sin(th) > .35) continue; const h = new T.Mesh(new T.CylinderGeometry(.95, .95, 27, 8), std(new T.Color(0xe08a3c).multiplyScalar(.85 + (i % 3) * .1), { roughness: .55 })); h.position.set(px + 4 * Math.cos(th), -6.5, 4 * Math.sin(th)); g.add(h); }
+      for (let i = 0; i < 6; i++) { const th = (30 + 60 * i) * Math.PI / 180; if (Math.sin(th) > .9) continue; const m = new T.Mesh(new T.CylinderGeometry(.85, .85, 22, 8), std(0xd8c25a, { roughness: .5 })); m.position.set(px + 6.4 * Math.cos(th), -19, 6.4 * Math.sin(th)); g.add(m); [-11, 11].forEach(dy => { const c = new T.Mesh(new T.SphereGeometry(.95, 10, 8), std(0xd8c25a, { roughness: .5 })); c.position.set(m.position.x, -19 + dy, m.position.z); g.add(c); }); }
+      [90, 210, 330].forEach((deg, i) => {
+        const th = deg * Math.PI / 180, cx = px + 4.4 * Math.cos(th), cz = 4.4 * Math.sin(th), lg = new T.Group();
+        const body = M.blob({ c: [cx, -31, cz], rad: [3.3, 5.4, 3.3], n: 330, sr: 1.05, col1: 0xdbe9f7, col2: 0xa9c4e3, seed: 40 + i, cavity: i === 0 ? { c: [cx, -27.4, cz + .2], r: 2.5, u: [0, 1, .2], open: [0, .45, 1], n: 40 } : undefined });
+        const tm = new T.Mesh(new T.CylinderGeometry(2.4, 2.4, 15, 12), std(0x8aa0b8, { roughness: .6 })); tm.position.set(cx, -45, cz); lg.add(body, tm); g.add(lg); W.pump.lobes.push({ g: lg, body, tm });
+      });
+      W.pump.h = glow(0xff7a52, 2.6, 0); W.pump.pocketGlow = glow(0xffd27a, 9, 0); W.pump.pocketGlow.position.copy(W.pump.pocket); g.add(W.pump.h, W.pump.pocketGlow); g.visible = false; root.add(g);
+    }
+    {
+      const rx = P.pbpRef.x; W.pbpRefG = new T.Group();
+      const tm2 = new T.Mesh(new T.CylinderGeometry(1.5, 1.5, 15, 10), std(0x8a5ad0)); tm2.position.set(rx, -45, 0); const st2 = new T.Mesh(new T.CylinderGeometry(.9, .9, 7, 8), std(0x7a4cc0)); st2.position.set(rx, -33, 0);
+      const cb2 = new T.Mesh(new T.SphereGeometry(.42, 10, 8), std(0xb8c3d0)), og2 = new T.Mesh(new T.SphereGeometry(.5, 12, 9), std(0xff5555, { emissive: 0x330000 })); cb2.position.set(rx - .4, -28.7, .3); og2.position.copy(P.serRef);
+      W.pbpRefG.add(tm2, st2, M.blob({ c: [rx, -30, 0], rad: [5.8, 4.4, 4.6], n: 700, sr: 1.1, col1: 0xa56ae0, col2: 0x5b3aa6, seed: 22, cavity: { c: [rx, -26.4, 0], r: 3.1, u: [0, 1, 0], open: [0, .15, 1], n: 70 } }), cb2, og2, stick(V(rx - .4, -28.7, .3), P.serRef, .15, 0xc9d4e2)); W.serRefO = og2; root.add(W.pbpRefG);
+      W.pbpRefGlow = glow(0xff4a3a, 14, 0); W.pbpRefGlow.position.copy(P.pbpRefPocket); root.add(W.pbpRefGlow);
+      /* altered PBP: bulky substituted residues narrowing the pocket mouth */
+      W.pbpBump = new T.Group(); [[2.7, -24.5, 1.3], [-2.7, -24.5, 1.3], [1.3, -24.1, 3.1], [-1.3, -24.1, 3.1], [0, -23.7, -1.2]].forEach((p, i) => { const b = new T.Mesh(new T.SphereGeometry(1.2 + (i % 2) * .15, 14, 10), std(0xff9a3a, { emissive: 0x7a2a00, emissiveIntensity: .7, roughness: .45 })); b.position.set(32 + p[0], p[1], p[2]); W.pbpBump.add(b); }); W.pbpBump.visible = false; root.add(W.pbpBump);
+    }
+    {
+      W.serEnz = { group: new T.Group() }; const g = W.serEnz.group;
+      g.add(M.blob({ c: [P.enzS.x, P.enzS.y, 0], rad: [9.2, 7.4, 7.2], n: 1100, sr: 1.35, col1: 0x56d6a8, col2: 0x1b7a60, seed: 34, rough: .2, cavity: { c: [P.p0S.x, P.p0S.y, 0], r: 5, u: [-.25, 1, 0], open: [0, .15, 1], n: 100 } }));
+      const og = new T.Mesh(new T.SphereGeometry(.55, 12, 9), std(0xff5555, { emissive: 0x330000 })); og.position.copy(P.serS); g.add(og, stick(V(P.serS.x + .3, P.serS.y - 1.8, P.serS.z), P.serS, .15, 0xc9d4e2));
+      [[-2.4, -.4], [2.2, -.2]].forEach(o => { const m = new T.Mesh(new T.SphereGeometry(.42, 10, 8), std(0x7fb7ff, { emissive: 0x15305a, emissiveIntensity: .6 })); m.position.set(P.p0S.x + o[0], P.p0S.y - 1.2 + o[1], .2); g.add(m); });
+      W.serEnz.og = og; W.serEnz.glow = glow(0xff4a3a, 10, 0); W.serEnz.glow.position.set(P.p0S.x, P.p0S.y + 1.2, 0); g.add(W.serEnz.glow); g.visible = false; root.add(g);
     }
     /* medium + solutes */
     const sr = rng(77);

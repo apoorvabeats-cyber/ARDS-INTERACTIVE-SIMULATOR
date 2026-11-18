@@ -43,7 +43,9 @@
       [P.hero, P.cfdc, P.caz].forEach(m => m.bond('lac').mat.color.set(0xffb347));
       P.hero.atoms.Ow.mesh.visible = false; P.hero.atoms.Hw.mesh.visible = false; P.h1.visible = false; P.coord.forEach(s => s.visible = false); P.ogBond.visible = false; P.pop.material.opacity = 0; P.lacGlow.material.opacity = 0;
       P.xs.forEach(s => { s.visible = false; s.scale.setScalar(3.2); }); P.ok.visible = false; P.mg.forEach(m => m.visible = false); P.ribo.visible = false; P.amb.forEach(m => m.group.visible = false);
-      W.ndm.visible = false; W.waters.forEach(w => w.visible = false); W.znGlow.forEach(g => g.material.opacity = .6); W.pbpGlow.material.opacity = 0; W.pbpOk.material.opacity = 0; W.serO.material.color.setHex(0xff5555);
+      W.ndm.visible = false; W.waters.forEach(w => w.visible = false);
+      W.pump.group.visible = false; W.fillPump.visible = true; W.fillA.visible = false; W.oprD.group.visible = true; W.pbpBump.visible = false; if (P.resHide) P.resHide(); W.serEnz.group.visible = false; W.serEnz.glow.material.opacity = 0; W.serEnz.og.material.color.setHex(0xff5555);
+      W.pbpRefGlow.material.opacity = 0; W.serRefO.material.color.setHex(0xff5555); W.pump.pocketGlow.material.opacity = 0; W.pump.h.material.opacity = 0; W.pump.ring.material.emissiveIntensity = .8; W.pump.lobes.forEach(l => { l.g.position.set(0, 0, 0); l.g.scale.set(1, 1, 1); l.body.material.color.setHex(0xffffff); }); W.znGlow.forEach(g => g.material.opacity = .6); W.pbpGlow.material.opacity = 0; W.pbpOk.material.opacity = 0; W.serO.material.color.setHex(0xff5555);
       W.tbdt.plug.position.set(0, 1, 0); W.pg.newBars.forEach(b => b.grow = 0); W.pg.apply(0, 0); if (W.om.dirty) { W.om.items.forEach((_, i) => W.om.setHead(i, 0, 0, 0)); W.om.flush(); W.om.dirty = false; }
     };
     return P;
@@ -53,7 +55,8 @@
   const flashAt = (t, ts) => { let f = 0; ts.forEach(c => { f = Math.max(f, 1 - clamp(Math.abs(t - c) / .55)); }); return f; };
 
   /* hero reaction (hydrolysis by NDM Zn2+ / acylation by PBP serine). `ts` is "standard" time: dock at 22.4 */
-  function react(P, W, hero, ts, mode, Dp, glowOn) {
+  function react(P, W, hero, ts, mode, Dp, glowOn, X) {
+    X = X || {}; const OG = X.og || W.serO, PG = X.glow || W.pbpGlow;
     const toLocal = p => p.clone().sub(Dp).applyQuaternion(qInv), h = sstep(28.8, 30.4, ts), A = Dp.clone().add(V(0, -1.15, .3)), B = W.pos.bridge, Sw = V(-17.5, .8, 4);
     hero.morph(h);
     const bl = hero.bond('lac'); bl.fade = 1 - sstep(29.2, 30.1, ts);
@@ -80,9 +83,9 @@
       W.znGlow.forEach((g, i) => { g.material.opacity = .55 + .25 * Math.sin(ts * 4 + i) + (ts > 24.6 && ts < 26.6 ? .35 : 0); });
     } else {
       /* serine acylation of PBP: Ser-OG attacks the lactam carbonyl, drug stays covalently attached */
-      P.ogBond.visible = ts > 27.8 && ts < 99; const og = W.serO.position, c7 = hero.group.localToWorld(hero.atoms.C7.mesh.position.clone());
+      P.ogBond.visible = ts > 27.8 && ts < 99; const og = OG.position, c7 = hero.group.localToWorld(hero.atoms.C7.mesh.position.clone());
       if (P.ogBond.visible) { P.ogBond.userData.set(og, c7); P.ogBond.material.opacity = sstep(27.8, 28.8, ts); }
-      W.pbpGlow.material.opacity = .9 * sstep(30, 32.5, ts); W.serO.material.color.setHex(ts > 28 ? 0xff9a3a : 0xff5555);
+      PG.material.opacity = (X.glowK || .9) * sstep(30, 32.5, ts); OG.material.color.setHex(ts > 28 ? 0xff9a3a : 0xff5555);
     }
     hero.layout();
   }
@@ -328,6 +331,7 @@
     return sc;
   }
 
+  M.util = { props, react, camFrom, flashAt, jit, euler, sprite, D_NDM, D_PBP, cellCamKeys, qDock };
   M.scenarios = {
     ndm_on: () => meropenem(true), ndm_off: () => meropenem(false),
     cfdc: () => drug('cfdc'), cazavi: () => drug('cazavi'), colistin: () => drug('colistin'), amikacin: () => drug('amikacin')
