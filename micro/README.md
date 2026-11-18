@@ -53,3 +53,6 @@ World switches (`world.js`): `W.pump` (efflux, filler `W.fillPump` when absent),
 - Enzyme: add to `MECH` (`cls: 'metallo' | 'serine'`) and to `HYD[enzyme][abx]`. Serine enzymes reuse the serine slot; a metallo enzyme reuses the NDM slot.
 - New structure type (for example ribosomal methylation, vancomycin D-Ala-D-Lac): add a switchable group to `world.js`, reset it in `hideAll`, and a scene runner in `scn_res.js`.
 - All weights are teaching values, not MICs. Real susceptibility is isolate-specific (AST, CLSI / EUCAST).
+
+## Entrance (`microbiology.html`, file 1 step 1)
+`micro/organisms.js` holds 19 organisms in 6 groups (data plus a procedural three.js model for each: clusters, chains, lancet diplococci with capsule, rods with flagella and pili, spore-former, wall-less Mycoplasma, Chlamydia inclusion, Candida, Aspergillus conidiophore, mycobacterial cord). To add one: add a record to `O` and a builder to `MODEL`. Models are schematic; text is teaching content needing specialist review. The Resistance Explorer card links to `microbiology-lab.html?org=<id>` for P. aeruginosa, K. pneumoniae, E. coli and A. baumannii only.

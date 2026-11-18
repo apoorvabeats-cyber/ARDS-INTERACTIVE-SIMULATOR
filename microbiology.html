@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Microbiology Lab · The bacterial universe · Critical Care Universe</title>
+<meta name="description" content="Entrance to the Microbiology Lab: choose from 19 organisms (Gram-positive, Gram-negative, anaerobes, atypical bacteria, fungi, mycobacteria), rotate a 3D model of each, and open the learning modules.">
+<style>
+:root{--bg:#050d16;--ink:#e8f1f8;--mute:#8fa6b8;--panel:#0b1a28;--line:#1f3a52;--acc:#4de3d0;--acc2:#7fb7ff;--warn:#ffc857;color-scheme:dark;box-sizing:border-box}
+*,*::before,*::after{box-sizing:inherit}
+html{background:var(--bg)}
+body{margin:0;background:radial-gradient(1100px 600px at 50% -15%,#0f3140 0,transparent 62%),var(--bg);color:var(--ink);font:15px/1.5 "Avenir Next","Segoe UI",Roboto,system-ui,sans-serif;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+main{max-width:1440px;margin:0 auto;padding:12px 16px 40px}
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.top a{font-size:13px;color:var(--ink);text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 14px;min-height:38px;display:inline-flex;align-items:center}
+.top .sp{flex:1}
+.top .badge{font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc)}
+h1{margin:6px 0 2px;font-size:clamp(22px,3.6vw,34px);letter-spacing:.01em;line-height:1.15}
+.sub{color:var(--mute);margin:0 0 12px;font-size:13.5px;letter-spacing:.12em;text-transform:uppercase}
+.wrap{display:grid;grid-template-columns:250px minmax(0,1fr) 340px;gap:14px;align-items:start}
+@media (max-width:1100px){.wrap{grid-template-columns:220px minmax(0,1fr)}.info{grid-column:1/-1}}
+@media (max-width:760px){.wrap{grid-template-columns:1fr}.list{order:2}.stagebox{order:1}.info{order:3}}
+.list{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px 8px 10px;max-height:78vh;overflow:auto}
+.list h2{margin:10px 6px 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:600}
+.list h2:first-child{margin-top:4px}
+.org{display:flex;width:100%;text-align:left;gap:8px;align-items:center;font:inherit;font-size:14px;color:var(--ink);background:transparent;border:1px solid transparent;border-radius:10px;padding:8px 10px;min-height:42px;cursor:pointer}
+.org i{font-style:italic}
+.org:hover{background:rgba(127,183,255,.08)}
+.org[aria-pressed="true"]{border-color:var(--acc);background:rgba(77,227,208,.09);color:var(--acc)}
+.org small{display:block;color:var(--mute);font-size:11.5px;line-height:1.2}
+.dot{flex:none;width:10px;height:10px;border-radius:50%}
+@media (max-width:760px){.list{max-height:none;display:flex;overflow-x:auto;gap:6px;padding:8px;border-radius:12px;scrollbar-width:thin}.list h2{display:none}.org{flex:none;width:auto;white-space:nowrap;border-color:var(--line);border-radius:999px;padding:6px 14px}.org small{display:none}}
+.stagebox{min-width:0}
+.stage{position:relative;border-radius:16px;overflow:hidden;background:radial-gradient(circle at 50% 45%,#0e2c3c,#050d16 70%);border:1px solid var(--line);aspect-ratio:1/1;max-height:78vh;width:100%;touch-action:none;user-select:none}
+@media (max-width:760px){.stage{aspect-ratio:1/1.05}}
+canvas{display:block;width:100%;height:100%;cursor:grab}
+.ctrls{position:absolute;left:10px;right:10px;bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;pointer-events:none}
+.ctrls button{pointer-events:auto;font:inherit;font-size:13px;color:var(--ink);background:rgba(5,16,28,.78);border:1px solid var(--line);border-radius:999px;padding:6px 13px;min-height:38px;cursor:pointer;backdrop-filter:blur(4px)}
+.ctrls button[aria-pressed="true"]{border-color:var(--acc);color:var(--acc)}
+.ctrls .sp{flex:1}
+.hint{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;gap:8px;font-size:12px;pointer-events:none}
+.hint span{background:rgba(5,16,28,.72);border:1px solid var(--line);border-radius:999px;padding:5px 11px}
+.hint b{color:var(--acc);font-weight:600}
+.nowebgl{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:30px;color:var(--mute)}
+.info{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.info h2{margin:0;font-size:20px;line-height:1.25;font-style:italic}
+.info .gram{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--acc);margin:0 0 4px}
+.info p.d{margin:4px 0 10px;color:var(--mute);font-size:13.5px}
+.info h3{margin:12px 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:600}
+.info ul{margin:0;padding-left:18px;font-size:13.5px}
+.info li{margin:3px 0}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chips span{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:#cfe0ec}
+.mods{margin-top:14px;border-top:1px solid var(--line);padding-top:6px}
+.mods h3{margin-top:8px}
+.mod{display:flex;gap:10px;align-items:center;width:100%;text-align:left;text-decoration:none;font:inherit;color:var(--ink);background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin:6px 0;min-height:48px}
+.mod b{display:block;font-size:14px;font-weight:600}
+.mod span{display:block;font-size:12px;color:var(--mute);line-height:1.3}
+.mod .st{flex:none;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;border-radius:999px;padding:3px 8px;border:1px solid var(--line);color:var(--mute)}
+a.mod:hover{border-color:var(--acc)}
+a.mod .st{color:#04201f;background:var(--acc);border-color:var(--acc)}
+.mod.off{opacity:.7;cursor:default}
+.foot{margin:14px 0 0;color:var(--mute);font-size:12px;max-width:100ch}
+button:focus-visible,a:focus-visible{outline:2px solid var(--acc2);outline-offset:2px}
+</style></head>
+<body><main>
+<div class="top"><a href="index.html" id="back">← Back to hall</a><span class="sp"></span><span class="badge">Critical Care Universe · Interactive world</span></div>
+<h1>MICROBIOLOGY LAB</h1>
+<p class="sub">The bacterial universe · choose an organism</p>
+<div class="wrap">
+  <nav class="list" id="list" aria-label="Organisms"></nav>
+  <section class="stagebox">
+    <div class="stage" id="stage">
+      <canvas id="cv" aria-label="Rotating 3D model of the selected organism"></canvas>
+      <div class="hint"><span id="gtag"><b>3D MODE</b></span><span id="orgname"></span></div>
+      <div class="ctrls">
+        <button id="bRot" aria-pressed="true">Auto-rotate</button>
+        <button id="bOut" aria-pressed="true">Outer layers</button>
+        <button id="bReset">Reset view</button>
+        <span class="sp"></span>
+        <button id="bPrev" aria-label="Previous organism">‹</button><button id="bNext" aria-label="Next organism">›</button>
+      </div>
+      <div class="nowebgl" id="nogl">3D view needs WebGL. The organism information on this page still works.</div>
+    </div>
+  </section>
+  <aside class="info" id="info" aria-live="polite"></aside>
+</div>
+<p class="foot">Schematic models for teaching: shapes are simplified and not to scale, and the content is educational, not a substitute for local microbiology guidance or an isolate's susceptibility report (CLSI / EUCAST). Drag to orbit, scroll or pinch to zoom.</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="micro/organisms.js?v=20261119b"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id),O=MICRO.orgs,esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const GCOL={gp:'#f2b630',gn:'#3fc6b0',an:'#c2a8ff',at:'#7fb7ff',fu:'#f7d9b2',my:'#ff6f9a'};
+const LAB_ORGS={pa:'Pseudomonas aeruginosa',kp:'Klebsiella pneumoniae',ec:'Escherichia coli',ab:'Acinetobacter baumannii'};
+/* ---------- list ---------- */
+$('list').innerHTML=O.GROUPS.map(g=>'<h2>'+esc(g.name)+'</h2>'+O.LIST.filter(o=>o.g===g.id).map(o=>'<button class="org" data-id="'+o.id+'" aria-pressed="false"><span class="dot" style="background:'+GCOL[g.id]+'"></span><span><i>'+esc(o.short)+'</i><small>'+esc(o.tag)+'</small></span></button>').join('')).join('');
+/* ---------- three ---------- */
+let R=null,scene,cam,cur=null,curId=null,auto=true,outerOn=true,t0=performance.now();
+const st={yaw:.5,pitch:.15,dist:11,tgtDist:11,tYaw:.5,tPitch:.15};
+try{R=new THREE.WebGLRenderer({canvas:$('cv'),antialias:true,alpha:true,powerPreference:'high-performance'});}catch(e){R=null;}
+if(!R){$('cv').style.display='none';$('nogl').style.display='flex';}
+else{
+  R.setPixelRatio(Math.min(devicePixelRatio||1,2));R.setClearColor(0x000000,0);
+  scene=new THREE.Scene();cam=new THREE.PerspectiveCamera(38,1,.1,100);
+  scene.add(new THREE.HemisphereLight(0xcfe8ff,0x1a2433,.9));
+  const k=new THREE.DirectionalLight(0xffffff,1.15);k.position.set(5,6,7);scene.add(k);
+  const r=new THREE.DirectionalLight(0x4de3d0,.7);r.position.set(-6,-2,-5);scene.add(r);
+  /* bokeh backdrop */
+  const bk=new THREE.Group(),rr=(()=>{let a=7;return()=>{a=(a*16807)%2147483647;return a/2147483647;};})();
+  for(let i=0;i<46;i++){const m=new THREE.Mesh(new THREE.SphereGeometry(.12+rr()*.55,10,8),new THREE.MeshBasicMaterial({color:i%3?0x2fa8b8:0x4d7fe0,transparent:true,opacity:.05+rr()*.07,depthWrite:false}));m.position.set((rr()-.5)*34,(rr()-.5)*22,-8-rr()*14);m.userData.s=.1+rr()*.3;m.userData.p=rr()*6;bk.add(m);}
+  scene.add(bk);scene.userData.bk=bk;
+  function size(){const s=$('stage'),w=s.clientWidth,h=s.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();}
+  addEventListener('resize',size);size();
+  /* input */
+  const cv=$('cv'),ptr=new Map();let lastD=0;
+  cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);ptr.set(e.pointerId,{x:e.clientX,y:e.clientY});cv.style.cursor='grabbing';lastD=0;});
+  const up=e=>{ptr.delete(e.pointerId);cv.style.cursor='grab';lastD=0;};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+  cv.addEventListener('pointermove',e=>{const p=ptr.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
+    if(ptr.size===2){const [a,b]=[...ptr.values()],d=Math.hypot(a.x-b.x,a.y-b.y);if(lastD)st.tgtDist=clamp(st.tgtDist*lastD/d,5.5,20);lastD=d;}
+    else{st.tYaw-=dx*.009;st.tPitch=clamp(st.tPitch+dy*.007,-1.3,1.3);}});
+  cv.addEventListener('wheel',e=>{e.preventDefault();st.tgtDist=clamp(st.tgtDist*(1+Math.sign(e.deltaY)*.08),5.5,20);},{passive:false});
+  function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+  window.__clamp=clamp;
+  function setOuter(){if(!cur)return;cur.userData.outer.forEach(m=>{m.visible=outerOn;});}
+  function show(id){
+    if(cur){scene.remove(cur);cur.traverse(o=>{if(o.geometry)o.geometry.dispose();});}
+    cur=O.build(id);scene.add(cur);setOuter();
+  }
+  window.__show=show;
+  let lastT=performance.now();
+  function frame(now){
+    const dt=Math.min(.05,(now-lastT)/1000);lastT=now;const t=(now-t0)/1000;
+    if(auto&&!ptr.size)st.tYaw+=dt*.35;
+    st.yaw+=(st.tYaw-st.yaw)*Math.min(1,dt*9);st.pitch+=(st.tPitch-st.pitch)*Math.min(1,dt*9);st.dist+=(st.tgtDist-st.dist)*Math.min(1,dt*7);
+    cam.position.set(Math.sin(st.yaw)*Math.cos(st.pitch)*st.dist,Math.sin(st.pitch)*st.dist,Math.cos(st.yaw)*Math.cos(st.pitch)*st.dist);cam.lookAt(0,0,0);
+    if(cur){cur.userData.spins.forEach((s,i)=>{s.rotation.z=t*(5+(i%4)*.8);});cur.position.y=Math.sin(t*.8)*.08;}
+    scene.userData.bk.children.forEach(m=>{m.position.y+=Math.sin(t*m.userData.s+m.userData.p)*.002;});
+    R.render(scene,cam);requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  $('bRot').onclick=e=>{auto=!auto;e.currentTarget.setAttribute('aria-pressed',auto);};
+  $('bOut').onclick=e=>{outerOn=!outerOn;e.currentTarget.setAttribute('aria-pressed',outerOn);setOuter();};
+  $('bReset').onclick=()=>{st.tYaw=st.yaw%(Math.PI*2);st.tPitch=.15;st.tgtDist=11;};
+}
+/* ---------- info panel ---------- */
+const MODS=[
+ {n:'Bacterial Anatomy',d:'Capsule, wall, membranes, ribosomes, DNA, plasmids, porins, pumps, flagella, pili',s:'Step 2 · planned'},
+ {n:'Infection Mechanism',d:'Adherence, colonisation, invasion, toxins, immune evasion, inflammation',s:'Step 3 · planned'},
+ {n:'Antibiotic Laboratory',d:'Drug classes acting on this organism, susceptible vs resistant animation',s:'Step 4 · planned'},
+ {n:'Resistance Explorer',d:'Tick resistance mechanisms and watch the molecular pathways',s:'open',lab:true},
+ {n:'Susceptibility Testing',d:'Culture, MIC and antibiogram workstation',s:'Step 7 · planned'},
+ {n:'Clinical Cases',d:'ICU case scenarios linked to the organism',s:'Step 7 · planned'}];
+function info(o){
+  const g=O.GROUPS.find(x=>x.id===o.g);
+  const lab=o.lab&&LAB_ORGS[o.lab];
+  $('info').innerHTML='<p class="gram">'+esc(g.name)+'</p><h2>'+esc(o.name)+'</h2><p class="d">'+esc(o.desc)+'</p>'
+   +'<h3>Key features</h3><ul>'+o.facts.map(f=>'<li>'+esc(f)+'</li>').join('')+'</ul>'
+   +'<h3>Resistance themes</h3><ul>'+o.res.map(f=>'<li>'+esc(f)+'</li>').join('')+'</ul>'
+   +'<h3>Structures in the model</h3><div class="chips">'+o.show.map(f=>'<span>'+esc(f)+'</span>').join('')+'</div>'
+   +'<div class="mods"><h3>Modules</h3>'+MODS.map(m=>{
+      if(m.lab)return lab?'<a class="mod" href="microbiology-lab.html?org='+o.lab+'&v=20261119b"><div style="flex:1"><b>'+m.n+'</b><span>'+m.d+'</span></div><span class="st">Open</span></a>'
+        :'<div class="mod off"><div style="flex:1"><b>'+m.n+'</b><span>Not yet built for this organism (available for P. aeruginosa, K. pneumoniae, E. coli and A. baumannii)</span></div><span class="st">Planned</span></div>';
+      return '<div class="mod off"><div style="flex:1"><b>'+m.n+'</b><span>'+m.d+'</span></div><span class="st">'+m.s.replace(/^.*· /,'')+'</span></div>';}).join('')
+   +'</div>';
+}
+function select(id,push){
+  const o=O.byId(id)||O.LIST[0];curId=o.id;
+  document.querySelectorAll('.org').forEach(b=>b.setAttribute('aria-pressed',b.dataset.id===o.id));
+  $('orgname').innerHTML='<b><i>'+esc(o.short)+'</i></b>';
+  info(o);if(R){window.__show(o.id);window.__resetView&&0;}
+  try{history.replaceState(null,'','?org='+o.id);}catch(e){}
+}
+$('list').addEventListener('click',e=>{const b=e.target.closest('.org');if(!b)return;select(b.dataset.id);});
+function step(d){const i=O.LIST.findIndex(o=>o.id===curId);select(O.LIST[(i+d+O.LIST.length)%O.LIST.length].id);const b=document.querySelector('.org[aria-pressed="true"]');if(b&&b.scrollIntoView)b.scrollIntoView({block:'nearest',inline:'nearest'});}
+$('bPrev').onclick=()=>step(-1);$('bNext').onclick=()=>step(1);
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='ArrowDown')step(1);else if(e.key==='ArrowLeft'||e.key==='ArrowUp')step(-1);});
+select(new URLSearchParams(location.search).get('org')||'pa');
+})();
+</script>
+</body></html>
