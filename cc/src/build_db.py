@@ -1,8 +1,13 @@
 import json,sys,importlib
 sys.path.insert(0,'.')
 from dbhelp import *
-import d1,d2,d3,d4
+import d1,d2,d3,d4,d5
 DIS=[d1.ARDS,d1.PANC,d2.AKI,d2.ALF,d3.AHF,d3.TBI,d4.STAT,d4.DIC]
+for d in DIS:
+  if d['id'] in d5.NEW:
+    cs,ls=d5.NEW[d['id']];d['complications']+=cs;d['links']+=ls
+  n=len(d['complications'])
+  for i,c in enumerate(d['complications']):c['a']=round(-90+360*i/n)
 # validate
 D={'vessel':{'flow','sat','leak','clot','bleed','isch'},'heart':{'con','rvf','rvdil','lvdil','congest','sept','rate'},'alveolus':{'vent','stretch','leak','fluid','fibro','inflam'},'nephron':{'gfr','injury','urea','k','acid'},'brain':{'swell','mass','shift','hern','isch','perf','amm'},'cell':{'mem','outer','inner','leak','mito','store','tox','swell'}}
 errs=0

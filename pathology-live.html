@@ -81,33 +81,33 @@ body.sepsis #modes,body.sepsis #views,body.sepsis .clock,body.sepsis #presets,bo
 body.sepsis #sepsis-lab{display:block}
 </style>
 <style>
-.subtabs,.labpick{display:flex;gap:6px;overflow:auto;margin-top:10px}
-.subtabs button,.labpick button,#voice{flex:0 0 auto;min-height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);font:inherit;cursor:pointer}
-.subtabs button.on,.labpick button.on,#voice[aria-pressed="true"]{color:var(--fg);border-color:var(--fg)}
-#frame{display:block;width:100%;height:calc(100dvh - 210px);min-height:540px;border:0;border-radius:14px;margin-top:10px;background:#071018}
+#voice,#mapBack{flex:0 0 auto;min-height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);font:inherit;cursor:pointer}
+#voice[aria-pressed="true"]{color:var(--fg);border-color:var(--fg)}
+#mapBack{color:var(--cool);border-color:var(--cool)}
+#mapBack[hidden],iframe[hidden]{display:none}
+#frame,#lab{display:block;width:100%;height:calc(100dvh - 150px);min-height:560px;border:0;border-radius:14px;margin-top:10px;background:#071018}
 .soon{margin-top:18px;color:var(--muted)}
 </style>
 </head>
 <body>
   <div class="top">
     <a class="back" href="index.html">Back to hall</a>
+    <button type="button" id="mapBack" hidden>← Map</button>
     <button type="button" id="voice" aria-pressed="true">Voice on</button>
   </div>
   <h1>Pathophysiology live</h1>
-  <p class="sub">Pick a disease. Follow each disease from the organ to the cell, then open its complications as 3D labs.</p>
+  <p class="sub">Pick a disease, tap a complication on its map, then open the 3D lab.</p>
   <div class="diseases" id="diseases"></div>
   <div id="pane" hidden>
-    <div class="subtabs" id="subtabs"><button type="button" data-t="map" id="mapTab">Map</button><button type="button" data-t="lab">3D lab</button></div>
-    <div class="labpick" id="labpick" hidden></div>
-    <iframe id="frame" title="Live module"></iframe>
+    <iframe id="frame" title="Disease map"></iframe>
+    <iframe id="lab" title="3D lab" hidden></iframe>
   </div>
   <p class="soon" id="soon" hidden></p>
 <script>
-const VER = "20261118j";
+const VER = "20261118k";
 const TABS = [["sepsis","Sepsis"],["ards","ARDS"],["dka","DKA / HHS"],["pancreatitis","Acute pancreatitis"],["aki","AKI"],["alf","Acute liver failure"],["ahf","Acute heart failure"],["tbi","Traumatic brain injury"],["status","Status epilepticus"],["dic","DIC"]];
 const MODS = {
  "sepsis": {
-  "map": "Sepsis map",
   "def": "shock",
   "mf": "sepsis/map.html",
   "lf": "sepsis/lab-{l}.html",
@@ -139,7 +139,6 @@ const MODS = {
   ]
  },
  "dka": {
-  "map": "DKA and HHS map",
   "def": "meta",
   "mf": "dka/map.html",
   "lf": "dka/lab-{l}.html",
@@ -159,8 +158,6 @@ const MODS = {
   ]
  },
  "ards": {
-  "map": "ARDS map",
-  "def": "rv",
   "mf": "cc/map.html?d=ards",
   "lf": "cc/lab.html?d=ards&c={l}",
   "labs": [
@@ -175,12 +172,14 @@ const MODS = {
    [
     "fibro",
     "Fibrosis"
+   ],
+   [
+    "vap",
+    "Ventilator pneumonia"
    ]
   ]
  },
  "pancreatitis": {
-  "map": "Acute pancreatitis map",
-  "def": "shock",
   "mf": "cc/map.html?d=pancreatitis",
   "lf": "cc/lab.html?d=pancreatitis&c={l}",
   "labs": [
@@ -199,12 +198,18 @@ const MODS = {
    [
     "necro",
     "Necrosis"
+   ],
+   [
+    "acs",
+    "Abdominal compartment"
+   ],
+   [
+    "hypoca",
+    "Hypocalcemia"
    ]
   ]
  },
  "aki": {
-  "map": "AKI map",
-  "def": "hyperk",
   "mf": "cc/map.html?d=aki",
   "lf": "cc/lab.html?d=aki&c={l}",
   "labs": [
@@ -227,8 +232,6 @@ const MODS = {
   ]
  },
  "alf": {
-  "map": "Acute liver failure map",
-  "def": "cedema",
   "mf": "cc/map.html?d=alf",
   "lf": "cc/lab.html?d=alf&c={l}",
   "labs": [
@@ -243,12 +246,18 @@ const MODS = {
    [
     "coag",
     "Coagulopathy"
+   ],
+   [
+    "hrs",
+    "Hepatorenal AKI"
+   ],
+   [
+    "inf",
+    "Infection vasoplegia"
    ]
   ]
  },
  "ahf": {
-  "map": "Acute heart failure map",
-  "def": "pe",
   "mf": "cc/map.html?d=ahf",
   "lf": "cc/lab.html?d=ahf&c={l}",
   "labs": [
@@ -263,12 +272,14 @@ const MODS = {
    [
     "aki",
     "AKI"
+   ],
+   [
+    "arr",
+    "Arrhythmia"
    ]
   ]
  },
  "tbi": {
-  "map": "Traumatic brain injury map",
-  "def": "icp",
   "mf": "cc/map.html?d=tbi",
   "lf": "cc/lab.html?d=tbi&c={l}",
   "labs": [
@@ -283,12 +294,18 @@ const MODS = {
    [
     "isch",
     "Ischemia"
+   ],
+   [
+    "coag",
+    "Coagulopathy"
+   ],
+   [
+    "npe",
+    "Neurogenic lung edema"
    ]
   ]
  },
  "status": {
-  "map": "Status epilepticus map",
-  "def": "hypox",
   "mf": "cc/map.html?d=status",
   "lf": "cc/lab.html?d=status&c={l}",
   "labs": [
@@ -303,12 +320,14 @@ const MODS = {
    [
     "rhabdo",
     "Rhabdomyolysis"
+   ],
+   [
+    "inj",
+    "Neuronal injury"
    ]
   ]
  },
  "dic": {
-  "map": "DIC map",
-  "def": "bleed",
   "mf": "cc/map.html?d=dic",
   "lf": "cc/lab.html?d=dic&c={l}",
   "labs": [
@@ -323,12 +342,20 @@ const MODS = {
    [
     "isch",
     "Organ ischemia"
+   ],
+   [
+    "aki",
+    "AKI"
+   ],
+   [
+    "purp",
+    "Purpura fulminans"
    ]
   ]
  }
 };
-const state = {id:"sepsis", tab:"map", lab:Object.fromEntries(Object.keys(MODS).map(k=>[k,MODS[k].def]))};
-const frame = document.getElementById("frame");
+const state = {id:"sepsis", lab:null};
+const frame = document.getElementById("frame"), labf = document.getElementById("lab");
 const $ = id => document.getElementById(id);
 
 /* Voice: one soft male voice, shared by every map and 3D lab through messages. */
@@ -360,12 +387,13 @@ $("voice").onclick = ()=>{
   if(VOICE.on) speak("Voice on.");
 };
 window.addEventListener("message", e=>{
-  if(e.source !== frame.contentWindow) return;
+  if(e.source !== frame.contentWindow && e.source !== labf.contentWindow) return;
   const d = e.data || {}, mod = MODS[state.id];
   if(d.vo) speak(d.vo, d.q);
-  if(d.lab && mod && mod.labs.some(l=>l[0]===d.lab)){ state.tab = "lab"; state.lab[state.id] = d.lab; render(); }
+  if(d.lab && mod && e.source === frame.contentWindow && mod.labs.some(l=>l[0]===d.lab)){ state.lab = d.lab; render(); }
 });
 
+const withV = u => u + (u.indexOf("?")<0?"?":"&") + "v=" + VER;
 function render(){
   const mod = MODS[state.id];
   document.querySelectorAll("#diseases button").forEach(b=>b.classList.toggle("on", b.dataset.id===state.id));
@@ -374,20 +402,20 @@ function render(){
   if(!mod){
     frame.removeAttribute("src");
     $("soon").textContent = TABS.find(t=>t[0]===state.id)[1]+" is being rebuilt.";
+    $("mapBack").hidden = true;
     return;
   }
-  $("mapTab").textContent = mod.map;
-  document.querySelectorAll("#subtabs button").forEach(b=>b.classList.toggle("on", b.dataset.t===state.tab));
-  $("labpick").hidden = state.tab !== "lab";
-  $("labpick").innerHTML = mod.labs.map(l=>"<button type='button' data-l='"+l[0]+"' class='"+(l[0]===state.lab[state.id]?"on":"")+"'>"+l[1]+"</button>").join("");
-  const base = state.tab==="map" ? mod.mf : mod.lf.replace("{l}", state.lab[state.id]);
-  const src = base+(base.indexOf("?")<0?"?":"&")+"v="+VER;
-  if(frame.getAttribute("src") !== src){ if(window.speechSynthesis) speechSynthesis.cancel(); frame.src = src; }
+  const mapSrc = withV(mod.mf);
+  if(frame.getAttribute("src") !== mapSrc){ if(window.speechSynthesis) speechSynthesis.cancel(); frame.src = mapSrc; }
+  frame.hidden = !!state.lab; labf.hidden = !state.lab; $("mapBack").hidden = !state.lab;
+  if(state.lab){
+    const ls = withV(mod.lf.replace("{l}", state.lab));
+    if(labf.getAttribute("src") !== ls){ if(window.speechSynthesis) speechSynthesis.cancel(); labf.src = ls; }
+  } else if(labf.getAttribute("src") !== "about:blank"){ labf.src = "about:blank"; }
 }
 $("diseases").innerHTML = TABS.map(t=>"<button type='button' data-id='"+t[0]+"'>"+t[1]+"</button>").join("");
-$("diseases").onclick = e=>{ const b=e.target.closest("[data-id]"); if(b){ state.id=b.dataset.id; render(); } };
-$("subtabs").onclick = e=>{ const b=e.target.closest("[data-t]"); if(b){ state.tab=b.dataset.t; render(); } };
-$("labpick").onclick = e=>{ const b=e.target.closest("[data-l]"); if(b){ state.lab[state.id]=b.dataset.l; render(); } };
+$("diseases").onclick = e=>{ const b=e.target.closest("[data-id]"); if(b){ if(state.id!==b.dataset.id) state.lab = null; state.id=b.dataset.id; render(); } };
+$("mapBack").onclick = ()=>{ state.lab = null; if(window.speechSynthesis) speechSynthesis.cancel(); render(); };
 const want = new URLSearchParams(location.search).get("d");
 if(want && TABS.some(t=>t[0]===want)) state.id = want;
 render();
