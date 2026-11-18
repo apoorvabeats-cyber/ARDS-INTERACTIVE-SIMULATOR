@@ -55,7 +55,7 @@ World switches (`world.js`): `W.pump` (efflux, filler `W.fillPump` when absent),
 - All weights are teaching values, not MICs. Real susceptibility is isolate-specific (AST, CLSI / EUCAST).
 
 ## Entrance (`microbiology.html`, file 1 step 1)
-`micro/organisms.js` holds 19 organisms in 6 groups (data plus a procedural three.js model for each: clusters, chains, lancet diplococci with capsule, rods with flagella and pili, spore-former, wall-less Mycoplasma, Chlamydia inclusion, Candida, Aspergillus conidiophore, mycobacterial cord). To add one: add a record to `O` and a builder to `MODEL`. Models are schematic; text is teaching content needing specialist review. The six module cards in the info panel (`MODS` in `microbiology.html`) link to the pages below with `?org=<id>`. Anatomy and Infection cover all 19 organisms. Antibiotic Laboratory, Resistance Explorer and the workstation cover six Gram-negatives only (pa, kp, ec, ab, en, sm); other organisms show "Not yet". The original Resistance Lab is still linked for pa, kp, ec and ab.
+`micro/organisms.js` holds 19 organisms in 6 groups (data plus a procedural three.js model for each: clusters, chains, lancet diplococci with capsule, rods with flagella and pili, spore-former, wall-less Mycoplasma, Chlamydia inclusion, Candida, Aspergillus conidiophore, mycobacterial cord). To add one: add a record to `O` and a builder to `MODEL`. Models are schematic; text is teaching content needing specialist review. The six module cards in the info panel (`MODS` in `microbiology.html`) link to the pages below with `?org=<id>`. Anatomy and Infection cover all 19 organisms. All six module cards now cover all 19 organisms. The original Resistance Lab is still linked for pa, kp, ec and ab.
 
 
 ## Microbiology Lab pages (file 1 steps 2 to 8)
@@ -77,8 +77,17 @@ Shared code: `micro/ui.css` (theme), `micro/common.js` (`MICRO.ui`: organism lis
 ### Workstation
 MIC = reference MIC divided by the modelled kill fraction, rounded to doubling dilutions with a seeded +/- 1 dilution jitter. Zone diameter is illustrative and derived from the MIC. Categories (S / I / R) use editable breakpoints from "Teaching set v1" (CLSI-style, illustrative). They are not CLSI or EUCAST values: verify against the current CLSI M100 or EUCAST table before any real use. The page states that a simulated organism's mechanism is a modelling input and that a real patient's mechanism must be confirmed by testing. The antibiogram is generated, not measured.
 
+### Organism coverage in the drug, resistance and workstation modules
+`ORGS` in `micro/pharm.js` now holds 19 organisms. Each has an envelope type (`env`: gn, gp, myco, wl, fungus), a horizontal scale (`sx`, so cocci are ovoid), a drug panel (`drugs`), a list of toggleable mechanisms (`mech`, used by `mechsFor`) and optional intrinsic resistance (`intr`, with text). New target classes (wall precursors, membrane, RNA polymerase, DNA, mycobacterial wall, ATP synthase, Cyp51, ergosterol, glucan synthase, flucytosine) map to five animation branches through `ANIM`. `killSteps(drug, org)` returns the kill-step text for the organism's envelope.
+
+To add an organism: add an `ORGS` record, any new `DRUGS` / `MECH` / `W` entries, then (workstation) `GRP`, `BASE`, `BPS.eucast`, `PROF`, `TYP`, `DEF3` and a `MEDIA` entry.
+
+### Breakpoints in the workstation
+Two sets. "EUCAST v16.1" holds values read from the EUCAST bacterial breakpoint tables (valid from 24 June 2026) and the antifungal tables v12.1 (valid from 10 April 2026) by an automated reader. Each row is tagged EUCAST or teaching; rows that were ambiguous, absent (anaerobes, colistin, some Gram-positive agents) or have no breakpoint are tagged teaching. They need checking against the source PDFs before any real use. EUCAST uses S <= and R >. CLSI M100 is not freely available and is not loaded; users can edit any value. Mycobacterium tuberculosis uses a WHO critical-concentration style (S or R only) with teaching values that were not verified. Mycoplasma, Legionella, Chlamydia and C. difficile have no clinical breakpoints; the page shows wild-type or non-wild-type against a teaching limit.
+
 ### Known gaps
-- No Gram-positive drug panels (MRSA PBP2a, VRE van operon), anaerobes, mycobacteria, atypicals or fungi in the drug, resistance or workstation modules.
+- Only C. albicans (not C. auris or C. glabrata) and A. fumigatus among fungi; no non-tuberculous mycobacteria.
 - Altered PBP in Gram-negatives is a hypothetical teaching mechanism.
-- All text and numbers are teaching content written without specialist review. They are not a clinical susceptibility prediction.
+- Leg. pneumophila and C. pneumoniae drug entry into host cells is described in text, not animated.
+- All text and numbers are teaching content written without specialist review. They are not a clinical susceptibility prediction, and MICs are generated, not measured.
 - Tested with software WebGL (desktop) and a 390 px emulated viewport; not tested on real phones.
