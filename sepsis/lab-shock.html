@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Septic shock: 3D circulation lab</title>
+<style>
+:root{--bg:#eef3f8;--ink:#0c1b2e;--mute:#546579;--panel:#fff;--line:#b9c8d8;--acc:#0a7f8f;--bad:#c0392b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#06111f;--ink:#e6f1fb;--mute:#8fa5bb;--panel:#0d2036;--line:#24435f;--acc:#3fe0f0;--bad:#ef5b52;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#06111f;--ink:#e6f1fb;--mute:#8fa5bb;--panel:#0d2036;--line:#24435f;--acc:#3fe0f0;--bad:#ef5b52;color-scheme:dark}
+html{background:var(--bg);scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Avenir Next","Segoe UI",Roboto,system-ui,sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px 14px 28px}
+h1{margin:0 0 10px;font-size:24px}
+#cv{position:relative;height:56vh;min-height:320px;border-radius:14px;overflow:hidden;background:#06111f;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+#lbl{position:absolute;left:12px;right:12px;bottom:10px;color:#e6f1fb;font-size:13px;line-height:1.35;text-shadow:0 1px 4px #000;pointer-events:none}
+#lbl b{display:block;font-size:15px}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+button{font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 12px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button[aria-pressed="true"]{border-color:var(--acc);color:var(--acc)}
+label{display:block;margin:12px 0 2px;color:var(--mute);font-size:13px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+.panel ul{margin:4px 0 0;padding-left:18px}.warn{color:var(--bad);font-weight:600}
+.hint{color:var(--mute);font-size:13px;margin:8px 0 0}
+</style></head><body><main>
+<h1>Septic shock: 3D circulation lab</h1>
+<div id="cv"><div id="lbl"></div></div>
+<div class="row" id="stages"></div>
+<label for="sev">Sepsis severity: <span id="v0"></span></label><input id="sev" type="range" min="0" max="100" value="60">
+<label for="fl">Fluid given: <span id="v1"></span> L</label><input id="fl" type="range" min="0" max="100" value="0">
+<div class="row" id="rx"></div>
+<div class="row" id="dz"></div><div class="panel" id="out"></div><div class="panel"><canvas id="sp" width="480" height="90" style="width:100%;height:90px" role="img" aria-label="Key outputs over simulated hours"></canvas><div class="hint" style="margin:2px 0 0"><span id="leg"></span> Hour <span id="hr">0</span>.</div></div><div class="panel" id="info">Tap any part of the 3D scene to inspect it.</div>
+<p class="hint">Drag to orbit. Scroll or pinch to zoom. Stage buttons fly you in.</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const calm=matchMedia('(prefers-reduced-motion:reduce)').matches;
+if(!window.THREE){$('#lbl').innerHTML='<b>3D engine could not load</b>Check your connection and reload.'}else{
+const V=(x,y,z)=>new THREE.Vector3(x,y,z),PI=Math.PI;
+const cv=$('#cv'),R=new THREE.WebGLRenderer({antialias:true});
+R.setPixelRatio(Math.min(devicePixelRatio,2));R.setClearColor(0x06111f);cv.prepend(R.domElement);
+const S=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,.01,400);
+S.add(new THREE.AmbientLight(0x8899bb,.9));cam.add(new THREE.PointLight(0xffffff,1.3,0));S.add(cam);
+const M=(c,o=.8,x={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,transparent:true,opacity:o,roughness:.45},x));
+const add=(m,p,par=S)=>{if(p)m.position.copy(p);par.add(m);return m};
+const CR=a=>new THREE.CatmullRomCurve3(a),tube=(c,r,m)=>new THREE.Mesh(new THREE.TubeGeometry(c,60,r,12,false),m);
+
+// circulation: aorta -> arteriole -> capillary -> vein
+const CA=CR([V(-.5,11.5,0),V(-.5,13.5,0),V(-2,14.6,0),V(-3,12,0),V(-3,6,0),V(-3,-2,0)]);
+const CB=CR([V(-3,-2,0),V(-2.5,-4,0),V(-1.2,-5.6,0),V(0,-6,0)]);
+const CC=CR([V(0,-6,0),V(.4,-6.6,.4),V(.8,-5.6,-.4),V(1.2,-6,0),V(1.6,-6.4,.3)]);
+const CD=CR([V(1.6,-6.4,0),V(2.5,-4,0),V(3,-2,0),V(3,4,0),V(3,9,0),V(1.2,10.2,0)]);
+const PATH=[CA,CB,CC,CD];PATH.forEach(c=>c.len=c.getLength());
+add(tube(CA,.55,M(0xe0405a,.5)));add(tube(CC,.12,M(0xe0405a,.6)));add(tube(CD,.6,M(0x4a7ae0,.45)));
+const heart=add(new THREE.Mesh(new THREE.SphereGeometry(1,28,20),M(0xc0392b,.85)),V(0,10,0));heart.scale.set(2,2.4,1.8);
+const ORG=[['brain',V(-1,17.5,0),1.0,[V(-2.2,14.4,0),V(-1.2,16.8,0)],20],['kidney',V(-6,4,0),.9,[V(-3,4,0),V(-5.3,4,0)],10],['gut',V(-6,-2,0),1.1,[V(-3,-1,0),V(-5.3,-1.6,0)],5]]
+ .map(([n,p,r,l,o])=>{add(tube(new THREE.LineCurve3(l[0],l[1]),.12,M(0xe0405a,.5)));return{n,o,m:add(new THREE.Mesh(new THREE.SphereGeometry(r,20,14),M(0x2ad4c0,.8)),p)}});
+let artM,artW;const vm=M(0xe0405a,.45),wm=M(0xf0a030,.28);
+function buildArt(r){[artM,artW].forEach(m=>{if(m){S.remove(m);m.geometry.dispose()}});artM=add(tube(CB,r,vm));artW=add(tube(CB,r+.08,wm))}
+
+// blood cells
+const N=300,bp=new Float32Array(N*3),bs=[],bt=[];
+for(let i=0;i<N;i++){bs.push(Math.floor(Math.random()*4));bt.push(Math.random())}
+const bg=new THREE.BufferGeometry();bg.setAttribute('position',new THREE.BufferAttribute(bp,3));
+const bpts=new THREE.Points(bg,new THREE.PointsMaterial({color:0xff6a7a,size:.2}));bpts.frustumCulled=false;S.add(bpts);
+// capillary leak and oedema
+const NL=90,lp=new Float32Array(NL*3),lt=[],ld=[],lc=[];
+for(let i=0;i<NL;i++){lt.push(Math.random());ld.push(V(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize());lc.push(Math.random())}
+const lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.BufferAttribute(lp,3));
+const lpts=new THREE.Points(lg,new THREE.PointsMaterial({color:0x4aa8ff,size:.1}));lpts.frustumCulled=false;S.add(lpts);
+
+// cell-level section (local x along the wall, endothelium at y=0, lumen above, smooth muscle below)
+const CG=V(5,-4,0),cell=new THREE.Group();cell.position.copy(CG);cell.scale.setScalar(.1);S.add(cell);
+const bx=(c,o,y)=>add(new THREE.Mesh(new THREE.BoxGeometry(1,1,1),M(c,o)),V(0,y,0),cell);
+const lum=bx(0xe0405a,.12,1.4);lum.scale.set(5,1.4,2);
+const eL=bx(0x2ad4c0,.6,0),eR=bx(0x2ad4c0,.6,0);
+const smc=add(new THREE.Mesh(new THREE.SphereGeometry(1,24,16),M(0x2ad4c0,.7)),V(0,-1.4,0),cell);
+const hair=[...Array(20)].map((_,i)=>{const g=new THREE.CylinderGeometry(.02,.02,1,6);g.translate(0,.5,0);return add(new THREE.Mesh(g,M(0xf0c040,.9)),V(-2.2+i*.23,.13,.3*Math.sin(i)),cell)});
+const rec=[...Array(7)].map((_,i)=>add(new THREE.Mesh(new THREE.SphereGeometry(.09,8,6),M(0x888888,1)),V(-1.5+i*.5,-.72,.7),cell));
+const rb=[...Array(5)].map(()=>{const m=add(new THREE.Mesh(new THREE.SphereGeometry(.2,12,10),M(0xe0405a,.95)),V(0,1.2,0),cell);m.scale.set(1,.5,1);return m});
+const NF=50,NN=60,cp=new Float32Array(NF*3),np=new Float32Array(NN*3),ct=[],nt=[],cx=[],nx=[];
+for(let i=0;i<NF;i++){ct.push(Math.random());cx.push(Math.random()*2-1)}
+for(let i=0;i<NN;i++){nt.push(Math.random());nx.push((Math.random()-.5)*3.6)}
+const mk=(arr,c,s)=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(arr,3));const p=new THREE.Points(g,new THREE.PointsMaterial({color:c,size:s}));p.frustumCulled=false;cell.add(p);return g};
+const cgf=mk(cp,0x4aa8ff,.012),cgn=mk(np,0xffffff,.012);
+
+// controls and model
+const ST=[
+['Circulation',V(0,5,0),34,null,null,'Heart, aorta, organs, arteriole, capillary bed and vein. Brain, kidney and gut turn magenta when underperfused.'],
+['Heart and aorta',V(-1,11,0),10,null,null,'Tachycardia and a falling stroke volume as the circulating volume drops.'],
+['Arteriole',V(-1.8,-4,0),4.5,null,null,'Vasoplegia: the arteriole dilates and stops responding to normal signals.'],
+['Capillary leak',V(.8,-6,0),3,null,null,'Plasma escapes through open junctions: relative hypovolaemia and tissue oedema.'],
+['Cell level',CG.clone().add(V(0,-.1,0)),.7,0,0,'Glycocalyx lost, endothelial junctions open, nitric oxide relaxes the smooth muscle.']];
+const RX=[['nor','Noradrenaline','alpha-1 constriction restores tone'],['vaso','Vasopressin','adds vasoconstriction'],['hc','Hydrocortisone','less leak, small pressor effect'],['dobu','Dobutamine','raises cardiac output'],['prop','Propofol bolus','vasodilation, hypotension (harms)']];
+let sev=.6,fl=0,rx={},stage=0,m={};
+function model(){
+ const L=sev*(rx.hc?.85:1),T=clamp(1-.42*sev+(rx.nor?.35:0)+(rx.vaso?.15:0)+(rx.hc?.06:0)-(rx.prop?.2:0),.15,1.5);
+ const vol=clamp(1-.3*L+.25*fl,.4,1.2),CO=5*vol*(rx.dobu?1.2:1),MAP=clamp(85*T*CO/5,20,140);
+ const lac=1+6*clamp((70-MAP)/45),ed=clamp(L*.8+fl*L*.8);
+ Object.assign(m,{L,T,CO,MAP,ed,sev});
+ buildArt(.2+.45*(1-clamp(T,.15,1)));
+ ORG.forEach(o=>{const pf=clamp((MAP-(80-o.o*2.5-0)+20-20)/20);o.pf=clamp((MAP-(75-o.o))/20);const c=new THREE.Color().setHSL((175+155*(1-o.pf))/360,.8,.5);o.m.material.color.copy(c);o.m.material.emissive.copy(c).multiplyScalar(.2)});
+ const on=RX.filter(d=>rx[d[0]]);
+ $('#out').innerHTML=`<span class="${MAP<65?'warn':''}">MAP ${Math.round(MAP)} mmHg</span>, CO ${CO.toFixed(1)} L/min, SVR ${Math.round(80*(MAP-8)/CO)}, <span class="${lac>2?'warn':''}">lactate ${lac.toFixed(1)} mmol/L</span>, tissue oedema ${Math.round(ed*100)}%`+(MAP<65?'<br><span class="warn">MAP below 65: organs are underperfused</span>':'')+(T>1.25?'<br><span class="warn">Excess vasoconstriction: gut and digital ischaemia risk</span>':'')+(fl>.6&&L>.4?'<br><span class="warn">Large fluid load with leak: oedema and lung injury</span>':'')+(on.length?'<ul>'+on.map(d=>`<li>${d[1]}: ${d[2]}</li>`).join('')+'</ul>':'');
+ $('#v0').textContent=Math.round(sev*100)+'%';$('#v1').textContent=(fl*3).toFixed(1);
+ document.querySelectorAll('[data-rx]').forEach(b=>b.setAttribute('aria-pressed',!!rx[b.dataset.rx]));
+ const g=.15+1.3*L;
+ eL.scale.set(2.4-g/2,.25,2);eL.position.x=-(2.4+g/2)/2-0;eR.scale.set(2.4-g/2,.25,2);eR.position.x=(2.4+g/2)/2;
+ hair.forEach(h=>{h.scale.y=.75*(1-L)+.04;h.visible=Math.abs(h.position.x)>g/2});
+ const rl=clamp(1-T);smc.scale.set(1.6+.8*rl,.9-.35*rl,1);
+ const sc=new THREE.Color().setHSL((175+120*rl)/360,.8,.5);smc.material.color.copy(sc);
+ rec.forEach(r=>r.material.color.set(rx.nor?0xff9030:0x888888));
+}
+const goal={t:V(0,5,0),r:34,y:null,p:null};let yaw=.5,pit=.15,rad=34,tgt=V(0,5,0);
+function go(i){stage=i;const s=ST[i];goal.t.copy(s[1]);goal.r=s[2];goal.y=s[3];goal.p=s[4];$('#lbl').innerHTML=`<b>${s[0]}</b>${s[5]}`;
+ document.querySelectorAll('[data-s]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.s===i))}
+$('#stages').innerHTML=ST.map((s,i)=>`<button data-s="${i}">${s[0]}</button>`).join('')+'<button data-next="1">Next stage</button>';
+$('#rx').innerHTML=RX.map(d=>`<button data-rx="${d[0]}" aria-pressed="false">${d[1]}</button>`).join('');
+$('#stages').addEventListener('click',ev=>{const b=ev.target.closest('button');if(b)go(b.dataset.next?(stage+1)%ST.length:+b.dataset.s)});
+$('#rx').addEventListener('click',ev=>{const b=ev.target.closest('[data-rx]');if(b){rx[b.dataset.rx]=!rx[b.dataset.rx];model()}});
+$('#sev').addEventListener('input',ev=>{sev=ev.target.value/100;model()});
+$('#fl').addEventListener('input',ev=>{fl=ev.target.value/100;model()});
+const ptr=new Map(),zoomBy=f=>{goal.r=clamp(goal.r*f,.3,110)};
+cv.addEventListener('pointerdown',ev=>{cv.setPointerCapture(ev.pointerId);ptr.set(ev.pointerId,[ev.clientX,ev.clientY])});
+cv.addEventListener('pointermove',ev=>{const o=ptr.get(ev.pointerId);if(!o)return;
+ if(ptr.size===1){goal.y=goal.p=null;yaw-=(ev.clientX-o[0])*.008;pit=clamp(pit+(ev.clientY-o[1])*.008,-1.3,1.3)}
+ else if(ptr.size===2){const q=[...ptr.entries()].find(([id])=>id!==ev.pointerId)[1];zoomBy(Math.hypot(o[0]-q[0],o[1]-q[1])/Math.hypot(ev.clientX-q[0],ev.clientY-q[1]))}
+ ptr.set(ev.pointerId,[ev.clientX,ev.clientY])});
+['pointerup','pointercancel'].forEach(t=>cv.addEventListener(t,ev=>ptr.delete(ev.pointerId)));
+cv.addEventListener('wheel',ev=>{ev.preventDefault();zoomBy(1+ev.deltaY*.001)},{passive:false});
+function fit(){const w=cv.clientWidth,h=cv.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+new ResizeObserver(fit).observe(cv);fit();
+
+const LAB={go:model,tg:rx,bg:'none',leg:'Teal: MAP. Amber: lactate.',
+key:()=>[[m.MAP,140,'#2ad4c0'],[1+6*clamp((70-m.MAP)/45),8,'#f0a030']],
+tag:()=>{heart.userData.k='heart';ORG.forEach(o=>o.m.userData.k='organ');smc.userData.k='smc';hair.forEach(h=>h.userData.k='glyco');S.traverse(o=>{if(o.isMesh&&o.geometry.type==='TubeGeometry'){const p=o.geometry.parameters.path;if(p===CB)o.userData.k='arteriole';else if(p===CC)o.userData.k='capillary'}})},
+dz:[['Early sepsis',.3,[],'Vasodilation starting; still compensated.'],['Septic shock',.65,[],'Untreated: hypotension and rising lactate.'],['Resuscitated',.65,['nor'],'Noradrenaline restores MAP.'],['Refractory',.9,['nor','vaso','hc'],'Needs stacked pressors and steroids.'],['Septic cardiomyopathy',.75,['nor','dobu'],'Low output state; inotrope added.'],['Sedation crash',.5,['prop'],'A propofol bolus drops the pressure.']],
+info:{heart:['Heart','Tachycardia compensates for falling stroke volume. Septic cardiomyopathy can cut output even after volume is restored.','Dobutamine if low output persists; avoid fluid overload.'],arteriole:['Arteriole','NO and blunted alpha-1 responsiveness cause vasoplegia, so pressure falls despite high output.','Noradrenaline, vasopressin, hydrocortisone. Propofol and other vasodilators worsen it.'],capillary:['Capillary','Glycocalyx shedding and open junctions leak plasma: relative hypovolaemia and oedema.','Balanced crystalloid in guided boluses; excess fluid worsens oedema.'],organ:['Organs','The brain autoregulates down to a lower MAP than kidney or gut, so the gut fails first.','Restore MAP, then reassess lactate and capillary refill.'],smc:['Smooth muscle cell','NO raises cGMP, which relaxes the cell and widens the arteriole.','Vasopressin acts on V1 receptors and bypasses the alpha-1 pathway.'],glyco:['Glycocalyx','A gel layer that holds plasma in the vessel; shed under cytokines and heparanase.','No proven drug protects it; fluid overload sheds more.']}};
+let tsev=sev,ramp=false,hr=0,hist=[],lh=0;const ray=new THREE.Raycaster(),dn=[0,0,0];
+$('#leg').textContent=LAB.leg;
+function spark(){const c=$('#sp'),g=c.getContext('2d'),w=c.width,h=c.height;g.clearRect(0,0,w,h);g.strokeStyle='#8886';g.beginPath();g.moveTo(0,h-1);g.lineTo(w,h-1);g.stroke();
+ [0,1].forEach(s=>{g.lineWidth=2;g.beginPath();hist.forEach((p,j)=>{g.strokeStyle=p[s][2];const x=j/79*w,y=h-4-(h-8)*clamp(p[s][0]/p[s][1]);j?g.lineTo(x,y):g.moveTo(x,y)});g.stroke()})}
+function step(dt){if(ramp&&Math.abs(sev-tsev)>.003){sev+=(tsev-sev)*(1-Math.exp(-dt*.5));$('#sev').value=Math.round(sev*100);LAB.go()}
+ if(!calm)hr+=dt*3;lh+=dt;if(lh>.5){lh=0;hist.push(LAB.key());if(hist.length>80)hist.shift();spark();$('#hr').textContent=Math.floor(hr)}}
+$('#dz').innerHTML=LAB.dz.map((d,i)=>`<button data-i="${i}" aria-pressed="false">${d[0]}</button>`).join('');
+$('#dz').addEventListener('click',ev=>{const b=ev.target.closest('[data-i]');if(!b)return;const d=LAB.dz[+b.dataset.i];
+ Object.keys(LAB.tg).forEach(x=>delete LAB.tg[x]);d[2].forEach(x=>LAB.tg[x]=true);tsev=d[1];sev=calm?tsev:0;ramp=!calm;hr=0;hist.length=0;
+ $('#sev').value=Math.round(sev*100);LAB.go();
+ document.querySelectorAll('#dz button').forEach(x=>x.setAttribute('aria-pressed',x===b));$('#info').innerHTML=`<strong>${d[0]}</strong><br>${d[3]}`});
+$('#sev').addEventListener('input',()=>{ramp=false});
+cv.addEventListener('pointerdown',ev=>{dn[0]=ev.clientX;dn[1]=ev.clientY;dn[2]=1});
+cv.addEventListener('pointerup',ev=>{if(!dn[2]||Math.hypot(ev.clientX-dn[0],ev.clientY-dn[1])>6)return;dn[2]=0;LAB.tag();const r=cv.getBoundingClientRect();
+ ray.setFromCamera({x:(ev.clientX-r.left)/r.width*2-1,y:-(ev.clientY-r.top)/r.height*2+1},cam);
+ const hs=ray.intersectObjects(S.children,true).filter(h=>h.object.isMesh&&h.object.visible&&h.object.userData.k),h=hs.find(x=>x.object.userData.k!==LAB.bg)||hs[0];
+ const i=h&&LAB.info[h.object.userData.k];if(!i)return;$('#info').innerHTML=`<strong>${i[0]}</strong><br>${i[1]}<br><em>Drugs and care:</em> ${i[2]}`});
+const VOD={lv:["Organ level", "Organ level", "Vessel level", "Capillary level", "Cell level"],ph:["Early sepsis. At organ level the circulation is compensated, with a fast heart rate and dilating vessels. At cellular level, bacterial toxins switch on immune cells, which release cytokines and nitric oxide.", "Sepsis with organ dysfunction. At organ level, blood pressure begins to sag and the kidneys and gut receive less flow. At cellular level, nitric oxide relaxes the arteriolar muscle and endothelial junctions begin to open.", "Septic shock. At organ level, pressure is low despite a fast heart, and lactate rises. At cellular level, the glycocalyx is shed, plasma leaks into the tissues, and the muscle no longer answers noradrenaline well.", "Severe shock with failing organs. At organ level, the brain, kidneys and gut are all under perfused. At cellular level, mitochondria cannot make enough energy, so lactate builds up and cells begin to die."]};
+const VOq=(t,q)=>{if(parent!==window)parent.postMessage({vo:t,q:!!q},'*')};
+const phase=()=>sev<.25?0:sev<.5?1:sev<.75?2:3;let lastPh=phase(),vt_=0;
+const plain=h=>h.replace(/<br>/g,'. ').replace(/<[^>]+>/g,'');
+$('#stages').addEventListener('click',()=>VOq(VOD.lv[stage]+'. '+ST[stage][0]+'. '+(ST[stage][5]||ST[stage][3])));
+document.querySelector('#rx,#drugs').addEventListener('click',ev=>{const b=ev.target.closest('[data-rx],[data-dg]');if(!b)return;const k=b.dataset.rx||b.dataset.dg,L=(typeof RX!=='undefined'?RX:DG).find(d=>d[0]===k);if(!L)return;
+ const w=[...$('#out').querySelectorAll('.warn')].map(e=>e.textContent).join('. ');VOq(L[1]+(LAB.tg[k]?' switched on. ':' switched off. ')+(L[3]||L[2])+'. '+w)});
+new MutationObserver(()=>VOq(plain($('#info').innerHTML))).observe($('#info'),{childList:true});
+$('#sev').addEventListener('input',()=>{clearTimeout(vt_);vt_=setTimeout(()=>{lastPh=phase();VOq(VOD.ph[lastPh])},700)});
+$('#dz').addEventListener('click',()=>{lastPh=-1;if(!ramp){lastPh=phase();VOq(VOD.ph[lastPh],true)}});
+setInterval(()=>{if(!ramp)return;const p=phase();if(p!==lastPh){lastPh=p;VOq(VOD.ph[p],true)}},400);
+const clock=new THREE.Clock();let ph=0;
+function tick(){
+ const dt=Math.min(clock.getDelta(),.05);step(dt);const k=calm?1:1-Math.exp(-dt*3);
+ tgt.lerp(goal.t,k);rad+=(goal.r-rad)*k;
+ if(goal.y!==null){yaw+=(goal.y-yaw)*k;pit+=(goal.p-pit)*k}
+ cam.position.set(tgt.x+rad*Math.sin(yaw)*Math.cos(pit),tgt.y+rad*Math.sin(pit),tgt.z+rad*Math.cos(yaw)*Math.cos(pit));cam.lookAt(tgt);
+ if(!calm)ph+=dt*(5+4*m.sev);const b=Math.sin(ph);
+ heart.scale.set(2*(1+.06*b),2.4*(1+.06*b),1.8);
+ const sp=3*m.CO/5;
+ for(let i=0;i<N;i++){if(!calm)bt[i]+=dt*sp/PATH[bs[i]].len*(bs[i]===1?1.3:1);
+  if(bt[i]>=1){bt[i]=0;bs[i]=(bs[i]+1)%4}
+  const p=PATH[bs[i]].getPointAt(bt[i]);bp[i*3]=p.x;bp[i*3+1]=p.y;bp[i*3+2]=p.z}
+ bg.attributes.position.needsUpdate=true;
+ const nl=Math.round(NL*m.L*1.1),cc=CC.getPointAt(.5);
+ for(let i=0;i<NL;i++){if(i>=nl){lp[i*3+1]=-1e4;continue}
+  if(!calm)lt[i]=(lt[i]+dt*.35)%1;const p=CC.getPointAt(lc[i]);const d=lt[i]*.9;
+  lp[i*3]=p.x+ld[i].x*d;lp[i*3+1]=p.y+ld[i].y*d;lp[i*3+2]=p.z+ld[i].z*d}
+ lg.attributes.position.needsUpdate=true;
+ const g=.15+1.3*m.L,nf=Math.round(NF*m.L*1.2),nn=Math.round(NN*m.sev);
+ for(let i=0;i<NF;i++){if(i>=nf){cp[i*3+1]=-1e4;continue}
+  if(!calm)ct[i]=(ct[i]+dt*.6)%1;cp[i*3]=cx[i]*g/2;cp[i*3+1]=1-2.2*ct[i];cp[i*3+2]=0}
+ cgf.attributes.position.needsUpdate=true;
+ for(let i=0;i<NN;i++){if(i>=nn){np[i*3+1]=-1e4;continue}
+  if(!calm)nt[i]=(nt[i]+dt*.5)%1;np[i*3]=nx[i];np[i*3+1]=-.15-1.1*nt[i];np[i*3+2]=0}
+ cgn.attributes.position.needsUpdate=true;
+ rb.forEach((r,i)=>{r.position.x=(((calm?0:ph*.08)*(m.CO/5)+i/5)%1)*5-2.5});
+ R.render(S,cam);requestAnimationFrame(tick)}
+model();go(0);tick();
+}
+</script></body></html>
