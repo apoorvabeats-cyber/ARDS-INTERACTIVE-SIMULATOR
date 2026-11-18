@@ -57,7 +57,27 @@
   };
 
   audio.volume = 0.48;
+  audio.load();
   skipButton.addEventListener("click", loadApp);
+
+  let audioCtx = null;
+  let wired = false;
+  const armScore = () => {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) {
+      if (!audioCtx) audioCtx = new Ctx();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      if (!wired) {
+        try {
+          audioCtx.createMediaElementSource(audio).connect(audioCtx.destination);
+          wired = true;
+        } catch (err) {}
+      }
+    }
+    audio.muted = false;
+    audio.volume = 0.48;
+    return audio.play();
+  };
 
   const legal1 = document.getElementById("legal-1");
   const legal2 = document.getElementById("legal-2");
@@ -74,16 +94,16 @@
   const showBrand = () => {
     if (branded || go.disabled) return;
     branded = true;
-    const pending = audio.play();
+    const pending = armScore();
     startup.classList.add("is-brand");
     legal1.hidden = true;
     legal2.hidden = true;
     if (!animations.length) animations.push(...logo.getAnimations({ subtree: true }));
     brandAt = performance.now();
-    musicButton.hidden = false;
+    musicButton.hidden = true;
     skipButton.hidden = true;
     if (pending && pending.then) {
-      pending.then(() => { if (!audio.paused) musicButton.hidden = true; }).catch(() => { musicButton.hidden = false; });
+      pending.then(() => { musicButton.hidden = !audio.paused; }).catch(() => { musicButton.hidden = false; });
     }
     if (reducedMotion) window.setTimeout(loadApp, 400);
     else window.requestAnimationFrame(syncIntro);
@@ -91,8 +111,11 @@
   go.addEventListener("click", showBrand);
   musicButton.addEventListener("click", () => {
     brandAt = performance.now();
-    try { audio.currentTime = 0; } catch (err) {}
-    startMusic();
+    try { if (audio.paused) audio.currentTime = 0; } catch (err) {}
+    const pending = armScore();
+    if (pending && pending.then) {
+      pending.then(() => { musicButton.hidden = !audio.paused; }).catch(() => { musicButton.hidden = false; });
+    }
   });
   window.setTimeout(() => {
     legal1.hidden = true;
