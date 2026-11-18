@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Microbiology Lab · Bacterial anatomy explorer</title>
 <meta name="description" content="Rotate a cutaway 3D cell for 19 organisms, tap capsule, wall, membrane, ribosome, DNA, plasmid, porin, pump, flagella and pili, and zoom to the molecular envelope.">
-<link rel="stylesheet" href="micro/ui.css?v=20261119d">
+<link rel="stylesheet" href="micro/ui.css?v=20261119e">
 <style>
 .pills{margin:8px 0 0}
 .pill i.d{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--acc);margin-right:7px}
@@ -12,7 +12,7 @@
 .absent{border-left:3px solid var(--warn);padding-left:10px;color:#ffe3a3}
 </style></head>
 <body><main>
-<div class="top"><a href="index.html">← Hall</a><a href="microbiology.html?v=20261119d" id="toOrg">← Organisms</a><span class="sp"></span><span class="badge">Microbiology Lab · Bacterial anatomy</span></div>
+<div class="top"><a href="index.html">← Hall</a><a href="microbiology.html?v=20261119e" id="toOrg">← Organisms</a><span class="sp"></span><span class="badge">Microbiology Lab · Bacterial anatomy</span></div>
 <h1 id="h1">Bacterial anatomy</h1>
 <p class="sub">Tap a structure to zoom and see what it does</p>
 <div class="wrap">
@@ -30,13 +30,15 @@
 <p class="foot">Schematic teaching models, not to scale. Structures marked "not present" are shown so you can see why a drug that needs them does or does not work. Content is educational.</p>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="micro/organisms.js?v=20261119d"></script>
-<script src="micro/anatomy.js?v=20261119d"></script>
-<script src="micro/common.js?v=20261119d"></script>
+<script src="micro/organisms.js?v=20261119e"></script>
+<script src="micro/anatomy.js?v=20261119e"></script>
+<script src="micro/common.js?v=20261119e"></script>
+<script src="micro/voice.js?v=20261119e"></script>
 <script>
 (function(){
 'use strict';
 const $=id=>document.getElementById(id),U=MICRO.ui,esc=U.esc,A=MICRO.anat,O=MICRO.orgs;
+const Vc=MICRO.voice;Vc.mount();
 const mark=U.orgList($('list'),id=>pick(id));
 const S=U.stage($('cv'),{clip:true,dist:12,auto:false,min:2.5,max:26,onTap:tap});
 let org=null,view='whole',cur=null,sel=null,cut=true,tSel=0,spins=[];
@@ -65,6 +67,7 @@ function select(id,fromTap){
   const present=view==='env'||p.present;
   $('info').innerHTML='<p class="k">'+(view==='whole'?'Whole cell':'Envelope close-up')+'</p><h2>'+esc(p.name)+'</h2>'+
    (present?'<h3>What it does</h3><p>'+esc(p.func)+'</p><h3>Why it matters for drugs</h3><p>'+esc(p.drug)+'</p>'+(p.note?'<p class="note">'+esc(p.note)+'</p>':''):'<p class="absent">'+esc(p.absent)+'</p><h3>For reference</h3><p>'+esc(p.func)+'</p>');
+  Vc.say(present?p.name+'. '+p.func:p.name+' is not present in this organism. '+p.absent);
   if(S&&present){const a=p.anchor.clone();S.st.auto=false;S.focus(a,p.dist);const l=$('lab');l.textContent=p.name;l.dataset.x=a.x;l.dataset.y=a.y;l.dataset.z=a.z;l.style.opacity=1;}
   else if(S){S.focus(new THREE.Vector3(),view==='whole'?Math.max(10,cur.size*1.75):11);$('lab').style.opacity=0;}
 }
@@ -85,9 +88,9 @@ if(S)S.onFrame((t,dt)=>{
 function pick(id){
   org=id;mark(id);const o=O.byId(id);$('h1').innerHTML='Bacterial anatomy · <i>'+esc(o.short)+'</i>';$('orgname').innerHTML='<b><i>'+esc(o.short)+'</i></b>';$('lab').style.opacity=0;
   try{history.replaceState(null,'','?org='+id+(view==='env'?'&view=env':''));}catch(e){}
-  $('toOrg').href='microbiology.html?org='+id+'&v=20261119d';build();
+  $('toOrg').href='microbiology.html?org='+id+'&v=20261119e';build();Vc.say('Bacterial anatomy of '+o.name+'. Tap any structure in the model, or choose one from the buttons below, to hear its name and what it does.');
 }
-function setView(v){view=v;$('vWhole').setAttribute('aria-pressed',v==='whole');$('vEnv').setAttribute('aria-pressed',v==='env');$('lab').style.opacity=0;build();}
+function setView(v){view=v;Vc.say(v==='env'?'Molecular close-up of the envelope. Tap a protein or a layer to hear what it does.':'Whole cell cutaway. Tap a structure to hear what it does.');$('vWhole').setAttribute('aria-pressed',v==='whole');$('vEnv').setAttribute('aria-pressed',v==='env');$('lab').style.opacity=0;build();}
 $('vWhole').onclick=()=>setView('whole');$('vEnv').onclick=()=>setView('env');
 $('bCut').onclick=e=>{cut=!cut;e.currentTarget.setAttribute('aria-pressed',cut);if(cur)cur.clipMats.forEach(m=>{m.clippingPlanes=cut?[cur.plane]:[];m.needsUpdate=true;});};
 $('bRot').onclick=e=>{if(!S)return;S.st.auto=!S.st.auto;e.currentTarget.setAttribute('aria-pressed',S.st.auto);};

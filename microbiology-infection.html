@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Microbiology Lab · Infection simulator</title>
 <meta name="description" content="Watch an organism-specific 3D infection of a host cell in seven stages: adherence, colonisation, invasion, toxin production, immune evasion, cell injury and inflammation.">
-<link rel="stylesheet" href="micro/ui.css?v=20261119d">
+<link rel="stylesheet" href="micro/ui.css?v=20261119e">
 <style>
 .stg{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
 .stg .pill{font-size:12.5px;padding:6px 11px;min-height:34px}
@@ -19,7 +19,7 @@
 .tag{position:absolute;left:0;top:0;pointer-events:none;font-size:12px;color:#04201f;background:var(--acc);border-radius:999px;padding:3px 10px;font-weight:600;white-space:nowrap;transform:translate(-50%,-140%)}
 </style></head>
 <body><main>
-<div class="top"><a href="index.html">← Hall</a><a href="microbiology.html?v=20261119d" id="toOrg">← Organisms</a><span class="sp"></span><span class="badge">Microbiology Lab · Infection simulator</span></div>
+<div class="top"><a href="index.html">← Hall</a><a href="microbiology.html?v=20261119e" id="toOrg">← Organisms</a><span class="sp"></span><span class="badge">Microbiology Lab · Infection simulator</span></div>
 <h1 id="h1">Infection simulator</h1>
 <p class="sub">One bacterium · one host cell · one infection mechanism</p>
 <div class="wrap">
@@ -40,48 +40,51 @@
 <p class="foot">Schematic teaching animation of the typical pathogenic sequence for each organism; individual strains and sites differ. Host cell, toxins and immune cells are simplified and not to scale. Educational content, not clinical guidance.</p>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="micro/organisms.js?v=20261119d"></script>
-<script src="micro/infection.js?v=20261119d"></script>
-<script src="micro/common.js?v=20261119d"></script>
+<script src="micro/organisms.js?v=20261119e"></script>
+<script src="micro/infection.js?v=20261119e"></script>
+<script src="micro/common.js?v=20261119e"></script>
+<script src="micro/voice.js?v=20261119e"></script>
 <script>
 (function(){
 'use strict';
 const $=id=>document.getElementById(id),U=MICRO.ui,esc=U.esc,I=MICRO.inf,O=MICRO.orgs;
 const mark=U.orgList($('list'),id=>pick(id));
-const S=U.stage($('cv'),{dist:14,auto:false,min:5,max:30,pitch:.38,yaw:.35});
+const S=U.stage($('cv'),{dist:17,auto:false,min:5,max:30,pitch:.38,yaw:.35});
+const Vc=MICRO.voice;Vc.mount();let narr=false;
+const FIX_T=new THREE.Vector3(0,.5,-.3),FIX_D=17; /* one fixed framing for the whole video: the camera never moves by itself */
 if(!S){$('cv').style.display='none';}
 let sim=null,org=null,t=0,playing=false,speed=1,lastSt=-1;
 function fmt(x){x=Math.max(0,x);return Math.floor(x/60)+':'+String(Math.floor(x%60)).padStart(2,'0');}
 $('stg').innerHTML=I.STAGES.map((s,i)=>'<button class="pill" data-i="'+i+'" aria-pressed="false">'+(i+1)+' '+s+'</button>').join('');
 function pick(id){
   org=id;mark(id);const o=O.byId(id);$('h1').innerHTML='Infection simulator · <i>'+esc(o.short)+'</i>';$('orgname').innerHTML='<b><i>'+esc(o.short)+'</i></b>';
-  if(sim)sim.dispose();sim=S?I.Sim(id,S.scene):null;t=0;playing=false;lastSt=-1;
+  if(sim)sim.dispose();sim=S?I.Sim(id,S.scene):null;t=0;playing=false;lastSt=-1;narr=false;if(S)S.focus(FIX_T,FIX_D);Vc.say('Infection simulator for '+o.name+'. Press start to watch it infect a host cell. The camera stays fixed, and a soft voice explains each of the seven stages as they play.');
   const tx=I.TXT[id];$('info').innerHTML='<p class="k">Infection sequence</p><h2><i>'+esc(o.name)+'</i></h2><ul class="steps" id="steps">'+I.STAGES.map((s,i)=>'<li data-i="'+i+'"><b>'+(i+1)+'. '+s+'</b>'+esc(tx[i])+'</li>').join('')+'</ul>';
   $('startTxt').textContent='Press start to watch '+o.short+' infect a host cell. Each stage is specific to this organism.';$('startbox').hidden=false;
-  try{history.replaceState(null,'','?org='+id);}catch(e){}$('toOrg').href='microbiology.html?org='+id+'&v=20261119d';
+  try{history.replaceState(null,'','?org='+id);}catch(e){}$('toOrg').href='microbiology.html?org='+id+'&v=20261119e';
   apply();
 }
 function apply(){
   if(!sim)return;const r=sim.update(t),st=r.stage;
-  if(st!==lastSt){lastSt=st;const f=sim.focus(st);if(playing||t>0)S.focus(f[0],f[1]);document.querySelectorAll('#stg .pill').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.i===st));document.querySelectorAll('#steps li').forEach(l=>{l.classList.toggle('on',+l.dataset.i===st);if(+l.dataset.i===st&&l.scrollIntoView&&playing)l.scrollIntoView({block:'nearest'});});
+  if(st!==lastSt){lastSt=st;if(narr)Vc.say(I.STAGES[st]+'. '+I.TXT[org][st]);document.querySelectorAll('#stg .pill').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.i===st));document.querySelectorAll('#steps li').forEach(l=>{l.classList.toggle('on',+l.dataset.i===st);if(+l.dataset.i===st&&l.scrollIntoView&&playing)l.scrollIntoView({block:'nearest'});});
     $('capT').textContent=(st+1)+'. '+I.STAGES[st];$('capX').textContent=I.TXT[org][st];}
   const tag=$('tag');tag.hidden=!(r.label&&(t>0));if(!tag.hidden){tag.textContent=r.label.text;tag._p=r.label.pos;}
   $('scrub').value=Math.round(t/I.DUR*1000);$('time').textContent=fmt(t)+' / '+fmt(I.DUR);
 }
 if(S)S.onFrame((tt,dt)=>{
-  if(playing&&sim){t+=dt*speed;if(t>=I.DUR){t=I.DUR-.001;playing=false;$('play').textContent='Play';}apply();}
+  if(playing&&sim){let nt=t+dt*speed;const cs=Math.floor(t/I.D),ns=Math.floor(nt/I.D);if(Vc.busy()&&ns>cs&&cs<I.NST-1)nt=(cs+1)*I.D-.001;t=nt;if(t>=I.DUR){t=I.DUR-.001;playing=false;$('play').textContent='Play';}apply();}
   const tag=$('tag');if(!tag.hidden&&tag._p){const v=tag._p.clone().project(S.cam),w=$('stage');tag.style.left=((v.x+1)/2*w.clientWidth)+'px';tag.style.top=((1-v.y)/2*w.clientHeight)+'px';}
 });
-$('start').onclick=()=>{$('startbox').hidden=true;t=0;playing=true;$('play').textContent='Pause';lastSt=-1;S&&S.focus(...sim.focus(0));apply();};
-$('play').onclick=()=>{if(t>=I.DUR-.01){t=0;lastSt=-1;}playing=!playing;$('startbox').hidden=true;$('play').textContent=playing?'Pause':'Play';};
-$('replay').onclick=()=>{t=0;lastSt=-1;playing=true;$('startbox').hidden=true;$('play').textContent='Pause';};
-$('scrub').oninput=e=>{t=+e.target.value/1000*I.DUR;playing=false;$('play').textContent='Play';$('startbox').hidden=true;lastSt=-1;apply();};
+$('start').onclick=()=>{$('startbox').hidden=true;t=0;playing=true;narr=true;$('play').textContent='Pause';lastSt=-1;apply();};
+$('play').onclick=()=>{if(t>=I.DUR-.01){t=0;}playing=!playing;narr=true;lastSt=-1;$('startbox').hidden=true;$('play').textContent=playing?'Pause':'Play';if(playing)apply();else Vc.stop();};
+$('replay').onclick=()=>{t=0;lastSt=-1;playing=true;narr=true;$('startbox').hidden=true;$('play').textContent='Pause';};
+$('scrub').oninput=e=>{Vc.stop();narr=false;t=+e.target.value/1000*I.DUR;playing=false;$('play').textContent='Play';$('startbox').hidden=true;lastSt=-1;apply();};
 $('speed').onclick=e=>{const b=e.target.closest('.pill');if(!b)return;speed=+b.dataset.v;document.querySelectorAll('#speed .pill').forEach(x=>x.setAttribute('aria-pressed',x===b));};
-$('stg').onclick=e=>{const b=e.target.closest('.pill');if(!b)return;t=+b.dataset.i*I.D+.05;playing=false;$('play').textContent='Play';$('startbox').hidden=true;lastSt=-1;apply();};
-$('info').onclick=e=>{const l=e.target.closest('li[data-i]');if(!l)return;t=+l.dataset.i*I.D+.05;playing=false;$('play').textContent='Play';$('startbox').hidden=true;lastSt=-1;apply();};
+$('stg').onclick=e=>{const b=e.target.closest('.pill');if(!b)return;narr=true;t=+b.dataset.i*I.D+.05;playing=false;$('play').textContent='Play';$('startbox').hidden=true;lastSt=-1;apply();};
+$('info').onclick=e=>{const l=e.target.closest('li[data-i]');if(!l)return;narr=true;t=+l.dataset.i*I.D+.05;playing=false;$('play').textContent='Play';$('startbox').hidden=true;lastSt=-1;apply();};
 const q=new URLSearchParams(location.search);pick(O.byId(q.get('org'))?q.get('org'):'pa');
 if(q.get('t')){t=parseFloat(q.get('t'));$('startbox').hidden=true;lastSt=-1;apply();}
-window.__inf={set(x){t=x;playing=false;$('startbox').hidden=true;lastSt=-1;apply();},pick};
+window.__inf={get t(){return t;},get cam(){const c=S&&S.cam;return c?[c.position.x,c.position.y,c.position.z]:null;},set(x){t=x;playing=false;$('startbox').hidden=true;lastSt=-1;apply();},pick};
 })();
 </script>
 </body></html>

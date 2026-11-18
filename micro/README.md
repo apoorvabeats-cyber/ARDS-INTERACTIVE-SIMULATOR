@@ -85,6 +85,13 @@ To add an organism: add an `ORGS` record, any new `DRUGS` / `MECH` / `W` entries
 ### Breakpoints in the workstation
 Two sets. "EUCAST v16.1" holds values read from the EUCAST bacterial breakpoint tables (valid from 24 June 2026) and the antifungal tables v12.1 (valid from 10 April 2026) by an automated reader. Each row is tagged EUCAST or teaching; rows that were ambiguous, absent (anaerobes, colistin, some Gram-positive agents) or have no breakpoint are tagged teaching. They need checking against the source PDFs before any real use. EUCAST uses S <= and R >. CLSI M100 is not freely available and is not loaded; users can edit any value. Mycobacterium tuberculosis uses a WHO critical-concentration style (S or R only) with teaching values that were not verified. Mycoplasma, Legionella, Chlamydia and C. difficile have no clinical breakpoints; the page shows wild-type or non-wild-type against a teaching limit.
 
+### Voice-over (`micro/voice.js`)
+`MICRO.voice` reads the selected module aloud with the browser's own speech synthesis (no audio files). It prefers a male English voice (en-IN, then en-GB, then en-US), rate 0.9, pitch 0.82, volume 0.8, and speaks in sentence-sized chunks. `mount()` adds "Voice on/off", "Hear again" and a voice picker to the page's `.top` bar; the choice is kept in localStorage. Pages call `say(text)` when the user picks an organism, structure, stage, drug, mechanism, case or tab. Anatomy: tapping a structure says its name and function. Infection and horizontal gene transfer: each step is narrated and the clock waits at a step boundary until the sentence ends (`busy()`), so narration is not cut off. Pause, scrub, tab change and leaving the page stop speech.
+Limits: which voices exist depends on the device (a male voice cannot be guaranteed; the picker lets the user choose); some browsers block speech until the first tap, in which case the text plays on the first tap; the voice quality was not listened to in testing, only the calls were checked with a mocked speech engine. The older Resistance Lab (`microbiology-lab.html`) keeps its own voice-over.
+
+### Camera in the infection simulator
+The camera is fixed for the whole video (one framing set when the organism is picked). Stage changes, scrubbing and the stage buttons no longer move it; the user can still orbit and zoom, and that view is kept. Earlier versions re-aimed the camera at each stage, which made the scene appear to drift.
+
 ### Known gaps
 - Only C. albicans (not C. auris or C. glabrata) and A. fumigatus among fungi; no non-tuberculous mycobacteria.
 - Altered PBP in Gram-negatives is a hypothetical teaching mechanism.

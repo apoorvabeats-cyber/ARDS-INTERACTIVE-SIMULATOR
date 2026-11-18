@@ -86,7 +86,8 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--acc2);outline-offse
 <p class="foot">Schematic models for teaching: shapes are simplified and not to scale, and the content is educational, not a substitute for local microbiology guidance or an isolate's susceptibility report (CLSI / EUCAST). Drag to orbit, scroll or pinch to zoom.</p>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="micro/organisms.js?v=20261119d"></script>
+<script src="micro/organisms.js?v=20261119e"></script>
+<script src="micro/voice.js?v=20261119e"></script>
 <script>
 (function(){
 'use strict';
@@ -144,7 +145,7 @@ else{
   $('bReset').onclick=()=>{st.tYaw=st.yaw%(Math.PI*2);st.tPitch=.15;st.tgtDist=11;};
 }
 /* ---------- info panel ---------- */
-const V='&v=20261119d',CASE1={pa:3,kp:2,ec:4,ab:1,en:5,sm:8,sa:10,mrsa:10,ef:11,vre:11,sp:12,cd:14,bf:15,mp:20,lp:21,ca:16,af:18,tb:19};
+const V='&v=20261119e',CASE1={pa:3,kp:2,ec:4,ab:1,en:5,sm:8,sa:10,mrsa:10,ef:11,vre:11,sp:12,cd:14,bf:15,mp:20,lp:21,ca:16,af:18,tb:19};
 const MODS=[
  {n:'Bacterial Anatomy',d:'Capsule, wall, membranes, ribosomes, DNA, plasmids, porins, pumps, flagella, pili',href:o=>'microbiology-anatomy.html?org='+o.id},
  {n:'Infection Mechanism',d:'Adherence, colonisation, invasion, toxins, immune evasion, inflammation',href:o=>'microbiology-infection.html?org='+o.id},
@@ -160,21 +161,24 @@ function info(o){
    +'<h3>Resistance themes</h3><ul>'+o.res.map(f=>'<li>'+esc(f)+'</li>').join('')+'</ul>'
    +'<h3>Structures in the model</h3><div class="chips">'+o.show.map(f=>'<span>'+esc(f)+'</span>').join('')+'</div>'
    +'<div class="mods"><h3>Modules</h3>'+MODS.map(m=>'<a class="mod" href="'+m.href(o)+V+'"><div style="flex:1"><b>'+m.n+'</b><span>'+m.d+'</span></div><span class="st">Open</span></a>').join('')
-   +(lab?'<a class="mod" href="microbiology-lab.html?org='+o.lab+'&v=20261119d"><div style="flex:1"><b>Full Resistance Lab</b><span>The original detailed pathway lab, with NDM and other experiments</span></div><span class="st">Open</span></a>':'')
+   +(lab?'<a class="mod" href="microbiology-lab.html?org='+o.lab+'&v=20261119e"><div style="flex:1"><b>Full Resistance Lab</b><span>The original detailed pathway lab, with NDM and other experiments</span></div><span class="st">Open</span></a>':'')
    +'</div>';
 }
-function select(id,push){
+const Vc=MICRO.voice;
+function speakOrg(o){const g=O.GROUPS.find(x=>x.id===o.g);Vc.say(o.name+'. '+g.name+'. '+o.desc+' Below are the six modules you can open for this organism: anatomy, infection, antibiotics, resistance, susceptibility testing and clinical cases.');}
+function select(id,push,speak){
   const o=O.byId(id)||O.LIST[0];curId=o.id;
   document.querySelectorAll('.org').forEach(b=>b.setAttribute('aria-pressed',b.dataset.id===o.id));
   $('orgname').innerHTML='<b><i>'+esc(o.short)+'</i></b>';
-  info(o);if(R){window.__show(o.id);window.__resetView&&0;}
+  info(o);if(R){window.__show(o.id);window.__resetView&&0;}if(speak)speakOrg(o);
   try{history.replaceState(null,'','?org='+o.id);}catch(e){}
 }
-$('list').addEventListener('click',e=>{const b=e.target.closest('.org');if(!b)return;select(b.dataset.id);});
-function step(d){const i=O.LIST.findIndex(o=>o.id===curId);select(O.LIST[(i+d+O.LIST.length)%O.LIST.length].id);const b=document.querySelector('.org[aria-pressed="true"]');if(b&&b.scrollIntoView)b.scrollIntoView({block:'nearest',inline:'nearest'});}
+$('list').addEventListener('click',e=>{const b=e.target.closest('.org');if(!b)return;select(b.dataset.id,0,true);});
+function step(d){const i=O.LIST.findIndex(o=>o.id===curId);select(O.LIST[(i+d+O.LIST.length)%O.LIST.length].id,0,true);const b=document.querySelector('.org[aria-pressed="true"]');if(b&&b.scrollIntoView)b.scrollIntoView({block:'nearest',inline:'nearest'});}
 $('bPrev').onclick=()=>step(-1);$('bNext').onclick=()=>step(1);
 document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='ArrowDown')step(1);else if(e.key==='ArrowLeft'||e.key==='ArrowUp')step(-1);});
-select(new URLSearchParams(location.search).get('org')||'pa');
+Vc.mount();const qo=new URLSearchParams(location.search).get('org');select(qo||'pa');
+if(!qo)Vc.say('Welcome to the microbiology laboratory. Nineteen organisms, each with its own three D model. Tap an organism to hear about it, then choose a module to explore.');
 })();
 </script>
 </body></html>

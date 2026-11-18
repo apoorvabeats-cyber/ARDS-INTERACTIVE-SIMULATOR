@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Microbiology Lab · Resistance mechanism explorer</title>
 <meta name="description" content="Explore six antibiotic resistance mechanisms in 3D (enzymatic destruction, target modification, reduced permeability, efflux, metabolic bypass, target protection) and watch horizontal gene transfer by conjugation, transformation and transduction.">
-<link rel="stylesheet" href="micro/ui.css?v=20261119d">
+<link rel="stylesheet" href="micro/ui.css?v=20261119e">
 <style>.wrap{grid-template-columns:200px minmax(0,1fr) 330px}@media (max-width:1100px){.wrap{grid-template-columns:200px minmax(0,1fr)}}@media (max-width:760px){.wrap{grid-template-columns:1fr}}
 .bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:3px}.bar i{display:block;height:100%;background:var(--acc)}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.tabs a.pill{text-decoration:none;display:inline-flex;align-items:center}
@@ -11,13 +11,13 @@
 .hcap{position:absolute;left:0;right:0;bottom:0;padding:34px 14px 12px;background:linear-gradient(transparent,rgba(3,9,16,.9) 55%);pointer-events:none;font-size:13.5px}
 .hcap b{display:block;color:var(--acc);font-size:12px;letter-spacing:.1em;text-transform:uppercase}</style></head>
 <body><main>
-<div class="top"><a href="index.html">← Hall</a><a href="microbiology.html?v=20261119d" id="toOrg">← Organisms</a><span class="sp"></span><span class="badge">Microbiology Lab · Resistance explorer</span></div>
+<div class="top"><a href="index.html">← Hall</a><a href="microbiology.html?v=20261119e" id="toOrg">← Organisms</a><span class="sp"></span><span class="badge">Microbiology Lab · Resistance explorer</span></div>
 <h1 id="h1">Resistance mechanism explorer</h1>
 <p class="sub">Six ways bacteria defeat antibiotics, and how the genes spread</p>
 <div class="wrap">
   <nav class="list" id="list" aria-label="Organisms"></nav>
   <section class="center">
-    <div class="tabs"><button class="tab" id="tMech" aria-pressed="true">Six mechanisms</button><button class="tab" id="tHgt" aria-pressed="false">Horizontal gene transfer</button><a class="pill" id="toLab" href="microbiology-lab.html?v=20261119d">Full molecular Resistance Lab (tick and combine) →</a></div>
+    <div class="tabs"><button class="tab" id="tMech" aria-pressed="true">Six mechanisms</button><button class="tab" id="tHgt" aria-pressed="false">Horizontal gene transfer</button><a class="pill" id="toLab" href="microbiology-lab.html?v=20261119e">Full molecular Resistance Lab (tick and combine) →</a></div>
     <div id="vMech">
       <div class="panelbox" style="padding:10px 12px"><div class="note" style="margin:0 0 6px">Mechanism type</div><div class="chips" id="cats" role="group"></div><div class="note" style="margin:8px 0 6px">Specific mechanism</div><div class="chips" id="mechs" role="group"></div><div class="note" style="margin:8px 0 6px">Antibiotic affected</div><div class="chips" id="drugs" role="group"></div></div>
       <div class="pgrid" id="pgrid" style="margin-top:10px"><canvas id="cv" aria-label="Control and mechanism"></canvas>
@@ -37,10 +37,11 @@
 <p class="foot">Illustrative teaching model, not a clinical susceptibility prediction. A mechanism being present in a bacterium does not by itself predict the antibiogram: this depends on expression, the isolate's other mechanisms and the drug. Educational content.</p>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="micro/organisms.js?v=20261119d"></script>
-<script src="micro/pharm.js?v=20261119d"></script>
-<script src="micro/hgt.js?v=20261119d"></script>
-<script src="micro/common.js?v=20261119d"></script>
+<script src="micro/organisms.js?v=20261119e"></script>
+<script src="micro/pharm.js?v=20261119e"></script>
+<script src="micro/hgt.js?v=20261119e"></script>
+<script src="micro/common.js?v=20261119e"></script>
+<script src="micro/voice.js?v=20261119e"></script>
 <script>
 (function(){
 'use strict';
@@ -57,6 +58,7 @@ function drawChips(){
   const ms=mechsInCat(cat);$('mechs').innerHTML=ms.map(m=>'<button class="pill" data-m="'+m+'" aria-pressed="'+(m===mech)+'">'+esc(P.MECH[m].name)+'</button>').join('')||'<span class="note">No mechanism of this type is modelled for this organism.</span>';
   const ds=mech?drugsFor(mech):[];$('drugs').innerHTML=ds.map(d=>'<button class="pill" data-d="'+d+'" aria-pressed="'+(d===drug)+'">'+esc(P.DRUG[d].name)+'</button>').join('')||'<span class="note">'+(mech?'No drug in this organism\'s panel is affected in the model.':'')+'</span>';
 }
+const Vc=MICRO.voice;Vc.mount();let hnarr=true,hstep=-1;
 function run(restart){
   if(!mechsInCat(cat).length){const c0=P.CATS.find(c=>mechsInCat(c[0]).length);if(c0)cat=c0[0];}
   const ms=mechsInCat(cat);if(!ms.includes(mech))mech=ms[0]||null;const ds=mech?drugsFor(mech):[];if(!ds.includes(drug))drug=ds[0]||null;
@@ -68,12 +70,14 @@ function run(restart){
     if(drug){const ev=P.evaluate(org,drug,new Set([mech])),n=ev.notes[0];h+='<h3>With '+esc(P.DRUG[drug].name)+'</h3><p>'+esc(n.txt)+'</p><p class="note">Model outcome: '+esc(P.OUT[ev.level])+' ('+Math.round(ev.kill*100)+'% of molecules effective).</p>';}
     h+='<h3>Effect on each drug in the panel (teaching model)</h3>'+P.ORGS[org].drugs.map(d=>{const w=P.W[mech][d]||0;return '<div style="margin:5px 0;font-size:13px"><span style="display:flex;justify-content:space-between"><span>'+esc(P.DRUG[d].name)+'</span><span>'+(w?Math.round(w*100)+'% neutralised':'none')+'</span></span><div class="bar"><i style="width:'+Math.round(w*100)+'%"></i></div></div>';}).join('');}
   $('info').innerHTML=h;
+  if(tab==='mech'){ if(!mech)Vc.say('Resistance explorer for '+P.ORGS[org].name+'. '+(P.CATS.find(c=>c[0]===cat)[1])+' is not modelled for this organism. Choose another mechanism type.');
+    else{const ev=drug?P.evaluate(org,drug,new Set([mech])):null;Vc.say(P.MECH[mech].name+'. '+P.MECH[mech].txt+(drug?' With '+P.DRUG[drug].name+': '+ev.notes[0].txt+' In this teaching model the result is '+P.OUT[ev.level].toLowerCase()+'.':''));} }
   try{history.replaceState(null,'','?org='+org+'&cat='+cat+(mech?'&m='+mech:'')+(drug?'&drug='+drug:'')+(tab==='hgt'?'&tab=hgt&k='+hk:''));}catch(e){}
 }
 const NOHGT=['ca','af','tb'],LAB4=['pa','kp','ec','ab'];
 function sync(){const nh=NOHGT.includes(org);$('tHgt').style.display=nh?'none':'';$('toLab').style.display=LAB4.includes(org)?'':'none';if(nh&&tab==='hgt')setTab('mech');
   const n=P.ORGS[org].note;let el=$('orgNote');if(!el){el=document.createElement('p');el.id='orgNote';el.className='note';$('vMech').insertBefore(el,$('vMech').firstChild);}el.textContent=(n||'')+(nh?' Horizontal gene transfer is not a route of resistance here.':'');el.style.display=(n||nh)?'':'none';}
-function pickOrg(id){org=id;mark(id);$('h1').innerHTML='Resistance explorer · <i>'+esc(O.byId(id).short)+'</i>';$('toOrg').href='microbiology.html?org='+id+'&v=20261119d';$('toLab').href='microbiology-lab.html?org='+(['pa','kp','ec','ab'].includes(id)?id:'pa')+'&v=20261119d';mech=null;sync();run(true);}
+function pickOrg(id){org=id;mark(id);$('h1').innerHTML='Resistance explorer · <i>'+esc(O.byId(id).short)+'</i>';$('toOrg').href='microbiology.html?org='+id+'&v=20261119e';$('toLab').href='microbiology-lab.html?org='+(['pa','kp','ec','ab'].includes(id)?id:'pa')+'&v=20261119e';mech=null;sync();run(true);}
 $('cats').onclick=e=>{const b=e.target.closest('.pill');if(!b)return;cat=b.dataset.c;mech=null;drug=null;run(true);};
 $('mechs').onclick=e=>{const b=e.target.closest('.pill');if(!b)return;mech=b.dataset.m;drug=null;run(true);};
 $('drugs').onclick=e=>{const b=e.target.closest('.pill');if(!b)return;drug=b.dataset.d;run(true);};
@@ -81,21 +85,22 @@ $('drugs').onclick=e=>{const b=e.target.closest('.pill');if(!b)return;drug=b.dat
 $('hk').innerHTML=Object.entries(H.KINDS).map(([k,v])=>'<button class="pill" data-k="'+k+'" aria-pressed="'+(k===hk)+'">'+v.name+'</button>').join('');
 function hgtInit(){
   if(HS||tab!=='hgt')return;HS=U.stage($('hcv'),{dist:12.5,auto:false,min:6,max:24,fov:38,pitch:.05,yaw:0,spin:0});if(!HS)return;
-  HS.onFrame((t,dt)=>{if(hplaying&&hsim){ht+=dt;if(ht>=hsim.D){ht=hsim.D;hplaying=false;}hshow();}});buildH();
+  HS.onFrame((t,dt)=>{if(hplaying&&hsim){let nt=ht+dt;const cs=hIdx(ht),ns=hIdx(nt);if(Vc.busy()&&ns>cs)nt=hsim.steps[cs+1][0]-.001;ht=nt;if(ht>=hsim.D){ht=hsim.D;hplaying=false;}hshow();}});buildH();
 }
-function buildH(){if(!HS)return;if(hsim)hsim.dispose();hsim=H.build(HS.scene,hk);ht=0;hplaying=true;HS.reset(12.5,0,.05);hshow();document.querySelectorAll('#hk .pill').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===hk));}
-function hshow(){if(!hsim)return;const r=hsim.update(ht);$('hT').textContent=hsim.name;$('hX').textContent=r.caption;$('hscrub').value=Math.round(ht/hsim.D*1000);$('htime').textContent=Math.floor(ht/60)+':'+String(Math.floor(ht%60)).padStart(2,'0')+' / '+Math.floor(hsim.D/60)+':'+String(Math.floor(hsim.D%60)).padStart(2,'0');$('hplay').textContent=hplaying?'Pause':'Play';}
+function hIdx(t){let k=0;hsim.steps.forEach((s,i)=>{if(t>=s[0])k=i;});return k;}
+function buildH(){if(!HS)return;hstep=-1;if(hsim)hsim.dispose();hsim=H.build(HS.scene,hk);ht=0;hplaying=true;HS.reset(12.5,0,.05);hshow();document.querySelectorAll('#hk .pill').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===hk));}
+function hshow(){if(!hsim)return;const r=hsim.update(ht);const hi=hIdx(ht);if(hi!==hstep){hstep=hi;if(hnarr&&(hplaying||hi>0||ht>0))Vc.say(hsim.steps[hi][1]);}$('hT').textContent=hsim.name;$('hX').textContent=r.caption;$('hscrub').value=Math.round(ht/hsim.D*1000);$('htime').textContent=Math.floor(ht/60)+':'+String(Math.floor(ht%60)).padStart(2,'0')+' / '+Math.floor(hsim.D/60)+':'+String(Math.floor(hsim.D%60)).padStart(2,'0');$('hplay').textContent=hplaying?'Pause':'Play';}
 $('hk').onclick=e=>{const b=e.target.closest('.pill');if(!b)return;hk=b.dataset.k;buildH();hinfo();};
-$('hplay').onclick=()=>{if(ht>=hsim.D-.01)ht=0;hplaying=!hplaying;hshow();};$('hreplay').onclick=()=>{ht=0;hplaying=true;hshow();};$('hscrub').oninput=e=>{hplaying=false;ht=+e.target.value/1000*hsim.D;hshow();};
+$('hplay').onclick=()=>{if(ht>=hsim.D-.01){ht=0;hstep=-1;}hplaying=!hplaying;hnarr=true;if(hplaying){hstep=-1;}else Vc.stop();hshow();};$('hreplay').onclick=()=>{ht=0;hstep=-1;hnarr=true;hplaying=true;hshow();};$('hscrub').oninput=e=>{Vc.stop();hnarr=true;hplaying=false;ht=+e.target.value/1000*hsim.D;hshow();};
 function hinfo(){const K=H.KINDS[hk];$('info').innerHTML='<p class="k">Horizontal gene transfer</p><h2>'+esc(K.name)+'</h2><ol style="margin:6px 0 0;padding-left:18px;font-size:13.5px">'+K.steps.map(s=>'<li style="margin:5px 0">'+esc(s[1])+'</li>').join('')+'</ol><p class="note">Vertical transfer is the other route: resistant cells divide and pass genes to daughter cells.</p>';}
-function setTab(t){tab=t;$('tMech').setAttribute('aria-pressed',t==='mech');$('tHgt').setAttribute('aria-pressed',t==='hgt');$('vMech').hidden=t!=='mech';$('vHgt').hidden=t!=='hgt';if(t==='hgt'){hgtInit();if(HS){HS.size();}hinfo();}else run(false);try{history.replaceState(null,'','?org='+org+(t==='hgt'?'&tab=hgt&k='+hk:''));}catch(e){}}
+function setTab(t){Vc.stop();tab=t;$('tMech').setAttribute('aria-pressed',t==='mech');$('tHgt').setAttribute('aria-pressed',t==='hgt');$('vMech').hidden=t!=='mech';$('vHgt').hidden=t!=='hgt';if(t==='hgt'){hgtInit();if(HS){HS.size();}hinfo();}else run(false);try{history.replaceState(null,'','?org='+org+(t==='hgt'?'&tab=hgt&k='+hk:''));}catch(e){}}
 $('tMech').onclick=()=>setTab('mech');$('tHgt').onclick=()=>setTab('hgt');
 const q=new URLSearchParams(location.search);if(P.ORGS[q.get('org')])org=q.get('org');if(P.CATS.some(c=>c[0]===q.get('cat')))cat=q.get('cat');if(P.MECH[q.get('m')])mech=q.get('m');if(P.DRUG[q.get('drug')])drug=q.get('drug');if(H.KINDS[q.get('k')])hk=q.get('k');
-mark(org);$('h1').innerHTML='Resistance explorer · <i>'+esc(O.byId(org).short)+'</i>';$('toOrg').href='microbiology.html?org='+org+'&v=20261119d';$('toLab').href='microbiology-lab.html?org='+(['pa','kp','ec','ab'].includes(org)?org:'pa')+'&v=20261119d';
+mark(org);$('h1').innerHTML='Resistance explorer · <i>'+esc(O.byId(org).short)+'</i>';$('toOrg').href='microbiology.html?org='+org+'&v=20261119e';$('toLab').href='microbiology-lab.html?org='+(['pa','kp','ec','ab'].includes(org)?org:'pa')+'&v=20261119e';
 if(mech&&P.MECH[mech]&&!q.get('cat'))cat=P.MECH[mech].cat;sync();run(false);
 if(q.get('tab')==='hgt'){setTab('hgt');if(q.get('t')){ht=parseFloat(q.get('t'));hplaying=false;setTimeout(hshow,300);}}
 else if(S){if(q.get('t'))S.seek(parseFloat(q.get('t')));else S.playing=true;}
-window.__res={S,run,get hsim(){return hsim;},setH(t){ht=t;hplaying=false;hshow();}};
+window.__res={S,run,get ht(){return ht;},get hsim(){return hsim;},setH(t){ht=t;hplaying=false;hshow();}};
 })();
 </script>
 </body></html>
