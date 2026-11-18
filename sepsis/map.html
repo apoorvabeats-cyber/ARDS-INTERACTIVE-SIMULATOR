@@ -47,6 +47,8 @@ a.lab3d:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 <div class="row" style="margin-top:8px"><button id="rx" aria-pressed="false">Source control and resuscitation</button></div>
 <div id="view"></div>
 </main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="path-stage.js?v=20261119b"></script>
 <script>
 const $=s=>document.querySelector(s);
 const C=[
@@ -79,7 +81,11 @@ const C=[
 ["Neuroinflammation","Microglia activate, blood-brain barrier leaks"],
 ["Autoregulation lost","Brain flow follows blood pressure passively"],
 ["Neurotransmitter imbalance","Cortical energy failure"],
-["Altered consciousness","Delirium, then coma; GCS falls"]]}];
+["Altered consciousness","Delirium, then coma; GCS falls"]]},{id:'hepatic',n:['Hepatic','dysfunction'],a:250,on:.45,val:s=>'INR '+(1+1.1*s).toFixed(2),st:[
+["Cholestasis of sepsis","Canalicular transporters are switched off"],
+["Steatosis","Hepatocytes fill with fat"],
+["Hypoxic hepatitis","Shock necroses central cells"],
+["Synthetic failure","INR rises, glucose falls, lactate lingers"]]}];
 const M=Object.fromEntries(C.map(c=>[c.id,c]));
 const E=[
 ['shock','cardiac','Hypotension cuts coronary flow; cytokines depress the myocardium'],
@@ -90,7 +96,7 @@ const E=[
 ['enceph','shock','Hypotension strips cerebral perfusion'],
 ['shock','dic','Hypoperfusion and endothelial injury feed coagulopathy'],
 ['shock','ards','Hypoxaemia deepens vasoplegia and lactate'],
-['cardiac','aki','Low output and venous congestion: cardiorenal injury']];
+['cardiac','aki','Low output and venous congestion: cardiorenal injury'],['shock','hepatic','Hypoperfusion necroses central hepatocytes'],['dic','hepatic','Cytokines and microthrombi drive cholestasis'],['cardiac','hepatic','Venous congestion adds a nutmeg liver']];
 let p=.35,rx=false,open=null,zoom=0,seg=null,dg={};
 const clamp=x=>Math.max(0,Math.min(1,x));
 const sev=c=>clamp((p-c.on)/(1-c.on))**.8*(rx?.65:1);
@@ -111,7 +117,7 @@ function wheel(){
   ${c.n.map((t,i)=>`<text x="${x}" y="${y+4+(i-(l-1)/2)*13}">${t}</text>`).join('')}</g>`});
  g+=`<g class="hub"><circle cx="200" cy="200" r="48" fill="var(--panel)" stroke="${col(p)}" stroke-width="3.5"/><text x="200" y="206">Sepsis</text></g>`;
  const act=E.map(([a,b,t])=>[Math.min(sev(M[a]),sev(M[b])),t]).filter(e=>e[0]>.15).sort((a,b)=>b[0]-a[0]).slice(0,3);
- return `<svg viewBox="0 0 400 400" role="img" aria-label="Sepsis and six complications">${g}</svg>
+ return `<svg viewBox="0 0 400 400" role="img" aria-label="Sepsis and its complications">${g}</svg>
  <div class="chips">${C.map(c=>`<button class="chip" data-id="${c.id}" style="border-color:${col(sev(c))}"><b>${c.n.join('').replace('-','')}</b>${c.val(sev(c))}</button>`).join('')}</div>
  <div class="panel"><strong>Active links</strong>${act.length?`<ul>${act.map(e=>`<li>${e[1]}</li>`).join('')}</ul>`:'<div>No organ links are active yet. Advance the disease to see them.</div>'}</div>
  <p class="hint">Tap a complication to open its mechanism and its 3D lab.</p>`;
@@ -130,7 +136,7 @@ function detail(c){
  return `<button data-back style="margin-top:12px">← Sepsis map</button>
  <h2>${c.n.join('').replace('-','')}</h2><div style="color:${k};font-weight:600">${c.val(s)}</div><a class="lab3d" href="lab-${c.id}.html" data-lab="${c.id}">Open the 3D lab</a>${c.id==='aki'?'<a class="lab3d" href="../nephrology-lab.html" target="_top">Full Nephrology Learning Lab</a>':''}
  <div class="bar"><i style="width:${Math.round(s*100)}%;background:${k}"></i></div>
- <div class="row" style="margin:10px 0 4px"><button data-z="0" aria-pressed="${!zoom}">Organ view</button><button data-z="1" aria-pressed="${zoom===1}">Cell view</button>${c.id==='aki'?`<button data-z="2" aria-pressed="${zoom===2}">Nephron lab</button>`:''}</div>${c.id==='aki'&&zoom===2?nephView(s):`<svg viewBox="0 0 360 250" role="img" aria-label="Animated anatomy">${(zoom?CELL:A)[c.id](s,k)}</svg>`}${drugs(c)}<h3 style="margin:14px 0 0;font-size:16px">Mechanism chain</h3><svg viewBox="0 0 360 428" role="img" aria-label="Mechanism chain">${g}</svg>
+ <div class="row" style="margin:10px 0 4px"><button data-z="0" aria-pressed="${!zoom}">Organ view</button><button data-z="1" aria-pressed="${zoom===1}">Cell view</button>${c.id==='aki'?`<button data-z="2" aria-pressed="${zoom===2}">Nephron lab</button>`:''}</div>${c.id==='aki'&&zoom===2?nephView(s):`<div id="anat-slot"></div>`}${drugs(c)}<h3 style="margin:14px 0 0;font-size:16px">Mechanism chain</h3><svg viewBox="0 0 360 428" role="img" aria-label="Mechanism chain">${g}</svg>
  <div class="panel"><strong>Linked complications</strong><ul>${links.map(e=>{const o=M[e[0]===c.id?e[1]:e[0]];return `<li><a href="#${o.id}" data-id="${o.id}" style="color:var(--acc)">${o.n.join('').replace('-','')}</a>: ${e[2]}</li>`}).join('')}</ul></div>`;
 }
 
@@ -171,12 +177,32 @@ cardiac:[[1,'Noradrenaline','maintains coronary perfusion pressure'],[1,'Dobutam
 ards:[[1,'Low tidal volume ventilation','6 ml/kg predicted weight, limit plateau pressure'],[1,'Prone positioning','improves oxygenation in severe ARDS'],[1,'Short-course neuromuscular blockade','severe early ARDS'],[1,'Dexamethasone','may help in moderate to severe ARDS'],[0,'Positive fluid balance','worsens alveolar oedema'],[0,'IV beta-2 agonists','no benefit, possible harm'],[0,'Deep benzodiazepine sedation','longer ventilation, delirium']],
 aki:[[1,'Noradrenaline to MAP 65 or more','restores renal perfusion'],[1,'Balanced crystalloids','fewer kidney events than saline'],[1,'Renal dose adjustment','of antibiotics and other drugs'],[0,'NSAIDs','afferent vasoconstriction'],[0,'Aminoglycosides, vancomycin with piperacillin-tazobactam','nephrotoxic'],[0,'IV contrast, colistin, amphotericin','tubular injury'],[0,'Hydroxyethyl starch','more AKI and dialysis'],[0,'Furosemide','no protection; only for volume overload']],
 dic:[[1,'Source control and antibiotics','the only definitive treatment'],[1,'Platelets, FFP, cryoprecipitate','only for bleeding or procedures'],[1,'Prophylactic heparin','VTE prevention if not bleeding'],[1,'Antithrombin, thrombomodulin','mixed evidence'],[0,'Tranexamic acid','thrombosis risk unless hyperfibrinolytic bleeding'],[0,'Platelets without bleeding','no benefit'],[0,'Full-dose heparin in active bleeding','worsens haemorrhage']],
-enceph:[[1,'Restore MAP and oxygenation','first-line brain protection'],[1,'Correct glucose, sodium, liver and kidney causes','treat the reversible'],[1,'Dexmedetomidine','lighter sedation, less delirium than benzodiazepines'],[0,'Benzodiazepines','deepen delirium'],[0,'Morphine in AKI','metabolite accumulation'],[0,'Anticholinergics, e.g. promethazine','worsen confusion'],[0,'High-dose cefepime or carbapenem in renal failure','seizures, neurotoxicity']]};
+enceph:[[1,'Restore MAP and oxygenation','first-line brain protection'],[1,'Correct glucose, sodium, liver and kidney causes','treat the reversible'],[1,'Dexmedetomidine','lighter sedation, less delirium than benzodiazepines'],[0,'Benzodiazepines','deepen delirium'],[0,'Morphine in AKI','metabolite accumulation'],[0,'Anticholinergics, e.g. promethazine','worsen confusion'],[0,'High-dose cefepime or carbapenem in renal failure','seizures, neurotoxicity']],
+hepatic:[[1,'Source control','removes the cytokine drive of cholestasis'],[1,'Restore perfusion','limits hypoxic hepatitis'],[1,'Stop hepatotoxic drugs','the injured liver cannot spare them'],[0,'Overfeeding','adds steatosis'],[0,'Waiting on jaundice','synthetic failure comes first'],[0,'Routine N-acetylcysteine','not a treatment for septic cholestasis']]
+};
 const drugs=c=>`<div class="panel rx"><strong>Medications and measures</strong> <span style="color:var(--mute);font-size:12px">(tap one to hear it)</span><ul>${D[c.id].map(([g,n,t])=>`<li class="${g?'up':'dn'}"><b>${g?'Helps':'Harms'}</b> ${n}: ${t}</li>`).join('')}</ul><div style="color:var(--mute);font-size:12px;margin-top:6px">Teaching summary. Follow your unit protocol and current Surviving Sepsis guidance.</div></div>`;
 const U3={shock:'https://claude.ai/artifact/8nAX95mGv3KfVVbKbjwo7G',cardiac:'https://claude.ai/artifact/HECgvsCUtti6wAE7BmXrCd',ards:'https://claude.ai/artifact/FAkfQJsmLMqfqujW4WdU8k',aki:'https://claude.ai/artifact/SzV6FhUEutnirgzTF2aBsX',dic:'https://claude.ai/artifact/TLp2UYi5ZAmsq2qivTpxmH',enceph:'https://claude.ai/artifact/2EfS34i2MJiP34gha5NDff'};
 function render(){
  $('#stage').textContent=stage();
  $('#view').innerHTML=open?detail(M[open]):wheel();
+ mountOrgan();
+}
+let ps=null;
+function mountOrgan(){
+ const slot=document.getElementById('anat-slot');
+ let host=document.getElementById('organ3d');
+ if(!host){
+  host=document.createElement('div');
+  host.id='organ3d';
+  host.style.cssText='height:min(48vh,420px);min-height:260px;border-radius:14px;overflow:hidden;background:#071018;touch-action:none;margin-top:8px';
+  document.body.appendChild(host);
+ }
+ if(!slot){ host.style.display='none'; return; }
+ host.style.display='block';
+ slot.appendChild(host);
+ if(!ps && window.PathStage) ps=PathStage.mount(host);
+ if(!ps||!open) return;
+ ps.set({id:open, severity:sev(M[open]), view:zoom>=1?'cells':'organ'});
 }
 $('#view').addEventListener('click',e=>{
  const n=e.target.closest('[data-id]');
@@ -209,7 +235,7 @@ cardiac:"Myocardial dysfunction, organ level. The ventricle dilates and ejects l
 ards:"ARDS, organ level. Both lungs fill with protein rich fluid and become stiff, so oxygen cannot cross into the blood. Lung protective ventilation is the key treatment.",
 aki:"Acute kidney injury, organ level. Filtration falls, urine output drops, and waste, potassium and acid accumulate in the blood.",
 dic:"D I C, organ level. Tiny clots block small vessels and starve organs, while platelets and clotting factors are used up, which causes bleeding.",
-enceph:"Encephalopathy, organ level. The whole brain is disturbed without a structural lesion, which causes delirium, drowsiness and a slow E E G."},
+enceph:"Encephalopathy, organ level. The whole brain is disturbed without a structural lesion, which causes delirium, drowsiness and a slow E E G.",hepatic:"Hepatic dysfunction, organ level. The liver becomes cholestatic and fatty, and in shock central cells die, so the INR rises and glucose falls."},
 rs:"Source control and resuscitation. Antibiotics, source control and fluids lower the severity of every complication."};
 const vq=(t,q)=>{if(parent!==window)parent.postMessage({vo:t,q:!!q},'*')};
 const ph4=()=>p<.25?0:p<.5?1:p<.75?2:3;let vtm=0;
