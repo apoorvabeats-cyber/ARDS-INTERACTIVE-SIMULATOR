@@ -92,6 +92,9 @@ Limits: which voices exist depends on the device (a male voice cannot be guarant
 ### Camera in the infection simulator
 The camera is fixed for the whole video (one framing set when the organism is picked). Stage changes, scrubbing and the stage buttons no longer move it; the user can still orbit and zoom, and that view is kept. Earlier versions re-aimed the camera at each stage, which made the scene appear to drift.
 
+### Content check against guidelines (19 Nov 2026)
+Checked by Claude against current sources; still needs specialist review. Sources: IDSA guidance on antimicrobial-resistant Gram-negative infections (July 2024; ESBL-E, MBL-producing CRE, CRAB), IDSA/SHEA C. difficile guideline with the 2022 focused update (fidaxomicin preferred; metronidazole only IV in fulminant disease; bezlotoxumab withdrawn), WHO drug-resistant TB treatment update (April 2025: BPaLM, BDLLfxC; pre-XDR/XDR definitions), invasive candidiasis guidance (echinocandin first-line) and EUCAST v16.1 / antifungal v12.1 breakpoints. Corrected: metallo-β-lactamase options (was "cefiderocol and colistin"), C. difficile first-line therapy and the moxifloxacin note, WHO TB regimens, and CRAB, ESBL, Candida and Aspergillus guidance lines. Not checked line by line: organism biology (virulence factors, stage descriptions) beyond a read-through; WHO TB critical concentrations and CLSI M100 were not available.
+
 ### Known gaps
 - Only C. albicans (not C. auris or C. glabrata) and A. fumigatus among fungi; no non-tuberculous mycobacteria.
 - Altered PBP in Gram-negatives is a hypothetical teaching mechanism.
