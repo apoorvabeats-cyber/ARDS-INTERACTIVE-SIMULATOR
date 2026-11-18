@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DIC in sepsis: 3D coagulation lab</title>
+<style>
+:root{--bg:#eef3f8;--ink:#0c1b2e;--mute:#546579;--panel:#fff;--line:#b9c8d8;--acc:#0a7f8f;--bad:#c0392b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#06111f;--ink:#e6f1fb;--mute:#8fa5bb;--panel:#0d2036;--line:#24435f;--acc:#3fe0f0;--bad:#ef5b52;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#06111f;--ink:#e6f1fb;--mute:#8fa5bb;--panel:#0d2036;--line:#24435f;--acc:#3fe0f0;--bad:#ef5b52;color-scheme:dark}
+html{background:var(--bg);scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Avenir Next","Segoe UI",Roboto,system-ui,sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px 14px 28px}
+h1{margin:0 0 10px;font-size:24px}
+#cv{position:relative;height:56vh;min-height:320px;border-radius:14px;overflow:hidden;background:#06111f;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+#lbl{position:absolute;left:12px;right:12px;bottom:10px;color:#e6f1fb;font-size:13px;line-height:1.35;text-shadow:0 1px 4px #000;pointer-events:none}
+#lbl b{display:block;font-size:15px}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+button{font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 12px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button[aria-pressed="true"]{border-color:var(--acc);color:var(--acc)}
+label{display:block;margin:12px 0 2px;color:var(--mute);font-size:13px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+.panel ul{margin:4px 0 0;padding-left:18px}.warn{color:var(--bad);font-weight:600}
+.hint{color:var(--mute);font-size:13px;margin:8px 0 0}
+</style></head><body><main>
+<h1>DIC in sepsis: 3D coagulation lab</h1>
+<div id="cv"><div id="lbl"></div></div>
+<div class="row" id="stages"></div>
+<label for="sev">Sepsis severity: <span id="v0"></span></label><input id="sev" type="range" min="0" max="100" value="65">
+<div class="row" id="rx"></div>
+<div class="row" id="dz"></div><div class="panel" id="out"></div><div class="panel"><canvas id="sp" width="480" height="90" style="width:100%;height:90px" role="img" aria-label="Key outputs over simulated hours"></canvas><div class="hint" style="margin:2px 0 0"><span id="leg"></span> Hour <span id="hr">0</span>.</div></div><div class="panel" id="info">Tap any part of the 3D scene to inspect it.</div>
+<p class="hint">Drag to orbit. Scroll or pinch to zoom. Stage buttons fly you in.</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const calm=matchMedia('(prefers-reduced-motion:reduce)').matches;
+if(!window.THREE){$('#lbl').innerHTML='<b>3D engine could not load</b>Check your connection and reload.'}else{
+const V=(x,y,z)=>new THREE.Vector3(x,y,z),PI=Math.PI,rnd=()=>Math.random();
+const cv=$('#cv'),R=new THREE.WebGLRenderer({antialias:true});
+R.setPixelRatio(Math.min(devicePixelRatio,2));R.setClearColor(0x06111f);cv.prepend(R.domElement);
+const S=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,.01,400);
+S.add(new THREE.AmbientLight(0x8899bb,.9));cam.add(new THREE.PointLight(0xffffff,1.3,0));S.add(cam);
+const M=(c,o=.8,x={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,transparent:true,opacity:o,roughness:.45},x));
+const add=(m,p,par=S)=>{if(p)m.position.copy(p);par.add(m);return m};
+const CR=a=>new THREE.CatmullRomCurve3(a),tube=(c,r,m)=>new THREE.Mesh(new THREE.TubeGeometry(c,60,r,12,false),m);
+const dirv=()=>V(rnd()-.5,rnd()-.5,rnd()-.5).normalize();
+
+// vascular bed: main vessel with three branches feeding organ beds
+const XS=[-9,0,9],BR=[1,.8,1.15];
+add(tube(CR([V(-14,6,0),V(14,6,0)]),.8,M(0xe0405a,.45)));
+const PATH=XS.map(x=>{const c=CR([V(-14,6,0),V(x-3,6,0),V(x,5,0),V(x,-1,0),V(x,-5,0)]);c.len=c.getLength();add(tube(CR([V(x,5.4,0),V(x,-5,0)]),.45,M(0xe0405a,.45)));return c});
+const BC=XS.map(x=>CR([V(x,5,0),V(x,-5,0)]));
+const ORG=XS.map(x=>add(new THREE.Mesh(new THREE.SphereGeometry(1.7,20,14),M(0x2ad4c0,.8)),V(x,-6.6,0)));
+const CL=XS.map((x,i)=>[...Array(6)].map((_,j)=>add(new THREE.Mesh(new THREE.IcosahedronGeometry(.55,0),M(0xf0c040,.95)),BC[i].getPointAt(.1+j*.13)).clone?null:null));
+const clots=XS.map((x,i)=>[...Array(6)].map((_,j)=>{const m=add(new THREE.Mesh(new THREE.IcosahedronGeometry(.55,0),M(0xf0e0a0,.95)),BC[i].getPointAt(.1+j*.13));return m}));
+const N=240,bp=new Float32Array(N*3),bi=[],bt=[];
+for(let i=0;i<N;i++){bi.push(i%3);bt.push(rnd())}
+const bg=new THREE.BufferGeometry();bg.setAttribute('position',new THREE.BufferAttribute(bp,3));
+const bpts=new THREE.Points(bg,new THREE.PointsMaterial({color:0xff6a7a,size:.22}));bpts.frustumCulled=false;S.add(bpts);
+const NB=60,blp=new Float32Array(NB*3),bb=[],bd=[],bk=[];
+for(let i=0;i<NB;i++){bb.push(i%3);bd.push(dirv());bk.push(rnd())}
+const blg=new THREE.BufferGeometry();blg.setAttribute('position',new THREE.BufferAttribute(blp,3));
+const bl=new THREE.Points(blg,new THREE.PointsMaterial({color:0xd01030,size:.3}));bl.frustumCulled=false;S.add(bl);
+
+// lumen detail: vessel with clot, fibrin strands, fragmenting red cells and a bleeding breach
+const LG=V(17,3,0),lg=new THREE.Group();lg.position.copy(LG);lg.scale.setScalar(.35);S.add(lg);
+add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,8,24,1,true),M(0xe0405a,.14,{side:THREE.DoubleSide})),{}),null,lg).rotation.z=PI/2;
+const cm=[...Array(16)].map(()=>add(new THREE.Mesh(new THREE.SphereGeometry(.28,10,8),M(0xf0c040,.92)),V((rnd()-.5)*1.6,(rnd()-.5)*1.4,(rnd()-.5)*1.4),lg));
+const NR=24,rb=[...Array(NR)].map(()=>{let y,z;do{y=(rnd()-.5)*2.6;z=(rnd()-.5)*2.6}while(y*y+z*z>1.3);const m=add(new THREE.Mesh(new THREE.SphereGeometry(.2,10,8),M(0xe0405a,.95)),V(rnd()*8-4,y,z),lg);m.scale.set(1,.5,1);return m});
+const sp=[];for(let i=0;i<60;i++){const a=rnd()*PI*2;sp.push((rnd()-.5)*2.4,1.5*Math.cos(a),1.5*Math.sin(a),(rnd()-.5)*.8,(rnd()-.5)*.8,(rnd()-.5)*.8)}
+const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));
+const strands=new THREE.LineSegments(sg,new THREE.LineBasicMaterial({color:0xfff0b0,transparent:true,opacity:.85}));lg.add(strands);
+const mkp=(par,n,c,s)=>{const a=new Float32Array(n*3),g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(a,3));const p=new THREE.Points(g,new THREE.PointsMaterial({color:c,size:s}));p.frustumCulled=false;par.add(p);return{a,g}};
+const NS=20,schi=mkp(lg,NS,0xff5050,.05),st=[],NQ=24,bld=mkp(lg,NQ,0xd01030,.06),qt=[],qj=[];
+for(let i=0;i<NS;i++)st.push(rnd());for(let i=0;i<NQ;i++){qt.push(rnd());qj.push([rnd()-.5,rnd()-.5])}
+const sy=[...Array(NS)].map(()=>[(rnd()-.5)*2,(rnd()-.5)*2]);
+
+// coagulation surface: tissue-factor cell, thrombin burst, antithrombin, fibrin mesh
+const CP=V(17,-6,0),cg=new THREE.Group();cg.position.copy(CP);cg.scale.setScalar(.1);S.add(cg);
+const mono=add(new THREE.Mesh(new THREE.SphereGeometry(1,28,20),M(0x2ad4c0,.7)),null,cg);
+const spikes=[...Array(24)].map((_,i)=>{const y=1-2*(i+.5)/24,r=Math.sqrt(1-y*y),a=i*2.4,d=V(r*Math.cos(a),y,r*Math.sin(a));
+ const s=add(new THREE.Mesh(new THREE.ConeGeometry(.08,.5,6),M(0xf0c040,.95)),d.clone().multiplyScalar(1.2),cg);s.quaternion.setFromUnitVectors(V(0,1,0),d);return s});
+const NT=80,NA=50,thp=mkp(cg,NT,0xff9030,.014),atp=mkp(cg,NA,0x9be08a,.014),td=[],tt=[],ad=[],at_=[];
+for(let i=0;i<NT;i++){td.push(dirv());tt.push(rnd())}for(let i=0;i<NA;i++){ad.push(dirv());at_.push(rnd())}
+const fp=[];for(let i=0;i<40;i++){const p=dirv().multiplyScalar(1.6+rnd()*1.4),q=p.clone().add(dirv().multiplyScalar(.9));fp.push(p.x,p.y,p.z,q.x,q.y,q.z)}
+const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.Float32BufferAttribute(fp,3));
+const fib=new THREE.LineSegments(fg,new THREE.LineBasicMaterial({color:0xfff0b0,transparent:true,opacity:.8}));cg.add(fib);
+
+// controls and model
+const ST=[
+['Vascular bed',V(0,0,0),36,null,null,'Main vessel and three organ beds. Clots choke the small branches while bleeding appears as factors run out.'],
+['Microthrombi',V(9,0,0),11,null,null,'Fibrin-platelet clots occlude the branch, slow flow and starve the organ.'],
+['Clot in lumen',LG,3.6,null,null,'Fibrin strands and platelets build a clot. Red cells shear into fragments. A wall breach bleeds when platelets and factors are used up.'],
+['Coagulation surface',CP,.9,null,null,'Tissue factor drives a thrombin burst. Antithrombin is meant to neutralise it but is depleted in sepsis.']];
+const RX=[['src','Source control and antibiotics','removes the trigger'],['hep','Heparin','less thrombin, more bleeding risk'],['atc','Antithrombin concentrate','restores the brake, mixed evidence'],['tx','Platelets and FFP','replaces what is consumed'],['txa','Tranexamic acid','blocks lysis: more clots (harms)']];
+let sev=.65,rx={},stage=0,m={};
+function model(){
+ const dr=clamp(sev*(rx.src?.65:1)),at=clamp(1-.85*dr+(rx.atc?.35:0)),thr=clamp(dr*(1.1-.5*at)*(rx.hep?.55:1));
+ const bur=clamp(thr*(rx.txa?1.35:1)),plt=Math.round(250*(1-.8*thr)+(rx.tx?60:0)),fct=clamp(1-.75*thr+(rx.tx?.25:0));
+ const bleed=clamp((1-clamp(plt/150))*.7+(1-fct)*.5+(rx.hep?.2:0))*(thr>.1?1:0);
+ Object.assign(m,{dr,at,thr,bur,bleed,tf:dr});
+ const on=RX.filter(d=>rx[d[0]]);
+ $('#out').innerHTML=`<span class="${plt<100?'warn':''}">Platelets ${plt} ×10⁹/L</span>, factors ${Math.round(fct*100)}%, D-dimer ×${(1+19*thr).toFixed(0)}, antithrombin ${Math.round(at*100)}%<br>Clot burden ${Math.round(bur*100)}%, <span class="${bleed>.5?'warn':''}">bleeding risk ${Math.round(bleed*100)}%</span>`
+ +(rx.hep&&bleed>.5?'<br><span class="warn">Heparin with active bleeding risk: harms</span>':'')+(rx.txa&&bur>.3?'<br><span class="warn">Tranexamic acid worsens microthrombosis here</span>':'')+(rx.tx&&bleed<.3?'<br>Transfusion without bleeding: no benefit':'')
+ +(on.length?'<ul>'+on.map(d=>`<li>${d[1]}: ${d[2]}</li>`).join('')+'</ul>':'');
+ $('#v0').textContent=Math.round(sev*100)+'%';
+ document.querySelectorAll('[data-rx]').forEach(b=>b.setAttribute('aria-pressed',!!rx[b.dataset.rx]));
+ XS.forEach((x,i)=>{const is=clamp(bur*BR[i]);const c=new THREE.Color().setHSL((175+125*is)/360,.8,.5);ORG[i].material.color.copy(c);ORG[i].material.emissive.copy(c).multiplyScalar(.2);
+  clots[i].forEach((k,j)=>k.visible=j<Math.round(6*is))});
+ cm.forEach((c,i)=>{c.scale.setScalar(Math.max(.01,bur*(.6+.4*(i%3)/2)))});
+ strands.geometry.setDrawRange(0,2*Math.round(60*thr));fib.geometry.setDrawRange(0,2*Math.round(40*thr));
+ spikes.forEach((s,i)=>s.visible=i<4+Math.round(20*m.tf));
+ const c=new THREE.Color().setHSL((175+120*clamp(thr))/360,.8,.5);mono.material.color.copy(c);
+}
+const goal={t:V(0,0,0),r:36,y:null,p:null};let yaw=.5,pit=.15,rad=36,tgt=V(0,0,0);
+function go(i){stage=i;const s=ST[i];goal.t.copy(s[1]);goal.r=s[2];goal.y=s[3];goal.p=s[4];$('#lbl').innerHTML=`<b>${s[0]}</b>${s[5]}`;
+ document.querySelectorAll('[data-s]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.s===i))}
+$('#stages').innerHTML=ST.map((s,i)=>`<button data-s="${i}">${s[0]}</button>`).join('')+'<button data-next="1">Next stage</button>';
+$('#rx').innerHTML=RX.map(d=>`<button data-rx="${d[0]}" aria-pressed="false">${d[1]}</button>`).join('');
+$('#stages').addEventListener('click',ev=>{const b=ev.target.closest('button');if(b)go(b.dataset.next?(stage+1)%ST.length:+b.dataset.s)});
+$('#rx').addEventListener('click',ev=>{const b=ev.target.closest('[data-rx]');if(b){rx[b.dataset.rx]=!rx[b.dataset.rx];model()}});
+$('#sev').addEventListener('input',ev=>{sev=ev.target.value/100;model()});
+const ptr=new Map(),zoomBy=f=>{goal.r=clamp(goal.r*f,.3,110)};
+cv.addEventListener('pointerdown',ev=>{cv.setPointerCapture(ev.pointerId);ptr.set(ev.pointerId,[ev.clientX,ev.clientY])});
+cv.addEventListener('pointermove',ev=>{const o=ptr.get(ev.pointerId);if(!o)return;
+ if(ptr.size===1){goal.y=goal.p=null;yaw-=(ev.clientX-o[0])*.008;pit=clamp(pit+(ev.clientY-o[1])*.008,-1.3,1.3)}
+ else if(ptr.size===2){const q=[...ptr.entries()].find(([id])=>id!==ev.pointerId)[1];zoomBy(Math.hypot(o[0]-q[0],o[1]-q[1])/Math.hypot(ev.clientX-q[0],ev.clientY-q[1]))}
+ ptr.set(ev.pointerId,[ev.clientX,ev.clientY])});
+['pointerup','pointercancel'].forEach(t=>cv.addEventListener(t,ev=>ptr.delete(ev.pointerId)));
+cv.addEventListener('wheel',ev=>{ev.preventDefault();zoomBy(1+ev.deltaY*.001)},{passive:false});
+function fit(){const w=cv.clientWidth,h=cv.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+new ResizeObserver(fit).observe(cv);fit();
+
+const LAB={go:model,tg:rx,bg:'none',leg:'Teal: platelets. Amber: bleeding risk.',
+key:()=>[[250*(1-.8*m.thr)+(rx.tx?60:0),300,'#2ad4c0'],[m.bleed,1,'#f0a030']],
+tag:()=>{ORG.forEach(o=>o.userData.k='organ');clots.forEach(a=>a.forEach(c=>c.userData.k='clot'));cm.forEach(c=>c.userData.k='clot');mono.userData.k='tfcell';spikes.forEach(s=>s.userData.k='tf');rb.forEach(r=>r.userData.k='rbc');S.traverse(o=>{if(o.isMesh&&o.geometry.type==='TubeGeometry')o.userData.k='vessel'})},
+dz:[['Early DIC',.35,[],'Compensated: platelets just starting to fall.'],['Overt DIC',.7,[],'Consumption and microthrombosis.'],['Source controlled',.7,['src'],'Treating the sepsis slows the process.'],['Bleeding phenotype',.85,['tx'],'Factors consumed; replace them for bleeding.'],['Heparin trial',.6,['hep'],'Less thrombin, more bleeding risk.'],['Antifibrinolytic error',.6,['txa'],'Tranexamic acid worsens thrombosis here.']],
+info:{vessel:['Small vessels','Fibrin-platelet microthrombi block flow while consumption of platelets and factors causes bleeding elsewhere.','Treat the cause; give products only for bleeding or procedures.'],organ:['Organs','Microthrombi cause ischaemia (kidney, lung, skin). Bleeding shows at mucosa, wounds and lines.','Prophylactic heparin for VTE unless bleeding.'],clot:['Microthrombus','Platelets and fibrin. Red cells shear on the mesh and fragment into schistocytes.','Tranexamic acid blocks lysis and worsens thrombosis in DIC.'],tfcell:['Tissue-factor cell','Monocytes and endothelium express tissue factor, starting the extrinsic pathway.','Source control is the only definitive treatment.'],tf:['Tissue factor','With factor VIIa it activates factor X, then thrombin in a burst.','Heparin and antithrombin restrain thrombin; benefit is uncertain.'],rbc:['Red cells','Mechanical haemolysis on fibrin strands gives schistocytes and a raised LDH.','Transfuse only for bleeding or threshold anaemia.']}};
+let tsev=sev,ramp=false,hr=0,hist=[],lh=0;const ray=new THREE.Raycaster(),dn=[0,0,0];
+$('#leg').textContent=LAB.leg;
+function spark(){const c=$('#sp'),g=c.getContext('2d'),w=c.width,h=c.height;g.clearRect(0,0,w,h);g.strokeStyle='#8886';g.beginPath();g.moveTo(0,h-1);g.lineTo(w,h-1);g.stroke();
+ [0,1].forEach(s=>{g.lineWidth=2;g.beginPath();hist.forEach((p,j)=>{g.strokeStyle=p[s][2];const x=j/79*w,y=h-4-(h-8)*clamp(p[s][0]/p[s][1]);j?g.lineTo(x,y):g.moveTo(x,y)});g.stroke()})}
+function step(dt){if(ramp&&Math.abs(sev-tsev)>.003){sev+=(tsev-sev)*(1-Math.exp(-dt*.5));$('#sev').value=Math.round(sev*100);LAB.go()}
+ if(!calm)hr+=dt*3;lh+=dt;if(lh>.5){lh=0;hist.push(LAB.key());if(hist.length>80)hist.shift();spark();$('#hr').textContent=Math.floor(hr)}}
+$('#dz').innerHTML=LAB.dz.map((d,i)=>`<button data-i="${i}" aria-pressed="false">${d[0]}</button>`).join('');
+$('#dz').addEventListener('click',ev=>{const b=ev.target.closest('[data-i]');if(!b)return;const d=LAB.dz[+b.dataset.i];
+ Object.keys(LAB.tg).forEach(x=>delete LAB.tg[x]);d[2].forEach(x=>LAB.tg[x]=true);tsev=d[1];sev=calm?tsev:0;ramp=!calm;hr=0;hist.length=0;
+ $('#sev').value=Math.round(sev*100);LAB.go();
+ document.querySelectorAll('#dz button').forEach(x=>x.setAttribute('aria-pressed',x===b));$('#info').innerHTML=`<strong>${d[0]}</strong><br>${d[3]}`});
+$('#sev').addEventListener('input',()=>{ramp=false});
+cv.addEventListener('pointerdown',ev=>{dn[0]=ev.clientX;dn[1]=ev.clientY;dn[2]=1});
+cv.addEventListener('pointerup',ev=>{if(!dn[2]||Math.hypot(ev.clientX-dn[0],ev.clientY-dn[1])>6)return;dn[2]=0;LAB.tag();const r=cv.getBoundingClientRect();
+ ray.setFromCamera({x:(ev.clientX-r.left)/r.width*2-1,y:-(ev.clientY-r.top)/r.height*2+1},cam);
+ const hs=ray.intersectObjects(S.children,true).filter(h=>h.object.isMesh&&h.object.visible&&h.object.userData.k),h=hs.find(x=>x.object.userData.k!==LAB.bg)||hs[0];
+ const i=h&&LAB.info[h.object.userData.k];if(!i)return;$('#info').innerHTML=`<strong>${i[0]}</strong><br>${i[1]}<br><em>Drugs and care:</em> ${i[2]}`});
+const VOD={lv:["Organ level", "Vessel level", "Clot level", "Cell level"],ph:["Early sepsis. At organ level, clotting tests are still normal. At cellular level, monocytes and the endothelium begin to express tissue factor.", "Early DIC. At organ level, platelets fall and D dimer rises. At cellular level, tissue factor drives a burst of thrombin, and fibrin begins to form.", "Overt DIC. At organ level, small clots block the vessels of the kidney, lung and skin. At cellular level, antithrombin and protein C are used up, so clotting is no longer restrained.", "Severe DIC with bleeding. At organ level, bleeding appears from lines, wounds and mucosa. At cellular level, platelets and clotting factors are consumed faster than they can be replaced."]};
+const VOq=(t,q)=>{if(parent!==window)parent.postMessage({vo:t,q:!!q},'*')};
+const phase=()=>sev<.25?0:sev<.5?1:sev<.75?2:3;let lastPh=phase(),vt_=0;
+const plain=h=>h.replace(/<br>/g,'. ').replace(/<[^>]+>/g,'');
+$('#stages').addEventListener('click',()=>VOq(VOD.lv[stage]+'. '+ST[stage][0]+'. '+(ST[stage][5]||ST[stage][3])));
+document.querySelector('#rx,#drugs').addEventListener('click',ev=>{const b=ev.target.closest('[data-rx],[data-dg]');if(!b)return;const k=b.dataset.rx||b.dataset.dg,L=(typeof RX!=='undefined'?RX:DG).find(d=>d[0]===k);if(!L)return;
+ const w=[...$('#out').querySelectorAll('.warn')].map(e=>e.textContent).join('. ');VOq(L[1]+(LAB.tg[k]?' switched on. ':' switched off. ')+(L[3]||L[2])+'. '+w)});
+new MutationObserver(()=>VOq(plain($('#info').innerHTML))).observe($('#info'),{childList:true});
+$('#sev').addEventListener('input',()=>{clearTimeout(vt_);vt_=setTimeout(()=>{lastPh=phase();VOq(VOD.ph[lastPh])},700)});
+$('#dz').addEventListener('click',()=>{lastPh=-1;if(!ramp){lastPh=phase();VOq(VOD.ph[lastPh],true)}});
+setInterval(()=>{if(!ramp)return;const p=phase();if(p!==lastPh){lastPh=p;VOq(VOD.ph[p],true)}},400);
+const clock=new THREE.Clock();
+function tick(){
+ const dt=Math.min(clock.getDelta(),.05);step(dt);const k=calm?1:1-Math.exp(-dt*3),mv=calm?0:1;
+ tgt.lerp(goal.t,k);rad+=(goal.r-rad)*k;
+ if(goal.y!==null){yaw+=(goal.y-yaw)*k;pit+=(goal.p-pit)*k}
+ cam.position.set(tgt.x+rad*Math.sin(yaw)*Math.cos(pit),tgt.y+rad*Math.sin(pit),tgt.z+rad*Math.cos(yaw)*Math.cos(pit));cam.lookAt(tgt);
+ for(let i=0;i<N;i++){const c=PATH[bi[i]];bt[i]+=mv*dt*3*(1-.85*clamp(m.bur*BR[bi[i]]))/c.len;if(bt[i]>=1)bt[i]=0;
+  const p=c.getPointAt(bt[i]);bp[i*3]=p.x;bp[i*3+1]=p.y;bp[i*3+2]=p.z}
+ bg.attributes.position.needsUpdate=true;
+ const nb=Math.round(NB*m.bleed);
+ for(let i=0;i<NB;i++){if(i>=nb){blp[i*3+1]=-1e4;continue}bk[i]=(bk[i]+mv*dt*.4)%1;
+  const p=BC[bb[i]].getPointAt(.55+.3*(i%4)/4);blp[i*3]=p.x+bd[i].x*bk[i]*1.6;blp[i*3+1]=p.y+bd[i].y*bk[i]*1.6;blp[i*3+2]=p.z+bd[i].z*bk[i]*1.6}
+ blg.attributes.position.needsUpdate=true;
+ const fl=1-.85*clamp(m.bur);
+ rb.forEach(r=>{r.position.x+=mv*dt*3*fl;if(r.position.x>4)r.position.x=-4;
+  if(m.bur>.25&&Math.abs(r.position.x)<.9)r.position.multiplyScalar(1);});
+ const ns=Math.round(NS*m.bur);
+ for(let i=0;i<NS;i++){if(i>=ns){schi.a[i*3+1]=-1e4;continue}st[i]=(st[i]+mv*dt*.5)%1;schi.a[i*3]=1.2+st[i]*3.2;schi.a[i*3+1]=sy[i][0];schi.a[i*3+2]=sy[i][1]}
+ schi.g.attributes.position.needsUpdate=true;
+ const nq=Math.round(NQ*m.bleed);
+ for(let i=0;i<NQ;i++){if(i>=nq){bld.a[i*3+1]=-1e4;continue}qt[i]=(qt[i]+mv*dt*.6)%1;bld.a[i*3]=2.5+qj[i][0]*2*qt[i];bld.a[i*3+1]=1.5+1.8*qt[i];bld.a[i*3+2]=qj[i][1]*2*qt[i]}
+ bld.g.attributes.position.needsUpdate=true;
+ const nt=Math.round(NT*m.thr),na=Math.round(NA*m.at);
+ for(let i=0;i<NT;i++){if(i>=nt){thp.a[i*3+1]=-1e4;continue}tt[i]=(tt[i]+mv*dt*.5)%1;const r=1.1+tt[i]*2.2;thp.a[i*3]=td[i].x*r;thp.a[i*3+1]=td[i].y*r;thp.a[i*3+2]=td[i].z*r}
+ thp.g.attributes.position.needsUpdate=true;
+ for(let i=0;i<NA;i++){if(i>=na){atp.a[i*3+1]=-1e4;continue}at_[i]=(at_[i]+mv*dt*.6)%1;const r=3.4-2.1*at_[i];atp.a[i*3]=ad[i].x*r;atp.a[i*3+1]=ad[i].y*r;atp.a[i*3+2]=ad[i].z*r}
+ atp.g.attributes.position.needsUpdate=true;
+ R.render(S,cam);requestAnimationFrame(tick)}
+model();go(0);tick();
+}
+</script></body></html>
