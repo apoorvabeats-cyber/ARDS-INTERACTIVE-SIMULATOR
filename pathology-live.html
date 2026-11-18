@@ -61,6 +61,7 @@ h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:28px;letter-spac
 .why{margin:0 0 10px;color:var(--fg);font-size:15px;line-height:1.45}
 .sheet h3{margin:12px 0 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:600}
 .sheet p{margin:0;color:var(--muted);font-size:14.5px;line-height:1.45}
+.lab3d{display:inline-block;margin:12px 8px 0 0;min-height:40px;line-height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--cool);color:var(--cool);text-decoration:none;font-size:14px}
 .kids{display:flex;flex-direction:column;gap:6px;margin-top:10px}
 .kids button{text-align:left;min-height:42px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:transparent}
 .clock{display:flex;align-items:center;gap:8px;margin-top:14px}
@@ -925,6 +926,19 @@ function chartItem(n, d){
     (kids?"<ol class='twig'>"+kids+"</ol>":"")+"</li>";
 }
 
+const LAB3D = {
+  shock:"https://claude.ai/artifact/8nAX95mGv3KfVVbKbjwo7G",
+  myocard:"https://claude.ai/artifact/HECgvsCUtti6wAE7BmXrCd",
+  ards:"https://claude.ai/artifact/FAkfQJsmLMqfqujW4WdU8k",
+  aki:"https://claude.ai/artifact/SzV6FhUEutnirgzTF2aBsX",
+  dic:"https://claude.ai/artifact/TLp2UYi5ZAmsq2qivTpxmH",
+  enceph:"https://claude.ai/artifact/2EfS34i2MJiP34gha5NDff"
+};
+function lab3d(d,n){
+  if(d.id!=="sepsis") return "";
+  const u = LAB3D[n.id] || LAB3D[n.parent];
+  return u ? "<a class='lab3d' href='"+u+"' target='_blank' rel='noopener'>Open the 3D lab</a>" : "";
+}
 function paintSheet(){
   const d = disease();
   const n = d.nodes.find(x=>x.id===state.selected) || null;
@@ -934,14 +948,14 @@ function paintSheet(){
       const r = evals[x.id];
       return "<button type='button' data-id='"+x.id+"'>"+esc(x.name)+"<small> · "+esc(labelOf(r))+"</small></button>";
     }).join("");
-    el.innerHTML = "<p class='kicker'>"+esc(d.name)+"</p><h2>What is active</h2><p class='why'>"+esc(d.line)+"</p><div class='kids'>"+bits+"</div>";
+    el.innerHTML = "<p class='kicker'>"+esc(d.name)+"</p><h2>What is active</h2><p class='why'>"+esc(d.line)+"</p><div class='kids'>"+bits+"</div>"+(d.id==="sepsis"?"<a class='lab3d' href='https://claude.ai/artifact/XDwKNMvbBNfvU8svkJQ9Bc' target='_blank' rel='noopener'>Open the sepsis map and 3D labs</a>":"");
     return;
   }
   const r = evals[n.id] || off("");
   const kids = d.nodes.filter(c=>c.parent===n.id);
   el.innerHTML = "<p class='kicker'>"+esc((ORGAN[n.organ]||"")+" · "+labelOf(r))+"</p><h2>"+esc(n.name)+"</h2><p class='why'>"+esc(r.why||"")+"</p>"+
     "<h3>Mechanism</h3><p>"+esc(n.mechanism)+"</p><h3>How it is recognised</h3><p>"+esc(n.diagnose)+"</p>"+
-    "<h3>Investigations</h3><p>"+esc(n.tests)+"</p><h3>Management</h3><p>"+esc(n.manage)+"</p>"+
+    "<h3>Investigations</h3><p>"+esc(n.tests)+"</p><h3>Management</h3><p>"+esc(n.manage)+"</p>"+lab3d(d,n)+
     (kids.length?"<div class='kids'>"+kids.map(c=>"<button type='button' data-id='"+c.id+"'>"+esc(c.name)+"<small> · "+esc(labelOf(evals[c.id]))+"</small></button>").join("")+"</div>":"");
 }
 
