@@ -35,7 +35,14 @@
   const syncIntro = () => {
     if (loading) return;
     const heard = !audio.paused && audio.currentTime > 0.05;
-    const time = heard ? audio.currentTime * 1000 : performance.now() - brandAt;
+    const waited = performance.now() - brandAt;
+    // Hold the logo at its opening frame until the music is really playing.
+    // If it still has not started after 5 seconds, carry on silently and offer the tap button.
+    let time;
+    if (heard) time = audio.currentTime * 1000;
+    else if (waited < 5000) time = Math.min(waited, 600);
+    else time = 600 + (waited - 5000);
+    if (!heard && waited > 1500) musicButton.hidden = false;
     animations.forEach((animation) => { animation.currentTime = time; });
     if (heard) musicButton.hidden = true;
     if (time >= 8000) loadApp();
@@ -60,20 +67,11 @@
   audio.load();
   skipButton.addEventListener("click", loadApp);
 
-  let audioCtx = null;
-  let wired = false;
+  // Play the score straight from the audio element. Routing it through Web Audio
+  // made iPhones on silent (and suspended audio contexts) play nothing while the
+  // page believed the music was running.
   const armScore = () => {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (Ctx) {
-      if (!audioCtx) audioCtx = new Ctx();
-      if (audioCtx.state === "suspended") audioCtx.resume();
-      if (!wired) {
-        try {
-          audioCtx.createMediaElementSource(audio).connect(audioCtx.destination);
-          wired = true;
-        } catch (err) {}
-      }
-    }
+    try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (err) {}
     audio.muted = false;
     audio.volume = 0.48;
     return audio.play();
