@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Septic shock circulation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600&family=Fraunces:opsz,wght@9..144,520&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#05070c;--fg:#f3efe6;--muted:#b7b1a4;--faint:#8a8478;--line:rgba(243,239,230,.18);--cool:#7fd4e6;--warm:#e2b48a;--bad:#e2b48a}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:Figtree,ui-sans-serif,sans-serif}
+main{max-width:560px;margin:0 auto;padding:14px 14px 32px}
+h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:28px;letter-spacing:-.03em;margin:0 0 6px}
+.sub{margin:0 0 12px;color:var(--muted);font-size:14px;line-height:1.4}
+#cv{position:relative;height:58vh;min-height:340px;border-radius:16px;overflow:hidden;background:#071018;touch-action:none;border:1px solid var(--line)}
+canvas{display:block;width:100%;height:100%}
+#lbl{position:absolute;left:12px;right:12px;bottom:10px;color:#f3efe6;font-size:13px;line-height:1.35;text-shadow:0 1px 6px #000;pointer-events:none}
+#lbl b{display:block;font-family:Fraunces,Georgia,serif;font-weight:520;font-size:16px;margin-bottom:2px}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+button{font:inherit;font-size:14px;color:var(--fg);background:#0c1823;border:1px solid var(--line);border-radius:999px;padding:8px 12px;min-height:40px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+button[aria-pressed="true"]{border-color:var(--cool);color:var(--cool)}
+label{display:block;margin:12px 0 2px;color:var(--muted);font-size:13px}
+label b{color:var(--fg);font-weight:600}
+input[type=range]{width:100%;accent-color:#7fd4e6}
+.panel{background:#0c141c;border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:12px;font-size:14.5px;line-height:1.45}
+.panel ul{margin:8px 0 0;padding-left:18px;color:var(--muted)}
+.warn{color:var(--warm)}
+.hint{color:var(--faint);font-size:12px;margin:8px 0 0}
+a.back{color:var(--cool);text-decoration:none;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+</style>
+<script type="importmap">
+{"imports":{"three":"./vendor/three/three.module.js"}}
+</script>
+</head>
+<body>
+<main>
+<a class="back" id="hub" href="hub.html">Hub</a>
+<h1>Septic shock circulation</h1>
+<p class="sub">Tone, leak and volume, on a circuit you can fly through. A drug changes the vessel, not a label.</p>
+<div id="cv"><div id="lbl"></div></div>
+<div class="row" id="stages"></div>
+<label for="sev">Sepsis severity <b id="v0"></b></label>
+<input id="sev" type="range" min="0" max="100" value="55">
+<label for="fl">Fluid given <b id="v1"></b></label>
+<input id="fl" type="range" min="0" max="100" value="0">
+<div class="row" id="rx"></div>
+<div class="panel" id="out"></div>
+<p class="hint">Drag to turn. Pinch or scroll to move closer. The stages fly you in.</p>
+</main>
+<script type="module">
+import * as THREE from "three";
+
+const $ = (s) => document.querySelector(s);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+const cv = $("#cv");
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.setClearColor(0x071018);
+if ("outputColorSpace" in renderer && THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+cv.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x071018, 18, 42);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.05, 80);
+scene.add(new THREE.AmbientLight(0x8ea0b4, 0.55));
+const key = new THREE.DirectionalLight(0xf4efe4, 2.4);
+key.position.set(6, 10, 7);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x7fd4e6, 0.85);
+rim.position.set(-7, 3, -6);
+scene.add(rim);
+const fill = new THREE.DirectionalLight(0xe2b48a, 0.28);
+fill.position.set(0, -4, 8);
+scene.add(fill);
+
+const flesh = (color, extra = {}) => new THREE.MeshPhysicalMaterial(Object.assign({
+  color, roughness: 0.38, metalness: 0.04, clearcoat: 0.35, clearcoatRoughness: 0.45
+}, extra));
+
+function vessel(points, radius, color) {
+  const curve = new THREE.CatmullRomCurve3(points);
+  const mesh = new THREE.Mesh(
+    new THREE.TubeGeometry(curve, 70, radius, 12, false),
+    flesh(color, { roughness: 0.48, clearcoat: 0.15 })
+  );
+  scene.add(mesh);
+  curve.len = curve.getLength();
+  return { mesh, curve };
+}
+
+const aorta = vessel([
+  V(0.35, 0.85, 0), V(0.25, 2.15, 0.05), V(-0.15, 3.05, 0),
+  V(-1.15, 3.15, 0), V(-1.45, 2.2, 0), V(-1.4, 0.4, 0), V(-1.25, -2.35, 0)
+], 0.28, 0x8d3b3b);
+
+vessel([
+  V(-0.35, 2.85, 0), V(0.15, 3.7, 0.1), V(0.35, 4.55, 0)
+], 0.12, 0x8d3b3b);
+
+vessel([
+  V(-1.4, 0.15, 0), V(-2.5, -0.05, 0.35), V(-3.55, -0.15, 0.55)
+], 0.09, 0x8d3b3b);
+vessel([
+  V(-1.4, 0.15, 0), V(-2.5, -0.05, -0.35), V(-3.55, -0.15, -0.55)
+], 0.09, 0x8d3b3b);
+
+vessel([
+  V(-1.35, -0.7, 0), V(-0.2, -0.85, 0.45), V(1.35, -0.55, 0.7)
+], 0.1, 0x8d3b3b);
+
+const caps = [];
+for (let i = 0; i < 7; i++) {
+  const z = (i - 3) * 0.28;
+  const made = vessel([
+    V(-1.25, -2.45, 0),
+    V(-0.55, -3.15, z * 0.35),
+    V(0.15, -3.55, z),
+    V(0.85, -3.15, z * 0.55),
+    V(1.35, -2.55, z * 0.2)
+  ], 0.045, 0x7a3535);
+  caps.push(made.curve);
+}
+const vein = vessel([
+  V(1.35, -2.55, 0), V(1.7, -1.1, 0.1), V(1.55, 0.6, 0.15), V(0.7, 0.95, 0.1)
+], 0.22, 0x3c5672);
+
+const arteriole = new THREE.Group();
+arteriole.position.set(-1.25, -2.95, 0);
+scene.add(arteriole);
+const arterioleBlood = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.16, 0.13, 1.12, 24, 1, true),
+  flesh(0x8d3b3b, { roughness: 0.35, side: THREE.DoubleSide })
+);
+const arterioleWall = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.26, 0.22, 1.15, 24, 1, true),
+  flesh(0xd9c7a8, { transparent: true, opacity: 0.28, roughness: 0.55, side: THREE.DoubleSide, clearcoat: 0 })
+);
+arteriole.add(arterioleBlood, arterioleWall);
+
+function organ(x, y, z, sx, sy, sz) {
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 36, 28), flesh(0x7f9c98));
+  mesh.scale.set(sx, sy, sz);
+  mesh.position.set(x, y, z);
+  scene.add(mesh);
+  return mesh;
+}
+const heartL = organ(0.25, 0.15, 0, 0.72, 0.95, 0.62);
+const heartR = organ(-0.45, 0.05, 0.28, 0.48, 0.72, 0.46);
+const atria = organ(0.05, 0.95, -0.05, 0.55, 0.38, 0.48);
+[heartL, heartR, atria].forEach((m) => m.material = flesh(0x7a3030, { clearcoat: 0.55 }));
+const brainL = organ(0.02, 5.2, 0.16, 0.5, 0.58, 0.52);
+const brainR = organ(0.68, 5.18, -0.08, 0.5, 0.58, 0.52);
+const cere = organ(0.34, 4.72, -0.2, 0.42, 0.26, 0.4);
+const kidneyL = organ(-4.05, -0.15, 0.6, 0.42, 0.72, 0.34);
+const kidneyR = organ(-4.05, -0.15, -0.6, 0.42, 0.72, 0.34);
+const liver = organ(1.85, -0.45, 0.85, 0.85, 0.48, 0.62);
+const gut = new THREE.Mesh(
+  new THREE.TorusGeometry(0.55, 0.16, 12, 28, Math.PI * 1.4),
+  flesh(0x7f9c98)
+);
+gut.position.set(-3.3, -1.55, 0);
+gut.rotation.set(1.1, 0.4, 0.6);
+scene.add(gut);
+const lungL = organ(-0.95, 0.85, -1.15, 0.7, 1.05, 0.42);
+const lungR = organ(1.05, 0.75, -1.2, 0.62, 0.95, 0.4);
+[lungL, lungR].forEach((m) => {
+  m.material = flesh(0x8aa4a8, { transparent: true, opacity: 0.28, roughness: 0.6, clearcoat: 0 });
+});
+const oedema = new THREE.Mesh(
+  new THREE.SphereGeometry(1.15, 28, 20),
+  new THREE.MeshPhysicalMaterial({ color: 0x9eb8c4, transparent: true, opacity: 0, roughness: 0.85, metalness: 0 })
+);
+oedema.position.set(0.1, -3.35, 0);
+oedema.scale.set(1.5, 0.55, 1.1);
+scene.add(oedema);
+
+const ORGANS = [
+  { mesh: brainL, need: 78 },
+  { mesh: brainR, need: 78 },
+  { mesh: cere, need: 78 },
+  { mesh: kidneyL, need: 74 },
+  { mesh: kidneyR, need: 74 },
+  { mesh: liver, need: 70 },
+  { mesh: gut, need: 68 }
+];
+const perfused = new THREE.Color(0x7f9c98);
+const starved = new THREE.Color(0xc48862);
+
+const PATHS = [aorta.curve, ...caps, vein.curve];
+const RBC = 280;
+const rbcGeo = new THREE.SphereGeometry(0.075, 10, 8);
+const rbc = new THREE.InstancedMesh(rbcGeo, flesh(0x6e2c2c, { roughness: 0.32, clearcoat: 0.2 }), RBC);
+rbc.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+scene.add(rbc);
+const dummy = new THREE.Object3D();
+const ride = Array.from({ length: RBC }, () => ({
+  path: Math.random() < 0.45 ? 0 : 1 + Math.floor(Math.random() * caps.length),
+  t: Math.random()
+}));
+
+const LEAK = 80;
+const dropGeo = new THREE.SphereGeometry(0.07, 8, 6);
+const drops = new THREE.InstancedMesh(dropGeo, new THREE.MeshPhysicalMaterial({
+  color: 0xc5d5de, transparent: true, opacity: 0.65, roughness: 0.2, metalness: 0
+}), LEAK);
+drops.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+scene.add(drops);
+const leakRide = Array.from({ length: LEAK }, () => ({
+  cap: Math.floor(Math.random() * caps.length),
+  u: Math.random(),
+  age: Math.random()
+}));
+
+const cell = new THREE.Group();
+cell.position.set(22, 0, 0);
+scene.add(cell);
+const lumen = new THREE.Mesh(
+  new THREE.BoxGeometry(4.4, 1.15, 1.7),
+  new THREE.MeshPhysicalMaterial({ color: 0x5c2428, transparent: true, opacity: 0.22, roughness: 0.15 })
+);
+lumen.position.y = 0.95;
+cell.add(lumen);
+function endo() {
+  return new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.28, 1.5, 6, 12),
+    flesh(0x6e8f88, { roughness: 0.55, clearcoat: 0.1 })
+  );
+}
+const endoL = endo();
+const endoR = endo();
+endoL.rotation.z = Math.PI / 2;
+endoR.rotation.z = Math.PI / 2;
+cell.add(endoL, endoR);
+const hairs = Array.from({ length: 28 }, (_, i) => {
+  const h = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.015, 0.55, 6),
+    flesh(0xcbb892, { roughness: 0.7, clearcoat: 0 })
+  );
+  h.position.set(-2.05 + i * 0.15, 0.42, (i % 2 ? 0.18 : -0.18));
+  cell.add(h);
+  return h;
+});
+const muscle = Array.from({ length: 6 }, (_, i) => {
+  const m = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.7, 4, 8), flesh(0x8d7358));
+  m.position.set(-1.5 + i * 0.6, -0.55, 0);
+  m.rotation.z = Math.PI / 2;
+  cell.add(m);
+  return m;
+});
+const receptors = Array.from({ length: 8 }, (_, i) => {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), flesh(0x8a8478, { emissive: 0x000000 }));
+  m.position.set(-1.4 + i * 0.4, -0.28, 0.22);
+  cell.add(m);
+  return m;
+});
+const cellRbc = Array.from({ length: 6 }, (_, i) => {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8), flesh(0x6e2c2c));
+  m.scale.y = 0.4;
+  m.position.set(-1.8 + i * 0.7, 1.05, 0);
+  cell.add(m);
+  return m;
+});
+const noGeo = new THREE.SphereGeometry(0.035, 6, 6);
+const noMesh = new THREE.InstancedMesh(noGeo, flesh(0xd5e4ea, { transparent: true, opacity: 0.8, roughness: 0.2 }), 40);
+noMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+cell.add(noMesh);
+const noRide = Array.from({ length: 40 }, () => ({ x: (Math.random() - 0.5) * 3.2, t: Math.random() }));
+
+const ring = new THREE.Mesh(
+  new THREE.RingGeometry(3.2, 3.28, 64),
+  new THREE.MeshBasicMaterial({ color: 0x24323c, side: THREE.DoubleSide })
+);
+ring.rotation.x = -Math.PI / 2;
+ring.position.y = -3.9;
+scene.add(ring);
+
+const STAGES = [
+  ["Circulation", V(0.2, 0.6, 0), 12.5, 0.7, 0.28, "Heart, aorta, organs and the capillary bed. An organ warms when its pressure fails."],
+  ["Heart and aorta", V(0.1, 1.1, 0), 4.2, 0.5, 0.2, "The heart quickens. Stroke volume falls as circulating volume is lost to the tissues."],
+  ["Arteriole", V(-1.25, -2.9, 0), 2.6, 0.3, 0.15, "Vasoplegia. The arteriole opens and stops holding pressure."],
+  ["Capillary leak", V(0.1, -3.3, 0), 3.1, 0.9, 0.35, "Plasma leaves through open junctions. Volume falls. The tissue swells."],
+  ["Vessel wall", V(22, 0.35, 0), 4.4, 0.55, 0.22, "Glycocalyx thins, the junction opens, nitric oxide relaxes the muscle."]
+];
+const DRUGS = [
+  ["nor", "Noradrenaline", "Alpha-1 tone returns. The arteriole narrows."],
+  ["vaso", "Vasopressin", "A second constrictor. Useful when noradrenaline is already high."],
+  ["hc", "Hydrocortisone", "Leak slows. A small effect on tone."],
+  ["dobu", "Dobutamine", "Cardiac output rises. It does not tighten the vessels."],
+  ["prop", "Propofol bolus", "The vessel opens further. Pressure falls."]
+];
+
+let severity = 0.55;
+let fluid = 0;
+const rx = {};
+let stage = 0;
+const phys = { leak: 0.4, tone: 0.7, co: 5, map: 70, oedema: 0, severity: 0.55 };
+
+function compute() {
+  const leak = severity * (rx.hc ? 0.72 : 1);
+  const tone = clamp(1 - 0.55 * severity + (rx.nor ? 0.42 : 0) + (rx.vaso ? 0.16 : 0) + (rx.hc ? 0.05 : 0) - (rx.prop ? 0.22 : 0), 0.22, 1.45);
+  const volume = clamp(1 - 0.38 * leak + 0.28 * fluid, 0.4, 1.25);
+  const co = 5.2 * volume * (rx.dobu ? 1.22 : 1) * (1 + 0.18 * severity);
+  const map = clamp(78 * tone * (co / 5.2), 28, 130);
+  const lactate = 0.8 + 6.2 * clamp((68 - map) / 42);
+  const oedemaAmt = clamp(leak * 0.75 + fluid * leak * 0.85);
+  Object.assign(phys, { leak, tone, co, map, oedema: oedemaAmt, severity, lactate, volume });
+
+  const dilate = clamp(1.55 - tone, 0.55, 1.7);
+  arteriole.scale.set(dilate, 1, dilate);
+
+  ORGANS.forEach((o) => {
+    const flow = clamp((map - (o.need - 18)) / 22);
+    o.mesh.material.color.copy(perfused).lerp(starved, 1 - flow);
+    o.mesh.material.emissive = o.mesh.material.emissive || new THREE.Color();
+    o.mesh.material.emissive.copy(o.mesh.material.color).multiplyScalar(0.08);
+  });
+  const lungHaze = 0.18 + oedemaAmt * 0.55;
+  lungL.material.opacity = lungHaze;
+  lungR.material.opacity = lungHaze;
+  lungL.material.color.copy(perfused).lerp(new THREE.Color(0xb7c6cc), oedemaAmt);
+  lungR.material.color.copy(lungL.material.color);
+  oedema.material.opacity = oedemaAmt * 0.42;
+
+  const gap = 0.18 + leak * 1.15;
+  endoL.position.set(-1.15 - gap * 0.5, 0.15, 0);
+  endoR.position.set(1.15 + gap * 0.5, 0.15, 0);
+  hairs.forEach((h) => {
+    const shed = Math.abs(h.position.x) < gap * 0.85;
+    h.scale.y = shed ? 0.08 : 0.25 + (1 - leak) * 0.9;
+    h.visible = h.scale.y > 0.12;
+  });
+  muscle.forEach((m) => {
+    m.scale.y = 0.75 + tone * 0.7;
+    m.material.color.copy(perfused).lerp(starved, clamp(1 - tone));
+  });
+  receptors.forEach((r) => {
+    r.material.emissive.set(rx.nor ? 0xc47a3a : 0x000000);
+    r.material.color.set(rx.nor ? 0xe2b48a : 0x8a8478);
+  });
+
+  const on = DRUGS.filter((d) => rx[d[0]]);
+  const mapWarn = map < 65;
+  const tight = tone > 1.22;
+  const flooded = fluid > 0.62 && leak > 0.35;
+  $("#out").innerHTML =
+    "<span class=\"" + (mapWarn ? "warn" : "") + "\">MAP " + Math.round(map) + " mmHg</span>" +
+    " · cardiac output " + co.toFixed(1) + " L/min" +
+    " · lactate <span class=\"" + (lactate > 2 ? "warn" : "") + "\">" + lactate.toFixed(1) + "</span> mmol/L" +
+    " · oedema " + Math.round(oedemaAmt * 100) + "%" +
+    (mapWarn ? "<br><span class=\"warn\">MAP is under 65. Organs are under-perfused.</span>" : "") +
+    (tight ? "<br><span class=\"warn\">Tone is high. Gut and digit flow can fail.</span>" : "") +
+    (flooded ? "<br><span class=\"warn\">Fluid on top of leak. The lung and the tissues swell.</span>" : "") +
+    (on.length ? "<ul>" + on.map((d) => "<li>" + d[1] + ". " + d[2] + "</li>").join("") + "</ul>" : "");
+  $("#v0").textContent = Math.round(severity * 100) + "%";
+  $("#v1").textContent = (fluid * 3).toFixed(1) + " L";
+  document.querySelectorAll("[data-rx]").forEach((b) => b.setAttribute("aria-pressed", rx[b.dataset.rx] ? "true" : "false"));
+}
+
+const goal = { t: V(0, 0.5, 0), r: 12, y: 0.6, p: 0.25 };
+let yaw = 0.9, pit = 0.18, rad = 14;
+let steer = true;
+const target = V(0, 0.5, 0);
+
+const CELLSTAGE = [
+  "At organ level the heart, the aorta and the organs share one pressure. At cellular level the endothelium is already leaking and the smooth muscle is losing tone.",
+  "At organ level stroke volume falls as plasma leaves the vessels. At cellular level the myocytes are stunned by inflammatory mediators, not by a blocked coronary artery.",
+  "At organ level the arteriole should hold pressure. At cellular level nitric oxide keeps the smooth muscle relaxed, so the lumen stays wide.",
+  "At organ level plasma leaves and the tissue swells. At cellular level the glycocalyx is shed and the junctions between endothelial cells are open.",
+  "At cellular level you are against the wall. The glycocalyx is thin, nitric oxide is high, and the muscle cannot tighten."
+];
+const CELLDRUG = {
+  nor:"At cellular level alpha-1 receptors on the vascular muscle are occupied, calcium rises, and the muscle shortens.",
+  vaso:"At cellular level a second receptor tightens the vessel when noradrenaline alone is not enough.",
+  hc:"At cellular level the endothelial junctions tighten a little, so less plasma leaves the vessel.",
+  dobu:"At cellular level the cardiac muscle contracts harder. The arteriole is not tightened.",
+  prop:"At cellular level the vascular muscle relaxes further, so pressure falls."
+};
+function maleVoice(){
+  if(!window.speechSynthesis) return null;
+  const voices = speechSynthesis.getVoices() || [];
+  const male = /daniel|alex|rishi|google uk english male|arthur|aaron|fred|david|male/i;
+  const female = /female|samantha|karen|moira|victoria|allison|serena|fiona/i;
+  const en = voices.filter(function(v){ return /^en/i.test(v.lang || "") && !female.test((v.name || "") + " " + (v.voiceURI || "")); });
+  return en.find(function(v){ return male.test((v.name || "") + " " + (v.voiceURI || "")); }) || en[0] || null;
+}
+function say(text){
+  if(!text || !window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const line = new SpeechSynthesisUtterance(text);
+  line.rate = 0.9;
+  line.pitch = 0.82;
+  line.volume = 1;
+  const voice = maleVoice();
+  if(voice) line.voice = voice;
+  speechSynthesis.speak(line);
+}
+if(window.speechSynthesis){
+  speechSynthesis.getVoices();
+  speechSynthesis.addEventListener("voiceschanged", function(){ speechSynthesis.getVoices(); });
+}
+if(/embed=1/.test(location.search)){
+  const hub = document.getElementById("hub");
+  if(hub) hub.hidden = true;
+}
+function go(i) {
+  stage = i;
+  const s = STAGES[i];
+  goal.t.copy(s[1]);
+  goal.r = s[2];
+  goal.y = s[3];
+  goal.p = s[4];
+  steer = true;
+  $("#lbl").innerHTML = "<b>" + s[0] + "</b>" + s[5];
+  document.querySelectorAll("[data-s]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.s === i)));
+  say(s[0] + ". " + s[5] + " " + CELLSTAGE[i]);
+}
+
+$("#stages").innerHTML = STAGES.map((s, i) => "<button type=\"button\" data-s=\"" + i + "\">" + s[0] + "</button>").join("") +
+  "<button type=\"button\" id=\"next\">Next</button>";
+$("#rx").innerHTML = DRUGS.map((d) => "<button type=\"button\" data-rx=\"" + d[0] + "\" aria-pressed=\"false\">" + d[1] + "</button>").join("");
+$("#stages").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button");
+  if (!b) return;
+  if (b.id === "next") go((stage + 1) % STAGES.length);
+  else go(+b.dataset.s);
+});
+$("#rx").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-rx]");
+  if (!b) return;
+  rx[b.dataset.rx] = !rx[b.dataset.rx];
+  compute();
+  const drug = DRUGS.find((d) => d[0] === b.dataset.rx);
+  if (drug) say((rx[drug[0]] ? "Started. " : "Stopped. ") + drug[1] + ". " + drug[2] + " " + (CELLDRUG[drug[0]] || ""));
+});
+let saidBand = "";
+function speakSeverity(){
+  const band = severity >= 0.75 ? "severe" : severity >= 0.4 ? "established" : "early";
+  if (band === saidBand) return;
+  saidBand = band;
+  if (band === "early") say("Early sepsis. At organ level the pressure is still held. At cellular level nitric oxide is rising and the endothelium is just beginning to leak.");
+  else if (band === "established") say("The sepsis is progressing. At organ level the vessels are open and flow to the kidney and the gut is falling. At cellular level the junctions are open and plasma is leaving the capillary.");
+  else say("Severe sepsis. At organ level several organs are under-perfused and lactate rises. At cellular level the mitochondria are short of oxygen and the barrier between blood and tissue has failed.");
+}
+$("#sev").addEventListener("input", (ev) => { severity = ev.target.value / 100; compute(); speakSeverity(); });
+$("#fl").addEventListener("input", (ev) => { fluid = ev.target.value / 100; compute(); });
+
+const ptr = new Map();
+function zoomBy(f) { goal.r = clamp(goal.r * f, 1.4, 28); }
+cv.addEventListener("pointerdown", (ev) => { cv.setPointerCapture(ev.pointerId); ptr.set(ev.pointerId, [ev.clientX, ev.clientY]); });
+cv.addEventListener("pointermove", (ev) => {
+  const o = ptr.get(ev.pointerId);
+  if (!o) return;
+  if (ptr.size === 1) {
+    steer = false;
+    yaw -= (ev.clientX - o[0]) * 0.008;
+    pit = clamp(pit + (ev.clientY - o[1]) * 0.008, -1.1, 1.15);
+  } else if (ptr.size === 2) {
+    const q = [...ptr.entries()].find(([id]) => id !== ev.pointerId)[1];
+    zoomBy(Math.hypot(o[0] - q[0], o[1] - q[1]) / Math.hypot(ev.clientX - q[0], ev.clientY - q[1]));
+  }
+  ptr.set(ev.pointerId, [ev.clientX, ev.clientY]);
+});
+["pointerup", "pointercancel"].forEach((t) => cv.addEventListener(t, (ev) => ptr.delete(ev.pointerId)));
+cv.addEventListener("wheel", (ev) => { ev.preventDefault(); zoomBy(1 + ev.deltaY * 0.001); }, { passive: false });
+
+function fit() {
+  const w = cv.clientWidth, h = cv.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / Math.max(1, h);
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(fit).observe(cv);
+fit();
+
+const clock = new THREE.Clock();
+let phase = 0;
+function frame() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const k = calm ? 1 : 1 - Math.exp(-dt * 2.4);
+  target.lerp(goal.t, k);
+  rad += (goal.r - rad) * k;
+  if (steer) {
+    yaw += (goal.y - yaw) * k;
+    pit += (goal.p - pit) * k;
+  }
+  camera.position.set(
+    target.x + rad * Math.sin(yaw) * Math.cos(pit),
+    target.y + rad * Math.sin(pit),
+    target.z + rad * Math.cos(yaw) * Math.cos(pit)
+  );
+  camera.lookAt(target);
+  if (!calm) phase += dt * (3.2 + phys.severity * 4);
+  const beat = 1 + Math.sin(phase) * 0.045 * (phys.co / 5);
+  heartL.scale.set(0.72 * beat, 0.95 * beat, 0.62 * beat);
+  heartR.scale.set(0.48 * beat, 0.72 * beat, 0.46 * beat);
+  const speed = 0.22 * phys.co / 5;
+  for (let i = 0; i < RBC; i++) {
+    const r = ride[i];
+    if (!calm) r.t += dt * speed / Math.max(0.4, PATHS[r.path].len);
+    if (r.t >= 1) {
+      r.t = 0;
+      r.path = r.path === 0 ? 1 + Math.floor(Math.random() * caps.length) : (Math.random() < 0.5 ? 0 : PATHS.length - 1);
+      if (r.path >= PATHS.length) r.path = 0;
+    }
+    const p = PATHS[r.path].getPointAt(Math.min(0.999, r.t));
+    dummy.position.copy(p);
+    dummy.scale.set(1, 0.38, 1);
+    dummy.lookAt(p.x, p.y + 1, p.z);
+    dummy.updateMatrix();
+    rbc.setMatrixAt(i, dummy.matrix);
+  }
+  rbc.instanceMatrix.needsUpdate = true;
+  const live = Math.round(LEAK * phys.leak);
+  for (let i = 0; i < LEAK; i++) {
+    if (i >= live) {
+      dummy.position.set(0, -80, 0);
+      dummy.scale.setScalar(1);
+      dummy.updateMatrix();
+      drops.setMatrixAt(i, dummy.matrix);
+      continue;
+    }
+    const d = leakRide[i];
+    if (!calm) d.age += dt * 0.45;
+    if (d.age > 1) d.age = 0;
+    const p = caps[d.cap].getPointAt(0.35 + d.u * 0.3);
+    dummy.position.set(p.x, p.y - d.age * 0.7, p.z + Math.sin(d.u * 6) * 0.05);
+    dummy.scale.setScalar(1);
+    dummy.updateMatrix();
+    drops.setMatrixAt(i, dummy.matrix);
+  }
+  drops.instanceMatrix.needsUpdate = true;
+  const nitric = Math.round(40 * phys.severity * (rx.nor ? 0.35 : 1));
+  for (let i = 0; i < 40; i++) {
+    if (i >= nitric) {
+      dummy.position.set(0, -5, 0);
+    } else {
+      const n = noRide[i];
+      if (!calm) n.t = (n.t + dt * 0.35) % 1;
+      dummy.position.set(n.x, 0.2 - n.t * 0.7, 0);
+    }
+    dummy.scale.setScalar(1);
+    dummy.updateMatrix();
+    noMesh.setMatrixAt(i, dummy.matrix);
+  }
+  noMesh.instanceMatrix.needsUpdate = true;
+  if (!calm) {
+    cellRbc.forEach((m, i) => {
+      m.position.x = ((phase * 0.15 * phys.co / 5 + i / 6) % 1) * 4 - 2;
+      m.rotation.z = phase * 0.4 + i;
+    });
+  }
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+compute();
+go(0);
+frame();
+</script>
+</body>
+</html>
