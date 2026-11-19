@@ -1,13 +1,18 @@
 import json,sys,importlib
 sys.path.insert(0,'.')
 from dbhelp import *
-import d1,d2,d3,d4,d5
-DIS=[d1.ARDS,d1.PANC,d2.AKI,d2.ALF,d3.AHF,d3.TBI,d4.STAT,d4.DIC]
+import d1,d2,d3,d4,d5,d6
+DIS=[d1.ARDS,d1.PANC,d2.AKI,d2.ALF,d3.AHF,d3.TBI,d4.STAT,d4.DIC,d6.SEPSIS]
 for d in DIS:
+  d['main']=d6.MAIN[d['id']]
   if d['id'] in d5.NEW:
     cs,ls=d5.NEW[d['id']];d['complications']+=cs;d['links']+=ls
   n=len(d['complications'])
   for i,c in enumerate(d['complications']):c['a']=round(-90+360*i/n)
+for d in DIS:
+  for c in d['complications']:
+    k=d6.KN.get((d['id'],c['id']))
+    if k: c['scene']['kn']=k
 # validate
 D={'vessel':{'flow','sat','leak','clot','bleed','isch'},'heart':{'con','rvf','rvdil','lvdil','congest','sept','rate'},'alveolus':{'vent','stretch','leak','fluid','fibro','inflam'},'nephron':{'gfr','injury','urea','k','acid'},'brain':{'swell','mass','shift','hern','isch','perf','amm'},'cell':{'mem','outer','inner','leak','mito','store','tox','swell'}}
 errs=0
@@ -16,7 +21,7 @@ for d in DIS:
   for a,b,t in d['links']:
     assert a in ids and b in ids,(d['id'],a,b)
   assert len(d['phases'])==4
-  for c in d['complications']:
+  for c in d['complications']+[d['main']]:
     V=D[c['scene']['a']];W=f"{d['id']}/{c['id']}"
     for k in c['state']:
       if k not in V: print('bad state var',W,k);errs+=1

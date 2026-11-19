@@ -34,6 +34,7 @@ svg{width:100%;height:auto;display:block}
 h2{margin:6px 0 0;font-size:21px}
 a.lab3d{display:inline-block;margin:8px 6px 0 0;padding:8px 14px;border:1px solid var(--acc);border-radius:999px;color:var(--acc);text-decoration:none;font-weight:600;font-size:14px}
 a.lab3d:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+a.lab3d.main{display:block;margin:10px 0 0;padding:10px 14px;border-radius:14px;border:0;color:#fff;background:linear-gradient(120deg,#0a7f8f,#3a56c8);text-align:left}a.lab3d.main b{display:block;font-size:15px}a.lab3d.main{font-weight:500;font-size:12.5px}.hub{cursor:pointer}
 .hint{color:var(--mute);font-size:13px;text-align:center;margin:4px 0 0}
 @keyframes beat{50%{transform:scale(var(--a))}}
 .rx ul{padding-left:0}.rx li{list-style:none;margin:5px 0}.rx b{display:inline-block;min-width:46px;font-size:12px}.up b{color:#2bb673}.dn b{color:#ef5b52}
@@ -85,12 +86,13 @@ function wheel(){
   g+=`<line class="${s>.12?'flow':''}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col(s)}" stroke-width="${.8+4*clamp(s)}" stroke-opacity="${.12+.88*clamp(s)}" stroke-dasharray="${s>.12?'6 6':'2 6'}"/>`});
  C.forEach(c=>{const[x,y]=pos(c),s=sev(c),k=col(s),l=c.n.length;
   g+=`<g class="node ${s>.6?'hot':''}" tabindex="0" role="button" data-id="${c.id}" aria-label="${c.n.join('')}: ${c.val(s)}"><circle r="39" cx="${x}" cy="${y}" fill="var(--panel)"/><circle class="glow" r="39" cx="${x}" cy="${y}" fill="${k}" fill-opacity="${.08+.3*clamp(s)}"/><circle r="39" cx="${x}" cy="${y}" fill="none" stroke="${k}" stroke-width="${2+2.5*clamp(s)}"/>${c.n.map((t,i)=>`<text x="${x}" y="${y+4+(i-(l-1)/2)*13}">${t}</text>`).join('')}</g>`});
- g+=`<g class="hub"><circle cx="200" cy="200" r="48" fill="var(--panel)" stroke="${col(p)}" stroke-width="3.5"/><text x="200" y="206">${type.toUpperCase()}</text></g>`;
+ g+=`<g class="hub" data-hub tabindex="0" role="button" aria-label="Open DKA and HHS itself: photoreal specimen and 3D model"><circle cx="200" cy="200" r="48" fill="var(--panel)" stroke="${col(p)}" stroke-width="3.5"/><text x="200" y="206">${type.toUpperCase()}</text></g>`;
  const act=E.map(([a,b,t])=>[Math.min(sev(M[a]),sev(M[b])),t]).filter(e=>e[0]>.15).sort((a,b)=>b[0]-a[0]).slice(0,3);
  return `<svg viewBox="0 0 400 400" role="img" aria-label="${type.toUpperCase()} and five complications">${g}</svg>
+ <a class="lab3d main" href="lab-meta.html" data-lab="meta"><b>DKA and HHS itself</b>Photoreal specimen and 3D interactive model of the disease</a>
  <div class="chips">${C.map(c=>`<button class="chip" data-id="${c.id}" style="border-color:${col(sev(c))}"><b>${c.n.join('').replace('-','')}</b>${c.val(sev(c))}</button>`).join('')}</div>
  <div class="panel"><strong>Active links</strong>${act.length?`<ul>${act.map(e=>`<li>${e[1]}</li>`).join('')}</ul>`:'<div>No links are active yet. Advance the disease to see them.</div>'}</div>
- <p class="hint">Tap a complication to see and hear it at organ and cell level, then open its 3D lab.</p>`}
+ <p class="hint">Tap the centre for the disease itself, or a complication to see and hear it at organ and cell level.</p>`}
 function detail(c){const s=sev(c),k=col(s);
  return `<button data-back style="margin-top:12px">← DKA and HHS map</button><h2>${c.n.join('').replace('-','')}</h2><div style="color:${k};font-weight:600">${c.val(s)}</div><div class="bar"><i style="width:${Math.round(clamp(s)*100)}%;background:${k}"></i></div>
  <div class="row"><button data-lv="org" aria-pressed="${lvl==='org'}">Organ level</button><button data-lv="cell" aria-pressed="${lvl==='cell'}">Cell level</button></div>
@@ -117,7 +119,8 @@ $('#presets').addEventListener('click',e=>{const b=e.target.closest('[data-p]');
 $('#prog').addEventListener('input',e=>{p=e.target.value/100;render();clearTimeout(vtm);vtm=setTimeout(()=>vq(PHM[type][ph4()]),700)});
 $('#rx').addEventListener('click',e=>{rx=!rx;e.currentTarget.setAttribute('aria-pressed',rx);render();vq(RS)});
 $('#view').addEventListener('click',e=>{const T=s=>e.target.closest(s);
- if(T('[data-lv]')&&open){lvl=T('[data-lv]').dataset.lv;render();vq(M[open][lvl])}
+ if(T('[data-hub]')&&!open){const a=$('a.lab3d.main');if(a)a.click()}
+ else if(T('[data-lv]')&&open){lvl=T('[data-lv]').dataset.lv;render();vq(M[open][lvl])}
  else if(T('[data-id]')&&!open){open=T('[data-id]').dataset.id;lvl=null;render();scrollTo(0,0);vq(M[open].org)}
  else if(T('[data-back]')){open=null;lvl=null;render()}
  else if(T('.rx li'))vq(T('.rx li').textContent)});

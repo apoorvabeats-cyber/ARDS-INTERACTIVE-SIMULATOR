@@ -34,6 +34,7 @@ svg{width:100%;height:auto;display:block}
 h2{margin:6px 0 0;font-size:21px}
 a.lab3d{display:inline-block;margin:8px 6px 0 0;padding:8px 14px;border:1px solid var(--acc);border-radius:999px;color:var(--acc);text-decoration:none;font-weight:600;font-size:14px}
 a.lab3d:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+a.lab3d.main{display:block;margin:10px 0 0;padding:10px 14px;border-radius:14px;border:0;color:#fff;background:linear-gradient(120deg,#0a7f8f,#3a56c8);text-align:left}a.lab3d.main b{display:block;font-size:15px}a.lab3d.main{font-weight:500;font-size:12.5px}.hub{cursor:pointer}
 .hint{color:var(--mute);font-size:13px;text-align:center;margin:4px 0 0}
 @keyframes beat{50%{transform:scale(var(--a))}}
 .rx ul{padding-left:0}.rx li{list-style:none;margin:5px 0}.rx b{display:inline-block;min-width:46px;font-size:12px}.up b{color:#2bb673}.dn b{color:#ef5b52}
@@ -116,12 +117,13 @@ function wheel(){
   <circle r="39" cx="${x}" cy="${y}" fill="var(--panel)"/><circle class="glow" r="39" cx="${x}" cy="${y}" fill="${k}" fill-opacity="${.08+.3*s}"/>
   <circle r="39" cx="${x}" cy="${y}" fill="none" stroke="${k}" stroke-width="${2+2.5*s}"/>
   ${c.n.map((t,i)=>`<text x="${x}" y="${y+4+(i-(l-1)/2)*13}">${t}</text>`).join('')}</g>`});
- g+=`<g class="hub"><circle cx="200" cy="200" r="48" fill="var(--panel)" stroke="${col(p)}" stroke-width="3.5"/><text x="200" y="206">Sepsis</text></g>`;
+ g+=`<g class="hub" data-hub tabindex="0" role="button" aria-label="Open Sepsis itself: photoreal specimen and 3D model"><circle cx="200" cy="200" r="48" fill="var(--panel)" stroke="${col(p)}" stroke-width="3.5"/><text x="200" y="206">Sepsis</text></g>`;
  const act=E.map(([a,b,t])=>[Math.min(sev(M[a]),sev(M[b])),t]).filter(e=>e[0]>.15).sort((a,b)=>b[0]-a[0]).slice(0,3);
  return `<svg viewBox="0 0 400 400" role="img" aria-label="Sepsis and its complications">${g}</svg>
+ <a class="lab3d main" href="lab-main.html" data-lab="main"><b>Sepsis itself</b>Photoreal specimen and 3D interactive model of the disease</a>
  <div class="chips">${C.map(c=>`<button class="chip" data-id="${c.id}" style="border-color:${col(sev(c))}"><b>${c.n.join('').replace('-','')}</b>${c.val(sev(c))}</button>`).join('')}</div>
  <div class="panel"><strong>Active links</strong>${act.length?`<ul>${act.map(e=>`<li>${e[1]}</li>`).join('')}</ul>`:'<div>No organ links are active yet. Advance the disease to see them.</div>'}</div>
- <p class="hint">Tap a complication to open its mechanism and its 3D lab.</p>`;
+ <p class="hint">Tap the centre for sepsis itself, or a complication to open its mechanism and its 3D lab.</p>`;
 }
 
 function detail(c){
@@ -247,7 +249,8 @@ document.getElementById('rx').addEventListener('click',()=>vq(MV.rs));
 const cellText=c=>'Cell level. '+c.st.map((t,i)=>'Step '+(i+1)+'. '+t[0]+'. '+t[1]+'.').join(' ');
 document.getElementById('view').addEventListener('click',e=>{
  const T=s=>e.target.closest(s);
- if(T('[data-id]')&&open&&!T('[data-z]')&&!T('[data-seg]')&&!T('[data-dg]'))vq(MV.org[open]);
+ if(T('[data-hub]')&&!open){const a=$('a.lab3d.main');if(a)a.click()}
+ else if(T('[data-id]')&&open&&!T('[data-z]')&&!T('[data-seg]')&&!T('[data-dg]'))vq(MV.org[open]);
  else if(T('[data-z]')&&open){const c=M[open];vq(zoom===1?cellText(c):zoom===2?'Nephron lab. Tap a segment to hear what happens there, and switch drugs on to see the nephron respond.':MV.org[open])}
  else if(T('[data-seg]')){const g=SEG.find(x=>x[0]===seg);if(g)vq(g[1]+'. '+g[4])}
  else if(T('[data-dg]')){const d=DG.find(x=>x[0]===T('[data-dg]').dataset.dg);if(d)vq(d[1]+(dg[d[0]]?' switched on. ':' switched off. ')+d[3])}

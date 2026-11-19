@@ -40,3 +40,10 @@ live readout (HUD), a severity thermometer, view chips (Organ / Cut-away / Cells
 - DKA labs (dka/lab-*.html) and sepsis/lab-shock.html pass their own `key` rows to the same mount call.
 - `FlowAid.vo(text, queue)` speaks on a standalone page; inside Pathology Live it posts `{vo, q}` to the parent, which owns the voice. `{stopvo:1}` cancels it.
 - sepsis/lab-shock.html now uses the same shell as the DKA labs (Specimen key `shock`, with fluid slider in the Drugs tab). Cache-bust string is 20261119g.
+
+## Disease-level labs ("<Disease> itself")
+Every disease tab in Pathology Live also has a lab for the disease itself: a photoreal specimen (Organ / Cut-away / Cells, Normal and Diseased) plus the interactive 3D model.
+- Open it by tapping the centre circle of the disease map, or the "<Disease> itself" button under the map. `cc/lab.html?d=<disease>&c=main`. Sepsis uses `sepsis/lab-main.html` (a redirect to the same page). DKA/HHS keeps `dka/lab-meta.html` as its disease-level lab.
+- Data: `cc/src/d6.py` holds `MAIN` (one `main` record per disease, built with `comp("main", ...)`), `MODELS` (specimen entries `<disease>-main`) and `KN` (cell-particle meanings). `build_db.py` attaches `d['main']`; `gen_models.py` rewrites `cc/pathology-models.json`; `marks_main.py` adds the pins to `sepsis/marks.json` (regenerate with `cd cc/src && python3 marks_src.py ../../sepsis/marks.json`).
+- Specimens reuse the existing organ models and textures with disease-specific text and pins. The clinical wording needs specialist review.
+- To add a disease: add a `MAIN` entry, a `MODELS` entry, marks in `marks_main.py`, and `["main","<Disease> itself"]` in `MODS` in `pathology-live.html`.

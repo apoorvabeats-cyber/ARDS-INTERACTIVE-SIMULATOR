@@ -313,6 +313,9 @@ SPEC["status-rhabdo"] = [
  L("cells", "Myoglobin", "Myoglobin", "Myoglobin blocks tubules and turns the urine tea-coloured.", "Helps: Keep urine flowing.", part="Myoglobin"),
 ]
 
+import marks_main
+SPEC.update(marks_main.build(L))
+
 def build():
     out = {"organ": ORGAN, "spec": SPEC}
     return out

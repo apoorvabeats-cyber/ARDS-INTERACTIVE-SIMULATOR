@@ -38,6 +38,7 @@ a.lab3d:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @keyframes beat{50%{transform:scale(var(--a))}}
 .rx ul{padding-left:0}.rx li{list-style:none;margin:5px 0}.rx b{display:inline-block;min-width:46px;font-size:12px}.up b{color:#2bb673}.dn b{color:#ef5b52}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+a.lab3d.main{display:block;margin:10px 0;padding:12px 14px;border-radius:14px;background:linear-gradient(135deg,#12c9b4,#3f8cff);color:#04131f;text-decoration:none;font-size:13px;line-height:1.35}a.lab3d.main b{display:block;font-size:15px}.hub{cursor:pointer}
 </style>
 </head><body><main>
 <h1 id="ttl">Loading</h1><div id="stage"></div>
@@ -71,12 +72,13 @@ function wheel(){
  C.forEach(c=>{const[x,y]=pos(c),s=sev(c),k=col(s),l=c.name.length;
   g+=`<g class="node ${s>.6?'hot':''}" tabindex="0" role="button" data-id="${c.id}" aria-label="${esc(nm(c))}: ${esc(val(c))}"><circle r="39" cx="${x}" cy="${y}" fill="var(--panel)"/><circle class="glow" r="39" cx="${x}" cy="${y}" fill="${k}" fill-opacity="${.08+.3*clamp(s)}"/><circle r="39" cx="${x}" cy="${y}" fill="none" stroke="${k}" stroke-width="${2+2.5*clamp(s)}"/>${c.name.map((t,i)=>`<text x="${x}" y="${y+4+(i-(l-1)/2)*13}">${esc(t)}</text>`).join('')}</g>`});
  const hl=hubLines();
- g+=`<g class="hub"><circle cx="200" cy="200" r="48" fill="var(--panel)" stroke="${col(p)}" stroke-width="3.5"/>${hl.map((t,i)=>`<text style="font-size:${hl.length>2?12:14}px" x="200" y="${204+(i-(hl.length-1)/2)*15}">${esc(t)}</text>`).join('')}</g>`;
+ g+=`<g class="hub" data-hub tabindex="0" role="button" aria-label="Open ${esc(DZ.name)} itself: photoreal specimen and 3D model"><circle cx="200" cy="200" r="48" fill="var(--panel)" stroke="${col(p)}" stroke-width="3.5"/>${hl.map((t,i)=>`<text style="font-size:${hl.length>2?12:14}px" x="200" y="${204+(i-(hl.length-1)/2)*15}">${esc(t)}</text>`).join('')}</g>`;
  const act=E.map(([a,b,t])=>[Math.min(sev(M[a]),sev(M[b])),t]).filter(e=>e[0]>.15).sort((a,b)=>b[0]-a[0]).slice(0,3);
  return `<svg viewBox="0 0 400 400" role="img" aria-label="${esc(DZ.name)} and its complications">${g}</svg>
+ <a class="lab3d main" href="lab.html?d=${DZ.id}&c=main" data-lab="main"><b>${esc(DZ.name)} itself</b>Photoreal specimen and 3D interactive model of the disease</a>
  <div class="chips">${C.map(c=>`<button class="chip" data-id="${c.id}" style="border-color:${col(sev(c))}"><b>${esc(nm(c))}</b>${esc(val(c))}</button>`).join('')}</div>
  <div class="panel"><strong>Active links</strong>${act.length?`<ul>${act.map(e=>`<li>${esc(e[1])}</li>`).join('')}</ul>`:'<div>No links are active yet. Advance the disease to see them.</div>'}</div>
- <p class="hint">Tap a complication to see and hear it at organ and cell level, then open its 3D lab.</p>`}
+ <p class="hint">Tap the centre for the disease itself, or a complication to see and hear it at organ and cell level, then open its 3D lab.</p>`}
 function detail(c){const s=sev(c),k=col(s);
  return `<button data-back style="margin-top:12px">← ${esc(DZ.name)} map</button><h2>${esc(nm(c))}</h2><div style="color:${k};font-weight:600">${esc(val(c))}</div><div class="bar"><i style="width:${Math.round(clamp(s)*100)}%;background:${k}"></i></div>
  <div class="row"><button data-lv="org" aria-pressed="${lvl==='org'}">Organ level</button><button data-lv="cell" aria-pressed="${lvl==='cell'}">Cell level</button></div>
@@ -91,7 +93,8 @@ $('#presets').addEventListener('click',e=>{const b=e.target.closest('[data-p]');
 $('#prog').addEventListener('input',e=>{p=e.target.value/100;render();clearTimeout(vtm);vtm=setTimeout(()=>vq(DZ.phases[ph4()]),700)});
 $('#rx').addEventListener('click',e=>{rx=!rx;render();vq(DZ.rxtext)});
 $('#view').addEventListener('click',e=>{const T=s=>e.target.closest(s);
- if(T('[data-lv]')&&open){lvl=T('[data-lv]').dataset.lv;render();vq(M[open][lvl])}
+ if(T('[data-hub]')&&!open){const a=$('a.lab3d.main');if(a)a.click()}
+ else if(T('[data-lv]')&&open){lvl=T('[data-lv]').dataset.lv;render();vq(M[open][lvl])}
  else if(T('[data-id]')&&!open){open=T('[data-id]').dataset.id;lvl=null;render();scrollTo(0,0);vq(M[open].org)}
  else if(T('[data-back]')){open=null;lvl=null;render()}
  else if(T('[data-say]'))vq(T('[data-say]').dataset.say)});
