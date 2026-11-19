@@ -32,7 +32,7 @@ canvas{display:block;width:100%;height:100%}
 #lbl{position:absolute;left:12px;right:34px;bottom:10px;color:#e6f1fb;font-size:13px;line-height:1.35;text-shadow:0 1px 4px #000;pointer-events:none}
 #lbl b{display:block;font-size:15px}
 #hud{position:absolute;left:10px;color:#cfeee8;font:600 11px/1.45 system-ui,sans-serif;pointer-events:none;text-shadow:0 1px 3px #000;z-index:2;max-width:70%}
-#stage.flow #hud{top:8px}#stage.spec #hud{bottom:44px}
+#stage.flow #hud{bottom:88px;left:10px}#stage.spec #hud{bottom:44px}
 #hud span.warn{color:#ff9d8f}
 #tb{position:absolute;right:8px;top:8px;bottom:8px;width:14px;border:2px solid #7fd8c0;border-radius:3px 3px 9px 9px;display:flex;align-items:flex-end;overflow:hidden;z-index:2;pointer-events:none}
 #tf{display:block;width:100%;height:0;background:#e8d36a;transition:height .3s,background .3s}
@@ -83,8 +83,9 @@ input[type=range]{width:100%;accent-color:var(--acc)}
 </section>
 </main>
 <script src="../vendor/three128/three.min.js"></script>
-<script src="../sepsis/path-stage.js?v=20261119f"></script>
-<script src="../cc/specimen.js?v=20261119f"></script>
+<script src="../sepsis/path-stage.js?v=20261119g"></script>
+<script src="../cc/specimen.js?v=20261119g"></script>
+<script src="../cc/flow-aid.js?v=20261119g"></script>
 <script>
 
 const $=s=>document.querySelector(s),clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
@@ -177,7 +178,7 @@ cv.addEventListener('pointerup',ev=>{if(!dn[2]||Math.hypot(ev.clientX-dn[0],ev.c
  const i=h&&LAB.info[h.object.userData.k];if(!i)return;$('#info').innerHTML=`<strong>${i[0]}</strong><br>${i[1]}<br><em>Drugs and care:</em> ${i[2]}`});
 
 const VOD={lv:["Organ level", "Cell level", "Cell level"],ph:["Early DKA. At organ level, the blood glucose climbs. At cellular level, insulin is low, so glucose transporters stay shut and the liver begins to make ketones.", "Established DKA. At organ level, ketones and acid build up in the blood and the breathing deepens. At cellular level, fatty acids are burned in liver mitochondria into ketone acids.", "Severe DKA. At organ level, the pH is very low and potassium shifts out of cells. At cellular level, muscle and fat cells starve in a sea of glucose.", "Critical DKA. At organ level, the patient is drowsy, dehydrated and at risk of arrhythmia. At cellular level, acid inhibits enzymes, and total body potassium is badly depleted."]};
-const VOq=(t,q)=>{if(window.__mute)return;if(parent!==window)parent.postMessage({vo:t,q:!!q},'*')};
+const VOq=(t,q)=>{if(window.__mute)return;FlowAid.vo(t,q)};
 const phase=()=>sev<.25?0:sev<.5?1:sev<.75?2:3;let lastPh=phase(),vt_=0;
 const plain=h=>h.replace(/<br>/g,'. ').replace(/<[^>]+>/g,'');
 $('#stages').addEventListener('click',()=>VOq(VOD.lv[stage]+'. '+ST[stage][0]+'. '+(ST[stage][5]||ST[stage][3])));
@@ -205,10 +206,16 @@ new MutationObserver(hud).observe($('#out'),{childList:true,subtree:true,charact
 const NAVL={organ:'Organ',cut:'Cut-away',cells:'Cells'};
 function navBuild(){const n=$('#nav');if(!SPI){n.style.display='none';return}
  n.innerHTML=SPI.views.map(x=>`<button data-v="${x.id}" aria-pressed="${!!window.__specOn&&x.id===curV}">${NAVL[x.id]||x.label}</button>`).join('')+`<button data-v="flow" aria-pressed="${!window.__specOn}">Flow model</button>`}
+const FA=FlowAid.mount({stage:stg,key:[['#ffffff','White dots','glucose, in the blood stream and moving toward the muscle cell transporters'],['#ff8a2a','Orange dots','ketone acids, in the blood and leaving the liver cell'],['#4fd3ff','Light blue dots','insulin released by the pancreas. Fewer dots mean less insulin'],['#f0e060','Yellow dots','fatty acids flooding into the liver cell'],['#b070ff','Purple dots','potassium leaking out of the muscle and fat cell'],['#4aa8ff','Blue posts','glucose transporters. They shut when insulin is missing','sq'],['#f0a030','Orange spheres','liver mitochondria, which turn fatty acids into ketones','sq']],
+ intro:'This is a metabolism model of diabetic ketoacidosis and hyperosmolar states. The pancreas, liver, muscle and fat share one blood stream. Watch the glucose and ketones build up when insulin is missing.',
+ state(){const on=RX.filter(d=>rx[d[0]]).map(d=>d[1]),r=plain($('#out').innerHTML.split('<ul>')[0]);
+  return 'At '+Math.round(sev*100)+' percent severity the readings are: '+r+'. '+VOD.ph[phase()]+(on.length?' Treatments switched on: '+on.join(', ')+'.':' No treatment is switched on yet.')},
+ stages:()=>ST.map((s,i)=>({t:(VOD.lv[i]||'')+'. '+s[0]+'. '+s[5],fn:()=>go(i)})).concat([{t:'Back to the whole scene.',fn:()=>go(0)}]),
+ outro:'Open the Drugs tab to switch treatments on or off and watch the particles change, or the Disease tab to replay the disease from early to critical.'});
 const setMode=on=>{window.__specOn=!!(on&&SPI);cv.style.display=window.__specOn?'none':'';$('#stages').style.display=window.__specOn?'none':'';
  stg.className=window.__specOn?'spec':'flow';
  if(SPI){if(window.__specOn){SPI.show();SPI.sync(effSev())}else SPI.hide()}
- if(!window.__specOn)fit();navBuild();hud();expBuild(true)};
+ if(!window.__specOn)fit();FA&&FA.show(!window.__specOn);navBuild();hud();expBuild(true)};
 window.__specSync=()=>{if(SPI&&window.__specOn)SPI.sync(effSev());hud()};
 let expKey='';function expBuild(force){const e=$('#exp');
  if(!window.__specOn||!SPI){e.innerHTML='<span class="hint">Use the stage buttons below to fly through the flow model. Tap parts of the 3D scene to inspect them.</span>';expKey='flow';return}
@@ -219,7 +226,7 @@ setInterval(()=>{if(window.__specOn)expBuild(false)},700);
 $('#nav').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b||!SPI)return;const id=b.dataset.v;
  if(id==='flow'){setMode(false);VOq('Flow model. Stages, drugs and outputs.')}else{curV=id;if(!window.__specOn)setMode(true);SPI.view(id);navBuild();expBuild(true);VOq((NAVL[id]||id)+' view.')}});
 $('#tabs').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.pane').forEach((x,i)=>x.classList.toggle('on',i===+b.dataset.t))});
-if(window.Specimen&&window.PathStage)Specimen.init({key:'dka-meta',wrap:$('#spec'),bar:$('#sview'),after:$('#revslot'),leader:true,ver:'20261119f',
+if(window.Specimen&&window.PathStage)Specimen.init({key:'dka-meta',wrap:$('#spec'),bar:$('#sview'),after:$('#revslot'),leader:true,ver:'20261119g',
  onLabel:h=>{if(!window.__lbl1){window.__lbl1=1;window.__mute=true;setTimeout(()=>{window.__mute=false},60)}$('#info').innerHTML=h},onPick:p=>{$('#info').innerHTML='<strong>'+escH(p.title)+'</strong><br>'+escH(p.body)+(p.care?'<br><em>Care:</em> '+escH(p.care):'')}}).then(api=>{
  if(!api){hud();return}SPI=api;setMode(true)});
 hud();

@@ -32,4 +32,11 @@ live readout (HUD), a severity thermometer, view chips (Organ / Cut-away / Cells
 - Cut-away is a real cross-section: GLB meshes are sliced at plane `x = entry.cutX` and the loops are triangulated into a cap (`buildCap`).
   The lung is cut through the right lung (`cutX = -0.6`). Cut pins use `cut:[u,v]` as fractions of the cap bounding box (x1.6).
 - Procedural organs (vessel, bleed, pancreas, bowel, muscle, skin) still use the simple disc cut and have organ and cell pins only.
-- Edit pins in cc/src/marks_src.py and regenerate: `cd cc/src && python3 marks_src.py ../../sepsis/marks.json`. Cache-bust string is 20261119f.
+- Edit pins in cc/src/marks_src.py and regenerate: `cd cc/src && python3 marks_src.py ../../sepsis/marks.json`. Cache-bust string is 20261119g.
+
+## Flow model: particle key and voice-over (cc/flow-aid.js)
+`FlowAid.mount({stage, key, intro, state, stages, outro})` adds three buttons to the flow-model stage: **Key** (a panel that names every coloured particle and shape), **Explain flow** (a male voice-over that walks through the scene, the key rows, the current readings, each camera stage and the drugs) and **Voice on/off**.
+- cc/lab.html: each archetype in `AR.*` returns `key` (rows of `[css colour, "Red dots", "meaning", optional shape class]`) and `say` (one-line scene description). Cell scenes build the key from the scene colours and `scene.kn` in db.json (meanings of inside, outside, leak and toxin particles for that complication). Keep `key` in step with any new particle set.
+- DKA labs (dka/lab-*.html) and sepsis/lab-shock.html pass their own `key` rows to the same mount call.
+- `FlowAid.vo(text, queue)` speaks on a standalone page; inside Pathology Live it posts `{vo, q}` to the parent, which owns the voice. `{stopvo:1}` cancels it.
+- sepsis/lab-shock.html now uses the same shell as the DKA labs (Specimen key `shock`, with fluid slider in the Drugs tab). Cache-bust string is 20261119g.

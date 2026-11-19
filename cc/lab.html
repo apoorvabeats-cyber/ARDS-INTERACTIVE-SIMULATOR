@@ -18,7 +18,7 @@ canvas{display:block;width:100%;height:100%}
 #lbl{position:absolute;left:12px;right:34px;bottom:10px;color:#e6f1fb;font-size:13px;line-height:1.35;text-shadow:0 1px 4px #000;pointer-events:none}
 #lbl b{display:block;font-size:15px}
 #hud{position:absolute;left:10px;color:#cfeee8;font:600 11px/1.45 system-ui,sans-serif;pointer-events:none;text-shadow:0 1px 3px #000;z-index:2;max-width:70%}
-#stage.flow #hud{top:8px}#stage.spec #hud{bottom:44px}
+#stage.flow #hud{bottom:88px;left:10px;max-width:70%}#stage.spec #hud{bottom:44px}
 #hud span.warn{color:#ff9d8f}
 #tb{position:absolute;right:8px;top:8px;bottom:8px;width:14px;border:2px solid #7fd8c0;border-radius:3px 3px 9px 9px;display:flex;align-items:flex-end;overflow:hidden;z-index:2;pointer-events:none}
 #tf{display:block;width:100%;height:0;background:#e8d36a;transition:height .3s,background .3s}
@@ -72,14 +72,15 @@ input[type=range]{width:100%;accent-color:var(--acc)}
 </main>
 <script src="engine.js"></script>
 <script src="../vendor/three128/three.min.js"></script>
-<script src="../sepsis/path-stage.js?v=20261119f"></script>
-<script src="path-extra.js?v=20261119f"></script>
-<script src="specimen.js?v=20261119f"></script>
+<script src="../sepsis/path-stage.js?v=20261119g"></script>
+<script src="path-extra.js?v=20261119g"></script>
+<script src="specimen.js?v=20261119g"></script>
+<script src="flow-aid.js?v=20261119g"></script>
 <script>
 const $=s=>document.querySelector(s),clamp=CCE.clamp;
 const calm=matchMedia('(prefers-reduced-motion:reduce)').matches;
 const QS=new URLSearchParams(location.search),DID=QS.get('d')||'ards',CID=QS.get('c');
-const VOq=(t,q)=>{if(window.__mute)return;if(parent!==window)parent.postMessage({vo:t,q:!!q},'*')};
+const VOq=(t,q)=>{if(window.__mute)return;FlowAid.vo(t,q)};
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 fetch('db.json?v='+(QS.get('v')||'')).then(r=>r.json()).then(db=>{
  const dz=db.diseases.find(x=>x.id===DID),c=dz&&(dz.complications.find(x=>x.id===CID)||dz.complications[0]);
@@ -117,7 +118,7 @@ AR.vessel=()=>{
  const holes=bd.slice(0,5).map(h=>{const p=P.getPointAt(h[0]),a=h[1],m=add(new THREE.Mesh(new THREE.CircleGeometry(.38,14),M(0x2a0508,.95,{side:2})),V(p.x,p.y+Math.cos(a)*1.82,p.z+Math.sin(a)*1.82));m.lookAt(p.x,p.y+Math.cos(a)*4,p.z+Math.sin(a)*4);return m});
  const NT=30,ts=[];for(let i=0;i<NT;i++){const t=(i+.5)/NT*.9+.05,p=P.getPointAt(t),a=rnd()*PI*2,r=4.2+rnd()*2.4;ts.push(T('tis',add(new THREE.Mesh(new THREE.SphereGeometry(.85,14,10),M(sc.tc,.85)),V(p.x+(rnd()-.5)*2,p.y+Math.cos(a)*r,p.z+Math.sin(a)*r))))}
  const rbc=new THREE.Color();
- return{lv:['Organ level','Vessel level','Cell level'],leg:'Red: blood cells. Yellow: platelet clots. Pale blue: leaked plasma. Dark red outside: bleeding. Tissue cells fade with ischaemia.',
+ return{lv:['Organ level','Vessel level','Cell level'],key:[['#ff3b4a','Red dots','blood cells flowing along the vessel. They turn blue-purple when the blood is short of oxygen'],['#f0c040','Yellow clumps','platelet and fibrin clots that block the flow','sq'],['#a8dcff','Pale blue dots','plasma leaking out through the vessel wall'],['#e01a35','Dark red dots','blood escaping through holes in the wall, which is bleeding'],[FlowAid.css(sc.tc),'Round tissue cells','the cells this vessel feeds. They swell, then darken and shrink when oxygen supply fails']],say:'Blood flows along a capillary bed that feeds a patch of tissue. Watch the speed of the red cells, whether clots build up, whether plasma leaks out and whether the tissue cells darken.',leg:'Red: blood cells. Yellow: platelet clots. Pale blue: leaked plasma. Dark red outside: bleeding. Tissue cells fade with ischaemia.',
  st:[['Vascular bed',V(0,0,0),24,.4,.15,'A capillary bed and the tissue it feeds. Flow, leak, clots and bleeding change as the disease progresses.'],['Vessel wall',V(0,0,0),7.5,.5,.1,'The wall and lumen. Cells flow through; plasma and cells escape when the wall fails.'],['Tissue cells',V(5,5,0),6,.3,.1,'The cells that depend on this vessel for oxygen. They swell, dim and die when supply fails.']],
  parts:{wall:['Vessel wall','The endothelium holds plasma in and keeps blood fluid. Injury makes it leaky and procoagulant.','Treat the cause first; supportive fluids and products target the specific defect.'],tis:['Tissue cells','Cells downstream swell from leaked fluid and darken when oxygen delivery falls.','Restore perfusion and oxygen delivery early.'],plt:['Platelets and fibrin','Platelets and fibrin form clots. Too many block small vessels; too few let blood escape.','Balance clotting against bleeding for the specific cause.']},
  tag(){},
@@ -140,7 +141,7 @@ AR.heart=()=>{
  const P=CR([V(-9,7,0),V(-6.5,5,0),V(-3.8,3.8,0),V(-2.6,0,0),V(-1.6,4.6,0),V(.4,7.4,0),V(2.4,6.6,0),V(3.2,3.9,0),V(2.4,0,0),V(3.4,4.6,0),V(5.4,8,0),V(8.4,9,0)]),PL=P.getLength();
  const NB=70,bt=[];for(let i=0;i<NB;i++)bt.push(rnd());const bb=mkp(S,NB,0x4a7ae8,.55),br=mkp(S,NB,0xff5060,.55);
  const NG=40,gg=[];for(let i=0;i<NG;i++)gg.push([rnd()-.5,rnd()-.5,rnd()-.5,rnd()]);const cg=mkp(S,NG,0x8a5ad8,.6);
- return{lv:['Organ level','Chamber level','Wall level'],leg:'Blue: venous blood into the right heart. Red: oxygenated blood to the body. Purple: congested venous blood.',
+ return{lv:['Organ level','Chamber level','Wall level'],key:[['#4a7ae8','Blue dots','venous blood returning to the right side of the heart'],['#ff5060','Red dots','oxygen-rich blood pumped out by the left side to the body'],['#8a5ad8','Purple dots','congested blood backing up behind a failing ventricle'],['#3a8fd8','Blue chamber','the right ventricle, shown on the left of the screen','sq'],['#c0392b','Red chamber','the left ventricle, shown on the right','sq']],say:'This is a simplified heart. Blood returns to the right ventricle, crosses the lungs, and is pumped out by the left ventricle. Watch how the chambers fill, how hard they squeeze and where blood backs up.',leg:'Blue: venous blood into the right heart. Red: oxygenated blood to the body. Purple: congested venous blood.',
  st:[['Heart',V(0,3.5,0),25,.3,.1,'Right and left ventricles, atria and great vessels. Output falls as chambers dilate and fail.'],['Right ventricle',V(-2.6,0,0),7,0,.1,'The thin walled right ventricle pumps against the lung circulation. It dilates when that load rises.'],['Septum',V(0,0,0),6,0,.15,'The septum bows toward the left ventricle when right pressures exceed left, which also lowers left filling.']],
  parts:{rv:['Right ventricle','Thin walled and built for low pressure. Pressure overload dilates it and cuts output.','Reduce right ventricular afterload and support perfusion.'],lv:['Left ventricle','Supplies the body. Output falls when it is underfilled, squeezed by the septum, or weak.','Match preload and support contractility.'],sept:['Interventricular septum','Shifts toward the left ventricle as right pressure rises, reducing left filling.','Lowering right sided pressure lets the septum return.'],vein:['Systemic veins','Pressure backs up here, causing congestion of the liver, kidneys and gut.','Relieve congestion with careful decongestion once perfusion is safe.']},
  tag(){},
@@ -169,7 +170,7 @@ AR.alveolus=()=>{
  const NA=60,at=[];for(let i=0;i<NA;i++)at.push([rnd(),rnd()*.9]);const air=mkp(S,NA,0xcfeeff,.45),aw=CR([V(-11,0,0),V(-6,.5,0),V(-2,0,0),V(2,0,0)]);
  const NI=50,ni=[];for(let i=0;i<NI;i++)ni.push([Math.floor(rnd()*7),rnd()*PI*2,rnd()*PI]);const nu=mkp(S,NI,0xf0d040,.5);
  const NK=70,kk=[];for(let i=0;i<NK;i++)kk.push([1+Math.floor(rnd()*6),rnd(),(rnd()-.5)*.7,(rnd()-.5)*.7]);const lk=mkp(S,NK,0xeaf6ff,.8);
- return{lv:['Organ level','Alveolar level','Barrier level'],leg:'White: air. Pink fill: alveolar fluid. Grey web: collagen. Yellow: neutrophils. Bubbles outside: air leak.',
+ return{lv:['Organ level','Alveolar level','Barrier level'],key:[['#cfeeff','White dots','air moving down the airway into the air sacs'],['#f0d040','Yellow dots','neutrophils, the inflammatory cells that attack the lung'],['#d890a8','Pink fill','fluid flooding the air sacs','sq'],['#b8a890','Grey web','scar collagen that stiffens the lung','sq'],['#eaf6ff','Bright bubbles','air leaking out of the lung into the chest']],say:'Air travels down the airway into a cluster of air sacs, the alveoli. Watch how much air reaches them, how much fluid fills them, and whether inflammatory cells, scar or leaking air appear as the disease advances.',leg:'White: air. Pink fill: alveolar fluid. Grey web: collagen. Yellow: neutrophils. Bubbles outside: air leak.',
  st:[['Lung unit',V(3,0,0),21,.5,.2,'A bronchiole feeding a cluster of alveoli, with the pleural space around them.'],['Alveolus',V(4,0,0),8,.4,.1,'Air fills the sac and capillaries wrap the wall. Stretch, fluid and scarring change how it behaves.'],['Air blood barrier',V(5.8,0,2.2),4,.2,.1,'A thin wall lets gas pass from air to blood. Fluid or collagen thickens it and gas exchange falls.']],
  parts:{alv:['Alveolus','The gas exchange sac. Overstretch tears it; fluid floods it; scarring stiffens it.','Protect the alveoli with limited volume and pressure, and treat the cause.'],wall:['Alveolar wall','Thin and stretchy when healthy. Becomes leaky, torn or thickened in disease.','Limit injury and let the wall recover.'],cap:['Capillary','Carries blood past the air. Leaks fluid into the alveolus when pressure or permeability rises.','Lower capillary pressure for cardiogenic edema; treat permeability injury supportively.'],pleura:['Pleural space','Air that escapes from torn alveoli collects here and can collapse the lung.','Decompress a tension pneumothorax urgently.'],fluid:['Alveolar fluid','Fluid fills the sac so no gas exchange happens there.','Remove fluid by lowering pressure or clearing the cause.'],fibro:['Collagen','Scar tissue stiffens the wall and thickens the barrier. It does not reverse quickly.','Early injury prevention matters most.'],airway:['Bronchiole','Air passes here to reach the sacs.','Keep the airway clear and protected.']},
  tag(){},
@@ -191,7 +192,7 @@ AR.nephron=()=>{
  const NJ=40,jt=[];for(let i=0;i<NJ;i++)jt.push([rnd(),rnd()*PI*2,rnd()*.6]);const ca=mkp(S,NJ,0x7a4a20,.55);
  const mk=(n,c,s)=>({n,s:mkp(S,n,c,s),q:[...Array(n)].map(()=>[rnd(),rnd()*PI*2,2+rnd()*2.2,rnd()])}),ur=mk(70,0xf0a030,.55),kp=mk(60,0xb060f0,.6),hp=mk(60,0xff6070,.55);
  const orb=(o,f,dt)=>{const n=Math.round(o.n*f);o.q.forEach((q,i)=>{if(i>=n){o.s.hide(i);return}const p=P.getPointAt(.05+.9*q[0]),a=q[1]+(calm?0:bph*.15*(q[3]+.3));o.s.put(i,p.x,p.y+Math.cos(a)*q[2],p.z+Math.sin(a)*q[2])});o.s.done()};
- return{lv:['Organ level','Tubule level','Glomerular level'],leg:'Pale blue: filtrate. Brown: casts and sloughed cells. Orange: urea. Purple: potassium. Pink: acid.',
+ return{lv:['Organ level','Tubule level','Glomerular level'],key:[['#9fd8ff','Pale blue dots','filtrate flowing along the tubule'],['#7a4a20','Brown dots','casts and sloughed tubule cells that block the flow'],['#f0a030','Orange dots','urea building up in the blood'],['#b060f0','Purple dots','potassium building up'],['#ff6070','Pink dots','acid, the hydrogen ions that lower the pH']],say:'This is a nephron, the working unit of the kidney. Blood is filtered at the glomerulus, and the filtrate runs along the tubule. Watch how much filtrate passes, whether the tubule blocks, and which waste particles pile up.',leg:'Pale blue: filtrate. Brown: casts and sloughed cells. Orange: urea. Purple: potassium. Pink: acid.',
  st:[['Nephron',V(2,-.5,0),22,.4,.15,'A glomerulus filters blood and the tubule shapes the urine. Injury and retained solutes show here.'],['Tubule cells',V(0,-.5,0),6.5,.3,.1,'Tubule cells do the work of reabsorption and acid and potassium handling. They are very sensitive to low flow.'],['Glomerulus',V(-9.5,3.2,0),5,.2,.1,'Blood is filtered here. Falling pressure or injury lowers filtration, so solutes build up.']],
  parts:{tub:['Tubule cells','Energy hungry cells that reabsorb solutes and secrete acid and potassium. They die first when perfusion falls.','Restore perfusion and avoid nephrotoxins.'],glom:['Glomerulus','The filter. Filtration falls when perfusion pressure or the filter itself is injured.','Restore perfusion pressure; avoid agents that drop it.'],lumen:['Tubular lumen','Filtrate flows here. Sloughed cells and casts can block it.','Maintain flow; dialyse for refractory overload.']},
  tag(){},
@@ -218,7 +219,7 @@ AR.brain=()=>{
  const neu=T('neuron',add(new THREE.Mesh(new THREE.SphereGeometry(1,18,12),M(0xf0c860,.9)),V(-1,-3.6,0),cg));add(new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,5,8),M(0xf0c860,.8)),V(-1,-6,0),cg);
  add(tube(CR([V(5,4,0),V(4,1,0),V(4,-2,0),V(5,-5,0)]),.35,M(0xd03a4a,.5)),null,cg);
  const NM=40,mm=[];for(let i=0;i<NM;i++)mm.push([rnd()*PI*2,rnd()*PI,rnd()]);const am=mkp(cg,NM,0x70e070,.34);
- return{lv:['Organ level','Midline level','Brainstem level','Cell level'],leg:'Pink: brain tissue. Blue: ventricles. Dark red: bleed. Yellow arrows of dots: pressure on the brain. Green: ammonia in the cell view.',
+ return{lv:['Organ level','Midline level','Brainstem level','Cell level'],key:[['#e8a8b8','Pink tissue','the two halves of the brain','sq'],['#5aa8ff','Blue spaces','the ventricles, which squeeze shut as the brain swells','sq'],['#c0202a','Dark red mass','a bleed or bruise that takes up space','sq'],['#ff4050','Red dots','blood flowing through the brain. Fewer dots mean less perfusion'],['#ffd040','Yellow dots','pressure pushing inward on the brain'],['#70e070','Green dots','ammonia around the cells in the cell view']],say:'The brain sits inside a rigid skull. Watch the blood flow, the size of the ventricles, any mass and the pressure arrows. Swelling or a mass squeezes the brain, pushes it across the midline and finally down through the gap at the base of the skull.',leg:'Pink: brain tissue. Blue: ventricles. Dark red: bleed. Yellow arrows of dots: pressure on the brain. Green: ammonia in the cell view.',
  st:[['Brain',V(0,-.5,0),19,.5,.15,'The brain inside the skull. Swelling or a mass raises pressure because the skull cannot expand.'],['Midline',V(0,.5,0),15,0,.05,'Seen from the front. Ventricles squeeze and the midline shifts away from a mass.'],['Brainstem',V(0,-3,0),7,.2,.05,'The brainstem sits below the tentorium. High pressure pushes brain down through the gap, which is herniation.'],['Brain cells',V(16,0,0),8,0,.05,'An astrocyte beside a capillary and a neuron. Astrocytes swell first in edema, and neurons fail without oxygen.']],
  parts:{brain:['Brain tissue','Fixed inside a rigid skull. Added volume raises pressure and lowers perfusion.','Keep head up, sedate, treat the cause and osmotherapy if needed.'],vent:['Ventricles','Fluid spaces that squeeze shut as the brain swells and shift away from a mass.','CSF drainage lowers pressure when an external drain is in place.'],mass:['Mass lesion','A bleed or contusion takes space and pushes the brain across the midline.','Surgical evacuation for a significant mass.'],skull:['Skull and tentorium','A rigid box. The tentorium divides it, and brain can be forced through its opening.','Do not wait for imaging if signs of herniation appear.'],stem:['Brainstem','Controls breathing and consciousness. Herniation squeezes it, causing coma and pupil changes.','Emergency osmotherapy, brief hyperventilation as a bridge, and surgery.'],astro:['Astrocyte','Swells first in cytotoxic edema. Takes up ammonia and converts it to glutamine, which draws water.','Lower the cause: ammonia, osmolality or hypoxia.'],neuron:['Neuron','Needs a constant supply of oxygen and glucose. Fails within minutes of ischaemia.','Maintain perfusion and oxygenation.']},
  tag(){},
@@ -246,7 +247,15 @@ AR.cell=()=>{
  const NO=70,oo=[...Array(NO)].map(()=>[rnd()*PI*2,rnd()*PI,rnd()]),po=mkp(cg,NO,sc.out||0x9be8ff,.6);
  const NK=60,kk=[...Array(NK)].map((_,i)=>[i%NH,rnd(),(rnd()-.5)*.6]),pk=mkp(cg,NK,sc.lk||0xff7050,.7);
  const NX=40,xx=[...Array(NX)].map(()=>[rnd()*PI*2,rnd()*PI,rnd()]),px=mkp(cg,NX,sc.tx||0x70e070,.7);
- return{lv:['Tissue level','Membrane level','Organelle level'],leg:sc.lg||'Dark discs: membrane damage. Orange: mitochondria. Small dots: ions and contents.',
+ return{lv:['Tissue level','Membrane level','Organelle level'],key:(()=>{const kn=sc.kn||{},cs=Object.keys(C.state),hx=c=>FlowAid.css(typeof c==='string'?c:c),nm=h=>{const k=new THREE.Color(h),o={};k.getHSL(o);if(o.l>.85)return'White';if(o.s<.15)return'Grey';const d=o.h*360,pl=o.l>.7?'Pale ':'';return pl+(d<15||d>=345?'red':d<40?'orange':d<70?'yellow':d<170?'green':d<260?'blue':d<300?'violet':'pink')},cap=t=>t[0].toUpperCase()+t.slice(1),
+  K=[[hx(sc.ion||0xffe060),cap(nm(sc.ion||0xffe060).toLowerCase())+' dots',kn.inner||'ions and contents held inside the cell']];
+  if(cs.includes('outer'))K.push([hx(sc.out||0x9be8ff),cap(nm(sc.out||0x9be8ff).toLowerCase())+' dots outside',kn.outer||'ions and fluid around the cell']);
+  if(cs.includes('leak'))K.push([hx(sc.lk||0xff7050),cap(nm(sc.lk||0xff7050).toLowerCase())+' dots streaming out',kn.leak||'contents leaking out through the membrane holes']);
+  if(cs.includes('tox'))K.push([hx(sc.tx||0x70e070),cap(nm(sc.tx||0x70e070).toLowerCase())+' dots',kn.tox||'toxins around the cell']);
+  if(cs.includes('mem'))K.push(['#1a0508','Dark discs','holes in the cell membrane','dc']);
+  K.push(['#f0a030','Orange ovals','mitochondria, the energy factories. They swell and grey when they fail','sq']);
+  if(cs.includes('store'))K.push([hx(sc.gr||0xe8d890),'Pale granules','energy stores such as glycogen or enzymes. They empty as the cell fails']);
+  return K})(),say:'This is a single cell with its membrane, mitochondria and the particles around it. Watch the membrane, the energy factories and what moves in or out as the disease advances.',leg:sc.lg||'Dark discs: membrane damage. Orange: mitochondria. Small dots: ions and contents.',
  st:[['Cell',V(0,0,0),17,.4,.15,sc.s0||'A cell and the ions and contents around it. The membrane holds the difference between inside and outside.'],['Membrane',V(0,3.2,2.6),5,.3,.15,sc.s1||'Pumps, channels and the lipid bilayer. Energy failure or injury makes the membrane leak.'],['Mitochondria',V(0,-.5,0),6.5,.3,.1,sc.s2||'Mitochondria make the energy the pumps need. When they fail, the cell swells and leaks.']],
  parts:{mem:['Cell membrane','Holds ions and contents inside. Energy failure or direct injury makes it leak.','Treat the cause and restore energy supply.'],nuc:['Nucleus','Holds the genes. Late in injury the nucleus condenses and the cell dies.','Early reversal prevents cell death.'],mito:['Mitochondria','Make ATP. Failure starves the pumps that hold the membrane potential.','Restore oxygen and substrate delivery.'],gran:['Energy stores','Glycogen granules. They fall when demand is high or the cell cannot refill them.','Replace substrate while the cell recovers.']},
  tag(){},
@@ -322,10 +331,16 @@ function hud(){const e=window.__specOn?effSev():sev;
 const NAVL={organ:'Organ',cut:'Cut-away',cells:'Cells'};
 function navBuild(){const n=$('#nav');if(!SPI){n.style.display='none';return}
  n.innerHTML=SPI.views.map(x=>`<button data-v="${x.id}" aria-pressed="${!!window.__specOn&&x.id===curV}">${NAVL[x.id]||x.label}</button>`).join('')+`<button data-v="flow" aria-pressed="${!window.__specOn}">Flow model</button>`}
+const FA=FlowAid.mount({stage:stg,key:A.key,
+ intro:'This is the flow model for '+TITLE+', in '+DIS.name+'. '+A.say,
+ state(){const on=RX.filter(d=>rx[d.id]).map(d=>d.n),r=C.outs.slice(0,3).map((o,j)=>CE.fmt(C,v,j)+(CE.warn(C,v,j)?', which is abnormal':'')).join('; ');
+  return 'At '+Math.round(sev*100)+' percent severity the readings are: '+r+'. '+C.prog[phase()]+(on.length?' Treatments switched on: '+on.join(', ')+'.':' No treatment is switched on yet.')},
+ stages:()=>ST.map((s,i)=>({t:(A.lv[i]||'')+'. '+s[0]+'. '+s[5],fn:()=>go(i)})).concat([{t:'Back to the whole scene.',fn:()=>go(0)}]),
+ outro:'Open the Drugs tab to switch treatments on or off and watch the particles change, or the Disease tab to replay this complication from early to critical.'});
 const setMode=on=>{window.__specOn=!!(on&&SPI);cv.style.display=window.__specOn?'none':'';$('#stages').style.display=window.__specOn?'none':'';
  stg.className=window.__specOn?'spec':'flow';
  if(SPI){if(window.__specOn){SPI.show();SPI.sync(effSev())}else SPI.hide()}
- if(!window.__specOn)fit();navBuild();hud();expBuild(true)};
+ if(!window.__specOn)fit();FA&&FA.show(!window.__specOn);navBuild();hud();expBuild(true)};
 window.__specSync=()=>{if(SPI&&window.__specOn)SPI.sync(effSev());hud()};
 let expKey='';function expBuild(force){const e=$('#exp');
  if(!window.__specOn||!SPI){e.innerHTML='<span class="hint">Use the stage buttons below to fly through the flow model. Tap parts of the 3D scene to inspect them.</span>';expKey='flow';return}
@@ -336,7 +351,7 @@ setInterval(()=>{if(window.__specOn)expBuild(false)},700);
 $('#nav').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b||!SPI)return;const id=b.dataset.v;
  if(id==='flow'){setMode(false);VOq('Flow model. Stages, drugs and outputs.')}else{curV=id;if(!window.__specOn)setMode(true);SPI.view(id);navBuild();expBuild(true);VOq((NAVL[id]||id)+' view.')}});
 $('#tabs').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.pane').forEach((x,i)=>x.classList.toggle('on',i===+b.dataset.t))});
-if(window.Specimen&&window.PathStage)Specimen.init({key:DID+'-'+C.id,wrap:$('#spec'),bar:$('#sview'),after:$('#revslot'),leader:true,ver:QS.get('v')||'20261119f',
+if(window.Specimen&&window.PathStage)Specimen.init({key:DID+'-'+C.id,wrap:$('#spec'),bar:$('#sview'),after:$('#revslot'),leader:true,ver:QS.get('v')||'20261119g',
  onLabel:h=>{if(!window.__lbl1){window.__lbl1=1;window.__mute=true;setTimeout(()=>{window.__mute=false},60)}$('#info').innerHTML=h},onPick:p=>{$('#info').innerHTML='<strong>'+esc(p.title)+'</strong><br>'+esc(p.body)+(p.care?'<br><em>Care:</em> '+esc(p.care):'')}}).then(api=>{
  if(!api){hud();return}SPI=api;setMode(true)});
 hud();
