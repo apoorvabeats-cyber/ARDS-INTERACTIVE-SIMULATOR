@@ -8,38 +8,107 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "low-power" });
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
-  renderer.setClearColor(0xe7e1d6);
+  renderer.setClearColor(0x0a1626);
   if (THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.0;
+
+  /* one vivid colour per door, used on the door, its feature wall, its floor path and its lights */
+  const ACC = { icu: 0x12e3c8, path: 0xa073ff, micro: 0x7be34f, rad: 0x3f8cff };
+  const hex = (n) => "#" + n.toString(16).padStart(6, "0");
+  const tex = (c) => {
+    const t = new THREE.CanvasTexture(c);
+    if (THREE.SRGBColorSpace) t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    return t;
+  };
+  const cnv = (w, h) => {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    return [c, c.getContext("2d")];
+  };
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xe4ddd2, 14, 28);
+  scene.fog = new THREE.Fog(0x0a1626, 16, 30);
   const camera = new THREE.PerspectiveCamera(56, 1, 0.08, 40);
-  scene.add(new THREE.HemisphereLight(0xfff8ee, 0xc8beb0, 1.15));
-  const sun = new THREE.DirectionalLight(0xfff4e6, 1.6);
-  sun.position.set(3, 8, 2);
+  scene.add(new THREE.HemisphereLight(0xf4f8ff, 0x7d93b4, 1.25));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+  sun.position.set(2, 8, 3);
   scene.add(sun);
-  const cool = new THREE.DirectionalLight(0xd5ebe8, 0.45);
-  cool.position.set(-4, 3, -2);
-  scene.add(cool);
 
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xe7e0d4, roughness: 0.86 });
-  const floorMat = new THREE.MeshStandardMaterial({ color: 0xf7f4ee, roughness: 0.72 });
-  const ceilMat = new THREE.MeshStandardMaterial({ color: 0xf3efe6, roughness: 0.9 });
-  const trim = new THREE.MeshStandardMaterial({ color: 0xc9bfb0, roughness: 0.6, metalness: 0.08 });
-  const glassMat = new THREE.MeshStandardMaterial({
-    color: 0xd5e6e4, transparent: true, opacity: 0.34, roughness: 0.08, metalness: 0.04, side: THREE.DoubleSide
-  });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf2f5fa, roughness: 0.55 });
+  const ceilMat = new THREE.MeshStandardMaterial({ color: 0xd9e2ee, roughness: 0.8 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0x1b2433, roughness: 0.35, metalness: 0.7 });
+  const brushed = new THREE.MeshStandardMaterial({ color: 0xd5dde8, roughness: 0.3, metalness: 0.85 });
+  const glow = (c, k) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: k == null ? 1.6 : k, roughness: 0.4 });
 
-  function box(w, h, d, mat, x, y, z) {
+  function box(w, h, d, mat, x, y, z, parent) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     m.position.set(x, y, z);
-    scene.add(m);
+    (parent || scene).add(m);
     return m;
   }
-  box(10, 0.12, 10, floorMat, 0, 0, 0);
+
+  /* ---------- floor: deep navy terrazzo, a medical-cross medallion and a lit path to every door ---------- */
+  const floorTex = (() => {
+    const S = 1024, [c, g] = cnv(S, S), px = S / 10;
+    const bg = g.createRadialGradient(S / 2, S / 2, 20, S / 2, S / 2, S * 0.72);
+    bg.addColorStop(0, "#17496a"); bg.addColorStop(0.55, "#0d2740"); bg.addColorStop(1, "#071526");
+    g.fillStyle = bg; g.fillRect(0, 0, S, S);
+    g.strokeStyle = "rgba(160,205,240,.08)"; g.lineWidth = 2;
+    for (let i = 0; i <= 10; i++) { g.beginPath(); g.moveTo(i * px, 0); g.lineTo(i * px, S); g.moveTo(0, i * px); g.lineTo(S, i * px); g.stroke(); }
+    for (let i = 0; i < 1400; i++) {              /* terrazzo flecks */
+      g.fillStyle = "rgba(190,225,255," + (Math.random() * 0.13) + ")";
+      g.beginPath(); g.arc(Math.random() * S, Math.random() * S, 1 + Math.random() * 2.2, 0, 6.3); g.fill();
+    }
+    /* paths: canvas top is the back wall (radiology), bottom the front (ICU), left the path lab, right the micro lab */
+    const lane = (ang, col) => {
+      g.save(); g.translate(S / 2, S / 2); g.rotate(ang);
+      const gr = g.createLinearGradient(0, 80, 0, S / 2 - 40);
+      gr.addColorStop(0, col + "00"); gr.addColorStop(0.35, col + "cc"); gr.addColorStop(1, col + "ff");
+      g.fillStyle = gr; g.fillRect(-16, 80, 32, S / 2 - 120);
+      g.strokeStyle = col; g.lineWidth = 7; g.lineCap = "round"; g.lineJoin = "round";
+      for (let k = 0; k < 3; k++) { const y = 190 + k * 80; g.globalAlpha = 0.45 + k * 0.25; g.beginPath(); g.moveTo(-34, y - 24); g.lineTo(0, y + 6); g.lineTo(34, y - 24); g.stroke(); }
+      g.restore();
+    };
+    lane(0, hex(ACC.icu)); lane(Math.PI, hex(ACC.rad)); lane(Math.PI / 2, hex(ACC.path)); lane(-Math.PI / 2, hex(ACC.micro));
+    /* medallion */
+    g.save(); g.translate(S / 2, S / 2);
+    const disc = g.createRadialGradient(0, 0, 10, 0, 0, 150);
+    disc.addColorStop(0, "#1f6e93"); disc.addColorStop(1, "#0f3552");
+    g.fillStyle = disc; g.beginPath(); g.arc(0, 0, 150, 0, 6.3); g.fill();
+    ["icu", "micro", "rad", "path"].forEach((k, i) => {
+      g.strokeStyle = hex(ACC[k]); g.lineWidth = 12; g.lineCap = "round";
+      g.beginPath(); g.arc(0, 0, 168, i * Math.PI / 2 + 0.12, (i + 1) * Math.PI / 2 - 0.12); g.stroke();
+    });
+    g.strokeStyle = "rgba(255,255,255,.55)"; g.lineWidth = 3; g.beginPath(); g.arc(0, 0, 138, 0, 6.3); g.stroke();
+    g.fillStyle = "#ffffff"; g.shadowColor = "#7ff3ff"; g.shadowBlur = 24;
+    g.fillRect(-18, -78, 36, 156); g.fillRect(-78, -18, 156, 36);
+    g.restore();
+    return tex(c);
+  })();
+  box(10, 0.12, 10, new THREE.MeshStandardMaterial({ color: 0x071526, roughness: 0.5 }), 0, 0, 0);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshStandardMaterial({
+    map: floorTex, emissiveMap: floorTex, emissive: 0xffffff, emissiveIntensity: 0.55, roughness: 0.22, metalness: 0.35
+  }));
+  floor.rotation.x = -Math.PI / 2; floor.position.y = 0.061;
+  scene.add(floor);
+
+  /* ---------- ceiling: soft coffers and a slowly turning four-colour ring ---------- */
   box(10, 0.1, 10, ceilMat, 0, 3.15, 0);
+  const lampMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xeaf6ff, emissiveIntensity: 1.1, roughness: 0.4 });
+  [[-2.7, 2.7], [2.7, 2.7], [-2.7, -2.7], [2.7, -2.7]].forEach(([x, z]) => box(1.6, 0.05, 0.5, lampMat, x, 3.08, z));
+  const ring = new THREE.Group();
+  ["icu", "micro", "rad", "path"].forEach((k, i) => {
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.045, 10, 48, Math.PI / 2 - 0.14), glow(ACC[k], 2.2));
+    arc.rotation.x = Math.PI / 2; arc.rotation.z = i * Math.PI / 2 + 0.07;
+    ring.add(arc);
+  });
+  ring.position.y = 3.07;
+  scene.add(ring);
+
+  /* ---------- walls with a door opening in the middle of each ---------- */
   box(0.16, 3.1, 3.9, wallMat, 5, 1.55, -3.05);
   box(0.16, 3.1, 3.9, wallMat, 5, 1.55, 3.05);
   box(0.16, 0.62, 2.2, wallMat, 5, 2.79, 0);
@@ -52,58 +121,137 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   box(0.16, 3.1, 3.9, wallMat, -5, 1.55, 3.05);
   box(0.16, 3.1, 3.9, wallMat, -5, 1.55, -3.05);
   box(0.16, 0.62, 2.2, wallMat, -5, 2.79, 0);
-  [[-2.2, 2], [2.2, 2], [-2.2, -2], [2.2, -2]].forEach(([x, z]) => {
-    const lamp = box(1.1, 0.06, 0.42, new THREE.MeshStandardMaterial({ color: 0xfff8ee, emissive: 0xfff1dc, emissiveIntensity: 0.7 }), x, 3.05, z);
-    lamp.material.roughness = 0.4;
+
+  /* corner light columns */
+  [[4.55, 4.55, ACC.icu], [-4.55, 4.55, ACC.path], [-4.55, -4.55, ACC.rad], [4.55, -4.55, ACC.micro]].forEach(([x, z, c]) => {
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 3.0, 20), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: c, emissiveIntensity: 1.0, roughness: 0.3, transparent: true, opacity: 0.92 }));
+    col.position.set(x, 1.56, z); scene.add(col);
+    [0.08, 3.04].forEach((y) => { const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.07, 20), steel); cap.position.set(x, y, z); scene.add(cap); });
   });
 
-  function sign(text) {
-    const c = document.createElement("canvas");
-    c.width = 640;
-    c.height = 128;
-    const g = c.getContext("2d");
-    g.fillStyle = "#14181c";
-    g.fillRect(0, 0, 640, 128);
-    g.fillStyle = "#f3efe6";
-  g.font = (text.length > 18 ? "600 34px " : "600 46px ") + "Figtree, sans-serif";
-    g.textAlign = "center";
-    g.textBaseline = "middle";
-    g.fillText(text, 320, 66);
-    const t = new THREE.CanvasTexture(c);
-    if (THREE.SRGBColorSpace) t.colorSpace = THREE.SRGBColorSpace;
-    return new THREE.MeshStandardMaterial({ map: t, roughness: 0.7 });
+  /* ---------- sign: a lit box with an icon, a coloured band and the name ---------- */
+  function icon(g, kind, cx, cy, r, col) {
+    g.save(); g.translate(cx, cy); g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 6; g.lineCap = "round"; g.lineJoin = "round";
+    if (kind === "icu") {                          /* heart-rate trace in a ring */
+      g.beginPath(); g.arc(0, 0, r, 0, 6.3); g.stroke();
+      g.beginPath(); g.moveTo(-r * 0.7, 2); g.lineTo(-r * 0.3, 2); g.lineTo(-r * 0.15, -r * 0.5); g.lineTo(r * 0.1, r * 0.55); g.lineTo(r * 0.28, 2); g.lineTo(r * 0.7, 2); g.stroke();
+    } else if (kind === "path") {                  /* cell with nucleus */
+      g.beginPath(); g.ellipse(0, 0, r, r * 0.78, 0.5, 0, 6.3); g.stroke();
+      g.beginPath(); g.arc(-r * 0.15, -r * 0.05, r * 0.3, 0, 6.3); g.fill();
+      g.beginPath(); g.arc(r * 0.42, r * 0.2, r * 0.12, 0, 6.3); g.fill();
+    } else if (kind === "micro") {                 /* petri dish with colonies */
+      g.beginPath(); g.arc(0, 0, r, 0, 6.3); g.stroke(); g.beginPath(); g.arc(0, 0, r * 0.74, 0, 6.3); g.stroke();
+      [[-0.25, -0.2, 0.17], [0.25, -0.05, 0.12], [-0.05, 0.3, 0.14], [0.3, 0.3, 0.08]].forEach(([a, b, s]) => { g.beginPath(); g.arc(a * r, b * r, s * r, 0, 6.3); g.fill(); });
+    } else {                                       /* scan ring with crosshair */
+      g.beginPath(); g.arc(0, 0, r, 0, 6.3); g.stroke(); g.beginPath(); g.arc(0, 0, r * 0.5, 0, 6.3); g.stroke();
+      g.lineWidth = 4; g.beginPath(); g.moveTo(-r * 1.15, 0); g.lineTo(-r * 0.62, 0); g.moveTo(r * 0.62, 0); g.lineTo(r * 1.15, 0); g.moveTo(0, -r * 1.15); g.lineTo(0, -r * 0.62); g.moveTo(0, r * 0.62); g.lineTo(0, r * 1.15); g.stroke();
+    }
+    g.restore();
+  }
+  function sign(kind, text) {
+    const [c, g] = cnv(768, 160), col = hex(ACC[kind]);
+    const bg = g.createLinearGradient(0, 0, 768, 0);
+    bg.addColorStop(0, "#0d1626"); bg.addColorStop(1, "#142238");
+    g.fillStyle = bg; g.fillRect(0, 0, 768, 160);
+    g.fillStyle = col; g.fillRect(0, 0, 768, 9); g.fillRect(0, 151, 768, 9);
+    icon(g, kind, 80, 80, 40, col);
+    g.fillStyle = "#ffffff";
+    g.font = (text.length > 18 ? "700 40px " : "700 54px ") + "Figtree, system-ui, sans-serif";
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(text, 442, 84);
+    const t = tex(c);
+    return new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: 0xffffff, emissiveIntensity: 0.95, roughness: 0.5 });
   }
 
+  /* feature wall panel: accent gradient with a faint heart-trace line */
+  function panelMat(col, flip) {
+    const [c, g] = cnv(512, 384), a = hex(col);
+    const gr = g.createLinearGradient(0, 0, 0, 384);
+    gr.addColorStop(0, a); gr.addColorStop(1, "#0b1a2c");
+    g.fillStyle = gr; g.fillRect(0, 0, 512, 384);
+    g.globalAlpha = 0.16; g.fillStyle = "#fff";
+    for (let y = 18; y < 384; y += 36) for (let x = 18; x < 512; x += 36) { g.beginPath(); g.arc(x, y, 2, 0, 6.3); g.fill(); }
+    g.globalAlpha = 1; g.strokeStyle = "rgba(255,255,255,.9)"; g.lineWidth = 4; g.lineJoin = "round";
+    g.beginPath(); g.moveTo(0, 230);
+    const pts = [[90, 230], [120, 230], [138, 170], [158, 292], [178, 214], [200, 230], [330, 230], [352, 230], [372, 150], [396, 300], [418, 218], [440, 230], [512, 230]];
+    pts.forEach(([x, y]) => g.lineTo(flip ? 512 - x : x, y));
+    g.stroke();
+    const t = tex(c);
+    return new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: 0xffffff, emissiveIntensity: 0.45, roughness: 0.4 });
+  }
+
+  const glassMats = {};
+  const decorOf = [];
+  const doorLights = [];
+  /* A door group: local +z points out of the room, so everything on the room side sits at negative z. */
   function door(kind, text) {
-    const g = new THREE.Group();
-    const frame = new THREE.Group();
-    const jamb = new THREE.MeshStandardMaterial({ color: 0xc9bfb0, roughness: 0.55, metalness: 0.06 });
-    [[-1.02, 1.2, 0.12, 2.4, 0.08], [1.02, 1.2, 0.12, 2.4, 0.08], [0, 2.42, 2.16, 0.14, 0.08]].forEach(([x, y, w, h, d]) => {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), jamb);
-      p.position.set(x, y, 0);
-      frame.add(p);
+    const col = ACC[kind];
+    const g = new THREE.Group(), deco = new THREE.Group();
+    /* frame: graphite jambs and lintel with a glowing inner edge */
+    [[-1.04, 1.2, 0.14, 2.4], [1.04, 1.2, 0.14, 2.4]].forEach(([x, y, w, h]) => box(w, h, 0.12, steel, x, y, 0, g));
+    box(2.22, 0.14, 0.12, steel, 0, 2.42, 0, g);
+    box(0.03, 2.34, 0.03, glow(col, 1.25), -0.955, 1.2, -0.07, g);
+    box(0.03, 2.34, 0.03, glow(col, 1.25), 0.955, 1.2, -0.07, g);
+    box(1.93, 0.03, 0.03, glow(col, 1.25), 0, 2.345, -0.07, g);
+    /* tinted glass leaves that slide apart */
+    const glass = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.22, transparent: true, opacity: 0.36, roughness: 0.06, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false });
+    glassMats[kind] = glass;
+    const left = new THREE.Mesh(new THREE.BoxGeometry(0.92, 2.26, 0.035), glass);
+    const right = new THREE.Mesh(new THREE.BoxGeometry(0.92, 2.26, 0.035), glass);
+    left.position.set(-0.48, 1.26, -0.03);
+    right.position.set(0.48, 1.26, -0.03);
+    [[left, 1], [right, -1]].forEach(([leaf, s]) => {
+      box(0.92, 0.2, 0.045, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, transparent: true, opacity: 0.7 }), 0, 0.25, 0, leaf); /* frosted band */
+      box(0.025, 2.26, 0.05, brushed, -s * 0.46, 0, 0, leaf);
+      const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.95, 10), brushed);
+      bar.position.set(-s * 0.39, 0, -0.07); leaf.add(bar);
     });
-    g.add(frame);
-    const left = new THREE.Mesh(new THREE.BoxGeometry(0.92, 2.28, 0.04), glassMat);
-    const right = new THREE.Mesh(new THREE.BoxGeometry(0.92, 2.28, 0.04), glassMat);
-    left.position.set(-0.48, 1.26, 0.06);
-    right.position.set(0.48, 1.26, 0.06);
     g.add(left, right);
-    const plate = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.38, 0.04), sign(text));
-    plate.position.set(0, 2.62, 0.08);
+    /* the light that spills out when it opens */
+    const [pc, pg] = cnv(64, 128);
+    const gr = pg.createLinearGradient(0, 0, 0, 128);
+    gr.addColorStop(0, "#ffffff"); gr.addColorStop(0.5, hex(col)); gr.addColorStop(1, "#06101c");
+    pg.fillStyle = gr; pg.fillRect(0, 0, 64, 128);
+    const portalTex = tex(pc);
+    const portal = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 2.3), new THREE.MeshBasicMaterial({ map: portalTex, side: THREE.DoubleSide }));
+    portal.position.set(0, 1.25, 0.2); portal.rotation.y = Math.PI;
+    g.add(portal);
+    /* sign with a soft halo */
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.46, 0.05), sign(kind, text));
+    plate.position.set(0, 2.76, -0.09);
     g.add(plate);
-    const hit = new THREE.Mesh(
-      new THREE.BoxGeometry(2.2, 2.7, 0.5),
-      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
-    );
-    hit.position.y = 1.3;
-    hit.userData.kind = kind;
+    const [hc, hg] = cnv(128, 64);
+    const hr = hg.createRadialGradient(64, 32, 2, 64, 32, 64); hr.addColorStop(0, hex(col)); hr.addColorStop(1, "#00000000");
+    hg.fillStyle = hr; hg.fillRect(0, 0, 128, 64);
+    const halo = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 1.2), new THREE.MeshBasicMaterial({ map: tex(hc), transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
+    halo.position.set(0, 2.76, -0.12); halo.rotation.y = Math.PI;
+    g.add(halo);
+    /* click target */
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(2.3, 2.9, 0.6), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+    hit.position.y = 1.4; hit.userData.kind = kind;
     g.add(hit);
-    g.userData.kind = kind;
-    g.userData.left = left;
-    g.userData.right = right;
-    g.userData.open = 0;
+    g.userData.kind = kind; g.userData.left = left; g.userData.right = right; g.userData.open = 0;
+    g.userData.glow = [halo, plate.material];
     scene.add(g);
+
+    /* decoration that shares the door's frame but is not clickable: feature wall, base light, cove, benches, light */
+    [-1, 1].forEach((s) => {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(2.95, 2.5, 0.05), panelMat(col, s > 0));
+      p.position.set(s * 2.78, 1.4, -0.075); deco.add(p);
+      box(2.95, 0.04, 0.06, glow(col, 0.95), s * 2.78, 0.2, -0.09, deco);           /* skirting light */
+      box(2.95, 0.04, 0.06, steel, s * 2.78, 2.68, -0.09, deco);
+      const bench = new THREE.Group();
+      box(1.5, 0.07, 0.42, new THREE.MeshStandardMaterial({ color: col, roughness: 0.55, emissive: col, emissiveIntensity: 0.12 }), 0, 0.45, 0, bench);
+      box(1.54, 0.03, 0.46, steel, 0, 0.405, 0, bench);
+      [-0.64, 0.64].forEach((x) => box(0.05, 0.4, 0.34, steel, x, 0.2, 0, bench));
+      bench.position.set(s * 2.78, 0.06, -0.52); deco.add(bench);
+    });
+    box(2.26, 0.04, 0.05, glow(col, 0.95), 0, 0.075, -0.45, deco);                   /* threshold strip */
+    box(9.7, 0.045, 0.05, glow(col, 0.9), 0, 3.0, -0.1, deco);                      /* cove along the top */
+    const pl = new THREE.PointLight(col, 6, 7.5, 2);
+    pl.position.set(0, 2.3, -1.3); deco.add(pl); doorLights.push(pl);
+    scene.add(deco);
+    decorOf.push([g, deco]);
     return g;
   }
 
@@ -111,14 +259,33 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   front.position.set(0, 0, 4.82);
   const leftDoor = door("path", "PATHOPHYSIOLOGY LIVE");
   leftDoor.position.set(-4.82, 0, 0);
-  leftDoor.rotation.y = Math.PI / 2;
+  leftDoor.rotation.y = -Math.PI / 2;
   const rightDoor = door("micro", "MICROBIOLOGY LAB");
   rightDoor.position.set(4.82, 0, 0);
-  rightDoor.rotation.y = -Math.PI / 2;
-
+  rightDoor.rotation.y = Math.PI / 2;
   const backDoor = door("rad", "RADIOLOGY");
   backDoor.position.set(0, 0, -4.82);
   backDoor.rotation.y = Math.PI;
+  decorOf.forEach(([g, d]) => { d.position.copy(g.position); d.rotation.copy(g.rotation); });
+
+  /* a few slow motes of light in the air */
+  const motes = (() => {
+    const n = 110, pos = new Float32Array(n * 3), col = new Float32Array(n * 3), cs = [ACC.icu, ACC.path, ACC.micro, ACC.rad].map((c) => new THREE.Color(c));
+    for (let i = 0; i < n; i++) {
+      let x, z; do { x = (Math.random() - 0.5) * 9; z = (Math.random() - 0.5) * 9; } while (x * x + z * z < 2.4);
+      pos.set([x, 0.3 + Math.random() * 2.6, z], i * 3);
+      const c = cs[i % 4]; col.set([c.r, c.g, c.b], i * 3);
+    }
+    const [dc, dg] = cnv(32, 32), dr = dg.createRadialGradient(16, 16, 1, 16, 16, 16);
+    dr.addColorStop(0, "#fff"); dr.addColorStop(1, "#fff0"); dg.fillStyle = dr; dg.fillRect(0, 0, 32, 32);
+    const dot = new THREE.CanvasTexture(dc);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.07, map: dot, alphaTest: 0.02, vertexColors: true, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
+    scene.add(pts);
+    return pts;
+  })();
 
   const ray = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -268,6 +435,22 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     if (mode === "done") { raf = 0; return; }
     raf = requestAnimationFrame(frame);
   }
+  let tAmb = 0;
+  function ambient(dt) {
+    if (calm) return;
+    tAmb += dt;
+    ring.rotation.y = tAmb * 0.12;
+    const m = motes.geometry.attributes.position;
+    for (let i = 0; i < m.count; i++) {
+      m.setY(i, m.getY(i) + Math.sin(tAmb * 0.6 + i) * 0.0012);
+      m.setX(i, m.getX(i) + Math.cos(tAmb * 0.4 + i * 1.7) * 0.0010);
+    }
+    m.needsUpdate = true;
+    [front, leftDoor, rightDoor, backDoor].forEach((d, i) => {
+      const k = 0.5 + 0.5 * Math.sin(tAmb * 1.6 + i * 1.57);
+      d.userData.glow[0].material.opacity = 0.42 + 0.3 * k;
+    });
+  }
   function step() {
     const dt = Math.min(clock.getDelta(), 0.05);
     if (job) {
@@ -291,6 +474,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     } else {
       placeCamera();
     }
+    ambient(dt);
     renderer.render(scene, camera);
   }
   placeCamera();
