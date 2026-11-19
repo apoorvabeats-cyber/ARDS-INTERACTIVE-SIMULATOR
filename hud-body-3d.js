@@ -27,7 +27,7 @@ try{
   throw err;
 }
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-renderer.setClearColor(0x163044, 1);
+renderer.setClearColor(0x163044, 0); /* transparent: body-stage.js paints the live ICU behind it */
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
