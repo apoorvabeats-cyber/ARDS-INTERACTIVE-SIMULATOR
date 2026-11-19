@@ -43,8 +43,9 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   box(0.16, 3.1, 3.9, wallMat, 5, 1.55, -3.05);
   box(0.16, 3.1, 3.9, wallMat, 5, 1.55, 3.05);
   box(0.16, 0.62, 2.2, wallMat, 5, 2.79, 0);
-  box(3.3, 3.1, 0.16, wallMat, -3.2, 1.55, -5);
-  box(3.3, 3.1, 0.16, wallMat, 3.2, 1.55, -5);
+  box(3.9, 3.1, 0.16, wallMat, -3.05, 1.55, -5);
+  box(3.9, 3.1, 0.16, wallMat, 3.05, 1.55, -5);
+  box(2.2, 0.62, 0.16, wallMat, 0, 2.79, -5);
   box(3.9, 3.1, 0.16, wallMat, -3.05, 1.55, 5);
   box(3.9, 3.1, 0.16, wallMat, 3.05, 1.55, 5);
   box(2.2, 0.62, 0.16, wallMat, 0, 2.79, 5);
@@ -115,9 +116,9 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   rightDoor.position.set(4.82, 0, 0);
   rightDoor.rotation.y = -Math.PI / 2;
 
-  const backSign = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.42, 0.04), sign("CRITICAL CARE HUB"));
-  backSign.position.set(0, 2.15, -4.88);
-  scene.add(backSign);
+  const backDoor = door("rad", "RADIOLOGY");
+  backDoor.position.set(0, 0, -4.82);
+  backDoor.rotation.y = Math.PI;
 
   const ray = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -163,10 +164,12 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     if (kind === "icu") {
       const btn = document.getElementById("icu-enter");
       if (btn) btn.click();
+    } else if (kind === "rad") {
+      location.href = "radiology.html?v=20261119r1";
     } else if (kind === "micro") {
       location.href = "microbiology.html?v=20261119g";
     } else {
-      location.href = "pathology-live.html?v=20261118k";
+      location.href = "pathology-live.html?v=20261119d";
     }
   }
 
@@ -178,7 +181,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     yaw = 0;
     pit = 0;
     eye.set(0, 1.62, 0);
-    try { shut(front); shut(leftDoor); shut(rightDoor); } catch (err) {}
+    try { shut(front); shut(leftDoor); shut(rightDoor); shut(backDoor); } catch (err) {}
     if (fade) fade.style.opacity = "0";
     document.body.classList.add("icu-gate");
     document.body.classList.remove("icu-open", "in", "enter", "inside", "lab", "arena", "osce", "reference", "picking", "body-only");
@@ -208,9 +211,9 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     clearTimeout(window.hubVoiceTimer);
     clearTimeout(leaveTimer);
     leaveTimer = setTimeout(() => finish(kind), calm ? 40 : 1800);
-    const door = kind === "icu" ? front : kind === "micro" ? rightDoor : leftDoor;
-    const face = kind === "icu" ? 0 : kind === "micro" ? Math.PI / 2 : -Math.PI / 2;
-    const dest = kind === "icu" ? new THREE.Vector3(0, 1.62, 5.5) : kind === "micro" ? new THREE.Vector3(5.5, 1.62, 0) : new THREE.Vector3(-5.5, 1.62, 0);
+    const door = kind === "icu" ? front : kind === "micro" ? rightDoor : kind === "rad" ? backDoor : leftDoor;
+    const face = kind === "icu" ? 0 : kind === "micro" ? Math.PI / 2 : kind === "rad" ? Math.PI : -Math.PI / 2;
+    const dest = kind === "icu" ? new THREE.Vector3(0, 1.62, 5.5) : kind === "micro" ? new THREE.Vector3(5.5, 1.62, 0) : kind === "rad" ? new THREE.Vector3(0, 1.62, -5.5) : new THREE.Vector3(-5.5, 1.62, 0);
     job = { kind, door, face, dest, t: 0 };
     if (calm) finish(kind);
     if (kind === "icu" && window.playIcuVoice) window.playIcuVoice();
@@ -269,7 +272,8 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     const dt = Math.min(clock.getDelta(), 0.05);
     if (job) {
       job.t += dt;
-      const gap = job.face - yaw;
+      const raw = job.face - yaw;
+      const gap = Math.atan2(Math.sin(raw), Math.cos(raw));
       yaw += gap * (calm ? 1 : 0.14);
       pit += (0 - pit) * 0.1;
       if (job.t > 0.25) job.door.userData.open = Math.min(1, job.door.userData.open + dt * 1.8);
@@ -277,7 +281,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       job.door.userData.left.position.x = -0.48 - o * 0.85;
       job.door.userData.right.position.x = 0.48 + o * 0.85;
       if (o > 0.45) eye.lerp(job.dest, calm ? 1 : 0.08);
-      const along = job.kind === "icu" ? eye.z : job.kind === "micro" ? eye.x : -eye.x;
+      const along = job.kind === "icu" ? eye.z : job.kind === "micro" ? eye.x : job.kind === "rad" ? -eye.z : -eye.x;
       if (fade) fade.style.opacity = String(Math.max(0, (along - 2.4) / 2.4));
       if (along > 4.2 || job.t > 2.2) {
         finish(job.kind);

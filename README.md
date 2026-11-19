@@ -80,3 +80,7 @@ ANATOMY_TOOLS_ROOT=/tmp/anatomy-tools node scripts/build-anatomy-model.mjs \
 The script bakes source transforms, groups anatomical surfaces, simplifies with a 0.3% relative error bound, and writes the GLB and provenance manifest. Conversion tools are not browser dependencies. Review attribution when modifying/replacing source assets.
 
 The separate legacy `anatomy-hub.html` viewer is documented in [anatomy/README.md](anatomy/README.md). Its older model/procedural modules and reference crops are not used by the opening screen.
+
+## Radiology Lab
+
+The fourth hall door opens `radiology.html`: a dark image workstation with chest X-ray, CT, MRI and ultrasound cases, marking tasks and reveals. See [radiology/README.md](radiology/README.md) for what it covers, what it does not (no DICOM, cine or MPR yet) and how to add real studies.
