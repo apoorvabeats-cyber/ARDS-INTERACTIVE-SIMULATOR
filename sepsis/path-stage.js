@@ -621,6 +621,11 @@
     return env;
   }
 
+  /* Plugin organs: PathStage.register(name, { gross(kit, mat, spec), cells(kit, spec), apply(kit, entry, sev, nec, t, extra) }).
+     A complication whose "organ" is a registered name is drawn by the plugin; the stage, views, clip plane and picking are shared. */
+  const EXTRA = {};
+  const KIT = { THREE, V, wet, organic, tube, tag, fbm, noise3, clamp, tissueMaterial, rbcGeo, buildCapillaryClose, buildVessel };
+
   function mount(container, hooks) {
     hooks = hooks || {};
     container.style.position = "relative";
@@ -683,6 +688,7 @@
       else if (spec.organ === "heart") organ = buildHeart(mat);
       else if (spec.organ === "liver") organ = buildLiver(mat);
       else if (spec.organ === "brain") organ = buildBrain(mat);
+      else if (EXTRA[spec.organ]) organ = EXTRA[spec.organ].gross(KIT, mat, spec);
       else organ = buildVessel(mat, spec.mode || "dic");
       organ.traverse((o) => { if (o.isMesh && o.material && o.material.clippingPlanes == null && o.material === mat) o.material.clippingPlanes = [clip]; });
       root.add(organ);
@@ -692,10 +698,11 @@
       else if (spec.organ === "heart") cells = buildMyocyte();
       else if (spec.organ === "liver") cells = buildHepato();
       else if (spec.organ === "brain") cells = buildBarrier();
+      else if (EXTRA[spec.organ]) cells = EXTRA[spec.organ].cells(KIT, spec);
       else cells = buildCapillaryClose(spec.mode || "dic");
       cells.visible = false;
       root.add(cells);
-      const capMesh = new THREE.Mesh(new THREE.CircleGeometry(1.45, 48), tissueMaterial(healthy, sick, 1.1));
+      const capMesh = new THREE.Mesh(new THREE.CircleGeometry(spec.capR || 1.45, 48), tissueMaterial(healthy, sick, spec.capScale || 1.1));
       capMesh.rotation.y = Math.PI / 2;
       capMesh.position.x = 0.02;
       capMesh.visible = false;
@@ -732,9 +739,10 @@
       }
     }
 
-    CATALOG.forEach(ensure);
     let catalog = CATALOG.slice();
-    fetch("pathology-models.json").then((r) => r.json()).then((data) => {
+    (hooks.catalog || []).forEach((spec) => { const i = catalog.findIndex((c) => c.id === spec.id); if (i >= 0) catalog[i] = spec; else catalog.push(spec); });
+    if (!hooks.lazy) catalog.forEach(ensure);
+    (hooks.modelsUrl === false ? Promise.reject() : fetch(hooks.modelsUrl || "pathology-models.json").then((r) => r.json())).then((data) => {
       if (!data || !data.complications) return;
       data.complications.forEach((spec) => {
         const i = catalog.findIndex((c) => c.id === spec.id);
@@ -743,11 +751,11 @@
         if (models[spec.id]) {
           models[spec.id].spec = catalog.find((c) => c.id === spec.id);
           if (spec.glb && !models[spec.id].glb) loadGlb(models[spec.id], spec.glb);
-        } else ensure(catalog.find((c) => c.id === spec.id));
+        } else if (!hooks.lazy) ensure(catalog.find((c) => c.id === spec.id));
       });
     }).catch(() => {});
 
-    let id = "ards", view = "organ", severity = 0.45, shown = 0.45, mode = "live", playing = false, playT = 0;
+    let id = hooks.start || "ards", view = "organ", severity = 0.45, shown = 0.45, mode = "live", playing = false, playT = 0;
     let yaw = 0.55, pit = 0.25, dist = 4.4, distGoal = 4.4, target = V(0, 0.05, 0);
     const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
     let dragging = false;
@@ -781,6 +789,8 @@
       extra = extra || {};
       entry.mat.userData.uMix.value = clamp(entry.spec.organ === "lung" ? sev * 0.75 : sev);
       if (entry.lower && entry.lower !== entry.mat) entry.lower.userData.uMix.value = clamp(sev * 1.15);
+      if (entry.spec.grow) entry.root.scale.setScalar(1 + entry.spec.grow * sev);
+      if (EXTRA[entry.spec.organ]) { entry.mat.userData.uMix.value = clamp(sev); if (entry.capMesh && entry.capMesh.material.userData.uMix) entry.capMesh.material.userData.uMix.value = sev; EXTRA[entry.spec.organ].apply(KIT, entry, sev, nec, t, extra || {}); return; }
       if (entry.capMesh && entry.capMesh.material.userData.uMix) entry.capMesh.material.userData.uMix.value = sev;
       const organ = entry.organ;
       if (entry.spec.organ === "lung") {
@@ -865,6 +875,8 @@
     }
 
     function frameDist() {
+      const sp = (models[id] && models[id].spec) || {};
+      if (sp.dist && sp.dist[view]) return sp.dist[view];
       if (view === "cells") return 2.45;
       if (view === "cut") return 3.8;
       if (id === "ards") return 4.6;
@@ -873,9 +885,10 @@
     }
 
     function apply() {
-      const entry = models[id] || ensure(catalog[0]);
+      const entry = models[id] || ensure(catalog.find((c) => c.id === id) || catalog[0]);
       Object.keys(models).forEach((k) => { models[k].root.visible = k === entry.spec.id; });
       const targetSev = mode === "normal" ? 0 : mode === "diseased" ? 1 : severity;
+      entry.view = view;
       entry.organ.visible = view !== "cells";
       entry.cells.visible = view === "cells";
       entry.capMesh.visible = view === "cut";
@@ -918,7 +931,16 @@
       const ray = new THREE.Raycaster();
       ray.setFromCamera(ndc, cam);
       const hits = ray.intersectObjects(scene.children, true).filter((h) => h.object.userData && h.object.userData.pick);
-      if (hits[0]) hooks.onPick(hits[0].object.userData.pick);
+      if (hits[0]) {
+        let pk = hits[0].object.userData.pick;
+        /* Per-complication wording: spec.picks[title] wins, then "*" (gross views) or "**" (cell view). */
+        const sp = (models[id] && models[id].spec) || {};
+        if (sp.picks) {
+          const o = sp.picks[pk.title] || sp.picks[view === "cells" ? "**" : "*"];
+          if (o) pk = { title: o.title || pk.title, body: o.body || pk.body, care: o.care != null ? o.care : pk.care };
+        }
+        hooks.onPick(pk);
+      }
     });
     renderer.domElement.addEventListener("pointercancel", up);
     renderer.domElement.addEventListener("wheel", (e) => { e.preventDefault(); distGoal = clamp(distGoal * (1 + e.deltaY * 0.001), 1.4, 9); }, { passive: false });
@@ -982,6 +1004,8 @@
 
   window.PathStage = {
     mount,
+    register: function (name, def) { EXTRA[name] = def; },
+    kit: KIT,
     catalog: function () { return CATALOG.map((c) => ({ id: c.id, title: c.title, views: c.views })); }
   };
 })();

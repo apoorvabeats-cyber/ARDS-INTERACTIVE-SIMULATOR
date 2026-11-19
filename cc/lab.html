@@ -13,6 +13,7 @@ h1{margin:0 0 2px;font-size:23px;letter-spacing:-.01em}
 #sub{color:var(--mute);font-size:13px;margin:0 0 10px}
 #cv{position:relative;height:56vh;min-height:320px;border-radius:14px;overflow:hidden;background:#06111f;touch-action:none}
 canvas{display:block;width:100%;height:100%}
+#spec{position:relative;height:56vh;min-height:320px;border-radius:14px;overflow:hidden;background:#070b10;touch-action:none}
 #lbl{position:absolute;left:12px;right:12px;bottom:10px;color:#e6f1fb;font-size:13px;line-height:1.35;text-shadow:0 1px 4px #000;pointer-events:none}
 #lbl b{display:block;font-size:15px}
 .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
@@ -29,7 +30,10 @@ input[type=range]{width:100%;accent-color:var(--acc)}
 .kv{color:var(--mute);font-size:13px}.kv b{color:var(--ink)}
 </style></head><body><main>
 <h1 id="ttl">Loading</h1><p id="sub"></p>
+<div class="row" id="spmode" style="display:none"></div>
 <div id="cv"><div id="lbl"></div></div>
+<div id="spec" style="display:none"></div>
+<div class="row" id="sview" style="display:none"></div>
 <div class="row" id="stages"></div>
 <div class="row" id="dz"></div>
 <label for="sev"><span id="sevn">Severity</span>: <span id="v0"></span></label><input id="sev" type="range" min="0" max="100" value="55">
@@ -42,11 +46,14 @@ input[type=range]{width:100%;accent-color:var(--acc)}
 </main>
 <script src="engine.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="../sepsis/path-stage.js?v=20261119c"></script>
+<script src="path-extra.js?v=20261119c"></script>
+<script src="specimen.js?v=20261119c"></script>
 <script>
 const $=s=>document.querySelector(s),clamp=CCE.clamp;
 const calm=matchMedia('(prefers-reduced-motion:reduce)').matches;
 const QS=new URLSearchParams(location.search),DID=QS.get('d')||'ards',CID=QS.get('c');
-const VOq=(t,q)=>{if(parent!==window)parent.postMessage({vo:t,q:!!q},'*')};
+const VOq=(t,q)=>{if(window.__mute)return;if(parent!==window)parent.postMessage({vo:t,q:!!q},'*')};
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 fetch('db.json?v='+(QS.get('v')||'')).then(r=>r.json()).then(db=>{
  const dz=db.diseases.find(x=>x.id===DID),c=dz&&(dz.complications.find(x=>x.id===CID)||dz.complications[0]);
@@ -234,7 +241,7 @@ const goal={t:ST[0][1].clone(),r:ST[0][2],y:null,p:null};let yaw=.5,pit=.15,rad=
 function go(i){stage=i;const s=ST[i];goal.t.copy(s[1]);goal.r=s[2];goal.y=s[3];goal.p=s[4];$('#lbl').innerHTML=`<b>${s[0]}</b>${esc(s[5])}`;document.querySelectorAll('[data-s]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.s===i))}
 function model(){v=CE.vars(C,sev,rx);const w=C.outs.map((o,j)=>CE.warn(C,v,j)),on=RX.filter(d=>rx[d.id]);
  $('#out').innerHTML=C.outs.map((o,j)=>`<span class="${w[j]?'warn':''}">${CE.fmt(C,v,j)}</span>`).join(', ')+(on.length?'<ul>'+on.map(d=>`<li><b style="color:var(${d.t==='harms'?'--bad':'--ok'})">${d.t==='harms'?'Harms':'Helps'}</b> ${esc(d.n)}: ${esc(d.note)}</li>`).join('')+'</ul>':'')}
-function refresh(){model();$('#v0').textContent=Math.round(sev*100)+'%';document.querySelectorAll('[data-rx]').forEach(b=>b.setAttribute('aria-pressed',!!rx[b.dataset.rx]))}
+function refresh(){model();$('#v0').textContent=Math.round(sev*100)+'%';document.querySelectorAll('[data-rx]').forEach(b=>b.setAttribute('aria-pressed',!!rx[b.dataset.rx]));if(window.__specSync)window.__specSync()}
 $('#stages').innerHTML=ST.map((s,i)=>`<button data-s="${i}">${esc(s[0])}</button>`).join('')+'<button data-next="1">Next stage</button>';
 $('#rx').innerHTML=RX.map(d=>`<button class="${d.t}" data-rx="${d.id}" aria-pressed="false">${esc(d.n)}</button>`).join('');
 $('#dz').innerHTML=DZ.map((d,i)=>`<button data-i="${i}" aria-pressed="false">${esc(d[0])}</button>`).join('');
@@ -276,8 +283,21 @@ const clock=new THREE.Clock();
 function tick(){const dt=Math.min(clock.getDelta(),.05);step(dt);const k=calm?1:1-Math.exp(-dt*3);
  tgt.lerp(goal.t,k);rad+=(goal.r-rad)*k;if(goal.y!==null){yaw+=(goal.y-yaw)*k;pit+=(goal.p-pit)*k}
  cam.position.set(tgt.x+rad*Math.sin(yaw)*Math.cos(pit),tgt.y+rad*Math.sin(pit),tgt.z+rad*Math.cos(yaw)*Math.cos(pit));cam.lookAt(tgt);
- A.frame(dt,v);R.render(S,cam);requestAnimationFrame(tick)}
+ A.frame(dt,v);if(!window.__specOn)R.render(S,cam);requestAnimationFrame(tick)}
 window.CCLAB={set(s,on){sev=s;tsev=s;ramp=false;Object.keys(rx).forEach(x=>delete rx[x]);(on||[]).forEach(x=>rx[x]=true);$('#sev').value=Math.round(s*100);refresh()},go,vars:()=>v};
 refresh();go(0);tick();
+/* Photoreal specimen (PathStage). Default view; the interactive model stays one tap away. Severity follows the engine, so drugs change the specimen. */
+const effSev=()=>{let n=0,d=0;for(const k in C.state){const p=C.state[k],sl=p[1];if(Math.abs(sl)<.05)continue;n+=clamp((v[k]-p[0])/sl)*Math.abs(sl);d+=Math.abs(sl)}return d?n/d:sev};
+let SPI=null;const setMode=on=>{window.__specOn=!!(on&&SPI);cv.style.display=window.__specOn?'none':'';$('#stages').style.display=window.__specOn?'none':'';
+ if(SPI){if(window.__specOn){SPI.show();SPI.sync(effSev())}else SPI.hide()}
+ document.querySelectorAll('#spmode button').forEach(b=>b.setAttribute('aria-pressed',(b.dataset.m==='spec')===window.__specOn));
+ if(!window.__specOn)fit()};
+window.__specSync=()=>{if(SPI&&window.__specOn)SPI.sync(effSev())};
+if(window.Specimen&&window.PathStage)Specimen.init({key:DID+'-'+C.id,wrap:$('#spec'),bar:$('#sview'),after:$('#sview'),ver:QS.get('v')||'20261119c',
+ onLabel:h=>{if(!window.__lbl1){window.__lbl1=1;window.__mute=true;setTimeout(()=>{window.__mute=false},60)}$('#info').innerHTML=h},onPick:p=>{$('#info').innerHTML='<strong>'+esc(p.title)+'</strong><br>'+esc(p.body)+(p.care?'<br><em>Care:</em> '+esc(p.care):'')}}).then(api=>{
+ if(!api)return;SPI=api;const m=$('#spmode');m.style.display='';
+ m.innerHTML='<button data-m="spec" aria-pressed="true">Photoreal specimen</button><button data-m="live" aria-pressed="false">Interactive model</button>';
+ m.addEventListener('click',ev=>{const b=ev.target.closest('button');if(b){setMode(b.dataset.m==='spec');VOq(b.dataset.m==='spec'?'Photoreal specimen. Normal organ, diseased organ, cut surface and the cells.':'Interactive model. Stages, drugs and outputs.')}});
+ setMode(true)});
 }
 </script></body></html>
