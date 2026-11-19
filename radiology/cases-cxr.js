@@ -188,4 +188,11 @@
       q: [{ q: "A central line tip lies in the right atrium. What is the main risk?", o: ["Pneumothorax", "Arrhythmia and cardiac perforation", "Air embolism only on removal", "None"], a: 1, w: "A rigid tip in the atrium can irritate or perforate it. Pull it back to the lower SVC." }]
     }
   ]);
+  var CXN = "radiology/media/cxr-normal-pa.jpg";
+  var CXT = { tag: "REAL CXR · CC BY 3.0", chip: "Real chest radiograph, CC BY 3.0", real: true, text: "Real adult PA chest radiograph from Hannover Medical School (COVID-19 image repository, CC BY 3.0). Labelled no finding in the source. Not read by this lab. Projection and patient differ from the case." };
+  R.cases.forEach(function (c) {
+    if (c.mod !== "cxr" || c.cmp) return;
+    var ap = /AP|portable|supine/i.test(c.view);
+    c.cmp = { src: CXN, cap: "Reference: adult PA chest radiograph reported as no finding" + (ap ? ". This is an erect PA film, so the heart is smaller and the lung vessels differ from a portable AP film" : ""), sourceTag: CXT, cr: ["cxrNormal"] };
+  });
 })();

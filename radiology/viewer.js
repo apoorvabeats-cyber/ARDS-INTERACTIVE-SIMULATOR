@@ -28,7 +28,8 @@
 
   /* Where an image came from decides how it is labelled. */
   function sourceInfo(c, src) {
-    if (c.sourceTag) return c.sourceTag;
+    if (src && c.cmp && c.cmp.sourceTag) return c.cmp.sourceTag;
+    if (!src && c.sourceTag) return c.sourceTag;
     var p = String(src || c.img);
     if (/^(pocus|echo)\//.test(p)) return { tag: "ILLUSTRATION", text: "Teaching illustration in ultrasound style. Not a clinical scan. No cine loop yet." };
     return { tag: "JPEG", text: "Teaching image (JPEG or PNG). No DICOM header. Source and licence to be recorded." };
@@ -138,6 +139,7 @@
     this.natW = v.videoWidth; this.natH = v.videoHeight;
     this.iw = bw; this.ih = bh; this.loaded = true;
     this.lut(); this.draw();
+    if (this.onframe) this.onframe(v);
   };
   Viewport.prototype.play = function (on) {
     var self = this, v = this.video; if (!v) return;
@@ -542,15 +544,22 @@
       '<button type="button" data-c="slow" ' + (live ? "" : "disabled") + ' aria-pressed="false">0.25×</button>' +
       '<button type="button" data-c="half" ' + (live ? "" : "disabled") + ' aria-pressed="false">0.5×</button>' +
       '<button type="button" data-c="norm" ' + (live ? "" : "disabled") + ' aria-pressed="true">1×</button>' +
-      '<span class="note">' + (live ? "Real cine loop. Loops continuously." : "Still frame. A real cine loop (probe movement, sliding, Doppler) has not been added yet, so playback is off.") + "</span>";
+      (live ? '<span class="frame" id="fr" aria-live="off"></span>' : "") +
+      '<span class="note">' + (live ? (c.mod === "us" ? "Real cine loop. Loops continuously." : "Real scan, scrolled slice by slice. Use the frame buttons to step one slice. Loops continuously.") : "Still frame. A real cine loop (probe movement, sliding, Doppler) has not been added yet, so playback is off.") + "</span>";
   }
+  vp1.onframe = function (v) {
+    var el = document.getElementById("fr"), c = byId(state.id);
+    if (!el || !c || c.kind !== "cine" || !v.duration) return;
+    var n = Math.round(v.duration * (vp1.fps || 30)), k = Math.min(n, Math.floor(v.currentTime * (vp1.fps || 30) + 0.001) + 1);
+    el.textContent = (c.unit || "Frame") + " " + k + " / " + n;
+  };
   cineEl.addEventListener("click", function (ev) {
     var b = ev.target.closest("button"); if (!b || b.disabled) return;
     var k = b.dataset.c, v = vp1.video;
     if (k === "prev") vp1.slice(-1); else if (k === "next") vp1.slice(1);
     else if (!v) return;
     else if (k === "play") { var on = v.paused; vp1.play(on); b.setAttribute("aria-pressed", on); b.textContent = on ? "Pause" : "Play"; }
-    else if (k === "back" || k === "fwd") { v.pause(); vp1.play(false); v.currentTime = clamp(v.currentTime + (k === "fwd" ? 1 : -1) / (vp1.fps || 30), 0, v.duration || 0); }
+    else if (k === "back" || k === "fwd") { v.pause(); vp1.play(false); var f = vp1.fps || 30, cur = Math.floor(v.currentTime * f + 0.001), last = Math.max(0, Math.round((v.duration || 0) * f) - 1); v.currentTime = (clamp(cur + (k === "fwd" ? 1 : -1), 0, last) + 0.5) / f; }
     else { v.playbackRate = k === "slow" ? 0.25 : k === "half" ? 0.5 : 1; cineEl.querySelectorAll("[data-c=slow],[data-c=half],[data-c=norm]").forEach(function (x) { x.setAttribute("aria-pressed", x === b); }); }
   });
   cineEl.addEventListener("input", function (ev) { if (ev.target.id === "sl") vp1.showSlice(+ev.target.value - 1); });
@@ -559,7 +568,7 @@
   function list(a) { return a && a.length ? "<ul>" + a.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : ""; }
   function renderPanel() {
     var c = byId(state.id), si = sourceInfo(c), h = "";
-    h += "<h2>" + esc(c.t) + '</h2><div class="chips"><span class="chip">' + esc(modOf(c).label) + '</span><span class="chip">' + esc(c.view) + '</span><span class="chip warn">' + esc(si.tag === "ILLUSTRATION" ? "Illustration, not a clinical scan" : "Teaching image") + "</span></div>";
+    h += "<h2>" + esc(c.t) + '</h2><div class="chips"><span class="chip">' + esc(modOf(c).label) + '</span><span class="chip">' + esc(c.view) + '</span><span class="chip ' + (si.real ? "real" : "warn") + '">' + esc(si.chip || (si.tag === "ILLUSTRATION" ? "Illustration, not a clinical scan" : "Teaching image")) + "</span></div>";
     h += '<div class="sec"><h3>Clinical presentation</h3><p>' + esc(c.hx) + "</p></div>";
     if (c.panels) {
       h += '<div class="sec"><h3>Sequence</h3><div class="opts" id="pan" style="flex-direction:row;flex-wrap:wrap">' +
@@ -569,10 +578,23 @@
     h += '<div class="sec" id="task"><h3>Your task</h3><p>' + esc(c.task) + '</p><div id="taskbody"></div></div>';
     h += '<div id="reveal"></div>';
     h += '<div class="foot">' + esc(si.text) + " The teaching text is a draft and needs clinical review before use. This lab teaches image recognition and is not a diagnostic tool.</div>";
+    h += creditHtml(c);
     if (c.mod === "ct") h += CT_REF;
     if (c.grp === "Lines and tubes") h += LINE_REF;
     panel.innerHTML = h; panel.scrollTop = 0;
     refreshTask();
+  }
+
+  function creditHtml(c) {
+    var ids = (c.cr || []).concat(c.cmp && c.cmp.cr ? c.cmp.cr : []), C = (window.RAD && window.RAD.credits) || {};
+    ids = ids.filter(function (k, i) { return C[k] && ids.indexOf(k) === i; });
+    if (!ids.length) return "";
+    return '<details class="credit"><summary>Image credit and licence</summary>' + ids.map(function (k) {
+      var x = C[k];
+      return "<p><b>" + esc(x.name) + "</b><br>" + esc(x.authors) + ". " + esc(x.source) + ' <a href="' + esc(x.url) + '" target="_blank" rel="noopener">Source</a><br>Licence: ' +
+        (x.licUrl && /^https:\/\/creativecommons/.test(x.licUrl) ? '<a href="' + esc(x.licUrl) + '" target="_blank" rel="noopener">' + esc(x.lic) + "</a>" : esc(x.lic)) +
+        "<br>" + esc(x.via) + "<br>Changes: " + esc(x.changes) + (x.cite ? "<br>" + esc(x.cite) : "") + (x.note ? "<br>" + esc(x.note) : "") + "</p>";
+    }).join("") + "</details>";
   }
 
   var CT_REF = '<details><summary>CT window reference (Hounsfield units)</summary><table><tr><th>Window</th><th>Centre / width</th><th>Use</th></tr>' +
@@ -664,7 +686,7 @@
       '<div class="sec"><h3>Radiological interpretation</h3><p>' + esc(c.rep) + "</p></div>" +
       (c.ddx && c.ddx.length ? '<div class="sec"><h3>Differential diagnosis</h3>' + list(c.ddx) + "</div>" : "") +
       '<div class="sec"><h3>Why it matters</h3><p>' + esc(c.sig) + "</p></div>" +
-      '<div class="sec"><h3>ICU management</h3>' + list(c.icu) + "</div>" +
+      (c.icu && c.icu.length ? '<div class="sec"><h3>' + esc(c.icuTitle || "ICU management") + "</h3>" + list(c.icu) + "</div>" : "") +
       '<div class="sec" id="quiz"><h3>Check your understanding</h3>' + (c.q || []).map(function (q, i) {
         return '<p style="margin-top:8px"><b>' + esc(q.q) + '</b></p><div class="opts" data-qi="' + i + '">' + q.o.map(function (o, k) { return '<button type="button" data-q="' + i + '" data-k="' + k + '">' + esc(o) + "</button>"; }).join("") + '</div><p class="why" id="why' + i + '"></p>';
       }).join("") + "</div>";

@@ -100,6 +100,192 @@
       sig: "Choosing the right sequence matters. DWI for stroke, FLAIR for oedema, T2* or SWI for blood.",
       icu: ["Coma with a normal CT: ask for MRI with DWI, FLAIR and SWI", "Check MRI safety first: devices, ventilator, infusion pumps and monitors", "Transport needs a trained team"],
       q: [{ q: "Which sequence is most sensitive for small haemorrhages?", o: ["T1", "T2* or SWI", "DWI", "FLAIR"], a: 1, w: "Haemosiderin causes signal loss that susceptibility sequences exaggerate." }]
+    },
+    {
+      "id": "mri-cine-sag",
+      "mod": "mri",
+      "grp": "Scroll normal anatomy (average T1)",
+      "t": "Sagittal T1: scroll through a normal brain",
+      "img": "radiology/media/mri-t1-sagittal.webm",
+      "kind": "cine",
+      "fps": 15,
+      "unit": "Slice",
+      "view": "Sagittal T1, face to the left",
+      "alt": "Cine loop scrolling through sagittal T1 slices of a normal average brain",
+      "hx": "Reference anatomy, not a patient. This is an average of many normal adult brains, so it is smoother than a single scan.",
+      "task": "Scroll to the midline, about slice 70 of 138, where the corpus callosum is longest. Then answer the question.",
+      "choice": {
+        "q": "In the midline slice, which structure is the bright arched band above the lateral ventricle?",
+        "o": [
+          "Corpus callosum",
+          "Pons",
+          "Cerebellar vermis",
+          "Pituitary gland"
+        ],
+        "a": 0,
+        "w": "The corpus callosum is a thick band of white matter joining the hemispheres. White matter is bright on T1."
+      },
+      "find": [
+        "Corpus callosum arches over the ventricle, with the genu in front and the splenium behind",
+        "Brainstem runs down in front of the cerebellum, with the pons as the rounded bulge",
+        "The cerebellum sits behind the brainstem and shows a folded pattern",
+        "Sulci are fine dark lines. CSF is dark on T1"
+      ],
+      "rep": "Normal midline sagittal brain anatomy on an average T1 template.",
+      "sig": "A normal reference makes abnormal easier to see: a thin or bowed corpus callosum, a crowded foramen magnum or a mass in the posterior fossa.",
+      "icuTitle": "Using it in practice",
+      "icu": [
+        "Check the midline first: corpus callosum, brainstem and the fourth ventricle",
+        "Look at the foramen magnum for tonsillar position",
+        "Compare sulcal size with the age of the patient"
+      ],
+      "q": [
+        {
+          "q": "On T1, which is brighter?",
+          "o": [
+            "White matter",
+            "Grey matter",
+            "They are identical",
+            "CSF"
+          ],
+          "a": 0,
+          "w": "Myelin makes white matter bright on T1. CSF is dark and grey matter is in between."
+        }
+      ],
+      "sourceTag": {
+        "tag": "REAL MRI · NORMAL AVERAGE",
+        "chip": "Real MRI template, normal anatomy",
+        "real": true,
+        "text": "Average of many normal adult brains (MNI ICBM152 2009a, T1). Smooth by design, so it is an anatomy reference and not a patient scan. Permissive MNI licence."
+      },
+      "cr": [
+        "mni"
+      ],
+      "reg": []
+    },
+    {
+      "id": "mri-cine-ax",
+      "mod": "mri",
+      "grp": "Scroll normal anatomy (average T1)",
+      "t": "Axial T1: scroll from the skull base to the vertex",
+      "img": "radiology/media/mri-t1-axial.webm",
+      "kind": "cine",
+      "fps": 15,
+      "unit": "Slice",
+      "view": "Axial T1",
+      "alt": "Cine loop scrolling through axial T1 slices of a normal average brain",
+      "hx": "Reference anatomy, not a patient. An average of many normal adults.",
+      "task": "Scroll to the middle of the series, then answer the question.",
+      "choice": {
+        "q": "Near the middle of the series two dark, curved spaces lie either side of the midline. What are they?",
+        "o": [
+          "Lateral ventricles",
+          "Sulci",
+          "Basal ganglia",
+          "Optic nerves"
+        ],
+        "a": 0,
+        "w": "CSF is dark on T1. The paired CSF spaces beside the midline are the lateral ventricles."
+      },
+      "find": [
+        "Lower slices show the brainstem, cerebellum and temporal lobes",
+        "Mid slices show the frontal horns and bodies of the lateral ventricles",
+        "Upper slices show the cortex and sulci down to the vertex",
+        "The two sides are symmetrical in a normal brain"
+      ],
+      "rep": "Normal axial brain anatomy on an average T1 template.",
+      "sig": "Asymmetry, mass effect and a shifted midline are only obvious if you know what symmetrical normal looks like.",
+      "icuTitle": "Using it in practice",
+      "icu": [
+        "Check ventricle size and symmetry",
+        "Check the midline septum and the sulci for effacement",
+        "Follow the grey-white junction around the cortex"
+      ],
+      "q": [
+        {
+          "q": "On T1, the fluid inside the ventricles appears:",
+          "o": [
+            "Dark",
+            "Bright",
+            "The same as white matter",
+            "As a signal void from flow"
+          ],
+          "a": 0,
+          "w": "Water is dark on T1 and bright on T2."
+        }
+      ],
+      "sourceTag": {
+        "tag": "REAL MRI · NORMAL AVERAGE",
+        "chip": "Real MRI template, normal anatomy",
+        "real": true,
+        "text": "Average of many normal adult brains (MNI ICBM152 2009a, T1). Smooth by design, so it is an anatomy reference and not a patient scan. Permissive MNI licence."
+      },
+      "cr": [
+        "mni"
+      ],
+      "reg": []
+    },
+    {
+      "id": "mri-cine-cor",
+      "mod": "mri",
+      "grp": "Scroll normal anatomy (average T1)",
+      "t": "Coronal T1: scroll from front to back",
+      "img": "radiology/media/mri-t1-coronal.webm",
+      "kind": "cine",
+      "fps": 15,
+      "unit": "Slice",
+      "view": "Coronal T1",
+      "alt": "Cine loop scrolling through coronal T1 slices of a normal average brain",
+      "hx": "Reference anatomy, not a patient. An average of many normal adults.",
+      "task": "Scroll through the series and compare the two sides at every level. Then answer the question.",
+      "choice": {
+        "q": "On a coronal slice, which side of the screen is the patient's right?",
+        "o": [
+          "The left side of the screen",
+          "The right side of the screen",
+          "It depends on the sequence",
+          "The top"
+        ],
+        "a": 0,
+        "w": "Radiological convention shows the patient's right on the left of the screen, as if you faced the patient. Always check for side markers on real studies."
+      },
+      "find": [
+        "Frontal lobes and the anterior horns of the lateral ventricles at the front",
+        "Temporal lobes and the temporal horns lower in the middle slices",
+        "Occipital lobes and the cerebellum at the back",
+        "A straight midline fissure with symmetrical hemispheres"
+      ],
+      "rep": "Normal coronal brain anatomy on an average T1 template.",
+      "sig": "The coronal plane is best for comparing the two sides, the hippocampi and the temporal lobes.",
+      "icuTitle": "Using it in practice",
+      "icu": [
+        "Compare left and right at each level",
+        "Look at the temporal lobes and hippocampi",
+        "Check the midline against the falx"
+      ],
+      "q": [
+        {
+          "q": "Which plane shows the corpus callosum in its whole length?",
+          "o": [
+            "Axial",
+            "Sagittal",
+            "Coronal through the thalami",
+            "None"
+          ],
+          "a": 1,
+          "w": "The midline sagittal plane shows the whole arch of the corpus callosum."
+        }
+      ],
+      "sourceTag": {
+        "tag": "REAL MRI · NORMAL AVERAGE",
+        "chip": "Real MRI template, normal anatomy",
+        "real": true,
+        "text": "Average of many normal adult brains (MNI ICBM152 2009a, T1). Smooth by design, so it is an anatomy reference and not a patient scan. Permissive MNI licence."
+      },
+      "cr": [
+        "mni"
+      ],
+      "reg": []
     }
   ]);
 })();

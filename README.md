@@ -83,4 +83,4 @@ The separate legacy `anatomy-hub.html` viewer is documented in [anatomy/README.m
 
 ## Radiology Lab
 
-The fourth hall door opens `radiology.html`: a dark image workstation with chest X-ray, CT, MRI and ultrasound cases, marking tasks and reveals. See [radiology/README.md](radiology/README.md) for what it covers, what it does not (no DICOM, cine or MPR yet) and how to add real studies.
+The fourth hall door opens `radiology.html`: a dark image workstation with chest X-ray, CT, MRI and ultrasound cases, marking tasks and reveals. See [radiology/README.md](radiology/README.md) for what it covers, what it does not (no DICOM or MPR; real cine for a small set of CT, MRI and lung ultrasound cases) and how to add real studies.

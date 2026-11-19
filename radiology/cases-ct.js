@@ -224,6 +224,141 @@
       sig: "An infected obstructed kidney is a urological emergency. Antibiotics alone will not clear it.",
       icu: ["Urgent decompression: percutaneous nephrostomy or ureteric stent", "Blood and urine cultures and broad antibiotics", "Monitor for sepsis and renal failure"],
       q: [{ q: "What is the treatment of an infected obstructed kidney?", o: ["Antibiotics alone", "Decompression plus antibiotics", "Diuretics", "Observation"], a: 1, w: "Source control by drainage is essential." }]
+    },
+    {
+      "id": "ct-cine-lung",
+      "mod": "ct",
+      "grp": "Scroll the chest (real CT)",
+      "t": "Chest CT, lung window: scroll from the upper abdomen to the lung apex",
+      "img": "radiology/media/ct-chest-lung.webm",
+      "kind": "cine",
+      "fps": 12,
+      "unit": "Slice",
+      "view": "Axial, lung window, non-contrast",
+      "alt": "Cine loop scrolling through an axial chest CT in a lung window",
+      "hx": "Anonymised research CT of an adult from a published lung cancer imaging trial. No clinical details come with the scan, so this case teaches how to scroll a chest CT. It does not teach a diagnosis.",
+      "task": "Press Play, or step one slice at a time with the frame buttons. Scroll up through the chest, then answer the question.",
+      "choice": {
+        "q": "In the upper chest (slices 85 to 105) a round, black, air-filled structure lies in the midline in front of the spine. What is it?",
+        "o": [
+          "Oesophagus",
+          "Trachea",
+          "Aortic arch",
+          "Superior vena cava"
+        ],
+        "a": 1,
+        "w": "The trachea is air-filled, so it is black on every window. The oesophagus lies behind and to the left of it and is a collapsed soft-tissue tube."
+      },
+      "find": [
+        "Scrolling upward you pass the liver dome, the heart, the carina and then the lung apices",
+        "Around slice 46 a rounded opacity with a hazy rim lies in the left lower lobe near the back of the chest. Image right is the patient's left",
+        "Smaller round opacities are visible in the right lung, for example around slices 52 and 75",
+        "These are descriptive observations. This lab has not read the scan for diagnosis"
+      ],
+      "rep": "Research chest CT in a lung window. Several rounded pulmonary opacities are visible. The scan comes from a lung cancer trial and has not been read for this lab, so no diagnosis is made.",
+      "sig": "Scrolling the whole series is how nodules, small effusions and airway changes are found, because one slice hides them. Nodules are judged by size, density and change over time, so always compare with earlier scans.",
+      "icuTitle": "A systematic search",
+      "icu": [
+        "Airways first, then lungs, pleura, mediastinum, heart and great vessels, upper abdomen and bones",
+        "Read the lungs in a lung window and nodes, vessels and pleura in a mediastinal window",
+        "Compare with previous imaging before calling a finding new"
+      ],
+      "q": [
+        {
+          "q": "Which window shows airways, ground-glass change and lung vessels best?",
+          "o": [
+            "Brain (centre 40, width 80)",
+            "Lung (centre -600, width 1500)",
+            "Bone (centre 400, width 1800)",
+            "Subdural (centre 75, width 215)"
+          ],
+          "a": 1,
+          "w": "Lung tissue is about -800 HU. A wide window centred near -600 puts it mid-grey so small density changes are visible."
+        },
+        {
+          "q": "On an axial CT, which side of the screen is the patient's right?",
+          "o": [
+            "The left side of the screen",
+            "The right side of the screen",
+            "It depends on the window",
+            "The top"
+          ],
+          "a": 0,
+          "w": "Axial CT is displayed as if you stand at the foot of the bed. The patient's right is on the left of the screen. The liver confirms it here."
+        }
+      ],
+      "sourceTag": {
+        "tag": "REAL CT · CC BY 3.0",
+        "chip": "Real CT scan, CC BY 3.0",
+        "real": true,
+        "text": "Real anonymised CT from The Cancer Imaging Archive (ACRIN-NSCLC-FDG-PET, CC BY 3.0), shown as a slice-by-slice cine. Display is 8 bit, so the W/L tool changes contrast only. This is not a DICOM viewer."
+      },
+      "cr": [
+        "acrin"
+      ],
+      "reg": []
+    },
+    {
+      "id": "ct-cine-med",
+      "mod": "ct",
+      "grp": "Scroll the chest (real CT)",
+      "t": "The same chest in a mediastinal window",
+      "img": "radiology/media/ct-chest-mediastinum.webm",
+      "kind": "cine",
+      "fps": 12,
+      "unit": "Slice",
+      "view": "Axial, mediastinal window, non-contrast",
+      "alt": "Cine loop scrolling through an axial chest CT in a soft-tissue window",
+      "hx": "The same anonymised series as the lung-window case, shown in a soft-tissue window. No clinical details come with the scan.",
+      "task": "Scroll the series and compare it with the lung window. Then answer the question.",
+      "choice": {
+        "q": "Why do the lungs look completely black in this window?",
+        "o": [
+          "The lungs are removed from this series",
+          "Lung density is below the bottom of the window, so it displays as black",
+          "Contrast agent fills the lungs",
+          "Both lungs are collapsed"
+        ],
+        "a": 1,
+        "w": "With centre 40 and width 400 the window starts near -160 HU. Aerated lung is about -800 HU, so it is shown as black and its detail is lost."
+      },
+      "find": [
+        "The heart, aorta, pulmonary arteries, trachea and main bronchi stand out against fat and muscle",
+        "Bone cortex is bright and subcutaneous fat is dark grey",
+        "The rounded lung opacities seen in the lung window are hard to see here, because a soft-tissue window hides lung detail",
+        "Hilar and mediastinal soft tissue is judged in this window"
+      ],
+      "rep": "Research chest CT in a mediastinal window, normal windowing for soft tissue. Not read for diagnosis.",
+      "sig": "Every chest CT needs both windows. A lung nodule can vanish in a soft-tissue window, and a node or pleural thickening can vanish in a lung window.",
+      "icuTitle": "Using the windows",
+      "icu": [
+        "Lung window for parenchyma, airways and pneumothorax",
+        "Mediastinal window for vessels, nodes, pleura and chest wall",
+        "Bone window for ribs and spine when injury is suspected"
+      ],
+      "q": [
+        {
+          "q": "Which window would you use to look for a small pneumothorax?",
+          "o": [
+            "Mediastinal",
+            "Lung",
+            "Brain",
+            "Abdomen"
+          ],
+          "a": 1,
+          "w": "Air in the pleural space is easiest to separate from lung in the lung window."
+        }
+      ],
+      "sourceTag": {
+        "tag": "REAL CT · CC BY 3.0",
+        "chip": "Real CT scan, CC BY 3.0",
+        "real": true,
+        "text": "Real anonymised CT from The Cancer Imaging Archive (ACRIN-NSCLC-FDG-PET, CC BY 3.0), shown as a slice-by-slice cine. Display is 8 bit, so the W/L tool changes contrast only. This is not a DICOM viewer."
+      },
+      "cr": [
+        "acrin"
+      ],
+      "reg": []
     }
   ]);
 })();

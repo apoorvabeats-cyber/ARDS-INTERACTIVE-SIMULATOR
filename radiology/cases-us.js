@@ -1,5 +1,5 @@
-/* Radiology Lab, ultrasound cases. The images in pocus/ and echo/ are stylised teaching illustrations,
-   not clinical scans, and are labelled that way in the viewer. Replace them with real cine loops when licensed. */
+/* Radiology Lab, ultrasound cases. The lung cases B-lines, consolidation and white lung are real cine loops (see credits.js).
+   The other images in pocus/ and echo/ are stylised teaching illustrations, not clinical scans, and are labelled that way. */
 (function () {
   var R = window.RAD = window.RAD || { cases: [] };
   R.add = R.add || function (a) { a.forEach(function (c) { R.cases.push(c); }); };
@@ -19,17 +19,70 @@
       q: [{ q: "What does the spine sign mean?", o: ["Pneumothorax", "Fluid above the diaphragm lets ultrasound see the vertebrae", "Consolidation", "Normal lung"], a: 1, w: "Normal lung blocks the beam. Fluid transmits it, so the spine appears above the diaphragm." }]
     },
     {
-      id: "us-blines", mod: "us", grp: "Lung", t: "B-lines: interstitial syndrome", img: "pocus/blines.jpg", view: "Anterior chest", cmp: NLUNG,
-      alt: "Lung ultrasound with several vertical B-lines",
-      hx: "Breathless patient with orthopnoea. Heart rate 110, saturation 88%.",
-      task: "Mark a B-line.",
-      reg: [[.55, .55, .30, .24, "Vertical B-lines from the pleural line"]],
-      find: ["Vertical laser-like lines starting at the pleural line", "They erase A-lines and move with sliding", "Three or more per space is abnormal"],
-      rep: "Multiple B-lines in an anterior window, in keeping with interstitial syndrome.",
-      ddx: ["Cardiogenic oedema", "ARDS", "Pneumonia", "Pulmonary fibrosis"],
-      sig: "Bilateral diffuse B-lines suggest oedema. Focal B-lines suggest pneumonia. Combine with the clinical picture and echo.",
-      icu: ["Bilateral B-lines with a dilated IVC and poor LV: treat as cardiogenic", "Patchy B-lines with a thickened pleura and consolidations: suggests ARDS or pneumonia", "Repeat after treatment to follow the response"],
-      q: [{ q: "A-lines with lung sliding in a breathless patient mean:", o: ["Pulmonary oedema", "A normal aerated lung pattern", "Consolidation", "Pneumothorax is certain"], a: 1, w: "A-lines with sliding show normal aeration. Look for causes such as COPD, PE or a metabolic cause." }]
+      "id": "us-blines",
+      "mod": "us",
+      "grp": "Lung",
+      "t": "B-lines and a thickened pleural line (real cine)",
+      "img": "radiology/media/us-blines-covid.webm",
+      "kind": "cine",
+      "fps": 39,
+      "view": "Chest wall, convex probe",
+      "alt": "Cine loop of lung ultrasound with a bright pleural line and vertical B-lines",
+      "hx": "Anonymised clip from a published series on COVID-19 pneumonia. No clinical details come with the clip, so only the image pattern is taught.",
+      "task": "Play the loop and watch the lung below the bright pleural line. Then answer the question.",
+      "choice": {
+        "q": "Vertical, laser-like bright lines that start at the pleural line and run to the bottom of the screen without fading are called:",
+        "o": [
+          "A-lines",
+          "B-lines",
+          "Z-lines",
+          "Rib shadows"
+        ],
+        "a": 1,
+        "w": "B-lines start at the pleural line, erase A-lines and move with lung sliding. A-lines are horizontal repeats of the pleural line. Rib shadows are dark and fixed to the bone."
+      },
+      "find": [
+        "Several vertical B-lines arise from the pleural line (the clip's reviewing clinician in the source dataset labels it as multiple B-lines with pleural thickening)",
+        "The pleural line is bright and mildly thickened",
+        "B-lines move with the pleura as the lung slides. Step through frame by frame to watch",
+        "One clip cannot tell COVID-19 from other causes of an interstitial pattern"
+      ],
+      "rep": "Convex-probe lung ultrasound showing multiple B-lines with pleural line thickening, in keeping with an interstitial pattern.",
+      "ddx": [
+        "Cardiogenic oedema",
+        "ARDS",
+        "Viral or other pneumonia",
+        "Pulmonary fibrosis"
+      ],
+      "sig": "Bilateral diffuse B-lines suggest oedema. Focal B-lines suggest pneumonia. Combine them with the clinical picture and echo.",
+      "icu": [
+        "Bilateral B-lines with a dilated IVC and poor LV function point to cardiogenic oedema",
+        "Patchy B-lines with a thickened pleura and consolidations suggest ARDS or pneumonia",
+        "Repeat after treatment to follow the response"
+      ],
+      "q": [
+        {
+          "q": "A-lines with lung sliding in a breathless patient mean:",
+          "o": [
+            "Pulmonary oedema",
+            "A normal aerated lung pattern",
+            "Consolidation",
+            "Pneumothorax is certain"
+          ],
+          "a": 1,
+          "w": "A-lines with sliding show normal aeration. Look for other causes such as COPD, PE or a metabolic cause."
+        }
+      ],
+      "sourceTag": {
+        "tag": "REAL CINE · CC BY 4.0",
+        "chip": "Real ultrasound cine, CC BY 4.0",
+        "real": true,
+        "text": "Real anonymised clip from a published, open-access paper (CC BY 4.0), re-encoded only. No clinical details come with the clip. Source in the credit line below."
+      },
+      "cr": [
+        "usCovid"
+      ],
+      "reg": []
     },
     {
       id: "us-barcode", mod: "us", grp: "Lung", t: "M-mode barcode sign: no lung sliding", img: "pocus/barcode.jpg", view: "Left anterior chest, M-mode", cmp: { src: "pocus/seashore.jpg", cap: "Reference: M-mode seashore sign, lung sliding present (illustration)" },
@@ -45,17 +98,136 @@
       q: [{ q: "Which M-mode sign is specific for pneumothorax?", o: ["Seashore sign", "Lung point", "A-lines", "Spine sign"], a: 1, w: "The lung point is the transition between sliding and non-sliding lung and is highly specific." }]
     },
     {
-      id: "us-consol", mod: "us", grp: "Lung", t: "Lung consolidation with air bronchograms", img: "pocus/consol.jpg", view: "Right base", cmp: NLUNG,
-      alt: "Lung ultrasound with tissue-like lung and branching bright lines",
-      hx: "Fever, productive cough, right basal crackles.",
-      task: "Mark the consolidated lung.",
-      reg: [[.52, .50, .24, .20, "Tissue-like lung with air bronchograms"]],
-      find: ["Lung looks like liver, called hepatisation", "Bright branching lines are air bronchograms", "Irregular deep border, the shred sign"],
-      rep: "Right basal consolidation with dynamic air bronchograms.",
-      ddx: ["Pneumonia", "Atelectasis (static bronchograms)", "Infarct", "Tumour"],
-      sig: "Dynamic air bronchograms favour pneumonia over compressive collapse.",
-      icu: ["Antibiotics after cultures", "Check for a parapneumonic effusion", "Monitor response with repeat ultrasound"],
-      q: [{ q: "Which finding separates pneumonia from atelectasis?", o: ["Dynamic air bronchograms", "Static air bronchograms", "No pleural line", "A-lines"], a: 0, w: "Air that moves with respiration in the bronchi indicates open airways in consolidated lung." }]
+      "id": "us-consol",
+      "mod": "us",
+      "grp": "Lung",
+      "t": "Subpleural consolidation in bacterial pneumonia (real cine)",
+      "img": "radiology/media/us-pneumonia-linear.webm",
+      "kind": "cine",
+      "fps": 25,
+      "view": "Chest wall, linear probe",
+      "alt": "Cine loop of lung ultrasound with a tissue-like area beneath the pleural line",
+      "hx": "Anonymised clip from a published series on 2009 H1N1 pneumonia. In the source it is labelled bacterial pneumonia. No clinical details come with the clip.",
+      "task": "Play the loop and describe the lung just below the pleural line. Then answer the question.",
+      "choice": {
+        "q": "Lung beneath the pleural line that looks like solid tissue, with irregular deep margins, instead of aerated lung with A-lines is called:",
+        "o": [
+          "Consolidation",
+          "Pleural effusion",
+          "Normal aerated lung",
+          "Pneumothorax"
+        ],
+        "a": 0,
+        "w": "Consolidated lung has lost its air and looks tissue-like, a little like liver. An effusion is anechoic fluid between the pleural layers. A pneumothorax shows no sliding and no B-lines."
+      },
+      "find": [
+        "A hypoechoic, tissue-like area lies beneath the pleural line (the source dataset labels this clip as consolidation)",
+        "The pleural line is bright and the deep margin of the area is irregular",
+        "This clip is a linear-probe view, which resolves the pleural line and small subpleural lesions well",
+        "Air bronchograms and effusion are not marked in this lab for this clip"
+      ],
+      "rep": "Linear-probe lung ultrasound with a subpleural consolidation, from a case labelled bacterial pneumonia in the source.",
+      "ddx": [
+        "Pneumonia",
+        "Atelectasis (static bronchograms)",
+        "Infarct",
+        "Tumour"
+      ],
+      "sig": "Dynamic air bronchograms favour pneumonia over compressive collapse. Always look for a parapneumonic effusion.",
+      "icu": [
+        "Antibiotics after cultures, as the local protocol advises",
+        "Check for a parapneumonic effusion",
+        "Monitor response with repeat ultrasound"
+      ],
+      "q": [
+        {
+          "q": "Which finding separates pneumonia from atelectasis?",
+          "o": [
+            "Dynamic air bronchograms",
+            "Static air bronchograms",
+            "No pleural line",
+            "A-lines"
+          ],
+          "a": 0,
+          "w": "Air that moves with respiration in the bronchi indicates open airways in consolidated lung."
+        }
+      ],
+      "sourceTag": {
+        "tag": "REAL CINE · CC BY 2.0",
+        "chip": "Real ultrasound cine, CC BY 2.0",
+        "real": true,
+        "text": "Real anonymised clip from a published, open-access paper (CC BY 2.0), re-encoded only. No clinical details come with the clip. Source in the credit line below."
+      },
+      "cr": [
+        "usPneu"
+      ],
+      "reg": []
+    },
+    {
+      "id": "us-whitelung",
+      "mod": "us",
+      "grp": "Lung",
+      "t": "\"White lung\" in H1N1 viral pneumonia (real cine)",
+      "img": "radiology/media/us-whitelung-h1n1.webm",
+      "kind": "cine",
+      "fps": 25,
+      "view": "Chest wall, convex probe",
+      "alt": "Cine loop of lung ultrasound with a diffusely echogenic lung",
+      "hx": "Anonymised clip from a published series on 2009 H1N1 pneumonia. In the source it is labelled with a \"white lung\" pattern. No clinical details come with the clip.",
+      "task": "Play the loop. Look at the texture of the lung below the pleural line. Then answer the question.",
+      "choice": {
+        "q": "Lung that looks uniformly bright and echogenic, with B-lines merging into one another, is often called:",
+        "o": [
+          "White lung",
+          "Seashore lung",
+          "Stratosphere lung",
+          "Barcode lung"
+        ],
+        "a": 0,
+        "w": "Confluent B-lines that merge fill the screen and give the white lung pattern. Seashore, stratosphere and barcode describe M-mode, where seashore is normal and the other two mean no sliding."
+      },
+      "find": [
+        "The source labels this clip \"white lung\", with consolidation and B-lines",
+        "The lung beneath the pleural line is diffusely echogenic instead of showing A-lines",
+        "A rib shadow darkens part of the field and should not be mistaken for disease",
+        "Many causes give this pattern, from pneumonia to severe oedema"
+      ],
+      "rep": "Convex-probe lung ultrasound with a diffusely echogenic pattern (white lung) in a case labelled H1N1 pneumonia in the source.",
+      "ddx": [
+        "Viral pneumonia",
+        "ARDS",
+        "Cardiogenic oedema",
+        "Severe interstitial disease"
+      ],
+      "sig": "A white lung pattern means very little air is left in the lung beneath the probe. It tracks lost aeration, and does not point to one disease.",
+      "icu": [
+        "Correlate with oxygenation and the ventilator settings",
+        "Look for a dilated IVC and a failing LV to separate oedema from ARDS",
+        "Use the same windows on repeat scans to follow aeration"
+      ],
+      "q": [
+        {
+          "q": "What does a white lung pattern mainly tell you?",
+          "o": [
+            "Very little air is left in the lung under the probe",
+            "There is a pneumothorax",
+            "The pleural line is missing",
+            "The lung is normal"
+          ],
+          "a": 0,
+          "w": "It marks lost aeration. The cause must come from the clinical picture and other tests."
+        }
+      ],
+      "sourceTag": {
+        "tag": "REAL CINE · CC BY 2.0",
+        "chip": "Real ultrasound cine, CC BY 2.0",
+        "real": true,
+        "text": "Real anonymised clip from a published, open-access paper (CC BY 2.0), re-encoded only. No clinical details come with the clip. Source in the credit line below."
+      },
+      "cr": [
+        "usH1n1"
+      ],
+      "reg": []
     },
     {
       id: "echo-plax", mod: "us", grp: "Cardiac", t: "Which echo view? Parasternal long axis", img: "echo/plax.jpg", view: "Echo", alt: "Illustration of a parasternal long axis view",

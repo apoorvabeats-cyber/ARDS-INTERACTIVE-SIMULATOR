@@ -165,7 +165,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       const btn = document.getElementById("icu-enter");
       if (btn) btn.click();
     } else if (kind === "rad") {
-      location.href = "radiology.html?v=20261119r1";
+      location.href = "radiology.html?v=20261119r2";
     } else if (kind === "micro") {
       location.href = "microbiology.html?v=20261119g";
     } else {

@@ -4,25 +4,35 @@ Open `radiology.html`. It is reached from the fourth door (behind you) in the ha
 
 ## What it is
 
-A dependency-free, dark-theme image workstation plus a case engine. Four modules: chest X-ray (including lines and tubes), CT, MRI, ultrasound. 54 cases.
+A dependency-free, dark-theme image workstation plus a case engine. Four modules: chest X-ray (including lines and tubes), CT, MRI, ultrasound. 60 cases, 8 of them real cine loops.
 
 Each case has a presentation, a marking task graded against stored ground-truth regions, a reveal (findings, interpretation, differential, why it matters, ICU management) and a short question. Progress is kept in the browser only.
 
 Viewer tools: pan, zoom, window/level (8-bit), invert, measure (pixels, uncalibrated), arrow, circle, point, undo, clear, side-by-side compare, full screen, pinch on touch screens.
 
+## Real data in the lab
+
+Credits, licences and the changes made are in [CREDITS.md](CREDITS.md), on `radiology-credits.html`, and under each case.
+
+- **CT cine (2 cases).** One real chest CT, 135 slices, from the TCIA ACRIN-NSCLC-FDG-PET collection (CC BY 3.0), shown as a scroll in a lung window and in a mediastinal window. It comes from a lung cancer trial. It has not been read for this lab, so the teaching is about scrolling, windows and anatomy, not a diagnosis.
+- **MRI cine (3 cases).** The MNI ICBM152 2009a normal T1 template, scrolled in the axial, coronal and sagittal planes. It is an average of many normal adults, so it is smooth and is an anatomy reference, not a patient. Its licence is a permissive copyright notice, not Creative Commons.
+- **Ultrasound cine (3 cases).** Lung ultrasound clips from open-access papers (CC BY 4.0 and CC BY 2.0): B-lines, subpleural consolidation, white lung. The clips are cropped and curated by [jannisborn/covid19_ultrasound](https://github.com/jannisborn/covid19_ultrasound). Only clips with a named paper, DOI and licence were used.
+- **Chest X-ray reference (all 14 cases).** One real adult PA film reported as no finding (Hannover Medical School, CC BY 3.0), shown through Compare.
+
+`radiology/tools/build-media.py` rebuilds every file in `radiology/media/` from the original sources. Only display changes are made: crop, window, scale, re-encode.
+
 ## What it is not (yet)
 
-- **No DICOM.** The images are JPEG or PNG teaching images already in this repo (`xrays/`, `cts/`, `mris/`, `scans/`). They have no DICOM header, no Hounsfield data and no calibration. The W/L tool changes display contrast only.
-- **No CT or MR stacks, no MPR.** The viewer supports `kind: "stack"` (ordered frames, wheel to scroll), but no stack has been added.
-- **No cine.** The viewer supports `kind: "cine"` (webm or mp4 with frame step, 0.25x and 0.5x, loop), but no loop has been added. Ultrasound cases are still frames and say so.
-- **The ultrasound and echo images (`pocus/`, `echo/`) are stylised illustrations**, not clinical scans (perfectly round vessels, schematic chambers). The viewer labels them ILLUSTRATION. Replace them with real, licensed loops.
-- **Normal references** exist for brain CT and a few ultrasound pairs only. Cases without one show an honest "not yet added" panel.
-- **Provenance and licence of every image are unverified.** Record each source and licence before public release. Some images carry the source's own arrows and labels.
+- **No DICOM.** Still images are JPEG or PNG teaching images already in this repo (`xrays/`, `cts/`, `mris/`, `scans/`) with no DICOM header and no Hounsfield data. The CT and MRI cine are 8-bit video, so the W/L tool changes display contrast only and there is no MPR.
+- **Cine exists for 8 cases only.** The pathology cases in CT and MRI are still single images. No licensed CT or MR volume with these pathologies (haemorrhage, infarct, abscess, PE) was found, so they stay as stills and say so.
+- **Ultrasound outside the lung is still illustrations.** Effusion, M-mode, echo views, IVC, FAST, gallbladder, kidney, bladder, DVT and optic nerve (`pocus/`, `echo/`) are stylised drawings labelled ILLUSTRATION. No licensed real cine for them was found. A normal lung (A-lines, sliding) cine was not added because no candidate clip had a named paper and licence.
+- **Normal references.** Chest X-ray cases show the real PA reference (an erect PA film, so heart size and vessels differ from portable AP films). Brain CT and a few ultrasound pairs still use their older references. Chest and abdomen CT, MRI sequences and most ultrasound cases show a "not yet added" panel, and nothing is generated to fill it. A sequence-matched normal MRI and a normal chest CT with a licence were not found.
+- **Provenance and licence of the older still images are unverified.** Record each source and licence before public release. Some carry the source's own arrows and labels.
 - All teaching text is a first draft and needs clinical review.
 
 ## Case format
 
-`cases-*.js` call `RAD.add([...])`. Key fields: `id`, `mod` (cxr, ct, mri, us), `grp`, `t`, `img`, `kind` (image, stack, cine, dicom), `view`, `hx`, `task`, `reg` (regions `[cx, cy, rx, ry, label]` as fractions of image width and height), `cmp` (reference image), `panels` (crop rectangles for a multi-panel figure), `choice` (a question instead of marking), `find`, `rep`, `ddx`, `sig`, `icu`, `q`.
+`cases-*.js` call `RAD.add([...])`. Key fields: `id`, `mod` (cxr, ct, mri, us), `grp`, `t`, `img`, `kind` (image, stack, cine, dicom), `view`, `hx`, `task`, `reg` (regions `[cx, cy, rx, ry, label]` as fractions of image width and height), `cmp` (reference image, `{src, cap, sourceTag, cr}`), `fps` and `unit` (cine frame rate and counter label), `sourceTag` (`{tag, chip, real, text}`) and `cr` (ids into `credits.js`), `panels` (crop rectangles for a multi-panel figure), `choice` (a question instead of marking), `find`, `rep`, `ddx`, `sig`, `icu`, `q`.
 
 ## Getting to real DICOM
 
