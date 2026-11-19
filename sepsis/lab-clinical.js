@@ -161,12 +161,14 @@
     if (!spec || !window.PathStage) return;
     const cv = $("#cv");
     const stage = window.__stage = PathStage.mount(cv, {
+      leader: true,
+      onLabel(html) { const q = $("#info"); if (q) q.innerHTML = html; },
       onPick(info) {
         $("#info").innerHTML = `<strong>${info.title}</strong><br>${info.body}<br><em>Drugs and care:</em> ${info.care}`;
       }
     });
-    fetch("pathology-models.json?v=20261119e").then((r) => r.json()).then((d) => {
-      const sp = (d.complications || []).find((c) => c.id === id), host2 = $("#stages");
+    fetch("pathology-models.json?v=20261119f").then((r) => r.json()).then((d) => {
+      const sp = (d.complications || []).find((c) => c.id === id), host2 = $("#revslot") || $("#stages");
       if (!sp || !sp.reversibleText || !host2) return;
       const pct = Math.round(Math.max(0, Math.min(1, sp.reversible == null ? 0.5 : sp.reversible)) * 100);
       const el = document.createElement("div");
@@ -174,7 +176,7 @@
       el.innerHTML = "<b>Reversible or not?</b> " + sp.reversibleText +
         '<div style="margin-top:6px;height:8px;border-radius:99px;background:var(--line);overflow:hidden" role="img" aria-label="Share of the injury that can recover: ' + pct + ' percent"><div style="width:' + pct + '%;height:100%;background:var(--ok,#1d8a5a)"></div></div>' +
         '<div class="hint" style="margin:4px 0 0">Green is the share that can recover when the cause is treated. The rest is permanent damage. Press Play, then compare Normal and Diseased.</div>';
-      host2.insertAdjacentElement("afterend", el);
+      if (host2.id === "revslot") host2.appendChild(el); else host2.insertAdjacentElement("afterend", el);
     }).catch(() => {});
     const s = { sev: spec.sev, rx: {}, vt: 8, peep: 5, list: spec.rx, m: {} };
     let viewI = 0, tsev = s.sev, ramp = false, hr = 0, hist = [], lh = 0, keyFn = () => [[0, 1, "#2ad4c0"], [0, 1, "#f0a030"]];
@@ -262,6 +264,10 @@
     })();
     go(0);
     refresh();
+    if (window.LabShell) {
+      const shell = LabShell.attach({ stage, views: spec.views, names: ["Organ", "Cut-away", "Cells"], go });
+      const g0 = go; /* keep the chips in step when the lab changes view itself */
+    }
   }
 
   window.LabClinical = { boot };

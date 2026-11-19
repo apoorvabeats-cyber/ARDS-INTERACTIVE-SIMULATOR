@@ -655,6 +655,19 @@
     const creditEl = document.createElement("div");
     creditEl.style.cssText = "position:absolute;right:8px;bottom:4px;font:10px/1.2 Figtree,sans-serif;color:rgba(243,239,230,.5);pointer-events:none;z-index:2";
     container.appendChild(creditEl);
+    /* Leader-line labels (hooks.leader): HTML chips with thin lines to the pin, like the Nephrology Learning Lab. */
+    const leader = !!hooks.leader;
+    let ovEl = null, ovSvg = null;
+    if (leader) {
+      if (!document.getElementById("ps-leader-css")) {
+        const st = document.createElement("style"); st.id = "ps-leader-css";
+        st.textContent = ".ps-l{position:absolute;left:0;top:0;white-space:nowrap;pointer-events:auto;cursor:pointer;background:rgba(8,16,24,.82);color:#eef3f6;border:1px solid #6a8294;border-radius:8px;padding:2px 7px;font:600 11px/1.25 Figtree,system-ui,sans-serif;touch-action:manipulation;user-select:none}.ps-l.lesion{border-color:#ff8a6b}.ps-l.part{border-color:#8fe0d2}.ps-l:active{background:rgba(30,60,80,.95)}.ps-ln{stroke:#b7c6d0;stroke-width:1}";
+        document.head.appendChild(st);
+      }
+      ovEl = document.createElement("div"); ovEl.style.cssText = "position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2";
+      ovSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); ovSvg.setAttribute("width", "100%"); ovSvg.setAttribute("height", "100%"); ovSvg.style.cssText = "position:absolute;inset:0;pointer-events:none";
+      ovEl.appendChild(ovSvg); container.appendChild(ovEl);
+    }
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x070b10);
@@ -672,7 +685,7 @@
     ground.rotation.x = -Math.PI / 2; ground.position.y = -1.35; scene.add(ground);
 
     const cam = new THREE.PerspectiveCamera(38, 1, 0.05, 40);
-    const clip = new THREE.Plane(V(1, 0, 0), 100);
+    const clip = new THREE.Plane(V(-1, 0, 0), 100); /* keeps x below the constant: the camera sits at +x in the cut view and looks at the cut face */
     const texCache = {};
     function tex(url) { if (!texCache[url]) texCache[url] = loadTex(url); return texCache[url]; }
 
@@ -716,7 +729,7 @@
       root.add(capMesh);
       root.visible = false;
       scene.add(root);
-      const entry = { spec, root, organ, cells, capMesh, mat, lower, peak: 0 };
+      const entry = { spec, root, organ, cells, capMesh, mat, lower, peak: 0, cutX: spec.cutX != null ? spec.cutX : 0.02 };
       models[spec.id] = entry;
       if (spec.glb) loadGlb(entry, spec.glb);
       return entry;
@@ -752,6 +765,10 @@
           });
           holder.updateMatrixWorld(true);
           seatDecals(entry, holder, meshes);
+          if (entry.spec.cutX == null && entry.spec.organ === "lung") entry.cutX = -0.6;
+          entry.capMesh.position.x = entry.cutX;
+          try { entry.capReal = buildCap(entry, meshes); } catch (err) { entry.capReal = false; }
+          if (view === "cut" && current.entry === entry) clip.constant = entry.cutX;
           entry.root.add(holder);
           entry.glb = holder;
           entry.organ.visible = false;
@@ -766,6 +783,60 @@
         sEl.onload = go;
         document.head.appendChild(sEl);
       }
+    }
+
+    /* A real cross-section: slice the mesh at the cut plane and fill the outline, so the cut face has the organ's own shape.
+       Paired lungs are cut through the right lung, because the midline passes between them. */
+    function buildCap(entry, meshes) {
+      const root = entry.root; root.updateMatrixWorld(true);
+      const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), X = entry.cutX, segs = [];
+      const a = V(0, 0, 0), b = V(0, 0, 0), c = V(0, 0, 0), M = new THREE.Matrix4();
+      meshes.forEach((m) => {
+        M.multiplyMatrices(inv, m.matrixWorld);
+        const ps = m.geometry.attributes.position, idx = m.geometry.index, n = idx ? idx.count / 3 : ps.count / 3;
+        for (let t = 0; t < n; t++) {
+          a.fromBufferAttribute(ps, idx ? idx.getX(t * 3) : t * 3).applyMatrix4(M);
+          b.fromBufferAttribute(ps, idx ? idx.getX(t * 3 + 1) : t * 3 + 1).applyMatrix4(M);
+          c.fromBufferAttribute(ps, idx ? idx.getX(t * 3 + 2) : t * 3 + 2).applyMatrix4(M);
+          const da = a.x - X, db = b.x - X, dc = c.x - X;
+          if ((da > 0 && db > 0 && dc > 0) || (da <= 0 && db <= 0 && dc <= 0)) continue;
+          const pts = [];
+          [[a, da, b, db], [b, db, c, dc], [c, dc, a, da]].forEach(([p, dp, q, dq]) => {
+            if ((dp > 0) !== (dq > 0)) { const u = dp / (dp - dq); pts.push([p.y + (q.y - p.y) * u, p.z + (q.z - p.z) * u]); }
+          });
+          if (pts.length === 2) segs.push(pts);
+        }
+      });
+      if (segs.length < 8) return false;
+      const key = (p) => Math.round(p[0] * 2e4) + "," + Math.round(p[1] * 2e4);
+      const adj = new Map();
+      segs.forEach((sg, i) => sg.forEach((p) => { const k = key(p); let l = adj.get(k); if (!l) { l = []; adj.set(k, l); } l.push(i); }));
+      const used = new Uint8Array(segs.length), loops = [];
+      for (let i = 0; i < segs.length; i++) {
+        if (used[i]) continue; used[i] = 1;
+        const loop = [segs[i][0], segs[i][1]], startK = key(segs[i][0]); let end = key(segs[i][1]);
+        for (let g = 0; g < 400000 && end !== startK; g++) {
+          const l = adj.get(end), j = l ? l.find((q) => !used[q]) : undefined;
+          if (j === undefined) break;
+          used[j] = 1; const sg = segs[j], nx = key(sg[0]) === end ? sg[1] : sg[0]; loop.push(nx); end = key(nx);
+        }
+        if (loop.length >= 12) loops.push(loop);
+      }
+      if (!loops.length) return false;
+      const shapes = loops.map((lp) => {
+        const step = Math.max(1, Math.floor(lp.length / 700));
+        const pts = []; for (let i = 0; i < lp.length; i += step) pts.push(new THREE.Vector2(-lp[i][1], lp[i][0]));
+        return new THREE.Shape(pts);
+      });
+      const geo = new THREE.ShapeGeometry(shapes), pos = geo.attributes.position, uv = geo.attributes.uv;
+      geo.computeBoundingBox();
+      const bb = geo.boundingBox;
+      entry.capBox = { cx: (bb.min.x + bb.max.x) / 2, cy: (bb.min.y + bb.max.y) / 2, hu: (bb.max.x - bb.min.x) / 2, hv: (bb.max.y - bb.min.y) / 2 };
+      for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / 2.9 + 0.5, pos.getY(i) / 2.9 + 0.5);
+      entry.capMesh.geometry.dispose(); entry.capMesh.geometry = geo;
+      entry.capMesh.rotation.set(0, Math.PI / 2, 0); entry.capMesh.position.x = X;
+      entry.capMesh.material.side = THREE.DoubleSide;
+      return true;
     }
 
     function seatDecals(entry, holder, meshes) {
@@ -947,12 +1018,15 @@
 
     function frameDist() {
       const sp = (models[id] && models[id].spec) || {};
-      if (sp.dist && sp.dist[view]) return sp.dist[view];
-      if (view === "cells") return 2.45;
-      if (view === "cut") return 3.8;
-      if (id === "ards") return 4.6;
-      if (id === "brain" || id === "enceph") return 3.8;
-      return 4.1;
+      let d;
+      if (sp.dist && sp.dist[view]) d = sp.dist[view];
+      else if (view === "cells") return 2.45;
+      else if (view === "cut") d = 3.8;
+      else if (id === "ards") d = 4.6;
+      else if (id === "brain" || id === "enceph") d = 3.8;
+      else d = 4.1;
+      /* a tall, narrow stage (a phone) needs more distance for the organ to fit across */
+      return view === "cells" ? d : d * Math.max(1, 0.85 / (cam.aspect || 1));
     }
 
     function apply() {
@@ -965,7 +1039,7 @@
       creditEl.style.display = entry.glb && view !== "cells" ? "" : "none";
       entry.cells.visible = view === "cells";
       entry.capMesh.visible = view === "cut";
-      clip.constant = view === "cut" ? 0.02 : 80;
+      clip.constant = view === "cut" ? entry.cutX : 80;
       buttons();
       return { entry, targetSev };
     }
@@ -981,7 +1055,7 @@
               part:"Title"  cell view: sits on the scene object whose tap title is this
               at:[x,y,z]    cell view: position in the scene }                                             */
     let marksData = { organ: {}, spec: {} }, marksOn = true;
-    fetch(BASE + "marks.json?v=20261119e").then((r) => r.json()).then((d) => { marksData = d || marksData; Object.keys(models).forEach((k) => { models[k].pins = null; }); }).catch(() => {});
+    fetch(BASE + "marks.json?v=20261119f").then((r) => r.json()).then((d) => { marksData = d || marksData; Object.keys(models).forEach((k) => { (models[k].pins || []).forEach((p) => { if (p.el) p.el.remove(); if (p.line) p.line.remove(); }); models[k].pins = null; }); }).catch(() => {});
     const PIN_COL = { lesion: "#ff7a59", part: "#7fd4e6" };
     function ringTex(col) {
       const c = document.createElement("canvas"); c.width = c.height = 96;
@@ -1013,7 +1087,15 @@
         const pick = { title: def.title || def.label, body: def.body || "", care: def.care || "", mark: true };
         ring.userData.pick = pick; label.userData.pick = pick;
         ring.visible = label.visible = false;
-        return { def, ring, label, ar: lt.w / lt.h, parent: null, pos: null, nrm: null, placed: false, a: 0 };
+        const pn = { def, ring, label, ar: lt.w / lt.h, parent: null, pos: null, nrm: null, placed: false, a: 0, el: null, line: null };
+        if (leader) {
+          pn.el = document.createElement("div"); pn.el.className = "ps-l " + (def.kind === "lesion" ? "lesion" : "part");
+          pn.el.textContent = def.label || def.title || ""; pn.el.style.display = "none";
+          pn.el.addEventListener("click", (ev) => { ev.stopPropagation(); pickPin(pn); });
+          pn.line = document.createElementNS("http://www.w3.org/2000/svg", "line"); pn.line.setAttribute("class", "ps-ln"); pn.line.style.display = "none";
+          ovSvg.appendChild(pn.line); ovEl.appendChild(pn.el);
+        }
+        return pn;
       });
       return entry.pins;
     }
@@ -1033,7 +1115,12 @@
         } else if (d.at) pos = V(d.at[0], d.at[1], d.at[2]);
       } else if (d.view === "cut") {
         parent = entry.root;
-        if (d.cut) { pos = V(0.035, d.cut[1], -d.cut[0]); nrm = V(1, 0, 0); }
+        if (entry.spec.glb && !entry.glb) return false;
+        if (d.cut) {
+          /* cut=[right, up] as a share of the section's own width and height, so it lands inside any organ */
+          const bx = entry.capBox, r = bx ? bx.cx + d.cut[0] * bx.hu * 1.6 : d.cut[0], u = bx ? bx.cy + d.cut[1] * bx.hv * 1.6 : d.cut[1];
+          pos = V(entry.cutX + 0.015, u, -r); nrm = V(1, 0, 0);
+        }
       } else {
         if (entry.spec.glb && !entry.glb) return false;
         parent = entry.glb || entry.organ;
@@ -1096,7 +1183,8 @@
         }
         pn.a += (a - pn.a) * 0.2;
         const on = pn.a > 0.04;
-        pn.ring.visible = pn.label.visible = on;
+        pn.ring.visible = on; pn.label.visible = on && !leader;
+        if (leader && !on && pn.el) { pn.el.style.display = "none"; pn.line.style.display = "none"; }
         if (!on) return;
         pn.ring.material.opacity = pn.label.material.opacity = pn.a;
         pn.ring.getWorldPosition(_w);
@@ -1110,9 +1198,36 @@
         const sc = _w.clone().project(cam);
         vis.push({ pn, sx: (sc.x * 0.5 + 0.5) * W, sy: (-sc.y * 0.5 + 0.5) * H, lw, lh, rp, lesion: d.kind === "lesion" });
       });
-      /* place labels above or below their ring, keep them on screen, and avoid overlap (lesions get first pick) */
       const rects = [];
       vis.sort((a, b) => (b.lesion ? 1 : 0) - (a.lesion ? 1 : 0));
+      if (leader) {
+        /* chip beside the ring on the side away from the middle of the picture, joined by a thin leader line */
+        vis.forEach((o) => {
+          const el = o.pn.el, ln = o.pn.line; el.style.display = "";
+          const lw = el.offsetWidth || 70, lh = el.offsetHeight || 18, a = o.pn.a;
+          const base = Math.atan2(o.sy - H / 2, o.sx - W / 2);
+          let best = null;
+          for (const da of [0, 0.7, -0.7, 1.4, -1.4, 2.1, -2.1, 3.14]) {
+            for (const gap of [o.rp + 14, o.rp + 34, o.rp + 58]) {
+              const ang = base + da, ux = Math.cos(ang), uy = Math.sin(ang);
+              const cx = o.sx + ux * gap, cy = o.sy + uy * gap;
+              const left = ux >= 0 ? cx : cx - lw, top = cy - lh / 2;
+              if (left < 3 || left + lw > W - 3 || top < 44 || top + lh > H - 30) continue;
+              if (rects.some((r) => left < r[2] + 2 && left + lw > r[0] - 2 && top < r[3] + 2 && top + lh > r[1] - 2)) continue;
+              best = { left, top, ux, uy, cx, cy }; break;
+            }
+            if (best) break;
+          }
+          if (!best) { el.style.display = "none"; ln.style.display = "none"; return; }
+          rects.push([best.left, best.top, best.left + lw, best.top + lh]);
+          el.style.transform = "translate(" + best.left.toFixed(1) + "px," + best.top.toFixed(1) + "px)"; el.style.opacity = a.toFixed(2);
+          const ex = best.ux >= 0 ? best.left : best.left + lw, ey = best.top + lh / 2;
+          ln.setAttribute("x1", (o.sx + best.ux * o.rp).toFixed(1)); ln.setAttribute("y1", (o.sy + best.uy * o.rp).toFixed(1));
+          ln.setAttribute("x2", ex.toFixed(1)); ln.setAttribute("y2", ey.toFixed(1)); ln.style.display = ""; ln.style.opacity = a.toFixed(2);
+        });
+        return vis.length;
+      }
+      /* place labels above or below their ring, keep them on screen, and avoid overlap (lesions get first pick) */
       vis.forEach((o) => {
         const cx = o.sx < o.lw / 2 + 4 ? 0 : (o.sx > W - o.lw / 2 - 4 ? 1 : 0.5), left = o.sx - cx * o.lw, g = o.rp + 3;
         let best = null;
@@ -1157,6 +1272,14 @@
       ptr.set(e.pointerId, [e.clientX, e.clientY]);
     });
     function up(e) { ptr.delete(e.pointerId); if (ptr.size === 0) dragging = false; }
+    function flyTo(w) {
+      yawGoal = Math.atan2(w.x - target.x, w.z - target.z); pitGoal = clamp(Math.atan2(w.y - target.y, Math.hypot(w.x - target.x, w.z - target.z)), -0.3, 0.7);
+      distGoal = Math.max(2.4, frameDist() * 0.62);
+    }
+    function pickPin(pn) {
+      if (hooks.onPick) hooks.onPick(pn.ring.userData.pick);
+      if (view === "organ") flyTo(pn.ring.getWorldPosition(new THREE.Vector3()));
+    }
     renderer.domElement.addEventListener("pointerup", (e) => {
       up(e);
       if (down.moved || !hooks.onPick) return;
@@ -1177,9 +1300,7 @@
         }
         hooks.onPick(pk);
         if (pk.mark && view === "organ") {
-          const w = hits[0].object.getWorldPosition(new THREE.Vector3());
-          yawGoal = Math.atan2(w.x - target.x, w.z - target.z); pitGoal = clamp(Math.atan2(w.y - target.y, Math.hypot(w.x - target.x, w.z - target.z)), -0.3, 0.7);
-          distGoal = Math.max(2.4, frameDist() * 0.62);
+          flyTo(hits[0].object.getWorldPosition(new THREE.Vector3()));
         }
       }
     });
@@ -1249,6 +1370,9 @@
         if (opts.extra) extra = opts.extra;
         current = apply();
       },
+      /* pins of the current complication in the current view: [{label, title, kind}], and focus(i) opens one */
+      pins() { return pinsFor(current.entry).filter((p) => p.def.view === view).map((p, i) => ({ i, label: p.def.label, title: p.def.title, kind: p.def.kind })); },
+      focus(i) { const l = pinsFor(current.entry).filter((p) => p.def.view === view); if (l[i]) pickPin(l[i]); },
       pose(y, p, d) { yaw = y; pit = p; if (d) { distGoal = d; dist = d; } },
       debug() { const e = current.entry; return { id, view, mode, shown, targetSev: current.targetSev, organ: e.organ.children.length, cells: e.cells.children.length, cellsVisible: e.cells.visible, glb: !!e.glb, capVisible: e.capMesh.visible, pins: (e.pins || []).filter((p) => p.ring.visible).map((p) => p.def.label), pinState: (e.pins || []).map((p) => [p.def.label, p.def.view, p.placed, +p.a.toFixed(2)]) }; },
       destroy() { dead = true; ro.disconnect(); renderer.dispose(); }

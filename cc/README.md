@@ -22,3 +22,14 @@ Each complication opens on a photoreal specimen. The interactive model with stag
 * The Normal and Diseased buttons set the severity the specimen shows. Play runs the progression.
 * Three.js r128 and its GLTFLoader are copied into `../vendor/three128/`, so the 3D labs no longer depend on a CDN. The pages keep working when the network blocks `cdnjs`.
 * The pin text is original teaching material and needs clinical review.
+
+## Nephrology-style lab shell (all 47 complication labs)
+Every 3D lab (cc/lab.html, sepsis/lab-*.html except lab-shock, dka/lab-*.html) uses one layout: a single large stage with a
+live readout (HUD), a severity thermometer, view chips (Organ / Cut-away / Cells) and four tabs: Explore, Output, Drugs, Disease.
+- `Specimen.init({leader:true, ...})` mounts PathStage with leader-line labels; `stage.pins()` lists labels and `stage.focus(i)` flies to one.
+- cc/lab.html has the shell built in. Sepsis labs call `LabShell.attach({stage, views, names, go})` (sepsis/lab-shell.js), which rearranges the
+  existing page so each lab's own script keeps working. DKA labs share the cc/lab.html template.
+- Cut-away is a real cross-section: GLB meshes are sliced at plane `x = entry.cutX` and the loops are triangulated into a cap (`buildCap`).
+  The lung is cut through the right lung (`cutX = -0.6`). Cut pins use `cut:[u,v]` as fractions of the cap bounding box (x1.6).
+- Procedural organs (vessel, bleed, pancreas, bowel, muscle, skin) still use the simple disc cut and have organ and cell pins only.
+- Edit pins in cc/src/marks_src.py and regenerate: `cd cc/src && python3 marks_src.py ../../sepsis/marks.json`. Cache-bust string is 20261119f.

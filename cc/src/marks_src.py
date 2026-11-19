@@ -87,7 +87,7 @@ SPEC["pancreatitis-ards"][0]["care"] = LUNG_CARE_ARDS + " Also treat the pancrea
 SPEC["ards-baro"] = [
  L("organ", "Apical bleb", "Subpleural bleb", "Air blebs at the apex rupture when peak or plateau pressure is high, letting air into the pleural space.", "Helps: Plateau below 30 and driving pressure below 15, chest drain for a tension pneumothorax. Avoid: High tidal volume and PEEP beyond what oxygenation needs.", dir=[-0.35, 1, 0.2]),
  L("organ", "Air-leak cyst", "Pneumatocele", "A thin-walled air cyst that forms where overdistended lung tears. It can grow or rupture.", "Helps: Lung-protective settings, watch for a new leak on the chest film. Avoid: Sudden pressure spikes (coughing, patient-ventilator asynchrony).", dir=[1, 0.4, 0.3]),
- L("cut", "Air-filled space", "Air-filled space", "Gas has dissected out of the alveoli into the interstitium and beneath the pleura.", "Helps: Lower pressures, drain if the leak is large. Avoid: High PEEP and tidal volume.", cut=[-0.5, 0.5]),
+ L("cut", "Air-filled space", "Air-filled space", "Gas has dissected out of the alveoli into the interstitium and beneath the pleura.", "Helps: Lower pressures, drain if the leak is large. Avoid: High PEEP and tidal volume.", cut=[-0.15, -0.3]),
  L("cells", "Overstretched wall", "Alveolar epithelium", "The thin alveolar wall is torn by overdistension. Air escapes into the tissue.", "Helps: Lower driving pressure. Avoid: Volutrauma.", part="Alveolar epithelium"),
 ]
 SPEC["ards-fibro"] = [

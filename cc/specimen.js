@@ -3,7 +3,8 @@
      key        id of the entry in pathology-models.json, for example "pancreatitis-necro"
      wrap       empty element that receives the 3D canvas
      bar        element that receives the view buttons (Organ / Cut surface / Cells / Next)
-   api: { show(), hide(), sync(severity), view(id), next(), spec }
+   api: { show(), hide(), sync(severity), view(id), next(), pins(), focus(i), curView(), views, spec }
+   o.leader: true draws leader-line labels (Nephrology Learning Lab style)
    A missing key resolves to null, so the page keeps its own interactive model. */
 (function () {
   "use strict";
@@ -30,7 +31,7 @@
       function ensureStage() {
         if (stage) return;
         stage = window.__stage = PathStage.mount(o.wrap, {
-          catalog: [spec], lazy: true, start: spec.id, modelsUrl: false,
+          catalog: [spec], lazy: true, start: spec.id, modelsUrl: false, leader: !!o.leader,
           onPick: (p) => { if (o.onPick) o.onPick(p); },
           onLabel: (html) => { if (html !== last) { last = html; if (o.onLabel) o.onLabel(html); } }
         });
@@ -64,6 +65,8 @@
         show() { o.wrap.style.display = ""; o.bar.style.display = ""; prev.style.display = ""; ensureStage(); last = ""; stage.set({ id: spec.id, view: curView, severity: sev }); },
         hide() { o.wrap.style.display = "none"; o.bar.style.display = "none"; prev.style.display = "none"; },
         sync(s) { sev = Math.max(0, Math.min(1, s)); if (stage) stage.set({ severity: sev }); },
+        stage() { return stage; }, pins() { ensureStage(); return stage.pins(); }, focus(i) { ensureStage(); stage.focus(i); },
+        curView() { return curView; }, views,
         view, next() { const i = views.findIndex((v) => v.id === curView); view(views[(i + 1) % views.length].id); }
       };
     }).catch(() => null);

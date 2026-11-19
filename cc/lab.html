@@ -11,44 +11,70 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Avenir Next"
 main{max-width:520px;margin:0 auto;padding:16px 14px 28px}
 h1{margin:0 0 2px;font-size:23px;letter-spacing:-.01em}
 #sub{color:var(--mute);font-size:13px;margin:0 0 10px}
-#cv{position:relative;height:56vh;min-height:320px;border-radius:14px;overflow:hidden;background:#06111f;touch-action:none}
+#stage{position:relative;height:60vh;min-height:340px;border-radius:14px;overflow:hidden;background:#060b12;touch-action:none}
+#cv,#spec{position:absolute;inset:0;height:auto;min-height:0;border-radius:0;overflow:hidden;touch-action:none}
+#cv{background:#06111f}#spec{background:#070b10;position:absolute!important;inset:0!important;height:auto!important}
 canvas{display:block;width:100%;height:100%}
-#spec{position:relative;height:56vh;min-height:320px;border-radius:14px;overflow:hidden;background:#070b10;touch-action:none}
-#lbl{position:absolute;left:12px;right:12px;bottom:10px;color:#e6f1fb;font-size:13px;line-height:1.35;text-shadow:0 1px 4px #000;pointer-events:none}
+#lbl{position:absolute;left:12px;right:34px;bottom:10px;color:#e6f1fb;font-size:13px;line-height:1.35;text-shadow:0 1px 4px #000;pointer-events:none}
 #lbl b{display:block;font-size:15px}
+#hud{position:absolute;left:10px;color:#cfeee8;font:600 11px/1.45 system-ui,sans-serif;pointer-events:none;text-shadow:0 1px 3px #000;z-index:2;max-width:70%}
+#stage.flow #hud{top:8px}#stage.spec #hud{bottom:44px}
+#hud span.warn{color:#ff9d8f}
+#tb{position:absolute;right:8px;top:8px;bottom:8px;width:14px;border:2px solid #7fd8c0;border-radius:3px 3px 9px 9px;display:flex;align-items:flex-end;overflow:hidden;z-index:2;pointer-events:none}
+#tf{display:block;width:100%;height:0;background:#e8d36a;transition:height .3s,background .3s}
+#stage.spec #hint{display:none}#info b,#info strong{display:block}
+#hint{position:absolute;right:30px;top:8px;color:#9bb;font:10px system-ui;pointer-events:none;z-index:2}
 .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+#nav{flex-wrap:nowrap;overflow-x:auto;margin:6px 0 8px;padding-bottom:2px}#nav button{white-space:nowrap}
+.tabs{display:flex;gap:6px;margin:10px 0 2px}.tabs button{flex:1}
+.pane{display:none}.pane.on{display:block}
 button{font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 12px;cursor:pointer}
 button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-button[aria-pressed="true"]{border-color:var(--acc);color:var(--acc)}
-#rx button.helps[aria-pressed="true"]{border-color:var(--ok);color:var(--ok)}
-#rx button.harms[aria-pressed="true"]{border-color:var(--bad);color:var(--bad)}
+button[aria-pressed="true"],.tabs button.on{border-color:var(--acc);color:#fff;background:var(--acc)}
+#rx button.helps[aria-pressed="true"]{border-color:var(--ok);color:#fff;background:var(--ok)}
+#rx button.harms[aria-pressed="true"]{border-color:var(--bad);color:#fff;background:var(--bad)}
+#exp button{font-size:12.5px;padding:5px 10px}#exp button i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:#7fd4e6}#exp button.lesion i{background:#ff7a59}
 label{display:block;margin:12px 0 2px;color:var(--mute);font-size:13px}
 input[type=range]{width:100%;accent-color:var(--acc)}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13.5px}
 .panel ul{margin:4px 0 0;padding-left:18px}.warn{color:var(--bad);font-weight:600}
 .hint{color:var(--mute);font-size:13px;margin:8px 0 0}
 .kv{color:var(--mute);font-size:13px}.kv b{color:var(--ink)}
+.sec{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:12px 0 0}
+#spmode,#sview{display:none!important}
 </style></head><body><main>
 <h1 id="ttl">Loading</h1><p id="sub"></p>
-<div class="row" id="spmode" style="display:none"></div>
-<div id="cv"><div id="lbl"></div></div>
-<div id="spec" style="display:none"></div>
-<div class="row" id="sview" style="display:none"></div>
+<div class="row" id="nav"></div>
+<div id="stage" class="spec"><div id="cv"><div id="lbl"></div></div><div id="spec" style="display:none"></div><div id="hud"></div><div id="hint">Drag to rotate · pinch to zoom</div><div id="tb"><i id="tf"></i></div></div>
+<div class="row" id="spmode" style="display:none"></div><div class="row" id="sview" style="display:none"></div>
+<div class="tabs" id="tabs"><button data-t="0" class="on">Explore</button><button data-t="1">Output</button><button data-t="2">Drugs</button><button data-t="3">Disease</button></div>
+<section class="pane on" id="t0">
+<div class="sec">Labelled structures · tap one</div><div class="row" id="exp"><span class="hint">Loading labels…</span></div>
+<div class="panel" id="info">Tap a label or any part of the organ to learn what it is and how to treat it.</div>
 <div class="row" id="stages"></div>
+<p class="hint" id="legp"><span id="leg"></span></p>
+</section>
+<section class="pane" id="t1">
+<div class="panel" id="out"></div>
+<div class="panel"><canvas id="sp" width="480" height="90" style="width:100%;height:90px" role="img" aria-label="Key outputs over simulated hours"></canvas><div class="hint" style="margin:2px 0 0">Hour <span id="hr">0</span> of the replay.</div></div>
+<div id="revslot"></div>
+<div class="panel kv" id="meta"></div>
+</section>
+<section class="pane" id="t2">
+<p class="hint">Switch treatments on or off. Green helps, red harms. The organ and the outputs change with them.</p>
+<div class="row" id="rx"></div>
+</section>
+<section class="pane" id="t3">
+<p class="hint">Replay the disease from early to critical, or set the severity yourself.</p>
 <div class="row" id="dz"></div>
 <label for="sev"><span id="sevn">Severity</span>: <span id="v0"></span></label><input id="sev" type="range" min="0" max="100" value="55">
-<div class="row" id="rx"></div>
-<div class="panel" id="out"></div>
-<div class="panel"><canvas id="sp" width="480" height="90" style="width:100%;height:90px" role="img" aria-label="Key outputs over simulated hours"></canvas><div class="hint" style="margin:2px 0 0"><span id="leg"></span> Hour <span id="hr">0</span>.</div></div>
-<div class="panel" id="info">Tap any part of the 3D scene to inspect it.</div>
-<div class="panel kv" id="meta"></div>
-<p class="hint">Drag to orbit. Scroll or pinch to zoom. Stage buttons fly you in. Presets replay the disease over simulated hours.</p>
+</section>
 </main>
 <script src="engine.js"></script>
 <script src="../vendor/three128/three.min.js"></script>
-<script src="../sepsis/path-stage.js?v=20261119e"></script>
-<script src="path-extra.js?v=20261119e"></script>
-<script src="specimen.js?v=20261119e"></script>
+<script src="../sepsis/path-stage.js?v=20261119f"></script>
+<script src="path-extra.js?v=20261119f"></script>
+<script src="specimen.js?v=20261119f"></script>
 <script>
 const $=s=>document.querySelector(s),clamp=CCE.clamp;
 const calm=matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -286,18 +312,33 @@ function tick(){const dt=Math.min(clock.getDelta(),.05);step(dt);const k=calm?1:
  A.frame(dt,v);if(!window.__specOn)R.render(S,cam);requestAnimationFrame(tick)}
 window.CCLAB={set(s,on){sev=s;tsev=s;ramp=false;Object.keys(rx).forEach(x=>delete rx[x]);(on||[]).forEach(x=>rx[x]=true);$('#sev').value=Math.round(s*100);refresh()},go,vars:()=>v};
 refresh();go(0);tick();
-/* Photoreal specimen (PathStage). Default view; the interactive model stays one tap away. Severity follows the engine, so drugs change the specimen. */
+/* Nephrology-lab style shell: one stage (real organ, cut-away, cells, or the flow model), live readouts, labelled structures and tabs.
+   Severity follows the engine, so drugs and replay change the specimen. */
 const effSev=()=>{let n=0,d=0;for(const k in C.state){const p=C.state[k],sl=p[1];if(Math.abs(sl)<.05)continue;n+=clamp((v[k]-p[0])/sl)*Math.abs(sl);d+=Math.abs(sl)}return d?n/d:sev};
-let SPI=null;const setMode=on=>{window.__specOn=!!(on&&SPI);cv.style.display=window.__specOn?'none':'';$('#stages').style.display=window.__specOn?'none':'';
+let SPI=null,curV='organ';const stg=$('#stage');stg.className='flow';
+function hud(){const e=window.__specOn?effSev():sev;
+ $('#hud').innerHTML=C.outs.slice(0,3).map((o,j)=>`<span class="${CE.warn(C,v,j)?'warn':''}">${CE.fmt(C,v,j)}</span>`).join('<br>');
+ $('#tf').style.height=Math.round(clamp(e)*100)+'%';$('#tf').style.background='hsl('+Math.round(55-55*clamp(e))+',75%,58%)'}
+const NAVL={organ:'Organ',cut:'Cut-away',cells:'Cells'};
+function navBuild(){const n=$('#nav');if(!SPI){n.style.display='none';return}
+ n.innerHTML=SPI.views.map(x=>`<button data-v="${x.id}" aria-pressed="${!!window.__specOn&&x.id===curV}">${NAVL[x.id]||x.label}</button>`).join('')+`<button data-v="flow" aria-pressed="${!window.__specOn}">Flow model</button>`}
+const setMode=on=>{window.__specOn=!!(on&&SPI);cv.style.display=window.__specOn?'none':'';$('#stages').style.display=window.__specOn?'none':'';
+ stg.className=window.__specOn?'spec':'flow';
  if(SPI){if(window.__specOn){SPI.show();SPI.sync(effSev())}else SPI.hide()}
- document.querySelectorAll('#spmode button').forEach(b=>b.setAttribute('aria-pressed',(b.dataset.m==='spec')===window.__specOn));
- if(!window.__specOn)fit()};
-window.__specSync=()=>{if(SPI&&window.__specOn)SPI.sync(effSev())};
-if(window.Specimen&&window.PathStage)Specimen.init({key:DID+'-'+C.id,wrap:$('#spec'),bar:$('#sview'),after:$('#sview'),ver:QS.get('v')||'20261119e',
+ if(!window.__specOn)fit();navBuild();hud();expBuild(true)};
+window.__specSync=()=>{if(SPI&&window.__specOn)SPI.sync(effSev());hud()};
+let expKey='';function expBuild(force){const e=$('#exp');
+ if(!window.__specOn||!SPI){e.innerHTML='<span class="hint">Use the stage buttons below to fly through the flow model. Tap parts of the 3D scene to inspect them.</span>';expKey='flow';return}
+ const L=SPI.pins(),k=JSON.stringify(L.map(x=>x.label))+curV;if(!force&&k===expKey)return;expKey=k;
+ e.innerHTML=L.length?L.map(x=>`<button class="${x.kind}" data-i="${x.i}"><i></i>${esc(x.label)}</button>`).join(''):'<span class="hint">Labels load in a moment.</span>'}
+$('#exp').addEventListener('click',ev=>{const b=ev.target.closest('[data-i]');if(b&&SPI){SPI.focus(+b.dataset.i);const q=$('#info');q.scrollIntoView&&q.scrollIntoView({block:'nearest',behavior:calm?'auto':'smooth'})}});
+setInterval(()=>{if(window.__specOn)expBuild(false)},700);
+$('#nav').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b||!SPI)return;const id=b.dataset.v;
+ if(id==='flow'){setMode(false);VOq('Flow model. Stages, drugs and outputs.')}else{curV=id;if(!window.__specOn)setMode(true);SPI.view(id);navBuild();expBuild(true);VOq((NAVL[id]||id)+' view.')}});
+$('#tabs').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.pane').forEach((x,i)=>x.classList.toggle('on',i===+b.dataset.t))});
+if(window.Specimen&&window.PathStage)Specimen.init({key:DID+'-'+C.id,wrap:$('#spec'),bar:$('#sview'),after:$('#revslot'),leader:true,ver:QS.get('v')||'20261119f',
  onLabel:h=>{if(!window.__lbl1){window.__lbl1=1;window.__mute=true;setTimeout(()=>{window.__mute=false},60)}$('#info').innerHTML=h},onPick:p=>{$('#info').innerHTML='<strong>'+esc(p.title)+'</strong><br>'+esc(p.body)+(p.care?'<br><em>Care:</em> '+esc(p.care):'')}}).then(api=>{
- if(!api)return;SPI=api;const m=$('#spmode');m.style.display='';
- m.innerHTML='<button data-m="spec" aria-pressed="true">Photoreal specimen</button><button data-m="live" aria-pressed="false">Interactive model</button>';
- m.addEventListener('click',ev=>{const b=ev.target.closest('button');if(b){setMode(b.dataset.m==='spec');VOq(b.dataset.m==='spec'?'Photoreal specimen. Normal organ, diseased organ, cut surface and the cells.':'Interactive model. Stages, drugs and outputs.')}});
- setMode(true)});
+ if(!api){hud();return}SPI=api;setMode(true)});
+hud();
 }
 </script></body></html>
