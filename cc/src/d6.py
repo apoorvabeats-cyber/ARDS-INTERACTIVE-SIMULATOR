@@ -213,7 +213,8 @@ def M_(id, title, organ, glb, healthy, diseased, rev, revtext, views, picks, **e
     d = {"id": id + "-main", "disease": id, "complication": "main", "title": title, "organ": organ, "glb": glb, "reversible": rev,
          "textures": {"healthy": healthy, "diseased": diseased}}
     d.update(extra)
-    d["views"] = [{"id": i, "label": l, "text": t} for i, l, t in views]
+    NAV = {"organ": "Pathogen-host", "storm": "Cytokine storm", "cells": "Dysregulation"}
+    d["views"] = [({"id": i, "label": l, "text": t, "nav": NAV[i]} if organ == "septic" else {"id": i, "label": l, "text": t}) for i, l, t in views]
     d["picks"] = {"*": {"body": picks[0], "care": picks[2]}, "**": {"body": picks[1], "care": picks[2]}}
     d["reversibleText"] = revtext
     return d
@@ -221,8 +222,12 @@ def M_(id, title, organ, glb, healthy, diseased, rev, revtext, views, picks, **e
 def pk(c): return (MAIN[c]["org"], MAIN[c]["cell"], "Helps: " + "; ".join(r["n"] for r in MAIN[c]["rx"] if r["t"] == "helps") + ". Avoid: " + "; ".join(r["n"] for r in MAIN[c]["rx"] if r["t"] == "harms") + ".")
 
 MODELS = {
- "sepsis": M_("sepsis", "Sepsis: the septic microcirculation", "vessel", "", "tex/tissue-healthy.jpg", "../sepsis/tex/kidney-aki.jpg", .6,
-  MAIN["sepsis"]["rev"], [("organ", "Microvessel", "A septic arteriole and capillary bed. The vessel is dilated and plasma leaks into the tissue."), ("cut", "Cut surface", "Pale, oedematous tissue with congested capillaries."), ("cells", "Capillary wall", "An activated endothelium that has lost its coat, leaks plasma and displays tissue factor.")], pk("sepsis"), mode="shock"),
+ "sepsis": dict(M_("sepsis", "Sepsis: pathogen, host and the dysregulated response", "septic", "", "tex/tissue-healthy.jpg", "../sepsis/tex/kidney-aki.jpg", .6,
+  MAIN["sepsis"]["rev"], [("organ", "Pathogen-host", "Bacteria on a barrier meet a macrophage, neutrophils and complement. Tap the receptors, the colony and the traps."),
+   ("storm", "Cytokine storm", "A cut-open venule with TNF-alpha, IL-1 beta, IL-6 and chemokines pouring out of macrophages. The wall loses its coat, leaks and clots."),
+   ("cells", "Immune dysregulation", "Hyperinflammation on one side and immune paralysis on the other. The balance beam shows both loads rising together.")],
+  ("", "", ""), still=True, capR=0.001, dist={"organ": 6.0, "storm": 6.6, "cells": 5.8}, cam={"organ": [0.25, 0.42], "storm": [0, 0.1], "cells": [0.1, 0.12]}),
+  picks={}),
  "ards": M_("ards", "ARDS: diffuse alveolar damage", "lung", "../models/organs/lung.glb", "../sepsis/tex/lung-healthy.jpg", "../sepsis/tex/lung-ards.jpg", .6,
   MAIN["ards"]["rev"], [("organ", "Lungs", "Heavy, dark red, airless lungs. The back of each lung is solid with fluid and collapse."), ("cut", "Cut surface", "Wet, red and rubbery lung that weighs two to three times normal. Frothy fluid weeps from the cut face."), ("cells", "Alveolus", "A flooded air sac with a hyaline membrane and neutrophils.")], pk("ards"), grow=.05),
  "pancreatitis": M_("pancreatitis", "Acute necrotising pancreatitis", "pancreas", "../models/organs/pancreas.glb", "tex/pancreas-healthy.jpg", "tex/pancreas-necrosis.jpg", .35,

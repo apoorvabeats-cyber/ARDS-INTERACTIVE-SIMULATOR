@@ -7,6 +7,8 @@ def care(k): return "Helps: " + "; ".join(r["n"] for r in d6.MAIN[k]["rx"] if r[
 
 def build(L):
     S = {}
+    def Np(*a, **k):
+        d = L(*a, **k); d["kind"] = "part"; return d
     c = care("ards")
     S["ards-main"] = [
      L("organ", "Dependent consolidation", "Dependent consolidation", "Fluid-filled and collapsed alveoli fill the back of the lung. Proning moves the load and recruits them.", c, dir=[0.55, -0.4, -1]),
@@ -62,8 +64,23 @@ def build(L):
     ]
     c = care("sepsis")
     S["sepsis-main"] = [
-     L("organ", "Dilated arteriole", "Dilated arteriole", "Nitric oxide relaxes the vessel muscle, so resistance and blood pressure fall.", c, at=[0, 0.1, 0.1]),
-     L("cells", "Leaky endothelium", "Leaky endothelium", "The lining loses its coat and its tight junctions. Plasma leaks into the tissue.", c, part="Endothelium"),
+     L("organ", "Gram-negative bacteria", "Gram-negative bacteria", "Rods that carry LPS, the classic danger signal.", c, part="Gram-negative rod"),
+     L("organ", "TLR4 binds LPS", "TLR4 binds LPS", "The receptor reads LPS and switches on NF-kappa B, the master switch of the cytokine genes.", c, part="Toll-like receptor 4"),
+     L("organ", "Neutrophil traps", "Neutrophil traps", "DNA strands that catch bacteria and also injure the vessel lining.", c, part="Neutrophil extracellular trap"),
+     Np("organ", "Macrophage", "Macrophage", "The sentinel that sees the microbe first and sounds the alarm.", c, part="Resident macrophage"),
+     Np("organ", "Epithelial barrier", "Epithelial barrier", "Cells joined by tight junctions. Cytokines pull the junctions apart.", c, part="Epithelial barrier"),
+     Np("organ", "Venule", "Venule", "Where defenders leave the blood and bacteria can enter it.", c, part="Post-capillary venule"),
+     L("storm", "Cytokine cloud", "Cytokine cloud", "TNF-alpha, IL-1 beta, IL-6 and chemokines released together. This is the storm.", c, at=[-0.9, 0.85, 0.3]),
+     L("storm", "Activated endothelium", "Activated endothelium", "The lining displays adhesion molecules and tissue factor, and relaxes the vessel.", c, part="Activated endothelium"),
+     L("storm", "Lost glycocalyx", "Lost glycocalyx", "The protective gel coat is shed, so plasma leaks and cells stick.", c, part="Glycocalyx"),
+     L("storm", "Plasma leak", "Plasma leak", "Gaps open and plasma escapes, so tissue swells and the vessel empties.", c, part="Gap in the wall"),
+     L("storm", "Micro clot", "Micro clot", "Fibrin and platelets block small vessels.", c, part="Microthrombus"),
+     Np("storm", "Macrophage", "Source of cytokines", "Activated macrophages around the vessel are the main source.", c, part="Perivascular macrophage"),
+     L("cells", "Hyperinflammation", "Hyperinflammation", "Macrophages and neutrophils stay switched on and keep making cytokines.", c, part="Hyperactive macrophage"),
+     L("cells", "Exhausted T cell", "Exhausted T cell", "PD-1 holds the cell back and it makes little interferon-gamma.", c, part="Exhausted T cell"),
+     L("cells", "Low HLA-DR monocyte", "Low HLA-DR", "Few HLA-DR molecules means weak antigen presentation. It marks immune paralysis.", c, part="Monocyte with low HLA-DR"),
+     L("cells", "Lymphocyte apoptosis", "Lymphocyte apoptosis", "Lymphocytes die in large numbers, so the count falls.", c, part="Apoptotic lymphocyte"),
+     Np("cells", "Balance lost", "Balance lost", "Pro- and anti-inflammatory loads rise together. Early on the pro side outweighs the other and later the anti side catches up.", c, part="Balance of the immune response"),
     ]
     c = care("dic")
     S["dic-main"] = [

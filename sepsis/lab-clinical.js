@@ -167,7 +167,7 @@
         $("#info").innerHTML = `<strong>${info.title}</strong><br>${info.body}<br><em>Drugs and care:</em> ${info.care}`;
       }
     });
-    fetch("pathology-models.json?v=20261119g").then((r) => r.json()).then((d) => {
+    fetch("pathology-models.json?v=20261119h").then((r) => r.json()).then((d) => {
       const sp = (d.complications || []).find((c) => c.id === id), host2 = $("#revslot") || $("#stages");
       if (!sp || !sp.reversibleText || !host2) return;
       const pct = Math.round(Math.max(0, Math.min(1, sp.reversible == null ? 0.5 : sp.reversible)) * 100);

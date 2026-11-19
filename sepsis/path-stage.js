@@ -1055,7 +1055,7 @@
               part:"Title"  cell view: sits on the scene object whose tap title is this
               at:[x,y,z]    cell view: position in the scene }                                             */
     let marksData = { organ: {}, spec: {} }, marksOn = true;
-    fetch(BASE + "marks.json?v=20261119g").then((r) => r.json()).then((d) => { marksData = d || marksData; Object.keys(models).forEach((k) => { (models[k].pins || []).forEach((p) => { if (p.el) p.el.remove(); if (p.line) p.line.remove(); }); models[k].pins = null; }); }).catch(() => {});
+    fetch(BASE + "marks.json?v=20261119h").then((r) => r.json()).then((d) => { marksData = d || marksData; Object.keys(models).forEach((k) => { (models[k].pins || []).forEach((p) => { if (p.el) p.el.remove(); if (p.line) p.line.remove(); }); models[k].pins = null; }); }).catch(() => {});
     const PIN_COL = { lesion: "#ff7a59", part: "#7fd4e6" };
     function ringTex(col) {
       const c = document.createElement("canvas"); c.width = c.height = 96;
@@ -1328,6 +1328,7 @@
         distGoal = frameDist();
         if (view === "cut") { yaw = Math.PI / 2; pit = 0.08; }
         if (view === "cells") { yaw = 0.5; pit = 0.18; }
+        const cv = entry.spec.cam && entry.spec.cam[view]; if (cv) { yaw = cv[0]; pit = cv[1]; }
         tickState.id = entry.spec.id;
         tickState.view = view;
       }
@@ -1337,7 +1338,7 @@
         if (Math.abs(dy) < 0.01) yawGoal = null;
       }
       dist += (distGoal - dist) * (1 - Math.exp(-dt * 3));
-      if (!dragging && !calm && view === "organ") yaw += dt * 0.18;
+      if (!dragging && !calm && view === "organ" && !entry.spec.still) yaw += dt * 0.18;
       let targetSev = current.targetSev;
       if (playing) {
         playT += dt * 0.28;

@@ -32,14 +32,14 @@ live readout (HUD), a severity thermometer, view chips (Organ / Cut-away / Cells
 - Cut-away is a real cross-section: GLB meshes are sliced at plane `x = entry.cutX` and the loops are triangulated into a cap (`buildCap`).
   The lung is cut through the right lung (`cutX = -0.6`). Cut pins use `cut:[u,v]` as fractions of the cap bounding box (x1.6).
 - Procedural organs (vessel, bleed, pancreas, bowel, muscle, skin) still use the simple disc cut and have organ and cell pins only.
-- Edit pins in cc/src/marks_src.py and regenerate: `cd cc/src && python3 marks_src.py ../../sepsis/marks.json`. Cache-bust string is 20261119g.
+- Edit pins in cc/src/marks_src.py and regenerate: `cd cc/src && python3 marks_src.py ../../sepsis/marks.json`. Cache-bust string is 20261119h.
 
 ## Flow model: particle key and voice-over (cc/flow-aid.js)
 `FlowAid.mount({stage, key, intro, state, stages, outro})` adds three buttons to the flow-model stage: **Key** (a panel that names every coloured particle and shape), **Explain flow** (a male voice-over that walks through the scene, the key rows, the current readings, each camera stage and the drugs) and **Voice on/off**.
 - cc/lab.html: each archetype in `AR.*` returns `key` (rows of `[css colour, "Red dots", "meaning", optional shape class]`) and `say` (one-line scene description). Cell scenes build the key from the scene colours and `scene.kn` in db.json (meanings of inside, outside, leak and toxin particles for that complication). Keep `key` in step with any new particle set.
 - DKA labs (dka/lab-*.html) and sepsis/lab-shock.html pass their own `key` rows to the same mount call.
 - `FlowAid.vo(text, queue)` speaks on a standalone page; inside Pathology Live it posts `{vo, q}` to the parent, which owns the voice. `{stopvo:1}` cancels it.
-- sepsis/lab-shock.html now uses the same shell as the DKA labs (Specimen key `shock`, with fluid slider in the Drugs tab). Cache-bust string is 20261119g.
+- sepsis/lab-shock.html now uses the same shell as the DKA labs (Specimen key `shock`, with fluid slider in the Drugs tab). Cache-bust string is 20261119h.
 
 ## Disease-level labs ("<Disease> itself")
 Every disease tab in Pathology Live also has a lab for the disease itself: a photoreal specimen (Organ / Cut-away / Cells, Normal and Diseased) plus the interactive 3D model.
@@ -47,3 +47,10 @@ Every disease tab in Pathology Live also has a lab for the disease itself: a pho
 - Data: `cc/src/d6.py` holds `MAIN` (one `main` record per disease, built with `comp("main", ...)`), `MODELS` (specimen entries `<disease>-main`) and `KN` (cell-particle meanings). `build_db.py` attaches `d['main']`; `gen_models.py` rewrites `cc/pathology-models.json`; `marks_main.py` adds the pins to `sepsis/marks.json` (regenerate with `cd cc/src && python3 marks_src.py ../../sepsis/marks.json`).
 - Specimens reuse the existing organ models and textures with disease-specific text and pins. The clinical wording needs specialist review.
 - To add a disease: add a `MAIN` entry, a `MODELS` entry, marks in `marks_main.py`, and `["main","<Disease> itself"]` in `MODS` in `pathology-live.html`.
+
+### Sepsis itself (cc/path-sepsis.js)
+Sepsis does not use an organ or a tissue block. `organ: "septic"` is a purpose-built plugin with three photoreal 3D scenes, picked with the view buttons:
+- **Pathogen-host** (`organ`): Gram-negative rods and Gram-positive cocci on an epithelial barrier, complement coat, macrophage with TLR4 receptors, neutrophils leaving a venule, NETs, bacteraemia.
+- **Cytokine storm** (`storm`): a cut-open venule with TNF-alpha, IL-1 beta, IL-6, IL-8 and IL-10 clouds, activated endothelium, glycocalyx loss, plasma leak, micro clots.
+- **Immune dysregulation** (`cells`): hyperinflammation against immune paralysis (exhausted T cell with PD-1, low HLA-DR monocyte, apoptotic lymphocytes) with a balance beam.
+Severity drives all three. Custom view ids need `still`, `cam` and `dist` per view in the spec (see `d6.py`); `nav` gives the button label. Pins use `part` titles from the scene.
