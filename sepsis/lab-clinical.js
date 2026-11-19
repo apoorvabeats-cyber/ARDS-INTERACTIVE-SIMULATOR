@@ -160,12 +160,12 @@
     const spec = SPECS[id];
     if (!spec || !window.PathStage) return;
     const cv = $("#cv");
-    const stage = PathStage.mount(cv, {
+    const stage = window.__stage = PathStage.mount(cv, {
       onPick(info) {
         $("#info").innerHTML = `<strong>${info.title}</strong><br>${info.body}<br><em>Drugs and care:</em> ${info.care}`;
       }
     });
-    fetch("pathology-models.json?v=20261119d").then((r) => r.json()).then((d) => {
+    fetch("pathology-models.json?v=20261119e").then((r) => r.json()).then((d) => {
       const sp = (d.complications || []).find((c) => c.id === id), host2 = $("#stages");
       if (!sp || !sp.reversibleText || !host2) return;
       const pct = Math.round(Math.max(0, Math.min(1, sp.reversible == null ? 0.5 : sp.reversible)) * 100);

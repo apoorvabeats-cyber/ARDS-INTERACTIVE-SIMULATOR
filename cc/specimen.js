@@ -29,7 +29,7 @@
 
       function ensureStage() {
         if (stage) return;
-        stage = PathStage.mount(o.wrap, {
+        stage = window.__stage = PathStage.mount(o.wrap, {
           catalog: [spec], lazy: true, start: spec.id, modelsUrl: false,
           onPick: (p) => { if (o.onPick) o.onPick(p); },
           onLabel: (html) => { if (html !== last) { last = html; if (o.onLabel) o.onLabel(html); } }

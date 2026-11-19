@@ -4,6 +4,7 @@
    A complication is added by editing pathology-models.json (organ: lung|kidney|heart|liver|brain|vessel).
    Optional glb replaces the gross mesh only. */
 (function () {
+  const BASE = ((document.currentScript && document.currentScript.src) || "").replace(/[^\/]*$/, "");
   if (!window.THREE) {
     window.PathStage = { mount: function (el) { el.innerHTML = "<p style='color:#f3efe6;padding:12px'>3D engine could not load.</p>"; return { set: function () {}, destroy: function () {} }; } };
     return;
@@ -639,10 +640,13 @@
     renderer.localClippingEnabled = true;
     renderer.domElement.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
     container.appendChild(renderer.domElement);
+    /* A phone can drop a WebGL context when several 3D pages are open. Allow it to be restored instead of leaving a blank canvas. */
+    renderer.domElement.addEventListener("webglcontextlost", (e) => { e.preventDefault(); });
+    renderer.domElement.addEventListener("webglcontextrestored", () => { try { renderer.compile(scene, cam); } catch (err) { /* next frame redraws */ } });
 
     const tagEl = document.createElement("div");
     tagEl.style.cssText = hooks.onLabel
-      ? "position:absolute;right:8px;top:8px;color:#f3efe6;background:rgba(8,14,20,.72);border:1px solid rgba(243,239,230,.28);border-radius:999px;padding:6px 10px;font:600 12px/1 Figtree,sans-serif;z-index:2;pointer-events:none"
+      ? "position:absolute;left:8px;bottom:8px;color:#f3efe6;background:rgba(8,14,20,.72);border:1px solid rgba(243,239,230,.28);border-radius:999px;padding:6px 10px;font:600 12px/1 Figtree,sans-serif;z-index:2;pointer-events:none"
       : "position:absolute;left:10px;right:10px;bottom:8px;color:#f3efe6;font:600 13px/1.35 Figtree,Segoe UI,sans-serif;text-shadow:0 1px 4px #000;pointer-events:none;z-index:2";
     container.appendChild(tagEl);
     const bar = document.createElement("div");
@@ -758,7 +762,7 @@
       if (THREE.GLTFLoader) go();
       else {
         const sEl = document.createElement("script");
-        sEl.src = "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js";
+        sEl.src = BASE + "../vendor/three128/GLTFLoader.js";
         sEl.onload = go;
         document.head.appendChild(sEl);
       }
@@ -823,23 +827,25 @@
     let id = hooks.start || "ards", view = "organ", severity = 0.45, shown = 0.45, mode = "live", playing = false, playT = 0;
     let yaw = 0.55, pit = 0.25, dist = 4.4, distGoal = 4.4, target = V(0, 0.05, 0);
     const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let dragging = false;
+    let dragging = false, yawGoal = null, pitGoal = null;
 
     function buttons() {
       const spec = catalog.find((c) => c.id === id) || catalog[0];
       bar.innerHTML = "";
-      [["live", "Live"], ["normal", "Normal"], ["diseased", "Diseased"], ["play", playing ? "Pause" : "Play"]].forEach(([k, label]) => {
+      [["live", "Live"], ["normal", "Normal"], ["diseased", "Diseased"], ["play", playing ? "Pause" : "Play"], ["pins", marksOn ? "Pins on" : "Pins off"], ["reset", "Reset"]].forEach(([k, label]) => {
         const b = document.createElement("button");
         b.type = "button";
         b.textContent = label;
         b.style.cssText = "min-height:32px;padding:0 10px;border-radius:999px;border:1px solid rgba(243,239,230,.28);background:rgba(8,14,20,.72);color:#f3efe6;font:600 12px/1 Figtree,sans-serif";
-        if (k === mode || (k === "play" && playing)) b.style.borderColor = "#7fd4e6";
+        if (k === mode || (k === "play" && playing) || (k === "pins" && marksOn)) b.style.borderColor = "#7fd4e6";
         b.onpointerdown = (e) => e.stopPropagation();
         b.onclick = (e) => {
           e.stopPropagation();
-          if (k === "play") { playing = !playing; playT = 0; }
+          if (k === "pins") { marksOn = !marksOn; buttons(); return; }
+          if (k === "reset") { yawGoal = null; distGoal = frameDist(); pit = 0.25; return; }
+          if (k === "play") { playing = !playing; playT = 0; if (playing) { mode = "live"; current = apply(); } else buttons(); return; }
           else { mode = k; playing = false; }
-          buttons();
+          current = apply(); /* recompute the target severity, otherwise Normal and Diseased only change the caption */
         };
         bar.appendChild(b);
       });
@@ -964,6 +970,166 @@
       return { entry, targetSev };
     }
 
+
+    /* ---- Pins: labelled markers on the specimen -------------------------------------------------
+       "part" pins name normal structures and show in every state. "lesion" pins mark what matters in the diseased
+       state and fade in as severity rises. Data lives in marks.json next to this file:
+         { organ: { <organ>: [pin, ...] }, spec: { <complication id>: [pin, ...] } }
+       pin: { kind, view: organ|cut|cells, label, title, body, care,
+              dir:[x,y,z]   organ view: ray from this direction onto the surface
+              cut:[x,y]     cut view: position on the cut face (right, up)
+              part:"Title"  cell view: sits on the scene object whose tap title is this
+              at:[x,y,z]    cell view: position in the scene }                                             */
+    let marksData = { organ: {}, spec: {} }, marksOn = true;
+    fetch(BASE + "marks.json?v=20261119e").then((r) => r.json()).then((d) => { marksData = d || marksData; Object.keys(models).forEach((k) => { models[k].pins = null; }); }).catch(() => {});
+    const PIN_COL = { lesion: "#ff7a59", part: "#7fd4e6" };
+    function ringTex(col) {
+      const c = document.createElement("canvas"); c.width = c.height = 96;
+      const g = c.getContext("2d");
+      g.lineWidth = 7; g.strokeStyle = col; g.beginPath(); g.arc(48, 48, 34, 0, 7); g.stroke();
+      g.fillStyle = col; g.beginPath(); g.arc(48, 48, 11, 0, 7); g.fill();
+      const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+    }
+    function labelTex(text, col) {
+      const c = document.createElement("canvas"), g = c.getContext("2d");
+      g.font = "600 30px Figtree,Segoe UI,sans-serif";
+      const w = Math.min(420, Math.ceil(g.measureText(text).width) + 34);
+      c.width = w; c.height = 52;
+      g.font = "600 30px Figtree,Segoe UI,sans-serif";
+      g.fillStyle = "rgba(8,14,20,.86)"; g.strokeStyle = col; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(14, 2); g.arcTo(w - 2, 2, w - 2, 50, 14); g.arcTo(w - 2, 50, 2, 50, 14); g.arcTo(2, 50, 2, 2, 14); g.arcTo(2, 2, w - 2, 2, 14); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = "#f6f1e7"; g.textBaseline = "middle"; g.fillText(text, 17, 28, w - 30);
+      const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return { t, w, h: 52 };
+    }
+    function pinsFor(entry) {
+      if (entry.pins) return entry.pins;
+      const defs = (marksData.spec[entry.spec.id] || []).concat(marksData.organ[entry.spec.organ] || []);
+      entry.pins = defs.map((def) => {
+        const col = PIN_COL[def.kind === "lesion" ? "lesion" : "part"];
+        const ring = new THREE.Sprite(new THREE.SpriteMaterial({ map: ringTex(col), transparent: true, depthTest: false, depthWrite: false, fog: false }));
+        const lt = labelTex(def.label || def.title || "", col);
+        const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: lt.t, transparent: true, depthTest: false, depthWrite: false, fog: false }));
+        ring.renderOrder = 20; label.renderOrder = 21;
+        const pick = { title: def.title || def.label, body: def.body || "", care: def.care || "", mark: true };
+        ring.userData.pick = pick; label.userData.pick = pick;
+        ring.visible = label.visible = false;
+        return { def, ring, label, ar: lt.w / lt.h, parent: null, pos: null, nrm: null, placed: false, a: 0 };
+      });
+      return entry.pins;
+    }
+    function findPart(root, title) {
+      let hit = null;
+      root.traverse((o) => { if (!hit && o.userData && o.userData.pick && o.userData.pick.title === title && !o.isSprite) hit = o; });
+      return hit;
+    }
+    function placePin(entry, pn) {
+      const d = pn.def;
+      let parent = null, pos = null, nrm = null;
+      if (d.view === "cells") {
+        parent = entry.cells;
+        if (d.part) {
+          const o = findPart(entry.cells, d.part);
+          if (o) { entry.cells.updateMatrixWorld(true); const w = new THREE.Vector3(); o.getWorldPosition(w); pos = entry.cells.worldToLocal(w); }
+        } else if (d.at) pos = V(d.at[0], d.at[1], d.at[2]);
+      } else if (d.view === "cut") {
+        parent = entry.root;
+        if (d.cut) { pos = V(0.035, d.cut[1], -d.cut[0]); nrm = V(1, 0, 0); }
+      } else {
+        if (entry.spec.glb && !entry.glb) return false;
+        parent = entry.glb || entry.organ;
+        if (d.dir) {
+          let top = parent; while (top.parent) top = top.parent; top.updateMatrixWorld(true);
+          const meshes = []; parent.traverse((o) => { if (o.isMesh) meshes.push(o); });
+          const dir = V(d.dir[0], d.dir[1], d.dir[2]).normalize();
+          const bb = new THREE.Box3().setFromObject(parent), ctr = bb.getCenter(new THREE.Vector3());
+          const ray = new THREE.Raycaster(ctr.clone().add(dir.clone().multiplyScalar(6)), dir.clone().negate(), 0.1, 14);
+          let h = ray.intersectObjects(meshes, false)[0];
+          if (!h) { /* ray missed (thin or odd mesh): take the vertex farthest along dir */
+            let best = -1e9, bp = null, bn = null; const vv = new THREE.Vector3();
+            meshes.forEach((m) => {
+              const ps = m.geometry.attributes.position, ns = m.geometry.attributes.normal, st = Math.max(1, Math.floor(ps.count / 20000));
+              for (let i = 0; i < ps.count; i += st) {
+                vv.fromBufferAttribute(ps, i).applyMatrix4(m.matrixWorld);
+                const sc = vv.clone().sub(ctr).dot(dir);
+                if (sc > best) { best = sc; bp = vv.clone(); bn = ns ? new THREE.Vector3().fromBufferAttribute(ns, i).transformDirection(m.matrixWorld) : dir.clone(); }
+              }
+            });
+            if (bp) h = { point: bp, face: { normal: bn }, object: { matrixWorld: new THREE.Matrix4() } };
+          }
+          if (h) {
+            pos = parent.worldToLocal(h.point.clone());
+            const n = h.face ? h.face.normal.clone() : dir.clone();
+            nrm = n.transformDirection(h.object.matrixWorld).transformDirection(new THREE.Matrix4().copy(parent.matrixWorld).invert());
+          }
+        } else if (d.part) {
+          const o = findPart(entry.organ, d.part) || findPart(parent, d.part);
+          if (o) { parent.updateMatrixWorld(true); entry.organ.updateMatrixWorld(true); const w = new THREE.Vector3(); o.getWorldPosition(w); pos = parent.worldToLocal(w); }
+        } else if (d.at) pos = V(d.at[0], d.at[1], d.at[2]);
+      }
+      if (!parent || !pos) return false;
+      pn.parent = parent; pn.pos = pos; pn.nrm = nrm;
+      pn.ring.position.copy(pos);
+      pn.label.position.copy(pos);
+      parent.add(pn.ring); parent.add(pn.label);
+      pn.placed = true;
+      return true;
+    }
+    const _w = new THREE.Vector3(), _n = new THREE.Vector3();
+    function updatePins(entry, sev, t) {
+      const list = pinsFor(entry);
+      const W = container.clientWidth || 320, H = container.clientHeight || 240;
+      const vis = [];
+      list.forEach((pn) => {
+        const d = pn.def;
+        let want = marksOn && d.view === view;
+        if (want && !pn.placed) want = placePin(entry, pn);
+        let a = 0;
+        if (want) {
+          a = d.kind === "lesion" ? clamp((sev - 0.22) / 0.3) : 1;
+          if (mode === "normal" && d.kind === "lesion") a = 0;
+          if (a > 0 && pn.nrm && pn.parent) {
+            pn.ring.getWorldPosition(_w);
+            _n.copy(pn.nrm).transformDirection(pn.parent.matrixWorld);
+            const toCam = cam.position.clone().sub(_w).normalize();
+            if (_n.dot(toCam) < 0.12) a = 0;
+          }
+        }
+        pn.a += (a - pn.a) * 0.2;
+        const on = pn.a > 0.04;
+        pn.ring.visible = pn.label.visible = on;
+        if (!on) return;
+        pn.ring.material.opacity = pn.label.material.opacity = pn.a;
+        pn.ring.getWorldPosition(_w);
+        const dist = cam.position.distanceTo(_w), ps = pn.parent.getWorldScale(new THREE.Vector3()).x || 1;
+        const k = dist * 0.052 / ps, pulse = d.kind === "lesion" && !calm ? 1 + 0.18 * Math.sin(t * 3.2) : 1;
+        pn.ring.scale.set(k * pulse, k * pulse, 1);
+        const lk = dist * 0.0105 / ps;
+        pn.label.scale.set(lk * pn.ar * 3.1, lk * 3.1, 1);
+        const pxPer = H / (2 * dist * Math.tan(cam.fov * Math.PI / 360));
+        const lh = lk * 3.1 * ps * pxPer, lw = lh * pn.ar, rp = k * ps * pxPer * 0.5;
+        const sc = _w.clone().project(cam);
+        vis.push({ pn, sx: (sc.x * 0.5 + 0.5) * W, sy: (-sc.y * 0.5 + 0.5) * H, lw, lh, rp, lesion: d.kind === "lesion" });
+      });
+      /* place labels above or below their ring, keep them on screen, and avoid overlap (lesions get first pick) */
+      const rects = [];
+      vis.sort((a, b) => (b.lesion ? 1 : 0) - (a.lesion ? 1 : 0));
+      vis.forEach((o) => {
+        const cx = o.sx < o.lw / 2 + 4 ? 0 : (o.sx > W - o.lw / 2 - 4 ? 1 : 0.5), left = o.sx - cx * o.lw, g = o.rp + 3;
+        let best = null;
+        for (const dir of [-1, 1, -2, 2]) {
+          const top = dir === -1 ? o.sy - g - o.lh : dir === 1 ? o.sy + g : dir === -2 ? o.sy - g - 2.2 * o.lh : o.sy + g + 1.2 * o.lh;
+          if (top < 44 || top + o.lh > H - 4) continue;
+          if (!rects.some((r) => left < r[2] && left + o.lw > r[0] && top < r[3] && top + o.lh > r[1])) { best = { dir, top }; break; }
+        }
+        if (!best) best = { dir: -1, top: o.sy - g - o.lh };
+        rects.push([left, best.top, left + o.lw, best.top + o.lh]);
+        const cyv = 1 - (o.sy - best.top) / o.lh;
+        o.pn.label.center.set(cx, cyv);
+        o.pn.label.position.copy(o.pn.pos);
+      });
+      return vis.length;
+    }
+
     let extra = {};
     let current = apply();
 
@@ -974,6 +1140,7 @@
       ptr.set(e.pointerId, [e.clientX, e.clientY]);
       down.x = e.clientX; down.y = e.clientY; down.moved = false;
       dragging = true;
+      yawGoal = null;
     });
     renderer.domElement.addEventListener("pointermove", (e) => {
       const o = ptr.get(e.pointerId); if (!o) return;
@@ -997,16 +1164,23 @@
       const ndc = { x: (e.clientX - r.left) / r.width * 2 - 1, y: -((e.clientY - r.top) / r.height * 2 - 1) };
       const ray = new THREE.Raycaster();
       ray.setFromCamera(ndc, cam);
-      const hits = ray.intersectObjects(scene.children, true).filter((h) => h.object.userData && h.object.userData.pick);
+      const shownChain = (o) => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
+      const hits = ray.intersectObjects(scene.children, true).filter((h) => h.object.userData && h.object.userData.pick && shownChain(h.object));
+      hits.sort((a, b) => (b.object.userData.pick.mark ? 1 : 0) - (a.object.userData.pick.mark ? 1 : 0) || a.distance - b.distance);
       if (hits[0]) {
         let pk = hits[0].object.userData.pick;
         /* Per-complication wording: spec.picks[title] wins, then "*" (gross views) or "**" (cell view). */
         const sp = (models[id] && models[id].spec) || {};
-        if (sp.picks) {
+        if (sp.picks && !pk.mark) {
           const o = sp.picks[pk.title] || sp.picks[view === "cells" ? "**" : "*"];
           if (o) pk = { title: o.title || pk.title, body: o.body || pk.body, care: o.care != null ? o.care : pk.care };
         }
         hooks.onPick(pk);
+        if (pk.mark && view === "organ") {
+          const w = hits[0].object.getWorldPosition(new THREE.Vector3());
+          yawGoal = Math.atan2(w.x - target.x, w.z - target.z); pitGoal = clamp(Math.atan2(w.y - target.y, Math.hypot(w.x - target.x, w.z - target.z)), -0.3, 0.7);
+          distGoal = Math.max(2.4, frameDist() * 0.62);
+        }
       }
     });
     renderer.domElement.addEventListener("pointercancel", up);
@@ -1036,6 +1210,11 @@
         tickState.id = entry.spec.id;
         tickState.view = view;
       }
+      if (yawGoal != null && !dragging) {
+        const dy = Math.atan2(Math.sin(yawGoal - yaw), Math.cos(yawGoal - yaw)), k = 1 - Math.exp(-dt * 4);
+        yaw += dy * k; pit += (pitGoal - pit) * k;
+        if (Math.abs(dy) < 0.01) yawGoal = null;
+      }
       dist += (distGoal - dist) * (1 - Math.exp(-dt * 3));
       if (!dragging && !calm && view === "organ") yaw += dt * 0.18;
       let targetSev = current.targetSev;
@@ -1048,6 +1227,7 @@
       entry.peak = Math.max(shown, entry.peak * (entry.spec.reversible > 0.85 ? 0.992 : 1));
       const nec = mode === "normal" ? 0 : Math.max(shown, entry.peak * (1 - (entry.spec.reversible == null ? 0.5 : entry.spec.reversible)));
       applyDisease(entry, shown, nec, t, extra);
+      updatePins(entry, shown, t);
       if (entry.glb) {
         const o = entry.organ.scale, h = entry.organ.userData && entry.organ.userData.heart;
         entry.glb.scale.set(o.x * (h ? h.scale.x / 0.85 : 1), o.y * (h ? h.scale.y / 0.85 : 1), o.z * (h ? h.scale.z / 0.68 : 1));
@@ -1069,6 +1249,8 @@
         if (opts.extra) extra = opts.extra;
         current = apply();
       },
+      pose(y, p, d) { yaw = y; pit = p; if (d) { distGoal = d; dist = d; } },
+      debug() { const e = current.entry; return { id, view, mode, shown, targetSev: current.targetSev, organ: e.organ.children.length, cells: e.cells.children.length, cellsVisible: e.cells.visible, glb: !!e.glb, capVisible: e.capMesh.visible, pins: (e.pins || []).filter((p) => p.ring.visible).map((p) => p.def.label), pinState: (e.pins || []).map((p) => [p.def.label, p.def.view, p.placed, +p.a.toFixed(2)]) }; },
       destroy() { dead = true; ro.disconnect(); renderer.dispose(); }
     };
   }

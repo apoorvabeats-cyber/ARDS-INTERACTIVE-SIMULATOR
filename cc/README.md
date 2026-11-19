@@ -14,3 +14,11 @@ Each complication opens on a photoreal specimen. The interactive model with stag
 * Surface markers (fat necrosis plaques, purpura, petechiae) are re-seated on the real mesh surface. Vessel and bleed models have no mesh and stay procedural.
 * Textures in `tex/` are generated procedurally from the existing healthy photographs. They are not clinical photographs. Replace a file with a real, licensed image of the same name to upgrade it. No code change is needed.
 * The teaching text is original and needs clinical review.
+
+## Pins, Normal/Diseased and offline 3D
+
+* `../sepsis/marks.json` holds the labelled pins. It is generated: edit `src/marks_src.py`, then run `python3 marks_src.py ../../sepsis/marks.json` from `src/`. `spec.<id>` lists the lesion pins for one complication and `organ.<organ>` lists the normal-anatomy pins shared by that organ. A pin has `kind` (lesion or part), `view` (organ, cut, cells), `label`, `title`, `body` and `care`, plus a position: `dir` (organ view, a direction ray onto the surface), `cut` (right, up on the cut face), `part` (the tap title of a scene object, in the cell view or on a tagged organ part) or `at` (x, y, z).
+* Lesion pins fade in as severity rises and are hidden in the Normal state. Tapping a pin opens its text and flies the camera to it. The "Pins" button toggles them and "Reset" returns the camera.
+* The Normal and Diseased buttons set the severity the specimen shows. Play runs the progression.
+* Three.js r128 and its GLTFLoader are copied into `../vendor/three128/`, so the 3D labs no longer depend on a CDN. The pages keep working when the network blocks `cdnjs`.
+* The pin text is original teaching material and needs clinical review.
