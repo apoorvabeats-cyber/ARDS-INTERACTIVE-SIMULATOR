@@ -648,6 +648,9 @@
     const bar = document.createElement("div");
     bar.style.cssText = "position:absolute;left:8px;top:8px;display:flex;gap:6px;z-index:3;flex-wrap:wrap";
     container.appendChild(bar);
+    const creditEl = document.createElement("div");
+    creditEl.style.cssText = "position:absolute;right:8px;bottom:4px;font:10px/1.2 Figtree,sans-serif;color:rgba(243,239,230,.5);pointer-events:none;z-index:2";
+    container.appendChild(creditEl);
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x070b10);
@@ -715,28 +718,90 @@
       return entry;
     }
 
+    /* Real meshes. The GLB replaces the procedural gross model. Its materials are swapped for the shared tissue material, so
+       Normal / Diseased / Play, the cut plane and tap-to-inspect all keep working. Surface markers (plaques, purpura and so on)
+       that a plugin lists in organ.userData.decals are re-seated on the real surface. */
     function loadGlb(entry, url) {
       function go() {
-        const loader = new THREE.GLTFLoader();
-        loader.load(url, (gltf) => {
-          const box = new THREE.Box3().setFromObject(gltf.scene);
+        new THREE.GLTFLoader().load(url, (gltf) => {
+          const holder = new THREE.Group();
+          const sc = gltf.scene;
+          const rot = entry.spec.glbRot;
+          if (rot) sc.rotation.set(rot[0] * Math.PI / 180, rot[1] * Math.PI / 180, rot[2] * Math.PI / 180);
+          sc.updateMatrixWorld(true);
+          const box = new THREE.Box3().setFromObject(sc);
           const size = new THREE.Vector3(); box.getSize(size);
           const s = 2.2 / Math.max(size.x, size.y, size.z, 0.001);
-          gltf.scene.scale.setScalar(s);
           const center = new THREE.Vector3(); box.getCenter(center);
-          gltf.scene.position.sub(center.multiplyScalar(s));
+          sc.scale.setScalar(s);
+          sc.position.copy(center).multiplyScalar(-s);
+          holder.add(sc);
+          let pick = null;
+          entry.organ.traverse((o) => { if (!pick && o.userData && o.userData.pick) pick = o.userData.pick; });
+          const meshes = [];
+          sc.traverse((o) => {
+            if (!o.isMesh) return;
+            o.material = entry.mat;
+            if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals();
+            if (pick) o.userData.pick = pick;
+            meshes.push(o);
+          });
+          holder.updateMatrixWorld(true);
+          seatDecals(entry, holder, meshes);
+          entry.root.add(holder);
+          entry.glb = holder;
           entry.organ.visible = false;
-          entry.root.add(gltf.scene);
-          entry.glb = gltf.scene;
-        });
+          if (entry.root.visible) entry.glb.visible = entry.view !== "cells";
+          creditEl.textContent = "Anatomy: BodyParts3D, DBCLS, CC BY-SA 2.1 JP";
+        }, undefined, () => { /* keep the procedural model */ });
       }
       if (THREE.GLTFLoader) go();
       else {
-        const s = document.createElement("script");
-        s.src = "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js";
-        s.onload = go;
-        document.head.appendChild(s);
+        const sEl = document.createElement("script");
+        sEl.src = "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js";
+        sEl.onload = go;
+        document.head.appendChild(sEl);
       }
+    }
+
+    function seatDecals(entry, holder, meshes) {
+      const list = entry.organ.userData && entry.organ.userData.decals;
+      if (!list || !list.length || !meshes.length) return;
+      const tris = [];
+      let total = 0;
+      meshes.forEach((m) => {
+        const g = m.geometry, pos = g.attributes.position, idx = g.index;
+        const n = idx ? idx.count / 3 : pos.count / 3;
+        const a = V(0, 0, 0), b = V(0, 0, 0), c = V(0, 0, 0), ab = V(0, 0, 0), ac = V(0, 0, 0);
+        for (let t = 0; t < n; t++) {
+          const i0 = idx ? idx.getX(t * 3) : t * 3, i1 = idx ? idx.getX(t * 3 + 1) : t * 3 + 1, i2 = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
+          a.fromBufferAttribute(pos, i0); b.fromBufferAttribute(pos, i1); c.fromBufferAttribute(pos, i2);
+          ab.subVectors(b, a); ac.subVectors(c, a);
+          const area = ab.cross(ac).length() * 0.5;
+          total += area;
+          tris.push({ m, i0, i1, i2, w: total });
+        }
+      });
+      const inv = new THREE.Matrix4().copy(holder.matrixWorld).invert();
+      let seed = 7;
+      const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+      list.forEach((d) => {
+        const r = rnd() * total;
+        let lo = 0, hi = tris.length - 1;
+        while (lo < hi) { const mid = (lo + hi) >> 1; if (tris[mid].w < r) lo = mid + 1; else hi = mid; }
+        const T = tris[lo], pos = T.m.geometry.attributes.position;
+        const a = V(0, 0, 0).fromBufferAttribute(pos, T.i0), b = V(0, 0, 0).fromBufferAttribute(pos, T.i1), c = V(0, 0, 0).fromBufferAttribute(pos, T.i2);
+        let u = rnd(), v = rnd(); if (u + v > 1) { u = 1 - u; v = 1 - v; }
+        const p = a.clone().addScaledVector(b.clone().sub(a), u).addScaledVector(c.clone().sub(a), v);
+        const nrm = b.clone().sub(a).cross(c.clone().sub(a)).normalize();
+        T.m.updateMatrixWorld(true);
+        p.applyMatrix4(T.m.matrixWorld).applyMatrix4(inv);
+        nrm.transformDirection(T.m.matrixWorld).transformDirection(inv).normalize();
+        d.parent && d.parent.remove(d);
+        d.position.copy(p).addScaledVector(nrm, 0.004);
+        d.quaternion.setFromUnitVectors(V(0, 1, 0), nrm);
+        holder.add(d);
+      });
     }
 
     let catalog = CATALOG.slice();
@@ -889,7 +954,9 @@
       Object.keys(models).forEach((k) => { models[k].root.visible = k === entry.spec.id; });
       const targetSev = mode === "normal" ? 0 : mode === "diseased" ? 1 : severity;
       entry.view = view;
-      entry.organ.visible = view !== "cells";
+      entry.organ.visible = view !== "cells" && !entry.glb;
+      if (entry.glb) entry.glb.visible = view !== "cells";
+      creditEl.style.display = entry.glb && view !== "cells" ? "" : "none";
       entry.cells.visible = view === "cells";
       entry.capMesh.visible = view === "cut";
       clip.constant = view === "cut" ? 0.02 : 80;
@@ -981,6 +1048,10 @@
       entry.peak = Math.max(shown, entry.peak * (entry.spec.reversible > 0.85 ? 0.992 : 1));
       const nec = mode === "normal" ? 0 : Math.max(shown, entry.peak * (1 - (entry.spec.reversible == null ? 0.5 : entry.spec.reversible)));
       applyDisease(entry, shown, nec, t, extra);
+      if (entry.glb) {
+        const o = entry.organ.scale, h = entry.organ.userData && entry.organ.userData.heart;
+        entry.glb.scale.set(o.x * (h ? h.scale.x / 0.85 : 1), o.y * (h ? h.scale.y / 0.85 : 1), o.z * (h ? h.scale.z / 0.68 : 1));
+      }
       const look = view === "cells" ? 0.1 : 0.05;
       cam.position.set(target.x + dist * Math.sin(yaw) * Math.cos(pit), target.y + dist * Math.sin(pit) * 0.85 + 0.2, target.z + dist * Math.cos(yaw) * Math.cos(pit));
       cam.lookAt(target.x, look, target.z);

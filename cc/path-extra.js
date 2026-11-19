@@ -77,7 +77,7 @@
     tag(fluid, "Peripancreatic fluid", "Inflammatory fluid collects around the gland and tracks along the retroperitoneum. It is sterile unless it becomes infected.", "Most acute collections settle. Drain only if infected or symptomatic.");
     g.add(fluid); ov.push(fluid);
     g.rotation.z = -0.12;
-    g.userData = { plaques, bleeds, fluid, ov, shapes, parts: g.children.filter((c) => c.isMesh).slice(0, 3) };
+    g.userData = { plaques, bleeds, fluid, ov, shapes, parts: g.children.filter((c) => c.isMesh).slice(0, 3), decals: plaques.concat(bleeds) };
     return g;
   }
 
@@ -309,7 +309,7 @@
       limb.add(b); bullae.push(b);
     }
     g.rotation.z = Math.PI / 2;
-    g.userData = { limb, lesions, pet, bullae, lMat };
+    g.userData = { limb, lesions, pet, bullae, lMat, decals: lesions.concat(pet, bullae) };
     return g;
   }
 
@@ -390,7 +390,7 @@
       tag(d, "Fibrin exudate", "A yellow film on the serosa from inflammation of the wall.", "");
       g.add(d); fib.push(d); ov.push(d);
     }
-    g.userData = { loop, isch, mes, fib, ov, base: 0.17 };
+    g.userData = { loop, isch, mes, fib, ov, base: 0.17, decals: fib };
     return g;
   }
 
@@ -480,7 +480,7 @@
     const drops = [], dMat = W(0x7a0f18, { roughness: 0.1, clearcoat: 1 });
     for (let i = 0; i < 8; i++) { const d = sphere(0.045, dMat, 10); d.scale.y = 1.4; d.userData.s = i / 8; tag(d, "Oozing blood", "Slow ooze from line sites and wounds that will not stop.", "Pressure, topical haemostatics and correction of the coagulopathy."); g.add(d); drops.push(d); ov.push(d); }
     const site = sphere(0.06, W(0x2b0408, { roughness: 0.4 }), 10); site.position.set(0.1, 0.8, 0.28); g.add(site); ov.push(site);
-    g.userData = { hem, pet, drops, ov, site };
+    g.userData = { hem, pet, drops, ov, site, decals: pet };
     return g;
   }
 
