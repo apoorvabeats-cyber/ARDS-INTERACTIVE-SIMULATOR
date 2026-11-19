@@ -7,6 +7,8 @@
    buildWard(THREE, scene, renderer, P, H) -> { BP, BA, hits, lamps, update(t,dt,yaw,facingAll), setDoor(i,open), door(i), approach(i) }
      H.mon(ctx,p,w,h,x,y)   monitor painter       H.rdr(ctx,p)  ventilator painter
      H.equip(p) -> {bags,pumps,doses}              Visual only. Clinical text is original and needs review.        */
+import { loadArchetype, build as buildPerson, breathe, patientFile } from "./patient3d.js";
+
 export function buildWard(T, S, R, P, H) {
   const V = T.Vector3, G = new T.Group(); G.name = "ward"; S.add(G);
   const CW = 5, CD = 3.8, FZ = 3.6, HT = 3.3, GH = 3.0, XS = [-5, 0, 5];
@@ -182,12 +184,14 @@ export function buildWard(T, S, R, P, H) {
     rb(0.04, 0.5, 0.88, 0.03, mMat, 1.07, 0.86, 0, bd);
     /* pillow, patient */
     const pil = rb(0.42, 0.1, 0.5, 0.05, mWhite, 0, 0, 0, bd); pil.position.copy(onBack(LB - 0.16, 0.11)); pil.rotation.z = -TH;
+    const i0 = bd.children.length;
     const sk = M(skin[p.sx] || skin.m, { roughness: 0.62, envMapIntensity: 0.4 }), gown = M(0x8fc4d6, { roughness: 0.85, bumpMap: fabric, bumpScale: 0.8 });
     const nrm = new V(sth, cth, 0), fwd = new V(cth, -sth, 0);
     const head = new T.Mesh(new T.SphereGeometry(0.112, 24, 18), sk); head.scale.set(1, 1.14, 0.95); head.position.copy(onBack(LB + 0.0, 0.2)); bd.add(head);
     const hair = new T.Mesh(new T.SphereGeometry(0.118, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.62), M(p.sx === "f" ? 0x1a100c : 0x141414, { roughness: 0.9 }));
     hair.scale.copy(head.scale); hair.position.copy(head.position); hair.rotation.z = -TH + Math.PI / 2 + 0.15; bd.add(hair);
     if (p.sx === "f") { const hb = new T.Mesh(new T.SphereGeometry(0.1, 14, 10), hair.material); hb.scale.set(1.2, 0.8, 1.5); hb.position.copy(onBack(LB + 0.12, 0.12)); bd.add(hb); }
+    c.eyeAnchor = head.position.clone().addScaledVector(nrm, 0.108).addScaledVector(fwd, -0.026);
     const nose = new T.Mesh(new T.ConeGeometry(0.018, 0.045, 8), sk); nose.position.copy(head.position).addScaledVector(nrm, 0.128).addScaledVector(fwd, 0.015); nose.quaternion.setFromUnitVectors(new V(0, 1, 0), nrm); bd.add(nose);
     [-1, 1].forEach((s) => { const e = new T.Mesh(new T.CapsuleGeometry(0.004, 0.022, 3, 6), M(0x2a1c18, { roughness: 0.9 })); e.position.copy(head.position).addScaledVector(nrm, 0.108).addScaledVector(fwd, -0.026); e.position.z += s * 0.04; e.quaternion.setFromUnitVectors(new V(0, 1, 0), new V(0, 0, 1)); bd.add(e); });
     cyl(0.045, 0.05, 0.1, sk, 0, 0, 0, bd, 12).position.copy(onBack(LB - 0.1, 0.17));
@@ -204,13 +208,14 @@ export function buildWard(T, S, R, P, H) {
     });
     /* legs under the blanket */
     [1, -1].forEach((s) => { const lg = new T.Mesh(new T.CapsuleGeometry(0.06, 0.55, 4, 12), gown); lg.rotation.z = Math.PI / 2; lg.position.set(0.72, 0.84, s * 0.14); bd.add(lg); const ft = new T.Mesh(new T.SphereGeometry(0.06, 10, 8), sk); ft.scale.set(1.3, 0.8, 0.9); ft.position.set(1.04, 0.86, s * 0.14); bd.add(ft); });
+    { const proc = new T.Group(); bd.add(proc); bd.children.slice(i0, bd.children.length - 1).forEach((x) => proc.add(x)); c.proc = proc; }
     /* blanket draped over the legs */
     const bg = new T.PlaneGeometry(1.15, 0.98, 64, 36); bg.rotateX(-Math.PI / 2);
     { const pa = bg.attributes.position; for (let k = 0; k < pa.count; k++) { const x = pa.getX(k), z = pa.getZ(k), az = Math.abs(z);
-      let y = 0.16 * Math.exp(-Math.pow((az - 0.14) / 0.12, 2)) * (1 - 0.15 * (x / 0.58 + 1) / 2) * Math.min(1, (x + 0.58) / 0.25); y += 0.018 * Math.exp(-Math.pow((x - 0.5) / 0.1, 2)) * Math.exp(-Math.pow((az - 0.12) / 0.1, 2));
+      let y = 0.25 * Math.exp(-Math.pow((az - 0.12) / 0.16, 2)) * (1 - 0.15 * (x / 0.58 + 1) / 2) * Math.min(1, (x + 0.58) / 0.25); y += 0.018 * Math.exp(-Math.pow((x - 0.5) / 0.1, 2)) * Math.exp(-Math.pow((az - 0.12) / 0.1, 2));
       y -= Math.max(0, az - 0.3) * Math.max(0, az - 0.3) * 6.5; y += 0.007 * Math.sin(x * 12 + z * 7) + 0.005 * Math.sin(x * 25 - z * 11); pa.setY(k, y); }
       bg.computeVertexNormals(); }
-    const blanket = new T.Mesh(bg, M(0x2c6db4, { roughness: 0.9, bumpMap: fabric, bumpScale: 1.1, side: T.DoubleSide, envMapIntensity: 0.4 })); blanket.position.set(0.5, 0.79, 0); bd.add(blanket);
+    const blanket = new T.Mesh(bg, M(0x2c6db4, { roughness: 0.9, bumpMap: fabric, bumpScale: 1.1, side: T.DoubleSide, envMapIntensity: 0.4 })); blanket.position.set(0.5, 0.86, 0); bd.add(blanket);
     rb(0.14, 0.012, 0.9, 0.006, mWhite, -0.02, 0.84, 0, bd);   /* turned-down sheet */
 
     /* ---- breathing support ---- */
@@ -271,8 +276,10 @@ export function buildWard(T, S, R, P, H) {
     mesh(new T.PlaneGeometry(0.26, 0.74), new T.MeshBasicMaterial({ map: pTex, toneMapped: false }), 0.12, 1.25, 0.103, pump);
     c.pdrip = [];
     /* tubing from the pole to the cannula */
-    const line = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3([cvec(1.55 - 0.1, 1.3, -CD + 0.9 + 0.1), cvec(1.2, 1.0, -2.7), cvec(0.8, 0.95, -2.1), cvec(BED.x + 0.26, 0.92, BED.z + 0.29)]), 24, 0.006, 6), M(0xe8f1f5, { transparent: true, opacity: 0.8, roughness: 0.3 }));
-    g.add(line); c.line = line; line.visible = false;
+    const lineMat = M(0xe8f1f5, { transparent: true, opacity: 0.8, roughness: 0.3 });
+    const mkLine = (end) => { const l = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3([cvec(1.55 - 0.1, 1.3, -CD + 0.9 + 0.1), cvec(1.2, 1.0, -2.7), cvec(0.8, 0.95, -2.1), end]), 24, 0.006, 6), lineMat); return l; };
+    let line = mkLine(cvec(BED.x + 0.26, 0.92, BED.z + 0.29)); c.mkLine = mkLine;
+    g.add(line); c.line = line; line.visible = false; c.lineEnd = null;
     /* sharps bin and hand rub */
     cyl(0.14, 0.12, 0.34, M(0xf3c71d, { roughness: 0.4 }), 2.1, 0.17, -1.0, g, 16); cyl(0.145, 0.145, 0.03, M(0x1a1a1a), 2.1, 0.355, -1.0, g, 16);
     rb(0.09, 0.2, 0.07, 0.02, mWhite, -2.2, 1.3, -CD + 0.09, g);
@@ -329,7 +336,7 @@ export function buildWard(T, S, R, P, H) {
       const e = c.open * c.open * (3 - 2 * c.open); c.leaf.position.x = -1.64 * e;
       c.dled.material.color.set(e > 0.5 ? 0x3dff9a : 0x36d6ff).multiplyScalar(2.4);
       const p = c.p, face = all || angd(BA[c.i], yaw) < 1.35; c.facing = face;
-      c.chest.scale.set(c.chest0.x * (1 + 0.09 * (p.vo || 0)), c.chest0.y, c.chest0.z * (1 + 0.04 * (p.vo || 0)));
+      if (c.human) breathe(c.human, p.vo || 0, 0.035 + 0.02 * Math.min(1, Math.max(0, (p.v.rr - 16) / 20))); else c.chest.scale.set(c.chest0.x * (1 + 0.09 * (p.vo || 0)), c.chest0.y, c.chest0.z * (1 + 0.04 * (p.vo || 0)));
       const key = [p.st, p.done, p.dx].join("|"); if (key !== c.sign.key) drawSign(c, p, c.i);
       const air = p.air, iv = p.iv;
       c.supp.imv.visible = air === "imv"; c.supp.niv.visible = air === "niv"; c.supp.mask.visible = air === "mask";
@@ -344,8 +351,35 @@ export function buildWard(T, S, R, P, H) {
   drawCmd();
   cubicles.forEach(refreshEquip);
 
+  /* ---------- real human bodies (GLB), loaded after the first frame; the procedural patient stays as the fallback ---------- */
+  const skins = [0xb98262, 0xa9714f, 0xc28e68, 0xb07a58, 0xc69773, 0x9f6a49];
+  function attachHuman(c) {
+    const f = patientFile(c.p), url = new URL("./patients/" + f.key + ".glb", import.meta.url).href;
+    loadArchetype(url).then((gltf) => {
+      const h = buildPerson(T, gltf, c.p, { skin: skins[c.i % skins.length], hair: f.age > 60 ? 0x9a9a9a : 0x15110f, longHair: f.sex === "f", incline: TH });
+      c.bed.add(h.group);
+      h.group.position.set(-0.02, 0.8, 0); h.group.updateMatrixWorld(true);
+      /* put the eyes where the procedural face was, so the airway equipment still meets the mouth */
+      const a = h.B("eye.L"), b = h.B("eye.R");
+      if (a && b) {
+        const m = new V().addVectors(a.getWorldPosition(new V()), b.getWorldPosition(new V())).multiplyScalar(0.5);
+        c.bed.updateMatrixWorld(true); const loc = c.bed.worldToLocal(m.clone());
+        h.group.position.add(c.eyeAnchor.clone().sub(loc)); h.group.position.z = 0;
+        h.group.updateMatrixWorld(true);
+        /* IV cannula on the wrist nearest the glass */
+        const wl = h.B("wrist.L"), wr = h.B("wrist.R"); let best = null, bz = -9;
+        [wl, wr].forEach((w) => { if (!w) return; const q = c.bed.worldToLocal(w.getWorldPosition(new V())); if (q.z > bz) { bz = q.z; best = q; } });
+        if (best) { const ge = best.clone().add(new V(BED.x, 0.02, BED.z)); const vis = c.line.visible; g_remove(c.line); c.line = c.mkLine(ge); c.line.visible = vis; c.g.add(c.line); }
+      }
+      c.proc.visible = false; c.human = h;
+    }).catch((e) => console.warn("Patient model not loaded; using the simple figure.", e));
+  }
+  const g_remove = (o) => { if (o.parent) o.parent.remove(o); };
+  let humansLoaded = false;
+  const loadHumans = () => { if (humansLoaded || H.humans === false) return; humansLoaded = true; cubicles.forEach(attachHuman); };
+
   return {
-    G, BP: (i) => BPs[i], BA, hits, lamps, update, cubicles,
+    G, BP: (i) => BPs[i], BA, hits, lamps, update, cubicles, loadHumans,
     setDoor: (i, o) => { cubicles[i].target = o ? 1 : 0; },
     door: (i) => cubicles[i].open,
     closeAll: () => cubicles.forEach((c) => { c.target = 0; }),
