@@ -93,6 +93,7 @@ import * as THREE from './three.module.js';
 import {FOLLOW_UPS,DISTRACTORS} from './case-decisions.js';
 import {ORDER_CASES,assessOrder} from './clinical-orders.js?v=20261115a';
 import {createCaseVoice} from './case-voice.mjs';
+import {buildWard} from './ward3d.js?v=20261120a';
 const $=s=>document.querySelector(s),V=THREE.Vector3,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 function updateLayout(){
  document.documentElement.style.setProperty('--top-height',$('#top').getBoundingClientRect().height+'px');
@@ -223,12 +224,9 @@ function renderFlat(){
   flatContext.drawImage(image,left,top,right-left,bottom-top);
  });
 }
-S.add(new THREE.HemisphereLight(0xffffff,0x6a7a88,1.15));
+S.add(new THREE.HemisphereLight(0xffffff,0x6a7a88,0.6));
 [[0,4.5,0],[100,6,5]].forEach(p=>{const l=new THREE.PointLight(0xe6f6ff,1.2,40);l.position.set(...p);S.add(l)});
 const box=(w,h,d,c,x,y,z,side)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:c,roughness:.7,side}));m.position.set(x,y,z);return m};
-S.add(box(22,6,22,0xb9c8d4,0,3,0,THREE.BackSide));
-const fl=new THREE.Mesh(new THREE.PlaneGeometry(22,22),new THREE.MeshStandardMaterial({color:0x7f8c97,roughness:.8}));fl.rotation.x=-Math.PI/2;fl.position.y=.01;S.add(fl);
-[-7.4,7.4].forEach(z=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(20,3.6),new THREE.MeshStandardMaterial({color:0xe3f1f8,transparent:true,opacity:.92,emissive:0x2a3f4d}));m.position.set(0,2.1,z);if(z>0)m.rotation.y=Math.PI;S.add(m)});
 S.add(box(34,14,34,0x07101f,100,7,0,THREE.BackSide));
 
 // command screen: 2 columns on portrait, 3 on landscape
@@ -257,9 +255,9 @@ const B=P.map((p,i)=>{
 const [x,z]=BP(i),cvs=document.createElement('canvas');cvs.width=1280;cvs.height=720;
  const tex=new THREE.CanvasTexture(cvs);tex.colorSpace=THREE.SRGBColorSpace;
  const g=new THREE.Mesh(new THREE.PlaneGeometry(5.2,2.925),new THREE.MeshBasicMaterial({map:tex}));
- g.position.set(x,1.55,z);g.lookAt(0,1.55,0);g.userData.bed=i;S.add(g);
- const lamp=new THREE.Mesh(new THREE.SphereGeometry(.12,12,8),new THREE.MeshBasicMaterial({color:0x3dff9a}));lamp.position.set(x*.98,3.25,z*.98);S.add(lamp);
- return{g,ctx:cvs.getContext('2d'),tex,lamp}});
+ g.position.set(x,1.55,z);g.lookAt(0,1.55,0);g.userData.bed=i;g.visible=false;S.add(g);
+ return{g,ctx:cvs.getContext('2d'),tex,lamp:{material:{color:{set(){}}}}}});
+let ward=null;
 function prow(p){const ip=p.air==='niv'?p.ipap:p.peep+p.dr+p.sev*6;return p.iv?[[(p.air==='imv'?'IMV':'NIV'),(p.air==='imv'?'tube':'mask')],['PIP',Math.round(ip)],[p.air==='imv'?'PEEP':'EPAP',p.peep],...(p.air==='imv'?[['Vt target',p.vt+' mL'],['RR set',p.setRate+'/min']]:[]),['RR measured',Math.round(p.v.rr)+'/min'],['FiO2',p.fio2+'%']]:[['O2 support',p.air==='room'?'Room air':'Oxygen mask'],['FiO2',p.fio2+'%'],['SpO2',Math.min(100,Math.round(p.v.spo2))],['RR',Math.round(p.v.rr)]]}
 function drawBed(i){const p=P[i],b=B[i],c=b.ctx,W=1280,H=720,im=(typeof bedShot==='function'?bedShot(p):PH[p.sx=='f'?1:0]);if(!im||!im.complete||!im.naturalWidth)return;
  c.clearRect(0,0,W,H);c.drawImage(im,0,0,W,H);
@@ -277,11 +275,11 @@ function drawBed(i){const p=P[i],b=B[i],c=b.ctx,W=1280,H=720,im=(typeof bedShot=
 let ent=0,mode='cmd',yaw=0,pit=0,cmdYaw=0,cmdPit=0,cur=null,transit=null,voiceOn=true,alarmOn=true,wallZoom=true;const tp=new V(),tl=new V(),lk=new V(100,4,-8);
 const voiceController='speechSynthesis' in window&&'SpeechSynthesisUtterance' in window?createCaseVoice(window.speechSynthesis,window.SpeechSynthesisUtterance,reason=>{console.warn('Case narration did not start:',reason);$('#voice-status').textContent=$('#replay-voice').hidden?'Voice could not start.':'Voice could not start. Tap Replay case voice.';$('#voice-status').hidden=false}):null;
 $('#zoom-wall').onclick=()=>{wallZoom=!wallZoom;$('#zoom-wall').textContent=wallZoom?'Fit wall':'Zoom wall';$('#zoom-wall').setAttribute('aria-pressed',String(wallZoom));$('#settings-menu').open=false};
-function updateFov(){cam.fov=mode==='ward'||mode==='travel'?Math.max(72,Math.min(110,2*Math.atan(5.2*1.08/(14*cam.aspect))*180/Math.PI)):72;cam.updateProjectionMatrix()}
+function updateFov(){cam.fov=mode==='ward'||mode==='travel'?(cam.aspect<1?Math.min(105,72+(1-cam.aspect)*70):72):72;cam.updateProjectionMatrix()}
 function tgt(){
  if(mode=='cmd'){const W=14,H=14*(845/1500),half=Math.tan(36*Math.PI/180),fit=Math.max(H/2/half,W/2/(half*cam.aspect)),d=fit*(wallZoom?(cam.aspect<1?.42:.76):1.04);tp.set(100,H/2,-8+d);tl.set(100+Math.sin(cmdYaw)*W*0.48,H/2+Math.sin(cmdPit)*H*0.3,-8)}
  else if(mode=='ward'){tp.set(0,1.6,0);tl.set(Math.sin(yaw)*Math.cos(pit),1.6+Math.sin(pit),-Math.cos(yaw)*Math.cos(pit))}
- else{const g=B[cur].g;tp.copy(g.position).multiplyScalar(-0.18);tp.y=1.62;tl.copy(g.position);tl.y=1.5}}
+ else if(ward){tp.copy(ward.inside(cur));tl.copy(ward.look(cur))}else{const g=B[cur].g;tp.copy(g.position).multiplyScalar(-0.18);tp.y=1.62;tl.copy(g.position);tl.y=1.5}}
 function go(m,i){
  transit=null;stopVoice();
  $('#voice-status').hidden=true;$('#replay-voice').hidden=m!=='bed'||!voiceOn||!P[i]||P[i].done;
@@ -310,7 +308,7 @@ cv.onpointerup=e=>{dn=0;if(mv>8)return;const r=cv.getBoundingClientRect();mv2.se
  const h=ray.intersectObjects(S.children,true).find(o=>o.object.visible&&((mode==='cmd'&&(o.object===scr||o.object.userData.command))||(mode==='ward'&&o.object.userData.bed!=null)));if(!h)return;
  if(mode=='cmd'&&h.object.userData&&h.object.userData.command&&h.uv){var uu=h.uv.x,vv=1-h.uv.y,sc=h.object.userData.screens||[];for(var kk=0;kk<sc.length;kk++){var rr=sc[kk];if(uu>=rr.x&&uu<=rr.x+rr.w&&vv>=rr.y&&vv<=rr.y+rr.h){openFromWall(rr.bed);break}}}
  else if(h.object===scr){const u=h.uv,i=Math.floor((1-u.y)*RW)*C+Math.floor(u.x*C);if(P[i])openFromWall(i)}
- else if(mode=='ward')go('bed',h.object.userData.bed)};
+ else if(mode=='ward')visit(h.object.userData.bed)};
 const setControl=(id,key)=>{const el=$('#'+id);el.oninput=()=>{const p=P[cur];p[key]=+el.value;el.previousElementSibling.textContent=el.value;showVentMech(p)}};
 setControl('fi','fio2');setControl('rrset','setRate');setControl('vtset','vt');
 $('#pe').oninput=()=>{const p=P[cur],el=$('#pe');p.peep=+el.value;if(p.air==='niv'&&p.ipap<p.peep+2)p.ipap=Math.min(30,p.peep+2);el.previousElementSibling.textContent=el.value;$('#ipap').value=p.ipap;$('#ipap').previousElementSibling.textContent=p.ipap;showVentMech(p)};
@@ -529,14 +527,18 @@ function loop(t){requestAnimationFrame(loop);if(t-last<1000/30-.5)return;const d
   else{cam.position.lerpVectors(transit.from,transit.to,ease);lk.lerpVectors(transit.lookFrom,transit.lookTo,ease)}
   if(progress===1){const i=transit.bed,pose=BP(i);
    if(transit.stage==='wall'){const targetYaw=Math.atan2(pose[0],-pose[1]);yaw=targetYaw-Math.PI*2;pit=0;go('ward');mode='travel';transit={bed:i,stage:'turn',start:t,duration:2400,fromYaw:yaw,toYaw:targetYaw}}
-   else if(transit.stage==='turn')transit={bed:i,stage:'ward',start:t,duration:1500,from:cam.position.clone(),to:new V(pose[0]*.7,1.6,pose[1]*.7),lookFrom:lk.clone(),lookTo:new V(pose[0],1.5,pose[1])};
+   else if(transit.stage==='turn')transit=walkTo(i,t)
+   else if(transit.stage==='walk'){ward&&ward.setDoor(i,true);transit={bed:i,stage:'open',start:t,duration:1250,from:cam.position.clone(),to:cam.position.clone(),lookFrom:lk.clone(),lookTo:lk.clone()}}
+   else if(transit.stage==='open')transit={bed:i,stage:'enter',start:t,duration:1500,from:cam.position.clone(),to:ward?ward.inside(i):cam.position.clone(),lookFrom:lk.clone(),lookTo:ward?ward.look(i):lk.clone()}
+   else if(transit.stage==='out'){ward&&ward.setDoor(i,false);yaw=BA[i];pit=0;mode='ward';transit=null;updateFov();$('#hint').textContent='Drag to look around · tap a bed to step in'}
    else go('bed',i)}
  }else{tgt();cam.position.lerp(tp,.07);lk.lerp(tl,.1)}
  cam.lookAt(lk);
  P.forEach(p=>{p.ph+=dt*p.v.hr/60;p.vp+=dt*p.v.rr/60;const f=((p.vp%1)+1)%1;p.vo=f<.38?.5-.5*Math.cos(Math.PI*f/.38):.5+.5*Math.cos(Math.PI*(f-.38)/.62)});
  if(mode==='cmd')updateWall(t);
+ else if(ward&&!flatMode){const dv=lk.clone().sub(cam.position);ward.update(t/1000,dt,Math.atan2(dv.x,-dv.z),mode==='bed')}
  if(fr++%2==0){
-  P.forEach((p,i)=>{if((mode=='ward'||mode=='travel')&&Math.abs(((BA[i]-yaw+Math.PI*3)%(Math.PI*2))-Math.PI)<1.3)drawBed(i);if(scr.visible)mon(sx,p,340,256,(i%C)*340,Math.floor(i/C)*256)});
+  P.forEach((p,i)=>{if(flatMode&&(mode=='ward'||mode=='travel')&&Math.abs(((BA[i]-yaw+Math.PI*3)%(Math.PI*2))-Math.PI)<1.3)drawBed(i);if(scr.visible)mon(sx,p,340,256,(i%C)*340,Math.floor(i/C)*256)});
   if(scr.visible)stex.needsUpdate=true;if(cur!=null)phd(P[cur])}
  if(!flatMode)R.render(S,cam);
  if(!graphicsChecked&&!flatMode&&wallReady&&mode==='cmd'&&R.getContext().drawingBufferWidth&&R.getContext().drawingBufferHeight){
@@ -570,6 +572,9 @@ function ivEquipment(p){
  BO.forEach(d=>{const count=z[d[0]]||0;if(count>0&&!['fl','hs','blood','sb'].includes(d[0]))doses.push({name:d[1],count:count})});
  return{bags,pumps,doses};
 }
+try{ward=buildWard(THREE,S,R,P,{mon,rdr,equip:ivEquipment});B.forEach((b,i)=>b.lamp=ward.lamps[i])}catch(e){console.error('3D ward failed; using photo beds.',e);ward=null;B.forEach(b=>b.g.visible=true)}
+function walkTo(i,t){return{bed:i,stage:'walk',start:t,duration:1500,from:cam.position.clone(),to:ward?ward.approach(i):new V(BP(i)[0]*.7,1.6,BP(i)[1]*.7),lookFrom:lk.clone(),lookTo:ward?ward.look(i):new V(BP(i)[0],1.5,BP(i)[1])}}
+function visit(i){if(transit||!P[i])return;if(!ward){go('bed',i);return}yaw=BA[i];pit=0;mode='travel';updateFov();$('#hint').textContent='';transit=walkTo(i,performance.now())}
 function drawGiven(c,p,W,H){
  const gear=ivEquipment(p),bags=gear.bags.slice(0,4),pumps=gear.pumps.slice(0,6),doses=gear.doses;
  if(!bags.length&&!pumps.length&&!doses.length)return;
@@ -695,8 +700,10 @@ scr.visible=true;
   mode='transit';transit={bed:i,stage:'wall',start:performance.now(),duration:850,from:cam.position.clone(),to:new V(x,y,-6.5),lookFrom:lk.clone(),lookTo:new V(x,y,-8)};
  };
 })();
-var _goBeds=go;
+var _goBeds=go,_goPrev=null;
 go=function(m,i){
+ if(m==='ward'&&mode==='bed'&&ward&&cur!=null){const b=cur;_goBeds('travel');mode='travel';transit={bed:b,stage:'out',start:performance.now(),duration:1300,from:cam.position.clone(),to:ward.approach(b),lookFrom:lk.clone(),lookTo:ward.look(b)};return}
+ if(ward){if(m==='bed')ward.cubicles.forEach(c=>{c.target=c.i===i?1:0});else if(m==='cmd')ward.cubicles.forEach(c=>{c.target=0;c.open=0;c.leaf.position.x=0});else if(m==='ward'&&mode!=='travel')ward.closeAll()}
  _goBeds(m,i);
  if(m!=='bed'||!P[i]) return;
  var shot=bedShot(P[i]);
