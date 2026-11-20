@@ -31,3 +31,14 @@ HRA United Male v1.5 does not include a stomach surface. The actual BodyParts3D 
 Three.js **0.170.0**, GLTFLoader, OrbitControls and BufferGeometryUtils are bundled under `vendor/three/` under the MIT license (see `vendor/three/LICENSE`). These run locally on GitHub Pages; the anatomy does not depend on a model CDN at runtime. Optional Google Fonts can fail without preventing the viewer from working.
 
 The existing `models/body.glb` (MakeHuman-derived shell) and procedural viewers are not used by the new opening-screen viewer.
+
+
+## Female reference body
+
+Kristen Browne and Heidi Schlehlein, **3D Reference Organ Set for United, Female, v1.5**, published by HuBMAP. Created using Visible Human Female data provided by the US National Library of Medicine.
+
+- Original GLB: https://cdn.humanatlas.io/digital-objects/ref-organ/united-female/v1.5/assets/3d-vh-f-united.glb
+- Browser file: `models/anatomy/female-human.glb`
+- License: [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/)
+
+Adaptations: skin, eyes, brain, spinal cord, lungs, heart, liver, pancreas, spleen, kidneys, bowel, bladder, uterus, ovaries and the great vessels; baked source transforms; feet placed on y=0; simplified with meshoptimizer for the browser. The viewer does not load this file yet.
