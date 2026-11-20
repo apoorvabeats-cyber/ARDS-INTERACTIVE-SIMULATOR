@@ -162,7 +162,7 @@ table.perm{border-collapse:collapse;width:100%;font-size:13px}
   <div class="grid">
     <div><div class="note" style="margin:0 0 6px">Animation speed</div><div class="grp" id="gSpeed"><button class="pill" data-v="0.5" aria-pressed="false">0.5×</button><button class="pill" data-v="1" aria-pressed="true">1×</button><button class="pill" data-v="2" aria-pressed="false">2×</button></div></div>
     <div><div class="note" style="margin:0 0 6px">Camera view</div><div class="grp" id="gView"><button class="pill" data-v="auto" aria-pressed="true">Cinematic</button><button class="pill" data-v="cell" aria-pressed="false">Whole cell</button><button class="pill" data-v="peri" aria-pressed="false">Wall / periplasm</button><button class="pill" data-v="mol" aria-pressed="false">Molecular</button></div></div>
-    <div><label class="sw"><input type="checkbox" id="swLabels" checked> Show molecular labels</label><label class="sw"><input type="checkbox" id="swNdm" checked> NDM enzyme active</label><button class="apply" id="apply">Apply experiment settings</button></div>
+    <div><label class="sw"><input type="checkbox" id="swLabels" checked> Show molecular labels</label><span id="ndmBox"><label class="sw"><input type="checkbox" id="swNdm" checked> NDM enzyme active</label></span><div id="mechBox" hidden></div><button class="apply" id="apply">Apply experiment settings</button></div>
   </div>
   <p class="note" id="applyNote">Speed, camera and labels change instantly. Switching NDM on or off starts a new run when you press Apply. With NDM off the same bacterium is a susceptible control, so you can see what NDM prevents. Other resistance mechanisms (efflux, porin loss) stay switched off.</p>
 </section>
@@ -243,7 +243,7 @@ function load(id,autoplay){
   document.querySelectorAll('.drug').forEach(b=>b.setAttribute('aria-pressed',b.dataset.id===st.exp));
   lab.renderNow();$('start').hidden=!!autoplay;$('play').textContent=autoplay?'⏸':'▶';
   if(autoplay){lab.playing=true;}
-  syncClock();
+  syncClock();ctlSync();
 }
 let curView='auto';
 function showResult(){
@@ -276,9 +276,35 @@ function pills(id,fn){const g=$(id);g.addEventListener('click',e=>{const b=e.tar
 pills('gSpeed',v=>{lab.speed=parseFloat(v);});
 pills('gView',v=>{curView=v;lab.view=v;lab.resetUser();lab.snap();if(!lab.playing)lab.renderNow();});
 $('swLabels').onchange=e=>{lab.labels=e.target.checked;if(!lab.playing)lab.renderNow();};
-function pend(){$('apply').classList.toggle('pending',$('swNdm').checked!==st.ndmApplied);}
+const NOTE_PA=$('applyNote').textContent;
+const mechChecks=()=>[...document.querySelectorAll('#mechBox input')];
+const mechChosen=()=>mechChecks().filter(x=>x.checked).map(x=>x.dataset.m);
+function pend(){
+  let p;
+  if(st.exp==='res'&&st.cfg){const a=mechChosen().sort().join(),b=st.cfg.mech.slice().sort().join();p=a!==b;}
+  else p=$('swNdm').checked!==st.ndmApplied;
+  $('apply').classList.toggle('pending',p);
+}
+/* the panel follows whatever is loaded: Resistance Lab runs (any organism) get one switch per mechanism, the Pseudomonas NDM demo keeps its NDM switch */
+function ctlSync(){
+  const res=st.exp==='res'&&st.cfg;
+  $('ndmBox').hidden=!!res;$('mechBox').hidden=!res;
+  if(res){
+    const c=st.cfg,o=RR.ORGS[c.org];
+    $('mechBox').innerHTML='<div class="note" style="margin:0 0 6px">Mechanisms in this run: <i>'+esc(o.name)+'</i>, '+esc(RR.ABX[c.abx].name)+'</div>'+o.mechs.map(m=>'<label class="sw"><input type="checkbox" data-m="'+m+'"'+(c.mech.includes(m)?' checked':'')+'> '+esc(RR.mechInfo(c.org,m).name)+'</label>').join('');
+    $('applyNote').textContent='Speed, camera and labels change instantly. Switch mechanisms on or off, then press Apply to start a new run with exactly those mechanisms. With none switched on the organism is a susceptible control, so you can see what the resistance mechanisms prevent.';
+  }else{$('applyNote').textContent=NOTE_PA;}
+  pend();
+}
 $('swNdm').onchange=pend;
-$('apply').onclick=()=>{st.ndmApplied=$('swNdm').checked;pend();load(st.ndmApplied?'ndm_on':'ndm_off',true);Voice.say(cur?cur.voice:'');};
+$('mechBox').addEventListener('change',pend);
+$('apply').onclick=()=>{
+  if(st.exp==='res'&&st.cfg){
+    const c={org:st.cfg.org,abx:st.cfg.abx,mech:mechChosen()};
+    rl.org=c.org;rl.abx=c.abx;rl.set=new Set(c.mech);renderRL();runRes(c,false);return;
+  }
+  st.ndmApplied=$('swNdm').checked;pend();load(st.ndmApplied?'ndm_on':'ndm_off',true);Voice.say(cur?cur.voice:'');
+};
 $('drugs').addEventListener('click',e=>{const b=e.target.closest('.drug');if(!b)return;load(b.dataset.id,true);ensureStage();});
 window.addEventListener('pagehide',Voice.stop);
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&lab.playing)pause();});
@@ -320,7 +346,7 @@ function renderPerm(){
 /* scroll only when the stage is out of view, so the page stays still during a run */
 function ensureStage(){try{const r=$('stage').getBoundingClientRect();if(r.top<0||r.bottom>innerHeight)$('stage').scrollIntoView({block:'start'});}catch(x){}}
 function runRes(cfg,focusStage){
-  const sc=MICRO.scenarios.res(cfg||rlCfg());load(sc,true);Voice.say(cur?cur.voice:'');
+  cfg=cfg||rlCfg();st.cfg=cfg;const sc=MICRO.scenarios.res(cfg);load(sc,true);Voice.say(cur?cur.voice:'');
   if(focusStage!==false)ensureStage();
 }
 $('rlOrg').addEventListener('click',e=>{const b=e.target.closest('.pill');if(!b)return;rl.org=b.dataset.v;rl.set=new Set(RR.ORGS[rl.org].presets[RR.ORGS[rl.org].presets.length-1][1]);renderRL();});
@@ -337,7 +363,7 @@ const q=new URLSearchParams(location.search);
 if(RR.ORGS[q.get('org')]&&q.get('x')!=='res'){rl.org=q.get('org');rl.abx=RR.ORGS[rl.org].abx[0];rl.set=new Set(RR.ORGS[rl.org].presets[RR.ORGS[rl.org].presets.length-1][1]);}
 renderRL();
 if(RR.ORGS[q.get('org')]&&q.get('x')!=='res'){const el=document.getElementById('rlOrg');if(el&&el.scrollIntoView)setTimeout(()=>el.scrollIntoView({block:'center'}),400);}
-if(q.get('x')==='res'){rl.org=RR.ORGS[q.get('org')]?q.get('org'):'pa';rl.abx=q.get('abx')||RR.ORGS[rl.org].abx[0];rl.set=new Set((q.get('m')||'').split(',').filter(Boolean));renderRL();load(MICRO.scenarios.res(rlCfg()),false);}
+if(q.get('x')==='res'){rl.org=RR.ORGS[q.get('org')]?q.get('org'):'pa';rl.abx=q.get('abx')||RR.ORGS[rl.org].abx[0];rl.set=new Set((q.get('m')||'').split(',').filter(Boolean));renderRL();st.cfg=rlCfg();load(MICRO.scenarios.res(st.cfg),false);}
 else load(MICRO.scenarios[q.get('x')]?q.get('x'):'ndm_on',false);
 lab.start();
 if(q.get('t')){lab.seek(parseFloat(q.get('t')));lab.renderNow();$('start').hidden=true;}
