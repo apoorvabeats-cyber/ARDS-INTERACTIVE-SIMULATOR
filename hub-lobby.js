@@ -275,57 +275,17 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   });
   const ALLDOORS = KINDS.map((k) => DOORS[k]);
 
-  /* What lies behind the Auditorium door: the auditorium itself, laid out like the real one (same seat blocks, central aisle,
-     LED banners and the Command Centre door at the far end), so opening the door shows the seats at once.
-     Door-local frame: +z leads away from the hall; x = (auditorium x) + 19.5, z = (auditorium z) + 21 (+0.18 for the wall plane). */
+  /* What lies behind the Auditorium door: the real auditorium, seen from its west gate (this hall lies beyond that wall).
+     The shared replica is built in auditorium coordinates; turn it into this door's frame: +z leads away from the hall, local +x is the
+     viewer's left, so auditorium (x, z) lands at lateral (ZC - z), depth (x - AU.x0) + 0.7 (the short tunnel between the two walls). */
+  const AUD_ZC = -17, AUD_X0 = -22, HUBC = { x: AUD_X0 - 0.7 - APO, z: AUD_ZC };
   function buildAudBeyond() {
     const g = new THREE.Group(); g.position.z = 0.18;
-    const B = (c) => new THREE.MeshBasicMaterial({ color: c });
-    const X0 = -2.5, X1 = 10.9, Z1 = 16, H = 7.0, W = X1 - X0, CX = 4.2;
-    const plane = (w, h, mat, x, y, z, ry, rx) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); m.position.set(x, y, z); m.rotation.y = ry || 0; m.rotation.x = rx || 0; g.add(m); return m; };
-    const bx = (w, h, d, mat, x, y, z) => box(w, h, d, mat, x, y, z, g);
-    /* floor with the lit aisle */
-    const [fc, fgx] = cnv(256, 512);
-    const fgr = fgx.createLinearGradient(0, 0, 0, 512); fgr.addColorStop(0, "#0b1826"); fgr.addColorStop(1, "#060b12");
-    fgx.fillStyle = fgr; fgx.fillRect(0, 0, 256, 512);
-    fgx.strokeStyle = "rgba(80,160,220,.10)"; fgx.lineWidth = 2;
-    for (let i = 0; i <= 14; i++) { fgx.beginPath(); fgx.moveTo(i * 256 / 14, 0); fgx.lineTo(i * 256 / 14, 512); fgx.stroke(); }
-    for (let j = 0; j <= 17; j++) { fgx.beginPath(); fgx.moveTo(0, j * 512 / 17); fgx.lineTo(256, j * 512 / 17); fgx.stroke(); }
-    fgx.strokeStyle = "#36d6ff"; fgx.shadowColor = "#36d6ff"; fgx.shadowBlur = 10; fgx.lineWidth = 5;
-    fgx.beginPath(); fgx.moveTo((CX - X0) / W * 256, 0); fgx.lineTo((CX - X0) / W * 256, 512); fgx.stroke();
-    plane(W, Z1, new THREE.MeshBasicMaterial({ map: tex(fc) }), (X0 + X1) / 2, 0.002, Z1 / 2, 0, -Math.PI / 2);
-    plane(W, Z1, B(0x0b1118), (X0 + X1) / 2, H, Z1 / 2, 0, Math.PI / 2);
-    /* walls */
-    const wall = B(0x1a2733);
-    plane(Z1, H, wall, X0, H / 2, Z1 / 2, Math.PI / 2); plane(Z1, H, wall, X1, H / 2, Z1 / 2, -Math.PI / 2); plane(W, H, wall, (X0 + X1) / 2, H / 2, Z1, Math.PI);
-    const cyan = B(0x36d6ff), dim = B(0x2aa7d6);
-    for (let k = 0; k < 8; k++) { const z = 1.2 + k * 2.1; bx(0.05, 5.6, 0.06, dim, X0 + 0.04, 3.4, z); bx(0.05, 5.6, 0.06, dim, X1 - 0.04, 3.4, z); }
-    bx(0.06, 0.06, Z1, cyan, X0 + 0.05, 6.4, Z1 / 2); bx(0.06, 0.06, Z1, cyan, X1 - 0.05, 6.4, Z1 / 2);
-    bx(0.05, 0.05, Z1, dim, X0 + 0.04, 0.07, Z1 / 2); bx(0.05, 0.05, Z1, dim, X1 - 0.04, 0.07, Z1 / 2);
-    /* LED banners on the side walls */
-    const [bc, bg] = cnv(1024, 300), bgr = bg.createLinearGradient(0, 0, 1024, 0); bgr.addColorStop(0, "#06182a"); bgr.addColorStop(1, "#0a2a46");
-    bg.fillStyle = bgr; bg.fillRect(0, 0, 1024, 300); bg.strokeStyle = "rgba(54,214,255,.5)"; bg.lineWidth = 4; bg.strokeRect(8, 8, 1008, 284);
-    bg.fillStyle = "#eaf6ff"; bg.font = "800 92px Figtree, system-ui, sans-serif"; bg.textAlign = "center"; bg.textBaseline = "middle"; bg.fillText("CRITICAL CARE UNIVERSE", 512, 130);
-    bg.fillStyle = "#36d6ff"; bg.font = "600 40px Figtree, system-ui, sans-serif"; bg.fillText("Learn · Simulate · Decide · Together", 512, 232);
-    const bm = new THREE.MeshBasicMaterial({ map: tex(bc) });
-    plane(6.4, 6.4 * 300 / 1024, bm, X0 + 0.06, 3.5, 8, Math.PI / 2); plane(6.4, 6.4 * 300 / 1024, bm, X1 - 0.06, 3.5, 8, -Math.PI / 2);
-    /* ceiling rings and bars */
-    [[3.4, 0.07, 0x36d6ff], [2.2, 0.05, 0xeaf6ff], [4.6, 0.05, 0x2a7fb8]].forEach(([r, t, c]) => { const m = new THREE.Mesh(new THREE.TorusGeometry(r, t, 8, 64), B(c)); m.position.set(CX, 6.88, 8); m.rotation.x = Math.PI / 2; g.add(m); });
-    for (let i = -2; i <= 2; i++) bx(0.12, 0.04, 14, B(0xeaf6ff), CX + i * 2.6, 6.94, 8);
-    /* seat blocks, exactly where the real ones are */
-    const n = 40, sb = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.09, 0.48), B(0x24384a), n), sk = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.56, 0.08), B(0x1d6f8f), n), sl = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.05, 0.08, 0.42, 8), B(0x6c7e90), n);
-    const m4 = new THREE.Matrix4(); let q = 0;
-    for (const side of [-1, 1]) for (let r = 0; r < 4; r++) for (let c = 0; c < 5; c++) {
-      const x = CX + side * (3.15 + c * 0.6), z = 13.6 - r * 1.35;
-      m4.makeTranslation(x, 0.45, z); sb.setMatrixAt(q, m4); m4.makeTranslation(x, 0.75, z + 0.24); sk.setMatrixAt(q, m4); m4.makeTranslation(x, 0.21, z); sl.setMatrixAt(q, m4); q++;
+    if (typeof window.ccuAudBeyond === "function") {
+      const A = window.ccuAudBeyond(THREE, "W");
+      A.rotation.y = -Math.PI / 2; A.position.set(AUD_ZC, 0, 0.7 - AUD_X0);
+      g.add(A);
     }
-    [sb, sk, sl].forEach((m) => g.add(m));
-    /* the Command Centre door at the far end */
-    bx(2.5, 3.1, 0.08, B(0x070b10), CX, 1.55, Z1 - 0.05); bx(2.5, 0.05, 0.06, cyan, CX, 3.12, Z1 - 0.1); bx(0.05, 3.1, 0.06, cyan, CX - 1.25, 1.55, Z1 - 0.1); bx(0.05, 3.1, 0.06, cyan, CX + 1.25, 1.55, Z1 - 0.1);
-    const [sc, sg] = cnv(768, 200); sg.fillStyle = "#0a1626"; sg.fillRect(0, 0, 768, 200); sg.strokeStyle = "#4aa8ff"; sg.lineWidth = 8; sg.strokeRect(4, 4, 760, 192);
-    sg.fillStyle = "#fff"; sg.font = "800 74px Figtree, system-ui, sans-serif"; sg.textAlign = "center"; sg.textBaseline = "middle"; sg.fillText("COMMAND CENTRE", 400, 92);
-    sg.fillStyle = "#4aa8ff"; sg.font = "600 34px Figtree, system-ui, sans-serif"; sg.fillText("Live ICU monitors", 400, 152);
-    plane(3.9, 3.9 * 200 / 768, new THREE.MeshBasicMaterial({ map: tex(sc) }), CX, 3.9, Z1 - 0.12, Math.PI);
     return g;
   }
   DOORS.aud.add(buildAudBeyond());
@@ -387,6 +347,28 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     door.userData.right.position.x = 0.48;
   }
 
+  /* leaving for the auditorium is a straight cut: keep this frame and the exact place we stand, and the auditorium picks up from there */
+  const HPH = 1.3 * Math.PI, HCS = Math.cos(HPH), HSN = Math.sin(HPH);
+  function keepFrame() {
+    try {
+      renderer.render(scene, camera);
+      const c = renderer.domElement, w = Math.min(960, c.width), h = Math.round(w * c.height / c.width), t = document.createElement("canvas");
+      t.width = w; t.height = h; t.getContext("2d").drawImage(c, 0, 0, w, h);
+      sessionStorage.setItem("ccu-snap", t.toDataURL("image/jpeg", 0.62)); sessionStorage.setItem("ccu-snap-t", String(Date.now()));
+    } catch (err) { try { sessionStorage.removeItem("ccu-snap"); } catch (e2) {} }
+  }
+  function keepPose() {
+    try {
+      const wx = HUBC.x + eye.x * HCS + eye.z * HSN, wz = HUBC.z + (-eye.x * HSN + eye.z * HCS);
+      const fx = Math.sin(yaw), fz = Math.cos(yaw), fwx = fx * HCS + fz * HSN, fwz = -fx * HSN + fz * HCS;
+      sessionStorage.setItem("ccu-pose", JSON.stringify({ to: "aud", x: wx, z: wz, yaw: Math.atan2(fwx, -fwz), t: Date.now() }));
+    } catch (err) {}
+  }
+  function readPose() {
+    try { const j = JSON.parse(sessionStorage.getItem("ccu-pose") || "null"); sessionStorage.removeItem("ccu-pose"); if (j && j.to === "hub" && Date.now() - j.t < 20000) return j; } catch (err) {}
+    return null;
+  }
+
   function finish(kind) {
     if (mode === "done") return;
     mode = "done";
@@ -396,7 +378,8 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       const btn = document.getElementById("icu-enter");
       if (btn) btn.click();
     } else if (kind === "aud") {
-      location.href = "critical-care-universe/index.html?home=1&to=auditorium&v=20261120j";
+      keepFrame(); keepPose();
+      location.href = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&v=20261120p";
     } else if (kind === "rad") {
       location.href = "radiology.html?v=20261119r2";
     } else if (kind === "micro") {
@@ -550,7 +533,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       }
       const along = eye.x * Math.sin(job.face) + eye.z * Math.cos(job.face);
       const aud = job.kind === "aud";
-      if (fade) fade.style.opacity = String(aud ? Math.max(0, (along - 6.5) / 0.8) : Math.max(0, (along - 3.2) / 2.4));
+      if (fade) fade.style.opacity = aud ? "0" : String(Math.max(0, (along - 3.2) / 2.4));
       if (aud ? (along > 7.25 || job.t > 6) : (along > 5.0 || job.t > 2.4)) {
         finish(job.kind);
         return;
@@ -565,12 +548,14 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   /* coming back from the auditorium: walk in through the Auditorium door, fading up from black, no extra "exiting" step */
   if (/[?&]from=auditorium/.test(location.search) && DOORS.aud) {
     const face = THETA.aud, d = DOORS.aud;
-    const start = new THREE.Vector3(Math.sin(face) * (APO - 2.5), 1.62, Math.cos(face) * (APO - 2.5));
-    eye.copy(start); yaw = face + Math.PI; pit = 0;
+    const pz = readPose();
+    const start = pz ? new THREE.Vector3(pz.x, 1.62, pz.z) : new THREE.Vector3(Math.sin(face) * (APO - 2.5), 1.62, Math.cos(face) * (APO - 2.5));
+    eye.copy(start); yaw = pz ? pz.yaw : face + Math.PI; pit = 0;
     d.userData.open = 1; d.userData.left.position.x = -0.48 - 0.85; d.userData.right.position.x = 0.48 + 0.85;
     mode = "arrive"; arrive = { t: 0, start, snd: false, shut: false };
     if (fade) { fade.style.transition = "none"; fade.style.opacity = "0"; }
   }
+  window.__hubLobby = { eye, setYaw: (v) => { yaw = v; }, getYaw: () => yaw, mode: () => mode, THETA, openDoor: (k) => { const d = DOORS[k]; d.userData.open = 1; d.userData.left.position.x = -1.33; d.userData.right.position.x = 1.33; } };
   placeCamera();
   frame();
 }

@@ -4,7 +4,10 @@
    World layout (x runs along the ICU hall; the hall's left end gate is at x = -8.4):
      command centre   x -20.4..-8.4, z -5..5,   height 4.6   (6 live monitors on the far wall, console desk, racks)
      sliding door     x -15.3, z -5               -> auditorium
-     auditorium       x -22..-8.6,  z -21..-5,   height 7.0   (three portals on the far wall z = -21)
+     auditorium       x -22..-8.6,  z -21..-5,   height 7.0
+       Critical Care Hub door on the west wall (z = ZC), Multidisciplinary Team door on the east wall (z = ZC), Exit on the far wall.
+       Behind the two side doors stand walkable replicas of the pentagon hub and the circular Nexus hall, so you walk in by dragging;
+       the real pages take over, from the same pose, a few steps inside.
    buildSuite(T, scene, P, H, env, {gateSet}) -> { doors, update(t,dt), clamp(x,z), hits, rooms }          */
 
 import { buildOutdoor } from "./outdoor3d.js?v=20261120j";
@@ -83,7 +86,9 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
   }
 
   const R = { x0: -20.4, x1: -8.4, z: 5, h: 4.6 }, cxR = (R.x0 + R.x1) / 2;
-  const AU = { x0: -22, x1: -8.6, z0: -21, z1: -5, h: 7.0 }, cxA = (AU.x0 + AU.x1) / 2;
+  const AU = { x0: -22, x1: -8.6, z0: -21, z1: -5, h: 7.0 }, cxA = (AU.x0 + AU.x1) / 2, ZC = -17;
+  const APO = 5.8, RHN = 11;                                              /* hub apothem, Nexus hall radius */
+  const HUBC = { x: AU.x0 - 0.7 - APO, z: ZC }, MDTC = { x: AU.x1 + 0.7 + RHN - 0.06, z: ZC };
   const out = buildOutdoor(T, S, { cx: cxA, cz: AU.z0 - 1.2 });
 
   /* =============================== COMMAND CENTRE =============================== */
@@ -175,29 +180,34 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
   const AW = AU.x1 - AU.x0, AD = AU.z1 - AU.z0;
   const accent = { hub: 0x27e0b0, exit: 0xffb347, team: 0xc07bff, cmd: 0x4aa8ff, aud: 0x36d6ff }, accHex = { hub: "#27e0b0", exit: "#ffb347", team: "#c07bff", cmd: "#4aa8ff", aud: "#36d6ff" };
   const px = (x) => (x - AU.x0) / AW * 1024, py = (z) => (z - AU.z0) / AD * 1223;
-  const portalX = { hub: cxA - 4.2, exit: cxA, team: cxA + 4.2 };
+  const PORT = { hub: { x: AU.x0, z: ZC, ry: Math.PI / 2 }, exit: { x: cxA, z: AU.z0, ry: 0 }, team: { x: AU.x1, z: ZC, ry: -Math.PI / 2 } };
   const floorT = ctex(1024, 1223, (g, w, h) => {
     const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#0a1522"); gr.addColorStop(1, "#060b12"); g.fillStyle = gr; g.fillRect(0, 0, w, h);
     g.strokeStyle = "rgba(80,160,220,.07)"; g.lineWidth = 2; for (let i = 0; i <= 13; i++) { g.beginPath(); g.moveTo(i * w / 13.4, 0); g.lineTo(i * w / 13.4, h); g.stroke(); } for (let j = 0; j <= 16; j++) { g.beginPath(); g.moveTo(0, j * h / 16); g.lineTo(w, j * h / 16); g.stroke(); }
     g.lineCap = "round"; g.lineJoin = "round";
     const trunk = (col, x1, z1, x2, z2) => { g.strokeStyle = col; g.shadowColor = col; g.shadowBlur = 18; g.lineWidth = 7; g.beginPath(); g.moveTo(px(x1), py(z1)); g.lineTo(px(x2), py(z2)); g.stroke(); };
-    g.strokeStyle = "#36d6ff"; g.shadowColor = "#36d6ff"; g.shadowBlur = 18; g.lineWidth = 7; g.beginPath(); g.moveTo(px(cxA), py(-5.6)); g.lineTo(px(cxA), py(-14.5)); g.stroke();
-    ["hub", "exit", "team"].forEach((k) => { g.strokeStyle = accHex[k]; g.shadowColor = accHex[k]; g.shadowBlur = 18; g.lineWidth = 7; g.beginPath(); g.moveTo(px(cxA), py(-14.5)); g.quadraticCurveTo(px(portalX[k]), py(-14.5), px(portalX[k]), py(-17)); g.lineTo(px(portalX[k]), py(-19.2)); g.stroke();
-      g.shadowBlur = 0; g.fillStyle = accHex[k] + "33"; g.beginPath(); g.arc(px(portalX[k]), py(-19.6), 1.15 / AW * 1024, 0, 7); g.fill(); g.strokeStyle = accHex[k]; g.lineWidth = 4; g.beginPath(); g.arc(px(portalX[k]), py(-19.6), 1.15 / AW * 1024, 0, 7); g.stroke(); });
+    /* one lit trunk from the command-centre door, a junction in the middle, and a lane to each of the three portals */
+    const lane = (col, pts) => { g.strokeStyle = col; g.shadowColor = col; g.shadowBlur = 18; g.lineWidth = 7; g.beginPath(); pts.forEach((q, i) => (i ? g.lineTo(px(q[0]), py(q[1])) : g.moveTo(px(q[0]), py(q[1])))); g.stroke(); };
+    lane("#36d6ff", [[cxA, -5.6], [cxA, -14.2]]);
+    lane(accHex.exit, [[cxA, -14.2], [cxA, -19.2]]);
+    lane(accHex.hub, [[cxA, -14.2], [cxA, ZC], [AU.x0 + 1.9, ZC]]);
+    lane(accHex.team, [[cxA, ZC], [AU.x1 - 1.9, ZC]]);
+    [["hub", AU.x0 + 1.4, ZC], ["exit", cxA, -19.6], ["team", AU.x1 - 1.4, ZC]].forEach(([k, x, z]) => {
+      g.shadowBlur = 0; g.fillStyle = accHex[k] + "33"; g.beginPath(); g.arc(px(x), py(z), 1.15 / AW * 1024, 0, 7); g.fill(); g.strokeStyle = accHex[k]; g.lineWidth = 4; g.beginPath(); g.arc(px(x), py(z), 1.15 / AW * 1024, 0, 7); g.stroke(); });
     g.shadowBlur = 0;
   });
   mesh(new T.PlaneGeometry(AW, AD), M(0xffffff, { map: floorT, roughness: 0.2, metalness: 0.5, envMapIntensity: 1.1 }), cxA, 0.003, (AU.z0 + AU.z1) / 2, aud).rotation.x = -Math.PI / 2;
   mesh(new T.PlaneGeometry(AW, AD), M(0x0b1118, { roughness: 0.9 }), cxA, AU.h, (AU.z0 + AU.z1) / 2, aud).rotation.x = Math.PI / 2;
   /* walls: south wall (with the sliding door), side walls in vertical slats with light fins, far wall with three portals */
   holeWall("z", AU.z1 - 0.02, AU.x0, AU.x1, AU.h, [{ c: cxA, w: 2.4, h: 3.0 }], Math.PI, slats);
-  holeWall("x", AU.x0, AU.z0, AU.z1, AU.h, [], Math.PI / 2, slats);
-  holeWall("x", AU.x1, AU.z0, AU.z1, AU.h, [], -Math.PI / 2, slats);
-  holeWall("z", AU.z0, AU.x0, AU.x1, AU.h, ["hub", "exit", "team"].map((k) => ({ c: portalX[k], w: 3.0, h: 4.4 })), 0, acoustic);
+  holeWall("x", AU.x0, AU.z0, AU.z1, AU.h, [{ c: ZC, w: 3.0, h: 4.4 }], Math.PI / 2, slats);
+  holeWall("x", AU.x1, AU.z0, AU.z1, AU.h, [{ c: ZC, w: 3.0, h: 4.4 }], -Math.PI / 2, slats);
+  holeWall("z", AU.z0, AU.x0, AU.x1, AU.h, [{ c: cxA, w: 3.0, h: 4.4 }], 0, acoustic);
   /* ambient LED banners on the side walls */
   const banner = ctex(1024, 300, (g, w, h) => { const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, "#06182a"); gr.addColorStop(1, "#0a2a46"); g.fillStyle = gr; g.fillRect(0, 0, w, h); g.strokeStyle = "rgba(54,214,255,.35)"; g.lineWidth = 3; for (let i = 0; i < 9; i++) { g.beginPath(); g.moveTo(0, 190 + i * 7); g.bezierCurveTo(w * 0.3, 120 + i * 9, w * 0.6, 260 - i * 7, w, 170 + i * 6); g.stroke(); } g.fillStyle = "#d8f4ff"; g.font = "700 76px system-ui,sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.shadowColor = "#36d6ff"; g.shadowBlur = 20; g.fillText("CRITICAL CARE UNIVERSE", 50, 92); g.shadowBlur = 0; g.fillStyle = "#7fd4e6"; g.font = "500 38px system-ui,sans-serif"; g.fillText("Learn  ·  Simulate  ·  Decide  ·  Together", 54, 160); });
-  [[AU.x0 + 0.06, Math.PI / 2], [AU.x1 - 0.06, -Math.PI / 2]].forEach((o) => { const m = pl(6.4, 6.4 * 300 / 1024, new T.MeshBasicMaterial({ map: banner, toneMapped: false }), o[0], 3.5, -13, o[1], 0, aud); bx(6.5, 0.04, 0.03, cyan, o[0], 3.5 - 0.98, -13, aud); });
+  [[AU.x0 + 0.06, Math.PI / 2], [AU.x1 - 0.06, -Math.PI / 2]].forEach((o) => { const m = pl(6.4, 6.4 * 300 / 1024, new T.MeshBasicMaterial({ map: banner, toneMapped: false }), o[0], 3.5, -9.2, o[1], 0, aud); bx(6.5, 0.04, 0.03, cyan, o[0], 3.5 - 0.98, -9.2, aud); });
   /* light fins and cove lines */
-  for (let k = 0; k < 8; k++) { const z = AU.z0 + 1.2 + k * 2.1; bx(0.05, 5.6, 0.06, cyanDim, AU.x0 + 0.04, 3.4, z, aud); bx(0.05, 5.6, 0.06, cyanDim, AU.x1 - 0.04, 3.4, z, aud); }
+  for (let k = 0; k < 8; k++) { const z = AU.z0 + 1.2 + k * 2.1; if (Math.abs(z - ZC) < 1.9) continue; bx(0.05, 5.6, 0.06, cyanDim, AU.x0 + 0.04, 3.4, z, aud); bx(0.05, 5.6, 0.06, cyanDim, AU.x1 - 0.04, 3.4, z, aud); }
   bx(AW, 0.06, 0.06, cyan, cxA, 6.4, AU.z0 + 0.05, aud); bx(0.06, 0.06, AD, cyan, AU.x0 + 0.05, 6.4, (AU.z0 + AU.z1) / 2, aud); bx(0.06, 0.06, AD, cyan, AU.x1 - 0.05, 6.4, (AU.z0 + AU.z1) / 2, aud);
   bx(AW, 0.05, 0.05, cyanDim, cxA, 0.07, AU.z0 + 0.04, aud); bx(0.05, 0.05, AD, cyanDim, AU.x0 + 0.04, 0.07, (AU.z0 + AU.z1) / 2, aud); bx(0.05, 0.05, AD, cyanDim, AU.x1 - 0.04, 0.07, (AU.z0 + AU.z1) / 2, aud);
   /* ceiling: light rings and bars */
@@ -215,25 +225,29 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
     else { [[-30, 8], [0, -10], [30, 8]].forEach((o) => { g.beginPath(); g.arc(ix + o[0], iy + o[1] - 8, 14, 0, 7); g.fill(); g.beginPath(); g.arc(ix + o[0], iy + o[1] + 26, 22, Math.PI, 0); g.fill(); }); }
     g.shadowBlur = 0; g.fillStyle = "#e4f6ff"; g.textAlign = "left"; g.textBaseline = "middle"; let fs = 46; g.font = "700 " + fs + "px system-ui,sans-serif"; while (g.measureText(title).width > w - 210 && fs > 24) { fs -= 2; g.font = "700 " + fs + "px system-ui,sans-serif"; } g.fillText(title, 190, h / 2 - 22); g.fillStyle = accHex[k]; g.font = "500 28px system-ui,sans-serif"; g.fillText(sub, 190, h / 2 + 34);
   });
-  let hubBack = null;
+  let hubBack = null, teamBack = null;
   const portalDefs = { hub: ["CRITICAL CARE HUB", "Simulators, labs and atlases"], exit: ["EXIT", "Step outside to the garden"], cmd: ["COMMAND CENTRE", "Live ICU monitors"], aud: ["AUDITORIUM", "Hub · Exit · Team"], team: ["MULTIDISCIPLINARY TEAM", "Case conference room"] };
   ["hub", "exit", "team"].forEach((k) => {
-    const x = portalX[k], zf = AU.z0;
-    const d = makeDoor(k, x, zf + 0.02, 3.0, 4.4, accent[k], aud);
-    if (k === "exit") { const disc0 = mesh(new T.RingGeometry(1.0, 1.15, 48), E(accent[k], 2), x, 0.012, zf + 1.4, aud); disc0.rotation.x = -Math.PI / 2; const t0 = sig(k, portalDefs[k][0], portalDefs[k][1]); pl(3.9, 3.9 * 200 / 768, new T.MeshBasicMaterial({ map: t0, toneMapped: false }), x, 5.45, zf + 0.04, 0, 0, aud).userData.door = k; return; }
+    const Q = PORT[k], inset = k === "exit" ? 0.02 : 0.02;
+    const ox = k === "hub" ? Q.x + inset : k === "team" ? Q.x - inset : Q.x, oz = k === "exit" ? Q.z + inset : Q.z;
+    const d = makeDoor(k, ox, oz, 3.0, 4.4, accent[k], aud);
+    d.g.rotation.y = Q.ry; if (k !== "exit") { d.axis = "x"; d.center = new V(Q.x, 0, Q.z); }
+    /* a local frame at the opening: +z into the room, so the same dimensions serve all three walls */
+    const lf = new T.Group(); lf.position.set(Q.x, 0, Q.z); lf.rotation.y = Q.ry; aud.add(lf);
+    if (k === "exit") { const disc0 = mesh(new T.RingGeometry(1.0, 1.15, 48), E(accent[k], 2), 0, 0.012, 1.4, lf); disc0.rotation.x = -Math.PI / 2; const t0 = sig(k, portalDefs[k][0], portalDefs[k][1]); pl(3.9, 3.9 * 200 / 768, new T.MeshBasicMaterial({ map: t0, toneMapped: false }), 0, 5.45, 0.04, 0, 0, lf).userData.door = k; return; }
     const glow = ctex(64, 256, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#0d1a29"); gr.addColorStop(1, "#04070b"); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
-    const back = pl(3.0, 4.4, new T.MeshBasicMaterial({ map: glow, toneMapped: false }), x, 2.2, zf - 0.7, 0, 0, aud); if (k === "hub") hubBack = back;
-    pl(0.7, 4.4, M(0x0a0f14, { side: T.DoubleSide }), x - 1.5, 2.2, zf - 0.35, Math.PI / 2, 0, aud); pl(0.7, 4.4, M(0x0a0f14, { side: T.DoubleSide }), x + 1.5, 2.2, zf - 0.35, Math.PI / 2, 0, aud);
-    pl(3.0, 0.7, M(0x0a0f14, { side: T.DoubleSide }), x, 4.4, zf - 0.35, 0, Math.PI / 2, aud);
+    const back = pl(3.0, 4.4, new T.MeshBasicMaterial({ map: glow, toneMapped: false }), 0, 2.2, -0.7, 0, 0, lf); if (k === "hub") hubBack = back; else teamBack = back;
+    pl(0.7, 4.4, M(0x0a0f14, { side: T.DoubleSide }), -1.5, 2.2, -0.35, Math.PI / 2, 0, lf); pl(0.7, 4.4, M(0x0a0f14, { side: T.DoubleSide }), 1.5, 2.2, -0.35, Math.PI / 2, 0, lf);
+    pl(3.0, 0.7, M(0x0a0f14, { side: T.DoubleSide }), 0, 4.4, -0.35, 0, Math.PI / 2, lf);
     const t = sig(k, portalDefs[k][0], portalDefs[k][1]);
-    pl(3.9, 3.9 * 200 / 768, new T.MeshBasicMaterial({ map: t, toneMapped: false }), x, 5.45, zf + 0.04, 0, 0, aud).userData.door = k;
-    const disc = mesh(new T.RingGeometry(1.0, 1.15, 48), E(accent[k], 2), x, 0.012, zf + 1.4, aud); disc.rotation.x = -Math.PI / 2;
+    pl(3.9, 3.9 * 200 / 768, new T.MeshBasicMaterial({ map: t, toneMapped: false }), 0, 5.45, 0.04, 0, 0, lf).userData.door = k;
+    const disc = mesh(new T.RingGeometry(1.0, 1.15, 48), E(accent[k], 2), 0, 0.012, 1.4, lf); disc.rotation.x = -Math.PI / 2;
   });
   /* ---- through the Hub gate: a replica of the five-door hub hall (same pentagon, doors, signs and floor), shown while the gate is open ---- */
   const hubHall = (() => {
-    const APO = 5.8, DR = APO - 0.18, SIDE = 2 * APO * Math.tan(Math.PI / 5), RC = (APO - 0.02) / Math.cos(Math.PI / 5), RT = 7.3, HH = 4.6;
+    const DR = APO - 0.18, SIDE = 2 * APO * Math.tan(Math.PI / 5), RC = (APO - 0.02) / Math.cos(Math.PI / 5), RT = 7.3, HH = 4.6;
     const hg = new T.Group(); hg.visible = false; G.add(hg);
-    hg.position.set(portalX.hub, 0, AU.z0 - 0.7 - APO); hg.rotation.y = 2 * Math.PI * 0.4;      /* lobby frame -> auditorium frame: its Auditorium door lands on this gate */
+    hg.position.set(HUBC.x, 0, HUBC.z); hg.rotation.y = 1.3 * Math.PI;                     /* lobby frame -> auditorium frame: its Auditorium door lands on the west gate */
     const KIN = [["icu", 0, 0x12e3c8, "ENTER THE ICU"], ["micro", 1, 0x7be34f, "MICROBIOLOGY LAB"], ["rad", 2, 0x3f8cff, "RADIOLOGY"], ["path", 4, 0xa073ff, "PATHOPHYSIOLOGY LIVE"]];
     const hx = (n) => "#" + n.toString(16).padStart(6, "0"), BM = (o) => new T.MeshBasicMaterial(Object.assign({ toneMapped: false }, o));
     const fan = (y, up, mat) => {
@@ -277,6 +291,61 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
       const pt = new T.Mesh(new T.BoxGeometry(2.3, 0.46, 0.05), BM({ map: plate(def[3], col) })); pt.position.set(0, 2.76, 0.06); dg.add(pt);
     });
     return hg;
+  })();
+  /* ---- through the Team gate: a replica of the circular Nexus hall (same pale floor with cyan rings, frosted wall with two light bands,
+         ceiling rings, wall screens, dais, turntable and a glass patient), shown while the gate is open. Its entrance faces this gate. ---- */
+  const mdtHall = (() => {
+    const RH = RHN, WH = 6.4, DR = 3.25, DH = 0.22, PED = 0.5, GAP = 0.16;
+    const mg = new T.Group(); mg.visible = false; G.add(mg);
+    mg.position.set(MDTC.x, 0, MDTC.z); mg.rotation.y = -Math.PI / 2;               /* the Nexus door (its +z side) lands on the east gate */
+    const BM = (o) => new T.MeshBasicMaterial(Object.assign({ toneMapped: false }, o));
+    const tor = (r, t, mat, y, par) => { const m = mesh(new T.TorusGeometry(r, t, 8, 72), mat, 0, y, 0, par || mg); m.rotation.x = Math.PI / 2; return m; };
+    const floorTex = ctex(512, 512, (g, w) => {
+      const c = w / 2, gr = g.createRadialGradient(c, c, 0, c, c, c); gr.addColorStop(0, "#f6fbfe"); gr.addColorStop(0.4, "#e2eef5"); gr.addColorStop(1, "#b9cfdd"); g.fillStyle = gr; g.fillRect(0, 0, w, w);
+      [[0.27, 0.9, 3], [0.4, 0.5, 1.5], [0.6, 0.38, 2], [0.8, 0.5, 1.5], [0.975, 0.9, 4]].forEach(([r, a, lw]) => { g.strokeStyle = "rgba(30,185,235," + a + ")"; g.lineWidth = lw; g.beginPath(); g.arc(c, c, r * c, 0, 7); g.stroke(); });
+      g.strokeStyle = "rgba(40,150,200,.16)"; g.lineWidth = 1; for (let i = 0; i < 32; i++) { const a = i / 32 * 6.2832; g.beginPath(); g.moveTo(c + Math.cos(a) * 0.28 * c, c + Math.sin(a) * 0.28 * c); g.lineTo(c + Math.cos(a) * 0.97 * c, c + Math.sin(a) * 0.97 * c); g.stroke(); }
+    });
+    mesh(new T.CircleGeometry(RH, 72), BM({ map: floorTex }), 0, 0.003, 0, mg).rotation.x = -Math.PI / 2;
+    const wallTex = ctex(1024, 128, (g, w, h) => {
+      const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#d4e3ee"); gr.addColorStop(1, "#bcd0de"); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 48; i++) { g.fillStyle = i % 2 ? "rgba(255,255,255,.18)" : "rgba(60,120,160,.07)"; g.fillRect(i * w / 48, 0, w / 48, h); g.fillStyle = "rgba(60,110,150,.35)"; g.fillRect(i * w / 48, 0, 2, h); }
+      g.fillStyle = "#26384a"; g.fillRect(0, h - 13, w, 13);
+    });
+    const arc = (r, h, mat, y) => mesh(new T.CylinderGeometry(r, r, h, 96, 1, true, GAP, Math.PI * 2 - 2 * GAP), mat, 0, y, 0, mg);
+    arc(RH, WH, BM({ map: wallTex, side: T.BackSide }), WH / 2);
+    [2.15, 4.7].forEach((y) => arc(RH - 0.03, 0.07, BM({ color: 0x7fe9ff, side: T.BackSide }), y));
+    tor(RH - 0.15, 0.045, BM({ color: 0x36d6ff }), 0.05);
+    mesh(new T.CircleGeometry(RH + 0.5, 64), BM({ color: 0x16222e }), 0, WH, 0, mg).rotation.x = Math.PI / 2;
+    [3.3, 6.1, 8.9].forEach((r) => tor(r, 0.05, BM({ color: 0x36d6ff }), WH - 0.2));
+    tor(2.2, 0.07, BM({ color: 0xbff4ff }), WH - 0.1); mesh(new T.CircleGeometry(2.1, 40), BM({ color: 0xffffff }), 0, WH - 0.06, 0, mg).rotation.x = Math.PI / 2;
+    mesh(new T.CylinderGeometry(0.7, 2.35, WH - DH, 40, 1, true), BM({ color: 0x7fe3ff, transparent: true, opacity: 0.055, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }), 0, (WH + DH) / 2, 0, mg);
+    /* wall holo-screens */
+    const scr = [0, 1, 2, 3].map((kind) => ctex(512, 300, (g, w, h) => {
+      g.fillStyle = "rgba(5,26,42,.78)"; g.fillRect(2, 2, w - 4, h - 4); g.strokeStyle = "rgba(110,225,255,.85)"; g.lineWidth = 4; g.strokeRect(4, 4, w - 8, h - 8);
+      g.fillStyle = "#7fe9ff"; g.font = "700 22px system-ui,sans-serif"; g.fillText(["IMAGING LIBRARY", "GENOMICS", "PHYSIOLOGY", "LABORATORY"][kind], 20, 38);
+      g.strokeStyle = ["#ff9a5a", "#6fe3ff", "#3dff9a", "#a9dff0"][kind]; g.lineWidth = 3; for (let r = 0; r < 4; r++) { g.beginPath(); for (let x = 20; x < w - 20; x += 4) { const y = 90 + r * 50 + Math.sin(x * (0.03 + r * 0.01) + kind) * 14; x === 20 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke(); }
+    }));
+    for (let k = 0; k < 10; k++) { const a = (k + 0.5) / 10 * Math.PI * 2; if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a)) ) < 0.35) continue;
+      const m = mesh(new T.PlaneGeometry(3.7, 2.17), BM({ map: scr[k % 4], transparent: true, side: T.DoubleSide, depthWrite: false }), Math.sin(a) * (RH - 0.3), 3.0, Math.cos(a) * (RH - 0.3), mg); m.rotation.y = a + Math.PI; }
+    /* entrance door frame in the south wall, labelled for the way back */
+    const dg = new T.Group(); dg.position.set(0, 0, RH - 0.06); dg.rotation.y = Math.PI; mg.add(dg);
+    bx(2.7, 0.08, 0.1, BM({ color: 0x36d6ff }), 0, 2.72, 0, dg); [-1.3, 1.3].forEach((x) => bx(0.08, 2.72, 0.1, BM({ color: 0x36d6ff }), x, 1.36, 0, dg));
+    const sg = ctex(512, 96, (g, w, h) => { g.fillStyle = "rgba(5,26,42,.9)"; g.fillRect(3, 3, w - 6, h - 6); g.strokeStyle = "#5fe3ff"; g.lineWidth = 4; g.strokeRect(3, 3, w - 6, h - 6); g.fillStyle = "#cff6ff"; g.font = "700 40px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("AUDITORIUM", w / 2, h / 2); });
+    mesh(new T.PlaneGeometry(1.7, 0.32), BM({ map: sg, transparent: true }), 0, 3.05, 0.06, dg);
+    /* dais, plate, turntable */
+    cyl(DR, DR + 0.1, DH, BM({ color: 0xf3f8fb }), 0, DH / 2, 0, mg, 64); tor(DR - 0.04, 0.04, BM({ color: 0x36d6ff }), DH + 0.005);
+    const plateTex = ctex(512, 512, (g, w) => { const c = w / 2; g.fillStyle = "#05263a"; g.fillRect(0, 0, w, w); for (let i = 0; i < 9; i++) { g.strokeStyle = "rgba(80,225,255," + (0.55 - i * 0.04) + ")"; g.lineWidth = i % 3 ? 1.5 : 3; g.beginPath(); g.arc(c, c, (0.18 + i * 0.095) * c, 0, 7); g.stroke(); } });
+    mesh(new T.CircleGeometry(DR - 0.12, 64), BM({ map: plateTex }), 0, DH + 0.003, 0, mg).rotation.x = -Math.PI / 2;
+    const TOP = DH + 0.045; cyl(1.52, 1.58, PED, BM({ color: 0x0b2f45 }), 0, TOP + PED / 2, 0, mg, 48); tor(1.5, 0.03, BM({ color: 0x7fe9ff }), TOP + PED + 0.005);
+    /* the patient: a glass figure in the same place and size as the real one */
+    const glass = BM({ color: 0x9fd6ee, transparent: true, opacity: 0.6 }), y0 = TOP + PED, body = new T.Group(); body.position.y = y0; mg.add(body);
+    mesh(new T.SphereGeometry(0.19, 20, 14), glass, 0, 2.3, 0, body); cyl(0.07, 0.08, 0.16, glass, 0, 2.06, 0, body, 12);
+    cyl(0.3, 0.24, 0.95, glass, 0, 1.52, 0, body, 20); cyl(0.24, 0.2, 0.3, glass, 0, 0.98, 0, body, 20);
+    [-1, 1].forEach((s) => { cyl(0.1, 0.075, 1.0, glass, s * 0.12, 0.5, 0, body, 12); const arm = cyl(0.065, 0.05, 1.0, glass, s * 0.5, 1.5, 0, body, 10); arm.rotation.z = s * 0.28; });
+    mesh(new T.SphereGeometry(0.11, 14, 10), BM({ color: 0xff6a78 }), 0.07, 1.78, 0.14, body);
+    [-1, 1].forEach((s) => { const l = mesh(new T.SphereGeometry(0.15, 14, 10), BM({ color: 0x8fb8ff, transparent: true, opacity: 0.8 }), s * 0.14, 1.8, 0.02, body); l.scale.set(0.8, 1.5, 0.7); });
+    mesh(new T.SphereGeometry(0.14, 12, 8), BM({ color: 0xffa860 }), -0.12, 1.5, 0.12, body).scale.set(1.4, 0.8, 0.8);
+    return mg;
   })();
   /* the sliding door from the command centre */
   const dAud = makeDoor("aud", cxA, -R.z + 0.02, 2.4, 3.0, 0x36d6ff, G);
@@ -334,13 +403,24 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
     if (dGate.open > 0.85) r.push({ x0: -9.2, x1: -7.2, z0: -0.75, z1: 0.75 });
     if (dAud.open > 0.85) r.push({ x0: cxA - 0.85, x1: cxA + 0.85, z0: -5.8, z1: -4.2 });
     if (doors.exit.open > 0.85) r.push({ x0: cxA - 0.85, x1: cxA + 0.85, z0: -22.5, z1: -19.9 });
+    /* the side gates: once open you can simply walk through them, into the hub hall or the Nexus hall */
+    if (doors.hub.open > 0.85) r.push({ x0: AU.x0 - 1.4, x1: AU.x0 + 0.2, z0: ZC - 0.95, z1: ZC + 0.95 });
+    if (doors.team.open > 0.85) r.push({ x0: AU.x1 - 0.2, x1: AU.x1 + 1.5, z0: ZC - 0.95, z1: ZC + 0.95 });
     return r;
+  };
+  const rounds = () => {
+    const c = [];
+    if (doors.hub.open > 0.85) c.push({ x: HUBC.x, z: HUBC.z, r: 5.2 });
+    if (doors.team.open > 0.85) c.push({ x: MDTC.x, z: MDTC.z, r: RHN - 1.0 });
+    return c;
   };
   const blocks = [{ x0: -18.5, x1: -16.0, z0: -3.3, z1: 3.3 }, { x0: -14.0, x1: -11.9, z0: 3.8, z1: 5.2 },
     { x0: cxA - 6.3, x1: cxA - 2.8, z0: -12.9, z1: -6.8 }, { x0: cxA + 2.8, x1: cxA + 6.3, z0: -12.9, z1: -6.8 }];
+  const pillars = [{ x: HUBC.x, z: HUBC.z, r: 0.95 }, { x: MDTC.x, z: MDTC.z, r: 3.3 }];       /* the hub's column, the Nexus dais */
   function clamp(x, z) {
     let best = null, bd = 1e9;
     rects().forEach((r) => { const cx = Math.max(r.x0, Math.min(r.x1, x)), cz = Math.max(r.z0, Math.min(r.z1, z)), d = (cx - x) ** 2 + (cz - z) ** 2; if (d < bd) { bd = d; best = [cx, cz]; } });
+    rounds().forEach((c) => { const dx = x - c.x, dz = z - c.z, l = Math.hypot(dx, dz) || 1e-6, k = l <= c.r ? 1 : c.r / l, cx = c.x + dx * k, cz = c.z + dz * k, d = (cx - x) ** 2 + (cz - z) ** 2; if (d < bd) { bd = d; best = [cx, cz]; } });
     let [px, pz] = best;
     blocks.forEach((b) => {
       if (px > b.x0 && px < b.x1 && pz > b.z0 && pz < b.z1) {
@@ -348,17 +428,20 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
         if (m === dl) px = b.x0; else if (m === dr) px = b.x1; else if (m === dt) pz = b.z0; else pz = b.z1;
       }
     });
+    pillars.forEach((c) => { const dx = px - c.x, dz = pz - c.z, l = Math.hypot(dx, dz); if (l < c.r) { const k = c.r / (l || 1e-6); px = c.x + (l ? dx * k : c.r); pz = c.z + (l ? dz * k : 0); } });
     if (doors.exit.open > 0.85 && z < -20.5) { const o = out.clamp(x, z); if ((o[0] - x) ** 2 + (o[1] - z) ** 2 < (px - x) ** 2 + (pz - z) ** 2) return o; }
     return [px, pz];
   }
+  const where = { hub: HUBC, mdt: MDTC, ZC, AU, APO, RH: RHN };
 
   /* =============================== per-frame =============================== */
   let mi = 0, acc = 0, accSlow = 0, first = true;
   function update(t, dt, cam) {
     Object.values(doors).forEach((d) => { if (d._tp !== d.target) { if (d._tp !== undefined && opt.onDoor) opt.onDoor(d, d.target > 0); d._tp = d.target; } });
-    const hubSee = doors.hub.open > 0.02 && !(doors.exit.open > 0.02);
+    const hubSee = doors.hub.open > 0.02 && !(doors.exit.open > 0.02), mdtSee = doors.team.open > 0.02 && !(doors.exit.open > 0.02);
     hubHall.visible = hubSee; if (hubBack) hubBack.visible = !hubSee;
-    if (cam) out.update(t, dt, cam, doors.exit.open > 0.02 || (cam.z < -21.3 && !hubSee));
+    mdtHall.visible = mdtSee; if (teamBack) teamBack.visible = !mdtSee;
+    if (cam) out.update(t, dt, cam, doors.exit.open > 0.02 || (cam.z < -21.3 && cam.x > -22.2 && cam.x < -8.7 && !hubSee && !mdtSee));
     Object.values(doors).forEach((d) => { if (Math.abs(d.open - d.target) > 0.001) { d.set(d.open + (d.target - d.open) * (1 - Math.exp(-dt * 3.2))); } else if (d.open !== d.target) d.set(d.target); });
     acc += dt; accSlow += dt;
     if (cam && cam.z < -12) return;          /* far away in the auditorium or outdoors: nothing to repaint */
@@ -367,5 +450,5 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
     const per = LOW ? 3 : 6; for (let k = 0; k < per; k++) { paintMon(mons[mi]); mi = (mi + 1) % mons.length; }
     if (accSlow > 0.6) { accSlow = 0; deskScr.forEach((s) => painters[s.key](s.d)); paintStatus(); if (rnd() > 0.5) drawLeds(); }
   }
-  return { doors, update, clamp, rooms: { R, AU }, room, outdoor: out, groundY: out.groundY };
+  return { doors, update, clamp, rooms: { R, AU }, where, room, outdoor: out, groundY: out.groundY };
 }

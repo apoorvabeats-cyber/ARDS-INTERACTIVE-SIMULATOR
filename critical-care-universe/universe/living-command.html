@@ -99,7 +99,7 @@ import {FOLLOW_UPS,DISTRACTORS} from './case-decisions.js';
 import {ORDER_CASES,assessOrder} from './clinical-orders.js?v=20261115a';
 import {createCaseVoice} from './case-voice.mjs';
 import {buildWard} from './ward3d.js?v=20261120o';
-import {buildSuite} from './command3d.js?v=20261120o';
+import {buildSuite} from './command3d.js?v=20261120p';
 import {createSfx} from './sfx.js?v=20261120o';
 const $=s=>document.querySelector(s),V=THREE.Vector3,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 function updateLayout(){
@@ -279,7 +279,10 @@ function drawBed(i){const p=P[i],b=B[i],c=b.ctx,W=1280,H=720,im=(typeof bedShot=
  b.tex.needsUpdate=true}
 
 // camera modes
-let arrive=null,ent=0,mode='cmd',yaw=0,pit=0,cmdYaw=0,cmdPit=0,cur=null,transit=null,voiceOn=true,alarmOn=true,wallZoom=true;const tp=new V(),tl=new V(),lk=new V(100,4,-8),wp=new V(0,0,0);let bobT=0;const WALK='Swipe up to walk · drag sideways to look · tap a door, bed or monitor';let suite=null,gyS=0,START_AUD=/[?&]start=aud/.test(location.search);const OUTH='Swipe up to walk · drag to look around · turn round to see the building · keep walking ahead to leave';
+let arrive=null,ent=0,mode='cmd',yaw=0,pit=0,cmdYaw=0,cmdPit=0,cur=null,transit=null,voiceOn=true,alarmOn=true,wallZoom=true;const tp=new V(),tl=new V(),lk=new V(100,4,-8),wp=new V(0,0,0);let bobT=0;const WALK='Swipe up to walk · drag sideways to look · tap a door, bed or monitor';let suite=null,gyS=0,START_AUD=/[?&]start=aud/.test(location.search),START_FROM=((location.search.match(/[?&]from=(hub|team)/)||[])[1])||'hub';
+function readPose(to){try{const j=JSON.parse(sessionStorage.getItem('ccu-pose')||'null');sessionStorage.removeItem('ccu-pose');if(j&&j.to===to&&Date.now()-j.t<20000)return j}catch(e){}return null}
+function freshSnap(){try{const t=+sessionStorage.getItem('ccu-snap-t')||0,v=sessionStorage.getItem('ccu-snap');return v&&Date.now()-t<15000?v:null}catch(e){return null}}
+if(START_AUD){const sn=freshSnap();if(sn){const l=document.getElementById('leave');l.style.transition='none';l.style.opacity=1;l.style.background='#050b18 url('+sn+') center/cover no-repeat'}}const OUTH='Swipe up to walk · drag to look around · turn round to see the building · keep walking ahead to leave';
 const voiceController=null; /* no spoken narration: the only voice in the ICU is the attached alarm-attention clip */
 // hall announcer: female PA voice reading the red banners, with a reverberant chime (see alarm-voice.mjs)
 let pendingNarration=null,hallBus=null;
@@ -594,7 +597,13 @@ function outdoorLogic(){
  if(!suite||flatMode)return;
  const D=suite.doors,c=cam.position,ou=suite.outdoor,outside=c.z<-21.9&&c.x<-8.7;
  if(D.exit.target>0&&!outside&&c.z>-17.5&&mode!=='travel')D.exit.target=0;
- if(mode!=='travel'&&c.z>-16.6){if(D.hub.target>0)D.hub.target=0;if(D.team.target>0)D.team.target=0}
+ if(mode!=='travel'&&!leaving){
+  const W=suite.where,dh=Math.hypot(c.x-W.AU.x0,c.z-W.ZC),dm=Math.hypot(c.x-W.AU.x1,c.z-W.ZC),inHub=c.x<W.AU.x0-.4,inMdt=c.x>W.AU.x1+.4;
+  /* the side gates open as you come near, and shut again once you are well away; never while you stand beyond one */
+  if(!inHub&&!inMdt){if(dh<2.8)D.hub.target=1;else if(dh>5.6)D.hub.target=0;if(dm<2.8)D.team.target=1;else if(dm>5.6)D.team.target=0}
+  if(mode==='ward'&&!transit&&window.__enterPlace){
+   if(inHub&&Math.hypot(c.x-W.hub.x,c.z-W.hub.z)<3.9)window.__enterPlace('hub');
+   else if(inMdt&&c.x>W.AU.x1+1.7)window.__enterPlace('team')}}
  if(D.exit.open>.05&&D.exit.target>0)sfx.startOutdoor(ou.info.phase);
  else if(D.exit.open<.02&&D.exit.target===0&&sfx.outdoorOn())sfx.stopOutdoor();
  if(!outside){if(!leaving&&!arriving)$('#leave').style.opacity=0;sfx.outdoorGain(.3);return}
@@ -667,11 +676,17 @@ try{ward=buildWard(THREE,S,R,P,{mon,rdr,equip:ivEquipment});B.forEach((b,i)=>b.l
 try{if(ward){suite=buildSuite(THREE,S,P,{mon},ward.env,{gateSet:a=>ward.setGate(a),onDoor:(d,o)=>sfx.door(o,{x:d.center.x,z:d.center.z},d.id==='gate'?1.1:1)});
  const D=suite.doors,cxA=-15.3;
  /* leaving by a door is a straight cut, never a fade: keep the last frame, hand it to the next page, which shows it until its own first frame */
- const keepFrame=()=>{try{R.render(S,cam);const c=R.domElement,w=Math.min(960,c.width),h=Math.round(w*c.height/c.width),t=document.createElement('canvas');t.width=w;t.height=h;t.getContext('2d').drawImage(c,0,0,w,h);sessionStorage.setItem('ccu-snap',t.toDataURL('image/jpeg',.62))}catch(e){try{sessionStorage.removeItem('ccu-snap')}catch(_){}}};
+ const keepFrame=()=>{try{R.render(S,cam);const c=R.domElement,w=Math.min(960,c.width),h=Math.round(w*c.height/c.width),t=document.createElement('canvas');t.width=w;t.height=h;t.getContext('2d').drawImage(c,0,0,w,h);sessionStorage.setItem('ccu-snap',t.toDataURL('image/jpeg',.62));sessionStorage.setItem('ccu-snap-t',String(Date.now()))}catch(e){try{sessionStorage.removeItem('ccu-snap')}catch(_){}}};
  window.__keepFrame=keepFrame;
  const cutTo=(msg,fallback)=>{if(leaving)return;leaving=true;keepFrame();sfx.stopOutdoor&&sfx.stopOutdoor();if(parent!==window)parent.postMessage(msg,'*');else if(fallback)location.href=fallback};
- D.hub.go=()=>cutTo('universe-hub','../../hub.html');
- D.team.go=()=>{try{fetch('../../models/anatomy/human-reference.glb',{cache:'force-cache'}).catch(()=>{})}catch(e){}if(parent!==window){cutTo('universe-team');setTimeout(()=>{leaving=false},2500)}else toast('The Multidisciplinary Team room opens from the Universe app.')};
+ /* the hub and Nexus gates only open; you walk through them yourself, and a few steps inside the real page takes over from exactly where you stand */
+ window.__enterPlace=k=>{if(leaving||transit)return;const W=suite.where,c=cam.position,fx=Math.sin(yaw),fz=-Math.cos(yaw);let pose;
+  if(k==='hub'){const px=c.x-W.hub.x,pz2=c.z-W.hub.z,ph=1.3*Math.PI,cs=Math.cos(ph),sn=Math.sin(ph);
+   pose={to:'hub',x:px*cs-pz2*sn,z:px*sn+pz2*cs,yaw:Math.atan2(fx*cs-fz*sn,fx*sn+fz*cs)}}
+  else{if(parent===window){return}pose={to:'team',x:c.z-W.mdt.z,z:W.mdt.x-c.x,yaw:yaw-Math.PI/2}}
+  try{pose.t=Date.now();sessionStorage.setItem('ccu-pose',JSON.stringify(pose))}catch(e){}
+  if(k==='hub')cutTo('universe-hub','../../hub.html?home=1&from=auditorium&v=20261120p');
+  else{try{fetch('../../models/anatomy/human-reference.glb',{cache:'force-cache'}).catch(()=>{})}catch(e){}cutTo('universe-team');setTimeout(()=>{leaving=false},2500)}};
  D.exit.noThrough=true;D.exit.go=()=>{const outside=cam.position.z<-21.8;
   if(!outside)startRoute([{p:new V(cxA,1.6,-22.1),look:new V(cxA,1.6,-30),dur:2000},{p:new V(cxA,1.6,-25.6),look:new V(cxA,1.5,-34),dur:1900}],()=>{$('#hint').textContent=OUTH});
   else startRoute([{p:new V(cxA,1.6,-19.4),look:new V(cxA,1.5,-12),dur:2200}])}}}catch(e){console.error('3D command suite failed; using the photo command centre.',e);suite=null}
@@ -829,7 +844,13 @@ scr.visible=true;
 var _goBeds=go,_goPrev=null;
 function stand(x,z,yw){wp.set(x,0,z);yaw=yw;pit=0;if(suite){suite.doors.gate.target=1;suite.doors.gate.set(1)}}
 go=function(m,i){
- if(m==='cmd'&&suite&&!flatMode){if(mode==='bed'){mode='travel';ward.closeAll()}m='ward';if(START_AUD){START_AUD=false;stand(-19.5,-19.7,Math.PI);suite.doors.hub.target=1;arriving=true;const l=$('#leave');l.style.transition='none';l.style.opacity=1;setTimeout(()=>{l.style.transition='opacity .9s';l.style.opacity=0;arriving=false},380)}else stand(-10.7,0,-Math.PI/2)}
+ if(m==='cmd'&&suite&&!flatMode){if(mode==='bed'){mode='travel';ward.closeAll()}m='ward';if(START_AUD){START_AUD=false;const W=suite.where,D=suite.doors,pz=readPose('aud');let sx,sz,sy;
+   if(START_FROM==='team'){sx=W.AU.x1-1.9;sz=W.ZC;sy=-Math.PI/2;D.team.target=1;D.team.set(1)}
+   else{sx=W.AU.x0+1.9;sz=W.ZC;sy=Math.PI/2;D.hub.target=1;D.hub.set(1)}
+   if(pz){sx=pz.x;sz=pz.z;sy=pz.yaw}
+   stand(sx,sz,sy);arriving=true;const l=$('#leave');l.style.transition='none';l.style.opacity=1;
+   /* a straight cut, never a fade: the last frame of the place we left stays up until this room has drawn once */
+   requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(()=>{l.style.transition='none';l.style.opacity=0;l.style.background='#050b18';arriving=false;try{sessionStorage.removeItem('ccu-snap');if(parent!==window&&parent.ccuSnapOff)parent.ccuSnapOff()}catch(e){}},120)))}else stand(-10.7,0,-Math.PI/2)}
  else if(m==='ward'&&suite&&!flatMode&&mode!=='bed'&&mode!=='transit'&&mode!=='travel'&&(mode==='cmd'||cam.position.x<-8.6))stand(-6.8,0,Math.PI/2);
  else if(m==='ward'&&mode==='transit')wp.set(0,0,0);
  if(m==='ward'&&mode==='bed'&&ward&&cur!=null){const b=cur;_goBeds('travel');mode='travel';transit={bed:b,stage:'out',start:performance.now(),duration:1300,from:cam.position.clone(),to:ward.approach(b),lookFrom:lk.clone(),lookTo:ward.look(b)};return}
@@ -844,4 +865,5 @@ go=function(m,i){
 };
 
 if(suite&&!flatMode)go('cmd');
+window.__lc={cam:()=>cam,suite:()=>suite,mode:()=>mode,wp,walkBy:d=>walkBy(d),setYaw:v=>{yaw=v},getYaw:()=>yaw};
 </script></body></html>

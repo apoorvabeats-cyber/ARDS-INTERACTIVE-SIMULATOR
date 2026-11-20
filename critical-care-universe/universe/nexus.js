@@ -53,6 +53,7 @@ const rr = (g, x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x 
 const rnd = (() => { let s = 5; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })();
 
 /* ================================================================ the hall */
+const DOORGAP = 0.16, ZC = -17, AUD_X = -8.6 + 0.7 + 11 - 0.06;   /* the doorway in the south wall, and where the auditorium lies behind it (auditorium z of the hall's centre, auditorium x of the hall's centre) */
 const RH = 11, WH = 6.4, DAIS_R = 3.25, DAIS_H = 0.22, MINR = 3.3, MAXR = RH - 0.8, BODY_S = 1.45;
 const hall = new T.Group(); S.add(hall);
 S.add(new T.HemisphereLight(0xeaf6ff, 0x5d7b92, 1.05));
@@ -74,8 +75,8 @@ const wallTex = ctex(2048, 256, (g, w, h) => {
   for (let i = 0; i < 48; i++) { g.fillStyle = i % 2 ? "rgba(255,255,255,.18)" : "rgba(60,120,160,.07)"; g.fillRect(i * w / 48, 0, w / 48, h); g.fillStyle = "rgba(60,110,150,.35)"; g.fillRect(i * w / 48, 0, 3, h); }
   g.fillStyle = "#26384a"; g.fillRect(0, h - 26, w, 26);
 });
-mesh(new T.CylinderGeometry(RH, RH, WH, 128, 1, true), new T.MeshStandardMaterial({ map: wallTex, roughness: 0.4, metalness: 0.1, side: T.BackSide, envMap: env, envMapIntensity: 0.5 }), 0, WH / 2, 0, hall);
-[2.15, 4.7].forEach((y) => mesh(new T.CylinderGeometry(RH - 0.03, RH - 0.03, 0.07, 128, 1, true), new T.MeshBasicMaterial({ color: new T.Color(0.3, 1.6, 2.4), side: T.BackSide, toneMapped: false }), 0, y, 0, hall));
+mesh(new T.CylinderGeometry(RH, RH, WH, 128, 1, true, DOORGAP, TAU - 2 * DOORGAP), new T.MeshStandardMaterial({ map: wallTex, roughness: 0.4, metalness: 0.1, side: T.BackSide, envMap: env, envMapIntensity: 0.5 }), 0, WH / 2, 0, hall);
+[2.15, 4.7].forEach((y) => mesh(new T.CylinderGeometry(RH - 0.03, RH - 0.03, 0.07, 128, 1, true, DOORGAP, TAU - 2 * DOORGAP), new T.MeshBasicMaterial({ color: new T.Color(0.3, 1.6, 2.4), side: T.BackSide, toneMapped: false }), 0, y, 0, hall));
 tor(RH - 0.15, 0.045, E(0x36d6ff, 2.2), 0.05, hall);
 
 /* ceiling: dark truss, glowing rings, a bright oculus over the patient, and a faint projection cone */
@@ -104,9 +105,13 @@ for (let k = 0; k < 10; k++) {
 /* the entrance door in the south wall (you arrive through it) */
 { const d = new T.Group(); d.position.set(0, 0, RH - 0.06); d.rotation.y = Math.PI; hall.add(d);
   mesh(new T.BoxGeometry(2.7, 0.08, 0.1), E(0x36d6ff, 2.2), 0, 2.72, 0, d); [-1.3, 1.3].forEach((x) => mesh(new T.BoxGeometry(0.08, 2.72, 0.1), E(0x36d6ff, 2.2), x, 1.36, 0, d));
-  mesh(new T.PlaneGeometry(2.5, 2.66), new T.MeshStandardMaterial({ color: 0x9fd8f5, transparent: true, opacity: 0.22, roughness: 0.05, metalness: 0.4, envMap: env, side: T.DoubleSide, depthWrite: false }), 0, 1.33, 0, d);
-  const sg = ctex(512, 96, (g, w, h) => { g.fillStyle = "rgba(5,26,42,.8)"; rr(g, 3, 3, w - 6, h - 6, 16); g.fill(); g.strokeStyle = "#5fe3ff"; g.lineWidth = 4; rr(g, 3, 3, w - 6, h - 6, 16); g.stroke(); g.fillStyle = "#cff6ff"; g.font = "700 40px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("ENTRANCE · UNIVERSE", w / 2, h / 2); });
+  const sg = ctex(512, 96, (g, w, h) => { g.fillStyle = "rgba(5,26,42,.8)"; rr(g, 3, 3, w - 6, h - 6, 16); g.fill(); g.strokeStyle = "#5fe3ff"; g.lineWidth = 4; rr(g, 3, 3, w - 6, h - 6, 16); g.stroke(); g.fillStyle = "#cff6ff"; g.font = "700 40px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("AUDITORIUM", w / 2, h / 2); });
   mesh(new T.PlaneGeometry(1.7, 0.32), new T.MeshBasicMaterial({ map: sg, transparent: true, toneMapped: false }), 0, 3.05, 0.06, d); }
+
+/* beyond the doorway: the real auditorium (a light replica of it), so the door is see-through from both sides */
+{ const A = typeof window.ccuAudBeyond === "function" ? window.ccuAudBeyond(T, "E") : null;
+  if (A) { A.rotation.y = Math.PI / 2; A.position.set(-ZC, 0, AUD_X); hall.add(A); }
+  mesh(new T.PlaneGeometry(3.2, 1.0), new T.MeshBasicMaterial({ color: 0x0a1522 }), 0, 0.004, RH + 0.1, hall).rotation.x = -Math.PI / 2; }
 
 /* ================================================================ the dais and the turntable */
 const dais = new T.Group(); hall.add(dais);
@@ -279,10 +284,13 @@ function updatePanels(dt, t) {
 const me = { x: 0, z: 9.6, yaw: Math.PI, h: 1.6, pit: 0 };
 { const a = ((hashN(myId) % 7) - 3) * 0.09; me.x = Math.sin(a) * 4.2; me.z = Math.cos(a) * 4.2; }
 const arrive = { t: 0, t0: performance.now(), from: { x: me.x * 1.62, z: me.z * 1.62 }, to: { x: me.x, z: me.z } };
+/* coming in from the auditorium on foot: begin exactly where the walk left off, under your own control, no scripted walk */
+try { const j = JSON.parse(sessionStorage.getItem("ccu-pose") || "null"); sessionStorage.removeItem("ccu-pose");
+  if (j && j.to === "team" && Date.now() - j.t < 20000) { me.x = j.x; me.z = j.z; me.yaw = j.yaw; arrive.t = 2.4; arrive.fromPose = true; } } catch (e) {}
 me.x = arrive.from.x; me.z = arrive.from.z;
 const faceCenter = (x, z) => Math.atan2(-x, z);
 me.yaw = faceCenter(me.x, me.z);
-function clampPos(x, z) { const r = Math.hypot(x, z) || 1e-6; if (!focus && r < MINR) { x *= MINR / r; z *= MINR / r; } else if (r > MAXR) { x *= MAXR / r; z *= MAXR / r; } return [x, z]; }
+function clampPos(x, z) { if (!focus && Math.abs(x) < 1.15 && z > MAXR - 1.2) return [clamp(x, -1.15, 1.15), Math.min(z, RH + 3.2)]; const r = Math.hypot(x, z) || 1e-6; if (!focus && r < MINR) { x *= MINR / r; z *= MINR / r; } else if (r > MAXR) { x *= MAXR / r; z *= MAXR / r; } return [x, z]; }
 function walkBy(d) { const c = clampPos(me.x + Math.sin(me.yaw) * d, me.z - Math.cos(me.yaw) * d); me.x = c[0]; me.z = c[1]; }
 let dn = 0, mvd = 0, lx = 0, ly = 0, sx = 0, sy = 0, holdDir = 0, lastV = 0, mode = "", onPatient = false, onDesk = false, spinV = 0, autoSpin = false, focus = null, retreat = false, lpT = 0, grab = null, gx = 0, held = false, lastMT = 0;
 const ray = new T.Raycaster(), ndc = new T.Vector2();
@@ -508,6 +516,19 @@ function setNameLabel() {
 }
 addEventListener("message", (e) => { const d = e.data; if (d && d.type === "mdt-state") apply(d); });
 $("#exit").onclick = () => leave("hall-exit"); $("#classic").onclick = () => leave("hall-classic"); $("#line").onclick = () => post("hall-line");
+let leavingTo = false;
+/* walking out through the doorway: keep this frame and the exact place we stand, and the auditorium picks up from there, no fade */
+function goAuditorium() {
+  leavingTo = true;
+  try {
+    R.render(S, cam);
+    const c = R.domElement, w = Math.min(960, c.width), h = Math.round(w * c.height / c.width), t = document.createElement("canvas"); t.width = w; t.height = h; t.getContext("2d").drawImage(c, 0, 0, w, h);
+    sessionStorage.setItem("ccu-snap", t.toDataURL("image/jpeg", 0.62)); sessionStorage.setItem("ccu-snap-t", String(Date.now()));
+    sessionStorage.setItem("ccu-pose", JSON.stringify({ to: "aud", x: AUD_X - me.z, z: ZC + me.x, yaw: me.yaw + Math.PI / 2, t: Date.now() }));
+  } catch (e) {}
+  if (net) { net.close(); net = null; }
+  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261120p";
+}
 function leave(type) { if (net) { net.close(); net = null; } post(type); }
 
 /* the vitals strip across the top of the screen */
@@ -533,6 +554,7 @@ function loop(now) {
   /* arrival: walk in through the door while the opening screen fades */
   if (arrive.t < 2.4 && shown) { arrive.t = (performance.now() - arrive.t0) / 1000; const k = clamp(arrive.t / 2.4, 0, 1), e = k * k * (3 - 2 * k); me.x = arrive.from.x + (arrive.to.x - arrive.from.x) * e; me.z = arrive.from.z + (arrive.to.z - arrive.from.z) * e; me.yaw = faceCenter(me.x, me.z); }
   if (dn && holdDir && mvd > 10 && performance.now() - lastV > 120 && mode !== "spin") walkBy(holdDir * dt * 1.7);
+  if (me.z > RH + 0.9 && shown && arrive.t >= 2.4 && !leavingTo) goAuditorium();
   /* glide to the bedside, or to an organ, or back out when released */
   let eyeH = 1.6, pit = 0;
   if (focus) { const k = 1 - Math.exp(-dt * 3.2); me.x += (focus.x - me.x) * k; me.z += (focus.z - me.z) * k; const ty = Math.atan2(focus.c.x - me.x, -(focus.c.z - me.z)); let dy = ty - me.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); me.yaw += dy * k; me.h += (focus.h - me.h) * k; me.pit += (0 - me.pit) * k; }
