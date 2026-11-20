@@ -14,7 +14,7 @@
     if (loading) return;
     loading = true;
     const app = document.createElement("script");
-    app.src = "./assets/app.js?v=20261120j";
+    app.src = "./assets/app.js?v=20261120m";
     app.type = "module";
     app.onerror = () => {
       startup.setAttribute("role", "alert");

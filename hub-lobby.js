@@ -530,7 +530,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
         const o = Math.max(0, 1 - (arrive.t - 0.5) * 1.6);
         d.userData.open = o; d.userData.left.position.x = -0.48 - o * 0.85; d.userData.right.position.x = 0.48 + o * 0.85;
       }
-      if (k >= 1) { shut(d); if (fade) { fade.style.opacity = "0"; fade.style.transition = ""; } arrive = null; mode = "look"; window.doorChosen = false; }
+      if (k >= 1) { shut(d); if (fade) { fade.style.opacity = "0"; fade.style.transition = ""; } document.documentElement.classList.remove("arriving"); arrive = null; mode = "look"; window.doorChosen = false; }
       placeCamera(); ambient(dt); renderer.render(scene, camera); return;
     }
     if (job) {
