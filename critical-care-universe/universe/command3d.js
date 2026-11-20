@@ -1,0 +1,304 @@
+/* ICU command suite: a walk-in command centre attached to the ICU hall, a sliding door to a modern auditorium,
+   and three portals (Critical Care Hub, Command Centre, Multidisciplinary Team). No people are modelled.
+
+   World layout (x runs along the ICU hall; the hall's left end gate is at x = -8.4):
+     command centre   x -20.4..-8.4, z -5..5,   height 4.6   (6 live monitors on the far wall, console desk, racks)
+     sliding door     x -15.3, z -5               -> auditorium
+     auditorium       x -22..-8.6,  z -21..-5,   height 7.0   (three portals on the far wall z = -21)
+   buildSuite(T, scene, P, H, env, {gateSet}) -> { doors, update(t,dt), clamp(x,z), hits, rooms }          */
+
+export function buildSuite(T, S, P, H, env, opt = {}) {
+  const V = T.Vector3, G = new T.Group(); G.name = "suite"; S.add(G);
+  const LOW = typeof matchMedia === "function" && matchMedia("(pointer:coarse)").matches;
+  const rnd = (() => { let s = 7; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })();
+  const M = (c, o) => new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.5, metalness: 0, envMap: env, envMapIntensity: 0.8 }, o || {}));
+  const E = (c, k) => new T.MeshBasicMaterial({ color: new T.Color(c).multiplyScalar(k || 1), toneMapped: false });
+  function ctex(w, h, fn) { const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); fn(g, w, h); const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.anisotropy = 4; t.userData = { c, g }; return t; }
+  const mesh = (geo, mat, x, y, z, par) => { const m = new T.Mesh(geo, mat); m.position.set(x || 0, y || 0, z || 0); (par || G).add(m); return m; };
+  const bx = (w, h, d, mat, x, y, z, par) => mesh(new T.BoxGeometry(w, h, d), mat, x, y, z, par);
+  const cyl = (r1, r2, h, mat, x, y, z, par, seg) => mesh(new T.CylinderGeometry(r1, r2, h, seg || 16), mat, x, y, z, par);
+  const pl = (w, h, mat, x, y, z, ry, rx, par) => { const m = mesh(new T.PlaneGeometry(w, h), mat, x, y, z, par); m.rotation.y = ry || 0; m.rotation.x = rx || 0; return m; };
+
+  /* ---------- textures ---------- */
+  const acoustic = ctex(512, 512, (g, w, h) => {
+    g.fillStyle = "#34404d"; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 6000; i++) { const v = 44 + rnd() * 26; g.fillStyle = "rgba(" + v + "," + (v + 6) + "," + (v + 12) + ",.55)"; g.fillRect(rnd() * w, rnd() * h, 2, 2); }
+    for (let x = 0; x < w; x += 128) { g.fillStyle = "rgba(0,0,0,.6)"; g.fillRect(x, 0, 4, h); g.fillStyle = "rgba(160,190,220,.05)"; g.fillRect(x + 4, 0, 2, h); }
+    g.fillStyle = "rgba(0,0,0,.5)"; g.fillRect(0, 0, w, 4); g.fillRect(0, h / 2, w, 3);
+  });
+  acoustic.wrapS = acoustic.wrapT = T.RepeatWrapping;
+  const carpet = ctex(256, 256, (g, w, h) => {
+    g.fillStyle = "#171c23"; g.fillRect(0, 0, w, h);
+    for (let ty = 0; ty < 4; ty++) for (let tx = 0; tx < 4; tx++) { const v = 20 + Math.floor(rnd() * 9); g.fillStyle = "rgb(" + v + "," + (v + 4) + "," + (v + 9) + ")"; g.fillRect(tx * 64, ty * 64, 64, 64); }
+    for (let i = 0; i < 2600; i++) { const v = 30 + rnd() * 25; g.fillStyle = "rgba(" + v + "," + (v + 4) + "," + (v + 10) + ",.5)"; g.fillRect(rnd() * w, rnd() * h, 2, 1); }
+    g.strokeStyle = "rgba(0,0,0,.55)"; g.lineWidth = 2; for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * 64, 0); g.lineTo(i * 64, h); g.moveTo(0, i * 64); g.lineTo(w, i * 64); g.stroke(); }
+  });
+  carpet.wrapS = carpet.wrapT = T.RepeatWrapping;
+  const slats = ctex(512, 512, (g, w, h) => {
+    g.fillStyle = "#101820"; g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 32) { const v = 30 + rnd() * 10; g.fillStyle = "rgb(" + v + "," + (v + 8) + "," + (v + 16) + ")"; g.fillRect(x + 2, 0, 28, h); g.fillStyle = "rgba(54,214,255,.10)"; g.fillRect(x + 2, 0, 2, h); }
+  });
+  slats.wrapS = slats.wrapT = T.RepeatWrapping;
+  const wallMat = (w, h, base, tint) => { const t = (base || acoustic).clone(); t.needsUpdate = true; t.repeat.set(Math.max(1, w / 1.6), Math.max(1, h / 1.6)); return M(tint || 0xffffff, { map: t, roughness: 0.92, side: T.DoubleSide }); };
+  const carpetMat = (w, d) => { const t = carpet.clone(); t.needsUpdate = true; t.repeat.set(w / 1.0, d / 1.0); return M(0xffffff, { map: t, roughness: 0.95 }); };
+
+  const cyan = E(0x36d6ff, 2.2), cyanDim = E(0x2aa7d6, 1.5), white = E(0xeaf6ff, 1.5);
+  const dark = M(0x10161d, { metalness: 0.5, roughness: 0.36 });
+  const metal = M(0x7f93a6, { metalness: 0.9, roughness: 0.3, envMapIntensity: 1.2 });
+
+  /* walls with rectangular openings: u runs along the wall (x for z-walls, z for x-walls) */
+  function holeWall(axis, pos, u0, u1, h, holes, ry, base) {
+    const hs = holes.slice().sort((a, b) => a.c - b.c), place = (ua, ub, y0, y1) => {
+      const w = ub - ua, hh = y1 - y0; if (w < 0.01 || hh < 0.01) return;
+      const uc = (ua + ub) / 2, yc = (y0 + y1) / 2, m = pl(w, hh, wallMat(w, hh, base), axis === "z" ? uc : pos, yc, axis === "z" ? pos : uc, ry);
+      return m;
+    };
+    let cur = u0;
+    hs.forEach((o) => { place(cur, o.c - o.w / 2, 0, h); place(o.c - o.w / 2, o.c + o.w / 2, o.h, h); cur = o.c + o.w / 2; });
+    place(cur, u1, 0, h);
+  }
+
+  /* sliding door in a z-wall: local +z is the front. Leaves slide apart along x. */
+  const doors = {};
+  function makeDoor(id, x, z, w, hh, accent, par) {
+    const g = new T.Group(); g.position.set(x, 0, z); (par || G).add(g);
+    const edge = E(accent, 2.3), leafM = M(0x1a232d, { metalness: 0.7, roughness: 0.3, envMapIntensity: 1.2 });
+    bx(0.14, hh + 0.14, 0.18, dark, -(w / 2 + 0.07), (hh + 0.14) / 2, 0, g); bx(0.14, hh + 0.14, 0.18, dark, w / 2 + 0.07, (hh + 0.14) / 2, 0, g);
+    bx(w + 0.28, 0.14, 0.18, dark, 0, hh + 0.07, 0, g);
+    bx(0.03, hh, 0.03, edge, -w / 2 - 0.0, hh / 2, 0.1, g); bx(0.03, hh, 0.03, edge, w / 2, hh / 2, 0.1, g); bx(w, 0.03, 0.03, edge, 0, hh - 0.01, 0.1, g);
+    const leaves = [];
+    [-1, 1].forEach((k) => {
+      const lf = new T.Group(); lf.position.set(k * w / 4, 0, 0.055); g.add(lf); lf.userData = { x0: k * w / 4, k }; leaves.push(lf);
+      bx(w / 2 - 0.01, hh - 0.02, 0.06, leafM, 0, hh / 2, 0, lf);
+      bx(0.025, hh * 0.86, 0.02, edge, -k * (w / 4 - 0.035), hh / 2, 0.035, lf);
+      bx(w / 2 - 0.2, 0.02, 0.02, edge, 0, hh * 0.5, 0.035, lf);
+    });
+    const hit = bx(w + 0.5, hh + 0.4, 0.9, new T.MeshBasicMaterial({ visible: false }), 0, (hh + 0.4) / 2, 0.3, g);
+    const d = { id, center: new V(x, 0, z), axis: "z", w, open: 0, target: 0, g,
+      set(a) { d.open = a; leaves.forEach((lf) => { lf.position.x = lf.userData.x0 + lf.userData.k * (w / 2 - 0.02) * a; }); } };
+    g.traverse((o) => { o.userData.door = id; });
+    doors[id] = d; return d;
+  }
+
+  const R = { x0: -20.4, x1: -8.4, z: 5, h: 4.6 }, cxR = (R.x0 + R.x1) / 2;
+  const AU = { x0: -22, x1: -8.6, z0: -21, z1: -5, h: 7.0 }, cxA = (AU.x0 + AU.x1) / 2;
+
+  /* =============================== COMMAND CENTRE =============================== */
+  const room = new T.Group(); G.add(room);
+  mesh(new T.PlaneGeometry(12, 10), carpetMat(12, 10), cxR, 0.002, 0, room).rotation.x = -Math.PI / 2;
+  mesh(new T.PlaneGeometry(12, 10), M(0x0d131a, { roughness: 0.9 }), cxR, R.h, 0, room).rotation.x = Math.PI / 2;
+  /* far wall (monitor wall), entrance wall with the hall's gate opening, side walls (door wall with a sliding door) */
+  holeWall("x", R.x0, -R.z, R.z, R.h, [], Math.PI / 2);
+  holeWall("x", R.x1 - 0.02, -R.z, R.z, R.h, [{ c: 0, w: 1.9, h: 2.5 }], -Math.PI / 2);
+  holeWall("z", R.z, R.x0, R.x1, R.h, [], Math.PI);
+  holeWall("z", -R.z, R.x0, R.x1, R.h, [{ c: cxA, w: 2.4, h: 3.0 }], 0);
+  /* LED cove lines and floor skirting glow, like the reference: cool white at the ceiling, blue at the wall base */
+  [[R.x0 + 0.05, 0, 0.05, 10, 4.52], [R.x1 - 0.05, 0, 0.05, 10, 4.52]].forEach((a) => bx(a[2], 0.04, a[3], white, a[0], a[4], a[1], room));
+  bx(12, 0.04, 0.05, white, cxR, 4.52, R.z - 0.05, room); bx(12, 0.04, 0.05, white, cxR, 4.52, -R.z + 0.05, room);
+  bx(0.04, 0.05, 10, cyan, R.x0 + 0.03, 0.06, 0, room); bx(12, 0.05, 0.04, cyanDim, cxR, 0.06, R.z - 0.03, room); bx(12, 0.05, 0.04, cyanDim, cxR, 0.06, -R.z + 0.03, room);
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) { const m = pl(1.7, 0.5, white, R.x0 + 2.2 + i * 2.7, R.h - 0.005, -2.8 + j * 2.8, 0, Math.PI / 2, room); }
+  /* wall plinth under the screens */
+  bx(0.2, 0.5, 7.7, dark, R.x0 + 0.1, 0.25, 0, room);
+  bx(0.06, 0.03, 7.7, cyan, R.x0 + 0.21, 0.5, 0, room);
+
+  /* ---- video wall: 6 live monitors, 3 across x 2 rows, wall mounted ---- */
+  const MW = 640, MH = 452;
+  bx(0.06, 3.6, 7.7, dark, R.x0 + 0.05, 2.44, 0, room);      /* mounting frame */
+  const mons = [];
+  for (let i = 0; i < 6; i++) {
+    const row = i < 3 ? 0 : 1, col = i % 3, zc = (col - 1) * 2.4, yc = row === 0 ? 3.28 : 1.58;
+    const g = new T.Group(); g.position.set(R.x0 + 0.1, yc, zc); g.rotation.y = Math.PI / 2; room.add(g);
+    bx(2.3, 1.64, 0.07, M(0x07090c, { metalness: 0.6, roughness: 0.3 }), 0, 0, 0, g);
+    const cv = document.createElement("canvas"); cv.width = MW; cv.height = MH; const tx = new T.CanvasTexture(cv); tx.colorSpace = T.SRGBColorSpace; tx.anisotropy = 4;
+    const sc = mesh(new T.PlaneGeometry(2.2, 1.55), new T.MeshBasicMaterial({ map: tx, toneMapped: false }), 0, 0, 0.037, g);
+    sc.userData.cmdBed = i; g.children[0].userData.cmdBed = i;
+    bx(2.3, 0.025, 0.02, cyan, 0, -0.83, 0.04, g);
+    mons.push({ ctx: cv.getContext("2d"), tex: tx, i });
+  }
+  /* header sign */
+  const sign = ctex(1024, 160, (g, w, h) => {
+    g.fillStyle = "#06131f"; g.fillRect(0, 0, w, h); g.strokeStyle = "#36d6ff"; g.lineWidth = 4; g.strokeRect(4, 4, w - 8, h - 8);
+    g.fillStyle = "#d8f4ff"; g.font = "700 70px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.shadowColor = "#36d6ff"; g.shadowBlur = 24; g.fillText("ICU COMMAND CENTRE", w / 2, h / 2 + 4);
+  });
+  const sg = mesh(new T.PlaneGeometry(2.7, 0.42), new T.MeshBasicMaterial({ map: sign, toneMapped: false }), R.x0 + 0.075, 4.4, 0, room); sg.rotation.y = Math.PI / 2;
+
+  /* ---- operator console, curved like the reference: centre desk and two angled wings, no chairs and no people ---- */
+  const desk = new T.Group(); desk.position.set(-17.0, 0, 0); room.add(desk);
+  const top = M(0x161b22, { metalness: 0.55, roughness: 0.22, envMapIntensity: 1.3 });
+  const body = M(0x0c1015, { metalness: 0.5, roughness: 0.5 });
+  const seg = (len, z, x, ry) => {
+    const g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = ry; desk.add(g);
+    bx(1.0, 0.07, len, top, 0, 0.78, 0, g); bx(0.86, 0.74, len - 0.12, body, -0.03, 0.37, 0, g); bx(0.03, 0.03, len, cyan, 0.5, 0.74, 0, g); bx(0.03, 0.03, len, cyanDim, 0.5, 0.05, 0, g);
+    return g;
+  };
+  const cen = seg(2.5, 0, 0, 0), wl = seg(1.9, 2.05, -0.5, 0.52), wr = seg(1.9, -2.05, -0.5, -0.52);
+  /* desk displays */
+  const dcv = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.anisotropy = 4; return { c, g: c.getContext("2d"), t }; };
+  const deskScr = [];
+  function deskMonitor(par, x, y, z, ry, w, h, key) {
+    const g = new T.Group(); g.position.set(x, y, z); g.rotation.y = ry; par.add(g);
+    bx(w + 0.05, h + 0.05, 0.04, M(0x07090c, { metalness: 0.6, roughness: 0.3 }), 0, 0, 0, g);
+    const d = dcv(512, Math.round(512 * h / w)); mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: d.t, toneMapped: false }), 0, 0, 0.022, g);
+    cyl(0.025, 0.04, 0.3, metal, 0, -h / 2 - 0.15, -0.03, g, 10); bx(0.3, 0.02, 0.2, metal, 0, -h / 2 - 0.3, -0.02, g);
+    deskScr.push({ d, key }); return g;
+  }
+  deskMonitor(cen, -0.28, 1.22, -0.65, Math.PI / 2 - 0.2, 0.74, 0.46, "alerts");
+  deskMonitor(cen, -0.28, 1.22, 0.65, Math.PI / 2 + 0.2, 0.74, 0.46, "census");
+  deskMonitor(cen, -0.34, 1.2, 0, Math.PI / 2, 0.84, 0.52, "worst");
+  deskMonitor(wl, -0.28, 1.1, -0.1, Math.PI / 2 - 0.27, 0.6, 0.38, "vent");
+  deskMonitor(wr, -0.28, 1.1, 0.1, Math.PI / 2 + 0.27, 0.6, 0.38, "vent");
+  /* keyboard, mouse, trackball, mixer panel, headset, mug */
+  const kb = ctex(256, 96, (g, w, h) => { g.fillStyle = "#0b0e12"; g.fillRect(0, 0, w, h); for (let r = 0; r < 5; r++) for (let c = 0; c < 17; c++) { g.fillStyle = "#222a33"; g.fillRect(6 + c * 14.4, 6 + r * 16.4, 12, 13); } });
+  const kbm = new T.MeshBasicMaterial({ map: kb }); bx(0.46, 0.02, 0.17, kbm, 0.22, 0.83, 0, cen); bx(0.06, 0.02, 0.1, M(0x0b0e12), 0.24, 0.83, 0.42, cen);
+  bx(0.34, 0.04, 0.2, M(0x0b0e12, { metalness: 0.6 }), 0.1, 0.84, -0.6, cen); [-0.1, -0.02, 0.06, 0.14].forEach((x) => cyl(0.012, 0.012, 0.02, E(0xff5a4a, 1.2), 0.1 + x * 0.5, 0.87, -0.6, cen, 8));
+  cyl(0.05, 0.05, 0.008, M(0x0b0e12), 0.36, 0.83, 0.42, cen, 14); mesh(new T.SphereGeometry(0.027, 12, 8), M(0xa02828, { roughness: 0.3 }), 0.36, 0.84, 0.42, cen);
+  const hs = new T.Group(); hs.position.set(0.18, 0.82, 1.0); cen.add(hs);
+  cyl(0.03, 0.045, 0.01, M(0x0b0e12), 0, 0, 0, hs, 14); cyl(0.008, 0.008, 0.3, metal, 0, 0.15, 0, hs, 8); mesh(new T.TorusGeometry(0.1, 0.015, 8, 20, Math.PI), M(0x15191f, { roughness: 0.5 }), 0, 0.33, 0, hs).rotation.z = 0; [-0.1, 0.1].forEach((x) => bx(0.03, 0.09, 0.07, M(0x1b2027), x, 0.28, 0, hs));
+  cyl(0.04, 0.035, 0.09, M(0xe9eef2, { roughness: 0.3 }), 0.12, 0.865, -1.0, cen, 16);
+
+  /* ---- server racks with blinking LEDs, and an ICU status wall on the right ---- */
+  const ledT = ctex(128, 512, () => {}), ledM = new T.MeshBasicMaterial({ map: ledT, toneMapped: false });
+  const drawLeds = () => { const g = ledT.userData.g; g.fillStyle = "#06090d"; g.fillRect(0, 0, 128, 512); for (let r = 0; r < 32; r++) { g.fillStyle = "#101820"; g.fillRect(6, r * 16 + 2, 116, 12); for (let c = 0; c < 8; c++) { const on = rnd() > 0.45; g.fillStyle = on ? (rnd() > 0.85 ? "#ffb347" : rnd() > 0.5 ? "#35e6a0" : "#37c8ff") : "#16222c"; g.fillRect(12 + c * 12, r * 16 + 5, 6, 6); } } ledT.needsUpdate = true; };
+  drawLeds();
+  [-12.4, -13.5].forEach((x) => { const g = new T.Group(); g.position.set(x, 0, R.z - 0.5); room.add(g); bx(0.85, 2.3, 0.9, M(0x0a0e13, { metalness: 0.6, roughness: 0.4 }), 0, 1.15, 0, g); const f = pl(0.7, 2.1, ledM, 0, 1.15, -0.455, Math.PI, 0, g); });
+  const status = dcv(1024, 480), stM = new T.MeshBasicMaterial({ map: status.t, toneMapped: false });
+  const stg = new T.Group(); stg.position.set(-16.2, 2.15, R.z - 0.06); stg.rotation.y = Math.PI; room.add(stg);
+  bx(3.5, 1.7, 0.06, M(0x07090c, { metalness: 0.6 }), 0, 0, 0, stg); pl(3.4, 1.6, stM, 0, 0, 0.034, 0, 0, stg); bx(3.5, 0.025, 0.02, cyan, 0, -0.86, 0.03, stg);
+  /* corner plant-free decor: floor lamp strips on the entry wall */
+  bx(0.05, 2.2, 0.05, cyan, R.x1 - 0.05, 1.3, 4.6, room); bx(0.05, 2.2, 0.05, cyan, R.x1 - 0.05, 1.3, -4.6, room);
+
+  /* =============================== AUDITORIUM =============================== */
+  const aud = new T.Group(); G.add(aud);
+  const AW = AU.x1 - AU.x0, AD = AU.z1 - AU.z0;
+  const accent = { hub: 0x27e0b0, cmd: 0x4aa8ff, team: 0xc07bff }, accHex = { hub: "#27e0b0", cmd: "#4aa8ff", team: "#c07bff" };
+  const px = (x) => (x - AU.x0) / AW * 1024, py = (z) => (z - AU.z0) / AD * 1223;
+  const portalX = { hub: cxA - 4.2, cmd: cxA, team: cxA + 4.2 };
+  const floorT = ctex(1024, 1223, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#0a1522"); gr.addColorStop(1, "#060b12"); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.strokeStyle = "rgba(80,160,220,.07)"; g.lineWidth = 2; for (let i = 0; i <= 13; i++) { g.beginPath(); g.moveTo(i * w / 13.4, 0); g.lineTo(i * w / 13.4, h); g.stroke(); } for (let j = 0; j <= 16; j++) { g.beginPath(); g.moveTo(0, j * h / 16); g.lineTo(w, j * h / 16); g.stroke(); }
+    g.lineCap = "round"; g.lineJoin = "round";
+    const trunk = (col, x1, z1, x2, z2) => { g.strokeStyle = col; g.shadowColor = col; g.shadowBlur = 18; g.lineWidth = 7; g.beginPath(); g.moveTo(px(x1), py(z1)); g.lineTo(px(x2), py(z2)); g.stroke(); };
+    g.strokeStyle = "#36d6ff"; g.shadowColor = "#36d6ff"; g.shadowBlur = 18; g.lineWidth = 7; g.beginPath(); g.moveTo(px(cxA), py(-5.6)); g.lineTo(px(cxA), py(-14.5)); g.stroke();
+    ["hub", "cmd", "team"].forEach((k) => { g.strokeStyle = accHex[k]; g.shadowColor = accHex[k]; g.shadowBlur = 18; g.lineWidth = 7; g.beginPath(); g.moveTo(px(cxA), py(-14.5)); g.quadraticCurveTo(px(portalX[k]), py(-14.5), px(portalX[k]), py(-17)); g.lineTo(px(portalX[k]), py(-19.2)); g.stroke();
+      g.shadowBlur = 0; g.fillStyle = accHex[k] + "33"; g.beginPath(); g.arc(px(portalX[k]), py(-19.6), 1.15 / AW * 1024, 0, 7); g.fill(); g.strokeStyle = accHex[k]; g.lineWidth = 4; g.beginPath(); g.arc(px(portalX[k]), py(-19.6), 1.15 / AW * 1024, 0, 7); g.stroke(); });
+    g.shadowBlur = 0;
+  });
+  mesh(new T.PlaneGeometry(AW, AD), M(0xffffff, { map: floorT, roughness: 0.2, metalness: 0.5, envMapIntensity: 1.1 }), cxA, 0.003, (AU.z0 + AU.z1) / 2, aud).rotation.x = -Math.PI / 2;
+  mesh(new T.PlaneGeometry(AW, AD), M(0x0b1118, { roughness: 0.9 }), cxA, AU.h, (AU.z0 + AU.z1) / 2, aud).rotation.x = Math.PI / 2;
+  /* walls: south wall (with the sliding door), side walls in vertical slats with light fins, far wall with three portals */
+  holeWall("z", AU.z1 - 0.02, AU.x0, AU.x1, AU.h, [{ c: cxA, w: 2.4, h: 3.0 }], Math.PI, slats);
+  holeWall("x", AU.x0, AU.z0, AU.z1, AU.h, [], Math.PI / 2, slats);
+  holeWall("x", AU.x1, AU.z0, AU.z1, AU.h, [], -Math.PI / 2, slats);
+  holeWall("z", AU.z0, AU.x0, AU.x1, AU.h, ["hub", "cmd", "team"].map((k) => ({ c: portalX[k], w: 3.0, h: 4.4 })), 0, acoustic);
+  /* ambient LED banners on the side walls */
+  const banner = ctex(1024, 300, (g, w, h) => { const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, "#06182a"); gr.addColorStop(1, "#0a2a46"); g.fillStyle = gr; g.fillRect(0, 0, w, h); g.strokeStyle = "rgba(54,214,255,.35)"; g.lineWidth = 3; for (let i = 0; i < 9; i++) { g.beginPath(); g.moveTo(0, 190 + i * 7); g.bezierCurveTo(w * 0.3, 120 + i * 9, w * 0.6, 260 - i * 7, w, 170 + i * 6); g.stroke(); } g.fillStyle = "#d8f4ff"; g.font = "700 76px system-ui,sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.shadowColor = "#36d6ff"; g.shadowBlur = 20; g.fillText("CRITICAL CARE UNIVERSE", 50, 92); g.shadowBlur = 0; g.fillStyle = "#7fd4e6"; g.font = "500 38px system-ui,sans-serif"; g.fillText("Learn  ·  Simulate  ·  Decide  ·  Together", 54, 160); });
+  [[AU.x0 + 0.06, Math.PI / 2], [AU.x1 - 0.06, -Math.PI / 2]].forEach((o) => { const m = pl(6.4, 6.4 * 300 / 1024, new T.MeshBasicMaterial({ map: banner, toneMapped: false }), o[0], 3.5, -13, o[1], 0, aud); bx(6.5, 0.04, 0.03, cyan, o[0], 3.5 - 0.98, -13, aud); });
+  /* light fins and cove lines */
+  for (let k = 0; k < 8; k++) { const z = AU.z0 + 1.2 + k * 2.1; bx(0.05, 5.6, 0.06, cyanDim, AU.x0 + 0.04, 3.4, z, aud); bx(0.05, 5.6, 0.06, cyanDim, AU.x1 - 0.04, 3.4, z, aud); }
+  bx(AW, 0.06, 0.06, cyan, cxA, 6.4, AU.z0 + 0.05, aud); bx(0.06, 0.06, AD, cyan, AU.x0 + 0.05, 6.4, (AU.z0 + AU.z1) / 2, aud); bx(0.06, 0.06, AD, cyan, AU.x1 - 0.05, 6.4, (AU.z0 + AU.z1) / 2, aud);
+  bx(AW, 0.05, 0.05, cyanDim, cxA, 0.07, AU.z0 + 0.04, aud); bx(0.05, 0.05, AD, cyanDim, AU.x0 + 0.04, 0.07, (AU.z0 + AU.z1) / 2, aud); bx(0.05, 0.05, AD, cyanDim, AU.x1 - 0.04, 0.07, (AU.z0 + AU.z1) / 2, aud);
+  /* ceiling: light rings and bars */
+  [[3.4, 0.07, 0x36d6ff], [2.2, 0.05, 0xeaf6ff], [4.6, 0.05, 0x2a7fb8]].forEach((r) => { const t = mesh(new T.TorusGeometry(r[0], r[1], 8, 72), E(r[2], 2), cxA, 6.88, -13, aud); t.rotation.x = Math.PI / 2; });
+  for (let i = -2; i <= 2; i++) bx(0.12, 0.04, 14, white, cxA + i * 2.6, 6.94, -13, aud);
+  /* floor discs in front of each portal, and the portals themselves */
+  const sig = (k, title, sub) => ctex(768, 200, (g, w, h) => {
+    g.fillStyle = "#06101a"; g.fillRect(0, 0, w, h); g.strokeStyle = accHex[k]; g.lineWidth = 5; g.strokeRect(5, 5, w - 10, h - 10);
+    g.shadowColor = accHex[k]; g.shadowBlur = 14; g.strokeStyle = accHex[k]; g.fillStyle = accHex[k]; g.lineWidth = 6;
+    const ix = 110, iy = h / 2;
+    if (k === "hub") { g.beginPath(); g.arc(ix, iy, 44, 0, 7); g.stroke(); g.fillRect(ix - 8, iy - 28, 16, 56); g.fillRect(ix - 28, iy - 8, 56, 16); }
+    else if (k === "cmd") { g.strokeRect(ix - 46, iy - 34, 92, 56); g.fillRect(ix - 20, iy + 26, 40, 8); g.beginPath(); g.moveTo(ix - 34, iy + 4); g.lineTo(ix - 14, iy - 8); g.lineTo(ix + 6, iy + 8); g.lineTo(ix + 34, iy - 16); g.stroke(); }
+    else { [[-30, 8], [0, -10], [30, 8]].forEach((o) => { g.beginPath(); g.arc(ix + o[0], iy + o[1] - 8, 14, 0, 7); g.fill(); g.beginPath(); g.arc(ix + o[0], iy + o[1] + 26, 22, Math.PI, 0); g.fill(); }); }
+    g.shadowBlur = 0; g.fillStyle = "#e4f6ff"; g.textAlign = "left"; g.textBaseline = "middle"; let fs = 46; g.font = "700 " + fs + "px system-ui,sans-serif"; while (g.measureText(title).width > w - 210 && fs > 24) { fs -= 2; g.font = "700 " + fs + "px system-ui,sans-serif"; } g.fillText(title, 190, h / 2 - 22); g.fillStyle = accHex[k]; g.font = "500 28px system-ui,sans-serif"; g.fillText(sub, 190, h / 2 + 34);
+  });
+  const portalDefs = { hub: ["CRITICAL CARE HUB", "Simulators, labs and atlases"], cmd: ["COMMAND CENTRE", "Live ICU monitors"], team: ["MULTIDISCIPLINARY TEAM", "Case conference room"] };
+  ["hub", "cmd", "team"].forEach((k) => {
+    const x = portalX[k], zf = AU.z0;
+    const d = makeDoor(k, x, zf + 0.02, 3.0, 4.4, accent[k], aud);
+    const glow = ctex(64, 256, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, accHex[k] + "cc"); gr.addColorStop(1, accHex[k] + "33"); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+    pl(3.0, 4.4, new T.MeshBasicMaterial({ map: glow, toneMapped: false }), x, 2.2, zf - 0.7, 0, 0, aud);
+    pl(0.7, 4.4, M(0x0a0f14, { side: T.DoubleSide }), x - 1.5, 2.2, zf - 0.35, Math.PI / 2, 0, aud); pl(0.7, 4.4, M(0x0a0f14, { side: T.DoubleSide }), x + 1.5, 2.2, zf - 0.35, Math.PI / 2, 0, aud);
+    pl(3.0, 0.7, M(0x0a0f14, { side: T.DoubleSide }), x, 4.4, zf - 0.35, 0, Math.PI / 2, aud);
+    const t = sig(k, portalDefs[k][0], portalDefs[k][1]);
+    pl(3.9, 3.9 * 200 / 768, new T.MeshBasicMaterial({ map: t, toneMapped: false }), x, 5.45, zf + 0.04, 0, 0, aud).userData.door = k;
+    const disc = mesh(new T.RingGeometry(1.0, 1.15, 48), E(accent[k], 2), x, 0.012, zf + 1.4, aud); disc.rotation.x = -Math.PI / 2;
+  });
+  /* the sliding door from the command centre */
+  const dAud = makeDoor("aud", cxA, -R.z + 0.02, 2.4, 3.0, 0x36d6ff, G);
+  const dGate = { id: "gate", center: new V(-8.4, 0, 0), axis: "x", w: 1.9, open: 0, target: 0, set(a) { dGate.open = a; if (opt.gateSet) opt.gateSet(a); } };
+  doors.gate = dGate;
+  /* door hits that were built as children of the auditorium group need the portals' z-front orientation: normal +z (toward the entry) */
+
+  /* seating: modern pods in two blocks either side of the central aisle */
+  const rows = 4, cols = 5, n = rows * cols * 2;
+  const seatBase = new T.InstancedMesh(new T.BoxGeometry(0.5, 0.09, 0.48), M(0x15202b, { roughness: 0.55, metalness: 0.2 }), n);
+  const seatBack = new T.InstancedMesh(new T.BoxGeometry(0.5, 0.56, 0.08), M(0x1d6f8f, { roughness: 0.6, metalness: 0.1 }), n);
+  const seatLeg = new T.InstancedMesh(new T.CylinderGeometry(0.05, 0.08, 0.42, 10), metal, n);
+  const mat4 = new T.Matrix4(); let q = 0;
+  for (const side of [-1, 1]) for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const x = cxA + side * (3.15 + c * 0.6), z = -7.4 - r * 1.35, y = 0.45;
+    mat4.makeTranslation(x, y, z); seatBase.setMatrixAt(q, mat4); mat4.makeTranslation(x, y + 0.3, z + 0.24); seatBack.setMatrixAt(q, mat4); mat4.makeTranslation(x, 0.21, z); seatLeg.setMatrixAt(q, mat4); q++;
+  }
+  [seatBase, seatBack, seatLeg].forEach((m) => { m.instanceMatrix.needsUpdate = true; aud.add(m); });
+
+  /* lights */
+  const pt = (c, k, d, x, y, z) => { const l = new T.PointLight(c, k, d, 1.6); l.position.set(x, y, z); G.add(l); return l; };
+  pt(0xdfefff, 12, 18, -15.5, 3.8, 0); pt(0x9fd8ff, 6, 12, -19.2, 3.0, 0);
+  if (!LOW) { pt(0xbfe4ff, 5, 12, -11, 3.6, 2.8); pt(0xdfefff, 12, 24, cxA, 6.0, -12); }
+  else pt(0xdfefff, 9, 22, cxA, 6.0, -12);
+
+  /* =============================== painters =============================== */
+  const col = (st) => ["#3dff9a", "#ffc24a", "#ff4d5e"][st || 0];
+  function paintMon(m) {
+    const p = P[m.i], g = m.ctx;
+    g.fillStyle = "#050b14"; g.fillRect(0, 0, MW, MH);
+    if (H && H.mon) H.mon(g, p, MW, MH, 0, 0);
+    g.strokeStyle = col(p.st); g.lineWidth = 7; g.strokeRect(3.5, 3.5, MW - 7, MH - 7);
+    m.tex.needsUpdate = true;
+  }
+  const bg = (g, w, h, title) => { g.fillStyle = "#06121f"; g.fillRect(0, 0, w, h); g.fillStyle = "#0c2236"; g.fillRect(0, 0, w, 52); g.fillStyle = "#36d6ff"; g.font = "700 30px system-ui,sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(title, 20, 27); };
+  const painters = {
+    alerts(d) { const g = d.g, w = d.c.width, h = d.c.height; bg(g, w, h, "ALERTS"); const rows = P.map((p, i) => [p, i]).sort((a, b) => b[0].st - a[0].st); rows.forEach(([p, i], k) => { const y = 62 + k * ((h - 70) / 6); g.fillStyle = col(p.st); g.fillRect(14, y + 4, 8, (h - 70) / 6 - 10); g.fillStyle = "#d8ecff"; g.font = "600 21px system-ui,sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText((i + 1) + "  " + p.n, 34, y + 14); g.fillStyle = "#7fa6c8"; g.font = "500 17px system-ui,sans-serif"; g.fillText(p.dx, 34, y + 36); g.fillStyle = col(p.st); g.textAlign = "right"; g.font = "700 22px system-ui,sans-serif"; g.fillText(Math.round(p.v.hr) + "  " + Math.round(p.v.spo2) + "%", w - 16, y + 24); }); d.t.needsUpdate = true; },
+    census(d) { const g = d.g, w = d.c.width, h = d.c.height; bg(g, w, h, "ICU CENSUS"); P.forEach((p, i) => { const cx = 64 + (i % 3) * 142, cy = 128 + Math.floor(i / 3) * 142; g.strokeStyle = col(p.st); g.lineWidth = 9; g.beginPath(); g.arc(cx, cy, 50, 0, 7); g.stroke(); g.fillStyle = "#d8ecff"; g.font = "700 38px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(i + 1, cx, cy + 2); }); const al = P.filter((p) => !p.done && p.st > 0).length; g.fillStyle = "#7fa6c8"; g.font = "500 20px system-ui,sans-serif"; g.textAlign = "left"; g.fillText("Alerts " + al + "   Ventilated " + P.filter((p) => p.iv).length + "   Done " + P.filter((p) => p.done).length, 20, h - 18); d.t.needsUpdate = true; },
+    worst(d) { const g = d.g, w = d.c.width, h = d.c.height; let b = 0; P.forEach((p, i) => { if (p.st > P[b].st) b = i; }); const p = P[b]; if (H && H.mon) H.mon(g, p, w, h, 0, 0); g.fillStyle = "rgba(6,18,31,.86)"; g.fillRect(0, 0, w, 34); g.fillStyle = col(p.st); g.font = "700 22px system-ui,sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText("PRIORITY  ·  BED " + (b + 1) + "  " + p.n, 14, 18); d.t.needsUpdate = true; },
+    vent(d) { const g = d.g, w = d.c.width, h = d.c.height; bg(g, w, h, "VENTILATORS"); const vs = P.map((p, i) => [p, i]).filter((a) => a[0].iv); vs.slice(0, 5).forEach(([p, i], k) => { const y = 64 + k * ((h - 70) / 5); g.fillStyle = "#d8ecff"; g.font = "600 20px system-ui,sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText("Bed " + (i + 1) + "  " + (p.air === "imv" ? "IMV" : "NIV"), 18, y + 14); g.fillStyle = "#7fa6c8"; g.font = "500 18px system-ui,sans-serif"; g.fillText("FiO₂ " + Math.round(p.fio2) + "%   PEEP " + p.peep, 18, y + 38); g.fillStyle = col(p.st); g.textAlign = "right"; g.fillText("RR " + Math.round(p.v.rr), w - 16, y + 26); }); if (!vs.length) { g.fillStyle = "#7fa6c8"; g.fillText("No ventilated patients", 20, 90); } d.t.needsUpdate = true; },
+  };
+  function paintStatus() {
+    const g = status.g, w = 1024, h = 480; bg(g, w, h, "ICU STATUS BOARD");
+    P.forEach((p, i) => { const cx = 70 + (i % 6) * 164, cy = 150; g.strokeStyle = col(p.st); g.lineWidth = 10; g.beginPath(); g.arc(cx, cy, 52, 0, 7); g.stroke(); g.fillStyle = "#d8ecff"; g.font = "700 40px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(i + 1, cx, cy + 2); g.font = "500 18px system-ui,sans-serif"; g.fillStyle = "#7fa6c8"; g.fillText(p.dx.length > 20 ? p.dx.slice(0, 19) + "…" : p.dx, cx, cy + 82); g.fillStyle = col(p.st); g.fillText(["Stable", "Watch", "Critical"][p.st || 0], cx, cy + 108); });
+    const al = P.filter((p) => !p.done && p.st > 0).length; g.fillStyle = "#36d6ff"; g.font = "700 34px system-ui,sans-serif"; g.textAlign = "left"; g.fillText("Active alerts: " + al, 30, 400); g.fillStyle = "#7fa6c8"; g.font = "500 26px system-ui,sans-serif"; g.fillText("Ventilated: " + P.filter((p) => p.iv).length + "     Cases closed: " + P.filter((p) => p.done).length + " / " + P.length, 30, 444);
+    status.t.needsUpdate = true;
+  }
+
+  /* =============================== walking limits =============================== */
+  const rects = () => {
+    const r = [{ x0: -7.3, x1: 7.3, z0: -2.7, z1: 2.7 }, { x0: -19.9, x1: -9.0, z0: -4.4, z1: 4.4 }, { x0: -21.3, x1: -9.3, z0: -20.1, z1: -5.7 }];
+    if (dGate.open > 0.85) r.push({ x0: -9.2, x1: -7.2, z0: -0.75, z1: 0.75 });
+    if (dAud.open > 0.85) r.push({ x0: cxA - 0.85, x1: cxA + 0.85, z0: -5.8, z1: -4.2 });
+    return r;
+  };
+  const blocks = [{ x0: -18.5, x1: -16.0, z0: -3.3, z1: 3.3 }, { x0: -14.0, x1: -11.9, z0: 3.8, z1: 5.2 },
+    { x0: cxA - 6.3, x1: cxA - 2.8, z0: -12.9, z1: -6.8 }, { x0: cxA + 2.8, x1: cxA + 6.3, z0: -12.9, z1: -6.8 }];
+  function clamp(x, z) {
+    let best = null, bd = 1e9;
+    rects().forEach((r) => { const cx = Math.max(r.x0, Math.min(r.x1, x)), cz = Math.max(r.z0, Math.min(r.z1, z)), d = (cx - x) ** 2 + (cz - z) ** 2; if (d < bd) { bd = d; best = [cx, cz]; } });
+    let [px, pz] = best;
+    blocks.forEach((b) => {
+      if (px > b.x0 && px < b.x1 && pz > b.z0 && pz < b.z1) {
+        const dl = px - b.x0, dr = b.x1 - px, dt = pz - b.z0, db = b.z1 - pz, m = Math.min(dl, dr, dt, db);
+        if (m === dl) px = b.x0; else if (m === dr) px = b.x1; else if (m === dt) pz = b.z0; else pz = b.z1;
+      }
+    });
+    return [px, pz];
+  }
+
+  /* =============================== per-frame =============================== */
+  let mi = 0, acc = 0, accSlow = 0, first = true;
+  function update(t, dt) {
+    Object.values(doors).forEach((d) => { if (Math.abs(d.open - d.target) > 0.001) { d.set(d.open + (d.target - d.open) * (1 - Math.exp(-dt * 3.2))); } else if (d.open !== d.target) d.set(d.target); });
+    acc += dt; accSlow += dt;
+    if (first) { mons.forEach(paintMon); deskScr.forEach((s) => painters[s.key](s.d)); paintStatus(); first = false; }
+    if (acc > 0.12) { acc = 0; paintMon(mons[mi]); mi = (mi + 1) % mons.length; paintMon(mons[mi]); mi = (mi + 1) % mons.length; }
+    if (accSlow > 0.6) { accSlow = 0; deskScr.forEach((s) => painters[s.key](s.d)); paintStatus(); if (rnd() > 0.5) drawLeds(); }
+  }
+  return { doors, update, clamp, rooms: { R, AU } };
+}

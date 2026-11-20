@@ -7,9 +7,9 @@
    buildWard(THREE, scene, renderer, P, H) -> { BP, BA, hits, lamps, update(t,dt,yaw,facingAll), setDoor(i,open), door(i), approach(i) }
      H.mon(ctx,p,w,h,x,y)   monitor painter       H.rdr(ctx,p)  ventilator painter
      H.equip(p) -> {bags,pumps,doses}              Visual only. Clinical text is original and needs review.        */
-import { loadArchetype, build as buildPerson, breathe, patientFile } from "./patient3d.js?v=20261120f";
+import { loadArchetype, build as buildPerson, breathe, patientFile } from "./patient3d.js?v=20261120g";
 
-import { buildBed } from "./icu-bed.js?v=20261120f";
+import { buildBed } from "./icu-bed.js?v=20261120g";
 export function buildWard(T, S, R, P, H) {
   const V = T.Vector3, G = new T.Group(); G.name = "ward"; S.add(G);
   const CW = 5, CD = 3.8, FZ = 3.6, HT = 3.3, GH = 3.0, XS = [-5, 0, 5];
@@ -76,15 +76,19 @@ export function buildWard(T, S, R, P, H) {
   [-1, 1].forEach((s) => { bx(16.8, 0.04, 0.05, eCy, 0, HT - 0.06, s * (FZ - 0.07), shell); });
   /* end walls */
   [-1, 1].forEach((s) => {
-    const w = mesh(new T.PlaneGeometry(2 * FZ, HT), M(0xc3cfd8, { metalness: 0.5, roughness: 0.3, envMapIntensity: 1.2 }), s * 8.4, HT / 2, 0, shell); w.rotation.y = -s * Math.PI / 2;
+    const wm = M(0xc3cfd8, { metalness: 0.5, roughness: 0.3, envMapIntensity: 1.2 });
+    if (s > 0) { const w = mesh(new T.PlaneGeometry(2 * FZ, HT), wm, s * 8.4, HT / 2, 0, shell); w.rotation.y = -s * Math.PI / 2; }
+    else { /* left end: the wall has an opening for the sliding gate (x = -8.4), the command centre lies beyond */
+      const o = 0.95, hh = 2.5, wid = FZ - o;
+      [[-1, 1].map((k) => { const w = mesh(new T.PlaneGeometry(wid, HT), wm, -8.4, HT / 2, k * (o + wid / 2), shell); w.rotation.y = Math.PI / 2; return w; })];
+      const lt = mesh(new T.PlaneGeometry(2 * o, HT - hh), wm, -8.4, hh + (HT - hh) / 2, 0, shell); lt.rotation.y = Math.PI / 2; }
     bx(0.04, HT, 0.05, eCy, s * 8.38, HT / 2, -2.4, shell); bx(0.04, HT, 0.05, eCy, s * 8.38, HT / 2, 2.4, shell);
   });
-  /* left end: steel double sliding gate to the command centre (tap it: leaves slide apart) */
+  /* left end: steel double sliding gate to the command centre (tap it: leaves slide apart onto a real opening) */
   const gate = { g: new T.Group(), leaves: [], open: 0 };
-  { const g = gate.g; g.position.set(-8.37, 0, 0); g.rotation.y = Math.PI / 2; shell.add(g);
-    rb(2.1, 2.55, 0.08, 0.04, mDark, 0, 1.275, 0, g);
-    const glow = ctex(256, 512, (c, w, h) => { const gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#74d8ff"); gr.addColorStop(0.55, "#d9f6ff"); gr.addColorStop(1, "#4aa6dc"); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
-    mesh(new T.PlaneGeometry(1.9, 2.4), new T.MeshBasicMaterial({ map: glow, toneMapped: false }), 0, 1.25, 0.045, g);
+  { const g = gate.g; g.position.set(-8.37, 0, 0); g.rotation.y = Math.PI / 2; G.add(g);
+    bx(0.14, 2.65, 0.14, mDark, -1.02, 1.325, 0, g); bx(0.14, 2.65, 0.14, mDark, 1.02, 1.325, 0, g); bx(2.18, 0.14, 0.14, mDark, 0, 2.57, 0, g);
+    bx(0.03, 2.5, 0.03, eCy, -0.95, 1.25, 0.06, g); bx(0.03, 2.5, 0.03, eCy, 0.95, 1.25, 0.06, g); bx(1.9, 0.03, 0.03, eCy, 0, 2.48, 0.06, g);
     [-1, 1].forEach((k) => {
       const lf = new T.Group(); lf.position.set(k * 0.475, 0, 0.055); g.add(lf); lf.userData.x0 = k * 0.475; lf.userData.k = k; gate.leaves.push(lf);
       rb(0.94, 2.4, 0.04, 0.02, mMetal, 0, 1.25, 0, lf);
@@ -93,9 +97,9 @@ export function buildWard(T, S, R, P, H) {
       if (k > 0) bx(0.2, 0.2, 0.02, new T.MeshBasicMaterial({ color: 0x0a2236 }), 0.2, 1.75, 0.03, lf);
     });
     const sg = ctex(640, 120, (c, w, h) => { c.fillStyle = "#07192b"; c.fillRect(0, 0, w, h); c.strokeStyle = "#36d6ff"; c.lineWidth = 5; c.strokeRect(5, 5, w - 10, h - 10); c.fillStyle = "#d8f4ff"; c.font = "bold 52px system-ui,sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("COMMAND CENTRE", w / 2, h / 2 + 3); });
-    mesh(new T.PlaneGeometry(1.9, 0.356), new T.MeshBasicMaterial({ map: sg, toneMapped: false }), 0, 2.86, 0.045, g);
-    const hit = mesh(new T.BoxGeometry(2.4, 3.1, 0.6), new T.MeshBasicMaterial({ visible: false }), 0, 1.55, 0.2, g);
-    g.traverse((o) => { o.userData.gate = true; }); hit.userData.gate = true; }
+    mesh(new T.PlaneGeometry(1.9, 0.356), new T.MeshBasicMaterial({ map: sg, toneMapped: false }), 0, 2.9, 0.045, g);
+    const hit = mesh(new T.BoxGeometry(2.4, 3.1, 0.9), new T.MeshBasicMaterial({ visible: false }), 0, 1.55, 0.3, g);
+    g.traverse((o) => { o.userData.door = "gate"; }); }
   const setGate = (a) => { gate.open = a; gate.leaves.forEach((lf) => { lf.position.x = lf.userData.x0 + lf.userData.k * 0.98 * a; }); };
 
   /* right end: ICU command panel (live) */
@@ -400,7 +404,7 @@ export function buildWard(T, S, R, P, H) {
     return part.userData.part;
   }
   return {
-    setGate, gateOpen: () => gate.open, select, bedCenter: (i) => cubicles[i].bed.localToWorld(new V(0.35, 0.95, 0)),
+    env, setGate, gateOpen: () => gate.open, select, bedCenter: (i) => cubicles[i].bed.localToWorld(new V(0.35, 0.95, 0)),
     G, BP: (i) => BPs[i], BA, hits, lamps, update, cubicles, loadHumans,
     setDoor: (i, o) => { cubicles[i].target = o ? 1 : 0; },
     door: (i) => cubicles[i].open,
