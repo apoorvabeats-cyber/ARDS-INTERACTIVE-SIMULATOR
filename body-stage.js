@@ -1,8 +1,9 @@
-/* Live sci-fi medical laboratory behind the 3D body ("Train your brain" → human body).
+/* Live ICU bay behind the 3D body ("Train your brain" → human body).
    A 2D canvas sits behind the transparent WebGL canvas. Only the room is drawn here: the body, organs and
-   every control are untouched. The room is a one-point-perspective lab: glass walls with metal mullions,
-   a lit ceiling, a glossy blue floor that mirrors the walls, distant scanner and instrument racks.
-   Live layer: heartbeat-synced aura, scanning rings, volumetric beams, particles and floating HUD panels.
+   every control are untouched. The room is a one-point-perspective ICU bay: curtained and glass walls,
+   a lit ceiling, a glossy blue floor, a bed on the left and a monitor cart on the right.
+   Live layer: a holographic vitals panel on the left (running ECG, HR, BP, RR, SpO2 that drift like a real
+   monitor) and a holographic skeleton on the right, heartbeat-synced aura, scan rings, beams and particles.
    Pauses when the body screen is hidden. Reduced motion draws one still frame. Decorative and simulated. */
 (function () {
   "use strict";
@@ -17,8 +18,8 @@
   const mk = () => { const c = document.createElement("canvas"); return [c, c.getContext("2d")]; };
   const [st, sx] = mk(), [room, rx] = mk(), [refl, fx] = mk();
   const reduce = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
-  const BPM = 72, FONT = "Figtree,'Segoe UI',system-ui,sans-serif", TAU = Math.PI * 2;
-  let W = 0, H = 0, DPR = 1, G = null, last = 0, T = 0, beatN = -1;
+  const FONT = "Figtree,'Segoe UI',system-ui,sans-serif", TAU = Math.PI * 2;
+  let W = 0, H = 0, DPR = 1, G = null, last = 0, T = 0, beatN = -1, phase = 0, hr = 72;
   const pulses = [], motes = [], bokeh = [];
   let seed = 7;
   const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -63,9 +64,75 @@
   const yfloor = (x) => (x < G.x0 ? H + (G.y1 - H) * (x / G.x0) : x > G.x1 ? H + (G.y1 - H) * ((W - x) / (W - G.x1)) : G.y1);
 
   /* ---------- static room (drawn once per size) ---------- */
+  function bed(c, x, y, w, g) {
+    const u = (k) => k * w;
+    c.save();
+    c.lineJoin = "round"; c.lineCap = "round";
+    /* floor shadow */
+    const sh = c.createRadialGradient(x + u(0.5), y, 2, x + u(0.5), y, u(0.6)); sh.addColorStop(0, "rgba(0,8,20,.7)"); sh.addColorStop(1, "rgba(0,8,20,0)");
+    c.save(); c.translate(0, y); c.scale(1, 0.12); c.translate(0, -y); c.fillStyle = sh; c.beginPath(); c.arc(x + u(0.5), y, u(0.6), 0, TAU); c.fill(); c.restore();
+    /* wheels + base frame */
+    [0.14, 0.86].forEach((k) => { c.fillStyle = "#0a1626"; c.beginPath(); c.arc(x + u(k), y - u(0.03), u(0.03), 0, TAU); c.fill(); c.strokeStyle = "rgba(140,215,255,.7)"; c.lineWidth = 1; c.stroke(); });
+    c.fillStyle = lin(c, 0, y - u(0.13), 0, y - u(0.06), [[0, "#35546f"], [1, "#122339"]]); c.fillRect(x + u(0.1), y - u(0.13), u(0.8), u(0.045));
+    c.fillRect(x + u(0.14), y - u(0.09), u(0.025), u(0.05)); c.fillRect(x + u(0.84), y - u(0.09), u(0.025), u(0.05));
+    /* headboard / footboard */
+    rr(c, x + u(0.02), y - u(0.44), u(0.035), u(0.33), 3); c.fillStyle = lin(c, x, 0, x + u(0.06), 0, [[0, "#1d3550"], [1, "#4a6c8c"]]); c.fill(); c.strokeStyle = "rgba(150,225,255,.7)"; c.lineWidth = 1; c.stroke();
+    rr(c, x + u(0.935), y - u(0.31), u(0.03), u(0.2), 3); c.fillStyle = "#274562"; c.fill(); c.stroke();
+    /* mattress with raised back section */
+    poly(c, [[x + u(0.06), y - u(0.13)], [x + u(0.94), y - u(0.13)], [x + u(0.94), y - u(0.2)], [x + u(0.46), y - u(0.2)], [x + u(0.14), y - u(0.31)], [x + u(0.06), y - u(0.27)]]);
+    c.fillStyle = lin(c, 0, y - u(0.31), 0, y - u(0.13), [[0, "#b9d4ea"], [0.5, "#6f95b6"], [1, "#2b4a68"]]); c.fill();
+    c.strokeStyle = "rgba(190,240,255,.85)"; c.lineWidth = 1.2; c.stroke();
+    /* blanket */
+    poly(c, [[x + u(0.42), y - u(0.2)], [x + u(0.94), y - u(0.2)], [x + u(0.94), y - u(0.135)], [x + u(0.4), y - u(0.135)]]);
+    c.fillStyle = lin(c, x + u(0.4), 0, x + u(0.94), 0, [[0, "rgba(60,150,220,.85)"], [1, "rgba(30,90,160,.85)"]]); c.fill();
+    c.strokeStyle = "rgba(200,240,255,.35)"; c.lineWidth = 1; c.beginPath(); c.moveTo(x + u(0.42), y - u(0.2)); c.lineTo(x + u(0.4), y - u(0.135)); c.stroke();
+    /* side rail */
+    c.strokeStyle = "rgba(190,240,255,.9)"; c.lineWidth = Math.max(1.4, w * 0.012);
+    c.beginPath(); c.moveTo(x + u(0.3), y - u(0.34)); c.lineTo(x + u(0.86), y - u(0.34)); c.stroke();
+    c.lineWidth = Math.max(1, w * 0.007);
+    for (let k = 0; k < 6; k++) { const px = x + u(0.34 + k * 0.1); c.beginPath(); c.moveTo(px, y - u(0.34)); c.lineTo(px, y - u(0.2)); c.stroke(); }
+    /* IV pole with two bags and a pump */
+    const px = x + u(1.02);
+    c.strokeStyle = "rgba(190,230,250,.85)"; c.lineWidth = Math.max(1.4, w * 0.011);
+    c.beginPath(); c.moveTo(px, y - u(0.04)); c.lineTo(px, y - u(0.98)); c.moveTo(px - u(0.07), y - u(0.98)); c.lineTo(px + u(0.07), y - u(0.98)); c.stroke();
+    [-0.06, 0.06].forEach((o) => { rr(c, px + u(o) - u(0.025), y - u(0.96), u(0.05), u(0.11), 4); c.fillStyle = "rgba(150,225,255,.45)"; c.fill(); c.strokeStyle = "rgba(210,246,255,.8)"; c.lineWidth = 1; c.stroke(); });
+    rr(c, px - u(0.05), y - u(0.66), u(0.1), u(0.08), 3); c.fillStyle = "#14304c"; c.fill(); c.strokeStyle = "rgba(150,225,255,.8)"; c.stroke();
+    g.leds.push({ x: px, y: y - u(0.62), c: [90, 255, 190], p: 0.8, r: Math.max(1.4, w * 0.012) });
+    c.restore();
+  }
+  function cart(c, x, y, w, g) {
+    const u = (k) => k * w;
+    c.save(); c.lineJoin = "round"; c.lineCap = "round";
+    const sh = c.createRadialGradient(x + u(0.5), y, 2, x + u(0.5), y, u(0.55)); sh.addColorStop(0, "rgba(0,8,20,.7)"); sh.addColorStop(1, "rgba(0,8,20,0)");
+    c.save(); c.translate(0, y); c.scale(1, 0.12); c.translate(0, -y); c.fillStyle = sh; c.beginPath(); c.arc(x + u(0.5), y, u(0.55), 0, TAU); c.fill(); c.restore();
+    /* base + wheels + pole */
+    c.fillStyle = "#16304b"; c.fillRect(x + u(0.12), y - u(0.08), u(0.76), u(0.045)); c.strokeStyle = "rgba(150,225,255,.7)"; c.lineWidth = 1; c.strokeRect(x + u(0.12), y - u(0.08), u(0.76), u(0.045));
+    [0.16, 0.84].forEach((k) => { c.fillStyle = "#0a1626"; c.beginPath(); c.arc(x + u(k), y - u(0.02), u(0.03), 0, TAU); c.fill(); c.stroke(); });
+    c.fillStyle = lin(c, x + u(0.46), 0, x + u(0.54), 0, [[0, "#223d58"], [0.5, "#8fb0cc"], [1, "#223d58"]]); c.fillRect(x + u(0.46), y - u(0.86), u(0.08), u(0.78));
+    /* drawer unit + infusion pumps */
+    rr(c, x + u(0.16), y - u(0.52), u(0.68), u(0.3), 5); c.fillStyle = lin(c, 0, y - u(0.52), 0, y - u(0.22), [[0, "#2f5273"], [1, "#122740"]]); c.fill(); c.strokeStyle = "rgba(160,230,255,.75)"; c.stroke();
+    c.fillStyle = "rgba(200,240,255,.7)"; c.fillRect(x + u(0.34), y - u(0.4), u(0.32), 2); c.fillRect(x + u(0.34), y - u(0.3), u(0.32), 2);
+    for (let k = 0; k < 3; k++) {
+      const py = y - u(0.84) + k * u(0.105);
+      rr(c, x + u(0.2), py + u(0.0), u(0.6), u(0.085), 3); c.fillStyle = "#0e2339"; c.fill(); c.strokeStyle = "rgba(150,225,255,.75)"; c.stroke();
+      c.fillStyle = "rgba(120,215,255,.35)"; c.fillRect(x + u(0.25), py + u(0.02), u(0.22), u(0.045));
+      g.leds.push({ x: x + u(0.7), y: py + u(0.042), c: [[90, 255, 190], [90, 210, 255], [255, 200, 90]][k], p: k * 1.9, r: Math.max(1.4, w * 0.012) });
+    }
+    /* bedside monitor on top */
+    const mw = u(0.84), mh = u(0.5), mx = x + u(0.08), my = y - u(1.44);
+    rr(c, mx, my, mw, mh, 6); c.fillStyle = "#0b1a2d"; c.fill(); c.strokeStyle = "rgba(160,232,255,.9)"; c.lineWidth = 1.6; c.stroke();
+    c.fillStyle = "#031019"; c.fillRect(mx + mw * 0.05, my + mh * 0.08, mw * 0.9, mh * 0.84);
+    c.strokeStyle = "rgba(130,255,220,.9)"; c.lineWidth = 1.3; c.beginPath();
+    for (let i = 0; i <= 40; i++) { const f = i / 40 * 2.2; const px = mx + mw * 0.08 + i / 40 * mw * 0.84, py = my + mh * 0.36 - ecg(f) * mh * 0.22; i ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke();
+    c.strokeStyle = "rgba(140,210,255,.85)"; c.beginPath();
+    for (let i = 0; i <= 40; i++) { const f = i / 40 * 2.2; const px = mx + mw * 0.08 + i / 40 * mw * 0.84, py = my + mh * 0.72 - pleth(f) * mh * 0.15; i ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke();
+    c.fillStyle = "rgba(130,255,220,.9)"; c.font = "700 " + Math.max(7, Math.round(mh * 0.16)) + "px " + FONT; c.fillText("72", mx + mw * 0.78, my + mh * 0.28);
+    c.restore();
+  }
   function drawRoom(c) {
     const g = G, N = 7, ds = []; for (let k = 0; k <= N; k++) ds.push(1 + (g.D - 1) * k / N);
     seed = 11;
+    g.leds = [];
 
     /* ceiling */
     poly(c, [[0, 0], [W, 0], [g.x1, g.y0], [g.x0, g.y0]]);
@@ -80,39 +147,29 @@
       bl.addColorStop(0, "rgba(120,210,255,.22)"); bl.addColorStop(1, "rgba(0,0,0,0)"); c.fillStyle = bl; c.fillRect(0, 0, W, g.y0 * 1.3);
     });
 
-    /* back wall: a glass bay with a lit lab beyond */
+    /* back wall: ICU headwall with a night window either side */
     const bh = g.y1 - g.y0;
     c.fillStyle = lin(c, 0, g.y0, 0, g.y1, [[0, "#04162c"], [0.5, "#0a3b6a"], [1, "#0d4a80"]]); c.fillRect(g.x0, g.y0, g.bw, bh);
-    let hz = c.createRadialGradient(g.cx, g.y0 + bh * 0.62, 2, g.cx, g.y0 + bh * 0.62, g.bw * 0.62);
-    hz.addColorStop(0, "rgba(140,225,255,.55)"); hz.addColorStop(0.5, "rgba(50,150,230,.2)"); hz.addColorStop(1, "rgba(0,0,0,0)");
+    const hz = c.createRadialGradient(g.cx, g.y0 + bh * 0.62, 2, g.cx, g.y0 + bh * 0.62, g.bw * 0.62);
+    hz.addColorStop(0, "rgba(140,225,255,.5)"); hz.addColorStop(0.5, "rgba(50,150,230,.2)"); hz.addColorStop(1, "rgba(0,0,0,0)");
     c.fillStyle = hz; c.fillRect(g.x0, g.y0, g.bw, bh);
-    /* far corridor of lit doorways */
-    for (let k = 0; k < 6; k++) { const w = g.bw * 0.045, x = g.x0 + g.bw * (0.08 + k * 0.168); c.fillStyle = "rgba(190,240,255,.16)"; c.fillRect(x, g.y0 + bh * 0.3, w, bh * 0.62); c.fillStyle = "rgba(255,255,255,.55)"; c.fillRect(x + w * 0.45, g.y0 + bh * 0.3, 1.4, bh * 0.62); }
-    /* CT / MRI gantry (left) */
-    if (g.land) { const gx = g.x0 + g.bw * 0.06, gw = g.bw * 0.19, gy = g.y1 - bh * 0.62, gh = bh * 0.58, r = Math.min(gw, gh) * 0.3;
-      rr(c, gx, gy, gw, gh, gw * 0.18); c.fillStyle = lin(c, gx, gy, gx + gw, gy + gh, [[0, "#6f8fae"], [0.5, "#2c4a68"], [1, "#12263c"]]); c.fill();
-      c.strokeStyle = "rgba(150,225,255,.7)"; c.lineWidth = 1; c.stroke();
-      const bx = gx + gw / 2, by = gy + gh * 0.46;
-      c.beginPath(); c.arc(bx, by, r * 1.12, 0, TAU); c.fillStyle = "#07192e"; c.fill();
-      c.beginPath(); c.arc(bx, by, r * 1.12, 0, TAU); c.strokeStyle = "rgba(90,215,255,.95)"; c.lineWidth = 2.4; c.stroke();
-      c.beginPath(); c.arc(bx, by, r * 0.78, 0, TAU); c.strokeStyle = "rgba(90,215,255,.35)"; c.lineWidth = 1; c.stroke();
-      rr(c, bx - gw * 0.2, by + r * 0.55, gw * 1.0, gh * 0.06, 3); c.fillStyle = "#7f9cb8"; c.fill();
-      c.fillStyle = "#2c4a68"; c.fillRect(bx + gw * 0.5, by + r * 0.6 + gh * 0.06, gw * 0.14, gh * 0.18);
-      g.ct = { x: bx, y: by, r };
-    }
-    /* instrument racks (right) */
-    for (let k = 0; g.land && k < 3; k++) {
-      const rw = g.bw * 0.085, rx0 = g.x1 - g.bw * (0.34 - k * 0.1), ry = g.y1 - bh * 0.7 + k * bh * 0.04, rh = g.y1 - ry - bh * 0.03;
-      c.fillStyle = lin(c, rx0, ry, rx0 + rw, ry, [[0, "#0a1f38"], [0.5, "#16395f"], [1, "#0a1f38"]]); c.fillRect(rx0, ry, rw, rh);
-      c.strokeStyle = "rgba(150,225,255,.55)"; c.lineWidth = 1; c.strokeRect(rx0, ry, rw, rh);
-      for (let j = 0; j < 14; j++) { const ly = ry + rh * (0.06 + j * 0.065); c.fillStyle = "rgba(120,210,255,.1)"; c.fillRect(rx0 + 3, ly, rw - 6, rh * 0.035);
-        const col = [[90, 255, 190], [90, 210, 255], [255, 200, 90]][(j + k) % 3]; g.leds.push({ x: rx0 + rw * (0.2 + rnd() * 0.6), y: ly + rh * 0.017, c: col, p: rnd() * 6.28, r: Math.max(1.2, rw * 0.03) }); }
-    }
-    /* back wall frame + floor seam */
+    [0.1, 0.7].forEach((o) => {
+      const wx = g.x0 + g.bw * o, wy = g.y0 + bh * 0.1, ww = g.bw * 0.2, wh = bh * 0.4;
+      c.fillStyle = lin(c, 0, wy, 0, wy + wh, [[0, "#06223f"], [1, "#0f5a96"]]); c.fillRect(wx, wy, ww, wh);
+      for (let k = 0; k < 14; k++) { c.fillStyle = "rgba(" + (k % 3 ? "255,225,150" : "150,225,255") + "," + (0.25 + rnd() * 0.4) + ")"; c.fillRect(wx + rnd() * (ww - 3), wy + wh * (0.45 + rnd() * 0.5), 1.6 + rnd() * 2, 1.6 + rnd() * 2); }
+      c.strokeStyle = "rgba(180,235,255,.65)"; c.lineWidth = 1.2; c.strokeRect(wx, wy, ww, wh);
+      c.beginPath(); c.moveTo(wx + ww / 2, wy); c.lineTo(wx + ww / 2, wy + wh); c.stroke();
+    });
+    /* headwall rail + outlets */
+    const ry = g.y0 + bh * 0.66;
+    c.fillStyle = "rgba(10,36,66,.75)"; c.fillRect(g.x0, ry, g.bw, g.y1 - ry);
+    neon(c, [[g.x0, ry], [g.x1, ry]], [110, 215, 255], 1.4, 0.8);
+    for (let k = 0; k < 5; k++) { const ox = g.x0 + g.bw * (0.2 + k * 0.15), os = Math.max(2, g.bw * 0.008);
+      rr(c, ox - os, ry + (g.y1 - ry) * 0.2, os * 2, os * 2.4, 2); c.fillStyle = ["#e8f4ff", "#2fd08a", "#ffd24a", "#8aa6c0", "#e8f4ff"][k]; c.globalAlpha = 0.8; c.fill(); c.globalAlpha = 1; }
     c.strokeStyle = "rgba(170,230,255,.5)"; c.lineWidth = 1.5; c.strokeRect(g.x0, g.y0, g.bw, bh);
     neon(c, [[g.x0, g.y1], [g.x1, g.y1]], [90, 200, 255], 1.6, 0.9);
 
-    /* side walls: glass panes, solid dado, header beam, metal mullions */
+    /* side walls: left = privacy curtain, right = equipment rail wall, glass elsewhere */
     [-1, 1].forEach((side) => {
       for (let k = 0; k < N; k++) {
         const dA = ds[k], dB = ds[k + 1];
@@ -121,34 +178,37 @@
         const xa = pane[0][0], xb = pane[1][0];
         c.fillStyle = lin(c, xa, 0, xb, 0, [[0, "rgba(6,24,46,.92)"], [1, "rgba(14,70,124,.78)"]]); c.fill();
         c.save(); poly(c, pane); c.clip();
-        /* lit room beyond the glass */
-        if (k % 2 === 1) {
-          const sc = pq(side, dA, dB, 0.2, 0.55), sc2 = pq(side, dA, dB, 0.8, 0.8);
+        if (side < 0 && k >= 1 && k <= 5) {
+          /* privacy curtain: pleated fabric with a ceiling track */
+          c.fillStyle = lin(c, xa, 0, xb, 0, [[0, "rgba(70,140,205,.5)"], [1, "rgba(110,185,245,.42)"]]); c.fill();
+          for (let j = 0; j <= 10; j++) { const a = pq(side, dA, dB, j / 10, 0.9), b = pq(side, dA, dB, j / 10, 0.2);
+            c.strokeStyle = "rgba(" + (j % 2 ? "20,60,110" : "200,238,255") + "," + (j % 2 ? 0.35 : 0.22) + ")"; c.lineWidth = 1.4; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+        } else if (side > 0 && k >= 1 && k <= 4) {
+          /* equipment rail wall: rail, panels, outlets */
+          const r0 = pq(side, dA, dB, 0.06, 0.52), r1 = pq(side, dA, dB, 0.94, 0.52);
+          neon(c, [r0, r1], [160, 225, 255], 1.1, 0.7);
+          c.fillStyle = "rgba(90,200,255,.16)"; poly(c, [pq(side, dA, dB, 0.15, 0.58), pq(side, dA, dB, 0.85, 0.58), pq(side, dA, dB, 0.85, 0.82), pq(side, dA, dB, 0.15, 0.82)]); c.fill();
+          c.strokeStyle = "rgba(190,240,255,.45)"; c.lineWidth = 1; c.stroke();
+          const o = pq(side, dA, dB, 0.5, 0.36); c.fillStyle = ["#e8f4ff", "#2fd08a", "#ffd24a"][k % 3]; c.globalAlpha = 0.75; c.fillRect(o[0] - 4, o[1] - 4, 8, 8); c.globalAlpha = 1;
+        } else if (k % 2 === 1) {
           c.fillStyle = "rgba(90,200,255,.2)"; poly(c, [pq(side, dA, dB, 0.18, 0.5), pq(side, dA, dB, 0.82, 0.5), pq(side, dA, dB, 0.82, 0.78), pq(side, dA, dB, 0.18, 0.78)]); c.fill();
           c.strokeStyle = "rgba(190,240,255,.5)"; c.lineWidth = 1; c.stroke();
-          for (let l = 0; l < 4; l++) { const a = pq(side, dA, dB, 0.26, 0.58 + l * 0.05), b = pq(side, dA, dB, 0.26 + 0.4 * (0.4 + rnd() * 0.5), 0.58 + l * 0.05); neon(c, [a, b], [120, 230, 255], 0.9, 0.55); }
-          void sc; void sc2;
         } else {
           c.fillStyle = "rgba(60,150,230,.13)"; poly(c, [pq(side, dA, dB, 0.1, 0.18), pq(side, dA, dB, 0.9, 0.18), pq(side, dA, dB, 0.9, 0.42), pq(side, dA, dB, 0.1, 0.42)]); c.fill();
         }
-        /* frosted privacy band */
         c.fillStyle = "rgba(210,240,255,.07)"; poly(c, [wp(side, dA, 0.44), wp(side, dB, 0.44), wp(side, dB, 0.5), wp(side, dA, 0.5)]); c.fill();
-        /* diagonal sheen */
         const m0 = pq(side, dA, dB, 0.15, 0.9), m1 = pq(side, dA, dB, 0.55, 0.2);
         const sh = c.createLinearGradient(m0[0], m0[1], m1[0], m1[1]);
         sh.addColorStop(0, "rgba(255,255,255,0)"); sh.addColorStop(0.45, "rgba(200,240,255,.17)"); sh.addColorStop(0.62, "rgba(255,255,255,0)");
         c.fillStyle = sh; c.fillRect(0, 0, W, H);
         c.restore();
       }
-      /* dado */
       poly(c, [wp(side, 1, 0), wp(side, g.D, 0), wp(side, g.D, 0.15), wp(side, 1, 0.15)]);
       c.fillStyle = lin(c, 0, g.y0, 0, H, [[0, "#162b44"], [1, "#050c18"]]); c.fill();
       neon(c, [wp(side, 1, 0.15), wp(side, g.D, 0.15)], [80, 200, 255], 1.6, 0.85);
-      /* header beam */
       poly(c, [wp(side, 1, 0.9), wp(side, g.D, 0.9), wp(side, g.D, 1), wp(side, 1, 1)]);
       c.fillStyle = lin(c, 0, 0, 0, g.y0 * 1.1, [[0, "#09172a"], [1, "#27425f"]]); c.fill();
       neon(c, [wp(side, 1, 0.9), wp(side, g.D, 0.9)], [80, 200, 255], 1.4, 0.8);
-      /* mullions */
       ds.forEach((d) => {
         const a = wp(side, d, 0.15), b = wp(side, d, 0.9), w = Math.max(2.5, 11 / d);
         c.fillStyle = lin(c, a[0] - w / 2, 0, a[0] + w / 2, 0, [[0, "#1e3550"], [0.35, "#9db8d1"], [0.55, "#e6f2fb"], [1, "#2a4562"]]);
@@ -156,9 +216,15 @@
         c.fillStyle = "rgba(120,225,255,.95)"; c.fillRect(a[0] + (side < 0 ? w / 2 : -w / 2 - 1.2), b[1], 1.2, a[1] - b[1]);
       });
     });
-    /* left-wall emergency exit sign and right-wall status strip, kept small */
     const ex = pq(-1, ds[3], ds[4], 0.5, 0.96); c.fillStyle = "rgba(90,255,190,.9)"; c.fillRect(ex[0] - 12, ex[1] - 4, 24, 8);
+
+    /* the bed (left) and the monitor cart (right), standing on the floor */
+    const bw0 = g.land ? W * 0.22 : W * 0.4, bx = g.land ? W * 0.07 : -W * 0.06;
+    bed(c, bx, Math.max(H * (g.land ? 0.86 : 0.78), yfloor(bx + bw0 * 0.5) + H * 0.035), bw0, g);
+    const cw0 = g.land ? W * 0.12 : W * 0.2, cx0 = g.land ? W * 0.8 : W * 0.78;
+    cart(c, cx0, Math.max(H * 0.78, yfloor(cx0 + cw0 * 0.5) + H * 0.035), cw0, g);
   }
+
 
   /* ---------- composed static layer: floor, reflections, room ---------- */
   function drawStatic() {
@@ -214,13 +280,15 @@
   const gauss = (x, m, w, a) => a * Math.exp(-Math.pow((x - m) / w, 2));
   function ecg(f) { f = f - Math.floor(f); return gauss(f, 0.13, 0.035, 0.13) + gauss(f, 0.27, 0.011, -0.1) + gauss(f, 0.3, 0.009, 1) + gauss(f, 0.335, 0.012, -0.22) + gauss(f, 0.54, 0.06, 0.3); }
   function pleth(f) { f = f - Math.floor(f); return gauss(f, 0.25, 0.1, 1) + gauss(f, 0.55, 0.08, 0.28); }
-  function trace(x, y, w, h, t, win, fn, color, lw, amp) {
-    const n = Math.max(20, Math.round(w / 2.4));
+  /* rolling trace driven by the live cardiac phase, so the rhythm follows the displayed heart rate */
+  function trace(x, y, w, h, off, win, fn, color, lw, amp, dot) {
+    const n = Math.max(20, Math.round(w / 2.4)); let lx = x, ly = y;
     ctx.beginPath();
-    for (let i = 0; i <= n; i++) { const v = fn((t - (1 - i / n) * win) * BPM / 60), px = x + (i / n) * w, py = y + h * 0.78 - v * h * amp; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    for (let i = 0; i <= n; i++) { const v = fn(phase + off - (1 - i / n) * win * hr / 60), px = x + (i / n) * w, py = y + h * 0.78 - v * h * amp; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); lx = px; ly = py; }
     ctx.lineJoin = "round";
     ctx.strokeStyle = rgba(color[0], color[1], color[2], 0.25); ctx.lineWidth = lw * 3; ctx.stroke();
     ctx.strokeStyle = rgba(color[0], color[1], color[2], 0.95); ctx.lineWidth = lw; ctx.stroke();
+    if (dot) { const q = ctx.createRadialGradient(lx, ly, 0, lx, ly, lw * 5); q.addColorStop(0, "rgba(255,255,255,.95)"); q.addColorStop(1, rgba(color[0], color[1], color[2], 0)); ctx.fillStyle = q; ctx.beginPath(); ctx.arc(lx, ly, lw * 5, 0, TAU); ctx.fill(); }
   }
 
   /* subtle electric-blue aura that follows the body outline (drawn behind the model) */
@@ -362,36 +430,141 @@
     c.setLineDash([2, 5]); c.lineWidth = 1; c.beginPath(); c.arc(cx, cy, r * 1.3, T * 0.8, T * 0.8 + TAU * 0.8); c.strokeStyle = "rgba(180,240,255,.5)"; c.stroke(); c.setLineDash([]);
     c.fillStyle = "rgba(225,249,255,.95)"; c.font = "700 " + Math.round(r * 0.62) + "px " + FONT; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(label, cx, cy + 1); c.restore();
   }
+  /* vitals drift like a real monitor: smooth slow wander, shown once a second */
+  const VIT = { hr: 72, sbp: 120, dbp: 76, map: 91, rr: 16, spo2: 98 };
+  const wander = (t) => ({
+    hr: 73 + 5 * Math.sin(t * 0.19) + 2.5 * Math.sin(t * 0.53 + 1.3) + 1.2 * Math.sin(t * 1.7),
+    sbp: 121 + 6 * Math.sin(t * 0.13 + 0.5) + 3 * Math.sin(t * 0.41),
+    dbp: 76 + 4 * Math.sin(t * 0.17 + 2) + 2 * Math.sin(t * 0.37),
+    rr: 16 + 1.6 * Math.sin(t * 0.11) + 0.8 * Math.sin(t * 0.29 + 1),
+    spo2: 97.4 + 0.9 * Math.sin(t * 0.09) + 0.5 * Math.sin(t * 0.31 + 2)
+  });
+  function vitalsUpdate() {
+    hr = wander(T).hr;                       /* the ECG rate follows this continuously */
+    const v = wander(Math.floor(T));         /* the numbers refresh once a second */
+    VIT.hr = Math.round(v.hr); VIT.sbp = Math.round(v.sbp); VIT.dbp = Math.round(v.dbp);
+    VIT.map = Math.round((v.sbp + 2 * v.dbp) / 3); VIT.rr = Math.round(v.rr); VIT.spo2 = Math.min(99, Math.max(95, Math.round(v.spo2)));
+  }
+  function heartIcon(cx, cy, s, col, a) {
+    const c = ctx; c.beginPath(); c.moveTo(cx, cy + s * 0.9);
+    c.bezierCurveTo(cx - s * 1.4, cy - s * 0.1, cx - s * 0.7, cy - s * 1.1, cx, cy - s * 0.35);
+    c.bezierCurveTo(cx + s * 0.7, cy - s * 1.1, cx + s * 1.4, cy - s * 0.1, cx, cy + s * 0.9);
+    c.fillStyle = rgba(col[0], col[1], col[2], a); c.fill();
+  }
+  function rowIcon(kind, cx, cy, s, col, beat) {
+    const c = ctx; c.save(); c.strokeStyle = rgba(col[0], col[1], col[2], 0.95); c.fillStyle = rgba(col[0], col[1], col[2], 0.95); c.lineWidth = Math.max(1.2, s * 0.16); c.lineCap = "round";
+    if (kind === "hr") heartIcon(cx, cy, s * (0.8 + 0.28 * beat), col, 0.55 + 0.45 * beat);
+    else if (kind === "bp") { c.beginPath(); c.arc(cx, cy + s * 0.15, s * 0.85, Math.PI * 0.85, Math.PI * 2.15); c.stroke(); c.beginPath(); c.moveTo(cx, cy + s * 0.15); c.lineTo(cx + s * 0.5 * Math.cos(-0.9 + 0.4 * Math.sin(T * 0.8)), cy + s * 0.15 + s * 0.5 * Math.sin(-0.9 + 0.4 * Math.sin(T * 0.8))); c.stroke(); }
+    else if (kind === "rr") { c.beginPath(); for (let i = 0; i <= 12; i++) { const px = cx - s + i / 12 * s * 2, py = cy + Math.sin(i / 12 * TAU * 1.5 - T * 2) * s * 0.45; i ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke(); }
+    else { c.beginPath(); c.moveTo(cx, cy - s * 0.95); c.bezierCurveTo(cx + s * 0.9, cy + s * 0.1, cx + s * 0.7, cy + s * 0.95, cx, cy + s * 0.95); c.bezierCurveTo(cx - s * 0.7, cy + s * 0.95, cx - s * 0.9, cy + s * 0.1, cx, cy - s * 0.95); c.fill(); }
+    c.restore();
+  }
+  function vitalsPanel(x, y, w, h, beat) {
+    const c = ctx, fs = holoPanel(x, y, w, h, "VITALS", beat), pad = Math.max(8, w * 0.07);
+    /* live dot */
+    c.fillStyle = rgba(255, 90, 90, 0.5 + 0.5 * Math.max(0, Math.sin(T * 4))); c.beginPath(); c.arc(x + w - pad - 2, y + fs * 0.9 + 3, 2.6, 0, TAU); c.fill();
+    c.fillStyle = "rgba(255,170,170,.8)"; c.font = "700 " + Math.max(7, Math.round(fs * 0.8)) + "px " + FONT; c.textAlign = "right"; c.textBaseline = "alphabetic"; c.fillText("LIVE", x + w - pad - 8, y + fs + 4);
+    /* ECG strip */
+    const ey = y + fs + 16, eh = h * 0.19;
+    c.fillStyle = "rgba(2,16,30,.55)"; c.fillRect(x + pad - 2, ey, w - pad * 2 + 4, eh);
+    c.strokeStyle = "rgba(120,220,255,.12)"; c.lineWidth = 1;
+    for (let k = 1; k < 4; k++) { c.beginPath(); c.moveTo(x + pad - 2, ey + eh * k / 4); c.lineTo(x + w - pad + 2, ey + eh * k / 4); c.stroke(); }
+    for (let k = 1; k < 8; k++) { c.beginPath(); c.moveTo(x + pad - 2 + (w - pad * 2 + 4) * k / 8, ey); c.lineTo(x + pad - 2 + (w - pad * 2 + 4) * k / 8, ey + eh); c.stroke(); }
+    c.save(); c.beginPath(); c.rect(x + pad - 2, ey, w - pad * 2 + 4, eh); c.clip();
+    trace(x + pad, ey + eh * 0.12, w - pad * 2, eh * 0.9, 0, 2.6, ecg, [130, 255, 220], 1.5, 0.85, true);
+    c.restore();
+    /* numeric rows */
+    const top = ey + eh + 6, rh = (y + h - 6 - top) / 4, lf = Math.max(8, Math.round(rh * 0.2)), vf = Math.round(rh * 0.5);
+    const rows = [
+      ["hr", "HR", "bpm", String(VIT.hr), [120, 255, 170]],
+      ["bp", "BP", "MAP " + VIT.map, VIT.sbp + "/" + VIT.dbp, [130, 215, 255]],
+      ["rr", "RESP", "/min", String(VIT.rr), [150, 230, 255]],
+      ["o2", "SpO₂", "%", String(VIT.spo2), [210, 240, 255]]
+    ];
+    rows.forEach((r, i) => {
+      const ry = top + i * rh, col = r[4];
+      c.fillStyle = "rgba(150,230,255,.18)"; c.fillRect(x + pad, ry, w - pad * 2, 1);
+      rowIcon(r[0], x + pad + lf * 0.6, ry + rh * 0.3, lf * 0.55, col, i === 0 ? beat : 0);
+      c.textAlign = "left"; c.fillStyle = "rgba(160,232,255,.8)"; c.font = "700 " + lf + "px " + FONT; c.fillText(r[1], x + pad + lf * 1.7, ry + rh * 0.3 + lf * 0.35);
+      /* unit sits right after the label on narrow (portrait) panels so the 3D body never hides it */
+      const lw = c.measureText(r[1]).width; c.fillStyle = "rgba(160,232,255,.55)"; c.font = "600 " + Math.max(7, lf - 1) + "px " + FONT;
+      if (w < 200) c.fillText(r[2], x + pad + lf * 1.7 + lw + 5, ry + rh * 0.3 + lf * 0.35);
+      else { c.textAlign = "right"; c.fillText(r[2], x + w - pad, ry + rh * 0.3 + lf * 0.35); c.textAlign = "left"; }
+      c.textAlign = "left"; c.fillStyle = rgba(col[0], col[1], col[2], 1); c.shadowColor = rgba(col[0], col[1], col[2], 0.7); c.shadowBlur = 8;
+      c.font = "700 " + vf + "px " + FONT; c.fillText(r[3], x + pad, ry + rh * 0.93); c.shadowBlur = 0;
+    });
+  }
+  /* AP chest/whole-body skeleton drawn as an X-ray film with a moving scan line */
+  function skeletonPanel(x, y, w, h, beat) {
+    const c = ctx, fs = holoPanel(x, y, w, h, "SKELETON", 0.3), pad = Math.max(8, w * 0.07);
+    const fy = y + fs + 14, fh = y + h - 8 - fy, fx0 = x + pad - 2, fw = w - pad * 2 + 4;
+    c.fillStyle = lin(c, 0, fy, 0, fy + fh, [[0, "rgba(6,28,56,.85)"], [1, "rgba(3,14,30,.85)"]]); c.fillRect(fx0, fy, fw, fh);
+    c.strokeStyle = "rgba(140,220,255,.25)"; c.lineWidth = 1; c.strokeRect(fx0, fy, fw, fh);
+    const S = Math.min(fh * 0.94, fw * 2.6), ox = fx0 + fw / 2, oy = fy + fh * 0.03;
+    const P = (nx, ny) => [ox + nx * S, oy + ny * S];
+    const line = (pts, a, wd) => { c.beginPath(); pts.forEach((p, i) => { const q = P(p[0], p[1]); i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); }); c.strokeStyle = rgba(150, 215, 255, 0.22 * a); c.lineWidth = wd * 3.2; c.stroke(); c.strokeStyle = rgba(222, 247, 255, 0.92 * a); c.lineWidth = wd; c.stroke(); };
+    const wd = Math.max(1.1, S * 0.006);
+    c.save(); c.beginPath(); c.rect(fx0, fy, fw, fh); c.clip(); c.lineCap = "round"; c.lineJoin = "round";
+    /* skull + jaw */
+    let q = P(0, 0.062); c.beginPath(); c.ellipse(q[0], q[1], S * 0.047, S * 0.052, 0, 0, TAU); c.strokeStyle = "rgba(150,215,255,.25)"; c.lineWidth = wd * 3.2; c.stroke(); c.strokeStyle = "rgba(222,247,255,.92)"; c.lineWidth = wd; c.stroke();
+    [-1, 1].forEach((s) => { const e = P(s * 0.017, 0.062); c.beginPath(); c.ellipse(e[0], e[1], S * 0.011, S * 0.009, 0, 0, TAU); c.stroke(); });
+    line([[-0.034, 0.093], [-0.018, 0.118], [0.018, 0.118], [0.034, 0.093]], 1, wd);
+    /* spine */
+    for (let i = 0; i < 24; i++) { const ny = 0.125 + i * 0.0155, wv = 0.011 + (i > 17 ? 0.004 : 0) + (i < 7 ? -0.002 : 0); const a = P(-wv, ny), b = P(wv, ny); c.strokeStyle = "rgba(222,247,255,.85)"; c.lineWidth = Math.max(1.2, S * 0.008); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    /* clavicles, scapula hints, sternum */
+    [-1, 1].forEach((s) => {
+      line([[0.008 * s, 0.168], [0.05 * s, 0.17], [0.11 * s, 0.19]], 1, wd);
+      line([[0.12 * s, 0.2], [0.14 * s, 0.24], [0.115 * s, 0.285], [0.092 * s, 0.25]], 0.55, wd * 0.8);
+    });
+    line([[0, 0.178], [0, 0.31]], 1, wd * 1.5); line([[-0.012, 0.18], [0.012, 0.18]], 1, wd);
+    /* ribs */
+    for (let i = 0; i < 9; i++) {
+      [-1, 1].forEach((s) => {
+        const y0 = 0.19 + i * 0.0225, e = 0.105 - Math.abs(i - 3) * 0.005 - (i > 6 ? 0.012 * (i - 6) : 0);
+        c.beginPath(); const a = P(0.012 * s, y0 + 0.004); c.moveTo(a[0], a[1]);
+        let b = P(0.06 * s, y0 - 0.02), cc = P(e * s, y0 - 0.004), d = P((e - 0.008) * s, y0 + 0.032); c.bezierCurveTo(b[0], b[1], cc[0], cc[1], d[0], d[1]);
+        if (i < 7) { b = P((e - 0.025) * s, y0 + 0.07); cc = P(0.025 * s, y0 + 0.06 + i * 0.0012); c.quadraticCurveTo(b[0], b[1], cc[0], cc[1]); }
+        c.strokeStyle = "rgba(150,215,255,.22)"; c.lineWidth = wd * 3; c.stroke(); c.strokeStyle = "rgba(222,247,255," + (0.9 - i * 0.04) + ")"; c.lineWidth = wd * 0.9; c.stroke();
+      });
+    }
+    /* pelvis + sacrum */
+    [-1, 1].forEach((s) => {
+      c.beginPath(); let a = P(0.015 * s, 0.47); c.moveTo(a[0], a[1]);
+      let b = P(0.125 * s, 0.445), d = P(0.125 * s, 0.525); c.quadraticCurveTo(b[0], b[1], d[0], d[1]);
+      b = P(0.105 * s, 0.575); d = P(0.045 * s, 0.565); c.quadraticCurveTo(b[0], b[1], d[0], d[1]);
+      d = P(0.022 * s, 0.525); c.lineTo(d[0], d[1]); d = P(0.015 * s, 0.47); c.lineTo(d[0], d[1]);
+      c.strokeStyle = "rgba(150,215,255,.22)"; c.lineWidth = wd * 3; c.stroke(); c.strokeStyle = "rgba(222,247,255,.92)"; c.lineWidth = wd; c.stroke();
+      const o = P(0.047 * s, 0.585); c.beginPath(); c.ellipse(o[0], o[1], S * 0.014, S * 0.02, 0, 0, TAU); c.stroke();
+    });
+    line([[-0.02, 0.49], [0, 0.565], [0.02, 0.49]], 0.9, wd);
+    /* limbs: humerus, forearm, femur, tibia, with joint heads */
+    [-1, 1].forEach((s) => {
+      line([[0.128 * s, 0.2], [0.165 * s, 0.375]], 1, wd * 1.6);
+      line([[0.168 * s, 0.385], [0.2 * s, 0.53]], 1, wd * 1.2); line([[0.158 * s, 0.385], [0.178 * s, 0.53]], 0.7, wd);
+      line([[0.2 * s, 0.54], [0.215 * s, 0.575], [0.2 * s, 0.6]], 0.7, wd * 0.8); line([[0.19 * s, 0.54], [0.185 * s, 0.585]], 0.7, wd * 0.8);
+      line([[0.065 * s, 0.57], [0.085 * s, 0.775]], 1, wd * 1.8);
+      line([[0.085 * s, 0.79], [0.075 * s, 0.945]], 1, wd * 1.3); line([[0.098 * s, 0.79], [0.092 * s, 0.94]], 0.7, wd);
+      line([[0.07 * s, 0.95], [0.1 * s, 0.975], [0.11 * s, 0.99]], 0.8, wd);
+      [[0.128, 0.195, 0.014], [0.065, 0.565, 0.02], [0.085, 0.782, 0.016], [0.168, 0.38, 0.011]].forEach((j) => { const e = P(j[0] * s, j[1]); c.beginPath(); c.arc(e[0], e[1], S * j[2], 0, TAU); c.strokeStyle = "rgba(222,247,255,.85)"; c.lineWidth = wd; c.stroke(); });
+    });
+    /* beating-heart shadow in the chest: a faint pulse behind the ribs */
+    const hp = P(-0.02, 0.27), hg = c.createRadialGradient(hp[0], hp[1], 1, hp[0], hp[1], S * 0.07);
+    hg.addColorStop(0, rgba(255, 120, 140, 0.16 + 0.22 * beat)); hg.addColorStop(1, "rgba(255,120,140,0)"); c.fillStyle = hg; c.beginPath(); c.arc(hp[0], hp[1], S * 0.08, 0, TAU); c.fill();
+    /* scan line */
+    const sy = fy + ((T * 0.22) % 1) * fh, sg = c.createLinearGradient(0, sy - 16, 0, sy + 2);
+    sg.addColorStop(0, "rgba(150,230,255,0)"); sg.addColorStop(1, "rgba(150,230,255,.3)"); c.fillStyle = sg; c.fillRect(fx0, sy - 16, fw, 18);
+    c.fillStyle = "rgba(225,250,255,.9)"; c.fillRect(fx0, sy, fw, 1.2);
+    c.restore();
+    c.fillStyle = "rgba(160,232,255,.7)"; c.font = "700 " + Math.max(8, Math.round(fs * 0.9)) + "px " + FONT; c.textAlign = "left"; c.textBaseline = "alphabetic";
+    c.fillText("R", fx0 + 4, fy + fh - 5); c.textAlign = "right"; c.fillText("L", fx0 + fw - 4, fy + fh - 5);
+  }
   function hud(beat) {
     const g = G, c = ctx;
-    if (g.land) {
-      const w = W * 0.17, h = w * 0.78, lx = W * 0.025, rx0 = W - w - lx;
-      let fs = holoPanel(lx, H * 0.17, w, h, "ECG · II", beat);
-      trace(lx + 10, H * 0.17 + fs + 14, w - 20, h * 0.5, T, 2.4, ecg, [130, 255, 220], 1.4, 0.8);
-      c.fillStyle = "rgba(170,235,255,.85)"; c.font = "700 " + Math.round(w * 0.1) + "px " + FONT; c.textAlign = "left"; c.textBaseline = "alphabetic"; c.fillText("HR " + (BPM + Math.round(Math.sin(T * 0.37))), lx + 10, H * 0.17 + h - 9);
-      fs = holoPanel(lx, H * 0.17 + h + H * 0.04, w, h * 0.95, "ORGAN SYSTEMS", 0.2);
-      ["Lung", "Heart", "Liver", "Kidney"].forEach((n, i) => {
-        const y = H * 0.17 + h + H * 0.04 + fs + 32 + i * (h * 0.95 - fs - 44) / 4, v = 0.55 + 0.35 * Math.sin(T * (0.5 + i * 0.17) + i * 2);
-        c.fillStyle = "rgba(170,235,255,.8)"; c.font = "600 " + Math.round(w * 0.07) + "px " + FONT; c.fillText(n, lx + 10, y);
-        c.fillStyle = "rgba(100,190,255,.2)"; c.fillRect(lx + w * 0.36, y - 7, w * 0.54, 6);
-        c.fillStyle = rgba(110, 225, 255, 0.9); c.fillRect(lx + w * 0.36, y - 7, w * 0.54 * v, 6);
-      });
-      fs = holoPanel(rx0, H * 0.15, w, h, "SpO₂ · PLETH", 0.25);
-      trace(rx0 + 10, H * 0.15 + fs + 12, w - 20, h * 0.42, T + 0.35, 2.2, pleth, [140, 210, 255], 1.3, 0.7);
-      c.fillStyle = "rgba(170,235,255,.85)"; c.font = "700 " + Math.round(w * 0.1) + "px " + FONT; c.textAlign = "left"; c.fillText("SpO₂ 98", rx0 + 10, H * 0.15 + h - 9);
-      fs = holoPanel(rx0, H * 0.15 + h + H * 0.04, w, h * 0.95, "PERFUSION", 0.2);
-      const gy = H * 0.15 + h + H * 0.04 + (h * 0.95 + fs) / 2 + 6, r = w * 0.15;
-      ringGauge(rx0 + w * 0.27, gy, r, 0.72 + 0.08 * Math.sin(T * 0.6), [110, 230, 255], "72");
-      ringGauge(rx0 + w * 0.73, gy, r, 0.5 + 0.1 * Math.sin(T * 0.4 + 1), [130, 255, 210], "MAP");
-    } else {
-      const w = Math.min(150, W * 0.34), h = w * 0.7, y = H * 0.66, lx = Math.max(8, W * 0.02), rx0 = W - w - lx;
-      const fs = holoPanel(lx, y, w, h, "ECG · II", beat);
-      trace(lx + 10, y + fs + 12, w - 20, h * 0.5, T, 2.4, ecg, [130, 255, 220], 1.4, 0.8);
-      c.fillStyle = "rgba(170,235,255,.85)"; c.font = "700 " + Math.round(w * 0.09) + "px " + FONT; c.textAlign = "left"; c.fillText("HR " + (BPM + Math.round(Math.sin(T * 0.37))), lx + 10, y + h - 8);
-      const fs2 = holoPanel(rx0, y - H * 0.02, w, h, "SpO₂", 0.25);
-      trace(rx0 + 10, y - H * 0.02 + fs2 + 10, w - 20, h * 0.42, T + 0.35, 2.2, pleth, [140, 210, 255], 1.3, 0.7);
-      c.fillStyle = "rgba(170,235,255,.85)"; c.font = "700 " + Math.round(w * 0.09) + "px " + FONT; c.fillText("SpO₂ 98", rx0 + 10, y - H * 0.02 + h - 8);
-    }
+    let w, h, y, lx, rx0;
+    if (g.land) { w = Math.min(W * 0.205, 270); h = Math.min(H * 0.57, w * 1.5); y = H * 0.14; lx = W * 0.03; rx0 = W - w - lx; }
+    else { w = Math.min(W * 0.335, 160); h = Math.min(H * 0.44, w * 2.55); y = H * 0.14; lx = Math.max(6, W * 0.02); rx0 = W - w - lx; }
+    vitalsPanel(lx, y, w, h, beat);
+    skeletonPanel(rx0, y, w, h, beat);
     c.textAlign = "left"; c.textBaseline = "alphabetic";
   }
 
@@ -415,14 +588,16 @@
     last = now; T += dt;
     resize();
     if (!G) return;
-    const ph = T * BPM / 60, bn = Math.floor(ph);
+    vitalsUpdate();
+    phase += dt * hr / 60;
+    const bn = Math.floor(phase + 0.7);
     if (bn !== beatN) { beatN = bn; pulses.push(T); if (pulses.length > 4) pulses.shift(); }
-    const beat = Math.exp(-(ph - bn) * 6.5);
+    const beat = Math.exp(-(phase + 0.7 - bn) * 6.5);
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(st, 0, 0);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     distant(beat); beams(beat); aura(beat); overheadRing(beat); scanRings(beat); platform(beat); motesDraw(dt); hud(beat);
   }
   if ("ResizeObserver" in window) new ResizeObserver(() => { if (active()) resize(); }).observe(stage);
   requestAnimationFrame(frame);
-  window.__bodyStage = { frame: () => T };
+  window.__bodyStage = { frame: () => T, vitals: () => Object.assign({ hrF: hr }, VIT) };
 })();
