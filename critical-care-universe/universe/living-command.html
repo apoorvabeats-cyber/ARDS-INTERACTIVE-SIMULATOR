@@ -98,7 +98,8 @@ import * as THREE from './three.module.js';
 import {FOLLOW_UPS,DISTRACTORS} from './case-decisions.js';
 import {ORDER_CASES,assessOrder} from './clinical-orders.js?v=20261115a';
 import {createCaseVoice} from './case-voice.mjs';
-import {buildWard} from './ward3d.js?v=20261120d';
+import {createAnnouncer} from './alarm-voice.mjs?v=20261120e';
+import {buildWard} from './ward3d.js?v=20261120e';
 const $=s=>document.querySelector(s),V=THREE.Vector3,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 function updateLayout(){
  document.documentElement.style.setProperty('--top-height',$('#top').getBoundingClientRect().height+'px');
@@ -279,6 +280,28 @@ function drawBed(i){const p=P[i],b=B[i],c=b.ctx,W=1280,H=720,im=(typeof bedShot=
 // camera modes
 let ent=0,mode='cmd',yaw=0,pit=0,cmdYaw=0,cmdPit=0,cur=null,transit=null,voiceOn=true,alarmOn=true,wallZoom=true;const tp=new V(),tl=new V(),lk=new V(100,4,-8);
 const voiceController='speechSynthesis' in window&&'SpeechSynthesisUtterance' in window?createCaseVoice(window.speechSynthesis,window.SpeechSynthesisUtterance,reason=>{console.warn('Case narration did not start:',reason);$('#voice-status').textContent=$('#replay-voice').hidden?'Voice could not start.':'Voice could not start. Tap Replay case voice.';$('#voice-status').hidden=false}):null;
+// hall announcer: female PA voice reading the red banners, with a reverberant chime (see alarm-voice.mjs)
+let pendingNarration=null,hallBus=null;
+function hall(){
+ if(!ac)return null;if(hallBus)return hallBus;
+ const len=Math.floor(ac.sampleRate*3.4),ir=ac.createBuffer(2,len,ac.sampleRate);
+ for(let c=0;c<2;c++){const d=ir.getChannelData(c);let lp=0;for(let k=0;k<len;k++){const t=k/ac.sampleRate;lp+=((Math.random()*2-1)-lp)*(.55-.4*Math.min(1,t/2.4));d[k]=lp*Math.exp(-t*2.1)*(k<ac.sampleRate*.03?k/(ac.sampleRate*.03):1)}}
+ const cv=ac.createConvolver();cv.buffer=ir;const wet=ac.createGain();wet.gain.value=1.1;const dry=ac.createGain();dry.gain.value=.5;
+ cv.connect(wet);const input=ac.createGain();input.connect(cv);input.connect(dry);wet.connect(ac.destination);dry.connect(ac.destination);
+ return hallBus={input}}
+function hallChime(){
+ const bus=hall();if(!bus)return;const t0=ac.currentTime+.02;
+ [[783.99,0],[659.25,.55]].forEach(([f,dt])=>[[1,.22],[2,.06],[3.01,.025]].forEach(([m,a])=>{
+  const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=f*m;
+  g.gain.setValueAtTime(0,t0+dt);g.gain.linearRampToValueAtTime(a,t0+dt+.012);g.gain.exponentialRampToValueAtTime(.0008,t0+dt+1.5);
+  o.connect(g);g.connect(bus.input);o.start(t0+dt);o.stop(t0+dt+1.6)}))}
+const announcer='speechSynthesis' in window&&'SpeechSynthesisUtterance' in window?createAnnouncer({
+ synthesis:window.speechSynthesis,Utterance:window.SpeechSynthesisUtterance,getVoices:()=>window.speechSynthesis.getVoices(),gapMs:15000,chimeMs:1500,
+ beforeSpeak:()=>{if(voiceController)voiceController.stop()},
+ chime:hallChime,
+ afterSpeak:()=>{if(pendingNarration){const t=pendingNarration;pendingNarration=null;speak(t)}else if(cur!=null&&mode==='bed'&&voiceOn&&P[cur]&&!P[cur].done)$('#replay-voice').hidden=false},
+ report:r=>console.warn('Alarm announcement problem:',r)}):null;
+if(announcer)window.speechSynthesis.getVoices();
 $('#zoom-wall').onclick=()=>{wallZoom=!wallZoom;$('#zoom-wall').textContent=wallZoom?'Fit wall':'Zoom wall';$('#zoom-wall').setAttribute('aria-pressed',String(wallZoom));$('#settings-menu').open=false};
 function updateFov(){cam.fov=mode==='ward'||mode==='travel'?(cam.aspect<1?Math.min(105,72+(1-cam.aspect)*70):72):72;cam.updateProjectionMatrix()}
 let v3=false;const orb={az:0,el:.45,r:1.45};
@@ -341,13 +364,13 @@ document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{document.querySe
 $('#enter').onclick=$('#dr').onclick=()=>{ent=1;$('#door').classList.add('open');unlockAudio();setTimeout(()=>$('#door').style.display='none',1800)};
 
 // decisions
-function stopVoice(){if(voiceController)voiceController.stop()}
-function speak(text){if(!voiceOn||!voiceController)return;$('#voice-status').hidden=true;voiceController.speak(text)}
+function stopVoice(){pendingNarration=null;if(announcer&&announcer.busy())return;if(voiceController)voiceController.stop()}
+function speak(text){if(!voiceOn||!voiceController)return;if(announcer&&announcer.busy()){pendingNarration=text;return}$('#voice-status').hidden=true;voiceController.speak(text)}
 function speakCase(){if(cur!=null&&!P[cur].done){const p=P[cur];speak(p.n+'. '+p.dx+'. '+p.hx+'. '+(p.narration||currentDecision(p).q))}}
 $('#replay-voice').onclick=speakCase;
 $('#voice').onclick=()=>{voiceOn=!voiceOn;$('#voice').textContent=voiceOn?'Voice on':'Voice off';$('#voice').setAttribute('aria-pressed',String(voiceOn));$('#replay-voice').hidden=!voiceOn||cur==null||P[cur].done;$('#voice-status').hidden=true;if(!voiceOn)stopVoice();else speakCase()};
 if(!voiceController){$('#voice').disabled=true;$('#voice').textContent='Voice unavailable';voiceOn=false}
-$('#alarm').onclick=()=>{alarmOn=!alarmOn;$('#alarm').textContent=alarmOn?'Alarms on':'Alarms off';$('#alarm').setAttribute('aria-pressed',String(alarmOn));if(alarmOn)unlockAudio();scheduleAlarm()};
+$('#alarm').onclick=()=>{alarmOn=!alarmOn;$('#alarm').textContent=alarmOn?'Alarms on':'Alarms off';$('#alarm').setAttribute('aria-pressed',String(alarmOn));if(alarmOn)unlockAudio();else if(announcer)announcer.stop();scheduleAlarm()};
 function setTreatmentEnabled(enabled){document.querySelectorAll('#t0 button,#t1 input,#t1 button,#order-submit').forEach(e=>e.disabled=!enabled)}
 // One journey. Primary, then secondary, then tertiary for every case. A correct step steadies the patient. Tertiary is the advanced stage, not a penalty.
 const LEVELS=[
@@ -382,7 +405,7 @@ $('#ev').onclick=e=>{const p=P[cur],t=e.target;if(t.dataset.debrief){fin();retur
  evu();speak(message)}
 function fin(){stopVoice();const n=P.filter(p=>p.recovered).length;$('#end').style.display='block';
  $('#end').innerHTML='<h2>Shift debrief: '+n+' of 6 recovered</h2><ol>'+P.map(p=>'<li><b>'+p.n+' · '+p.dx+' · '+(p.recovered?'recovered':'not recovered')+'</b><ul>'+p.answers.map(a=>'<li>'+a.level+' — '+a.question+'<br>Your choice: '+a.selected+'<br>Suggested priority: '+a.best+'</li>').join('')+'</ul>'+(p.orderLog.length?'<b>Simulated orders</b><ul>'+p.orderLog.map(o=>'<li>'+o.label+' — '+o.level+': '+o.text+'</li>').join('')+'</ul>':'')+'</li>').join('')+'</ol><button onclick="document.getElementById(\'end\').style.display=\'none\'">Return to shift</button> <button onclick="location.reload()">Restart shift</button>'}
-function toast(m){const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.opacity=0,4000)}
+function toast(m,say){const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.opacity=0,say?8000:4000);if(say&&alarmOn&&announcer)announcer.announce(m)}
 function beep(){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.04;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.12)}
 
 function simulatedLabs(p){const v=p.v,[a,c,h,l]=p.ab;
@@ -515,21 +538,21 @@ let T=0,lastAlarmAt=performance.now(),lastAlarmBed=-1,alarmTimer;
 function scheduleAlarm(){
  clearTimeout(alarmTimer);
  if(!alarmOn)return;
- const remaining=12000-(performance.now()-lastAlarmAt);
+ const remaining=15000-(performance.now()-lastAlarmAt);
  if(remaining>0){alarmTimer=setTimeout(scheduleAlarm,remaining);return}
  const candidates=ent?P.filter(p=>!p.done&&p.st>0):[];
  if(!candidates.length){alarmTimer=setTimeout(scheduleAlarm,1000);return}
  const p=candidates.find(p=>p.i>lastAlarmBed)||candidates[0];
- lastAlarmAt=performance.now();lastAlarmBed=p.i;beep();toast('Alarm · bed '+(p.i+1)+' · '+p.n+': '+priority(p).reason+' (simulated)');
- alarmTimer=setTimeout(scheduleAlarm,12000);
+ lastAlarmAt=performance.now();lastAlarmBed=p.i;if(!announcer)beep();toast('Alarm · bed '+(p.i+1)+' · '+p.n+': '+priority(p).reason+' (simulated)',true);
+ alarmTimer=setTimeout(scheduleAlarm,15000);
 }
 scheduleAlarm();
 setInterval(()=>{if(!ent)return;T++;
  P.forEach((p,i)=>{
   if(p.done)return;
-  if(!p.pend&&!p.done&&T>=p.ev){p.pend=1;if(p.level)toast('Bed '+(i+1)+' · '+p.n+' · '+levelOf(p).name)}
+  if(!p.pend&&!p.done&&T>=p.ev){p.pend=1;if(p.level)toast('Bed '+(i+1)+' · '+p.n+' · '+levelOf(p).name,true)}
   p.bol*=.88;
-  (p.haz||[]).forEach(q=>{const kv=kval(p);if(p.dz[q[0]]>0&&(q[1]=='lt'?kv<q[2]:kv>q[2])){p.sev=Math.min(1,p.sev+.05);if(!p.hzs){p.hzs=1;toast('Bed '+(i+1)+': '+q[3])}}});
+  (p.haz||[]).forEach(q=>{const kv=kval(p);if(p.dz[q[0]]>0&&(q[1]=='lt'?kv<q[2]:kv>q[2])){p.sev=Math.min(1,p.sev+.05);if(!p.hzs){p.hzs=1;toast('Bed '+(i+1)+': '+q[3],true)}}});
   if(p.prh&&p.pr)p.sev=Math.min(1,p.sev+.03);if(p.twc)p.tw=p.dz[p.twc[2]]?p.twc[1]:p.twc[0];
   const v=p.v,z=p.dz,n=k=>z[k]||0,sb=p.sbp+p.sev*(p.hyp?25:-36)+n('nor')*1.3+n('vas')*500+n('dob')-n('gtn')*1.5+p.bol-n('mid')*(1.5+p.sev*2)+n('adr')*2.5+(p.ls<0?p.ls*n('ls')*6:0);
   const g={hr:p.hr+p.sev*(p.hrd?-15:30)-p.bol*.4+n('dob')*1.2-n('mid')+(p.hrd?Math.min(40,n('atr')*10):0)+n('adr')*3,sbp:sb,dbp:(p.dbp??p.sbp*.6)+(sb-p.sbp)*.6,spo2:clamp(p.spo2-p.sev*13+(p.fio2-p.initialFio2)*.12+(p.peep-p.initialPeep)*.35+(p.pr?(p.prs??2):0)+(p.fl||0)*p.bol+(p.ls>0?Math.min(6,n('ls')*p.ls):0)+(p.ed?Math.min(5,n('gtn')*.5):0),60,100),rr:p.iv&&p.air==='imv'?p.setRate:p.rr+p.sev*8-n('mid')*.6,t:p.t+p.sev*.6};
