@@ -9,9 +9,10 @@ import { GLTFLoader } from "./vendor/GLTFLoader.js";
 import { createDevices } from "./icu-devices.js?v=20261120o";
 import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261120o";
 import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261120o";
-import { createSfx } from "./sfx.js?v=20261120o";
-import { createDesk, DESK } from "./nexus-desk.js?v=20261120o";
-import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261120o";
+import { createSfx } from "./sfx.js?v=20261121c";
+import { createDesk, DESK } from "./nexus-desk.js?v=20261121c";
+import { paintMachine } from "./nexus-machines.js?v=20261121c";
+import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261121c";
 
 const $ = (s) => document.querySelector(s);
 const Q = new URLSearchParams(location.search), DEMO = Q.has("demo");
@@ -87,21 +88,69 @@ tor(2.2, 0.07, E(0xbff4ff, 2.2), WH - 0.1, hall); mesh(new T.CircleGeometry(2.1,
 for (let i = 0; i < 10; i++) { const a = i / 10 * TAU + 0.15, r = i % 2 ? 7.4 : 5.0; const d = mesh(new T.CircleGeometry(0.35, 20), E(0xe8f7ff, 1.4), Math.sin(a) * r, WH - 0.05, Math.cos(a) * r, hall); d.rotation.x = Math.PI / 2; }
 mesh(new T.CylinderGeometry(0.7, 2.35, WH - DAIS_H, 48, 1, true), new T.MeshBasicMaterial({ color: 0x7fe3ff, transparent: true, opacity: 0.055, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, toneMapped: false }), 0, (WH + DAIS_H) / 2, 0, hall);
 
-/* wall holo-screens: organ scans, a DNA helix, graphs and reports, as in the reference */
-function wallScreen(kind) {
-  return ctex(1024, 600, (g, w, h) => {
-    g.fillStyle = "rgba(5,26,42,.62)"; rr(g, 4, 4, w - 8, h - 8, 26); g.fill(); g.strokeStyle = "rgba(110,225,255,.8)"; g.lineWidth = 5; rr(g, 4, 4, w - 8, h - 8, 26); g.stroke();
-    g.fillStyle = "#7fe9ff"; g.font = "700 34px system-ui,sans-serif"; g.fillText(["IMAGING LIBRARY", "GENOMICS", "PHYSIOLOGY", "LABORATORY"][kind], 34, 62);
-    if (kind === 0) { for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) { const x = 40 + c * 235, y = 100 + r * 245, gr = g.createRadialGradient(x + 100, y + 100, 6, x + 100, y + 100, 100); gr.addColorStop(0, r ? "#ffd27a" : "#ff9a5a"); gr.addColorStop(0.6, r ? "#d9602a" : "#2fb4a8"); gr.addColorStop(1, "rgba(5,26,42,0)"); g.fillStyle = "rgba(0,0,0,.3)"; g.fillRect(x, y, 200, 200); g.fillStyle = gr; g.beginPath(); g.ellipse(x + 100, y + 100, 80 - c * 6, 62 + r * 10, c * 0.4, 0, TAU); g.fill(); g.strokeStyle = "rgba(110,225,255,.6)"; g.lineWidth = 2; g.strokeRect(x, y, 200, 200); } }
-    if (kind === 1) { for (let i = 0; i < 60; i++) { const y = 90 + i * 8.2, a = i * 0.28, x1 = w / 2 + Math.sin(a) * 200, x2 = w / 2 - Math.sin(a) * 200; g.strokeStyle = "rgba(110,225,255,.55)"; g.lineWidth = 3; g.beginPath(); g.moveTo(x1, y); g.lineTo(x2, y); g.stroke(); g.fillStyle = "#ffcf6e"; g.beginPath(); g.arc(x1, y, 7, 0, TAU); g.fill(); g.fillStyle = "#7fe9ff"; g.beginPath(); g.arc(x2, y, 7, 0, TAU); g.fill(); } }
-    if (kind === 2) { ["#3dff9a", "#ff6b78", "#48d9ff", "#f4d45a"].forEach((col, k) => { g.strokeStyle = col; g.lineWidth = 4; g.beginPath(); for (let x = 40; x < w - 40; x += 4) { const y = 150 + k * 112 + Math.sin(x * (0.02 + k * 0.006)) * (24 + k * 6) * (k === 0 ? Math.exp(-Math.pow((x % 200) - 100, 2) / 900) * 2 : 1); x === 40 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke(); }); }
-    if (kind === 3) { g.font = "500 26px ui-monospace,monospace"; for (let i = 0; i < 12; i++) { g.fillStyle = i % 4 === 0 ? "#ffcf6e" : "#a9dff0"; g.fillText(["Lactate 4.2 mmol/L", "pH 7.31", "pCO₂ 38 mmHg", "Creatinine 1.9 mg/dL", "K⁺ 4.6 mmol/L", "WCC 18.4", "CRP 212", "Hb 11.4 g/dL", "Na⁺ 138", "Troponin <0.01", "PCT 8.6", "INR 1.3"][i], 44, 120 + i * 38); g.fillRect(560, 106 + i * 38, 60 + ((i * 53) % 330), 14); } }
-  });
+/* wall holo-screens: live scans, a turning DNA helix, running traces, changing laboratory values, gauges and a radar. They keep moving. */
+const wallLive = { hr: 78, map: 85, spo2: 97, rr: 16, temp: 37, lactate: 1.8, k: 4.2, cr: 1.0 };
+const WK = [["IMAGING LIBRARY", "CT · MRI · ULTRASOUND"], ["GENOMICS", "SEQUENCING RUN"], ["PHYSIOLOGY", "BEDSIDE TRACES"], ["LABORATORY", "POINT OF CARE"], ["HAEMODYNAMICS", "PRESSURE AND FLOW"], ["ICU NETWORK", "BEDS AND TEAMS"]];
+function paintWall(kind, g, w, h, t) {
+  const L = wallLive, C = "#7fe9ff", mono = (px) => "600 " + px + "px ui-monospace,Menlo,Consolas,monospace", sans = (px, wt) => (wt || 700) + " " + px + "px system-ui,sans-serif";
+  g.clearRect(0, 0, w, h); g.fillStyle = "rgba(4,22,36,.72)"; rr(g, 4, 4, w - 8, h - 8, 22); g.fill();
+  const gl = g.createLinearGradient(0, 0, 0, h); gl.addColorStop(0, "rgba(95,227,255,.12)"); gl.addColorStop(0.5, "rgba(95,227,255,0)"); gl.addColorStop(1, "rgba(95,227,255,.08)"); g.fillStyle = gl; rr(g, 4, 4, w - 8, h - 8, 22); g.fill();
+  g.strokeStyle = "rgba(110,225,255,.85)"; g.lineWidth = 4; rr(g, 4, 4, w - 8, h - 8, 22); g.stroke();
+  g.fillStyle = C; g.font = sans(26); g.textAlign = "left"; g.fillText(WK[kind][0], 26, 46); g.fillStyle = "#8bb6c6"; g.font = sans(14, 600); g.fillText(WK[kind][1], 28, 68);
+  const on = Math.sin(t * 3) > -0.2; g.fillStyle = on ? "#ff5468" : "#5a2a32"; g.beginPath(); g.arc(w - 120, 38, 7, 0, 6.3); g.fill(); g.fillStyle = "#dff6ff"; g.font = mono(15); g.fillText("LIVE", w - 105, 44);
+  g.fillStyle = "rgba(95,227,255,.14)"; g.fillRect(24, 78, w - 48, 2);
+  const X0 = 26, Y0 = 92, W0 = w - 52, H0 = h - 116;
+  g.save(); g.beginPath(); g.rect(X0, Y0, W0, H0); g.clip();
+  if (kind === 0) {
+    const cols = 4, rows = 2, cw = W0 / cols, ch = H0 / rows, act = Math.floor(t * 0.7) % 8, tags = ["CT HEAD", "CT CHEST", "MRI BRAIN", "US HEART", "CT ABD", "MRI SPINE", "US LUNG", "CT PELVIS"];
+    for (let i = 0; i < 8; i++) { const cx = X0 + (i % cols) * cw + 6, cy = Y0 + Math.floor(i / cols) * ch + 6, iw = cw - 12, ih = ch - 12;
+      g.fillStyle = "#03101a"; g.fillRect(cx, cy, iw, ih); const gr = g.createRadialGradient(cx + iw / 2, cy + ih / 2, 4, cx + iw / 2, cy + ih / 2, ih * 0.62); gr.addColorStop(0, i > 3 ? "#ffd27a" : "#ff9a5a"); gr.addColorStop(0.6, i > 3 ? "#d9602a" : "#2fb4a8"); gr.addColorStop(1, "rgba(5,26,42,0)"); g.fillStyle = gr; g.beginPath(); g.ellipse(cx + iw / 2, cy + ih / 2, iw * 0.34 + Math.sin(t * 1.3 + i) * 3, ih * 0.38, 0, 0, 6.3); g.fill();
+      const sy = cy + ((t * 60 + i * 23) % ih); g.fillStyle = "rgba(160,255,240,.5)"; g.fillRect(cx, sy, iw, 2);
+      g.fillStyle = "#cfefff"; g.font = mono(11); g.fillText(tags[i], cx + 5, cy + 14); g.strokeStyle = i === act ? "#ffcf6e" : "rgba(110,225,255,.45)"; g.lineWidth = i === act ? 3 : 1.2; g.strokeRect(cx, cy, iw, ih);
+      if (i === act) { g.fillStyle = "#ffcf6e"; g.fillText("SLICE " + (100 + Math.floor(t * 9) % 150) + " / 256", cx + 5, cy + ih - 8); } }
+  } else if (kind === 1) {
+    const cx = X0 + W0 * 0.36, ph = t * 1.4;
+    for (let i = 0; i < 52; i++) { const y = Y0 + 6 + i * (H0 - 12) / 51, a = i * 0.3 + ph, x1 = cx + Math.sin(a) * 150, x2 = cx - Math.sin(a) * 150, z1 = Math.cos(a), z2 = -z1;
+      g.strokeStyle = "rgba(110,225,255," + (0.18 + 0.3 * Math.abs(Math.sin(a))) + ")"; g.lineWidth = 3; g.beginPath(); g.moveTo(x1, y); g.lineTo(x2, y); g.stroke();
+      g.fillStyle = "rgba(255,207,110," + (0.5 + 0.5 * z1) + ")"; g.beginPath(); g.arc(x1, y, 5 + 2.5 * z1, 0, 6.3); g.fill(); g.fillStyle = "rgba(127,233,255," + (0.5 + 0.5 * z2) + ")"; g.beginPath(); g.arc(x2, y, 5 + 2.5 * z2, 0, 6.3); g.fill(); }
+    const bases = "ATGCCGATTAGCGGATCATGC"; g.font = mono(20); for (let r = 0; r < 12; r++) { const y = Y0 + 24 + r * 26; for (let c = 0; c < 10; c++) { const ch = bases[(c + r * 3 + Math.floor(t * 4)) % bases.length]; g.fillStyle = { A: "#3dff9a", T: "#ff6b78", G: "#ffcf6e", C: "#48d9ff" }[ch]; g.fillText(ch, X0 + W0 * 0.64 + c * 24, y); } }
+    g.fillStyle = "rgba(95,227,255,.2)"; g.fillRect(X0 + W0 * 0.64, Y0 + H0 - 26, W0 * 0.34, 10); g.fillStyle = C; g.fillRect(X0 + W0 * 0.64, Y0 + H0 - 26, W0 * 0.34 * ((t * 0.07) % 1), 10);
+  } else if (kind === 2) {
+    const per = 60 / Math.max(35, L.hr), tr = [["II", "#3dff9a", (f) => { const q = (m, sd, a) => a * Math.exp(-(((f - m) / sd) ** 2)); return 0.5 + 0.1 * q(0.2, 0.03, 1) + 0.9 * q(0.4, 0.014, 1) - 0.12 * q(0.37, 0.01, 1) + 0.18 * q(0.65, 0.05, 1); }, 0.7], ["ART", "#ff6b78", (f) => 0.2 + 0.6 * Math.exp(-(((f - 0.15) / 0.12) ** 2)) + 0.15 * Math.exp(-(((f - 0.45) / 0.07) ** 2)), 1], ["SpO₂", "#48d9ff", (f) => 0.2 + 0.6 * Math.exp(-(((f - 0.22) / 0.16) ** 2)), 1], ["RESP", "#f4d45a", (f) => 0.5 + 0.35 * Math.sin(f * 6.283), 1]];
+    const rh = H0 / 4; tr.forEach((r, k) => { const y = Y0 + k * rh, px = 110, cyc = k === 3 ? 60 / Math.max(6, L.rr) : per; g.fillStyle = r[1]; g.font = mono(16); g.fillText(r[0], X0 + 4, y + 22); g.fillStyle = "#e9fbff"; g.font = mono(26); g.fillText(["" + Math.round(L.hr), Math.round(L.map * 1.45) + "/" + Math.round(L.map * 0.78), Math.round(L.spo2) + "%", "" + Math.round(L.rr)][k], X0 + 4, y + 52);
+      g.strokeStyle = r[1]; g.lineWidth = 2.4; g.beginPath(); const sw = (t % 5) / 5; for (let x = 0; x <= W0 - px - 30; x += 3) { const u = x / (W0 - px - 30), f = (((t - (sw - u + (u > sw ? 1 : 0)) * 5) / cyc) % 1 + 1) % 1; const yy = y + rh - 8 - r[2](f) * (rh - 18); if (Math.abs(u - sw) < 0.03) { g.moveTo(X0 + px + x, yy); continue; } x ? g.lineTo(X0 + px + x, yy) : g.moveTo(X0 + px + x, yy); } g.stroke();
+      g.fillStyle = "rgba(255,255,255,.7)"; g.fillRect(X0 + px + sw * (W0 - px - 30), y + 4, 3, rh - 8); });
+  } else if (kind === 3) {
+    const rows = [["Lactate", L.lactate, "mmol/L", 2, 4], ["pH", 7.38 - Math.max(0, L.lactate - 1.5) * 0.02, "", 7.35, 7.3], ["K⁺", L.k, "mmol/L", 5.1, 5.6], ["Creatinine", L.cr, "mg/dL", 1.3, 2.5], ["Na⁺", 138 + Math.sin(t * 0.3) * 1.5, "mmol/L", 146, 150], ["WCC", 14.2 + Math.sin(t * 0.21) * 1.2, "×10⁹/L", 11, 18], ["CRP", 188 + Math.sin(t * 0.17) * 9, "mg/L", 10, 100], ["PCT", 6.4 + Math.sin(t * 0.13) * 0.6, "ng/mL", 0.5, 2], ["Hb", 11.2 + Math.sin(t * 0.11) * 0.3, "g/dL", 0, 0]];
+    const rh = H0 / rows.length; rows.forEach((r, i) => { const y = Y0 + i * rh + rh * 0.72, bad = r[4] && (r[1] >= r[4]), warn = r[3] && r[1] >= r[3] && !bad, col = bad ? "#ff5468" : warn ? "#ffcf6e" : "#a9dff0";
+      if (i === 1) { const ph = r[1]; g.fillStyle = ph < 7.3 ? "#ff5468" : ph < 7.35 ? "#ffcf6e" : "#a9dff0"; } else g.fillStyle = col; g.font = mono(21); g.fillText(r[0], X0 + 6, y); g.fillText((r[1] < 10 ? r[1].toFixed(r[0] === "pH" ? 2 : 1) : Math.round(r[1])) + " " + r[2], X0 + 190, y);
+      g.fillStyle = "rgba(95,227,255,.16)"; g.fillRect(X0 + 440, y - 15, W0 - 450, 12); g.fillStyle = col; g.fillRect(X0 + 440, y - 15, (W0 - 450) * (0.25 + 0.5 * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 1.7))), 12); });
+  } else if (kind === 4) {
+    const gs = [["MAP", L.map, 40, 120, "mmHg", "#3dff9a"], ["CO", 4 + Math.sin(t * 0.5) * 0.5 + (L.map - 80) * 0.02, 2, 8, "L/min", "#48d9ff"], ["SVR", 1100 + Math.sin(t * 0.4) * 80, 400, 1800, "dyn", "#ffcf6e"]];
+    gs.forEach((q, i) => { const cx = X0 + W0 * (0.17 + i * 0.33), cy = Y0 + H0 * 0.62, R = Math.min(W0 * 0.14, H0 * 0.42), a0 = Math.PI * 0.8, a1 = Math.PI * 2.2, v = Math.max(0, Math.min(1, (q[1] - q[2]) / (q[3] - q[2])));
+      g.lineWidth = 12; g.lineCap = "round"; g.strokeStyle = "rgba(95,227,255,.18)"; g.beginPath(); g.arc(cx, cy, R, a0, a1); g.stroke(); g.strokeStyle = q[5]; g.beginPath(); g.arc(cx, cy, R, a0, a0 + (a1 - a0) * v); g.stroke();
+      g.strokeStyle = "#fff"; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a0 + (a1 - a0) * v) * R * 0.82, cy + Math.sin(a0 + (a1 - a0) * v) * R * 0.82); g.stroke();
+      g.fillStyle = "#e9fbff"; g.textAlign = "center"; g.font = mono(26); g.fillText(q[0] === "SVR" ? String(Math.round(q[1])) : q[1].toFixed(q[0] === "MAP" ? 0 : 1), cx, cy + R * 0.5); g.fillStyle = "#8bb6c6"; g.font = mono(13); g.fillText(q[0] + " · " + q[4], cx, cy + R * 0.5 + 20); g.textAlign = "left"; });
+    for (let i = 0; i < 24; i++) { const bx = X0 + 12 + i * ((W0 - 24) / 24), bh = (0.15 + 0.7 * (0.5 + 0.5 * Math.sin(t * 2 + i * 0.5))) * H0 * 0.2; g.fillStyle = "rgba(95,227,255,.55)"; g.fillRect(bx, Y0 + H0 - bh, (W0 - 24) / 24 - 4, bh); }
+  } else {
+    const cx = X0 + W0 * 0.3, cy = Y0 + H0 * 0.5, R = Math.min(W0 * 0.26, H0 * 0.46), sw = t * 1.1;
+    for (let k = 1; k <= 3; k++) { g.strokeStyle = "rgba(95,227,255," + (0.15 + k * 0.05) + ")"; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy, R * k / 3, 0, 6.3); g.stroke(); }
+    g.beginPath(); g.moveTo(cx - R, cy); g.lineTo(cx + R, cy); g.moveTo(cx, cy - R); g.lineTo(cx, cy + R); g.stroke();
+    const sg = g.createConicGradient ? g.createConicGradient(sw, cx, cy) : null; if (sg) { sg.addColorStop(0, "rgba(61,255,154,.55)"); sg.addColorStop(0.18, "rgba(61,255,154,0)"); sg.addColorStop(1, "rgba(61,255,154,0)"); g.fillStyle = sg; g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R, 0, 6.3); g.fill(); }
+    for (let i = 0; i < 7; i++) { const a = i * 0.9 + 0.3, d = R * (0.35 + 0.55 * ((i * 37) % 10) / 10), bx = cx + Math.cos(a) * d, by = cy + Math.sin(a) * d, age = (((sw - a) % 6.283) + 6.283) % 6.283; g.fillStyle = "rgba(255,207,110," + Math.max(0.15, 1 - age / 4) + ")"; g.beginPath(); g.arc(bx, by, 6, 0, 6.3); g.fill(); }
+    [["BEDS", "6 / 6"], ["TEAMS", "3 ONLINE"], ["ALERTS", String(1 + Math.floor(t * 0.2) % 3)], ["LATENCY", (18 + Math.floor(Math.sin(t) * 5)) + " ms"]].forEach((r, i) => { const y = Y0 + 20 + i * (H0 / 4); g.fillStyle = "#8bb6c6"; g.font = mono(15); g.fillText(r[0], X0 + W0 * 0.66, y); g.fillStyle = "#e9fbff"; g.font = mono(26); g.fillText(r[1], X0 + W0 * 0.66, y + 30); });
+  }
+  g.restore();
 }
+const walls = [];
+const WALLK = [2, 0, 3, 1, 4, 5, 2, 3, 0, 4];
 for (let k = 0; k < 10; k++) {
-  const a = (k + 0.5) / 10 * TAU, p = mesh(new T.PlaneGeometry(3.7, 2.17), new T.MeshBasicMaterial({ map: wallScreen(k % 4), transparent: true, toneMapped: false, depthWrite: false, side: T.DoubleSide }), Math.sin(a) * (RH - 0.3), 3.0, Math.cos(a) * (RH - 0.3), hall);
-  p.rotation.y = a + Math.PI; p.renderOrder = 2;
+  const cvw = document.createElement("canvas"); cvw.width = 768; cvw.height = 450; const gw = cvw.getContext("2d"), tw = new T.CanvasTexture(cvw); tw.colorSpace = T.SRGBColorSpace; tw.anisotropy = 4;
+  const a = (k + 0.5) / 10 * TAU, p = mesh(new T.PlaneGeometry(3.7, 2.17), new T.MeshBasicMaterial({ map: tw, transparent: true, toneMapped: false, depthWrite: false, side: T.DoubleSide }), Math.sin(a) * (RH - 0.3), 3.0, Math.cos(a) * (RH - 0.3), hall);
+  p.rotation.y = a + Math.PI; p.renderOrder = 2; walls.push({ g: gw, tex: tw, cv: cvw, kind: WALLK[k], mesh: p }); paintWall(WALLK[k], gw, 768, 450, k * 1.7); tw.needsUpdate = true;
 }
+let wallN = 0;
+function updateWalls(t) { for (let j = 0; j < 2; j++) { const w = walls[(wallN + j * 5) % 10]; paintWall(w.kind, w.g, 768, 450, t + w.kind); w.tex.needsUpdate = true; } wallN = (wallN + 1) % 10; }
 /* the entrance door in the south wall (you arrive through it) */
 { const d = new T.Group(); d.position.set(0, 0, RH - 0.06); d.rotation.y = Math.PI; hall.add(d);
   mesh(new T.BoxGeometry(2.7, 0.08, 0.1), E(0x36d6ff, 2.2), 0, 2.72, 0, d); [-1.3, 1.3].forEach((x) => mesh(new T.BoxGeometry(0.08, 2.72, 0.1), E(0x36d6ff, 2.2), x, 1.36, 0, d));
@@ -289,6 +338,8 @@ const arrive = { t: 0, t0: performance.now(), from: { x: me.x * 1.62, z: me.z * 
 try { const j = JSON.parse(sessionStorage.getItem("ccu-pose") || "null"); sessionStorage.removeItem("ccu-pose");
   if (j && j.to === "team" && Date.now() - j.t < 20000) { me.x = j.x; me.z = j.z; me.yaw = j.yaw; arrive.t = 2.4; arrive.fromPose = true; } } catch (e) {}
 me.x = arrive.from.x; me.z = arrive.from.z;
+/* the camera angle: level (0) up to 60 degrees looking down at the desk. The semicircular arrow sets it. */
+const VP_MAX = Math.PI / 3; let vp = 0.78, vpCur = 0;
 const faceCenter = (x, z) => Math.atan2(-x, z);
 me.yaw = faceCenter(me.x, me.z);
 function clampPos(x, z) { if (!focus && Math.abs(x) < 1.2 && z > MAXR - 1.5) return [clamp(x, -1.2, 1.2), Math.min(z, RH + 3.2)]; const r = Math.hypot(x, z) || 1e-6; if (!focus && r < MINR) { x *= MINR / r; z *= MINR / r; } else if (r > MAXR) { x *= MAXR / r; z *= MAXR / r; } return [x, z]; }
@@ -299,7 +350,7 @@ function walkBy(d) {
     if (dot > 0.5) { const k = Math.min(0.7, d * 2.5); nx -= nx * k; let dy = Math.atan2(vx, -vz) - me.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); me.yaw += dy * Math.min(0.5, d * 1.5); }
   }
   const c = clampPos(nx, nz); me.x = c[0]; me.z = c[1]; }
-let dn = 0, mvd = 0, lx = 0, ly = 0, sx = 0, sy = 0, holdDir = 0, lastV = 0, mode = "", onPatient = false, onDesk = false, spinV = 0, autoSpin = false, focus = null, retreat = false, lpT = 0, grab = null, gx = 0, held = false, lastMT = 0;
+let dn = 0, mvd = 0, lx = 0, ly = 0, sx = 0, sy = 0, holdDir = 0, lastV = 0, mode = "", onPatient = false, onDesk = false, tileDown = null, spinV = 0, autoSpin = false, focus = null, retreat = false, lpT = 0, grab = null, gx = 0, held = false, lastMT = 0;
 const ray = new T.Raycaster(), ndc = new T.Vector2();
 const sfx = createSfx();
 const setRay = (cx, cy) => { ndc.set(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam); };
@@ -310,7 +361,7 @@ function panelAt(cx, cy) { setRay(cx, cy); const ms = panels.filter((p) => p.m.v
 cv.addEventListener("pointerdown", (e) => {
   dn = 1; mvd = 0; lx = sx = e.clientX; ly = sy = e.clientY; holdDir = 0; mode = ""; spinV = 0; held = false; grab = null; gx = 0; lastMT = performance.now(); sfx.unlock();
   const dp = pointHitsPatient(e.clientX, e.clientY); setRay(e.clientX, e.clientY); const dd = odesk.hit(ray), pa = panelAt(e.clientX, e.clientY);
-  onPatient = dp != null && (dd == null || dp < dd); onDesk = dd != null && (dp == null || dd < dp);
+  onPatient = dp != null && (dd == null || dp < dd); onDesk = dd != null && (dp == null || dd < dp); tileDown = odesk.pick(ray);
   clearTimeout(lpT);
   if (pa && (dp == null || pa.d < dp) && (dd == null || pa.d < dd)) { onPatient = false; onDesk = false; lpT = setTimeout(() => { if (dn && mvd < 10) { grab = pa.p; grab.grab = 1; gx = 0; held = true; navigator.vibrate && navigator.vibrate(20); sfx.beep && sfx.beep({ f: 660, vol: 0.5 }); $("#hint").style.opacity = 1; $("#hint").textContent = "Swipe left or right to remove this panel"; } }, 480); }
   if (focus) { focus = null; retreat = true; }
@@ -320,7 +371,9 @@ cv.addEventListener("pointermove", (e) => {
   if (!dn) return; const dx = e.clientX - lx, dy = e.clientY - ly, now = performance.now(), dts = Math.max(0.008, (now - lastMT) / 1000); lx = e.clientX; ly = e.clientY; lastMT = now; mvd += Math.abs(dx) + Math.abs(dy);
   if (grab) { gx += dx; grab.dragX = gx * 0.006; if (Math.abs(gx) > 90) { removePanel(grab, Math.sign(gx)); grab.grab = 0; grab.dragX = 0; grab = null; $("#pnl").hidden = !panels.some((q) => !q.pop && (q.hidden || q.rm)); } return; }
   if (mvd > 10 && lpT) { clearTimeout(lpT); lpT = 0; }
-  if (!mode && mvd > 8) { const horiz = Math.abs(e.clientX - sx) > Math.abs(e.clientY - sy) * 1.1; mode = onPatient && horiz ? "spin" : onDesk && horiz ? "orbit" : "walk"; }
+  if (!mode && mvd > 8) { const horiz = Math.abs(e.clientX - sx) > Math.abs(e.clientY - sy) * 1.1; mode = tileDown && horiz ? "dock" : onPatient && horiz ? "spin" : onDesk && horiz ? "orbit" : "walk"; }
+  if (mode === "docked") return;
+  if (mode === "dock") { const tdx = e.clientX - sx; if (Math.abs(tdx) > 52 && tileDown) { openSection(tileDown, 0, tdx < 0 ? "L" : "R"); tileDown = null; mode = "docked"; navigator.vibrate && navigator.vibrate(10); } return; }
   if (mode === "spin") { turn.rotation.y += dx * 0.011; spinV = dx * 0.011 * 40; autoSpin && setAuto(false); return; }
   if (mode === "orbit") { odesk.drag(dx * 0.0042, dts); return; }
   me.yaw -= dx * 0.006;
@@ -333,6 +386,21 @@ function setAuto(on) { autoSpin = on; $("#spin").dataset.on = on ? "1" : "0"; }
 $("#spin").onclick = () => setAuto(!autoSpin);
 $("#pnl").onclick = restorePanels;
 $("#xray").onclick = () => { insideWant = !insideWant; $("#xray").dataset.on = insideWant ? "1" : "0"; };
+/* the semicircular arrow: drag the knob round the arc to tilt the camera between level and 60 degrees looking down; the button flips between the two */
+const tsvg = $("#tiltsvg"), tknob = $("#tiltknob"), tfill = $("#tiltfill"), tbtn = $("#tiltbtn"), tdeg = $("#tiltdeg");
+function paintTilt() {
+  const t = vp / VP_MAX, ph = (-90 + t * 180) * Math.PI / 180, x = 10 + 58 * Math.cos(ph), y = 68 - 58 * Math.sin(ph);
+  tknob.setAttribute("cx", x.toFixed(1)); tknob.setAttribute("cy", y.toFixed(1)); tfill.setAttribute("d", t < 0.005 ? "M10 126 A58 58 0 0 1 10 126" : "M10 126 A58 58 0 0 1 " + x.toFixed(1) + " " + y.toFixed(1));
+  const deg = Math.round(vp * 180 / Math.PI); tdeg.textContent = deg + "°"; tsvg.setAttribute("aria-valuenow", String(deg)); tbtn.dataset.on = vp > 0.17 ? "1" : "0"; tbtn.textContent = vp > 0.17 ? "Level view" : "Top view";
+}
+function setTilt(v) { vp = clamp(v, 0, VP_MAX); paintTilt(); }
+function tiltFrom(e) { const r = tsvg.getBoundingClientRect(), k = r.width / 62, cx = r.left + 10 * k, cy = r.top + 68 * k, a = Math.atan2(-(e.clientY - cy), Math.max(0.0001, e.clientX - cx)); setTilt((a + Math.PI / 2) / Math.PI * VP_MAX); }
+let tdrag = false;
+tsvg.addEventListener("pointerdown", (e) => { tdrag = true; try { tsvg.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } tiltFrom(e); sfx.unlock(); e.preventDefault(); });
+tsvg.addEventListener("pointermove", (e) => { if (tdrag) tiltFrom(e); });
+const tend = () => { tdrag = false; }; tsvg.addEventListener("pointerup", tend); tsvg.addEventListener("pointercancel", tend);
+tbtn.onclick = () => setTilt(vp > 0.17 ? 0 : 0.8);
+paintTilt();
 
 /* ================================================================ the other doctors */
 const remotes = new Map(); let peerList = [], net = null, netKey = "";
@@ -372,7 +440,7 @@ let cardT = 0, sel = "";
 function card(html, ms) { const c = $("#card"); c.innerHTML = html; c.hidden = false; clearTimeout(cardT); cardT = setTimeout(() => { c.hidden = true; }, ms || 8000); }
 function tapAt(cx, cy) {
   setRay(cx, cy);
-  const tid = odesk.pick(ray); if (tid) { if (tid === secId) closeSection(); else openSection(tid); return; }
+  const tid = odesk.pick(ray); if (tid) { if (paneOf(tid)) closeSection(paneOf(tid).side); else openSection(tid); return; }
   const docs = []; remotes.forEach((r) => { if (r.doc && r.doc.group.visible) docs.push(r.doc.group); });
   const hd = ray.intersectObjects(docs, true)[0];
   if (hd) { let o = hd.object; while (o && !o.userData.sid) o = o.parent; const r = o && remotes.get(o.userData.sid); if (r) { card(`<b>Dr ${esc(r.info.name)}</b><span>${esc(specInfo(r.info.spec)[0])}${r.near ? " · at the patient" : " · in the hall"}</span>`); return; } }
@@ -450,57 +518,78 @@ function renderDesk() {
 let deskOk = "";
 
 /* ================================================================ what comes in: results, findings, the trends, and the popups */
-const feed = [], hist = [], labSeries = [], seenKeys = new Set(), unseen = { lab: 0, rad: 0, overview: 0 };
+const feed = [], hist = [], labSeries = [], seenKeys = new Set(), unseen = { invest: 0, history: 0 };
 let feedInit = false, lastLab = "";
 const FIND_RE = [[/looked at the heart/i, "img", "Echocardiogram"], [/blood cultures/i, "lab", "Blood cultures"], [/bronchoscopy/i, "find", "Bronchoscopy"], [/examined/i, "find", "Examination"]];
-const SECOF = { lab: "lab", img: "rad", find: "overview" };
+const SECOF = { lab: "invest", img: "invest", find: "history" };
 function scanFeed() {
   if (!P) return; const fresh = [];
   (P.results || []).forEach((r) => { const k = "r|" + r.label + "|" + r.text; if (!seenKeys.has(k)) { seenKeys.add(k); fresh.push({ kind: /Labs/i.test(r.label) ? "lab" : "img", label: r.label, text: r.text, key: k }); } });
   (P.log || []).forEach((l) => { const k = "l|" + l.t + "|" + l.text; if (seenKeys.has(k)) return; seenKeys.add(k); const f = FIND_RE.find((x) => x[0].test(l.text || "")); if (f) fresh.push({ kind: f[1], label: f[2], text: l.text, key: k }); });
-  fresh.forEach((i) => { i.hour = P.hour; feed.push(i); if (feedInit) { pushPopup(i); const sc = SECOF[i.kind]; if (secId !== sc) unseen[sc]++; } });
+  fresh.forEach((i) => { i.hour = P.hour; feed.push(i); if (feedInit) { pushPopup(i); const sc = SECOF[i.kind]; if (!paneOf(sc)) unseen[sc]++; } });
   feedInit = true;
   const l = labsOf({ P }); if (l.sent && l.text !== lastLab) { lastLab = l.text; labSeries.push({ hour: P.hour, lactate: l.lactate, cr: l.cr, k: l.k, hb: l.hb }); }
   const h = { hour: P.hour, hr: P.hr, map: P.map, spo2: P.spo2, temp: P.temp }; if (hist.length && hist[hist.length - 1].hour === P.hour) hist[hist.length - 1] = h; else hist.push(h); if (hist.length > 60) hist.shift();
 }
 function badgeAll() { Object.keys(unseen).forEach((k) => odesk.setBadge(k, unseen[k])); }
 
-/* ================================================================ the seven scientific sections */
-let secId = "", secSub = 0, secKey = "";
+/* ================================================================ the eight scientific sections, in two side panels */
+/* a touched label opens its panel; swiped left it docks on the left of the screen, swiped right on the right. Both can be open together. */
 const sciCtx = () => ({ P, SC, eq, orders: mdt.orders, busy: mdt.busy, room: mdt.room, labSeries, hist, feed });
 const viewAz = () => Math.atan2(cam.position.x, cam.position.z);
-function sciHtml() {
-  const sec = SECTIONS.find((x) => x.id === secId); if (!sec) return "";
-  return `<header><span class="no">${sec.n}</span><h2>${esc(sec.title)}</h2><button id="scix" type="button" aria-label="Close">✕</button></header><nav class="subs">${sec.subs.map((t, i) => `<button type="button" data-i="${i}" data-on="${i === secSub ? 1 : 0}">${esc(t)}</button>`).join("")}</nav><div class="sbody"><h3>${esc(sec.subs[secSub])}</h3>${buildSection(secId, secSub, sciCtx())}</div>`;
+const panes = { L: { side: "L", el: $("#sciL"), id: "", sub: 0, key: "" }, R: { side: "R", el: $("#sci"), id: "", sub: 0, key: "" } };
+const paneList = [panes.L, panes.R];
+const openIds = () => paneList.map((q) => q.id).filter(Boolean);
+const anyOpen = () => openIds().length > 0;
+const paneOf = (id) => paneList.find((q) => q.id === id);
+const syncOpen = () => { document.body.classList.toggle("both", !!(panes.L.id && panes.R.id)); odesk.setActive(openIds()); };
+function sciHtml(q) {
+  const sec = SECTIONS.find((x) => x.id === q.id); if (!sec) return "";
+  const g = sec.groups || {};
+  return `<header><span class="no">${sec.n}</span><h2>${esc(sec.title)}</h2><button class="scix" type="button" aria-label="Close">✕</button></header><nav class="subs">${sec.subs.map((t, i) => (g[i] ? `<i class="gl">${esc(g[i])}</i>` : "") + `<button type="button" data-i="${i}" data-on="${i === q.sub ? 1 : 0}">${esc(t)}</button>`).join("")}</nav><div class="sbody"><h3>${esc(sec.subs[q.sub])}</h3>${buildSection(q.id, q.sub, sciCtx())}</div>`;
 }
-function sciPaint() {
-  const el = $("#sci"); el.querySelectorAll("canvas.ximg").forEach((c) => paintImage(c, c.dataset.k, c.dataset.r)); el.querySelectorAll("canvas.ecg").forEach((c) => paintEcg(c, +c.dataset.hr, c.dataset.r, c.dataset.a === "1"));
+function sciPaint(q) {
+  const el = q.el; el.querySelectorAll("canvas.ximg").forEach((c) => paintImage(c, c.dataset.k, c.dataset.r)); el.querySelectorAll("canvas.ecg").forEach((c) => paintEcg(c, +c.dataset.hr, c.dataset.r, c.dataset.a === "1")); paintMachines(0);
 }
-function renderSection(force) {
-  if (!secId) return; const key = JSON.stringify([secId, secSub, P && [Math.round(P.hr), Math.round(P.map), Math.round(P.spo2), P.hour, (P.results || []).length, (P.log || []).length, P.tube, P.norepi, P.oxygen, P.artLine, P.hdLine, P.dialysis], mdt.busy, mdt.orders && JSON.stringify(mdt.orders.groups.map((g) => g.items.map((i) => i.ok ? 1 : 0))), mdt.room && mdt.room.members && mdt.room.members.length]);
-  if (!force && key === secKey) return; secKey = key; const el = $("#sci"), sb = el.querySelector(".sbody"), top = sb ? sb.scrollTop : 0, ns = el.querySelector(".subs"), nl = ns ? ns.scrollLeft : 0;
-  el.innerHTML = sciHtml(); const nb = el.querySelector(".sbody"); if (nb && !force) nb.scrollTop = top; const n2 = el.querySelector(".subs"); if (n2 && !force) n2.scrollLeft = nl; sciPaint();
+/* the machines on the Treatment page move: repaint them a few times a second while a panel shows one */
+let machT = 0;
+function paintMachines(now) {
+  const cs = []; paneList.forEach((q) => { if (q.id && !q.el.hidden) q.el.querySelectorAll("canvas.mach").forEach((c) => cs.push(c)); });
+  cs.forEach((c) => { let st = {}; try { st = JSON.parse(c.dataset.st || "{}"); } catch (e) { /* ignore */ } paintMachine(c, c.dataset.k, st, now / 1000); });
+}
+function renderSection(q, force) {
+  if (!q.id) return; const key = JSON.stringify([q.id, q.sub, P && [Math.round(P.hr), Math.round(P.map), Math.round(P.spo2), P.hour, (P.results || []).length, (P.log || []).length, P.tube, P.norepi, P.oxygen, P.artLine, P.hdLine, P.dialysis], mdt.busy, mdt.orders && JSON.stringify(mdt.orders.groups.map((g) => g.items.map((i) => i.ok ? 1 : 0))), mdt.room && mdt.room.members && mdt.room.members.length]);
+  if (!force && key === q.key) return; q.key = key; const el = q.el, sb = el.querySelector(".sbody"), top = sb ? sb.scrollTop : 0, ns = el.querySelector(".subs"), nl = ns ? ns.scrollLeft : 0;
+  el.innerHTML = sciHtml(q); const nb = el.querySelector(".sbody"); if (nb && !force) nb.scrollTop = top; const n2 = el.querySelector(".subs"); if (n2 && !force) n2.scrollLeft = nl; sciPaint(q);
   const on = el.querySelector(".subs [data-on='1']"), sn = el.querySelector(".subs"); if (on && sn && force) sn.scrollLeft = on.offsetLeft - (sn.clientWidth - on.offsetWidth) / 2;
 }
-function openSection(id, sub) {
-  if (!SECTIONS.some((x) => x.id === id)) return; const was = secId; closeDock(); $("#card").hidden = true; secId = id; secSub = sub || 0; unseen[id] = 0; badgeAll(); odesk.setActive(id); odesk.faceTile(id, viewAz()); $("#hint").style.opacity = 0;
-  renderSection(true); const el = $("#sci"), sc = odesk.screenOf(id, cam); el.style.transformOrigin = sc ? Math.round(clamp(sc.x, 0, 1) * 100) + "% " + Math.round(clamp(sc.y, 0, 1) * 100) + "%" : "50% 100%"; el.hidden = false;
-  if (!was) { el.classList.remove("in"); void el.offsetWidth; el.classList.add("in"); } sfx.unlock();
+const renderAll = (force) => paneList.forEach((q) => renderSection(q, force));
+function openSection(id, sub, side) {
+  if (!SECTIONS.some((x) => x.id === id)) return;
+  side = side || (panes.R.id ? (panes.L.id ? "R" : "L") : "R");
+  const other = paneOf(id); if (other && other.side !== side) { other.id = ""; other.key = ""; other.el.hidden = true; other.el.classList.remove("in"); }
+  const q = panes[side], was = q.id; closeDock(); $("#card").hidden = true; q.id = id; q.sub = sub || 0; unseen[id] = 0; badgeAll(); syncOpen(); odesk.faceTile(id, viewAz()); $("#hint").style.opacity = 0;
+  renderSection(q, true); const el = q.el, sc = odesk.screenOf(id, cam); el.style.transformOrigin = sc ? Math.round(clamp(sc.x, 0, 1) * 100) + "% " + Math.round(clamp(sc.y, 0, 1) * 100) + "%" : "50% 100%"; el.hidden = false;
+  if (was !== id) { el.classList.remove("in"); void el.offsetWidth; el.classList.add("in"); } sfx.unlock(); sfx.beep && sfx.beep({ f: 880, vol: 0.25 });
 }
-function closeSection() { secId = ""; secKey = ""; odesk.setActive(null); const el = $("#sci"); el.hidden = true; el.classList.remove("in"); }
-$("#sci").addEventListener("click", (e) => {
+function closeSection(side) {
+  paneList.forEach((q) => { if (side && q.side !== side) return; q.id = ""; q.key = ""; q.el.hidden = true; q.el.classList.remove("in"); }); syncOpen();
+}
+paneList.forEach((q) => q.el.addEventListener("click", (e) => {
   const t = e.target.closest("button,canvas"); if (!t) return;
-  if (t.id === "scix") return closeSection();
-  if (t.dataset.i != null && t.closest(".subs")) { secSub = +t.dataset.i; renderSection(true); return; }
+  if (t.classList.contains("scix")) return closeSection(q.side);
+  if (t.dataset.i != null && t.closest(".subs")) { q.sub = +t.dataset.i; renderSection(q, true); return; }
   if (t.dataset.act === "order") { post("hall-order", { kind: t.dataset.kind, specialty: t.dataset.spec || "" }); t.classList.add("sent"); sfx.unlock(); return; }
-  if (t.dataset.act === "goto") { secSub = +t.dataset.sub || 0; secId = t.dataset.sec; unseen[secId] = 0; badgeAll(); odesk.setActive(secId); odesk.faceTile(secId, viewAz()); renderSection(true); return; }
-  if (t.tagName === "CANVAS" && t.classList.contains("ximg")) { const r = t.getBoundingClientRect(), x = (e.clientX - r.left) * t.width / r.width, y = (e.clientY - r.top) * t.height / r.height, hs = hotspotAt(t.dataset.k, x, y, t.width, t.height, t.dataset.r), box = $("#sci").querySelector(".hot"); if (box) { box.textContent = hs ? hs.n + ". " + hs.text : "Tap on one of the numbered spots."; box.dataset.hit = hs && hs.hit ? "1" : "0"; } }
-});
+  if (t.dataset.act === "goto") { q.sub = +t.dataset.sub || 0; q.id = t.dataset.sec; unseen[q.id] = 0; badgeAll(); syncOpen(); odesk.faceTile(q.id, viewAz()); renderSection(q, true); return; }
+  if (t.tagName === "CANVAS" && t.classList.contains("ximg")) { const r = t.getBoundingClientRect(), x = (e.clientX - r.left) * t.width / r.width, y = (e.clientY - r.top) * t.height / r.height, hs = hotspotAt(t.dataset.k, x, y, t.width, t.height, t.dataset.r), box = q.el.querySelector(".hot"); if (box) { box.textContent = hs ? hs.n + ". " + hs.text : "Tap on one of the numbered spots."; box.dataset.hit = hs && hs.hit ? "1" : "0"; } }
+}));
 function tileInfo() {
   if (!P) { SECTIONS.forEach((x) => odesk.setInfo(x.id, "waiting for the case")); return; }
   const l = labsOf({ P }), so = sofaOf({ P, SC, eq, labSeries }), rs = (P.results || []).filter((r) => /Chest|CT/.test(r.label)).length + (P.log || []).filter((x) => /looked at the heart/.test(x.text || "")).length, run = [P.norepi, eq.fluid > 0, eq.abx, eq.blood, P.dialysis].filter(Boolean).length;
-  odesk.setInfo("overview", (SC ? SC.name.split(" ")[0] + " · " : "") + "hour " + P.hour); odesk.setInfo("vitals", "HR " + Math.round(P.hr) + " · MAP " + Math.round(P.map) + " · SpO₂ " + Math.round(P.spo2));
-  odesk.setInfo("lab", l.sent ? "Lactate " + l.lactate + " · K " + l.k : "no blood sent yet"); odesk.setInfo("orders", run + " running"); odesk.setInfo("rad", rs ? rs + " stud" + (rs > 1 ? "ies" : "y") : "no images yet"); odesk.setInfo("organ", "GCS " + Math.round(P.gcs) + " · RR " + Math.round(P.rr)); odesk.setInfo("intel", "SOFA at least " + so.tot);
+  const dxs = SC ? SC.dx : "", ab = eq.abx ? "antibiotic on" : "no antibiotic", cu = (P.log || []).some((x) => /blood cultures/.test(x.text || "")), pr = (P.problems || []).filter((q) => q.open && !q.resolved).length;
+  odesk.setInfo("history", (SC ? SC.name.split(" ")[0] + ", " + SC.age : "") + " · hour " + P.hour); odesk.setInfo("diagnosis", dxs ? dxs.slice(0, 30) : "no diagnosis yet"); odesk.setInfo("vitals", "HR " + Math.round(P.hr) + " · MAP " + Math.round(P.map) + " · SpO₂ " + Math.round(P.spo2));
+  odesk.setInfo("organ", "GCS " + Math.round(P.gcs) + " · RR " + Math.round(P.rr)); odesk.setInfo("cultures", cu ? "blood cultures sent" : "not sent"); odesk.setInfo("invest", (l.sent ? "Lactate " + l.lactate + " · " : "") + (rs ? rs + " image" + (rs > 1 ? "s" : "") : "no images yet"));
+  odesk.setInfo("issues", pr ? pr + " open problem" + (pr > 1 ? "s" : "") : "none open"); odesk.setInfo("treat", run + " running · " + ab + (so.tot ? "" : ""));
 }
 
 /* ================================================================ the state from the Team room */
@@ -511,7 +600,7 @@ function apply(d) {
   const room = mdt.room; P = room && room.patient || null; SC = room && room.scenario || null;
   const spec = room && room.you && room.you.specialty; if (spec && spec !== mySpec) mySpec = spec;
   if (room && room.code) startNet();
-  if (P) { eq = equipFrom(P); refreshTubes(true); scanFeed(); tileInfo(); badgeAll(); renderSection(false); } else if (secId) closeSection();
+  if (P) { eq = equipFrom(P); refreshTubes(true); scanFeed(); tileInfo(); badgeAll(); renderAll(false); } else if (anyOpen()) closeSection();
   $("#line").dataset.on = mdt.line ? "1" : "0";
   $("#title").textContent = room ? (room.code ? "Medical Nexus · " + room.code : "Medical Nexus") + (SC ? " · " + SC.dx : "") : "Medical Nexus";
   $("#vit").hidden = !(P && room.status === "live"); chips(); renderDesk(); renderDock(); $("#rx").hidden = dockOpen || !(room && room.status === "live");
@@ -553,6 +642,7 @@ function sounds(now) {
 }
 
 /* ================================================================ the loop */
+let stride = 0, lastStep = 0, px0 = me.x, pz0 = me.z;
 let vsh = 0, last = 0, sendT = 0, mvSpeed = 0, px = me.x, pz = me.z, bobT = 0, t0 = performance.now(), shown = false, panelT = 0;
 const camTarget = new V(), organPos = new V();
 function loop(now) {
@@ -565,12 +655,15 @@ function loop(now) {
   /* glide to the bedside, or to an organ, or back out when released */
   let eyeH = 1.6, pit = 0;
   if (focus) { const k = 1 - Math.exp(-dt * 3.2); me.x += (focus.x - me.x) * k; me.z += (focus.z - me.z) * k; const ty = Math.atan2(focus.c.x - me.x, -(focus.c.z - me.z)); let dy = ty - me.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); me.yaw += dy * k; me.h += (focus.h - me.h) * k; me.pit += (0 - me.pit) * k; }
-  else { me.h += (1.6 - me.h) * Math.min(1, dt * 3); me.pit += (0 - me.pit) * Math.min(1, dt * 3); if (goal) { const k = 1 - Math.exp(-dt * 2.6); me.x += (goal.x - me.x) * k; me.z += (goal.z - me.z) * k; let dy = faceCenter(me.x, me.z) - me.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); me.yaw += dy * k; if (Math.hypot(goal.x - me.x, goal.z - me.z) < 0.03) goal = null; } if (retreat) { const r = Math.hypot(me.x, me.z); if (r < MINR - 0.01) { const k = Math.min(1, dt * 2.4), nr = r + (MINR - r) * k; me.x *= nr / (r || 1); me.z *= nr / (r || 1); } else retreat = false; } }
+  else { vpCur += (vp - vpCur) * Math.min(1, dt * 4); const rr0 = Math.hypot(me.x, me.z) || 1, fade = arrive.t < 2.4 ? 0 : clamp((10.0 - rr0) / 2.2, 0, 1), eyeG = Math.max(1.6, Math.min(5.4, 1 + rr0 * Math.tan(vpCur))), eyeT = 1.6 + (eyeG - 1.6) * fade, pitT = vpCur * fade > 0.02 ? -Math.atan((eyeG - 1) / rr0) * fade : 0; me.h += (eyeT - me.h) * Math.min(1, dt * 3); me.pit += (pitT - me.pit) * Math.min(1, dt * 3); if (goal) { const k = 1 - Math.exp(-dt * 2.6); me.x += (goal.x - me.x) * k; me.z += (goal.z - me.z) * k; let dy = faceCenter(me.x, me.z) - me.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); me.yaw += dy * k; if (Math.hypot(goal.x - me.x, goal.z - me.z) < 0.03) goal = null; } if (retreat) { const r = Math.hypot(me.x, me.z); if (r < MINR - 0.01) { const k = Math.min(1, dt * 2.4), nr = r + (MINR - r) * k; me.x *= nr / (r || 1); me.z *= nr / (r || 1); } else retreat = false; } }
   eyeH = me.h; pit = me.pit;
   const sp = Math.hypot(me.x - px, me.z - pz) / Math.max(dt, 0.001); mvSpeed += (sp - mvSpeed) * Math.min(1, dt * 8); px = me.x; pz = me.z;
+  if (dn && mode !== "spin" && mode !== "orbit" && mode !== "dock" && !focus && arrive.t >= 2.4) { stride += Math.hypot(me.x - px0, me.z - pz0); if (stride > 0.62 && now - lastStep > 260) { stride = 0; lastStep = now; sfx.step(Math.min(1, 0.55 + mvSpeed * 0.25)); } } else stride = Math.min(stride, 0.3);
+  px0 = me.x; pz0 = me.z;
   bobT += mvSpeed * dt * 2.2; const bob = focus ? 0 : Math.sin(bobT * 3.0) * 0.016 * Math.min(1, mvSpeed);
-  { const w = innerWidth, h = innerHeight, pt = cam.aspect < 0.8; vsh += ((secId ? 1 : 0) - vsh) * Math.min(1, dt * 5); if (vsh > 0.004) cam.setViewOffset(w, h, pt ? 0 : w * 0.2 * vsh, pt ? h * 0.2 * vsh : 0, w, h); else if (cam.view) cam.clearViewOffset(); }
+  { const w = innerWidth, h = innerHeight, pt = cam.aspect < 0.8; const sd = (panes.R.id ? 1 : 0) - (panes.L.id ? 1 : 0); vsh += ((anyOpen() ? 1 : 0) - vsh) * Math.min(1, dt * 5); if (vsh > 0.004) cam.setViewOffset(w, h, pt ? 0 : w * 0.2 * vsh * sd, pt ? h * 0.2 * vsh : 0, w, h); else if (cam.view) cam.clearViewOffset(); }
   cam.position.set(me.x, eyeH + bob, me.z); cam.rotation.order = "YXZ"; cam.rotation.set(focus ? Math.atan2(focus.c.y - eyeH, Math.hypot(focus.c.x - me.x, focus.c.z - me.z)) * 0.8 : pit, -me.yaw, 0);
+  if (!focus && eyeH > 1.7) cam.position.y = eyeH + bob * 0.3;
   /* the patient: turntable, breathing, heartbeat, status colour */
   if (!dn || mode !== "spin") { if (autoSpin) turn.rotation.y += dt * 0.5; else { turn.rotation.y += spinV * dt; spinV *= Math.exp(-dt * 3.2); } }
   const tgt = P || { hr: 80, sbp: 120, dbp: 75, map: 90, spo2: 98, rr: 16, gcs: 15, temp: 37, k: 4, lactate: 1.5, cr: 1 }, kk = Math.min(1, dt * 1.6);
@@ -587,6 +680,8 @@ function loop(now) {
   if (nameLabel.sp) nameLabel.sp.material.opacity = clamp((Math.hypot(cam.position.x, cam.position.z) - 2.0) / 1.6, 0, 1);
   refreshTubes(false);
   /* panels, strip */
+  wallLive.hr = disp.hr; wallLive.map = disp.map; wallLive.spo2 = disp.spo2; wallLive.rr = disp.rr; wallLive.temp = disp.temp; wallLive.lactate = disp.lactate; wallLive.k = disp.k; wallLive.cr = disp.cr; if (!document.hidden) updateWalls(t);
+  if ((machT += dt) > 0.07) { machT = 0; paintMachines(now); }
   odesk.update(dt, t, viewAz()); { const want = insideWant || !!focus ? 0.17 : 1; bodyMat.opacity += (want - bodyMat.opacity) * Math.min(1, dt * 5); bodyMat.depthWrite = bodyMat.opacity > 0.6; }
   updatePanels(dt, t); if ((panelT += dt) > 0.25) { panelT = 0; paintStrip(); renderDock(false); }
   /* send my place to the others */

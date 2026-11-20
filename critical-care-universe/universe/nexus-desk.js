@@ -1,5 +1,5 @@
 /* The orbit desk of the Medical Nexus: a drum with a sloped top that circles the patient's glass cylinder, as in the reference picture.
-   A ring on the sloped top turns with the finger. Seven lit labels sit on that ring. A label that is touched stands up out of the desk and
+   A ring on the sloped top turns with the finger. Eight lit labels sit on that ring. A label that is touched stands up out of the desk and
    opens as a scientific panel (the panel itself is HTML, built by nexus-sections.js).
    createDesk(T, o) -> { group, orbit, tileMeshes, frustum, update(dt, t, viewAz), drag(dAngle), release(), pick(ray), hit(ray), setActive(id), setInfo(id, text), setBadge(id, n), faceTile(id, viewAz), screenOf(id, cam) } */
 export const DESK = { DI: 1.62, DO: 3.0, HI: 1.02, HO: 0.74 };
@@ -24,7 +24,7 @@ export function createDesk(T, o) {
   ring(1.5, 0.02, glow(0x7fe9ff, 2.4), CYL_H); ring(1.5, 0.02, glow(0x7fe9ff, 1.8), 0.02);
   for (let k = 0; k < 4; k++) { const a = k * TAU / 4 + 0.78, m = new T.Mesh(new T.BoxGeometry(0.014, CYL_H, 0.014), glow(0x7fe9ff, 1.4)); m.position.set(Math.sin(a) * 1.5, CYL_H / 2, Math.cos(a) * 1.5); group.add(m); }
 
-  /* the orbit ring: turns on the sloped top, carries the seven labels */
+  /* the orbit ring: turns on the sloped top, carries the eight labels */
   const orbit = new T.Group(); group.add(orbit);
   const texC = document.createElement("canvas"); texC.width = 2048; texC.height = 160; { const g = texC.getContext("2d"), w = 2048, h = 160, n = SECTIONS.length;
     const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#0d3550"); gr.addColorStop(0.5, "#0a2538"); gr.addColorStop(1, "#0d3550"); g.fillStyle = gr; g.fillRect(0, 0, w, h);
@@ -37,7 +37,7 @@ export function createDesk(T, o) {
   const band = new T.Mesh(new T.CylinderGeometry(rin, rout, hh, 160, 1, true), new T.MeshStandardMaterial({ map: ringTex, emissiveMap: ringTex, emissive: 0xffffff, emissiveIntensity: 0.75, roughness: 0.35, metalness: 0.3, envMap: env, side: T.DoubleSide }));
   band.position.y = ymid + 0.012; orbit.add(band);
 
-  /* the seven labels */
+  /* the eight labels */
   const TW = 1.5, TH = 0.82, RM = 2.32, tiles = [];
   const rrect = (g, x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
   function paintTile(t) {
@@ -85,7 +85,7 @@ export function createDesk(T, o) {
     release() { dragging = false; },
     pick(ray) { const h = ray.intersectObjects(tiles.map((t) => t.mesh), false)[0]; return h ? h.object.userData.tile.id : null; },
     hit(ray) { const h = ray.intersectObject(frustum, false)[0]; return h ? h.distance : null; },
-    setActive(id) { tiles.forEach((t) => { const on = t.id === id; if (t.active !== on) { t.active = on; paintTile(t); } }); },
+    setActive(ids) { const L = [].concat(ids || []); tiles.forEach((t) => { const on = L.includes(t.id); if (t.active !== on) { t.active = on; paintTile(t); } }); },
     setInfo(id, s) { const t = tiles.find((x) => x.id === id); if (t && t.info !== s) { t.info = s; paintTile(t); } },
     setBadge(id, n) { const t = tiles.find((x) => x.id === id); if (t && t.badge !== n) { t.badge = n; paintTile(t); } },
     /* turn the ring so the label is straight in front of the viewer */

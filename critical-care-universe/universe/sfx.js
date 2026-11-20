@@ -1,6 +1,6 @@
 /* Soft synthesised sound for the Critical Care Universe: sliding gates, ICU monitor beeps, gentle alarms and the outdoor ambience
    (birds by day, crickets and an owl by night). Everything is generated with Web Audio, so there are no files to load.
-   createSfx() -> { unlock(), setOn(b), setListener(x,z,yaw), door(opening,pos?), chime(kind), beep(opt), alert(level,pos?), startOutdoor(phase), stopOutdoor(), tick() } */
+   createSfx() -> { unlock(), setOn(b), setListener(x,z,yaw), door(opening,pos?), chime(kind), beep(opt), alert(level,pos?), step(vol), startOutdoor(phase), stopOutdoor(), tick() } */
 
 export function createSfx() {
   let ac = null, master = null, nb = null, on = true, bus = null, timers = [], outG = null, outNodes = [];
@@ -103,6 +103,24 @@ export function createSfx() {
       const os = ac.createOscillator(); os.type = "triangle"; os.frequency.value = f; const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 2200;
       const g = ac.createGain(); os.connect(lp); lp.connect(g); g.connect(out); env(g, t + dt, 0.012, 1, 0.2); os.start(t + dt); os.stop(t + dt + 0.3);
     });
+  };
+
+  /* ---------- footsteps: formal leather shoes on a hard floor, kept soft ---------- */
+  let foot = 0;
+  S.step = (vol) => {
+    if (!ready()) return;
+    const t0 = ac.currentTime + 0.005, v = (vol == null ? 1 : vol) * 0.2, side = (foot++ % 2) ? 1 : -1, j = 0.92 + Math.random() * 0.16, out = outTo(side * 0.14, 1);
+    const src = ac.createBufferSource(); src.buffer = noiseBuf(); src.loop = true;
+    /* the heel strikes: a short click */
+    const bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 2300 * j; bp.Q.value = 1.3;
+    const g1 = ac.createGain(); env(g1, t0, 0.002, v * 0.55, 0.026); src.connect(bp); bp.connect(g1); g1.connect(out);
+    /* the sole follows: a muffled slap */
+    const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 780 * j; lp.Q.value = 0.6;
+    const g2 = ac.createGain(); env(g2, t0 + 0.028, 0.006, v * 0.5, 0.07); src.connect(lp); lp.connect(g2); g2.connect(out);
+    /* the weight on the floor: a low thump */
+    const o = ac.createOscillator(); o.type = "sine"; o.frequency.setValueAtTime(130 * j, t0); o.frequency.exponentialRampToValueAtTime(52, t0 + 0.11);
+    const g3 = ac.createGain(); env(g3, t0, 0.004, v * 0.8, 0.12); o.connect(g3); g3.connect(out);
+    src.start(t0, Math.random()); src.stop(t0 + 0.14); o.start(t0); o.stop(t0 + 0.16);
   };
 
   /* ---------- outdoor ambience ---------- */
