@@ -379,7 +379,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       if (btn) btn.click();
     } else if (kind === "aud") {
       keepFrame(); keepPose();
-      location.href = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&v=20261120p";
+      location.href = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&v=20261121a";
     } else if (kind === "rad") {
       location.href = "radiology.html?v=20261119r2";
     } else if (kind === "micro") {
@@ -391,6 +391,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
 
   window.returnToHall = function () {
     clearTimeout(leaveTimer);
+    if (window.ccuWelcome) window.ccuWelcome("hub");
     window.hallLock = Date.now() + 900;
     mode = "look";
     job = null;
@@ -557,5 +558,6 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   }
   window.__hubLobby = { eye, setYaw: (v) => { yaw = v; }, getYaw: () => yaw, mode: () => mode, THETA, openDoor: (k) => { const d = DOORS[k]; d.userData.open = 1; d.userData.left.position.x = -1.33; d.userData.right.position.x = 1.33; } };
   placeCamera();
+  if (window.ccuWelcome) window.ccuWelcome("hub");
   frame();
 }

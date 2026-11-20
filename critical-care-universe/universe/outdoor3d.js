@@ -179,6 +179,21 @@ export function buildOutdoor(T, S, opt = {}) {
   const tag = ctex(1024, 96, (g, w, h) => { g.fillStyle = "rgba(0,0,0,0)"; g.clearRect(0, 0, w, h); g.fillStyle = "#d8f4ff"; g.font = "600 46px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.shadowColor = "#36d6ff"; g.shadowBlur = 14; g.fillText("ICU  ·  SIMULATION  ·  PATHOPHYSIOLOGY  ·  LEARNING", w / 2, h / 2); });
   add(new T.PlaneGeometry(10.5, 10.5 * 96 / 1024), BM({ map: tag, transparent: true, toneMapped: false }), cx, sgy + 2.55, cz - 0.15, OUT).rotation.y = Math.PI;
 
+  /* the logo on an iron bar above the roof, turning a full circle, seen from both sides */
+  const spin = new T.Group(); spin.position.set(cx, 0, cz + 0.5); OUT.add(spin);
+  const iron = BM({ color: C(0x2a3038) }), ironHi = BM({ color: C(0x4a525c) });
+  const LR = 2.1, LY = HB + 0.9 + LR;
+  add(new T.BoxGeometry(1.1, 0.12, 0.7), iron, 0, HB + 0.32, 0, spin);
+  add(new T.CylinderGeometry(0.11, 0.14, LY + LR + 0.4 - (HB + 0.32), 10), iron, 0, (HB + 0.32 + LY + LR + 0.4) / 2, 0, spin);
+  [[HB + 1.0, 0.2], [LY + LR + 0.4, 0.17]].forEach(([y, r]) => add(new T.CylinderGeometry(r, r, 0.12, 12), ironHi, 0, y, 0, spin));
+  [-1, 1].forEach((sx) => { const b = add(new T.BoxGeometry(0.07, 1.25, 0.07), iron, sx * 0.34, HB + 0.9, 0, spin); b.rotation.z = sx * 0.3; });
+  const logo = new T.Group(); logo.position.set(0, LY, 0); spin.add(logo);
+  const logoTex = new T.TextureLoader().load(new URL("../brand/logo-spin.png", import.meta.url).href); logoTex.colorSpace = T.SRGBColorSpace; logoTex.anisotropy = 4;
+  const face = add(new T.PlaneGeometry(LR * 2, LR * 2), BM({ map: logoTex, transparent: true, side: T.DoubleSide, toneMapped: false, depthWrite: false }), 0, 0, 0, logo);
+  const logoGlow = add(new T.PlaneGeometry(LR * 3.6, LR * 3.6), BM({ map: ctex(128, 128, (g, w, h) => { const r = g.createRadialGradient(64, 64, 4, 64, 64, 64); r.addColorStop(0, "rgba(80,200,255,.55)"); r.addColorStop(0.55, "rgba(60,150,255,.18)"); r.addColorStop(1, "rgba(60,150,255,0)"); g.fillStyle = r; g.fillRect(0, 0, w, h); }), transparent: true, opacity: 0.35 + night * 0.55, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false, side: T.DoubleSide }), 0, 0, 0, logo);
+  face.renderOrder = 3; logoGlow.renderOrder = 2;
+  const spinRate = (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) ? 0 : 0.9;   /* radians a second: about seven seconds a turn */
+
   /* ---------- trees, hedges, lamps ---------- */
   const trees = [];
   const inWalk = (x, z) => Math.abs(x - cx) < 12.5 && z < cz + 1 && z > cz - RS - 22;
@@ -257,6 +272,7 @@ export function buildOutdoor(T, S, opt = {}) {
     if (!OUT.visible) return;
     sky.position.copy(cam); skyMat.uniforms.t.value = t;
     signTex.offset.x = (t * 0.045) % 1;
+    logo.rotation.y = t * spinRate;
     clouds.forEach((c) => { c.position.x += dt * c.userData.v * 0.35; if (c.position.x > 150) c.position.x = -150; });
     birds.forEach((b) => { const d = b.userData; d.a += dt * d.sp; b.position.set(cx + Math.sin(d.a) * d.r * 1.4, d.y + Math.sin(d.a * 2 + d.ph) * 1.5, cz - 36 + Math.cos(d.a) * d.r); b.rotation.y = d.a + (d.sp > 0 ? Math.PI / 2 : -Math.PI / 2); const f = Math.sin(t * 9 + d.ph) * 0.55; d.w1.rotation.z = f; d.w2.rotation.z = -f; });
     if (flies) { const p = flies.geometry.attributes.position, sd = flies.userData.seed; for (let i = 0; i < sd.length; i++) p.setXYZ(i, sd[i][0] + Math.sin(t * 0.5 + sd[i][3]) * 1.2, sd[i][1] + Math.sin(t * 0.9 + sd[i][3] * 2) * 0.35, sd[i][2] + Math.cos(t * 0.4 + sd[i][3]) * 1.2); p.needsUpdate = true; flies.material.opacity = 0.55 + 0.4 * Math.sin(t * 2.2); }

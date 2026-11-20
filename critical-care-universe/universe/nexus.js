@@ -283,6 +283,7 @@ function updatePanels(dt, t) {
 /* ================================================================ controls: the ICU's finger drag, plus turning the patient */
 const me = { x: 0, z: 9.6, yaw: Math.PI, h: 1.6, pit: 0 };
 { const a = ((hashN(myId) % 7) - 3) * 0.09; me.x = Math.sin(a) * 4.2; me.z = Math.cos(a) * 4.2; }
+if (window.ccuWelcome) window.ccuWelcome("mdt");
 const arrive = { t: 0, t0: performance.now(), from: { x: me.x * 1.62, z: me.z * 1.62 }, to: { x: me.x, z: me.z } };
 /* coming in from the auditorium on foot: begin exactly where the walk left off, under your own control, no scripted walk */
 try { const j = JSON.parse(sessionStorage.getItem("ccu-pose") || "null"); sessionStorage.removeItem("ccu-pose");
@@ -290,8 +291,14 @@ try { const j = JSON.parse(sessionStorage.getItem("ccu-pose") || "null"); sessio
 me.x = arrive.from.x; me.z = arrive.from.z;
 const faceCenter = (x, z) => Math.atan2(-x, z);
 me.yaw = faceCenter(me.x, me.z);
-function clampPos(x, z) { if (!focus && Math.abs(x) < 1.15 && z > MAXR - 1.2) return [clamp(x, -1.15, 1.15), Math.min(z, RH + 3.2)]; const r = Math.hypot(x, z) || 1e-6; if (!focus && r < MINR) { x *= MINR / r; z *= MINR / r; } else if (r > MAXR) { x *= MAXR / r; z *= MAXR / r; } return [x, z]; }
-function walkBy(d) { const c = clampPos(me.x + Math.sin(me.yaw) * d, me.z - Math.cos(me.yaw) * d); me.x = c[0]; me.z = c[1]; }
+function clampPos(x, z) { if (!focus && Math.abs(x) < 1.2 && z > MAXR - 1.5) return [clamp(x, -1.2, 1.2), Math.min(z, RH + 3.2)]; const r = Math.hypot(x, z) || 1e-6; if (!focus && r < MINR) { x *= MINR / r; z *= MINR / r; } else if (r > MAXR) { x *= MAXR / r; z *= MAXR / r; } return [x, z]; }
+function walkBy(d) {
+  let nx = me.x + Math.sin(me.yaw) * d, nz = me.z - Math.cos(me.yaw) * d;
+  if (!focus && d > 0 && nz > 3) { /* walking towards the doorway draws you in line with it and turns you to it, so a finger-drag always finds the way out */
+    const vx = -nx, vz = RH + 2 - nz, vl = Math.hypot(vx, vz) || 1, dot = (Math.sin(me.yaw) * vx - Math.cos(me.yaw) * vz) / vl;
+    if (dot > 0.5) { const k = Math.min(0.7, d * 2.5); nx -= nx * k; let dy = Math.atan2(vx, -vz) - me.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); me.yaw += dy * Math.min(0.5, d * 1.5); }
+  }
+  const c = clampPos(nx, nz); me.x = c[0]; me.z = c[1]; }
 let dn = 0, mvd = 0, lx = 0, ly = 0, sx = 0, sy = 0, holdDir = 0, lastV = 0, mode = "", onPatient = false, onDesk = false, spinV = 0, autoSpin = false, focus = null, retreat = false, lpT = 0, grab = null, gx = 0, held = false, lastMT = 0;
 const ray = new T.Raycaster(), ndc = new T.Vector2();
 const sfx = createSfx();
@@ -527,7 +534,7 @@ function goAuditorium() {
     sessionStorage.setItem("ccu-pose", JSON.stringify({ to: "aud", x: AUD_X - me.z, z: ZC + me.x, yaw: me.yaw + Math.PI / 2, t: Date.now() }));
   } catch (e) {}
   if (net) { net.close(); net = null; }
-  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261120p";
+  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261121a";
 }
 function leave(type) { if (net) { net.close(); net = null; } post(type); }
 
