@@ -14,7 +14,8 @@
     const W = { cell: M.buildCell(), mol: M.buildMol() };
     scene.add(W.cell.root, W.mol.root);
     const SW = W.mol; SW.cell = W.cell; SW.mol = SW; /* scenarios address the molecular world directly, with .cell for the bacterium */
-    const BG = { cell: new T.Color(0x07161f), mol: new T.Color(0x07101c) };
+    const BG = { cell: new T.Color(0x07161f), mol: new T.Color(0x07101c), uni: new T.Color(0x060f19) };
+    SW.getUni = () => { if (!W.uni) { W.uni = M.buildUni(); scene.add(W.uni.root); } return W.uni; };
     const lab = { idle: 3, renderer, scene, camera, W, t: 0, playing: false, speed: 1, view: 'auto', labels: true, sc: null, onScene: null, onTime: null, onEnd: null, scn: -1, user: { yaw: 0, pit: 0, zoom: 1 } };
     const cp = V(0, 0, 30), cl = V(), tmpP = V(), tmpL = V(), lastWorld = { v: '' };
     let lastTs = 0, raf = 0, snap = true, w = 0, h = 0;
@@ -55,6 +56,13 @@
     lab.resetUser = () => { U.yaw = 0; U.pit = 0; U.zoom = 1; };
 
     function viewCam(res) {
+      if (lab.sc && lab.sc.uni) {
+        const u = SW.getUni(), f = res.focus || V(0, 10, 0), top = 80, bot = -50, mid = (top + bot) / 2;
+        if (lab.view === 'cell') return { world: 'uni', pos: V(0, mid + 4, (top - bot) / .73 * 1.08), look: V(0, mid, 0) };
+        if (lab.view === 'peri') return { world: 'uni', pos: V(-6, 26, 100), look: V(-6, 22, 0) };
+        if (lab.view === 'mol') return { world: 'uni', pos: f.clone().add(V(4, 4, res.focusDist || 26)), look: f.clone() };
+        void u; return null;
+      }
       if (lab.view === 'cell') return { world: 'cell', pos: V(0, 1.8, 17), look: V(0, 0, 0) };
       if (lab.view === 'peri') return { world: 'mol', pos: V(-4, -4, 98), look: V(-4, -14, 0) };
       if (lab.view === 'mol') { const f = res.focus || V(-12.5, -4, 0); return { world: 'mol', pos: f.clone().add(V(3, 3, res.focusDist || 22)), look: f.clone() }; }
@@ -64,8 +72,8 @@
       const sc = lab.sc; if (!sc) return;
       const res = sc.at(lab.t, { camera, W: SW, dt }) || {};
       const vc = viewCam(res), world = vc ? vc.world : res.world, pos = vc ? vc.pos : res.pos, look = vc ? vc.look : res.look;
-      W.cell.root.visible = world === 'cell'; W.mol.root.visible = world === 'mol';
-      scene.background = BG[world]; scene.fog = world === 'cell' ? new T.Fog(0x07161f, 30, 70) : new T.Fog(0x07101c, 140, 330);
+      W.cell.root.visible = world === 'cell'; W.mol.root.visible = world === 'mol'; if (W.uni) W.uni.root.visible = world === 'uni';
+      scene.background = BG[world]; scene.fog = world === 'cell' ? new T.Fog(0x07161f, 30, 70) : world === 'uni' ? new T.Fog(0x060f19, 190, 420) : new T.Fog(0x07101c, 140, 330);
       /* user offset around look point */
       const v = tmpP.copy(pos).sub(look), r = v.length() * U.zoom, th = Math.atan2(v.x, v.z) + U.yaw, ph = clamp(Math.asin(clamp(v.y / (v.length() || 1), -1, 1)) + U.pit, -1.35, 1.35);
       tmpP.set(Math.sin(th) * Math.cos(ph) * r, Math.sin(ph) * r, Math.cos(th) * Math.cos(ph) * r).add(look); tmpL.copy(look);

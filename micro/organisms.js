@@ -12,19 +12,19 @@
     { id: 'at', name: 'Atypical bacteria' }, { id: 'fu', name: 'Fungi' }, { id: 'my', name: 'Mycobacteria' }
   ];
   const O = [
-    { id: 'sa', g: 'gp', name: 'Staphylococcus aureus', short: 'S. aureus', tag: 'cocci in clusters', desc: 'Gram-positive · cocci in grape-like clusters · catalase + coagulase positive', lab: false,
+    { id: 'sa', g: 'gp', name: 'Staphylococcus aureus', short: 'S. aureus', tag: 'cocci in clusters', desc: 'Gram-positive · cocci in grape-like clusters · catalase + coagulase positive', lab: 'sa',
       facts: ['Thick peptidoglycan wall with teichoic acids, no outer membrane (Gram-positive).', 'Golden pigment (staphyloxanthin), protein A, and toxins such as PVL, TSST-1 and enterotoxins.', 'Causes bacteraemia, endocarditis, skin and soft-tissue, bone and joint infection and pneumonia.'],
       res: ['Penicillinase (blaZ) hydrolyses penicillin: most isolates are penicillin-resistant.', 'mecA acquisition makes it MRSA (see MRSA).'], show: ['Peptidoglycan wall', 'Cell membrane', 'Nucleoid', 'Cluster arrangement'] },
-    { id: 'mrsa', g: 'gp', name: 'MRSA (methicillin-resistant S. aureus)', short: 'MRSA', tag: 'cocci + PBP2a', desc: 'Gram-positive · S. aureus carrying mecA / SCCmec', lab: false,
+    { id: 'mrsa', g: 'gp', name: 'MRSA (methicillin-resistant S. aureus)', short: 'MRSA', tag: 'cocci + PBP2a', desc: 'Gram-positive · S. aureus carrying mecA / SCCmec', lab: 'mrsa',
       facts: ['mecA (or mecC) on the SCCmec cassette encodes PBP2a, a penicillin-binding protein with very low affinity for most β-lactams.', 'PBP2a keeps building peptidoglycan when the native PBPs are blocked.', 'Ceftaroline is a β-lactam designed to bind PBP2a; other drug choices depend on site, severity and local guidance.'],
       res: ['Altered target: PBP2a (red studs in the model).', 'Often co-resistant to other classes; susceptibility must come from the isolate’s AST.'], show: ['PBP2a (red studs)', 'Peptidoglycan wall', 'Cluster arrangement'] },
-    { id: 'ef', g: 'gp', name: 'Enterococcus (E. faecalis / E. faecium)', short: 'Enterococcus', tag: 'pairs and short chains', desc: 'Gram-positive · ovoid cocci in pairs and short chains · gut commensal', lab: false,
+    { id: 'ef', g: 'gp', name: 'Enterococcus (E. faecalis / E. faecium)', short: 'Enterococcus', tag: 'pairs and short chains', desc: 'Gram-positive · ovoid cocci in pairs and short chains · gut commensal', lab: 'ef',
       facts: ['Hardy gut organisms that tolerate bile, salt and drying; common in urinary, intra-abdominal and endovascular infection.', 'Intrinsically resistant to cephalosporins and low-level resistant to aminoglycosides.', 'E. faecium more often has high-level ampicillin resistance (altered PBP5).'],
       res: ['Intrinsic: low-affinity PBPs, so cephalosporins fail.', 'Acquired: vancomycin resistance (see VRE).'], show: ['Peptidoglycan wall', 'Pair and chain arrangement'] },
-    { id: 'vre', g: 'gp', name: 'VRE (vancomycin-resistant Enterococcus)', short: 'VRE', tag: 'van operon', desc: 'Gram-positive · Enterococcus carrying a van gene cluster (mostly E. faecium)', lab: false,
+    { id: 'vre', g: 'gp', name: 'VRE (vancomycin-resistant Enterococcus)', short: 'VRE', tag: 'van operon', desc: 'Gram-positive · Enterococcus carrying a van gene cluster (mostly E. faecium)', lab: 'vre',
       facts: ['vanA / vanB operons make cells build wall precursors ending in D-Ala-D-Lactate instead of D-Ala-D-Ala.', 'Vancomycin binds D-Ala-D-Ala strongly and D-Ala-D-Lac poorly, so it can no longer block cross-linking.', 'vanA gives high-level resistance to vancomycin and teicoplanin; vanB varies in teicoplanin.'],
       res: ['Altered target: D-Ala-D-Lac precursors (orange studs in the model).', 'Carried on mobile elements, so it can spread between enterococci.'], show: ['Modified precursors (orange)', 'Peptidoglycan wall'] },
-    { id: 'sp', g: 'gp', name: 'Streptococcus pneumoniae', short: 'S. pneumoniae', tag: 'lancet diplococci', desc: 'Gram-positive · lancet-shaped diplococci · polysaccharide capsule · α-haemolytic', lab: false,
+    { id: 'sp', g: 'gp', name: 'Streptococcus pneumoniae', short: 'S. pneumoniae', tag: 'lancet diplococci', desc: 'Gram-positive · lancet-shaped diplococci · polysaccharide capsule · α-haemolytic', lab: 'sp',
       facts: ['The polysaccharide capsule (more than 90 serotypes) blocks phagocytosis; vaccines target capsular types.', 'Optochin-sensitive and bile-soluble in the laboratory.', 'Causes community-acquired pneumonia, meningitis, sinusitis and otitis.'],
       res: ['Altered PBPs (mosaic pbp genes) lower penicillin affinity.', 'Macrolide resistance (erm, mef) and fluoroquinolone target mutations (gyrA / parC).'], show: ['Capsule (halo)', 'Peptidoglycan wall', 'Diplococcus septum'] },
 
@@ -40,10 +40,10 @@
     { id: 'ab', g: 'gn', name: 'Acinetobacter baumannii', short: 'A. baumannii', tag: 'coccobacillus pairs', desc: 'Gram-negative · strictly aerobic coccobacillus · non-motile · oxidase negative', lab: 'ab',
       facts: ['Survives for long periods on dry hospital surfaces and equipment.', 'Non-flagellated; moves by twitching with type IV pili.', 'Causes ventilator-associated pneumonia, bloodstream and wound infection in ICU patients.'],
       res: ['OXA-23 / 24 / 58 class D carbapenemases are the commonest carbapenem-resistance route.', 'Intrinsic AmpC (ADC), AdeABC efflux, porin changes, and NDM in some isolates.'], show: ['Outer membrane (LPS)', 'Type IV pili', 'Coccobacillus pair'] },
-    { id: 'en', g: 'gn', name: 'Enterobacter cloacae complex', short: 'Enterobacter', tag: 'rod, inducible AmpC', desc: 'Gram-negative · motile rod · Enterobacterales · inducible chromosomal AmpC', lab: false,
+    { id: 'en', g: 'gn', name: 'Enterobacter cloacae complex', short: 'Enterobacter', tag: 'rod, inducible AmpC', desc: 'Gram-negative · motile rod · Enterobacterales · inducible chromosomal AmpC', lab: 'en',
       facts: ['Hospital-associated pathogen in ventilator-associated pneumonia, bloodstream and device-related infection.', 'Peritrichous flagella; capsule is usually thin.', 'Chromosomal AmpC can be switched on during treatment.'],
       res: ['Inducible or derepressed AmpC can cause resistance to third-generation cephalosporins on therapy.', 'Cefepime is relatively stable to AmpC; carbapenem resistance needs carbapenemases or AmpC with porin loss.'], show: ['Outer membrane (LPS)', 'Peritrichous flagella', 'Nucleoid'] },
-    { id: 'sm', g: 'gn', name: 'Serratia marcescens', short: 'Serratia', tag: 'red-pigmented rod', desc: 'Gram-negative · motile rod · some strains red (prodigiosin) · ICU outbreaks', lab: false,
+    { id: 'sm', g: 'gn', name: 'Serratia marcescens', short: 'Serratia', tag: 'red-pigmented rod', desc: 'Gram-negative · motile rod · some strains red (prodigiosin) · ICU outbreaks', lab: 'sm',
       facts: ['Many strains make the red pigment prodigiosin.', 'Causes nosocomial pneumonia, urinary and bloodstream infection and ICU outbreaks.', 'Persists in moist environments and on equipment.'],
       res: ['Inducible chromosomal AmpC.', 'Intrinsically resistant to colistin and polymyxin B; carbapenemases (for example KPC) occur in some isolates.'], show: ['Outer membrane (LPS)', 'Peritrichous flagella', 'Red pigment'] },
 
@@ -64,14 +64,14 @@
       facts: ['Two forms: small dense elementary bodies (infectious) and larger reticulate bodies (dividing) inside an inclusion.', 'Cannot grow outside host cells; lacks a conventional peptidoglycan wall.', 'Causes atypical pneumonia and bronchitis.'],
       res: ['Active drugs must enter host cells (tetracyclines, macrolides, quinolones); β-lactams are unreliable.'], show: ['Inclusion', 'Elementary bodies (dense)', 'Reticulate bodies (large)'] },
 
-    { id: 'ca', g: 'fu', name: 'Candida albicans', short: 'C. albicans', tag: 'yeast and hyphae', desc: 'Fungus · dimorphic yeast · budding cells and pseudohyphae · biofilm former', lab: false,
+    { id: 'ca', g: 'fu', name: 'Candida albicans', short: 'C. albicans', tag: 'yeast and hyphae', desc: 'Fungus · dimorphic yeast · budding cells and pseudohyphae · biofilm former', lab: 'ca',
       facts: ['Commensal that becomes invasive with catheters, broad-spectrum antibiotics, abdominal surgery or immune compromise.', 'Switches between budding yeast and hyphae; forms biofilm on catheters.', 'A leading cause of candidaemia in ICU.'],
       res: ['Echinocandins block β-(1,3)-D-glucan synthase in the cell wall; azoles block ergosterol synthesis (Erg11).', 'Azole resistance through efflux pumps (CDR1, MDR1) and ERG11 mutations.'], show: ['Cell wall (glucan)', 'Budding', 'Pseudohyphae', 'Nucleus'] },
-    { id: 'af', g: 'fu', name: 'Aspergillus fumigatus', short: 'A. fumigatus', tag: 'mould, conidial head', desc: 'Fungus · mould · septate hyphae · airborne conidia', lab: false,
+    { id: 'af', g: 'fu', name: 'Aspergillus fumigatus', short: 'A. fumigatus', tag: 'mould, conidial head', desc: 'Fungus · mould · septate hyphae · airborne conidia', lab: 'af',
       facts: ['Airborne conidia are inhaled daily; invasive disease occurs in neutropenia, transplant, steroid use and severe viral pneumonia in ICU.', 'Hyphae are septate and branch at acute angles; angio-invasion causes infarction.', 'The conidial head (vesicle, phialides, conidial chains) is the characteristic microscopic structure.'],
       res: ['Azole resistance often arises from cyp51A changes (for example TR34 / L98H), including after environmental fungicide exposure.'], show: ['Conidiophore', 'Phialides', 'Conidial chains', 'Septate hyphae'] },
 
-    { id: 'tb', g: 'my', name: 'Mycobacterium tuberculosis', short: 'M. tuberculosis', tag: 'acid-fast waxy rods', desc: 'Mycobacteria · acid-fast bacilli · mycolic-acid wall · slow growing', lab: false,
+    { id: 'tb', g: 'my', name: 'Mycobacterium tuberculosis', short: 'M. tuberculosis', tag: 'acid-fast waxy rods', desc: 'Mycobacteria · acid-fast bacilli · mycolic-acid wall · slow growing', lab: 'tb',
       facts: ['The wall is rich in mycolic acids and arabinogalactan: waxy, acid-fast, impermeable to many drugs.', 'Cord factor (trehalose dimycolate) gives serpentine cords; survives inside macrophages and forms granulomas.', 'Doubling time is about 20 hours, so cultures and treatment are slow.'],
       res: ['Resistance arises from chromosomal mutations (for example rpoB for rifampicin, katG / inhA for isoniazid), not from plasmids.', 'Multidrug therapy is used to prevent selection of resistant mutants.'], show: ['Mycolic-acid wall', 'Cord arrangement', 'Nucleoid'] }
   ];

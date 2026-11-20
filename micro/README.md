@@ -10,6 +10,9 @@ Reusable 3D molecular engine behind `microbiology-lab.html` (three.js r128, no b
 | `scenarios.js` | choreography. Every scenario is a pure function of time `at(t)`, so it can be scrubbed, paused and run at 0.5x / 1x / 2x |
 | `resistance.js` | the resistance engine's data and fate model: organisms, antibiotics, mechanisms, `evaluate()`, `permutations()`, `tokens()` (no three.js, unit-testable) |
 | `scn_res.js` | Resistance Lab composer: `M.scenarios.res({org, abx, mech:[ids]})` builds a timeline from exactly the ticked mechanisms |
+| `res_uni.js` | "family u" data for the other organisms in the Resistance Lab (S. aureus, MRSA, E. faecalis/faecium, VRE, S. pneumoniae, Enterobacter, Stenotrophomonas, M. tuberculosis, Candida, Aspergillus): drugs, mechanisms, per-drug fate weights (`fx`), `fates()` and `R.targetName()`. Teaching weights, not MICs |
+| `world_uni.js` | `buildUni()`: one 3D world for gram-positive, mycobacterial and fungal cells (wall layers, cytoplasm, PBP / D-Ala / ribosome / gyrase / RNAP / InhA / Cyp51 / glucan synthase / ergosterol targets, BlaZ and KatG enzymes, drug molecule) |
+| `scn_uni.js` | scene runners for the family-u world (intro, entry, efflux, enzyme, target, pro-drug, six-molecule fates, result); overrides `M.scenarios.res` for those organisms and leaves the four Gram-negative scenarios untouched |
 
 ## How a scenario works
 
@@ -106,3 +109,8 @@ Limits: older drugs are tagged "marketed" from general knowledge, not a drug-by-
 - Leg. pneumophila and C. pneumoniae drug entry into host cells is described in text, not animated.
 - All text and numbers are teaching content written without specialist review. They are not a clinical susceptibility prediction, and MICs are generated, not measured.
 - Tested with software WebGL (desktop) and a 390 px emulated viewport; not tested on real phones.
+
+### Resistance Lab: two fate models
+- Gram-negative (P. aeruginosa, K. pneumoniae, E. coli, A. baumannii): original model, unchanged. Never entered, pumped out, hydrolysed, weak binding or bound.
+- Family u (everything else). `enter` = product of barrier retentions; `effluxed = enter x (1 - prod(1 - pump))`; `inactive = remaining x (1 - prod(1 - h))`; `bound = active x prod(bind)`; the rest is weak binding. Outcome: at least 0.7 blocked, at least 0.35 partial, otherwise the organism survives. Add a drug or mechanism in `res_uni.js`; add a new target shape in `world_uni.js` (`buildTarget`) and reference it from the drug's `tgt`.
+- Anaerobes and atypicals (Bacteroides, Clostridioides, Legionella, Mycoplasma, and so on) are not built yet.
