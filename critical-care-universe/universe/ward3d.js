@@ -7,8 +7,9 @@
    buildWard(THREE, scene, renderer, P, H) -> { BP, BA, hits, lamps, update(t,dt,yaw,facingAll), setDoor(i,open), door(i), approach(i) }
      H.mon(ctx,p,w,h,x,y)   monitor painter       H.rdr(ctx,p)  ventilator painter
      H.equip(p) -> {bags,pumps,doses}              Visual only. Clinical text is original and needs review.        */
-import { loadArchetype, build as buildPerson, breathe, patientFile } from "./patient3d.js";
+import { loadArchetype, build as buildPerson, breathe, patientFile } from "./patient3d.js?v=20261120b";
 
+import { buildBed } from "./icu-bed.js?v=20261120b";
 export function buildWard(T, S, R, P, H) {
   const V = T.Vector3, G = new T.Group(); G.name = "ward"; S.add(G);
   const CW = 5, CD = 3.8, FZ = 3.6, HT = 3.3, GH = 3.0, XS = [-5, 0, 5];
@@ -169,21 +170,13 @@ export function buildWard(T, S, R, P, H) {
 
     /* ---- bed ---- */
     const bd = new T.Group(); bd.position.set(BED.x, 0, BED.z); g.add(bd); c.bed = bd;
-    const mBase = M(0x5b6874, { metalness: 0.75, roughness: 0.35, envMapIntensity: 1.2 }), mMat = M(0xdbe3e8, { roughness: 0.55 }), mWheel = M(0x0c0f12, { roughness: 0.6 });
-    rb(1.7, 0.1, 0.7, 0.03, mBase, 0.05, 0.3, 0, bd); [-0.5, 0.55].forEach((x) => rb(0.26, 0.32, 0.5, 0.03, mBase, x, 0.15, 0, bd));
-    [[-0.7, 0.3], [-0.7, -0.3], [0.8, 0.3], [0.8, -0.3]].forEach((q) => { const w = cyl(0.075, 0.075, 0.05, mWheel, q[0], 0.075, q[1], bd, 14); w.rotation.x = Math.PI / 2; cyl(0.03, 0.03, 0.055, mMetal, q[0], 0.075, q[1], bd, 8).rotation.x = Math.PI / 2; });
-    rb(1.1, 0.05, 0.86, 0.02, M(0x6c7985, { metalness: 0.7, roughness: 0.4 }), 0.5, 0.67, 0, bd);
-    { const uf = rb(LB, 0.04, 0.8, 0.02, M(0x6c7985, { metalness: 0.7, roughness: 0.4 }), 0, 0, 0, bd); uf.position.set(-0.05 - cth * LB / 2 + sth * -0.11, 0.78 + sth * LB / 2 + cth * -0.11, 0); uf.rotation.z = -TH;
-      const st = cyl(0.025, 0.025, 0.42, mMetal, -0.25, 0.5, 0, bd, 8); st.rotation.z = 0.5; }
-    rb(0.05, 0.4, 0.9, 0.03, mBase, -0.62, 0.52, 0, bd);
-    rb(1.12, 0.12, 0.88, 0.05, mMat, 0.5, 0.72, 0, bd);
+    const mWheel = M(0x0c0f12, { roughness: 0.6 });
     const hinge = [-0.05, 0.78], onBack = (u, off, z) => new V(hinge[0] - cth * u + sth * off, hinge[1] + sth * u + cth * off, z || 0);
-    const back = rb(LB, 0.12, 0.88, 0.05, mMat, 0, 0, 0, bd); back.position.copy(onBack(LB / 2, 0.0)); back.rotation.z = -TH;
-    const rail = M(0xd9e1e7, { metalness: 0.9, roughness: 0.25, envMapIntensity: 1.5 });
-    [0.46, -0.46].forEach((z) => { [0.98, 1.12].forEach((y) => cyl(0.013, 0.013, 1.0, rail, 0.5, y, z, bd, 8).rotation.z = Math.PI / 2); [0.05, 0.5, 0.95].forEach((x) => cyl(0.013, 0.013, 0.34, rail, x, 1.02, z, bd, 8)); });
-    rb(0.04, 0.5, 0.88, 0.03, mMat, 1.07, 0.86, 0, bd);
+    const bedX = buildBed(T, { M, rb, bx, cyl, mesh, ctex, rnd, V, onBack, TH, LB, mMetal, mDark, env, fabric });
+    c.bedX = bedX; c.onBack = onBack;
+    [bedX.frame, bedX.mattress, bedX.rails].forEach((o) => bd.add(o));
     /* pillow, patient */
-    const pil = rb(0.42, 0.1, 0.5, 0.05, mWhite, 0, 0, 0, bd); pil.position.copy(onBack(LB - 0.16, 0.11)); pil.rotation.z = -TH;
+    bd.add(bedX.pillow);
     const i0 = bd.children.length;
     const sk = M(skin[p.sx] || skin.m, { roughness: 0.62, envMapIntensity: 0.4 }), gown = M(0x8fc4d6, { roughness: 0.85, bumpMap: fabric, bumpScale: 0.8 });
     const nrm = new V(sth, cth, 0), fwd = new V(cth, -sth, 0);
@@ -209,14 +202,7 @@ export function buildWard(T, S, R, P, H) {
     /* legs under the blanket */
     [1, -1].forEach((s) => { const lg = new T.Mesh(new T.CapsuleGeometry(0.06, 0.55, 4, 12), gown); lg.rotation.z = Math.PI / 2; lg.position.set(0.72, 0.84, s * 0.14); bd.add(lg); const ft = new T.Mesh(new T.SphereGeometry(0.06, 10, 8), sk); ft.scale.set(1.3, 0.8, 0.9); ft.position.set(1.04, 0.86, s * 0.14); bd.add(ft); });
     { const proc = new T.Group(); bd.add(proc); bd.children.slice(i0, bd.children.length - 1).forEach((x) => proc.add(x)); c.proc = proc; }
-    /* blanket draped over the legs */
-    const bg = new T.PlaneGeometry(1.15, 0.98, 64, 36); bg.rotateX(-Math.PI / 2);
-    { const pa = bg.attributes.position; for (let k = 0; k < pa.count; k++) { const x = pa.getX(k), z = pa.getZ(k), az = Math.abs(z);
-      let y = 0.25 * Math.exp(-Math.pow((az - 0.12) / 0.16, 2)) * (1 - 0.15 * (x / 0.58 + 1) / 2) * Math.min(1, (x + 0.58) / 0.25); y += 0.018 * Math.exp(-Math.pow((x - 0.5) / 0.1, 2)) * Math.exp(-Math.pow((az - 0.12) / 0.1, 2));
-      y -= Math.max(0, az - 0.3) * Math.max(0, az - 0.3) * 6.5; y += 0.007 * Math.sin(x * 12 + z * 7) + 0.005 * Math.sin(x * 25 - z * 11); pa.setY(k, y); }
-      bg.computeVertexNormals(); }
-    const blanket = new T.Mesh(bg, M(0x2c6db4, { roughness: 0.9, bumpMap: fabric, bumpScale: 1.1, side: T.DoubleSide, envMapIntensity: 0.4 })); blanket.position.set(0.5, 0.86, 0); bd.add(blanket);
-    rb(0.14, 0.012, 0.9, 0.006, mWhite, -0.02, 0.84, 0, bd);   /* turned-down sheet */
+    bd.add(bedX.sheetG);   /* top sheet draped over the legs; reshaped to the real legs when the body loads */
 
     /* ---- breathing support ---- */
     const mouth = head.position.clone().addScaledVector(nrm, 0.095).addScaledVector(fwd, 0.055);
@@ -236,20 +222,20 @@ export function buildWard(T, S, R, P, H) {
       niv.add(strap(0.126, M(0x394650, { roughness: 0.8 })));
       const om = new T.Mesh(new T.SphereGeometry(0.085, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), M(0xa9e2c4, { transparent: true, opacity: 0.62, roughness: 0.2, side: T.DoubleSide, depthWrite: false })); om.scale.set(0.9, 1.1, 1.05); om.position.copy(mouth).addScaledVector(nrm, -0.02); om.quaternion.setFromUnitVectors(new V(0, 1, 0), nrm); msk.add(om);
       msk.add(strap(0.125, M(0xdddddd, { roughness: 0.8 })));
-      bd.add(imv); bd.add(niv); bd.add(msk); c.supp = { imv, niv, mask: msk };
+      imv.userData.part = "Endotracheal tube"; niv.userData.part = "NIV mask"; msk.userData.part = "Oxygen mask"; bd.add(imv); bd.add(niv); bd.add(msk); c.supp = { imv, niv, mask: msk };
     }
     /* oxygen flow meter on the head wall (mask and room air) */
     const fm = new T.Group(); fm.position.set(1.9, 1.5, -CD + 0.14); g.add(fm); cyl(0.022, 0.022, 0.2, clear, 0, 0, 0, fm, 10); cyl(0.012, 0.012, 0.03, M(0xff9a2a), 0, 0.06, 0, fm, 8); c.fm = fm;
 
     /* ---- wall monitor on an arm, live screen ---- */
-    const mg = new T.Group(); mg.position.set(0.1, 1.78, -CD + 0.75); mg.rotation.x = -0.06; g.add(mg);
+    const mg = new T.Group(); mg.userData.part = "Multiparameter monitor"; mg.position.set(0.1, 1.78, -CD + 0.75); mg.rotation.x = -0.06; g.add(mg);
     cyl(0.025, 0.025, 0.7, mMetal, 0, 0.0, -0.36, mg, 8).rotation.x = Math.PI / 2; bx(0.12, 0.12, 0.05, mDark, 0, 0, -0.01, mg);
     rb(0.8, 0.58, 0.07, 0.03, mDark, 0, 0, 0.03, mg);
     const monTex = ctex(512, 362, () => {}); c.mon = monTex;
     mesh(new T.PlaneGeometry(0.72, 0.508), new T.MeshBasicMaterial({ map: monTex, toneMapped: false }), 0, 0, 0.0672, mg);
     bx(0.7, 0.012, 0.01, eCy, 0, -0.29, 0.07, mg);
     /* ---- ventilator trolley (left of the bed head), live screen ---- */
-    const vg = new T.Group(); vg.position.set(-1.75, 0, -CD + 0.65); vg.rotation.y = 0.22; g.add(vg); c.vent = vg;
+    const vg = new T.Group(); vg.userData.part = "Ventilator"; vg.position.set(-1.75, 0, -CD + 0.65); vg.rotation.y = 0.22; g.add(vg); c.vent = vg;
     rb(0.52, 0.06, 0.5, 0.02, mDark, 0, 0.12, 0, vg); cyl(0.04, 0.04, 0.85, mMetal, 0, 0.55, 0, vg, 10);
     [[-0.2, 0.2], [0.2, 0.2], [-0.2, -0.2], [0.2, -0.2]].forEach((q) => cyl(0.04, 0.04, 0.03, mWheel, q[0], 0.04, q[1], vg, 10));
     rb(0.5, 0.36, 0.3, 0.04, M(0x252d35, { metalness: 0.55, roughness: 0.35 }), 0, 1.15, 0, vg);
@@ -262,10 +248,11 @@ export function buildWard(T, S, R, P, H) {
     const cm0 = mouth.clone().addScaledVector(nrm, 0.095).add(new V(BED.x, 0, BED.z));
     const vOut = cvec(-1.75 + 0.1, 1.05, -CD + 0.7), vIn = cvec(-1.75 + 0.2, 1.05, -CD + 0.7);
     const mkTube = (a, b, dz) => { const m = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3([a, new V((a.x + b.x) / 2, Math.max(a.y, b.y) + 0.12, (a.z + b.z) / 2 + dz), b]), 28, 0.014, 8), M(0xe4edf1, { roughness: 0.35, transparent: true, opacity: 0.9, envMapIntensity: 1.2 })); return m; };
-    const circ = new T.Group(); circ.add(mkTube(cm0, vOut, 0.1)); circ.add(mkTube(cm0.clone().add(cvec(0.01, 0.015, 0.02)), vIn, -0.05)); g.add(circ); c.circ = circ;
+    const mkCirc = (d) => { const a = cm0.clone().add(d || new V()), k = new T.Group(); k.add(mkTube(a, vOut, 0.1)); k.add(mkTube(a.clone().add(cvec(0.01, 0.015, 0.02)), vIn, -0.05)); return k; };
+    const circ = mkCirc(); circ.userData.part = "Ventilator circuit"; g.add(circ); c.circ = circ; c.mkCirc = mkCirc;
 
     /* ---- IV pole, bags, pump stack ---- */
-    const pg = new T.Group(); pg.position.set(1.55, 0, -CD + 0.9); g.add(pg); c.pole = pg;
+    const pg = new T.Group(); pg.userData.part = "IV pole, bags and infusion pumps"; pg.position.set(1.55, 0, -CD + 0.9); g.add(pg); c.pole = pg;
     const chrome = M(0xdfe8ee, { metalness: 1, roughness: 0.2, envMapIntensity: 1.6 });
     cyl(0.014, 0.014, 2.05, chrome, 0, 1.03, 0, pg, 8); for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2, l = bx(0.3, 0.02, 0.025, chrome, Math.cos(a) * 0.15, 0.05, Math.sin(a) * 0.15, pg); l.rotation.y = -a; }
     bx(0.62, 0.016, 0.016, chrome, 0, 2.05, 0, pg);
@@ -278,7 +265,7 @@ export function buildWard(T, S, R, P, H) {
     /* tubing from the pole to the cannula */
     const lineMat = M(0xe8f1f5, { transparent: true, opacity: 0.8, roughness: 0.3 });
     const mkLine = (end) => { const l = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3([cvec(1.55 - 0.1, 1.3, -CD + 0.9 + 0.1), cvec(1.2, 1.0, -2.7), cvec(0.8, 0.95, -2.1), end]), 24, 0.006, 6), lineMat); return l; };
-    let line = mkLine(cvec(BED.x + 0.26, 0.92, BED.z + 0.29)); c.mkLine = mkLine;
+    let line = mkLine(cvec(BED.x + 0.26, 0.92, BED.z + 0.29)); line.userData.part = "IV line"; c.mkLine = mkLine;
     g.add(line); c.line = line; line.visible = false; c.lineEnd = null;
     /* sharps bin and hand rub */
     cyl(0.14, 0.12, 0.34, M(0xf3c71d, { roughness: 0.4 }), 2.1, 0.17, -1.0, g, 16); cyl(0.145, 0.145, 0.03, M(0x1a1a1a), 2.1, 0.355, -1.0, g, 16);
@@ -356,20 +343,29 @@ export function buildWard(T, S, R, P, H) {
   function attachHuman(c) {
     const f = patientFile(c.p), url = new URL("./patients/" + f.key + ".glb", import.meta.url).href;
     loadArchetype(url).then((gltf) => {
-      const h = buildPerson(T, gltf, c.p, { skin: skins[c.i % skins.length], hair: f.age > 60 ? 0x9a9a9a : 0x15110f, longHair: f.sex === "f", incline: TH });
-      c.bed.add(h.group);
-      h.group.position.set(-0.02, 0.8, 0); h.group.updateMatrixWorld(true);
-      /* put the eyes where the procedural face was, so the airway equipment still meets the mouth */
+      const h = buildPerson(T, gltf, c.p, { skin: skins[c.i % skins.length], hair: f.age > 60 ? 0x9a9a9a : 0x15110f, longHair: f.sex === "f", incline: TH, pose: c.i });
+      h.group.userData.part = "Patient"; c.bed.add(h.group);
+      h.group.scale.setScalar(f.sex === "m" ? 1.1 : 1.04);
+      c.bed.updateMatrixWorld(true);
+      const bedPos = (o) => c.bed.worldToLocal(o.getWorldPosition(new V()));
+      /* seat the hips on the mattress: the pelvis joint sits just above the seat, the spine follows the raised back section */
+      h.group.position.set(0, 0, 0); h.group.updateMatrixWorld(true);
+      const hip = bedPos(h.B("spine05")), want = c.onBack(0.1, c.bedX.SB + 0.115);
+      h.group.position.copy(want).sub(hip); h.group.position.z = 0; h.group.updateMatrixWorld(true);
+      /* move the airway equipment to the real face (it was placed for the simple figure) */
       const a = h.B("eye.L"), b = h.B("eye.R");
       if (a && b) {
-        const m = new V().addVectors(a.getWorldPosition(new V()), b.getWorldPosition(new V())).multiplyScalar(0.5);
-        c.bed.updateMatrixWorld(true); const loc = c.bed.worldToLocal(m.clone());
-        h.group.position.add(c.eyeAnchor.clone().sub(loc)); h.group.position.z = 0;
-        h.group.updateMatrixWorld(true);
+        const m = new V().addVectors(bedPos(a), bedPos(b)).multiplyScalar(0.5), d = m.clone().sub(c.eyeAnchor);
+        ["imv", "niv", "mask"].forEach((k) => { if (c.supp[k]) c.supp[k].position.add(d); });
+        const vis = c.circ.visible; g_remove(c.circ); c.circ = c.mkCirc(d); c.circ.userData.part = "Ventilator circuit"; c.circ.visible = vis; c.g.add(c.circ);
+        /* sheet follows the real legs */
+        const hp = bedPos(h.B("spine05")), thL = bedPos(h.B("upperleg02.L")), kn = bedPos(h.B("lowerleg01.L")), an = bedPos(h.B("lowerleg02.L")), lz = Math.abs(thL.z) || 0.11;
+        const pts = [[hp.x, hp.y + 0.005, 0.115], [(hp.x + kn.x) / 2, (hp.y + kn.y) / 2 + 0.012, 0.1], [kn.x, kn.y + 0.01, 0.078], [an.x, an.y + 0.008, 0.058]];
+        c.bedX.setLegs([{ z: lz, pts }, { z: -lz, pts }], -0.02, an.x + 0.03);
         /* IV cannula on the wrist nearest the glass */
         const wl = h.B("wrist.L"), wr = h.B("wrist.R"); let best = null, bz = -9;
-        [wl, wr].forEach((w) => { if (!w) return; const q = c.bed.worldToLocal(w.getWorldPosition(new V())); if (q.z > bz) { bz = q.z; best = q; } });
-        if (best) { const ge = best.clone().add(new V(BED.x, 0.02, BED.z)); const vis = c.line.visible; g_remove(c.line); c.line = c.mkLine(ge); c.line.visible = vis; c.g.add(c.line); }
+        [wl, wr].forEach((w) => { if (!w) return; const q = bedPos(w); if (q.z > bz) { bz = q.z; best = q; } });
+        if (best) { const ge = best.clone().add(new V(BED.x, 0.02, BED.z)); const vis2 = c.line.visible; g_remove(c.line); c.line = c.mkLine(ge); c.line.userData.part = "IV line"; c.line.visible = vis2; c.g.add(c.line); }
       }
       c.proc.visible = false; c.human = h;
     }).catch((e) => console.warn("Patient model not loaded; using the simple figure.", e));
@@ -378,7 +374,19 @@ export function buildWard(T, S, R, P, H) {
   let humansLoaded = false;
   const loadHumans = () => { if (humansLoaded || H.humans === false) return; humansLoaded = true; cubicles.forEach(attachHuman); };
 
+  /* ---------- selection: tap a part in the 3D bed view ---------- */
+  const selBox = new T.Box3Helper(new T.Box3(), 0x36d6ff); selBox.visible = false; selBox.renderOrder = 9; selBox.material.depthTest = false; G.add(selBox);
+  const shown = (o) => { for (; o; o = o.parent) if (o.visible === false) return false; return true; };
+  const partOf = (o) => { for (; o; o = o.parent) if (o.userData && o.userData.part) return o; return null; };
+  function select(i, ray) {
+    if (!ray) { selBox.visible = false; return ""; }
+    const hit = ray.intersectObjects(cubicles[i].g.children, true).find((h) => shown(h.object) && partOf(h.object));
+    if (!hit) { selBox.visible = false; return ""; }
+    const part = partOf(hit.object); selBox.box.makeEmpty(); selBox.box.setFromObject(part, true); selBox.visible = !selBox.box.isEmpty();
+    return part.userData.part;
+  }
   return {
+    select, bedCenter: (i) => cubicles[i].bed.localToWorld(new V(0.35, 0.95, 0)),
     G, BP: (i) => BPs[i], BA, hits, lamps, update, cubicles, loadHumans,
     setDoor: (i, o) => { cubicles[i].target = o ? 1 : 0; },
     door: (i) => cubicles[i].open,

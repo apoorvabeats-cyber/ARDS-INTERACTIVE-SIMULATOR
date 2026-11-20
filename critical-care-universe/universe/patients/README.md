@@ -20,3 +20,11 @@ materials named `skin` (and optionally `gown`), and these bone names (dots allow
 head, clavicle.L/R, upperarm01.L/R, lowerarm01.L/R, wrist.L/R, upperleg01.L/R, eye.L/R`. Keep the file under ~1 MB
 (decimate to ~15k tris, 1k textures or none) so six patients load quickly on a phone. Drop it in this folder under the
 archetype name.
+
+## Bed and 3D bed view
+`../icu-bed.js` builds the ICU bed (chassis, columns, casters, split side rails with control pads, mattress, pillow, sheet) as
+separate groups tagged `userData.part`. In the bed screen, "3D view" lets you orbit, zoom and tap a part to select it
+(patient, bed frame, mattress, side rails, pillow, bedding, ventilator, monitor, IV pole and pumps, circuit, airway).
+The body is seated from the pelvis joint, arms are aimed with `aim()` in `../patient3d.js`, skin pores and blotches come
+from a shader (no UVs needed), and hospital shorts are a skinned copy of the pelvis triangles.
+A photoreal MetaHuman / Character Creator GLB prepared as described above drops in without code changes.

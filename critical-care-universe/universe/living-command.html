@@ -33,6 +33,10 @@ input[type=range]{width:100%}
 #top,#toast{z-index:3}#panel{z-index:2}#end{z-index:5}
 #photo{position:fixed;inset:0;z-index:1;background:#050b18;display:none;opacity:0;transition:opacity .5s}
 #photo.on{opacity:1}
+#v3d{position:fixed;right:12px;top:calc(var(--top-height,60px) + 12px);z-index:4;pointer-events:auto;min-height:34px;padding:4px 12px;border:1px solid #39e6ff;border-radius:18px;background:#0d2140cc;color:#d8ecff;font:600 13px system-ui,sans-serif;cursor:pointer}
+#photo.v3{display:none!important}
+#v3tag{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--top-height,60px) + 14px);z-index:4;padding:5px 12px;border-radius:14px;background:#06283acc;border:1px solid #39e6ff;color:#d8ecff;font:600 13px system-ui,sans-serif;pointer-events:none;display:none;white-space:nowrap}
+#v3hint{position:fixed;left:0;right:0;z-index:4;text-align:center;color:#7fa6c8;font:12px system-ui,sans-serif;pointer-events:none;display:none;top:calc(var(--top-height,60px) + 50px)}
 #pw{position:relative;width:min(100%,960px,max(160px,calc((100dvh - var(--top-height,60px) - 180px) * 16 / 9)));aspect-ratio:16/9;margin:calc(var(--top-height,60px) + 6px + env(safe-area-inset-top,0px)) auto 0}
 #pb,#pc{position:absolute;inset:0;width:100%;height:100%;background-size:100% 100%}
 #iv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
@@ -61,6 +65,7 @@ input[type=range]{width:100%}
 <div id="toast"></div>
 <div id="hint"></div>
 <div id="photo"><div id="pw"><div id="pb"></div><canvas id="pc" width="640" height="360" aria-hidden="true"></canvas><canvas id="iv" width="1280" height="720" aria-hidden="true"></canvas><canvas id="pl" width="720" height="508"></canvas><canvas id="pr" width="300" height="200"></canvas><div id="pi"></div></div></div>
+<button id="v3d" type="button" hidden>3D view</button><div id="v3tag"></div><div id="v3hint">Drag to orbit · pinch or scroll to zoom · tap a part to select it</div>
 <div id="panel">
 <h3 id="pn"></h3><small id="hx" style="display:block;color:#9fc3e4;margin-bottom:6px"></small>
 <button id="replay-voice" type="button" hidden>Replay case voice</button><p id="voice-status" role="status" hidden></p>
@@ -93,7 +98,7 @@ import * as THREE from './three.module.js';
 import {FOLLOW_UPS,DISTRACTORS} from './case-decisions.js';
 import {ORDER_CASES,assessOrder} from './clinical-orders.js?v=20261115a';
 import {createCaseVoice} from './case-voice.mjs';
-import {buildWard} from './ward3d.js?v=20261120a';
+import {buildWard} from './ward3d.js?v=20261120b';
 const $=s=>document.querySelector(s),V=THREE.Vector3,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 function updateLayout(){
  document.documentElement.style.setProperty('--top-height',$('#top').getBoundingClientRect().height+'px');
@@ -276,12 +281,22 @@ let ent=0,mode='cmd',yaw=0,pit=0,cmdYaw=0,cmdPit=0,cur=null,transit=null,voiceOn
 const voiceController='speechSynthesis' in window&&'SpeechSynthesisUtterance' in window?createCaseVoice(window.speechSynthesis,window.SpeechSynthesisUtterance,reason=>{console.warn('Case narration did not start:',reason);$('#voice-status').textContent=$('#replay-voice').hidden?'Voice could not start.':'Voice could not start. Tap Replay case voice.';$('#voice-status').hidden=false}):null;
 $('#zoom-wall').onclick=()=>{wallZoom=!wallZoom;$('#zoom-wall').textContent=wallZoom?'Fit wall':'Zoom wall';$('#zoom-wall').setAttribute('aria-pressed',String(wallZoom));$('#settings-menu').open=false};
 function updateFov(){cam.fov=mode==='ward'||mode==='travel'?(cam.aspect<1?Math.min(105,72+(1-cam.aspect)*70):72):72;cam.updateProjectionMatrix()}
+let v3=false;const orb={az:0,el:.45,r:1.45};
+function setV3(on){
+ v3=!!on&&!!ward&&!flatMode;const ph=$('#photo');ph.classList.toggle('v3',v3);$('#v3d').textContent=v3?'Photo view':'3D view';
+ $('#v3hint').style.display=v3?'block':'none';$('#v3tag').style.display='none';$('#v3tag').textContent='';
+ if(v3){const sgn=Math.sign(BP(cur)[1])||-1;orb.az=(sgn>0?Math.PI:0)+.5;orb.el=.45;orb.r=1.45;ward.cubicles[cur].target=1;if(ward.select)ward.select(cur,null)}
+ else if(ward&&ward.select)ward.select(cur,null);
+ $('#panel').style.display=v3?'none':(mode=='bed'?'block':'none')
+}
+function fitView(){return;if(!v3)return;const w=cv.clientWidth,h=cv.clientHeight,hv=Math.max(120,Math.min(h,parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--photo-bottom'))||h*.45));cam.setViewOffset(w,h,0,(h-hv)/2,w,h);cam.updateProjectionMatrix()}
 function tgt(){
  if(mode=='cmd'){const W=14,H=14*(845/1500),half=Math.tan(36*Math.PI/180),fit=Math.max(H/2/half,W/2/(half*cam.aspect)),d=fit*(wallZoom?(cam.aspect<1?.42:.76):1.04);tp.set(100,H/2,-8+d);tl.set(100+Math.sin(cmdYaw)*W*0.48,H/2+Math.sin(cmdPit)*H*0.3,-8)}
  else if(mode=='ward'){tp.set(0,1.6,0);tl.set(Math.sin(yaw)*Math.cos(pit),1.6+Math.sin(pit),-Math.cos(yaw)*Math.cos(pit))}
+ else if(ward&&mode=='bed'&&v3){const c=ward.bedCenter(cur),hz=Math.cos(orb.el)*orb.r;tp.set(c.x+Math.sin(orb.az)*hz,c.y+Math.sin(orb.el)*orb.r,c.z+Math.cos(orb.az)*hz);tl.copy(c)}
  else if(ward){tp.copy(ward.inside(cur));tl.copy(ward.look(cur))}else{const g=B[cur].g;tp.copy(g.position).multiplyScalar(-0.18);tp.y=1.62;tl.copy(g.position);tl.y=1.5}}
 function go(m,i){
- transit=null;stopVoice();
+ transit=null;stopVoice();if(v3)setV3(false);
  $('#voice-status').hidden=true;$('#replay-voice').hidden=m!=='bed'||!voiceOn||!P[i]||P[i].done;
  mode=m;updateFov();if(m=='bed'){cur=i;const p=P[i];$('#pn').textContent=(i+1)+'. '+p.n+' · '+p.dx;$('#hx').textContent=p.hx;
   [['fi',p.fio2],['pe',p.peep],['rrset',p.setRate],['vtset',p.vt],['ipap',p.ipap]].forEach(([id,v])=>{const e=$('#'+id);e.value=v;if(e.previousElementSibling)e.previousElementSibling.textContent=v});
@@ -291,7 +306,7 @@ function go(m,i){
  else cur=null;
  if(m=='cmd'||m=='ward'){tgt();cam.position.copy(tp);lk.copy(tl);cam.lookAt(lk)}
  $('#panel').style.display=m=='bed'?'block':'none';
- const ph=$('#photo');if(m=='bed'){$('#pb').style.backgroundImage='url('+IM[P[i].sx=='f'?1:0]+')';const r=RR[i],s=$('#pr').style;s.left=r[0]+'%';s.top=r[1]+'%';s.width=r[2]+'%';s.height=r[3]+'%';ph.style.display='block';updateLayout();requestAnimationFrame(()=>{updateLayout();ph.classList.add('on')})}else{ph.classList.remove('on');setTimeout(()=>{if(mode!='bed')ph.style.display='none'},500)}
+ const ph=$('#photo');if(m=='bed'){$('#pb').style.backgroundImage='url('+IM[P[i].sx=='f'?1:0]+')';const r=RR[i],s=$('#pr').style;s.left=r[0]+'%';s.top=r[1]+'%';s.width=r[2]+'%';s.height=r[3]+'%';ph.style.display='block';$('#v3d').hidden=!ward||flatMode;updateLayout();requestAnimationFrame(()=>{updateLayout();ph.classList.add('on')})}else{$('#v3d').hidden=true;ph.classList.remove('on');setTimeout(()=>{if(mode!='bed')ph.style.display='none'},500)}
  $('#hint').textContent=m=='ward'?'Drag to look around · tap a bed to step in':m=='cmd'?'Swipe to scan the command wall · tap a patient monitor':''}
 document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>go(b.dataset.m));
 go('cmd');
@@ -302,9 +317,16 @@ function unlockAudio(){try{const Audio=window.AudioContext||window.webkitAudioCo
 document.addEventListener('pointerdown',unlockAudio,{once:true});
 document.addEventListener('pointerdown',()=>{if(voiceOn&&voiceController)voiceController.prime()});
 cv.onpointerdown=e=>{dn=1;mv=0;lx=e.clientX;ly=e.clientY};
-cv.onpointermove=e=>{if(!dn)return;const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;mv+=Math.abs(dx)+Math.abs(dy);if(mode=='ward'){yaw-=dx*.006;pit=clamp(pit+dy*.004,-.5,.5)}else if(mode=='cmd'){cmdYaw=clamp(cmdYaw-dx*.0032,-1.05,1.05);cmdPit=clamp(cmdPit-dy*.002,-.42,.42)}};
+cv.onpointermove=e=>{if(!dn)return;const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;mv+=Math.abs(dx)+Math.abs(dy);if(mode=='bed'&&v3&&pts.size<2){orb.az-=dx*.008;orb.el=clamp(orb.el+dy*.006,-.2,1.35)}else if(mode=='ward'){yaw-=dx*.006;pit=clamp(pit+dy*.004,-.5,.5)}else if(mode=='cmd'){cmdYaw=clamp(cmdYaw-dx*.0032,-1.05,1.05);cmdPit=clamp(cmdPit-dy*.002,-.42,.42)}};
 cv.onpointercancel=()=>dn=0;
+const pts=new Map();let pd0=0;
+cv.addEventListener('pointerdown',e=>{pts.set(e.pointerId,[e.clientX,e.clientY]);if(pts.size===2){const a=[...pts.values()];pd0=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1])}});
+cv.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,[e.clientX,e.clientY]);if(pts.size===2&&mode==='bed'&&v3){const a=[...pts.values()],d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(pd0>0&&d>0)orb.r=clamp(orb.r*pd0/d,.75,1.6);pd0=d;mv+=20}});
+['pointerup','pointercancel','pointerleave'].forEach(ev=>cv.addEventListener(ev,e=>pts.delete(e.pointerId)));
+cv.addEventListener('wheel',e=>{if(mode==='bed'&&v3){e.preventDefault();orb.r=clamp(orb.r*Math.exp(e.deltaY*.0012),.75,1.6)}},{passive:false});
+$('#v3d').onclick=()=>setV3(!v3);addEventListener('resize',fitView);
 cv.onpointerup=e=>{dn=0;if(mv>8)return;const r=cv.getBoundingClientRect();mv2.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(mv2,cam);
+ if(mode==='bed'&&v3&&ward&&ward.select){const nm=ward.select(cur,ray),tg=$('#v3tag');tg.textContent=nm?'Selected: '+nm:'';tg.style.display=nm?'block':'none';return}
  const h=ray.intersectObjects(S.children,true).find(o=>o.object.visible&&((mode==='cmd'&&(o.object===scr||o.object.userData.command))||(mode==='ward'&&o.object.userData.bed!=null)));if(!h)return;
  if(mode=='cmd'&&h.object.userData&&h.object.userData.command&&h.uv){var uu=h.uv.x,vv=1-h.uv.y,sc=h.object.userData.screens||[];for(var kk=0;kk<sc.length;kk++){var rr=sc[kk];if(uu>=rr.x&&uu<=rr.x+rr.w&&vv>=rr.y&&vv<=rr.y+rr.h){openFromWall(rr.bed);break}}}
  else if(h.object===scr){const u=h.uv,i=Math.floor((1-u.y)*RW)*C+Math.floor(u.x*C);if(P[i])openFromWall(i)}
