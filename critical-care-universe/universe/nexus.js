@@ -9,10 +9,10 @@ import { GLTFLoader } from "./vendor/GLTFLoader.js";
 import { createDevices } from "./icu-devices.js?v=20261120o";
 import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261120o";
 import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261120o";
-import { createSfx } from "./sfx.js?v=20261121d";
-import { createDesk, DESK } from "./nexus-desk.js?v=20261121d";
-import { paintMachine } from "./nexus-machines.js?v=20261121d";
-import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261121d";
+import { createSfx } from "./sfx.js?v=20261121e";
+import { createDesk, DESK } from "./nexus-desk.js?v=20261121e";
+import { paintMachine } from "./nexus-machines.js?v=20261121e";
+import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261121e";
 
 const $ = (s) => document.querySelector(s);
 const Q = new URLSearchParams(location.search), DEMO = Q.has("demo");
@@ -623,7 +623,7 @@ function goAuditorium() {
     sessionStorage.setItem("ccu-pose", JSON.stringify({ to: "aud", x: AUD_X - me.z, z: ZC + me.x, yaw: me.yaw + Math.PI / 2, t: Date.now() }));
   } catch (e) {}
   if (net) { net.close(); net = null; }
-  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261121d";
+  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261121e";
 }
 function leave(type) { if (net) { net.close(); net = null; } post(type); }
 

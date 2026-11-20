@@ -10,7 +10,8 @@
        the real pages take over, from the same pose, a few steps inside.
    buildSuite(T, scene, P, H, env, {gateSet}) -> { doors, update(t,dt), clamp(x,z), hits, rooms }          */
 
-import { buildOutdoor } from "./outdoor3d.js?v=20261121d";
+import { buildOutdoor } from "./outdoor3d.js?v=20261121e";
+import { loadVisitorCopy, createVisitor } from "./visitor-avatar.js?v=20261121e";
 
 export function buildSuite(T, S, P, H, env, opt = {}) {
   const V = T.Vector3, G = new T.Group(); G.name = "suite"; S.add(G);
@@ -374,6 +375,41 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
   }
   [seatBase, seatBack, seatLeg].forEach((m) => { m.instanceMatrix.needsUpdate = true; aud.add(m); });
 
+  /* ---- two tall LIVE UPDATES screens, one on the hub-door wall and one on the Nexus-door wall, set back from the doors: three beds each, the same live bed monitors as the ICU board ---- */
+  const tall = [];
+  [[AU.x0 + 0.06, Math.PI / 2, 0], [AU.x1 - 0.06, -Math.PI / 2, 3]].forEach(([wx, ry, first]) => {
+    const d = dcv(720, 1192), m = new T.MeshBasicMaterial({ map: d.t, toneMapped: false }), g = new T.Group(); g.position.set(wx, 3.45, -10.6); g.rotation.y = ry; aud.add(g);
+    bx(3.5, 5.7, 0.08, M(0x07090c, { metalness: 0.6, roughness: 0.35 }), 0, 0, -0.01, g); pl(3.3, 5.46, m, 0, 0, 0.04, 0, 0, g);
+    [-1, 1].forEach((k) => bx(0.04, 5.7, 0.03, cyan, k * 1.74, 0, 0.05, g)); bx(3.5, 0.04, 0.03, cyan, 0, 2.86, 0.05, g); bx(3.5, 0.04, 0.03, cyan, 0, -2.86, 0.05, g);
+    tall.push({ d, first, g });
+  });
+  /* ---- two visitors: one walks the aisle in a slow loop, one sits in the audience ---- */
+  const visitors = [];
+  const walkPts = [[cxA - 1.9, -8.2], [cxA - 1.9, -18.6], [cxA + 1.9, -18.6], [cxA + 1.9, -8.2]];
+  loadVisitorCopy().then((gl) => {
+    const v = createVisitor(T, gl, { mode: "walk", height: 1.68 }); aud.add(v.group); v.group.position.set(walkPts[0][0], 0, walkPts[0][1]);
+    visitors.push({ v, kind: "walk", i: 1, x: walkPts[0][0], z: walkPts[0][1], yaw: Math.PI });
+  }).catch(() => {});
+  loadVisitorCopy().then((gl) => {
+    const v = createVisitor(T, gl, { mode: "sit", height: 1.68 }), sx = cxA + 3.15 + 0.6, sz = -7.4 - 1.35; aud.add(v.group);
+    v.group.position.set(sx, 0.64 - v.hipsHeight, sz + 0.06); v.group.rotation.y = Math.PI;       /* faces the exit end of the hall, like every seat */
+    visitors.push({ v, kind: "sit" });
+  }).catch(() => {});
+  let audAcc = 0, audK = 0, audFirst = true;
+  function updateAud(t, dt, cam) {
+    if (!cam || cam.z > -4.5 || cam.z < -22.5) return;
+    const sdt = Math.min(dt, 0.1);
+    visitors.forEach((o) => {
+      if (o.kind === "walk") {
+        const tg = walkPts[o.i], dx = tg[0] - o.x, dz = tg[1] - o.z, dl = Math.hypot(dx, dz), step = Math.min(dl, 0.95 * sdt);
+        if (dl < 0.15) o.i = (o.i + 1) % walkPts.length; else { o.x += dx / dl * step; o.z += dz / dl * step; }
+        let dy = Math.atan2(dx, dz) - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, sdt * 3.2);
+        o.v.group.position.x = o.x; o.v.group.position.z = o.z; o.v.group.rotation.y = o.yaw; o.v.update(sdt, 1);
+      } else o.v.update(sdt, 0);
+    });
+    audAcc += dt; if (audFirst || audAcc > 0.1) { audFirst = false; audAcc = 0; paintTall(tall[audK]); audK ^= 1; }
+  }
+
   /* lights */
   const pt = (c, k, d, x, y, z) => { const l = new T.PointLight(c, k, d, 1.6); l.position.set(x, y, z); G.add(l); return l; };
   pt(0xdfefff, 12, 18, -15.5, 3.8, 0); pt(0x9fd8ff, 6, 12, -19.2, 3.0, 0);
@@ -421,6 +457,26 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
       g.fillStyle = "#e5f4ff"; g.font = "600 25px system-ui,sans-serif"; g.fillText(e.txt.length > 52 ? e.txt.slice(0, 51) + "…" : e.txt, 168, y + (rowH - 6) / 2); g.globalAlpha = 1; }
     g.fillStyle = "rgba(54,214,255,.55)"; const sx = ((tn * 160) % (w + 200)) - 200; g.fillRect(sx, h - 6, 200, 3);
     d.t.needsUpdate = true;
+  }
+  /* a tall screen: title, then three bed monitors (the live ones from the ICU) each with a line of what is running */
+  function paintTall(t) {
+    const g = t.d.g, w = 720, h = 1192, tn = performance.now() / 1000; g.fillStyle = "#050d16"; g.fillRect(0, 0, w, h);
+    const hd = g.createLinearGradient(0, 0, w, 0); hd.addColorStop(0, "#0b2a40"); hd.addColorStop(1, "#103a56"); g.fillStyle = hd; g.fillRect(0, 0, w, 56);
+    g.fillStyle = "#36d6ff"; g.font = "800 28px system-ui,sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText("LIVE UPDATES", 18, 29);
+    g.fillStyle = Math.sin(tn * 3) > -0.1 ? "#ff4d5e" : "#4a2a30"; g.beginPath(); g.arc(w - 176, 29, 7, 0, 7); g.fill();
+    g.fillStyle = "#d8ecff"; g.font = "700 20px ui-monospace,Menlo,monospace"; g.textAlign = "right"; g.fillText("BEDS " + (t.first + 1) + "–" + (t.first + 3) + "   " + clock(), w - 14, 30);
+    for (let k = 0; k < 3; k++) {
+      const p = P[t.first + k], y = 56 + k * 378; if (!p) continue;
+      if (H && H.mon) H.mon(g, p, w, 300, 0, y); else { g.fillStyle = "#020b12"; g.fillRect(0, y, w, 300); }
+      const v = p.v, map = Math.round((v.sbp + 2 * v.dbp) / 3), air = ({ imv: "Ventilator", niv: "NIV", hf: "High-flow oxygen", o2: "Oxygen" })[p.air] || "Room air";
+      g.fillStyle = "#0a1a28"; g.fillRect(0, y + 300, w, 78); g.fillStyle = col(p.st); g.fillRect(0, y + 300, 7, 78);
+      g.textAlign = "left"; g.textBaseline = "middle"; g.fillStyle = "#e5f4ff"; g.font = "700 23px system-ui,sans-serif"; g.fillText(p.dx.length > 38 ? p.dx.slice(0, 37) + "…" : p.dx, 22, y + 322);
+      g.fillStyle = "#8fb6cf"; g.font = "600 19px ui-monospace,Menlo,monospace"; g.fillText("MAP " + map + "  T " + (v.t != null ? Number(v.t).toFixed(1) : "–") + "°  " + air + (p.iv ? "  FiO₂ " + Math.round(p.fio2) + "%  PEEP " + p.peep : ""), 22, y + 356);
+      g.fillStyle = col(p.st); g.textAlign = "right"; g.font = "800 22px system-ui,sans-serif"; g.fillText(["STABLE", "WATCH", "CRITICAL"][p.st || 0], w - 16, y + 322);
+      g.fillStyle = "#36d6ff"; g.fillRect(0, y + 377, w, 1);
+    }
+    g.fillStyle = "rgba(54,214,255,.5)"; const sy = ((tn * 90) % (h + 120)) - 120; g.fillRect(0, sy, w, 2);
+    t.d.t.needsUpdate = true;
   }
   function paintStatus() {
     const g = status.g, w = 1024, h = 480; bg(g, w, h, "ICU STATUS BOARD");
@@ -476,6 +532,7 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
     if (cam) out.update(t, dt, cam, doors.exit.open > 0.02 || (cam.z < -21.3 && cam.x > -22.2 && cam.x < -8.7 && !hubSee && !mdtSee));
     Object.values(doors).forEach((d) => { if (Math.abs(d.open - d.target) > 0.001) { d.set(d.open + (d.target - d.open) * (1 - Math.exp(-dt * 3.2))); } else if (d.open !== d.target) d.set(d.target); });
     acc += dt; accSlow += dt;
+    updateAud(t, dt, cam);
     if (cam && cam.z < -12) return;          /* far away in the auditorium or outdoors: nothing to repaint */
     if (first) { mons.forEach(paintMon); deskScr.forEach((s) => painters[s.key](s.d)); paintStatus(); feedTick(); feedBoards.forEach(paintFeed); first = false; }
     /* every wall monitor is redrawn on every frame (phones: half of them per frame), so the traces glide instead of stepping */
