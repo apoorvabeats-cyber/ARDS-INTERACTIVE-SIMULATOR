@@ -32,5 +32,11 @@ A photoreal MetaHuman / Character Creator GLB prepared as described above drops 
 ## Male patient body (male_ref.glb)
 All male patients use `male_ref.glb`, the Human Reference Atlas "Visible Human Male" skin from `models/anatomy/human-reference.glb`
 (Kristen Browne and Heidi Schlehlein / HuBMAP, **CC BY 4.0**), rigged and given a hospital top and shorts by `../../../tools/rig_reference.py`
-(bone-distance skin weights, same bone names as the MakeHuman bodies, about 1.8 MB, 1.72 m). Females still use the MakeHuman archetypes.
+(bone-distance skin weights, same bone names as the MakeHuman bodies, about 1.8 MB, 1.72 m). 
 Re-run: `python3 tools/rig_reference.py models/anatomy/human-reference.glb critical-care-universe/universe/patients/male_ref.glb`
+
+## Female patient body (female_ref.glb)
+All female patients use `female_ref.glb`, the Human Reference Atlas "United Female" skin from `models/anatomy/female-human.glb`
+(HuBMAP, CC BY 4.0; credit in `models/anatomy/ATTRIBUTION.md`), rigged and gowned by the same script with a female landmark profile
+(about 0.7 MB, 1.62 m). The MakeHuman archetypes remain as a fallback for custom patients.
+Re-run: `python3 tools/rig_reference.py models/anatomy/female-human.glb critical-care-universe/universe/patients/female_ref.glb female`

@@ -11,7 +11,7 @@ const clean = (n) => n.replace(/[.\s]/g, "");
 export function patientFile(p) {
   const m = /^(\d+)\s*([MF])/i.exec(p.hx || "");
   const age = m ? +m[1] : 50, sex = (m ? m[2] : p.sx || "M").toLowerCase() === "f" ? "f" : "m";
-  return { sex, age, key: sex === "m" ? "male_ref" : sex + (age < 36 ? "28" : age < 58 ? "48" : "68") };
+  return { sex, age, key: sex === "m" ? "male_ref" : "female_ref" };
 }
 
 export function loadArchetype(url) {
