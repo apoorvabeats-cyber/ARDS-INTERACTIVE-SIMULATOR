@@ -92,10 +92,7 @@ export function buildBed(T, X) {
   });
 
   /* ---- pillow ---- */
-  { const g = new T.SphereGeometry(1, 36, 22), p = g.attributes.position;
-    for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const k = 1 - 0.5 * Math.pow(Math.abs(y), 2); p.setXYZ(i, x * k, y * 0.42, z * k); }
-    g.computeVertexNormals();
-    const m = new T.Mesh(g, cotton); m.scale.set(0.17, 0.1, 0.23); m.position.copy(onBack(LB - 0.19, SB + 0.06)); m.rotation.z = -TH; pillow.add(m); }
+  { const m = rb(0.44, 0.11, 0.6, 0.05, cotton, 0, 0, 0, pillow); m.position.copy(onBack(LB - 0.2, SB + 0.06)); m.rotation.z = -TH; }
 
   /* ---- draped top sheet over the legs: height field over the leg capsules ---- */
   function makeSheet(legs, x0, x1) {

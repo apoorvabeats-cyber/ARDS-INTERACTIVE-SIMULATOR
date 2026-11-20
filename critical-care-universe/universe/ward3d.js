@@ -7,9 +7,9 @@
    buildWard(THREE, scene, renderer, P, H) -> { BP, BA, hits, lamps, update(t,dt,yaw,facingAll), setDoor(i,open), door(i), approach(i) }
      H.mon(ctx,p,w,h,x,y)   monitor painter       H.rdr(ctx,p)  ventilator painter
      H.equip(p) -> {bags,pumps,doses}              Visual only. Clinical text is original and needs review.        */
-import { loadArchetype, build as buildPerson, breathe, patientFile } from "./patient3d.js?v=20261120b";
+import { loadArchetype, build as buildPerson, breathe, patientFile } from "./patient3d.js?v=20261120c";
 
-import { buildBed } from "./icu-bed.js?v=20261120b";
+import { buildBed } from "./icu-bed.js?v=20261120c";
 export function buildWard(T, S, R, P, H) {
   const V = T.Vector3, G = new T.Group(); G.name = "ward"; S.add(G);
   const CW = 5, CD = 3.8, FZ = 3.6, HT = 3.3, GH = 3.0, XS = [-5, 0, 5];
@@ -345,7 +345,7 @@ export function buildWard(T, S, R, P, H) {
     loadArchetype(url).then((gltf) => {
       const h = buildPerson(T, gltf, c.p, { skin: skins[c.i % skins.length], hair: f.age > 60 ? 0x9a9a9a : 0x15110f, longHair: f.sex === "f", incline: TH, pose: c.i });
       h.group.userData.part = "Patient"; c.bed.add(h.group);
-      h.group.scale.setScalar(f.sex === "m" ? 1.1 : 1.04);
+      h.group.scale.setScalar((gltf.scene.userData && gltf.scene.userData.patientScale) || (gltf.scene.children[1] && gltf.scene.children[1].userData.patientScale) || (f.sex === "m" ? 1.1 : 1.04));
       c.bed.updateMatrixWorld(true);
       const bedPos = (o) => c.bed.worldToLocal(o.getWorldPosition(new V()));
       /* seat the hips on the mattress: the pelvis joint sits just above the seat, the spine follows the raised back section */
@@ -360,7 +360,7 @@ export function buildWard(T, S, R, P, H) {
         const vis = c.circ.visible; g_remove(c.circ); c.circ = c.mkCirc(d); c.circ.userData.part = "Ventilator circuit"; c.circ.visible = vis; c.g.add(c.circ);
         /* sheet follows the real legs */
         const hp = bedPos(h.B("spine05")), thL = bedPos(h.B("upperleg02.L")), kn = bedPos(h.B("lowerleg01.L")), an = bedPos(h.B("lowerleg02.L")), lz = Math.abs(thL.z) || 0.11;
-        const pts = [[hp.x, hp.y + 0.005, 0.115], [(hp.x + kn.x) / 2, (hp.y + kn.y) / 2 + 0.012, 0.1], [kn.x, kn.y + 0.01, 0.078], [an.x, an.y + 0.008, 0.058]];
+        const pts = [[hp.x, hp.y + 0.02, 0.13], [(hp.x + kn.x) / 2, (hp.y + kn.y) / 2 + 0.025, 0.115], [kn.x, kn.y + 0.02, 0.09], [an.x, an.y + 0.015, 0.066]];
         c.bedX.setLegs([{ z: lz, pts }, { z: -lz, pts }], -0.02, an.x + 0.03);
         /* IV cannula on the wrist nearest the glass */
         const wl = h.B("wrist.L"), wr = h.B("wrist.R"); let best = null, bz = -9;

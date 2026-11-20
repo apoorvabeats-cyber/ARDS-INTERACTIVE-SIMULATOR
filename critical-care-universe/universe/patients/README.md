@@ -28,3 +28,9 @@ separate groups tagged `userData.part`. In the bed screen, "3D view" lets you or
 The body is seated from the pelvis joint, arms are aimed with `aim()` in `../patient3d.js`, skin pores and blotches come
 from a shader (no UVs needed), and hospital shorts are a skinned copy of the pelvis triangles.
 A photoreal MetaHuman / Character Creator GLB prepared as described above drops in without code changes.
+
+## Male patient body (male_ref.glb)
+All male patients use `male_ref.glb`, the Human Reference Atlas "Visible Human Male" skin from `models/anatomy/human-reference.glb`
+(Kristen Browne and Heidi Schlehlein / HuBMAP, **CC BY 4.0**), rigged and given a hospital top and shorts by `../../../tools/rig_reference.py`
+(bone-distance skin weights, same bone names as the MakeHuman bodies, about 1.8 MB, 1.72 m). Females still use the MakeHuman archetypes.
+Re-run: `python3 tools/rig_reference.py models/anatomy/human-reference.glb critical-care-universe/universe/patients/male_ref.glb`

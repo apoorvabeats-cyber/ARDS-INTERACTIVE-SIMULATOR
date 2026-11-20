@@ -11,7 +11,7 @@ const clean = (n) => n.replace(/[.\s]/g, "");
 export function patientFile(p) {
   const m = /^(\d+)\s*([MF])/i.exec(p.hx || "");
   const age = m ? +m[1] : 50, sex = (m ? m[2] : p.sx || "M").toLowerCase() === "f" ? "f" : "m";
-  return { sex, age, key: sex + (age < 36 ? "28" : age < 58 ? "48" : "68") };
+  return { sex, age, key: sex === "m" ? "male_ref" : sex + (age < 36 ? "28" : age < 58 ? "48" : "68") };
 }
 
 export function loadArchetype(url) {
@@ -71,7 +71,7 @@ export function build(T, gltf, p, opt) {
   clone.traverse((o) => { if (o.isSkinnedMesh) sm.push(o); });
   /* hospital shorts: a slightly inflated copy of the skin triangles around the pelvis and thighs, skinned to the same bones */
   { const src = sm.find((o) => o.material && o.material.name === "skin");
-    if (src && src.geometry.index) {
+    if (src && src.geometry.index && !((src.parent && src.parent.userData.noShorts) || src.userData.noShorts)) {
       const g0 = src.geometry, pos = g0.attributes.position, nor = g0.attributes.normal, idx = g0.index.array, keep = [];
       const ok = (v) => { const y = pos.getY(v); return y > -0.3 && y < 0.17 && Math.abs(pos.getX(v)) < 0.3; };
       for (let i = 0; i < idx.length; i += 3) if (ok(idx[i]) && ok(idx[i + 1]) && ok(idx[i + 2])) keep.push(idx[i], idx[i + 1], idx[i + 2]);
