@@ -7,9 +7,9 @@
    buildWard(THREE, scene, renderer, P, H) -> { BP, BA, hits, lamps, update(t,dt,yaw,facingAll), setDoor(i,open), door(i), approach(i) }
      H.mon(ctx,p,w,h,x,y)   monitor painter       H.rdr(ctx,p)  ventilator painter
      H.equip(p) -> {bags,pumps,doses}              Visual only. Clinical text is original and needs review.        */
-import { loadArchetype, build as buildPerson, breathe, patientFile } from "./patient3d.js?v=20261120i";
+import { loadArchetype, build as buildPerson, breathe, patientFile } from "./patient3d.js?v=20261120j";
 
-import { buildBed } from "./icu-bed.js?v=20261120i";
+import { buildBed } from "./icu-bed.js?v=20261120j";
 export function buildWard(T, S, R, P, H) {
   const V = T.Vector3, G = new T.Group(); G.name = "ward"; S.add(G);
   const CW = 5, CD = 3.8, FZ = 3.6, HT = 3.3, GH = 3.0, XS = [-5, 0, 5];
