@@ -6,12 +6,12 @@
    Movement is the ICU's finger drag: swipe up to walk, drag sideways to look. Drag ON the patient to turn him through 360 degrees. */
 import * as T from "./three.module.js";
 import { GLTFLoader } from "./vendor/GLTFLoader.js";
-import { createDevices } from "./icu-devices.js?v=20261120n";
-import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261120n";
-import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261120n";
-import { createSfx } from "./sfx.js?v=20261120n";
-import { createDesk, DESK } from "./nexus-desk.js?v=20261120n";
-import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261120n";
+import { createDevices } from "./icu-devices.js?v=20261120o";
+import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261120o";
+import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261120o";
+import { createSfx } from "./sfx.js?v=20261120o";
+import { createDesk, DESK } from "./nexus-desk.js?v=20261120o";
+import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261120o";
 
 const $ = (s) => document.querySelector(s);
 const Q = new URLSearchParams(location.search), DEMO = Q.has("demo");
@@ -484,8 +484,8 @@ $("#sci").addEventListener("click", (e) => {
 function tileInfo() {
   if (!P) { SECTIONS.forEach((x) => odesk.setInfo(x.id, "waiting for the case")); return; }
   const l = labsOf({ P }), so = sofaOf({ P, SC, eq, labSeries }), rs = (P.results || []).filter((r) => /Chest|CT/.test(r.label)).length + (P.log || []).filter((x) => /looked at the heart/.test(x.text || "")).length, run = [P.norepi, eq.fluid > 0, eq.abx, eq.blood, P.dialysis].filter(Boolean).length;
-  odesk.setInfo("overview", (SC ? SC.name.split(" ")[0] + " · " : "") + "hour " + P.hour); odesk.setInfo("resp", "SpO₂ " + Math.round(P.spo2) + " % · RR " + Math.round(P.rr)); odesk.setInfo("hemo", "MAP " + Math.round(P.map) + " · HR " + Math.round(P.hr));
-  odesk.setInfo("lab", l.sent ? "Lactate " + l.lactate + " · K " + l.k : "no blood sent yet"); odesk.setInfo("orders", run + " running"); odesk.setInfo("rad", rs ? rs + " stud" + (rs > 1 ? "ies" : "y") : "no images yet"); odesk.setInfo("intel", "SOFA at least " + so.tot);
+  odesk.setInfo("overview", (SC ? SC.name.split(" ")[0] + " · " : "") + "hour " + P.hour); odesk.setInfo("vitals", "HR " + Math.round(P.hr) + " · MAP " + Math.round(P.map) + " · SpO₂ " + Math.round(P.spo2));
+  odesk.setInfo("lab", l.sent ? "Lactate " + l.lactate + " · K " + l.k : "no blood sent yet"); odesk.setInfo("orders", run + " running"); odesk.setInfo("rad", rs ? rs + " stud" + (rs > 1 ? "ies" : "y") : "no images yet"); odesk.setInfo("organ", "GCS " + Math.round(P.gcs) + " · RR " + Math.round(P.rr)); odesk.setInfo("intel", "SOFA at least " + so.tot);
 }
 
 /* ================================================================ the state from the Team room */

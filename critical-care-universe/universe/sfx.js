@@ -19,8 +19,11 @@ export function createSfx() {
   S.unlock = () => { const c = ctx(); if (c && c.state === "suspended") c.resume().catch(() => {}); return !!c; };
   S.setOn = (b) => { on = !!b; if (master) master.gain.value = on ? 0.9 : 0; if (!on) S.stopOutdoor(); };
   S.isOn = () => on;
+  S.ready = () => !!(ac && master && ac.state === "running");
   S.setListener = (x, z, yaw) => { L.x = x; L.z = z; L.yaw = yaw; };
   const ready = () => ac && master && on && ac.state === "running";
+  /* phones only allow sound after a tap has finished, so keep trying on every kind of gesture until the context is really running */
+  if (typeof document !== "undefined") { const evs = ["pointerdown", "pointerup", "touchend", "click", "keydown"], kick = () => { S.unlock(); if (ac && ac.state === "running") evs.forEach((e) => document.removeEventListener(e, kick, true)); }; evs.forEach((e) => document.addEventListener(e, kick, true)); }
 
   const noiseBuf = () => {
     if (nb) return nb;
@@ -60,7 +63,7 @@ export function createSfx() {
   S.door = (opening, pos, size) => {
     if (!ready()) return;
     const t = ac.currentTime, p = place(pos), k = (size || 1) * p.gain, dur = 1.25;
-    const o = outTo(p.pan, 2.0 * k);
+    const o = outTo(p.pan, 4.4 * k);
     const click = ac.createBufferSource(); click.buffer = noiseBuf();
     const hp = ac.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 2200;
     const cg = ac.createGain(); click.connect(hp); hp.connect(cg); cg.connect(o); env(cg, t, 0.004, 0.09, 0.05);
@@ -94,7 +97,7 @@ export function createSfx() {
   /* soft alarm phrases: level 1 = a calm two-note advisory, level 2 = a gentle three-note urgent call (never harsh) */
   S.alert = (level, pos) => {
     if (!ready()) return;
-    const t = ac.currentTime, p = place(pos), out = outTo(p.pan, 0.11 * p.gain * (level > 1 ? 1.25 : 1));
+    const t = ac.currentTime, p = place(pos), out = outTo(p.pan, 0.26 * p.gain * (level > 1 ? 1.25 : 1));
     const notes = level > 1 ? [[784, 0], [659, 0.2], [784, 0.4], [988, 0.7]] : [[659, 0], [523, 0.22]];
     notes.forEach(([f, dt]) => {
       const os = ac.createOscillator(); os.type = "triangle"; os.frequency.value = f; const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 2200;

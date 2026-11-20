@@ -98,10 +98,9 @@ import * as THREE from './three.module.js';
 import {FOLLOW_UPS,DISTRACTORS} from './case-decisions.js';
 import {ORDER_CASES,assessOrder} from './clinical-orders.js?v=20261115a';
 import {createCaseVoice} from './case-voice.mjs';
-import {createAnnouncer} from './alarm-voice.mjs?v=20261120j';
-import {buildWard} from './ward3d.js?v=20261120j';
-import {buildSuite} from './command3d.js?v=20261120j';
-import {createSfx} from './sfx.js?v=20261120j';
+import {buildWard} from './ward3d.js?v=20261120o';
+import {buildSuite} from './command3d.js?v=20261120o';
+import {createSfx} from './sfx.js?v=20261120o';
 const $=s=>document.querySelector(s),V=THREE.Vector3,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 function updateLayout(){
  document.documentElement.style.setProperty('--top-height',$('#top').getBoundingClientRect().height+'px');
@@ -281,7 +280,7 @@ function drawBed(i){const p=P[i],b=B[i],c=b.ctx,W=1280,H=720,im=(typeof bedShot=
 
 // camera modes
 let arrive=null,ent=0,mode='cmd',yaw=0,pit=0,cmdYaw=0,cmdPit=0,cur=null,transit=null,voiceOn=true,alarmOn=true,wallZoom=true;const tp=new V(),tl=new V(),lk=new V(100,4,-8),wp=new V(0,0,0);let bobT=0;const WALK='Swipe up to walk · drag sideways to look · tap a door, bed or monitor';let suite=null,gyS=0,START_AUD=/[?&]start=aud/.test(location.search);const OUTH='Swipe up to walk · drag to look around · turn round to see the building · keep walking ahead to leave';
-const voiceController='speechSynthesis' in window&&'SpeechSynthesisUtterance' in window?createCaseVoice(window.speechSynthesis,window.SpeechSynthesisUtterance,reason=>{console.warn('Case narration did not start:',reason);$('#voice-status').textContent=$('#replay-voice').hidden?'Voice could not start.':'Voice could not start. Tap Replay case voice.';$('#voice-status').hidden=false}):null;
+const voiceController=null; /* no spoken narration: the only voice in the ICU is the attached alarm-attention clip */
 // hall announcer: female PA voice reading the red banners, with a reverberant chime (see alarm-voice.mjs)
 let pendingNarration=null,hallBus=null;
 function hall(){
@@ -292,7 +291,7 @@ function hall(){
  cv.connect(wet);const input=ac.createGain();input.connect(cv);input.connect(dry);wet.connect(ac.destination);dry.connect(ac.destination);
  return hallBus={input,wet,dry}}
 let attBuf=null;
-function loadAtt(){if(!ac||attBuf!==null)return;attBuf=false;fetch('voice/alarm-attention.mp3?v=20261120j').then(r=>r.arrayBuffer()).then(b=>new Promise((ok,no)=>ac.decodeAudioData(b,ok,no))).then(d=>{attBuf=d}).catch(e=>{console.warn('Alarm voice clip not loaded:',e);attBuf=null})}
+function loadAtt(){if(!ac||attBuf!==null)return;attBuf=false;fetch('voice/alarm-attention.mp3?v=20261120o').then(r=>r.arrayBuffer()).then(b=>new Promise((ok,no)=>ac.decodeAudioData(b,ok,no))).then(d=>{attBuf=d}).catch(e=>{console.warn('Alarm voice clip not loaded:',e);attBuf=null})}
 function hallChime(){
  const bus=hall();if(!bus)return;loadAtt();
  if(attBuf&&attBuf.duration){const s=ac.createBufferSource(),g=ac.createGain();s.buffer=attBuf;g.gain.value=1.15;s.connect(g);g.connect(bus.input);s.start(ac.currentTime+.02);return}
@@ -301,13 +300,8 @@ function hallChime(){
   const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=f*m;
   g.gain.setValueAtTime(0,t0+dt);g.gain.linearRampToValueAtTime(a,t0+dt+.012);g.gain.exponentialRampToValueAtTime(.0008,t0+dt+1.5);
   o.connect(g);g.connect(bus.input);o.start(t0+dt);o.stop(t0+dt+1.6)}))}
-const announcer='speechSynthesis' in window&&'SpeechSynthesisUtterance' in window?createAnnouncer({
- synthesis:window.speechSynthesis,Utterance:window.SpeechSynthesisUtterance,getVoices:()=>window.speechSynthesis.getVoices(),gapMs:15000,chimeMs:1350,
- beforeSpeak:()=>{if(voiceController)voiceController.stop()},
- chime:hallChime,
- afterSpeak:()=>{if(pendingNarration){const t=pendingNarration;pendingNarration=null;speak(t)}else if(cur!=null&&mode==='bed'&&voiceOn&&P[cur]&&!P[cur].done)$('#replay-voice').hidden=false},
- report:r=>console.warn('Alarm announcement problem:',r)}):null;
-if(announcer)window.speechSynthesis.getVoices();
+let lastClip=-1e9;
+const announcer={announce(){const n=performance.now();if(n-lastClip<15000)return;lastClip=n;hallChime()},stop(){},busy(){return false}}; /* the attached voice clip, at most once every 15 s, no synthetic speech */
 $('#zoom-wall').onclick=()=>{wallZoom=!wallZoom;$('#zoom-wall').textContent=wallZoom?'Fit wall':'Zoom wall';$('#zoom-wall').setAttribute('aria-pressed',String(wallZoom));$('#settings-menu').open=false};
 function updateFov(){cam.fov=mode==='ward'||mode==='travel'?(cam.aspect<1?Math.min(105,72+(1-cam.aspect)*70):72):72;cam.updateProjectionMatrix()}
 let v3=false;const orb={az:0,el:.45,r:1.45};
@@ -345,7 +339,7 @@ go('cmd');
 const ray=new THREE.Raycaster(),mv2=new THREE.Vector2();let dn=0,mv=0,lx=0,ly=0,ac;
 const sfx=createSfx();
 function unlockAudio(){sfx.unlock();try{const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;ac=ac||new Audio();loadAtt();if(ac.state==='suspended')ac.resume().catch(e=>console.warn('Unable to enable alarm audio:',e))}catch(e){console.warn('Unable to enable alarm audio:',e)}}
-document.addEventListener('pointerdown',unlockAudio,{once:true});
+['pointerdown','pointerup','touchend','click','keydown'].forEach(e=>document.addEventListener(e,function k(){unlockAudio();if(ac&&ac.state==='running'&&sfx.ready&&sfx.ready())['pointerdown','pointerup','touchend','click','keydown'].forEach(x=>document.removeEventListener(x,k,true))},true));
 document.addEventListener('pointerdown',()=>{if(voiceOn&&voiceController)voiceController.prime()});
 let holdDir=0,lastVMove=0;
 cv.onpointerdown=e=>{dn=1;mv=0;lx=e.clientX;ly=e.clientY;holdDir=0;try{cv.setPointerCapture(e.pointerId)}catch(_){}};
@@ -379,7 +373,7 @@ function speak(text){if(!voiceOn||!voiceController)return;if(announcer&&announce
 function speakCase(){if(cur!=null&&!P[cur].done){const p=P[cur];speak(p.n+'. '+p.dx+'. '+p.hx+'. '+(p.narration||currentDecision(p).q))}}
 $('#replay-voice').onclick=speakCase;
 $('#voice').onclick=()=>{voiceOn=!voiceOn;$('#voice').textContent=voiceOn?'Voice on':'Voice off';$('#voice').setAttribute('aria-pressed',String(voiceOn));$('#replay-voice').hidden=!voiceOn||cur==null||P[cur].done;$('#voice-status').hidden=true;if(!voiceOn)stopVoice();else speakCase()};
-if(!voiceController){$('#voice').disabled=true;$('#voice').textContent='Voice unavailable';voiceOn=false}
+if(!voiceController){$('#voice').hidden=true;voiceOn=false}
 $('#snd').onclick=()=>{const on=!sfx.isOn();sfx.setOn(on);$('#snd').textContent=on?'Sound on':'Sound off';$('#snd').setAttribute('aria-pressed',String(on));if(on)unlockAudio()};
 $('#alarm').onclick=()=>{alarmOn=!alarmOn;$('#alarm').textContent=alarmOn?'Alarms on':'Alarms off';$('#alarm').setAttribute('aria-pressed',String(alarmOn));if(alarmOn)unlockAudio();else if(announcer)announcer.stop();scheduleAlarm()};
 function setTreatmentEnabled(enabled){document.querySelectorAll('#t0 button,#t1 input,#t1 button,#order-submit').forEach(e=>e.disabled=!enabled)}
@@ -418,7 +412,7 @@ function fin(){stopVoice();const n=P.filter(p=>p.recovered).length;$('#end').sty
  $('#end').innerHTML='<h2>Shift debrief: '+n+' of 6 recovered</h2><ol>'+P.map(p=>'<li><b>'+p.n+' · '+p.dx+' · '+(p.recovered?'recovered':'not recovered')+'</b><ul>'+p.answers.map(a=>'<li>'+a.level+' — '+a.question+'<br>Your choice: '+a.selected+'<br>Suggested priority: '+a.best+'</li>').join('')+'</ul>'+(p.orderLog.length?'<b>Simulated orders</b><ul>'+p.orderLog.map(o=>'<li>'+o.label+' — '+o.level+': '+o.text+'</li>').join('')+'</ul>':'')+'</li>').join('')+'</ol><button onclick="document.getElementById(\'end\').style.display=\'none\'">Return to shift</button> <button onclick="location.reload()">Restart shift</button>'}
 function inICU(){return mode==='bed'||cam.position.z>-4.6}
 function toast(m,say){const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.opacity=0,say?8000:4000);if(say&&alarmOn&&announcer&&inICU())announcer.announce(m.replace(/^Alarm\s*·\s*/i,''))}
-function beep(){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.04;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.12)}
+function beep(){if(!ac)return;const t=ac.currentTime+.01,out=ac.createGain();out.gain.value=.5;out.connect(ac.destination);[[880,.32],[1760,.1],[2640,.04]].forEach(([f,a])=>{const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(a,t+.006);g.gain.exponentialRampToValueAtTime(.0005,t+1.3);o.connect(g);g.connect(out);o.start(t);o.stop(t+1.4)});[0,.5].slice(1).forEach(d=>{const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=880;g.gain.setValueAtTime(0,t+d);g.gain.linearRampToValueAtTime(.26,t+d+.006);g.gain.exponentialRampToValueAtTime(.0005,t+d+1.1);o.connect(g);g.connect(out);o.start(t+d);o.stop(t+d+1.2)})}
 
 function simulatedLabs(p){const v=p.v,[a,c,h,l]=p.ab;
  return{ph:a-p.sev*.07,pc:c+p.sev*6-(v.rr-p.rr)*.4+(p.co2s?(p.fio2-50)*.12:0),hc:h-p.sev*1.5,la:Math.max(.6,l+p.sev*3.2)}}
@@ -555,7 +549,7 @@ function scheduleAlarm(){
  const candidates=ent&&inICU()?P.filter(p=>!p.done&&p.st>0):[];
  if(!candidates.length){alarmTimer=setTimeout(scheduleAlarm,1000);return}
  const p=candidates.find(p=>p.i>lastAlarmBed)||candidates[0];
- lastAlarmAt=performance.now();lastAlarmBed=p.i;if(!announcer)beep();toast('Alarm · bed '+(p.i+1)+' · '+p.n+': '+priority(p).reason+' (simulated)',true);
+ lastAlarmAt=performance.now();lastAlarmBed=p.i;beep();toast('Alarm · bed '+(p.i+1)+' · '+p.n+': '+priority(p).reason+' (simulated)',true);
  alarmTimer=setTimeout(scheduleAlarm,15000);
 }
 scheduleAlarm();

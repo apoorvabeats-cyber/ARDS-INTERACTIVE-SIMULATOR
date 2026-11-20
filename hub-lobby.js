@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createSfx } from "./critical-care-universe/universe/sfx.js?v=20261120j";
+import { createSfx } from "./critical-care-universe/universe/sfx.js?v=20261120o";
 
 const gate = document.getElementById("icu-gate");
 const canvas = document.getElementById("lobby");
