@@ -6,10 +6,12 @@
    Movement is the ICU's finger drag: swipe up to walk, drag sideways to look. Drag ON the patient to turn him through 360 degrees. */
 import * as T from "./three.module.js";
 import { GLTFLoader } from "./vendor/GLTFLoader.js";
-import { createDevices } from "./icu-devices.js?v=20261120m";
-import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261120m";
-import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261120m";
-import { createSfx } from "./sfx.js?v=20261120m";
+import { createDevices } from "./icu-devices.js?v=20261120n";
+import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261120n";
+import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261120n";
+import { createSfx } from "./sfx.js?v=20261120n";
+import { createDesk, DESK } from "./nexus-desk.js?v=20261120n";
+import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261120n";
 
 const $ = (s) => document.querySelector(s);
 const Q = new URLSearchParams(location.search), DEMO = Q.has("demo");
@@ -51,11 +53,11 @@ const rr = (g, x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x 
 const rnd = (() => { let s = 5; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })();
 
 /* ================================================================ the hall */
-const RH = 11, WH = 6.4, DAIS_R = 2.75, DAIS_H = 0.22, MINR = 2.4, MAXR = RH - 0.8;
+const RH = 11, WH = 6.4, DAIS_R = 3.25, DAIS_H = 0.22, MINR = 3.3, MAXR = RH - 0.8, BODY_S = 1.45;
 const hall = new T.Group(); S.add(hall);
 S.add(new T.HemisphereLight(0xeaf6ff, 0x5d7b92, 1.05));
 const keyL = new T.PointLight(0xd5edff, 26, 15, 1.5); keyL.position.set(0, WH - 1.1, 0); S.add(keyL);
-const glowL = new T.PointLight(0x36d6ff, 5, 6, 1.6); glowL.position.set(0, 0.5, 0); S.add(glowL);
+const glowL = new T.PointLight(0x36d6ff, 5, 6, 1.6); glowL.position.set(0, 1.4, 0); S.add(glowL);
 
 /* floor: pale polished disc with cyan rings and spokes */
 const floorTex = ctex(1024, 1024, (g, w) => {
@@ -118,27 +120,30 @@ const plateTex = ctex(1024, 1024, (g, w) => {
 });
 const plate = mesh(new T.CircleGeometry(DAIS_R - 0.12, 96), new T.MeshStandardMaterial({ color: 0x0a2a3e, emissive: 0xffffff, emissiveMap: plateTex, emissiveIntensity: 0.95, map: plateTex, roughness: 0.3, metalness: 0.2, envMap: env }), 0, DAIS_H + 0.003, 0, dais); plate.rotation.x = -Math.PI / 2;
 const haloM = new T.MeshBasicMaterial({ color: 0x36d6ff, transparent: true, opacity: 0.55, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false });
-const halo = tor(DAIS_R - 0.3, 0.05, haloM, DAIS_H + 0.03, dais);
+const halo = tor(DAIS_R - 0.1, 0.05, haloM, DAIS_H + 0.03, dais);
 const TOP = DAIS_H + 0.045;
-const turn = new T.Group(); turn.position.y = TOP; hall.add(turn);
+const PED = 0.5;
+const turn = new T.Group(); turn.position.y = TOP + PED; hall.add(turn);
+cyl(1.52, 1.58, PED, M(0x0b2f45, { metalness: 0.5, roughness: 0.3 }), 0, TOP + PED / 2, 0, hall, 64); tor(1.5, 0.03, E(0x7fe9ff, 2.6), TOP + PED + 0.005, hall, 96);
 const dialTex = ctex(512, 512, (g, w) => {
   const c = w / 2; g.fillStyle = "#0b2f45"; g.beginPath(); g.arc(c, c, c, 0, TAU); g.fill(); g.strokeStyle = "#7fe9ff"; g.lineWidth = 6; g.beginPath(); g.arc(c, c, c - 6, 0, TAU); g.stroke();
   for (let i = 0; i < 72; i++) { const a = i / 72 * TAU, r0 = c - 14 - (i % 6 ? 8 : 24); g.strokeStyle = "#bff4ff"; g.lineWidth = i % 6 ? 2 : 4; g.beginPath(); g.moveTo(c + Math.sin(a) * r0, c - Math.cos(a) * r0); g.lineTo(c + Math.sin(a) * (c - 14), c - Math.cos(a) * (c - 14)); g.stroke(); }
   g.fillStyle = "#e8fbff"; g.font = "700 30px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; for (let i = 0; i < 8; i++) { const a = i / 8 * TAU, r = c - 64; g.fillText(String(i * 45), c + Math.sin(a) * r, c - Math.cos(a) * r); }
 });
-const disc = mesh(new T.CircleGeometry(1.0, 64), new T.MeshBasicMaterial({ map: dialTex, toneMapped: false }), 0, 0.012, 0, turn); disc.rotation.x = -Math.PI / 2;
-tor(1.0, 0.03, E(0x7fe9ff, 2.4), 0.02, turn, 64);
+const disc = mesh(new T.CircleGeometry(1.45, 64), new T.MeshBasicMaterial({ map: dialTex, toneMapped: false }), 0, 0.012, 0, turn); disc.rotation.x = -Math.PI / 2;
+tor(1.45, 0.03, E(0x7fe9ff, 2.4), 0.02, turn, 64);
 
 /* ================================================================ the patient: the Critical Care Hub's own 3D human */
 const patient = new T.Group(); turn.add(patient);
 const hitCyl = mesh(new T.CylinderGeometry(0.95, 0.95, 2.2, 14), new T.MeshBasicMaterial({ visible: false }), 0, 1.0, 0, patient);
 const organs = {}, organMeshes = [], rimU = { c: { value: new T.Color(0x58d6ff) }, k: { value: 1 } };
 const ORGAN_COLOR = { brain: 0xd98480, spinal: 0xe4d09a, lungs: 0xf0a8b4, heart: 0xc43145, liver: 0x8a3a2a, pancreas: 0xe2c15e, spleen: 0x7a3554, kidneys: 0xb24d40, bowel: 0xe6aa7e, bladder: 0xe3d39a, stomach: 0xd48472, arteries: 0xd22734, veins: 0x3a6cb5 };
-const bodyMat = new T.ShaderMaterial({
-  transparent: true, depthWrite: false, side: T.FrontSide, uniforms: rimU,
-  vertexShader: "varying vec3 n;varying vec3 v;void main(){vec4 mv=modelViewMatrix*vec4(position,1.);n=normalize(normalMatrix*normal);v=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}",
-  fragmentShader: "uniform vec3 c;uniform float k;varying vec3 n;varying vec3 v;void main(){float f=pow(1.-abs(dot(n,v)),2.0);gl_FragColor=vec4(c*(.45+1.5*f)*k,.1+.62*f);}",
-});
+/* the body is solid: pale clinical skin, lit like the rest of the hall, with a coloured rim that follows the patient's status.
+   "See inside" (or tapping an organ) turns the skin glassy so the organs show. */
+const bodyMat = new T.MeshStandardMaterial({ color: 0xbfcfdb, roughness: 0.5, metalness: 0.04, envMap: env, envMapIntensity: 0.95, emissive: 0x0b1a26, emissiveIntensity: 1, transparent: true, opacity: 1 });
+bodyMat.onBeforeCompile = (sh) => { sh.uniforms.rimC = rimU.c; sh.uniforms.rimK = rimU.k; sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform vec3 rimC;uniform float rimK;").replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance += rimC * pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 2.6) * rimK * 0.8;"); };
+bodyMat.customProgramCacheKey = () => "nexusBody1";
+let insideWant = false;
 let bodyReady = false, handTip = new V(0.5, 0.9, 0.02);
 const bodyLoad = new Promise((res) => {
   const url = new URL("../../models/anatomy/human-reference.glb", import.meta.url).href;
@@ -156,11 +161,12 @@ const bodyLoad = new Promise((res) => {
     bodyReady = true; res(true);
   }, undefined, () => res(false));
 });
+patient.scale.setScalar(BODY_S);
 const nameLabel = { sp: null, key: "" };
 
 /* ================================================================ ICU devices (ventilator, IV pole, pumps) */
 const dev = createDevices(T, env);
-{ const a = 1.95, r = 2.15; dev.vent.position.set(-Math.sin(a) * r, TOP, Math.cos(a) * r); dev.vent.rotation.y = 0.35; dev.pole.position.set(Math.sin(a) * r, TOP, Math.cos(a) * r); dev.pole.rotation.y = -0.2; S.add(dev.vent, dev.pole); }
+{ const a = 0.95, r = 4.15, put = (g, sx) => { const x = sx * Math.sin(a) * r, z = Math.cos(a) * r; g.position.set(x, 0, z); g.rotation.y = Math.atan2(-x, -z); S.add(g); }; put(dev.vent, -1); put(dev.pole, 1); dev.vent.scale.setScalar(1.15); dev.pole.scale.setScalar(1.15); }
 const tubeMat = M(0xe4edf1, { roughness: 0.35, transparent: true, opacity: 0.9, envMapIntensity: 1.2 });
 const tubes = { circ: null, iv: null, ck: "" };
 function setTube(k, a, b, lift, on) {
@@ -173,7 +179,7 @@ function refreshTubes(force) {
   const key = [turn.rotation.y.toFixed(2), eq.tube, eq.norepi, eq.fluid, eq.abx, eq.blood].join();
   if (!force && key === tubes.ck) return; tubes.ck = key; patient.updateMatrixWorld(true); dev.vent.updateMatrixWorld(true); dev.pole.updateMatrixWorld(true);
   const mouth = patient.localToWorld(new V(0, 1.625, 0.09)), hand = patient.localToWorld(handTip.clone().multiplyScalar(0.92).add(new V(0, 0.02, 0.0)));
-  setTube("circ", dev.ventPort(new V()), mouth, 0.35, eq.tube);
+  setTube("circ", dev.ventPort(new V()), mouth, 0.5, eq.tube);
   setTube("iv", dev.polePort(new V()), hand, 0.3, eq.norepi || eq.fluid > 0 || eq.abx || eq.blood);
 }
 
@@ -229,44 +235,89 @@ const pTeam = holo(0.92, 0.6, 400, 0.8, 1.4, 0.32, (g, w, h) => {
   if (!mem.length) { g.fillStyle = "#cfe7f3"; g.font = "26px system-ui,sans-serif"; g.fillText("Open a shift to bring the team in.", 24, 110); }
 }); pTeam.team = true;
 let azS = 0;
+pHist.id = "hist"; pVit.id = "vit"; pFind.id = "find"; pTeam.id = "team"; pFind.portHide = pTeam.portHide = true; /* on a tall phone screen only the history and the vitals float; findings and team are in the desk */
+/* where each panel floats: [azimuth offset from where you look, radius from the patient, height] for a wide screen and for a tall (phone) screen */
+const LAY = { hist: [[-0.82, 2.9, 2.0], [0.55, -2.6, 2.5]], vit: [[0.82, 2.9, 2.0], [-0.55, -2.6, 2.5]], find: [[-0.82, 2.9, 3.0], [0.55, -2.6, 4.0]], team: [[0.82, 2.9, 2.95], [-0.55, -2.6, 4.0]] };
+const POPL = [[[0, 2.6, 3.7], [0.55, -2.6, 4.0]], [[-0.36, 2.6, 3.7], [-0.55, -2.6, 4.0]], [[0.36, 2.6, 3.7], [0, -2.6, 5.0]]];
+const POP_COL = { lab: "#ffc24a", img: "#a99bff", find: "#3dff9a" }, POP_HEAD = { lab: "NEW LABORATORY RESULT", img: "NEW IMAGING", find: "NEW FINDING" };
+const THUMB = { "Chest film": "cxr", "CT chest": "ctchest", "CT head": "cthead", Echocardiogram: "echo" };
+const pops = [0, 1, 2].map((n) => { const p = holo(0.86, 0.57, 420, 0, 2.2, 3.4, (g, w, h) => {
+  const it = p.item; g.clearRect(0, 0, w, h); if (!it) return; const col = POP_COL[it.kind] || "#7fe9ff";
+  g.fillStyle = "rgba(5,24,40,.9)"; rr(g, 3, 3, w - 6, h - 6, 22); g.fill(); g.strokeStyle = col; g.lineWidth = 5; rr(g, 3, 3, w - 6, h - 6, 22); g.stroke();
+  g.fillStyle = col; g.font = "800 22px system-ui,sans-serif"; g.textAlign = "left"; g.fillText(POP_HEAD[it.kind] || "NEW", 24, 40); g.fillStyle = "rgba(255,255,255,.18)"; g.fillRect(24, 54, w - 48, 2);
+  g.fillStyle = "#fff"; g.font = "700 34px system-ui,sans-serif"; g.fillText(it.label, 24, 104);
+  const tk = THUMB[it.label], tw = tk ? 190 : 0; if (tk) { if (!it.thumb) { it.thumb = document.createElement("canvas"); it.thumb.width = 220; it.thumb.height = 220; paintImage(it.thumb, tk, it.text); } g.drawImage(it.thumb, w - 214, 78, 190, 190); }
+  g.fillStyle = "#d6ecf6"; g.font = "24px system-ui,sans-serif"; wrap(g, it.text, 24, 146, w - 48 - tw, 31, tk ? 7 : 8);
+  g.fillStyle = "rgba(143,182,201,.9)"; g.font = "600 18px system-ui,sans-serif"; g.fillText("Hour " + it.hour + " · hold and swipe to dismiss", 24, h - 18);
+}); p.pop = true; p.slot = n; p.item = null; p.age = 0; p.id = "pop" + n; return p; });
+function pushPopup(it) {
+  let p = pops.find((q) => !q.item && !q.rm); if (!p) p = pops.slice().sort((a, b) => b.age - a.age)[0];
+  p.item = it; p.age = 0; p.key = ""; p.t = 9; p.hidden = false; p.rm = null; p.dragX = 0; p.slide = 0; p.shown = 1; sfx.chime(it.kind); $("#note").textContent = (POP_HEAD[it.kind] || "NEW").toLowerCase().replace(/^./, (c) => c.toUpperCase()) + ": " + it.label; $("#note").hidden = false; clearTimeout(noteT); noteT = setTimeout(() => { $("#note").hidden = true; }, 5000);
+}
+let noteT = 0;
+function removePanel(p, dir) { if (p.rm) return; p.rm = { dir: dir || 1, t: 0 }; p.grab = 0; navigator.vibrate && navigator.vibrate(12); }
+function restorePanels() { panels.forEach((p) => { if (!p.pop) { p.hidden = false; p.rm = null; p.slide = 0; } }); $("#pnl").hidden = true; }
+const rgt = new V();
 function updatePanels(dt, t) {
   const dist = Math.hypot(cam.position.x, cam.position.z), az = Math.atan2(cam.position.x, cam.position.z);
   azS += Math.atan2(Math.sin(az - azS), Math.cos(az - azS)) * Math.min(1, dt * 2.6);
-  const port = cam.aspect < 0.8, vis = clamp((11 - dist) / 3, 0, 1), s = clamp(dist / 3.6, 1, port ? 1.3 : 1.9);
+  const port = cam.aspect < 0.8, vis = clamp((11 - dist) / 3, 0, 1), s = clamp(dist / 4.2, 1, port ? 1.45 : 1.9); rgt.set(1, 0, 0).applyQuaternion(cam.quaternion); rgt.y = 0; rgt.normalize();
   panels.forEach((p) => {
-    p.m.visible = vis > 0.02 && !!mdt.room && (p.team || !!SC) && !window.__nopanels; if (!p.m.visible) return; p.m.material.opacity = vis;
-    const a = azS + p.off * (dist < 2.8 ? 1.25 : 1) * (port ? 0.62 : 1), r = p.rad * (1 + (s - 1) * 0.55), x = Math.sin(a) * r, z = Math.cos(a) * r;
-    p.m.position.set(x, TOP + p.y + (s - 1) * 0.35, z); p.m.rotation.set(0, Math.atan2(cam.position.x - x, cam.position.z - z), 0); p.m.scale.setScalar(s * (cam.aspect < 0.8 ? 0.92 : 1));
-    if ((p.t += dt) > (p.every || 0.25)) { p.t = 0; const k = p.every ? "" : JSON.stringify([P && [P.hr, P.sbp, P.spo2, P.hour, P.log && P.log.length, P.results && P.results.length], SC && SC.name, mdt.room && mdt.room.members && mdt.room.members.length, remotes.size, mdt.room && mdt.room.status, (P && P.problems || []).map((q) => (q.resolved ? 1 : 0) + (q.called ? 2 : 0)).join("")]); if (p.every || k !== p.key) { p.key = k; p.paint(p.tex.userData.g, PX, p.pxh, t); p.tex.needsUpdate = true; } }
+    if (p.rm) { p.rm.t += dt; p.slide = p.rm.dir * Math.pow(Math.min(1, p.rm.t / 0.42), 2) * 2.6; if (p.rm.t >= 0.42) { p.rm = null; p.hidden = true; p.slide = 0; if (p.pop) p.item = null; $("#pnl").hidden = !panels.some((q) => !q.pop && q.hidden && !(port && q.portHide)); } }
+    if (p.pop && p.item) { p.age += dt; if (p.age > 75 && !p.rm) removePanel(p, 1); }
+    p.m.visible = vis > 0.02 && !!mdt.room && !p.hidden && !(port && p.portHide) && (p.pop ? !!p.item : (p.team || !!SC)) && !window.__nopanels; if (!p.m.visible) return;
+    p.m.material.opacity = vis * (p.rm ? 1 - Math.min(1, p.rm.t / 0.42) : 1);
+    const L = p.pop ? POPL[p.slot][port ? 1 : 0] : LAY[p.id][port ? 1 : 0], a = azS + L[0], r = L[1] * (1 + (s - 1) * 0.5), sl = (p.slide || 0) + (p.dragX || 0), x = Math.sin(a) * r + rgt.x * sl, z = Math.cos(a) * r + rgt.z * sl;
+    p.m.position.set(x, TOP + L[2] + (s - 1) * 0.35, z); p.m.rotation.set(0, Math.atan2(cam.position.x - x, cam.position.z - z), 0);
+    const pulse = p.pop ? Math.min(1, p.age / 0.35) : 1, k = (p.pop ? (port ? 1.3 : 0.82) : port ? 0.9 : 0.8) * s * (port ? 0.9 : 1) * (p.grab ? 1.07 : 1) * (0.55 + 0.45 * (1 - Math.pow(1 - pulse, 3)));
+    p.m.scale.setScalar(k);
+    if ((p.t += dt) > (p.every || 0.25)) { p.t = 0; const kk = p.every ? "" : p.pop ? (p.item ? p.item.key || "x" : "") + (p.grab ? 1 : 0) : JSON.stringify([P && [P.hr, P.sbp, P.spo2, P.hour, P.log && P.log.length, P.results && P.results.length], SC && SC.name, mdt.room && mdt.room.members && mdt.room.members.length, remotes.size, mdt.room && mdt.room.status, (P && P.problems || []).map((q) => (q.resolved ? 1 : 0) + (q.called ? 2 : 0)).join("")]); if (p.every || kk !== p.key) { p.key = kk; p.paint(p.tex.userData.g, PX, p.pxh, t); p.tex.needsUpdate = true; } }
   });
 }
 
 /* ================================================================ controls: the ICU's finger drag, plus turning the patient */
 const me = { x: 0, z: 9.6, yaw: Math.PI, h: 1.6, pit: 0 };
-{ const a = ((hashN(myId) % 7) - 3) * 0.09; me.x = Math.sin(a) * 6.2; me.z = Math.cos(a) * 6.2; }
+{ const a = ((hashN(myId) % 7) - 3) * 0.09; me.x = Math.sin(a) * 4.2; me.z = Math.cos(a) * 4.2; }
 const arrive = { t: 0, t0: performance.now(), from: { x: me.x * 1.62, z: me.z * 1.62 }, to: { x: me.x, z: me.z } };
 me.x = arrive.from.x; me.z = arrive.from.z;
 const faceCenter = (x, z) => Math.atan2(-x, z);
 me.yaw = faceCenter(me.x, me.z);
 function clampPos(x, z) { const r = Math.hypot(x, z) || 1e-6; if (!focus && r < MINR) { x *= MINR / r; z *= MINR / r; } else if (r > MAXR) { x *= MAXR / r; z *= MAXR / r; } return [x, z]; }
 function walkBy(d) { const c = clampPos(me.x + Math.sin(me.yaw) * d, me.z - Math.cos(me.yaw) * d); me.x = c[0]; me.z = c[1]; }
-let dn = 0, mvd = 0, lx = 0, ly = 0, sx = 0, sy = 0, holdDir = 0, lastV = 0, mode = "", onPatient = false, spinV = 0, autoSpin = false, focus = null, retreat = false;
+let dn = 0, mvd = 0, lx = 0, ly = 0, sx = 0, sy = 0, holdDir = 0, lastV = 0, mode = "", onPatient = false, onDesk = false, spinV = 0, autoSpin = false, focus = null, retreat = false, lpT = 0, grab = null, gx = 0, held = false, lastMT = 0;
 const ray = new T.Raycaster(), ndc = new T.Vector2();
 const sfx = createSfx();
-function pointHitsPatient(cx, cy) { ndc.set(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam); return ray.intersectObject(hitCyl, false).length > 0; }
-cv.addEventListener("pointerdown", (e) => { dn = 1; mvd = 0; lx = sx = e.clientX; ly = sy = e.clientY; holdDir = 0; mode = ""; spinV = 0; onPatient = pointHitsPatient(e.clientX, e.clientY); sfx.unlock(); if (focus) { focus = null; retreat = true; } try { cv.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } });
+const setRay = (cx, cy) => { ndc.set(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam); };
+function pointHitsPatient(cx, cy) { setRay(cx, cy); const h = ray.intersectObject(hitCyl, false)[0]; return h ? h.distance : null; }
+/* the desk: the sloped top with the turning ring and the seven labels, standing round the patient */
+const odesk = createDesk(T, { env, TOP, hall, SECTIONS });
+function panelAt(cx, cy) { setRay(cx, cy); const ms = panels.filter((p) => p.m.visible && !p.rm).map((p) => p.m), h = ray.intersectObjects(ms, false)[0]; return h ? { p: panels.find((p) => p.m === h.object), d: h.distance } : null; }
+cv.addEventListener("pointerdown", (e) => {
+  dn = 1; mvd = 0; lx = sx = e.clientX; ly = sy = e.clientY; holdDir = 0; mode = ""; spinV = 0; held = false; grab = null; gx = 0; lastMT = performance.now(); sfx.unlock();
+  const dp = pointHitsPatient(e.clientX, e.clientY); setRay(e.clientX, e.clientY); const dd = odesk.hit(ray), pa = panelAt(e.clientX, e.clientY);
+  onPatient = dp != null && (dd == null || dp < dd); onDesk = dd != null && (dp == null || dd < dp);
+  clearTimeout(lpT);
+  if (pa && (dp == null || pa.d < dp) && (dd == null || pa.d < dd)) { onPatient = false; onDesk = false; lpT = setTimeout(() => { if (dn && mvd < 10) { grab = pa.p; grab.grab = 1; gx = 0; held = true; navigator.vibrate && navigator.vibrate(20); sfx.beep && sfx.beep({ f: 660, vol: 0.5 }); $("#hint").style.opacity = 1; $("#hint").textContent = "Swipe left or right to remove this panel"; } }, 480); }
+  if (focus) { focus = null; retreat = true; }
+  try { cv.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+});
 cv.addEventListener("pointermove", (e) => {
-  if (!dn) return; const dx = e.clientX - lx, dy = e.clientY - ly; lx = e.clientX; ly = e.clientY; mvd += Math.abs(dx) + Math.abs(dy);
-  if (!mode && mvd > 8) mode = onPatient && Math.abs(e.clientX - sx) > Math.abs(e.clientY - sy) * 1.1 ? "spin" : "walk";
+  if (!dn) return; const dx = e.clientX - lx, dy = e.clientY - ly, now = performance.now(), dts = Math.max(0.008, (now - lastMT) / 1000); lx = e.clientX; ly = e.clientY; lastMT = now; mvd += Math.abs(dx) + Math.abs(dy);
+  if (grab) { gx += dx; grab.dragX = gx * 0.006; if (Math.abs(gx) > 90) { removePanel(grab, Math.sign(gx)); grab.grab = 0; grab.dragX = 0; grab = null; $("#pnl").hidden = !panels.some((q) => !q.pop && (q.hidden || q.rm)); } return; }
+  if (mvd > 10 && lpT) { clearTimeout(lpT); lpT = 0; }
+  if (!mode && mvd > 8) { const horiz = Math.abs(e.clientX - sx) > Math.abs(e.clientY - sy) * 1.1; mode = onPatient && horiz ? "spin" : onDesk && horiz ? "orbit" : "walk"; }
   if (mode === "spin") { turn.rotation.y += dx * 0.011; spinV = dx * 0.011 * 40; autoSpin && setAuto(false); return; }
+  if (mode === "orbit") { odesk.drag(dx * 0.0042, dts); return; }
   me.yaw -= dx * 0.006;
   if (Math.abs(dy) >= Math.abs(dx) * 0.5) { walkBy(-dy * 0.014); if (Math.abs(dy) >= 1) { holdDir = dy < 0 ? 1 : -1; lastV = performance.now(); } }
 });
-const stopHold = () => { dn = 0; holdDir = 0; };
+const stopHold = () => { dn = 0; holdDir = 0; clearTimeout(lpT); lpT = 0; if (grab) { grab.grab = 0; grab.dragX = 0; grab = null; } odesk.release(); };
 cv.addEventListener("pointercancel", stopHold); cv.addEventListener("lostpointercapture", () => { holdDir = 0; }); addEventListener("blur", stopHold);
-cv.addEventListener("pointerup", (e) => { const was = mvd; stopHold(); if (was > 8) return; tapAt(e.clientX, e.clientY); });
+cv.addEventListener("pointerup", (e) => { const was = mvd, h = held; stopHold(); if (was > 8 || h) return; tapAt(e.clientX, e.clientY); });
 function setAuto(on) { autoSpin = on; $("#spin").dataset.on = on ? "1" : "0"; }
 $("#spin").onclick = () => setAuto(!autoSpin);
+$("#pnl").onclick = restorePanels;
+$("#xray").onclick = () => { insideWant = !insideWant; $("#xray").dataset.on = insideWant ? "1" : "0"; };
 
 /* ================================================================ the other doctors */
 const remotes = new Map(); let peerList = [], net = null, netKey = "";
@@ -305,7 +356,8 @@ const FOCUS_D = { lungs: 1.35, heart: 1.1, brain: 0.95, kidneys: 1.2, liver: 1.2
 let cardT = 0, sel = "";
 function card(html, ms) { const c = $("#card"); c.innerHTML = html; c.hidden = false; clearTimeout(cardT); cardT = setTimeout(() => { c.hidden = true; }, ms || 8000); }
 function tapAt(cx, cy) {
-  ndc.set(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam);
+  setRay(cx, cy);
+  const tid = odesk.pick(ray); if (tid) { if (tid === secId) closeSection(); else openSection(tid); return; }
   const docs = []; remotes.forEach((r) => { if (r.doc && r.doc.group.visible) docs.push(r.doc.group); });
   const hd = ray.intersectObjects(docs, true)[0];
   if (hd) { let o = hd.object; while (o && !o.userData.sid) o = o.parent; const r = o && remotes.get(o.userData.sid); if (r) { card(`<b>Dr ${esc(r.info.name)}</b><span>${esc(specInfo(r.info.spec)[0])}${r.near ? " · at the patient" : " · in the hall"}</span>`); return; } }
@@ -318,17 +370,17 @@ function tapAt(cx, cy) {
 function focusOrgan(name) {
   const o = organs[name], info = ORG[name]; if (!o || !info) return; sel = name;
   const c = new T.Box3().setFromObject(o.mesh).getCenter(new V()), d = FOCUS_D[name] || 1.3; let dx = cam.position.x - c.x, dz = cam.position.z - c.z; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
-  focus = { x: c.x + dx * d, z: c.z + dz * d, h: c.y + 0.1, name, c }; retreat = false;
+  focus = { x: c.x + dx * d * 1.25, z: c.z + dz * d * 1.25, h: Math.max(c.y + 0.1, 1.95), name, c }; retreat = false; closeSection();
   const line = P ? info[2](P) : ""; card(`<b>${info[0]}</b>${line ? `<span>${esc(line)}</span>` : ""}<div class="row"><button id="go1">${info[1]} orders</button><button id="go2">Back to the hall</button></div>`, 20000);
   $("#go1").onclick = () => openDock(info[1]); $("#go2").onclick = () => { focus = null; retreat = true; $("#card").hidden = true; sel = ""; };
 }
-$("#bed").onclick = () => { focus = null; retreat = false; const r = Math.hypot(me.x, me.z) || 1, k = 3.1 / r; goal = { x: me.x * k, z: me.z * k }; };
+$("#bed").onclick = () => { focus = null; retreat = false; const r = Math.hypot(me.x, me.z) || 1, k = 3.75 / r; goal = { x: me.x * k, z: me.z * k }; };
 let goal = null;
 
 /* ================================================================ the Orders dock */
 let dockOpen = false, dockGroup = "";
 const GROUPS_ORDER = ["Orders", "Lung", "Heart", "Infection", "Kidney", "Gut", "Abdomen", "Brain"];
-function openDock(g) { dockOpen = true; if (g) dockGroup = g; renderDock(true); $("#dock").hidden = false; $("#rx").hidden = true; }
+function openDock(g) { closeSection(); dockOpen = true; if (g) dockGroup = g; renderDock(true); $("#dock").hidden = false; $("#rx").hidden = true; }
 function closeDock() { dockOpen = false; $("#dock").hidden = true; $("#rx").hidden = !(mdt.room && mdt.room.status === "live"); }
 $("#dx").onclick = closeDock; $("#rx").onclick = () => openDock(dockGroup || "");
 let dockKey = "";
@@ -382,6 +434,60 @@ function renderDesk() {
 }
 let deskOk = "";
 
+/* ================================================================ what comes in: results, findings, the trends, and the popups */
+const feed = [], hist = [], labSeries = [], seenKeys = new Set(), unseen = { lab: 0, rad: 0, overview: 0 };
+let feedInit = false, lastLab = "";
+const FIND_RE = [[/looked at the heart/i, "img", "Echocardiogram"], [/blood cultures/i, "lab", "Blood cultures"], [/bronchoscopy/i, "find", "Bronchoscopy"], [/examined/i, "find", "Examination"]];
+const SECOF = { lab: "lab", img: "rad", find: "overview" };
+function scanFeed() {
+  if (!P) return; const fresh = [];
+  (P.results || []).forEach((r) => { const k = "r|" + r.label + "|" + r.text; if (!seenKeys.has(k)) { seenKeys.add(k); fresh.push({ kind: /Labs/i.test(r.label) ? "lab" : "img", label: r.label, text: r.text, key: k }); } });
+  (P.log || []).forEach((l) => { const k = "l|" + l.t + "|" + l.text; if (seenKeys.has(k)) return; seenKeys.add(k); const f = FIND_RE.find((x) => x[0].test(l.text || "")); if (f) fresh.push({ kind: f[1], label: f[2], text: l.text, key: k }); });
+  fresh.forEach((i) => { i.hour = P.hour; feed.push(i); if (feedInit) { pushPopup(i); const sc = SECOF[i.kind]; if (secId !== sc) unseen[sc]++; } });
+  feedInit = true;
+  const l = labsOf({ P }); if (l.sent && l.text !== lastLab) { lastLab = l.text; labSeries.push({ hour: P.hour, lactate: l.lactate, cr: l.cr, k: l.k, hb: l.hb }); }
+  const h = { hour: P.hour, hr: P.hr, map: P.map, spo2: P.spo2, temp: P.temp }; if (hist.length && hist[hist.length - 1].hour === P.hour) hist[hist.length - 1] = h; else hist.push(h); if (hist.length > 60) hist.shift();
+}
+function badgeAll() { Object.keys(unseen).forEach((k) => odesk.setBadge(k, unseen[k])); }
+
+/* ================================================================ the seven scientific sections */
+let secId = "", secSub = 0, secKey = "";
+const sciCtx = () => ({ P, SC, eq, orders: mdt.orders, busy: mdt.busy, room: mdt.room, labSeries, hist, feed });
+const viewAz = () => Math.atan2(cam.position.x, cam.position.z);
+function sciHtml() {
+  const sec = SECTIONS.find((x) => x.id === secId); if (!sec) return "";
+  return `<header><span class="no">${sec.n}</span><h2>${esc(sec.title)}</h2><button id="scix" type="button" aria-label="Close">✕</button></header><nav class="subs">${sec.subs.map((t, i) => `<button type="button" data-i="${i}" data-on="${i === secSub ? 1 : 0}">${esc(t)}</button>`).join("")}</nav><div class="sbody"><h3>${esc(sec.subs[secSub])}</h3>${buildSection(secId, secSub, sciCtx())}</div>`;
+}
+function sciPaint() {
+  const el = $("#sci"); el.querySelectorAll("canvas.ximg").forEach((c) => paintImage(c, c.dataset.k, c.dataset.r)); el.querySelectorAll("canvas.ecg").forEach((c) => paintEcg(c, +c.dataset.hr, c.dataset.r, c.dataset.a === "1"));
+}
+function renderSection(force) {
+  if (!secId) return; const key = JSON.stringify([secId, secSub, P && [Math.round(P.hr), Math.round(P.map), Math.round(P.spo2), P.hour, (P.results || []).length, (P.log || []).length, P.tube, P.norepi, P.oxygen, P.artLine, P.hdLine, P.dialysis], mdt.busy, mdt.orders && JSON.stringify(mdt.orders.groups.map((g) => g.items.map((i) => i.ok ? 1 : 0))), mdt.room && mdt.room.members && mdt.room.members.length]);
+  if (!force && key === secKey) return; secKey = key; const el = $("#sci"), sb = el.querySelector(".sbody"), top = sb ? sb.scrollTop : 0, ns = el.querySelector(".subs"), nl = ns ? ns.scrollLeft : 0;
+  el.innerHTML = sciHtml(); const nb = el.querySelector(".sbody"); if (nb && !force) nb.scrollTop = top; const n2 = el.querySelector(".subs"); if (n2 && !force) n2.scrollLeft = nl; sciPaint();
+  const on = el.querySelector(".subs [data-on='1']"), sn = el.querySelector(".subs"); if (on && sn && force) sn.scrollLeft = on.offsetLeft - (sn.clientWidth - on.offsetWidth) / 2;
+}
+function openSection(id, sub) {
+  if (!SECTIONS.some((x) => x.id === id)) return; const was = secId; closeDock(); $("#card").hidden = true; secId = id; secSub = sub || 0; unseen[id] = 0; badgeAll(); odesk.setActive(id); odesk.faceTile(id, viewAz()); $("#hint").style.opacity = 0;
+  renderSection(true); const el = $("#sci"), sc = odesk.screenOf(id, cam); el.style.transformOrigin = sc ? Math.round(clamp(sc.x, 0, 1) * 100) + "% " + Math.round(clamp(sc.y, 0, 1) * 100) + "%" : "50% 100%"; el.hidden = false;
+  if (!was) { el.classList.remove("in"); void el.offsetWidth; el.classList.add("in"); } sfx.unlock();
+}
+function closeSection() { secId = ""; secKey = ""; odesk.setActive(null); const el = $("#sci"); el.hidden = true; el.classList.remove("in"); }
+$("#sci").addEventListener("click", (e) => {
+  const t = e.target.closest("button,canvas"); if (!t) return;
+  if (t.id === "scix") return closeSection();
+  if (t.dataset.i != null && t.closest(".subs")) { secSub = +t.dataset.i; renderSection(true); return; }
+  if (t.dataset.act === "order") { post("hall-order", { kind: t.dataset.kind, specialty: t.dataset.spec || "" }); t.classList.add("sent"); sfx.unlock(); return; }
+  if (t.dataset.act === "goto") { secSub = +t.dataset.sub || 0; secId = t.dataset.sec; unseen[secId] = 0; badgeAll(); odesk.setActive(secId); odesk.faceTile(secId, viewAz()); renderSection(true); return; }
+  if (t.tagName === "CANVAS" && t.classList.contains("ximg")) { const r = t.getBoundingClientRect(), x = (e.clientX - r.left) * t.width / r.width, y = (e.clientY - r.top) * t.height / r.height, hs = hotspotAt(t.dataset.k, x, y, t.width, t.height, t.dataset.r), box = $("#sci").querySelector(".hot"); if (box) { box.textContent = hs ? hs.n + ". " + hs.text : "Tap on one of the numbered spots."; box.dataset.hit = hs && hs.hit ? "1" : "0"; } }
+});
+function tileInfo() {
+  if (!P) { SECTIONS.forEach((x) => odesk.setInfo(x.id, "waiting for the case")); return; }
+  const l = labsOf({ P }), so = sofaOf({ P, SC, eq, labSeries }), rs = (P.results || []).filter((r) => /Chest|CT/.test(r.label)).length + (P.log || []).filter((x) => /looked at the heart/.test(x.text || "")).length, run = [P.norepi, eq.fluid > 0, eq.abx, eq.blood, P.dialysis].filter(Boolean).length;
+  odesk.setInfo("overview", (SC ? SC.name.split(" ")[0] + " · " : "") + "hour " + P.hour); odesk.setInfo("resp", "SpO₂ " + Math.round(P.spo2) + " % · RR " + Math.round(P.rr)); odesk.setInfo("hemo", "MAP " + Math.round(P.map) + " · HR " + Math.round(P.hr));
+  odesk.setInfo("lab", l.sent ? "Lactate " + l.lactate + " · K " + l.k : "no blood sent yet"); odesk.setInfo("orders", run + " running"); odesk.setInfo("rad", rs ? rs + " stud" + (rs > 1 ? "ies" : "y") : "no images yet"); odesk.setInfo("intel", "SOFA at least " + so.tot);
+}
+
 /* ================================================================ the state from the Team room */
 const equipFrom = (p) => { const L = (p.log || []).map((x) => x.text || ""), cnt = (re) => L.filter((t) => re.test(t)).length; return { tube: !!p.tube, oxygen: !!p.oxygen, spo2: Math.round(p.spo2), rr: p.rr, norepi: !!p.norepi, fluid: cnt(/fluid bolus/), abx: cnt(/started antibiotics/) > 0, blood: cnt(/transfused blood/) > 0, dialysis: !!p.dialysis, saline: cnt(/3% saline/) > 0, mannitol: cnt(/mannitol/) > 0 }; };
 function apply(d) {
@@ -390,7 +496,7 @@ function apply(d) {
   const room = mdt.room; P = room && room.patient || null; SC = room && room.scenario || null;
   const spec = room && room.you && room.you.specialty; if (spec && spec !== mySpec) mySpec = spec;
   if (room && room.code) startNet();
-  if (P) { eq = equipFrom(P); refreshTubes(true); }
+  if (P) { eq = equipFrom(P); refreshTubes(true); scanFeed(); tileInfo(); badgeAll(); renderSection(false); } else if (secId) closeSection();
   $("#line").dataset.on = mdt.line ? "1" : "0";
   $("#title").textContent = room ? (room.code ? "Medical Nexus · " + room.code : "Medical Nexus") + (SC ? " · " + SC.dx : "") : "Medical Nexus";
   $("#vit").hidden = !(P && room.status === "live"); chips(); renderDesk(); renderDock(); $("#rx").hidden = dockOpen || !(room && room.status === "live");
@@ -398,11 +504,11 @@ function apply(d) {
 }
 function setNameLabel() {
   if (nameLabel.sp) { patient.remove(nameLabel.sp); nameLabel.sp.material.map.dispose(); }
-  nameLabel.key = SC.name; const sp = nameTag(T, `${SC.name}, ${SC.age}`, SC.dx.length > 30 ? SC.dx.slice(0, 29) + "…" : SC.dx, 0x5fe3ff); sp.position.set(0, 2.3, 0); sp.scale.set(1.35, 0.34, 1); patient.add(sp); nameLabel.sp = sp;
+  nameLabel.key = SC.name; const sp = nameTag(T, `${SC.name}, ${SC.age}`, SC.dx.length > 30 ? SC.dx.slice(0, 29) + "…" : SC.dx, 0x5fe3ff); sp.position.set(0, 2.05, 0); sp.scale.set(1.35, 0.34, 1); patient.add(sp); nameLabel.sp = sp;
 }
 addEventListener("message", (e) => { const d = e.data; if (d && d.type === "mdt-state") apply(d); });
 $("#exit").onclick = () => leave("hall-exit"); $("#classic").onclick = () => leave("hall-classic"); $("#line").onclick = () => post("hall-line");
-function leave(type) { if (net) { net.close(); net = null; } $("#veil").classList.remove("off"); $("#vmsg").textContent = "Leaving the hall…"; setTimeout(() => post(type), 520); }
+function leave(type) { if (net) { net.close(); net = null; } post(type); }
 
 /* the vitals strip across the top of the screen */
 function paintStrip() {
@@ -419,13 +525,13 @@ function sounds(now) {
 }
 
 /* ================================================================ the loop */
-let last = 0, sendT = 0, mvSpeed = 0, px = me.x, pz = me.z, bobT = 0, t0 = performance.now(), shown = false, panelT = 0;
+let vsh = 0, last = 0, sendT = 0, mvSpeed = 0, px = me.x, pz = me.z, bobT = 0, t0 = performance.now(), shown = false, panelT = 0;
 const camTarget = new V(), organPos = new V();
 function loop(now) {
   requestAnimationFrame(loop);
   if (now - last < 1000 / 45) return; const dt = Math.min((now - last) / 1000, 0.1); last = now; const t = (now - t0) / 1000;
   /* arrival: walk in through the door while the opening screen fades */
-  if (arrive.t < 2.4) { arrive.t = (performance.now() - arrive.t0) / 1000; const k = clamp(arrive.t / 2.4, 0, 1), e = k * k * (3 - 2 * k); me.x = arrive.from.x + (arrive.to.x - arrive.from.x) * e; me.z = arrive.from.z + (arrive.to.z - arrive.from.z) * e; me.yaw = faceCenter(me.x, me.z); }
+  if (arrive.t < 2.4 && shown) { arrive.t = (performance.now() - arrive.t0) / 1000; const k = clamp(arrive.t / 2.4, 0, 1), e = k * k * (3 - 2 * k); me.x = arrive.from.x + (arrive.to.x - arrive.from.x) * e; me.z = arrive.from.z + (arrive.to.z - arrive.from.z) * e; me.yaw = faceCenter(me.x, me.z); }
   if (dn && holdDir && mvd > 10 && performance.now() - lastV > 120 && mode !== "spin") walkBy(holdDir * dt * 1.7);
   /* glide to the bedside, or to an organ, or back out when released */
   let eyeH = 1.6, pit = 0;
@@ -434,6 +540,7 @@ function loop(now) {
   eyeH = me.h; pit = me.pit;
   const sp = Math.hypot(me.x - px, me.z - pz) / Math.max(dt, 0.001); mvSpeed += (sp - mvSpeed) * Math.min(1, dt * 8); px = me.x; pz = me.z;
   bobT += mvSpeed * dt * 2.2; const bob = focus ? 0 : Math.sin(bobT * 3.0) * 0.016 * Math.min(1, mvSpeed);
+  { const w = innerWidth, h = innerHeight, pt = cam.aspect < 0.8; vsh += ((secId ? 1 : 0) - vsh) * Math.min(1, dt * 5); if (vsh > 0.004) cam.setViewOffset(w, h, pt ? 0 : w * 0.2 * vsh, pt ? h * 0.2 * vsh : 0, w, h); else if (cam.view) cam.clearViewOffset(); }
   cam.position.set(me.x, eyeH + bob, me.z); cam.rotation.order = "YXZ"; cam.rotation.set(focus ? Math.atan2(focus.c.y - eyeH, Math.hypot(focus.c.x - me.x, focus.c.z - me.z)) * 0.8 : pit, -me.yaw, 0);
   /* the patient: turntable, breathing, heartbeat, status colour */
   if (!dn || mode !== "spin") { if (autoSpin) turn.rotation.y += dt * 0.5; else { turn.rotation.y += spinV * dt; spinV *= Math.exp(-dt * 3.2); } }
@@ -451,6 +558,7 @@ function loop(now) {
   if (nameLabel.sp) nameLabel.sp.material.opacity = clamp((Math.hypot(cam.position.x, cam.position.z) - 2.0) / 1.6, 0, 1);
   refreshTubes(false);
   /* panels, strip */
+  odesk.update(dt, t, viewAz()); { const want = insideWant || !!focus ? 0.17 : 1; bodyMat.opacity += (want - bodyMat.opacity) * Math.min(1, dt * 5); bodyMat.depthWrite = bodyMat.opacity > 0.6; }
   updatePanels(dt, t); if ((panelT += dt) > 0.25) { panelT = 0; paintStrip(); renderDock(false); }
   /* send my place to the others */
   if ((sendT += dt) > 0.1) { sendT = 0; if (net) net.send({ x: +me.x.toFixed(2), z: +me.z.toFixed(2), y: +me.yaw.toFixed(3), a: mvSpeed > 0.15 ? 1 : 0, bed: Math.hypot(me.x, me.z) < 4.2 ? 1 : -1 }); }
@@ -460,7 +568,7 @@ function loop(now) {
     if (performance.now() - r.last > 15000 && r.info && !r.info.connected) r.doc.group.visible = false;
   });
   sounds(now); R.render(S, cam);
-  if (!shown && bodyReady) { shown = true; setTimeout(() => $("#veil").classList.add("off"), 250); }
+  if (!shown && bodyReady) { shown = true; arrive.t0 = performance.now(); requestAnimationFrame(() => $("#veil").classList.add("off")); }
 }
 requestAnimationFrame(loop);
 bodyLoad.then((ok) => { if (!ok) $("#vmsg").textContent = "The 3D body did not load. Check the connection."; });
@@ -470,7 +578,7 @@ setTimeout(() => { $("#hint").style.opacity = 0; }, 22000);
 /* ================================================================ start */
 $("#title").textContent = "Medical Nexus"; chips(); renderDesk();
 post("hall-ready");
-window.__nexus = { me, cam, S, turn, remotes, organs, dev, eqSet: (x) => { Object.assign(eq, x); refreshTubes(true); }, apply, peers: () => peerList, net: () => net, focusOrgan, get P() { return P; } };
+window.__nexus = { me, cam, S, turn, remotes, organs, dev, desk: odesk, panels, pops, feed, hist, labSeries, openSection, closeSection, bodyMat, tapAt, get mdt() { return mdt; }, eqSet: (x) => { Object.assign(eq, x); refreshTubes(true); }, apply, peers: () => peerList, net: () => net, focusOrgan, get P() { return P; } };
 if (DEMO) {
   const orders = { groups: [{ g: "Orders", items: [{ kind: "examine", label: "Examine", ok: true }, { kind: "labs", label: "Send labs", ok: true }, { kind: "antibiotics", label: "Antibiotics", ok: true }, { kind: "fluid", label: "Fluid 500 mL", ok: true }, { kind: "norepi", label: "Noradrenaline", ok: true }, { kind: "art-line", label: "Insert arterial line", ok: true }] }, { g: "Lung", items: [{ kind: "oxygen", label: "Oxygen", ok: true }, { kind: "intubate", label: "Intubate", ok: true }, { kind: "cxr", label: "Chest film", ok: true }, { kind: "ct-chest", label: "CT chest", ok: false }] }, { g: "Heart", items: [{ kind: "echo", label: "Echocardiogram", ok: true }] }], call: [{ id: "pulmonologist", label: "Pulmonologist", ok: true }, { id: "nephrologist", label: "Nephrologist", ok: true }], wrong: [{ kind: "flood", label: "Give 2 litres without looking", ok: true }], acls: [], enter: false };
   const room = { id: "demo", code: "DEMO42", status: "live", host: true, slots: { intensivist: 1, pulmonologist: 1, nephrologist: 1 }, you: { specialty: mySpec, inside: true }, members: [{ userId: myId, name: myName, specialty: mySpec, inside: true }, { userId: "x1", name: "Ravi", specialty: "pulmonologist" }, { userId: "x2", name: "Meera", specialty: "nephrologist" }], scenario: { name: "Meera Nair", age: 58, sex: "woman", dx: "Fever and hypoxaemic pneumonia", story: "Three days of fever and a productive cough. She is speaking. The saturation is 91% on air. The pressure, for now, is acceptable." }, patient: { hour: 3, hr: 112, sbp: 104, dbp: 64, map: 77, spo2: 91, rr: 28, gcs: 15, temp: 38.6, lactate: 2.6, cr: 1.4, k: 4.3, rhythm: "sinus", alive: true, tube: false, oxygen: true, norepi: false, problems: [{ id: "a", title: "Pneumonia with falling saturation", specialty: "pulmonologist", open: true, called: false }, { id: "b", title: "Rising lactate", specialty: "intensivist", open: true, called: true }], results: [{ label: "Labs", text: "Lactate 2.6 mmol/L. Creatinine 1.4 mg/dL. Potassium 4.3 mmol/L. Haemoglobin 11.4 g/dL." }], log: [{ t: 1, text: "Asha examined the patient." }, { t: 2, text: "Asha put oxygen on." }] } };

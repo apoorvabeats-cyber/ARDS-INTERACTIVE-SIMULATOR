@@ -522,7 +522,6 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     if (arrive) {
       const d = DOORS.aud;
       arrive.t += dt;
-            if (fade) fade.style.opacity = String(Math.max(0, 1 - arrive.t / 0.5));
       const k = Math.min(1, arrive.t / 2.0), e = 1 - Math.pow(1 - k, 2.2);
       eye.set(arrive.start.x * (1 - e), 1.62, arrive.start.z * (1 - e));
       if (arrive.t > 0.5) {
@@ -530,8 +529,10 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
         const o = Math.max(0, 1 - (arrive.t - 0.5) * 1.6);
         d.userData.open = o; d.userData.left.position.x = -0.48 - o * 0.85; d.userData.right.position.x = 0.48 + o * 0.85;
       }
-      if (k >= 1) { shut(d); if (fade) { fade.style.opacity = "0"; fade.style.transition = ""; } document.documentElement.classList.remove("arriving"); arrive = null; mode = "look"; window.doorChosen = false; }
-      placeCamera(); ambient(dt); renderer.render(scene, camera); return;
+      if (k >= 1) { shut(d); if (fade) { fade.style.opacity = "0"; fade.style.transition = ""; } document.documentElement.classList.remove("arriving"); if (window.ccuSnapOff) window.ccuSnapOff(); arrive = null; mode = "look"; window.doorChosen = false; }
+      placeCamera(); ambient(dt); renderer.render(scene, camera);
+      if (window.ccuSnapOff && arrive && !arrive.shown) { arrive.shown = true; requestAnimationFrame(() => requestAnimationFrame(() => window.ccuSnapOff && window.ccuSnapOff())); }
+      return;
     }
     if (job) {
       job.t += dt;
@@ -568,7 +569,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     eye.copy(start); yaw = face + Math.PI; pit = 0;
     d.userData.open = 1; d.userData.left.position.x = -0.48 - 0.85; d.userData.right.position.x = 0.48 + 0.85;
     mode = "arrive"; arrive = { t: 0, start, snd: false, shut: false };
-    if (fade) { fade.style.transition = "none"; fade.style.opacity = "1"; }
+    if (fade) { fade.style.transition = "none"; fade.style.opacity = "0"; }
   }
   placeCamera();
   frame();

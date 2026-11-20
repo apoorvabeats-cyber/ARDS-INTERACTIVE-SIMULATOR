@@ -672,9 +672,12 @@ function ivEquipment(p){
 try{ward=buildWard(THREE,S,R,P,{mon,rdr,equip:ivEquipment});B.forEach((b,i)=>b.lamp=ward.lamps[i])}catch(e){console.error('3D ward failed; using photo beds.',e);ward=null;B.forEach(b=>b.g.visible=true)}
 try{if(ward){suite=buildSuite(THREE,S,P,{mon},ward.env,{gateSet:a=>ward.setGate(a),onDoor:(d,o)=>sfx.door(o,{x:d.center.x,z:d.center.z},d.id==='gate'?1.1:1)});
  const D=suite.doors,cxA=-15.3;
- const fadeOut=(fn)=>{leaving=true;const l=$('#leave');l.style.transition='opacity .55s';l.style.opacity=1;setTimeout(fn,600)};
- D.hub.go=()=>fadeOut(()=>{if(parent!==window)parent.postMessage('universe-hub','*');else location.href='../../hub.html'});
- D.team.go=()=>{try{fetch('../../models/anatomy/human-reference.glb',{cache:'force-cache'}).catch(()=>{})}catch(e){}if(parent!==window)fadeOut(()=>{parent.postMessage('universe-team','*');setTimeout(()=>{leaving=false;$('#leave').style.opacity=0},1400)});else toast('The Multidisciplinary Team room opens from the Universe app.')};
+ /* leaving by a door is a straight cut, never a fade: keep the last frame, hand it to the next page, which shows it until its own first frame */
+ const keepFrame=()=>{try{R.render(S,cam);const c=R.domElement,w=Math.min(960,c.width),h=Math.round(w*c.height/c.width),t=document.createElement('canvas');t.width=w;t.height=h;t.getContext('2d').drawImage(c,0,0,w,h);sessionStorage.setItem('ccu-snap',t.toDataURL('image/jpeg',.62))}catch(e){try{sessionStorage.removeItem('ccu-snap')}catch(_){}}};
+ window.__keepFrame=keepFrame;
+ const cutTo=(msg,fallback)=>{if(leaving)return;leaving=true;keepFrame();sfx.stopOutdoor&&sfx.stopOutdoor();if(parent!==window)parent.postMessage(msg,'*');else if(fallback)location.href=fallback};
+ D.hub.go=()=>cutTo('universe-hub','../../hub.html');
+ D.team.go=()=>{try{fetch('../../models/anatomy/human-reference.glb',{cache:'force-cache'}).catch(()=>{})}catch(e){}if(parent!==window){cutTo('universe-team');setTimeout(()=>{leaving=false},2500)}else toast('The Multidisciplinary Team room opens from the Universe app.')};
  D.exit.noThrough=true;D.exit.go=()=>{const outside=cam.position.z<-21.8;
   if(!outside)startRoute([{p:new V(cxA,1.6,-22.1),look:new V(cxA,1.6,-30),dur:2000},{p:new V(cxA,1.6,-25.6),look:new V(cxA,1.5,-34),dur:1900}],()=>{$('#hint').textContent=OUTH});
   else startRoute([{p:new V(cxA,1.6,-19.4),look:new V(cxA,1.5,-12),dur:2200}])}}}catch(e){console.error('3D command suite failed; using the photo command centre.',e);suite=null}

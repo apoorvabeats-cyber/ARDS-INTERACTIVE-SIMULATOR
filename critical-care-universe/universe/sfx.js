@@ -1,6 +1,6 @@
 /* Soft synthesised sound for the Critical Care Universe: sliding gates, ICU monitor beeps, gentle alarms and the outdoor ambience
    (birds by day, crickets and an owl by night). Everything is generated with Web Audio, so there are no files to load.
-   createSfx() -> { unlock(), setOn(b), setListener(x,z,yaw), door(opening,pos?), beep(opt), alert(level,pos?), startOutdoor(phase), stopOutdoor(), tick() } */
+   createSfx() -> { unlock(), setOn(b), setListener(x,z,yaw), door(opening,pos?), chime(kind), beep(opt), alert(level,pos?), startOutdoor(phase), stopOutdoor(), tick() } */
 
 export function createSfx() {
   let ac = null, master = null, nb = null, on = true, bus = null, timers = [], outG = null, outNodes = [];
@@ -44,6 +44,16 @@ export function createSfx() {
     g.gain.cancelScheduleAndHoldAtTime ? g.gain.cancelScheduleAndHoldAtTime(t0) : g.gain.cancelScheduledValues(t0);
     g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(peak, t0 + a); g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d);
     return t0 + a + d + (end || 0);
+  };
+
+  /* ---------- a new result has arrived: a short, clear chime (lab: two notes, imaging: three, finding: one soft bell) ---------- */
+  S.chime = (kind) => {
+    if (!ready()) return;
+    const seq = { lab: [659, 880], img: [523, 659, 784], find: [740], alert: [988, 740] }[kind] || [784], t = ac.currentTime, out = outTo(0, 1);
+    seq.forEach((f, i) => [[f, 0.2], [f * 2.0, 0.05]].forEach(([fr, pk]) => {
+      const os = ac.createOscillator(); os.type = "sine"; os.frequency.value = fr; const g = ac.createGain(); os.connect(g); g.connect(out);
+      env(g, t + i * 0.14, 0.012, pk, 0.7); os.start(t + i * 0.14); os.stop(t + i * 0.14 + 0.9);
+    }));
   };
 
   /* ---------- sliding gate: motor whine, rail whoosh, latch click and a soft closing thunk ---------- */
