@@ -13,16 +13,31 @@ export function buildOutdoor(T, S, opt = {}) {
   const OUT = new T.Group(); OUT.name = "outdoor"; S.add(OUT);
 
   /* ---------- time of day ---------- */
+  const now = new Date();
+  const qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return new URLSearchParams(""); } })();
+  /* where in the world: from the phone's time zone (Delhi-NCR for India), or ?lat= &lon= to override. Only used to find today's sunrise and sunset. */
+  const tz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { return ""; } })();
+  const lat = qs.get("lat") !== null ? +qs.get("lat") : /Kolkata|Calcutta/.test(tz) ? 28.6 : /^(Australia|Pacific\/Auckland|America\/(Sao_Paulo|Argentina|Santiago|Lima)|Africa\/(Johannesburg|Maputo))/.test(tz) ? -33 : 30;
+  const lon = qs.get("lon") !== null ? +qs.get("lon") : /Kolkata|Calcutta/.test(tz) ? 77.2 : -now.getTimezoneOffset() / 4;
+  const sol = (() => {      /* NOAA solar equations: local solar noon, sunrise, sunset (decimal hours on the phone's clock) and the sun's declination */
+    const N = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 864e5), g = 2 * Math.PI / 365 * (N - 1 + 0.5), rd = Math.PI / 180;
+    const eq = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+    const dec = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+    const c = (Math.cos(90.833 * rd) - Math.sin(lat * rd) * Math.sin(dec)) / (Math.cos(lat * rd) * Math.cos(dec)), ha = Math.acos(Math.max(-1, Math.min(1, c))) / rd;
+    const loc = (utcMin) => (utcMin - now.getTimezoneOffset()) / 60;
+    return { noon: loc(720 - 4 * lon - eq), rise: loc(720 - 4 * (lon + ha) - eq), set: loc(720 - 4 * (lon - ha) - eq), dec };
+  })();
   const hour = (() => {
-    let q = null; try { q = new URLSearchParams(location.search).get("hour"); } catch (e) {}
+    const q = qs.get("hour");
     if (q !== null && q !== "" && !isNaN(+q)) return ((+q % 24) + 24) % 24;
-    const d = new Date(); return d.getHours() + d.getMinutes() / 60;
+    return now.getHours() + now.getMinutes() / 60;
   })();
   const C = (h) => new T.Color(h);
-  /* hour, sky top, sky horizon, light tint, how night-like (0..1) */
-  const K = [[0, 0x050a1c, 0x13233f, 0x5a6fa8, 1], [4.8, 0x0a1230, 0x23305a, 0x6a76ae, 0.95], [5.8, 0x2b3c78, 0xd88f86, 0xc9a2a0, 0.55], [6.8, 0x4a7fc0, 0xffc08e, 0xffd2ac, 0.2],
-    [8.5, 0x3d8de0, 0xc4e2ff, 0xfff1e0, 0], [12, 0x2b83e6, 0xa8d4ff, 0xffffff, 0], [15.5, 0x3b84d6, 0xeed8b4, 0xffe8cc, 0], [17.3, 0x4a70b8, 0xffb36a, 0xffc88e, 0.05],
-    [18.4, 0x3b3f88, 0xff7c5e, 0xe69a86, 0.3], [19.4, 0x161e4c, 0x7c4c80, 0x8a7aa8, 0.75], [20.6, 0x070d24, 0x16264a, 0x5f74ac, 1], [24, 0x050a1c, 0x13233f, 0x5a6fa8, 1]];
+  const sr = sol.rise, ss = sol.set, nn = sol.noon;
+  /* the sky is keyed to today's real sunrise and sunset: hour, sky top, sky horizon, light tint, how night-like (0..1) */
+  const K = [[-0.1, 0x050a1c, 0x13233f, 0x5a6fa8, 1], [sr - 1.9, 0x070d24, 0x16264a, 0x5f74ac, 1], [sr - 0.7, 0x1a2858, 0x4a4d86, 0x8f8cb8, 0.8], [sr - 0.1, 0x2f4688, 0xd88f86, 0xc9a2a0, 0.45], [sr + 0.6, 0x4a7fc0, 0xffc08e, 0xffd2ac, 0.15],
+    [sr + 2.0, 0x3d8de0, 0xc4e2ff, 0xfff1e0, 0], [nn, 0x2b83e6, 0xa8d4ff, 0xffffff, 0], [ss - 2.6, 0x3b84d6, 0xeed8b4, 0xffe8cc, 0], [ss - 1.1, 0x4a70b8, 0xffb36a, 0xffc88e, 0.04],
+    [ss - 0.1, 0x3b3f88, 0xff7c5e, 0xe69a86, 0.3], [ss + 0.7, 0x161e4c, 0x7c4c80, 0x8a7aa8, 0.72], [ss + 1.6, 0x070d24, 0x16264a, 0x5f74ac, 1], [24.1, 0x050a1c, 0x13233f, 0x5a6fa8, 1]];
   const pal = (() => {
     let i = 0; while (i < K.length - 2 && hour > K[i + 1][0]) i++;
     const a = K[i], b = K[i + 1], f = Math.max(0, Math.min(1, (hour - a[0]) / (b[0] - a[0])));
@@ -30,11 +45,12 @@ export function buildOutdoor(T, S, opt = {}) {
   })();
   const night = pal.night;
   const phase = night > 0.72 ? "night" : night > 0.18 ? "dusk" : "day";
-  const label = phase === "night" ? "Night" : (hour < 11 ? (night > 0.18 ? "Dawn" : "Morning") : hour < 15 ? "Day" : hour < 17.2 ? "Afternoon" : (night > 0.18 ? "Dusk" : "Golden hour"));
-  const sunT = (hour - 6) / 12, sunEl = Math.sin(sunT * Math.PI) * 1.15 - 0.06, sunAz = -1.0 + 2.0 * Math.max(0, Math.min(1, sunT));
+  const label = hour < sr - 0.7 || hour > ss + 1.2 ? "Night" : hour < sr + 0.6 ? "Dawn" : hour < nn - 1.5 ? "Morning" : hour < ss - 3 ? "Day" : hour < ss - 1.1 ? "Afternoon" : hour < ss ? "Golden hour" : "Dusk";
+  const sunT = Math.max(0, Math.min(1, (hour - sr) / Math.max(1, ss - sr))), sunAz = -1.0 + 2.0 * sunT;
+  const ha = (hour - nn) * 15 * Math.PI / 180, sunEl = Math.asin(Math.sin(lat * Math.PI / 180) * Math.sin(sol.dec) + Math.cos(lat * Math.PI / 180) * Math.cos(sol.dec) * Math.cos(ha));
   const sunDir = new T.Vector3(Math.sin(sunAz) * Math.cos(Math.max(0, sunEl)), sunEl, -Math.cos(sunAz) * Math.cos(Math.max(0, sunEl))).normalize();
-  const mh = ((hour + 6) % 24) / 12, moonEl = Math.sin(mh * Math.PI) * 0.95 - 0.05;
-  const moonDir = new T.Vector3(Math.sin(-0.8 + mh * 1.0), moonEl, -0.75).normalize();
+  const nightLen = 24 - (ss - sr), sinceSet = hour >= ss ? hour - ss : hour + 24 - ss, moonT = Math.max(0, Math.min(1, sinceSet / nightLen)), moonEl = Math.sin(moonT * Math.PI) * 0.95 - 0.05;
+  const moonDir = new T.Vector3(Math.sin(-0.9 + moonT * 1.8), moonEl, -0.75).normalize();
   const sunCol = C(sunEl < 0.25 ? 0xffa060 : 0xfff2d8);
   const tint = pal.tint;                                                    /* multiplies every unlit surface */
   const mix = (hex, k) => C(hex).multiply(tint).multiplyScalar(k == null ? 1 : k);
@@ -245,5 +261,5 @@ export function buildOutdoor(T, S, opt = {}) {
     birds.forEach((b) => { const d = b.userData; d.a += dt * d.sp; b.position.set(cx + Math.sin(d.a) * d.r * 1.4, d.y + Math.sin(d.a * 2 + d.ph) * 1.5, cz - 36 + Math.cos(d.a) * d.r); b.rotation.y = d.a + (d.sp > 0 ? Math.PI / 2 : -Math.PI / 2); const f = Math.sin(t * 9 + d.ph) * 0.55; d.w1.rotation.z = f; d.w2.rotation.z = -f; });
     if (flies) { const p = flies.geometry.attributes.position, sd = flies.userData.seed; for (let i = 0; i < sd.length; i++) p.setXYZ(i, sd[i][0] + Math.sin(t * 0.5 + sd[i][3]) * 1.2, sd[i][1] + Math.sin(t * 0.9 + sd[i][3] * 2) * 0.35, sd[i][2] + Math.cos(t * 0.4 + sd[i][3]) * 1.2); p.needsUpdate = true; flies.material.opacity = 0.55 + 0.4 * Math.sin(t * 2.2); }
   }
-  return { group: OUT, groundY, clamp, exitness, update, info: { hour, phase, label, night, cx, cz, RS, R0 } };
+  return { group: OUT, groundY, clamp, exitness, update, info: { hour, phase, label, night, cx, cz, RS, R0, sunrise: sr, sunset: ss, lat, lon } };
 }

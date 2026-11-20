@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createSfx } from "./critical-care-universe/universe/sfx.js?v=20261120h";
+import { createSfx } from "./critical-care-universe/universe/sfx.js?v=20261120i";
 
 const gate = document.getElementById("icu-gate");
 const canvas = document.getElementById("lobby");
@@ -204,7 +204,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     box(0.03, 2.34, 0.03, glow(col, 1.25), 0.955, 1.2, -0.07, g);
     box(1.93, 0.03, 0.03, glow(col, 1.25), 0, 2.345, -0.07, g);
     /* tinted glass leaves that slide apart */
-    const glass = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.22, transparent: true, opacity: 0.36, roughness: 0.06, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false });
+    const glass = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.07, transparent: true, opacity: 0.3, roughness: 0.06, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false });
     glassMats[kind] = glass;
     const left = new THREE.Mesh(new THREE.BoxGeometry(0.92, 2.26, 0.035), glass);
     const right = new THREE.Mesh(new THREE.BoxGeometry(0.92, 2.26, 0.035), glass);
@@ -220,7 +220,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     /* the light that spills out when it opens */
     const [pc, pg] = cnv(64, 128);
     const gr = pg.createLinearGradient(0, 0, 0, 128);
-    gr.addColorStop(0, "#ffffff"); gr.addColorStop(0.5, hex(col)); gr.addColorStop(1, "#06101c");
+    gr.addColorStop(0, "#d3dbe5"); gr.addColorStop(0.5, "#4a5462"); gr.addColorStop(1, "#080d14");
     pg.fillStyle = gr; pg.fillRect(0, 0, 64, 128);
     const portalTex = tex(pc);
     const portal = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 2.3), new THREE.MeshBasicMaterial({ map: portalTex, side: THREE.DoubleSide }));
@@ -304,6 +304,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   let lastY = 0;
   let mode = "look";
   let job = null;
+  let arrive = null;
   let raf = 0;
   let leaveTimer = 0;
   const fade = document.getElementById("lobby-fade");
@@ -338,7 +339,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       const btn = document.getElementById("icu-enter");
       if (btn) btn.click();
     } else if (kind === "aud") {
-      location.href = "critical-care-universe/index.html?home=1&to=auditorium&v=20261120h";
+      location.href = "critical-care-universe/index.html?home=1&to=auditorium&v=20261120i";
     } else if (kind === "rad") {
       location.href = "radiology.html?v=20261119r2";
     } else if (kind === "micro") {
@@ -461,6 +462,21 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   }
   function step() {
     const dt = Math.min(clock.getDelta(), 0.05);
+    if (arrive) {
+      const d = DOORS.aud;
+      arrive.t += dt;
+      if (!arrive.snd && arrive.t > 0.05) { arrive.snd = true; sfx.setListener(0, 0, yaw); sfx.door(true, { x: d.position.x, z: d.position.z }, 1.0); }
+      if (fade) fade.style.opacity = String(Math.max(0, 1 - arrive.t / 0.9));
+      const k = Math.min(1, arrive.t / 2.4), e = 1 - Math.pow(1 - k, 2.2);
+      eye.set(arrive.start.x * (1 - e), 1.62, arrive.start.z * (1 - e));
+      if (arrive.t > 1.2) {
+        if (!arrive.shut) { arrive.shut = true; sfx.door(false, { x: d.position.x, z: d.position.z }, 1.0); }
+        const o = Math.max(0, 1 - (arrive.t - 1.2) * 1.6);
+        d.userData.open = o; d.userData.left.position.x = -0.48 - o * 0.85; d.userData.right.position.x = 0.48 + o * 0.85;
+      }
+      if (k >= 1) { shut(d); if (fade) { fade.style.opacity = "0"; fade.style.transition = ""; } arrive = null; mode = "look"; window.doorChosen = false; }
+      placeCamera(); ambient(dt); renderer.render(scene, camera); return;
+    }
     if (job) {
       job.t += dt;
       const raw = job.face - yaw;
@@ -484,6 +500,15 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     }
     ambient(dt);
     renderer.render(scene, camera);
+  }
+  /* coming back from the auditorium: walk in through the Auditorium door, fading up from black, no extra "exiting" step */
+  if (/[?&]from=auditorium/.test(location.search) && DOORS.aud) {
+    const face = THETA.aud, d = DOORS.aud;
+    const start = new THREE.Vector3(Math.sin(face) * (APO + 1.0), 1.62, Math.cos(face) * (APO + 1.0));
+    eye.copy(start); yaw = face + Math.PI; pit = 0;
+    d.userData.open = 1; d.userData.left.position.x = -0.48 - 0.85; d.userData.right.position.x = 0.48 + 0.85;
+    mode = "arrive"; arrive = { t: 0, start, snd: false, shut: false };
+    if (fade) { fade.style.transition = "none"; fade.style.opacity = "1"; }
   }
   placeCamera();
   frame();

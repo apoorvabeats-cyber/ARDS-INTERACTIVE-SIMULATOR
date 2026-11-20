@@ -10,7 +10,7 @@ html,body{height:100%;margin:0;background:#050b18;color:var(--t);font:13px/1.4 s
 button{font:inherit;color:var(--t);background:#0d2140;border:1px solid #2a5a8c;border-radius:6px;padding:8px 12px;cursor:pointer}
 button:focus-visible,input:focus-visible{outline:2px solid var(--c)}
 #top{position:fixed;top:env(safe-area-inset-top,0px);left:0;right:0;display:flex;gap:8px;align-items:center;padding:8px 10px;background:linear-gradient(#050b18,transparent)}
-#top b{margin-right:auto;font-size:15px;letter-spacing:.04em}
+#top b{margin-right:auto;font-size:15px;letter-spacing:.04em}#settings-menu,#top b{display:none!important}#home{margin-left:auto}
 #top button[data-m],#home{width:clamp(72px,10vw,112px);min-height:44px;padding:4px;line-height:1.15}
 #settings-menu{position:relative;flex-shrink:0}#settings-menu summary{list-style:none;cursor:pointer;background:#0d2140;border:1px solid #2a5a8c;border-radius:6px;padding:8px}#settings-menu summary::-webkit-details-marker{display:none}#settings-menu summary:focus-visible{outline:2px solid var(--c)}#audio-controls{position:absolute;right:0;top:calc(100% + 4px);display:flex;flex-direction:column;gap:4px;padding:6px;background:#050b18;border:1px solid #2a5a8c;border-radius:6px;min-width:110px}#audio-controls button{padding:8px;font-size:12px}
 @media(max-width:600px){#top{gap:3px;padding:5px}#top b{font-size:11px}#top button[data-m],#home{width:clamp(50px,16vw,80px);font-size:11px}#hud{font-size:10px;white-space:nowrap}#settings-menu summary{padding:8px 5px}}
@@ -98,10 +98,10 @@ import * as THREE from './three.module.js';
 import {FOLLOW_UPS,DISTRACTORS} from './case-decisions.js';
 import {ORDER_CASES,assessOrder} from './clinical-orders.js?v=20261115a';
 import {createCaseVoice} from './case-voice.mjs';
-import {createAnnouncer} from './alarm-voice.mjs?v=20261120h';
-import {buildWard} from './ward3d.js?v=20261120h';
-import {buildSuite} from './command3d.js?v=20261120h';
-import {createSfx} from './sfx.js?v=20261120h';
+import {createAnnouncer} from './alarm-voice.mjs?v=20261120i';
+import {buildWard} from './ward3d.js?v=20261120i';
+import {buildSuite} from './command3d.js?v=20261120i';
+import {createSfx} from './sfx.js?v=20261120i';
 const $=s=>document.querySelector(s),V=THREE.Vector3,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 function updateLayout(){
  document.documentElement.style.setProperty('--top-height',$('#top').getBoundingClientRect().height+'px');
@@ -290,15 +290,19 @@ function hall(){
  for(let c=0;c<2;c++){const d=ir.getChannelData(c);let lp=0;for(let k=0;k<len;k++){const t=k/ac.sampleRate;lp+=((Math.random()*2-1)-lp)*(.55-.4*Math.min(1,t/2.4));d[k]=lp*Math.exp(-t*2.1)*(k<ac.sampleRate*.03?k/(ac.sampleRate*.03):1)}}
  const cv=ac.createConvolver();cv.buffer=ir;const wet=ac.createGain();wet.gain.value=1.1;const dry=ac.createGain();dry.gain.value=.5;
  cv.connect(wet);const input=ac.createGain();input.connect(cv);input.connect(dry);wet.connect(ac.destination);dry.connect(ac.destination);
- return hallBus={input}}
+ return hallBus={input,wet,dry}}
+let attBuf=null;
+function loadAtt(){if(!ac||attBuf!==null)return;attBuf=false;fetch('voice/alarm-attention.mp3?v=20261120i').then(r=>r.arrayBuffer()).then(b=>new Promise((ok,no)=>ac.decodeAudioData(b,ok,no))).then(d=>{attBuf=d}).catch(e=>{console.warn('Alarm voice clip not loaded:',e);attBuf=null})}
 function hallChime(){
- const bus=hall();if(!bus)return;const t0=ac.currentTime+.02;
+ const bus=hall();if(!bus)return;loadAtt();
+ if(attBuf&&attBuf.duration){const s=ac.createBufferSource(),g=ac.createGain();s.buffer=attBuf;g.gain.value=1.15;s.connect(g);g.connect(bus.input);s.start(ac.currentTime+.02);return}
+ const t0=ac.currentTime+.02;
  [[783.99,0],[659.25,.55]].forEach(([f,dt])=>[[1,.22],[2,.06],[3.01,.025]].forEach(([m,a])=>{
   const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=f*m;
   g.gain.setValueAtTime(0,t0+dt);g.gain.linearRampToValueAtTime(a,t0+dt+.012);g.gain.exponentialRampToValueAtTime(.0008,t0+dt+1.5);
   o.connect(g);g.connect(bus.input);o.start(t0+dt);o.stop(t0+dt+1.6)}))}
 const announcer='speechSynthesis' in window&&'SpeechSynthesisUtterance' in window?createAnnouncer({
- synthesis:window.speechSynthesis,Utterance:window.SpeechSynthesisUtterance,getVoices:()=>window.speechSynthesis.getVoices(),gapMs:15000,chimeMs:1500,
+ synthesis:window.speechSynthesis,Utterance:window.SpeechSynthesisUtterance,getVoices:()=>window.speechSynthesis.getVoices(),gapMs:15000,chimeMs:1350,
  beforeSpeak:()=>{if(voiceController)voiceController.stop()},
  chime:hallChime,
  afterSpeak:()=>{if(pendingNarration){const t=pendingNarration;pendingNarration=null;speak(t)}else if(cur!=null&&mode==='bed'&&voiceOn&&P[cur]&&!P[cur].done)$('#replay-voice').hidden=false},
@@ -340,7 +344,7 @@ go('cmd');
 // input
 const ray=new THREE.Raycaster(),mv2=new THREE.Vector2();let dn=0,mv=0,lx=0,ly=0,ac;
 const sfx=createSfx();
-function unlockAudio(){sfx.unlock();try{const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;ac=ac||new Audio();if(ac.state==='suspended')ac.resume().catch(e=>console.warn('Unable to enable alarm audio:',e))}catch(e){console.warn('Unable to enable alarm audio:',e)}}
+function unlockAudio(){sfx.unlock();try{const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;ac=ac||new Audio();loadAtt();if(ac.state==='suspended')ac.resume().catch(e=>console.warn('Unable to enable alarm audio:',e))}catch(e){console.warn('Unable to enable alarm audio:',e)}}
 document.addEventListener('pointerdown',unlockAudio,{once:true});
 document.addEventListener('pointerdown',()=>{if(voiceOn&&voiceController)voiceController.prime()});
 let holdDir=0,lastVMove=0;
@@ -412,7 +416,8 @@ $('#ev').onclick=e=>{const p=P[cur],t=e.target;if(t.dataset.debrief){fin();retur
  evu();speak(message)}
 function fin(){stopVoice();const n=P.filter(p=>p.recovered).length;$('#end').style.display='block';
  $('#end').innerHTML='<h2>Shift debrief: '+n+' of 6 recovered</h2><ol>'+P.map(p=>'<li><b>'+p.n+' · '+p.dx+' · '+(p.recovered?'recovered':'not recovered')+'</b><ul>'+p.answers.map(a=>'<li>'+a.level+' — '+a.question+'<br>Your choice: '+a.selected+'<br>Suggested priority: '+a.best+'</li>').join('')+'</ul>'+(p.orderLog.length?'<b>Simulated orders</b><ul>'+p.orderLog.map(o=>'<li>'+o.label+' — '+o.level+': '+o.text+'</li>').join('')+'</ul>':'')+'</li>').join('')+'</ol><button onclick="document.getElementById(\'end\').style.display=\'none\'">Return to shift</button> <button onclick="location.reload()">Restart shift</button>'}
-function toast(m,say){const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.opacity=0,say?8000:4000);if(say&&alarmOn&&announcer)announcer.announce(m)}
+function inICU(){return mode==='bed'||cam.position.z>-4.6}
+function toast(m,say){const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.opacity=0,say?8000:4000);if(say&&alarmOn&&announcer&&inICU())announcer.announce(m.replace(/^Alarm\s*·\s*/i,''))}
 function beep(){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.04;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.12)}
 
 function simulatedLabs(p){const v=p.v,[a,c,h,l]=p.ab;
@@ -547,7 +552,7 @@ function scheduleAlarm(){
  if(!alarmOn)return;
  const remaining=15000-(performance.now()-lastAlarmAt);
  if(remaining>0){alarmTimer=setTimeout(scheduleAlarm,remaining);return}
- const candidates=ent?P.filter(p=>!p.done&&p.st>0):[];
+ const candidates=ent&&inICU()?P.filter(p=>!p.done&&p.st>0):[];
  if(!candidates.length){alarmTimer=setTimeout(scheduleAlarm,1000);return}
  const p=candidates.find(p=>p.i>lastAlarmBed)||candidates[0];
  lastAlarmAt=performance.now();lastAlarmBed=p.i;if(!announcer)beep();toast('Alarm · bed '+(p.i+1)+' · '+p.n+': '+priority(p).reason+' (simulated)',true);
@@ -571,9 +576,14 @@ setInterval(()=>{if(!ent)return;T++;
  $('#hud').textContent=Math.floor(T/60)+':'+String(T%60).padStart(2,'0')+' · '+P.filter(p=>p.done).length+'/6';
  if(cur!=null){evu();labs();renderOrders(false);showVentMech(P[cur])}},1000);
 
-let nBeep=0,nAlert=0,bi=0,leaving=false;
+let nBeep=0,nAlert=0,bi=0,leaving=false,arriving=false;
+window.addEventListener('pagehide',()=>{try{window.speechSynthesis.cancel()}catch(e){}});
 function bedPos(i){const b=ward.BP(i);return{x:b[0],z:b[1]}}
+let wasICU=true;
+function leaveICUSilence(){if(announcer)announcer.stop();try{if(voiceController)voiceController.stop()}catch(e){}try{window.speechSynthesis.cancel()}catch(e){}pendingNarration=null;nBeep=nAlert=0;if(hallBus){try{hallBus.input.disconnect();hallBus.wet.disconnect();hallBus.dry.disconnect()}catch(e){}hallBus=null}toastOff()}
+function toastOff(){const t=$('#toast');t.style.opacity=0}
 function soundscape(now){
+ if(suite&&!flatMode){const i=inICU();if(wasICU&&!i)leaveICUSilence();wasICU=i}
  if(!suite||flatMode||!sfx.isOn())return;
  if(ward)ward.cubicles.forEach(q=>{if(q._tp!==q.target){if(q._tp!==undefined){const b=ward.BP(q.i);sfx.door(q.target>0,{x:b[0],z:b[1]},.75)}q._tp=q.target}});
  const c=cam.position;
@@ -590,9 +600,10 @@ function outdoorLogic(){
  if(!suite||flatMode)return;
  const D=suite.doors,c=cam.position,ou=suite.outdoor,outside=c.z<-21.9&&c.x<-8.7;
  if(D.exit.target>0&&!outside&&c.z>-17.5&&mode!=='travel')D.exit.target=0;
+ if(mode!=='travel'&&c.z>-16.6){if(D.hub.target>0)D.hub.target=0;if(D.team.target>0)D.team.target=0}
  if(D.exit.open>.05&&D.exit.target>0)sfx.startOutdoor(ou.info.phase);
  else if(D.exit.open<.02&&D.exit.target===0&&sfx.outdoorOn())sfx.stopOutdoor();
- if(!outside){if(!leaving)$('#leave').style.opacity=0;sfx.outdoorGain(.3);return}
+ if(!outside){if(!leaving&&!arriving)$('#leave').style.opacity=0;sfx.outdoorGain(.3);return}
  const ex=ou.exitness(wp.x,wp.z);
  if(mode==='ward'&&!transit&&!leaving){
   sfx.outdoorGain(1-ex*.9);
@@ -661,8 +672,9 @@ function ivEquipment(p){
 try{ward=buildWard(THREE,S,R,P,{mon,rdr,equip:ivEquipment});B.forEach((b,i)=>b.lamp=ward.lamps[i])}catch(e){console.error('3D ward failed; using photo beds.',e);ward=null;B.forEach(b=>b.g.visible=true)}
 try{if(ward){suite=buildSuite(THREE,S,P,{mon},ward.env,{gateSet:a=>ward.setGate(a),onDoor:(d,o)=>sfx.door(o,{x:d.center.x,z:d.center.z},d.id==='gate'?1.1:1)});
  const D=suite.doors,cxA=-15.3;
- D.hub.go=()=>{if(parent!==window)parent.postMessage('universe-hub','*');else location.href='../../hub.html'};
- D.team.go=()=>{if(parent!==window)parent.postMessage('universe-team','*');else toast('The Multidisciplinary Team room opens from the Universe app.')};
+ const fadeOut=(fn)=>{leaving=true;const l=$('#leave');l.style.transition='opacity .55s';l.style.opacity=1;setTimeout(fn,600)};
+ D.hub.go=()=>fadeOut(()=>{if(parent!==window)parent.postMessage('universe-hub','*');else location.href='../../hub.html'});
+ D.team.go=()=>{if(parent!==window)fadeOut(()=>{parent.postMessage('universe-team','*');setTimeout(()=>{leaving=false;$('#leave').style.opacity=0},1400)});else toast('The Multidisciplinary Team room opens from the Universe app.')};
  D.exit.noThrough=true;D.exit.go=()=>{const outside=cam.position.z<-21.8;
   if(!outside)startRoute([{p:new V(cxA,1.6,-22.1),look:new V(cxA,1.6,-30),dur:2000},{p:new V(cxA,1.6,-25.6),look:new V(cxA,1.5,-34),dur:1900}],()=>{$('#hint').textContent=OUTH});
   else startRoute([{p:new V(cxA,1.6,-19.4),look:new V(cxA,1.5,-12),dur:2200}])}}}catch(e){console.error('3D command suite failed; using the photo command centre.',e);suite=null}
@@ -820,7 +832,7 @@ scr.visible=true;
 var _goBeds=go,_goPrev=null;
 function stand(x,z,yw){wp.set(x,0,z);yaw=yw;pit=0;if(suite){suite.doors.gate.target=1;suite.doors.gate.set(1)}}
 go=function(m,i){
- if(m==='cmd'&&suite&&!flatMode){if(mode==='bed'){mode='travel';ward.closeAll()}m='ward';if(START_AUD){START_AUD=false;stand(-15.3,-7.2,0)}else stand(-10.7,0,-Math.PI/2)}
+ if(m==='cmd'&&suite&&!flatMode){if(mode==='bed'){mode='travel';ward.closeAll()}m='ward';if(START_AUD){START_AUD=false;stand(-19.5,-19.7,Math.PI);suite.doors.hub.target=1;arriving=true;const l=$('#leave');l.style.transition='none';l.style.opacity=1;setTimeout(()=>{l.style.transition='opacity .9s';l.style.opacity=0;arriving=false},380)}else stand(-10.7,0,-Math.PI/2)}
  else if(m==='ward'&&suite&&!flatMode&&mode!=='bed'&&mode!=='transit'&&mode!=='travel'&&(mode==='cmd'||cam.position.x<-8.6))stand(-6.8,0,Math.PI/2);
  else if(m==='ward'&&mode==='transit')wp.set(0,0,0);
  if(m==='ward'&&mode==='bed'&&ward&&cur!=null){const b=cur;_goBeds('travel');mode='travel';transit={bed:b,stage:'out',start:performance.now(),duration:1300,from:cam.position.clone(),to:ward.approach(b),lookFrom:lk.clone(),lookTo:ward.look(b)};return}
