@@ -53,7 +53,7 @@ const S=U.stage($('cv'),{dist:17,auto:false,min:5,max:30,pitch:.38,yaw:.35});
 const Vc=MICRO.voice;Vc.mount();let narr=false;
 const FIX_T=new THREE.Vector3(0,.5,-.3),FIX_D=17; /* one fixed framing for the whole video: the camera never moves by itself */
 if(!S){$('cv').style.display='none';}
-let sim=null,org=null,t=0,playing=false,speed=1,lastSt=-1;
+let sim=null,org=null,t=0,playing=false,speed=1,lastSt=-1,pace=1;
 function fmt(x){x=Math.max(0,x);return Math.floor(x/60)+':'+String(Math.floor(x%60)).padStart(2,'0');}
 $('stg').innerHTML=I.STAGES.map((s,i)=>'<button class="pill" data-i="'+i+'" aria-pressed="false">'+(i+1)+' '+s+'</button>').join('');
 function pick(id){
@@ -66,13 +66,13 @@ function pick(id){
 }
 function apply(){
   if(!sim)return;const r=sim.update(t),st=r.stage;
-  if(st!==lastSt){lastSt=st;if(narr)Vc.say(I.STAGES[st]+'. '+I.TXT[org][st]);document.querySelectorAll('#stg .pill').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.i===st));document.querySelectorAll('#steps li').forEach(l=>{l.classList.toggle('on',+l.dataset.i===st);if(+l.dataset.i===st&&l.scrollIntoView&&playing)l.scrollIntoView({block:'nearest'});});
+  if(st!==lastSt){lastSt=st;pace=1;if(narr){const tx=I.STAGES[st]+'. '+I.TXT[org][st];if(Vc.say(tx)&&Vc.enabled())pace=Math.max(.4,Math.min(1,I.D/Vc.estSeconds(tx)));}document.querySelectorAll('#stg .pill').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.i===st));document.querySelectorAll('#steps li').forEach(l=>{l.classList.toggle('on',+l.dataset.i===st);});
     $('capT').textContent=(st+1)+'. '+I.STAGES[st];$('capX').textContent=I.TXT[org][st];}
   const tag=$('tag');tag.hidden=!(r.label&&(t>0));if(!tag.hidden){tag.textContent=r.label.text;tag._p=r.label.pos;}
   $('scrub').value=Math.round(t/I.DUR*1000);$('time').textContent=fmt(t)+' / '+fmt(I.DUR);
 }
 if(S)S.onFrame((tt,dt)=>{
-  if(playing&&sim){let nt=t+dt*speed;const cs=Math.floor(t/I.D),ns=Math.floor(nt/I.D);if(Vc.busy()&&ns>cs&&cs<I.NST-1)nt=(cs+1)*I.D-.001;t=nt;if(t>=I.DUR){t=I.DUR-.001;playing=false;$('play').textContent='Play';}apply();}
+  if(playing&&sim){let nt=t+dt*speed*(narr?pace:1);const cs=Math.floor(t/I.D),ns=Math.floor(nt/I.D);if(Vc.busy()&&ns>cs&&cs<I.NST-1)nt=(cs+1)*I.D-.001;t=nt;if(t>=I.DUR){t=I.DUR-.001;playing=false;$('play').textContent='Play';}apply();}
   const tag=$('tag');if(!tag.hidden&&tag._p){const v=tag._p.clone().project(S.cam),w=$('stage');tag.style.left=((v.x+1)/2*w.clientWidth)+'px';tag.style.top=((1-v.y)/2*w.clientHeight)+'px';}
 });
 $('start').onclick=()=>{$('startbox').hidden=true;t=0;playing=true;narr=true;$('play').textContent='Pause';lastSt=-1;apply();};

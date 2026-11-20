@@ -11,7 +11,7 @@
     get(k) { try { return localStorage.getItem('micro.voice.' + k); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem('micro.voice.' + k, v); } catch (e) { } }
   };
-  let on = store.get('on') !== '0', voice = null, token = 0, left = 0, pending = null, armed = false, lastText = '', btn = null, sel = null, rep = null;
+  let on = store.get('on') !== '0', voice = null, token = 0, left = 0, startedAt = 0, budget = 0, pending = null, armed = false, lastText = '', btn = null, sel = null, rep = null;
   const FEMALE = /(female|zira|samantha|susan|hazel|heera|karen|moira|tessa|victoria|fiona|kalpana|veena|aria|jenny|sonia|libby|natasha|clara|emma|catherine|linda|heather|nicky|allison|ava|joanna|kendra|kimberly|salli|ivy|amy|olivia|serena|zoe|siri|raveena|neerja|swara)/i;
   const MALE = /(male|david|mark|guy|daniel|alex|fred|george|james|ryan|prabhat|ravi|rishi|aaron|arthur|oliver|thomas|brian|christopher|eric|davis|tony|steffan|liam|mitchell|rocko|reed|evan|gordon|hemant|madhur|rehaan)/i;
   function score(v) {
@@ -67,7 +67,7 @@
     lastText = t;
     if (!on) return false;
     stop();
-    const my = token, chunks = chunk(t); left = chunks.length;
+    const my = token, chunks = chunk(t); left = chunks.length; startedAt = performance.now(); budget = Math.min(24000, Math.max(3500, t.length * 75 + 2500));
     try { if (speechSynthesis.paused) speechSynthesis.resume(); } catch (e) { }
     chunks.forEach((c, i) => {
       const u = new SpeechSynthesisUtterance(c); setup(u);
@@ -120,5 +120,5 @@
     pick();
   }
   if (ok) { try { speechSynthesis.onvoiceschanged = () => pick(); } catch (e) { } pick(); window.addEventListener('pagehide', stop); document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); }); }
-  M.voice = { ok, say, stop, mount, textOf, busy: () => ok && on && left > 0, enabled: () => ok && on, setOn, last: () => lastText };
+  M.voice = { ok, say, stop, mount, textOf, busy: () => ok && on && left > 0 && (performance.now() - startedAt) < budget, estSeconds: t => Math.min(24, Math.max(3.5, (clean(t).length * 70 + 1500) / 1000)), enabled: () => ok && on, setOn, last: () => lastText };
 })();
