@@ -107,7 +107,7 @@ export function createSfx() {
 
   /* ---------- footsteps: formal leather shoes on a hard floor, kept soft ---------- */
   let foot = 0;
-  S.step = (vol) => {
+  S.step = (vol) => { return; /* footsteps removed on request */
     if (!ready()) return;
     /* phone speakers cannot play deep bass, so the step lives in the middle: a firm heel click near 1.6 kHz, a leather slap near 600 Hz and a short knock near 200 Hz */
     const t0 = ac.currentTime + 0.005, v = (vol == null ? 1 : vol) * 0.9, side = (foot++ % 2) ? 1 : -1, j = 0.93 + Math.random() * 0.14, out = outTo(side * 0.12, 1.4);

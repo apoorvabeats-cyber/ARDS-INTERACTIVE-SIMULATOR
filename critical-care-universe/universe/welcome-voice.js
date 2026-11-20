@@ -13,7 +13,7 @@
       sessionStorage.setItem(k, String(Date.now()));
     } catch (e) { /* storage may be blocked: say it anyway */ }
     try { if (playing) playing.pause(); } catch (e) { /* ignore */ }
-    const a = new Audio(base + "voice/welcome-" + key + ".mp3?v=20261121e");
+    const a = new Audio(base + "voice/welcome-" + key + ".mp3?v=20261121g");
     a.volume = 0.95; a.preload = "auto"; playing = a;
     const arm = function () {
       const evs = ["pointerdown", "touchend", "click", "keydown"], t0 = Date.now();

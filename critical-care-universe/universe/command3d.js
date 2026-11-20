@@ -10,8 +10,9 @@
        the real pages take over, from the same pose, a few steps inside.
    buildSuite(T, scene, P, H, env, {gateSet}) -> { doors, update(t,dt), clamp(x,z), hits, rooms }          */
 
-import { buildOutdoor } from "./outdoor3d.js?v=20261121e";
-import { loadVisitorCopy, createVisitor } from "./visitor-avatar.js?v=20261121e";
+import { buildOutdoor } from "./outdoor3d.js?v=20261121g";
+import { loadVisitorCopy, createVisitor } from "./visitor-avatar.js?v=20261121g";
+import { liveUpdates } from "./live-updates.js?v=20261121g";
 
 export function buildSuite(T, S, P, H, env, opt = {}) {
   const V = T.Vector3, G = new T.Group(); G.name = "suite"; S.add(G);
@@ -375,13 +376,13 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
   }
   [seatBase, seatBack, seatLeg].forEach((m) => { m.instanceMatrix.needsUpdate = true; aud.add(m); });
 
-  /* ---- two tall LIVE UPDATES screens, one on the hub-door wall and one on the Nexus-door wall, set back from the doors: three beds each, the same live bed monitors as the ICU board ---- */
-  const tall = [];
-  [[AU.x0 + 0.06, Math.PI / 2, 0], [AU.x1 - 0.06, -Math.PI / 2, 3]].forEach(([wx, ry, first]) => {
-    const d = dcv(720, 1192), m = new T.MeshBasicMaterial({ map: d.t, toneMapped: false }), g = new T.Group(); g.position.set(wx, 3.45, -10.6); g.rotation.y = ry; aud.add(g);
-    bx(3.5, 5.7, 0.08, M(0x07090c, { metalness: 0.6, roughness: 0.35 }), 0, 0, -0.01, g); pl(3.3, 5.46, m, 0, 0, 0.04, 0, 0, g);
-    [-1, 1].forEach((k) => bx(0.04, 5.7, 0.03, cyan, k * 1.74, 0, 0.05, g)); bx(3.5, 0.04, 0.03, cyan, 0, 2.86, 0.05, g); bx(3.5, 0.04, 0.03, cyan, 0, -2.86, 0.05, g);
-    tall.push({ d, first, g });
+  /* ---- two large LIVE UPDATES screens, one each side of the exit door: the society feed from the app's home screen ---- */
+  const live = liveUpdates(), liveBoards = [];
+  [-1, 1].forEach((k, idx) => {
+    const d = dcv(680, 920), m = new T.MeshBasicMaterial({ map: d.t, toneMapped: false }), g = new T.Group(); g.position.set(cxA + k * 4.0, 3.15, AU.z0 + 0.07); aud.add(g);
+    bx(3.7, 4.9, 0.1, M(0x07090c, { metalness: 0.6, roughness: 0.35 }), 0, 0, -0.01, g); pl(3.5, 4.72, m, 0, 0, 0.045, 0, 0, g);
+    [-1, 1].forEach((j) => bx(0.04, 4.9, 0.03, cyan, j * 1.84, 0, 0.06, g)); bx(3.7, 0.04, 0.03, cyan, 0, 2.46, 0.06, g); bx(3.7, 0.04, 0.03, cyan, 0, -2.46, 0.06, g);
+    liveBoards.push({ d, phase: idx * 0.5 });
   });
   /* ---- two visitors: one walks the aisle in a slow loop, one sits in the audience ---- */
   const visitors = [];
@@ -395,19 +396,25 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
     v.group.position.set(sx, 0.64 - v.hipsHeight, sz + 0.06); v.group.rotation.y = Math.PI;       /* faces the exit end of the hall, like every seat */
     visitors.push({ v, kind: "sit" });
   }).catch(() => {});
-  let audAcc = 0, audK = 0, audFirst = true;
+  /* a third visitor strolls the plaza outside the exit */
+  const plazaPts = [[cxA - 5.5, -34.0], [cxA + 5.5, -34.8], [cxA + 5.0, -36.4], [cxA - 5.0, -35.6]];
+  loadVisitorCopy().then((gl) => {
+    const v = createVisitor(T, gl, { mode: "walk", height: 1.7 }); aud.add(v.group); v.group.position.set(plazaPts[0][0], out.groundY(plazaPts[0][0], plazaPts[0][1]), plazaPts[0][1]);
+    visitors.push({ v, kind: "walk", pts: plazaPts, spd: 0.8, gy: true, i: 1, x: plazaPts[0][0], z: plazaPts[0][1], yaw: 0 });
+  }).catch(() => {});
+  let audAcc = 0, audFirst = true;
   function updateAud(t, dt, cam) {
-    if (!cam || cam.z > -4.5 || cam.z < -22.5) return;
+    if (!cam || cam.z > -4.5 || cam.z < -48) return;
     const sdt = Math.min(dt, 0.1);
     visitors.forEach((o) => {
       if (o.kind === "walk") {
-        const tg = walkPts[o.i], dx = tg[0] - o.x, dz = tg[1] - o.z, dl = Math.hypot(dx, dz), step = Math.min(dl, 0.95 * sdt);
-        if (dl < 0.15) o.i = (o.i + 1) % walkPts.length; else { o.x += dx / dl * step; o.z += dz / dl * step; }
+        const pts = o.pts || walkPts, tg = pts[o.i], dx = tg[0] - o.x, dz = tg[1] - o.z, dl = Math.hypot(dx, dz), step = Math.min(dl, (o.spd || 0.95) * sdt);
+        if (dl < 0.15) o.i = (o.i + 1) % pts.length; else { o.x += dx / dl * step; o.z += dz / dl * step; }
         let dy = Math.atan2(dx, dz) - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, sdt * 3.2);
-        o.v.group.position.x = o.x; o.v.group.position.z = o.z; o.v.group.rotation.y = o.yaw; o.v.update(sdt, 1);
+        o.v.group.position.x = o.x; o.v.group.position.z = o.z; if (o.gy) o.v.group.position.y = out.groundY(o.x, o.z); o.v.group.rotation.y = o.yaw; o.v.update(sdt, 1);
       } else o.v.update(sdt, 0);
     });
-    audAcc += dt; if (audFirst || audAcc > 0.1) { audFirst = false; audAcc = 0; paintTall(tall[audK]); audK ^= 1; }
+    audAcc += dt; if (cam.z > -22.5 && (audFirst || audAcc > 0.1)) { audFirst = false; audAcc = 0; liveBoards.forEach(paintLive); }
   }
 
   /* lights */
@@ -458,25 +465,39 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
     g.fillStyle = "rgba(54,214,255,.55)"; const sx = ((tn * 160) % (w + 200)) - 200; g.fillRect(sx, h - 6, 200, 3);
     d.t.needsUpdate = true;
   }
-  /* a tall screen: title, then three bed monitors (the live ones from the ICU) each with a line of what is running */
-  function paintTall(t) {
-    const g = t.d.g, w = 720, h = 1192, tn = performance.now() / 1000; g.fillStyle = "#050d16"; g.fillRect(0, 0, w, h);
-    const hd = g.createLinearGradient(0, 0, w, 0); hd.addColorStop(0, "#0b2a40"); hd.addColorStop(1, "#103a56"); g.fillStyle = hd; g.fillRect(0, 0, w, 56);
-    g.fillStyle = "#36d6ff"; g.font = "800 28px system-ui,sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText("LIVE UPDATES", 18, 29);
-    g.fillStyle = Math.sin(tn * 3) > -0.1 ? "#ff4d5e" : "#4a2a30"; g.beginPath(); g.arc(w - 176, 29, 7, 0, 7); g.fill();
-    g.fillStyle = "#d8ecff"; g.font = "700 20px ui-monospace,Menlo,monospace"; g.textAlign = "right"; g.fillText("BEDS " + (t.first + 1) + "–" + (t.first + 3) + "   " + clock(), w - 14, 30);
-    for (let k = 0; k < 3; k++) {
-      const p = P[t.first + k], y = 56 + k * 378; if (!p) continue;
-      if (H && H.mon) H.mon(g, p, w, 300, 0, y); else { g.fillStyle = "#020b12"; g.fillRect(0, y, w, 300); }
-      const v = p.v, map = Math.round((v.sbp + 2 * v.dbp) / 3), air = ({ imv: "Ventilator", niv: "NIV", hf: "High-flow oxygen", o2: "Oxygen" })[p.air] || "Room air";
-      g.fillStyle = "#0a1a28"; g.fillRect(0, y + 300, w, 78); g.fillStyle = col(p.st); g.fillRect(0, y + 300, 7, 78);
-      g.textAlign = "left"; g.textBaseline = "middle"; g.fillStyle = "#e5f4ff"; g.font = "700 23px system-ui,sans-serif"; g.fillText(p.dx.length > 38 ? p.dx.slice(0, 37) + "…" : p.dx, 22, y + 322);
-      g.fillStyle = "#8fb6cf"; g.font = "600 19px ui-monospace,Menlo,monospace"; g.fillText("MAP " + map + "  T " + (v.t != null ? Number(v.t).toFixed(1) : "–") + "°  " + air + (p.iv ? "  FiO₂ " + Math.round(p.fio2) + "%  PEEP " + p.peep : ""), 22, y + 356);
-      g.fillStyle = col(p.st); g.textAlign = "right"; g.font = "800 22px system-ui,sans-serif"; g.fillText(["STABLE", "WATCH", "CRITICAL"][p.st || 0], w - 16, y + 322);
-      g.fillStyle = "#36d6ff"; g.fillRect(0, y + 377, w, 1);
-    }
-    g.fillStyle = "rgba(54,214,255,.5)"; const sy = ((tn * 90) % (h + 120)) - 120; g.fillRect(0, sy, w, 2);
-    t.d.t.needsUpdate = true;
+  /* a LIVE UPDATES screen: the society feed from the app's home screen as cards that drift upward; two screens share the list half a cycle apart */
+  const LCOL = { SCCM: "#36d6ff", ESICM: "#27e0b0", KDIGO: "#ffb347", IDSA: "#c07bff", ATS: "#4aa8ff", ICMR: "#ff7a90", ARDS: "#ffd24a" };
+  const wrapTxt = (g, s, mw, maxL) => { const ws = String(s).split(" "), out = []; let l = ""; for (const w of ws) { const t = l ? l + " " + w : w; if (g.measureText(t).width > mw && l) { out.push(l); l = w; if (out.length === maxL) break; } else l = t; } if (out.length < maxL && l) out.push(l); else if (l && out.length === maxL) out[maxL - 1] = out[maxL - 1].replace(/\s*\S*$/, "") + "…"; return out; };
+  function paintLive(b) {
+    const g = b.d.g, w = 680, h = 920, tn = performance.now() / 1000, items = live.items(), CH = 176, total = Math.max(1, items.length) * CH;
+    g.fillStyle = "#040b14"; g.fillRect(0, 0, w, h);
+    const bgG = g.createLinearGradient(0, 0, 0, h); bgG.addColorStop(0, "rgba(20,70,110,.35)"); bgG.addColorStop(1, "rgba(4,11,20,0)"); g.fillStyle = bgG; g.fillRect(0, 0, w, h);
+    g.save(); g.beginPath(); g.rect(0, 92, w, h - 92 - 34); g.clip();
+    const sc = (tn * 22 + b.phase * total) % total;
+    for (let rep = -1; rep < 2; rep++) items.forEach((it, i) => {
+      const y = 100 + i * CH - sc + rep * total; if (y > h || y < 92 - CH) return;
+      const ac = LCOL[it.lane] || "#36d6ff", fy = y + CH - 14, edge = Math.min(1, Math.max(0.25, (y - 70) / 60));
+      g.globalAlpha = Math.min(1, edge, Math.max(0.25, (h - 40 - y) / 90));
+      g.fillStyle = "rgba(54,214,255,.07)"; g.fillRect(16, y, w - 32, CH - 14); g.fillStyle = ac; g.fillRect(16, y, 6, CH - 14);
+      g.fillStyle = ac; g.globalAlpha *= 0.18; g.fillRect(34, y + 14, 92, 40); g.globalAlpha = Math.min(1, edge);
+      g.fillStyle = ac; g.font = "800 22px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(it.lane, 80, y + 35);
+      g.textAlign = "left"; g.fillStyle = "#8fb6cf"; g.font = "600 17px system-ui,sans-serif"; g.fillText((it.topic || "").toUpperCase(), 140, y + 35);
+      if (it.fresh) { g.fillStyle = "#ff4d5e"; g.fillRect(w - 98, y + 17, 62, 26); g.fillStyle = "#fff"; g.font = "800 16px system-ui,sans-serif"; g.textAlign = "center"; g.fillText("NEW", w - 67, y + 31); }
+      g.textAlign = "left"; g.fillStyle = "#e9f6ff"; g.font = "700 24px system-ui,sans-serif";
+      wrapTxt(g, it.title, w - 90, 2).forEach((ln, k) => g.fillText(ln, 36, y + 76 + k * 30));
+      g.fillStyle = "#7fa6c8"; g.font = "500 17px system-ui,sans-serif"; const dt = (it.detail || "") + (it.when ? "  ·  " + it.when : ""); g.fillText(dt.length > 54 ? dt.slice(0, 53) + "…" : dt, 36, fy - 6);
+      g.globalAlpha = 1;
+    });
+    g.restore();
+    const hd = g.createLinearGradient(0, 0, w, 0); hd.addColorStop(0, "#0b2a40"); hd.addColorStop(1, "#124a6a"); g.fillStyle = hd; g.fillRect(0, 0, w, 84);
+    g.fillStyle = "#36d6ff"; g.fillRect(0, 84, w, 3);
+    g.fillStyle = "#36d6ff"; g.font = "800 40px system-ui,sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText("LIVE UPDATES", 24, 34);
+    g.fillStyle = "#8fb6cf"; g.font = "600 18px system-ui,sans-serif"; g.fillText("Guidelines and papers from the societies", 24, 64);
+    g.fillStyle = Math.sin(tn * 3) > -0.1 ? "#ff4d5e" : "#4a2a30"; g.beginPath(); g.arc(w - 150, 34, 9, 0, 7); g.fill();
+    g.fillStyle = "#e5f4ff"; g.font = "700 26px ui-monospace,Menlo,monospace"; g.textAlign = "right"; g.fillText(clock(), w - 22, 35);
+    g.fillStyle = "#06121f"; g.fillRect(0, h - 34, w, 34); g.fillStyle = "#7fa6c8"; g.font = "500 16px system-ui,sans-serif"; g.textAlign = "left"; g.fillText(items.length + " items  ·  SCCM  ESICM  KDIGO  IDSA  ATS  ICMR", 24, h - 17);
+    g.fillStyle = "rgba(54,214,255,.5)"; const sx = ((tn * 180) % (w + 220)) - 220; g.fillRect(sx, h - 4, 220, 3);
+    b.d.t.needsUpdate = true;
   }
   function paintStatus() {
     const g = status.g, w = 1024, h = 480; bg(g, w, h, "ICU STATUS BOARD");

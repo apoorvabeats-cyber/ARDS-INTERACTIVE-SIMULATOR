@@ -9,10 +9,11 @@ import { GLTFLoader } from "./vendor/GLTFLoader.js";
 import { createDevices } from "./icu-devices.js?v=20261120o";
 import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261120o";
 import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261120o";
-import { createSfx } from "./sfx.js?v=20261121e";
-import { createDesk, DESK } from "./nexus-desk.js?v=20261121e";
-import { paintMachine } from "./nexus-machines.js?v=20261121e";
-import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261121e";
+import { createSfx } from "./sfx.js?v=20261121g";
+import { CSS3DRenderer, CSS3DObject } from "./vendor/CSS3DRenderer.js?v=20261121g";
+import { createDesk, DESK } from "./nexus-desk.js?v=20261121g";
+import { paintMachine } from "./nexus-machines.js?v=20261121g";
+import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261121g";
 
 const $ = (s) => document.querySelector(s);
 const Q = new URLSearchParams(location.search), DEMO = Q.has("demo");
@@ -32,7 +33,9 @@ const coarse = typeof matchMedia === "function" && matchMedia("(pointer:coarse)"
 R.setPixelRatio(Math.min(devicePixelRatio || 1, coarse ? 1.75 : 2)); R.outputColorSpace = T.SRGBColorSpace; R.toneMapping = T.ACESFilmicToneMapping; R.toneMappingExposure = 1.02;
 const S = new T.Scene(); S.background = new T.Color(0x0b1824);
 const cam = new T.PerspectiveCamera(64, 1, 0.05, 60);
-const fit = () => { const w = innerWidth, h = innerHeight; R.setSize(w, h, false); cam.aspect = w / Math.max(1, h); cam.fov = cam.aspect < 0.8 ? 72 : 62; cam.updateProjectionMatrix(); };
+/* the docked section panels are real LCD screens standing in the hall beside the patient: the page elements are pinned into the 3D scene */
+const lcdScene = new T.Scene(), css3 = new CSS3DRenderer(), lcdEl = css3.domElement; lcdEl.id = "lcd"; document.body.appendChild(lcdEl);
+const fit = () => { const w = innerWidth, h = innerHeight; R.setSize(w, h, false); css3.setSize(w, h); cam.aspect = w / Math.max(1, h); cam.fov = cam.aspect < 0.8 ? 72 : 62; cam.updateProjectionMatrix(); };
 addEventListener("resize", fit); fit();
 
 /* ================================================================ materials and helpers */
@@ -350,7 +353,7 @@ function walkBy(d) {
     if (dot > 0.5) { const k = Math.min(0.7, d * 2.5); nx -= nx * k; let dy = Math.atan2(vx, -vz) - me.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); me.yaw += dy * Math.min(0.5, d * 1.5); }
   }
   const c = clampPos(nx, nz); me.x = c[0]; me.z = c[1]; }
-let dn = 0, mvd = 0, lx = 0, ly = 0, sx = 0, sy = 0, holdDir = 0, lastV = 0, mode = "", onPatient = false, onDesk = false, tileDown = null, spinV = 0, autoSpin = false, focus = null, retreat = false, lpT = 0, grab = null, gx = 0, held = false, lastMT = 0;
+let dn = 0, mvd = 0, lx = 0, ly = 0, sx = 0, sy = 0, holdDir = 0, lastV = 0, mode = "", onPatient = false, onDesk = false, tileDown = null, tileArmed = null, tileT = 0, spinV = 0, autoSpin = false, focus = null, retreat = false, lpT = 0, grab = null, gx = 0, held = false, lastMT = 0;
 const ray = new T.Raycaster(), ndc = new T.Vector2();
 const sfx = createSfx();
 const setRay = (cx, cy) => { ndc.set(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam); };
@@ -362,7 +365,9 @@ cv.addEventListener("pointerdown", (e) => {
   dn = 1; mvd = 0; lx = sx = e.clientX; ly = sy = e.clientY; holdDir = 0; mode = ""; spinV = 0; held = false; grab = null; gx = 0; lastMT = performance.now(); sfx.unlock();
   const dp = pointHitsPatient(e.clientX, e.clientY); setRay(e.clientX, e.clientY); const dd = odesk.hit(ray), pa = panelAt(e.clientX, e.clientY);
   onPatient = dp != null && (dd == null || dp < dd); onDesk = dd != null && (dp == null || dd < dp); tileDown = odesk.pick(ray);
-  clearTimeout(lpT);
+  clearTimeout(lpT); clearTimeout(tileT); tileT = 0; tileArmed = null;
+  /* a tile only answers a firm press: hold it for a second, then swipe left or right and its panel docks on that side of the body. A tap or a drag does not open anything. */
+  if (tileDown) tileT = setTimeout(() => { tileT = 0; if (dn && mvd < 10 && tileDown) { tileArmed = tileDown; navigator.vibrate && navigator.vibrate(20); sfx.beep && sfx.beep({ f: 660, vol: 0.4 }); const hh = $("#hint"); hh.style.opacity = 1; hh.textContent = "Now swipe left or right: the panel docks beside the body"; } }, 1000);
   if (pa && (dp == null || pa.d < dp) && (dd == null || pa.d < dd)) { onPatient = false; onDesk = false; lpT = setTimeout(() => { if (dn && mvd < 10) { grab = pa.p; grab.grab = 1; gx = 0; held = true; navigator.vibrate && navigator.vibrate(20); sfx.beep && sfx.beep({ f: 660, vol: 0.5 }); $("#hint").style.opacity = 1; $("#hint").textContent = "Swipe left or right to remove this panel"; } }, 480); }
   if (focus) { focus = null; retreat = true; }
   try { cv.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
@@ -371,15 +376,16 @@ cv.addEventListener("pointermove", (e) => {
   if (!dn) return; const dx = e.clientX - lx, dy = e.clientY - ly, now = performance.now(), dts = Math.max(0.008, (now - lastMT) / 1000); lx = e.clientX; ly = e.clientY; lastMT = now; mvd += Math.abs(dx) + Math.abs(dy);
   if (grab) { gx += dx; grab.dragX = gx * 0.006; if (Math.abs(gx) > 90) { removePanel(grab, Math.sign(gx)); grab.grab = 0; grab.dragX = 0; grab = null; $("#pnl").hidden = !panels.some((q) => !q.pop && (q.hidden || q.rm)); } return; }
   if (mvd > 10 && lpT) { clearTimeout(lpT); lpT = 0; }
-  if (!mode && mvd > 8) { const horiz = Math.abs(e.clientX - sx) > Math.abs(e.clientY - sy) * 1.1; mode = tileDown && horiz ? "dock" : onPatient && horiz ? "spin" : onDesk && horiz ? "orbit" : "walk"; }
+  if (mvd > 10 && tileT) { clearTimeout(tileT); tileT = 0; }
+  if (!mode && mvd > 8) { const horiz = Math.abs(e.clientX - sx) > Math.abs(e.clientY - sy) * 1.1; mode = tileArmed ? "dock" : onPatient && horiz ? "spin" : (onDesk || tileDown) && horiz ? "orbit" : "walk"; }
   if (mode === "docked") return;
-  if (mode === "dock") { const tdx = e.clientX - sx; if (Math.abs(tdx) > 52 && tileDown) { openSection(tileDown, 0, tdx < 0 ? "L" : "R"); tileDown = null; mode = "docked"; navigator.vibrate && navigator.vibrate(10); } return; }
+  if (mode === "dock") { const tdx = e.clientX - sx; if (Math.abs(tdx) > 52 && tileArmed) { openSection(tileArmed, 0, tdx < 0 ? "L" : "R"); tileArmed = null; tileDown = null; mode = "docked"; navigator.vibrate && navigator.vibrate(10); } return; }
   if (mode === "spin") { turn.rotation.y += dx * 0.011; spinV = dx * 0.011 * 40; autoSpin && setAuto(false); return; }
   if (mode === "orbit") { odesk.drag(dx * 0.0042, dts); return; }
   me.yaw -= dx * 0.006;
   if (Math.abs(dy) >= Math.abs(dx) * 0.5) { walkBy(-dy * 0.014); if (Math.abs(dy) >= 1) { holdDir = dy < 0 ? 1 : -1; lastV = performance.now(); } }
 });
-const stopHold = () => { dn = 0; holdDir = 0; clearTimeout(lpT); lpT = 0; if (grab) { grab.grab = 0; grab.dragX = 0; grab = null; } odesk.release(); };
+const stopHold = () => { dn = 0; holdDir = 0; clearTimeout(lpT); lpT = 0; clearTimeout(tileT); tileT = 0; if (tileArmed) { tileArmed = null; $("#hint").style.opacity = 0; } if (grab) { grab.grab = 0; grab.dragX = 0; grab = null; } odesk.release(); };
 cv.addEventListener("pointercancel", stopHold); cv.addEventListener("lostpointercapture", () => { holdDir = 0; }); addEventListener("blur", stopHold);
 cv.addEventListener("pointerup", (e) => { const was = mvd, h = held; stopHold(); if (was > 8 || h) return; tapAt(e.clientX, e.clientY); });
 function setAuto(on) { autoSpin = on; $("#spin").dataset.on = on ? "1" : "0"; }
@@ -440,7 +446,7 @@ let cardT = 0, sel = "";
 function card(html, ms) { const c = $("#card"); c.innerHTML = html; c.hidden = false; clearTimeout(cardT); cardT = setTimeout(() => { c.hidden = true; }, ms || 8000); }
 function tapAt(cx, cy) {
   setRay(cx, cy);
-  const tid = odesk.pick(ray); if (tid) { if (paneOf(tid)) closeSection(paneOf(tid).side); else openSection(tid); return; }
+  if (odesk.pick(ray)) return;     /* a tap on a label does nothing: it needs a firm press and a swipe */
   const docs = []; remotes.forEach((r) => { if (r.doc && r.doc.group.visible) docs.push(r.doc.group); });
   const hd = ray.intersectObjects(docs, true)[0];
   if (hd) { let o = hd.object; while (o && !o.userData.sid) o = o.parent; const r = o && remotes.get(o.userData.sid); if (r) { card(`<b>Dr ${esc(r.info.name)}</b><span>${esc(specInfo(r.info.spec)[0])}${r.near ? " · at the patient" : " · in the hall"}</span>`); return; } }
@@ -539,6 +545,16 @@ const sciCtx = () => ({ P, SC, eq, orders: mdt.orders, busy: mdt.busy, room: mdt
 const viewAz = () => Math.atan2(cam.position.x, cam.position.z);
 const panes = { L: { side: "L", el: $("#sciL"), id: "", sub: 0, key: "" }, R: { side: "R", el: $("#sci"), id: "", sub: 0, key: "" } };
 const paneList = [panes.L, panes.R];
+const LCD_W = 360, LCD_H = 480, LCD_K = 100, LCD_S = 1.3 * LCD_K / LCD_W, LCD_LAT = 1.3;     /* the CSS renderer counts one world unit as one pixel, so the little scene is built 100 times larger and viewed by a matching camera */
+const ccam = new T.PerspectiveCamera();
+/* each frame the two screens are put left and right of the patient, as seen from where you stand, and turned to face you */
+function placeLcd() {
+  const any = anyOpen(); lcdEl.style.display = any ? "" : "none"; if (!any) return;
+  const dx = cam.position.x, dz = cam.position.z, d = Math.hypot(dx, dz) || 1, rx = dz / d, rz = -dx / d, y = turn.position.y + 0.95, wd = clamp(0.3 * Math.hypot(d, cam.position.y), 1.3, 2.6);
+  paneList.forEach((q) => { if (!q.obj) return; const sd = q.side === "L" ? -1 : 1, lat = wd * 0.5 + 0.55; q.obj.scale.setScalar(wd * LCD_K / LCD_W); q.obj.position.set(rx * sd * lat * LCD_K, y * LCD_K, rz * sd * lat * LCD_K); q.obj.rotation.y = Math.atan2(cam.position.x * LCD_K - q.obj.position.x, cam.position.z * LCD_K - q.obj.position.z); q.obj.updateMatrixWorld(); });
+  ccam.position.copy(cam.position).multiplyScalar(LCD_K); ccam.quaternion.copy(cam.quaternion); ccam.projectionMatrix.copy(cam.projectionMatrix); ccam.projectionMatrixInverse.copy(cam.projectionMatrixInverse); ccam.updateMatrixWorld(true);
+  css3.render(lcdScene, ccam);
+}
 const openIds = () => paneList.map((q) => q.id).filter(Boolean);
 const anyOpen = () => openIds().length > 0;
 const paneOf = (id) => paneList.find((q) => q.id === id);
@@ -567,13 +583,14 @@ const renderAll = (force) => paneList.forEach((q) => renderSection(q, force));
 function openSection(id, sub, side) {
   if (!SECTIONS.some((x) => x.id === id)) return;
   side = side || (panes.R.id ? (panes.L.id ? "R" : "L") : "R");
-  const other = paneOf(id); if (other && other.side !== side) { other.id = ""; other.key = ""; other.el.hidden = true; other.el.classList.remove("in"); }
+  const other = paneOf(id); if (other && other.side !== side) { other.id = ""; other.key = ""; other.el.hidden = true; if (other.obj) other.obj.visible = false; }
   const q = panes[side], was = q.id; closeDock(); $("#card").hidden = true; q.id = id; q.sub = sub || 0; unseen[id] = 0; badgeAll(); syncOpen(); odesk.faceTile(id, viewAz()); $("#hint").style.opacity = 0;
-  renderSection(q, true); const el = q.el, sc = odesk.screenOf(id, cam); el.style.transformOrigin = sc ? Math.round(clamp(sc.x, 0, 1) * 100) + "% " + Math.round(clamp(sc.y, 0, 1) * 100) + "%" : "50% 100%"; el.hidden = false;
-  if (was !== id) { el.classList.remove("in"); void el.offsetWidth; el.classList.add("in"); } sfx.unlock(); sfx.beep && sfx.beep({ f: 880, vol: 0.25 });
+  renderSection(q, true); const el = q.el;
+  if (!q.obj) { q.obj = new CSS3DObject(el); q.obj.scale.setScalar(LCD_S); el.classList.add("lcd"); lcdScene.add(q.obj); }
+  el.hidden = false; q.obj.visible = true; sfx.unlock(); sfx.beep && sfx.beep({ f: 880, vol: 0.25 });
 }
 function closeSection(side) {
-  paneList.forEach((q) => { if (side && q.side !== side) return; q.id = ""; q.key = ""; q.el.hidden = true; q.el.classList.remove("in"); }); syncOpen();
+  paneList.forEach((q) => { if (side && q.side !== side) return; q.id = ""; q.key = ""; q.el.hidden = true; if (q.obj) q.obj.visible = false; }); syncOpen();
 }
 paneList.forEach((q) => q.el.addEventListener("click", (e) => {
   const t = e.target.closest("button,canvas"); if (!t) return;
@@ -623,7 +640,7 @@ function goAuditorium() {
     sessionStorage.setItem("ccu-pose", JSON.stringify({ to: "aud", x: AUD_X - me.z, z: ZC + me.x, yaw: me.yaw + Math.PI / 2, t: Date.now() }));
   } catch (e) {}
   if (net) { net.close(); net = null; }
-  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261121e";
+  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261121g";
 }
 function leave(type) { if (net) { net.close(); net = null; } post(type); }
 
@@ -642,7 +659,6 @@ function sounds(now) {
 }
 
 /* ================================================================ the loop */
-let stride = 0, lastStep = 0, px0 = me.x, pz0 = me.z;
 let vsh = 0, last = 0, sendT = 0, mvSpeed = 0, px = me.x, pz = me.z, bobT = 0, t0 = performance.now(), shown = false, panelT = 0;
 const camTarget = new V(), organPos = new V();
 function loop(now) {
@@ -658,10 +674,8 @@ function loop(now) {
   else { vpCur += (vp - vpCur) * Math.min(1, dt * 4); const rr0 = Math.hypot(me.x, me.z) || 1, fade = arrive.t < 2.4 ? 0 : clamp((10.0 - rr0) / 2.2, 0, 1), eyeG = Math.max(1.6, Math.min(5.4, 1 + rr0 * Math.tan(vpCur))), eyeT = 1.6 + (eyeG - 1.6) * fade, pitT = vpCur * fade > 0.02 ? -Math.atan((eyeG - 1) / rr0) * fade : 0; me.h += (eyeT - me.h) * Math.min(1, dt * 3); me.pit += (pitT - me.pit) * Math.min(1, dt * 3); if (goal) { const k = 1 - Math.exp(-dt * 2.6); me.x += (goal.x - me.x) * k; me.z += (goal.z - me.z) * k; let dy = faceCenter(me.x, me.z) - me.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); me.yaw += dy * k; if (Math.hypot(goal.x - me.x, goal.z - me.z) < 0.03) goal = null; } if (retreat) { const r = Math.hypot(me.x, me.z); if (r < MINR - 0.01) { const k = Math.min(1, dt * 2.4), nr = r + (MINR - r) * k; me.x *= nr / (r || 1); me.z *= nr / (r || 1); } else retreat = false; } }
   eyeH = me.h; pit = me.pit;
   const sp = Math.hypot(me.x - px, me.z - pz) / Math.max(dt, 0.001); mvSpeed += (sp - mvSpeed) * Math.min(1, dt * 8); px = me.x; pz = me.z;
-  if (mvSpeed > 0.2 && mode !== "spin" && mode !== "orbit" && mode !== "dock" && !focus && arrive.t >= 2.4) { stride += Math.hypot(me.x - px0, me.z - pz0); if (stride > 0.4 && now - lastStep > 230) { stride = 0; lastStep = now; sfx.step(Math.min(1, 0.7 + mvSpeed * 0.2)); } } else stride = Math.min(stride, 0.2);
-  px0 = me.x; pz0 = me.z;
   bobT += mvSpeed * dt * 2.2; const bob = focus ? 0 : Math.sin(bobT * 3.0) * 0.016 * Math.min(1, mvSpeed);
-  { const w = innerWidth, h = innerHeight, pt = cam.aspect < 0.8; const sd = (panes.R.id ? 1 : 0) - (panes.L.id ? 1 : 0); vsh += ((anyOpen() ? 1 : 0) - vsh) * Math.min(1, dt * 5); if (vsh > 0.004) cam.setViewOffset(w, h, pt ? 0 : w * 0.2 * vsh * sd, pt ? h * 0.2 * vsh : 0, w, h); else if (cam.view) cam.clearViewOffset(); }
+  if (cam.view) cam.clearViewOffset();
   cam.position.set(me.x, eyeH + bob, me.z); cam.rotation.order = "YXZ"; cam.rotation.set(focus ? Math.atan2(focus.c.y - eyeH, Math.hypot(focus.c.x - me.x, focus.c.z - me.z)) * 0.8 : pit, -me.yaw, 0);
   if (!focus && eyeH > 1.7) cam.position.y = eyeH + bob * 0.3;
   /* the patient: turntable, breathing, heartbeat, status colour */
@@ -691,7 +705,7 @@ function loop(now) {
     const v = Math.hypot(r.x - ox, r.z - oz) / Math.max(dt, 0.001); r.doc.setMoving(Math.min(1, v / 1.6)); r.doc.group.position.set(r.x, 0, r.z); r.doc.group.rotation.y = Math.PI - r.yaw; r.doc.update(dt);
     if (performance.now() - r.last > 15000 && r.info && !r.info.connected) r.doc.group.visible = false;
   });
-  sounds(now); R.render(S, cam);
+  sounds(now); R.render(S, cam); placeLcd();
   if (!shown && bodyReady) { shown = true; arrive.t0 = performance.now(); requestAnimationFrame(() => $("#veil").classList.add("off")); }
 }
 requestAnimationFrame(loop);
