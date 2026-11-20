@@ -61,7 +61,7 @@ input[type=range]{width:100%}
 <canvas id="gl"></canvas>
 <canvas id="flat-gl" aria-hidden="true"></canvas>
 <div id="door"><h1>Intensive Care Unit</h1><div class="frame" id="dr" style="background:radial-gradient(#39e6ff66,#02060f)"><div class="leaf l"></div><div class="leaf r"></div></div><p>Six patients. One doctor.</p><button id="enter">Enter the ICU</button></div>
-<div id="top"><b>ICU · Sim</b><button id="home" type="button">Universe</button><button data-m="cmd">Command center</button><button data-m="ward">ICU</button><span id="hud">0:00 · 0/6</span><details id="settings-menu"><summary>Options</summary><div id="audio-controls"><button id="zoom-wall" type="button" aria-pressed="true">Fit wall</button><button id="flat-toggle" type="button" aria-pressed="false">2D view</button><button id="voice" type="button" aria-pressed="true">Voice on</button><button id="alarm" type="button" aria-pressed="true">Alarms on</button></div></details></div>
+<div id="leave" style="position:fixed;inset:0;z-index:8;background:#050b18;opacity:0;pointer-events:none;transition:opacity .9s"></div><div id="top"><b>ICU · Sim</b><button id="home" type="button">Universe</button><button data-m="cmd">Command center</button><button data-m="ward">ICU</button><span id="hud">0:00 · 0/6</span><details id="settings-menu"><summary>Options</summary><div id="audio-controls"><button id="zoom-wall" type="button" aria-pressed="true">Fit wall</button><button id="flat-toggle" type="button" aria-pressed="false">2D view</button><button id="voice" type="button" aria-pressed="true">Voice on</button><button id="alarm" type="button" aria-pressed="true">Alarms on</button><button id="snd" type="button" aria-pressed="true">Sound on</button></div></details></div>
 <div id="toast"></div>
 <div id="hint"></div>
 <div id="photo"><div id="pw"><div id="pb"></div><canvas id="pc" width="640" height="360" aria-hidden="true"></canvas><canvas id="iv" width="1280" height="720" aria-hidden="true"></canvas><canvas id="pl" width="720" height="508"></canvas><canvas id="pr" width="300" height="200"></canvas><div id="pi"></div></div></div>
@@ -98,9 +98,10 @@ import * as THREE from './three.module.js';
 import {FOLLOW_UPS,DISTRACTORS} from './case-decisions.js';
 import {ORDER_CASES,assessOrder} from './clinical-orders.js?v=20261115a';
 import {createCaseVoice} from './case-voice.mjs';
-import {createAnnouncer} from './alarm-voice.mjs?v=20261120g';
-import {buildWard} from './ward3d.js?v=20261120g';
-import {buildSuite} from './command3d.js?v=20261120g';
+import {createAnnouncer} from './alarm-voice.mjs?v=20261120h';
+import {buildWard} from './ward3d.js?v=20261120h';
+import {buildSuite} from './command3d.js?v=20261120h';
+import {createSfx} from './sfx.js?v=20261120h';
 const $=s=>document.querySelector(s),V=THREE.Vector3,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 function updateLayout(){
  document.documentElement.style.setProperty('--top-height',$('#top').getBoundingClientRect().height+'px');
@@ -279,7 +280,7 @@ function drawBed(i){const p=P[i],b=B[i],c=b.ctx,W=1280,H=720,im=(typeof bedShot=
  b.tex.needsUpdate=true}
 
 // camera modes
-let arrive=null,ent=0,mode='cmd',yaw=0,pit=0,cmdYaw=0,cmdPit=0,cur=null,transit=null,voiceOn=true,alarmOn=true,wallZoom=true;const tp=new V(),tl=new V(),lk=new V(100,4,-8),wp=new V(0,0,0);let bobT=0;const WALK='Swipe up to walk · drag sideways to look · tap a door, bed or monitor';let suite=null;
+let arrive=null,ent=0,mode='cmd',yaw=0,pit=0,cmdYaw=0,cmdPit=0,cur=null,transit=null,voiceOn=true,alarmOn=true,wallZoom=true;const tp=new V(),tl=new V(),lk=new V(100,4,-8),wp=new V(0,0,0);let bobT=0;const WALK='Swipe up to walk · drag sideways to look · tap a door, bed or monitor';let suite=null,gyS=0,START_AUD=/[?&]start=aud/.test(location.search);const OUTH='Swipe up to walk · drag to look around · turn round to see the building · keep walking ahead to leave';
 const voiceController='speechSynthesis' in window&&'SpeechSynthesisUtterance' in window?createCaseVoice(window.speechSynthesis,window.SpeechSynthesisUtterance,reason=>{console.warn('Case narration did not start:',reason);$('#voice-status').textContent=$('#replay-voice').hidden?'Voice could not start.':'Voice could not start. Tap Replay case voice.';$('#voice-status').hidden=false}):null;
 // hall announcer: female PA voice reading the red banners, with a reverberant chime (see alarm-voice.mjs)
 let pendingNarration=null,hallBus=null;
@@ -317,7 +318,7 @@ function fitView(){return;if(!v3)return;const w=cv.clientWidth,h=cv.clientHeight
 function walkBy(d){if(mode!=='ward'||transit)return;const nx=wp.x+Math.sin(yaw)*d,nz=wp.z-Math.cos(yaw)*d;if(suite){const c=suite.clamp(nx,nz);wp.x=c[0];wp.z=c[1]}else{wp.x=clamp(nx,-7.3,7.3);wp.z=clamp(nz,-2.7,2.7)}}
 function tgt(){
  if(mode=='cmd'){const W=14,H=14*(845/1500),half=Math.tan(36*Math.PI/180),fit=Math.max(H/2/half,W/2/(half*cam.aspect)),d=fit*(wallZoom?(cam.aspect<1?.42:.76):1.04);tp.set(100,H/2,-8+d);tl.set(100+Math.sin(cmdYaw)*W*0.48,H/2+Math.sin(cmdPit)*H*0.3,-8)}
- else if(mode=='ward'){tp.set(wp.x,1.6,wp.z);tl.set(wp.x+Math.sin(yaw)*Math.cos(pit),1.6+Math.sin(pit),wp.z-Math.cos(yaw)*Math.cos(pit))}
+ else if(mode=='ward'){tp.set(wp.x,1.6+gyS,wp.z);tl.set(wp.x+Math.sin(yaw)*Math.cos(pit),1.6+gyS+Math.sin(pit),wp.z-Math.cos(yaw)*Math.cos(pit))}
  else if(ward&&mode=='bed'&&v3){const c=ward.bedCenter(cur),hz=Math.cos(orb.el)*orb.r;tp.set(c.x+Math.sin(orb.az)*hz,c.y+Math.sin(orb.el)*orb.r,c.z+Math.cos(orb.az)*hz);tl.copy(c)}
  else if(ward){tp.copy(ward.inside(cur));tl.copy(ward.look(cur))}else{const g=B[cur].g;tp.copy(g.position).multiplyScalar(-0.18);tp.y=1.62;tl.copy(g.position);tl.y=1.5}}
 function go(m,i){
@@ -338,12 +339,14 @@ go('cmd');
 
 // input
 const ray=new THREE.Raycaster(),mv2=new THREE.Vector2();let dn=0,mv=0,lx=0,ly=0,ac;
-function unlockAudio(){try{const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;ac=ac||new Audio();if(ac.state==='suspended')ac.resume().catch(e=>console.warn('Unable to enable alarm audio:',e))}catch(e){console.warn('Unable to enable alarm audio:',e)}}
+const sfx=createSfx();
+function unlockAudio(){sfx.unlock();try{const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;ac=ac||new Audio();if(ac.state==='suspended')ac.resume().catch(e=>console.warn('Unable to enable alarm audio:',e))}catch(e){console.warn('Unable to enable alarm audio:',e)}}
 document.addEventListener('pointerdown',unlockAudio,{once:true});
 document.addEventListener('pointerdown',()=>{if(voiceOn&&voiceController)voiceController.prime()});
-cv.onpointerdown=e=>{dn=1;mv=0;lx=e.clientX;ly=e.clientY};
-cv.onpointermove=e=>{if(!dn)return;const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;mv+=Math.abs(dx)+Math.abs(dy);if(mode=='bed'&&v3&&pts.size<2){orb.az-=dx*.008;orb.el=clamp(orb.el+dy*.006,-.2,1.35)}else if(mode=='ward'&&!transit){yaw-=dx*.006;if(Math.abs(dy)>=Math.abs(dx)*.5)walkBy(-dy*.014)}else if(mode=='cmd'&&!arrive){cmdYaw=clamp(cmdYaw-dx*.0032,-1.05,1.05);cmdPit=clamp(cmdPit-dy*.002,-.42,.42)}};
-cv.onpointercancel=()=>dn=0;
+let holdDir=0,lastVMove=0;
+cv.onpointerdown=e=>{dn=1;mv=0;lx=e.clientX;ly=e.clientY;holdDir=0;try{cv.setPointerCapture(e.pointerId)}catch(_){}};
+cv.onpointermove=e=>{if(!dn)return;const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;mv+=Math.abs(dx)+Math.abs(dy);if(mode=='bed'&&v3&&pts.size<2){orb.az-=dx*.008;orb.el=clamp(orb.el+dy*.006,-.2,1.35)}else if(mode=='ward'&&!transit){yaw-=dx*.006;if(Math.abs(dy)>=Math.abs(dx)*.5){walkBy(-dy*.014);if(Math.abs(dy)>=1){holdDir=dy<0?1:-1;lastVMove=performance.now()}}}else if(mode=='cmd'&&!arrive){cmdYaw=clamp(cmdYaw-dx*.0032,-1.05,1.05);cmdPit=clamp(cmdPit-dy*.002,-.42,.42)}};
+cv.onpointercancel=()=>{dn=0;holdDir=0};cv.addEventListener('lostpointercapture',()=>{holdDir=0});addEventListener('blur',()=>{dn=0;holdDir=0});
 const pts=new Map();let pd0=0;
 cv.addEventListener('pointerdown',e=>{pts.set(e.pointerId,[e.clientX,e.clientY]);if(pts.size===2){const a=[...pts.values()];pd0=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1])}});
 cv.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,[e.clientX,e.clientY]);if(pts.size===2&&mode==='bed'&&v3){const a=[...pts.values()],d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(pd0>0&&d>0)orb.r=clamp(orb.r*pd0/d,.75,1.6);pd0=d;mv+=20}});
@@ -351,7 +354,7 @@ cv.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;pts.set(e.
 cv.addEventListener('wheel',e=>{if(mode==='bed'&&v3){e.preventDefault();orb.r=clamp(orb.r*Math.exp(e.deltaY*.0012),.75,1.6)}else if(mode==='ward'&&!transit){e.preventDefault();walkBy(-clamp(e.deltaY,-120,120)*.004)}},{passive:false});
 addEventListener('keydown',e=>{if(mode!=='ward'||transit||/INPUT|SELECT|TEXTAREA/.test((e.target||{}).tagName||''))return;const k=e.key;if(k==='ArrowUp'||k==='w'||k==='W')walkBy(.45);else if(k==='ArrowDown'||k==='s'||k==='S')walkBy(-.45);else if(k==='ArrowLeft'||k==='a'||k==='A')yaw-=.12;else if(k==='ArrowRight'||k==='d'||k==='D')yaw+=.12;else return;e.preventDefault()});
 $('#v3d').onclick=()=>setV3(!v3);addEventListener('resize',fitView);
-cv.onpointerup=e=>{dn=0;if(mv>8||arrive||transit)return;const r=cv.getBoundingClientRect();mv2.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(mv2,cam);
+cv.onpointerup=e=>{dn=0;holdDir=0;if(mv>8||arrive||transit)return;const r=cv.getBoundingClientRect();mv2.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(mv2,cam);
  if(mode==='bed'&&v3&&ward&&ward.select){const nm=ward.select(cur,ray),tg=$('#v3tag');tg.textContent=nm?'Selected: '+nm:'';tg.style.display=nm?'block':'none';return}
  const h=ray.intersectObjects(S.children,true).find(o=>o.object.visible&&((mode==='cmd'&&(o.object===scr||o.object.userData.command))||(mode==='ward'&&(o.object.userData.bed!=null||o.object.userData.door!=null||o.object.userData.cmdBed!=null))));if(!h)return;
  if(mode=='cmd'&&h.object.userData&&h.object.userData.command&&h.uv){var uu=h.uv.x,vv=1-h.uv.y,sc=h.object.userData.screens||[];for(var kk=0;kk<sc.length;kk++){var rr=sc[kk];if(uu>=rr.x&&uu<=rr.x+rr.w&&vv>=rr.y&&vv<=rr.y+rr.h){openFromWall(rr.bed);break}}}
@@ -373,6 +376,7 @@ function speakCase(){if(cur!=null&&!P[cur].done){const p=P[cur];speak(p.n+'. '+p
 $('#replay-voice').onclick=speakCase;
 $('#voice').onclick=()=>{voiceOn=!voiceOn;$('#voice').textContent=voiceOn?'Voice on':'Voice off';$('#voice').setAttribute('aria-pressed',String(voiceOn));$('#replay-voice').hidden=!voiceOn||cur==null||P[cur].done;$('#voice-status').hidden=true;if(!voiceOn)stopVoice();else speakCase()};
 if(!voiceController){$('#voice').disabled=true;$('#voice').textContent='Voice unavailable';voiceOn=false}
+$('#snd').onclick=()=>{const on=!sfx.isOn();sfx.setOn(on);$('#snd').textContent=on?'Sound on':'Sound off';$('#snd').setAttribute('aria-pressed',String(on));if(on)unlockAudio()};
 $('#alarm').onclick=()=>{alarmOn=!alarmOn;$('#alarm').textContent=alarmOn?'Alarms on':'Alarms off';$('#alarm').setAttribute('aria-pressed',String(alarmOn));if(alarmOn)unlockAudio();else if(announcer)announcer.stop();scheduleAlarm()};
 function setTreatmentEnabled(enabled){document.querySelectorAll('#t0 button,#t1 input,#t1 button,#order-submit').forEach(e=>e.disabled=!enabled)}
 // One journey. Primary, then secondary, then tertiary for every case. A correct step steadies the patient. Tertiary is the advanced stage, not a penalty.
@@ -567,13 +571,44 @@ setInterval(()=>{if(!ent)return;T++;
  $('#hud').textContent=Math.floor(T/60)+':'+String(T%60).padStart(2,'0')+' · '+P.filter(p=>p.done).length+'/6';
  if(cur!=null){evu();labs();renderOrders(false);showVentMech(P[cur])}},1000);
 
+let nBeep=0,nAlert=0,bi=0,leaving=false;
+function bedPos(i){const b=ward.BP(i);return{x:b[0],z:b[1]}}
+function soundscape(now){
+ if(!suite||flatMode||!sfx.isOn())return;
+ if(ward)ward.cubicles.forEach(q=>{if(q._tp!==q.target){if(q._tp!==undefined){const b=ward.BP(q.i);sfx.door(q.target>0,{x:b[0],z:b[1]},.75)}q._tp=q.target}});
+ const c=cam.position;
+ if(mode==='bed'&&cur!=null&&P[cur]){const p=P[cur];
+  if(now>nBeep){sfx.beep({f:[880,1046,1175][p.st||0],vol:.8});nBeep=now+60000/Math.max(40,p.v.hr)}
+  if(alarmOn&&p.st>0&&!p.done&&now>nAlert){sfx.alert(p.st>1?2:1);nAlert=now+7000+Math.random()*3000}
+  return}
+ if(mode!=='ward'&&mode!=='travel')return;
+ const hall=c.x>-8.7&&Math.abs(c.z)<4,room=c.x<=-8.7&&c.z>-5.6&&c.z<5.6;
+ if(!hall&&!room)return;
+ if(now>nBeep){const i=bi++%6,p=P[i],st=p.st||0;sfx.beep({f:[740,880,1046][st]*(1+i*.035),vol:(hall?.9:.55)*[.5,.75,.95][st],pos:hall?bedPos(i):{x:-20.4,z:(i%3-1)*2.4}});nBeep=now+(hall?520:820)+Math.random()*380}
+ if(alarmOn&&now>nAlert){const bad=P.map((p,i)=>[p,i]).filter(a=>!a[0].done&&a[0].st>0);if(bad.length){const[p,i]=bad[Math.floor(Math.random()*bad.length)];sfx.alert(p.st>1?2:1,hall?bedPos(i):{x:-20.4,z:(i%3-1)*2.4})}nAlert=now+6500+Math.random()*4500}}
+function outdoorLogic(){
+ if(!suite||flatMode)return;
+ const D=suite.doors,c=cam.position,ou=suite.outdoor,outside=c.z<-21.9&&c.x<-8.7;
+ if(D.exit.target>0&&!outside&&c.z>-17.5&&mode!=='travel')D.exit.target=0;
+ if(D.exit.open>.05&&D.exit.target>0)sfx.startOutdoor(ou.info.phase);
+ else if(D.exit.open<.02&&D.exit.target===0&&sfx.outdoorOn())sfx.stopOutdoor();
+ if(!outside){if(!leaving)$('#leave').style.opacity=0;sfx.outdoorGain(.3);return}
+ const ex=ou.exitness(wp.x,wp.z);
+ if(mode==='ward'&&!transit&&!leaving){
+  sfx.outdoorGain(1-ex*.9);
+  $('#leave').style.opacity=ex>.3?String((ex-.3)/.7):'0';
+  const hint=ex>.2?'Keep walking to leave the Universe':OUTH;if($('#hint').textContent!==hint)$('#hint').textContent=hint;
+  if(ex>=.97){leaving=true;$('#leave').style.opacity=1;sfx.stopOutdoor();setTimeout(()=>{if(parent!==window)parent.postMessage('universe-home','*');else location.href='../index.html?home=1'},950)}}}
 let last=0,fr=0,updateWall=()=>{};
 function loop(t){requestAnimationFrame(loop);if(t-last<1000/30-.5)return;const dt=Math.min((t-last)/1000,.1);last=t;
+ if(dn&&holdDir&&mode==='ward'&&!transit&&mv>10&&performance.now()-lastVMove>120)walkBy(holdDir*dt*1.7);
+ if(suite)gyS+=(suite.groundY(cam.position.x,cam.position.z)-gyS)*.16;
+ soundscape(performance.now());outdoorLogic();
  if(transit){
   const progress=clamp((t-transit.start)/transit.duration,0,1),ease=progress*progress*(3-2*progress);
   if(transit.stage==='turn'){yaw=transit.fromYaw+(transit.toYaw-transit.fromYaw)*ease;tl.set(Math.sin(yaw),1.6,-Math.cos(yaw));lk.copy(tl)}
   else{cam.position.lerpVectors(transit.from,transit.to,ease);lk.lerpVectors(transit.lookFrom,transit.lookTo,ease)}
-  if(/^(door-walk|door-through|leg)$/.test(transit.stage)){bobT+=dt*7.5;cam.position.y=1.6+Math.sin(bobT)*.022}
+  if(/^(door-walk|door-through|leg)$/.test(transit.stage)){bobT+=dt*7.5;cam.position.y=1.6+gyS+Math.sin(bobT)*.022}
   if(progress===1){const i=transit.bed,pose=BP(i);
    if(/^(door-|leg)/.test(transit.stage))doorNext(t);
    else if(transit.stage==='wall'){const targetYaw=Math.atan2(pose[0],-pose[1]);yaw=targetYaw-Math.PI*2;pit=0;go('ward');mode='travel';transit={bed:i,stage:'turn',start:t,duration:2400,fromYaw:yaw,toYaw:targetYaw}}
@@ -582,11 +617,12 @@ function loop(t){requestAnimationFrame(loop);if(t-last<1000/30-.5)return;const d
    else if(transit.stage==='open')transit={bed:i,stage:'enter',start:t,duration:1500,from:cam.position.clone(),to:ward?ward.inside(i):cam.position.clone(),lookFrom:lk.clone(),lookTo:ward?ward.look(i):lk.clone()}
    else if(transit.stage==='out'){ward&&ward.setDoor(i,false);yaw=BA[i];pit=0;mode='ward';transit=null;updateFov();wp.set(cam.position.x,0,cam.position.z);$('#hint').textContent=WALK}
    else go('bed',i)}
- }else{tgt();const px=cam.position.x,pz=cam.position.z;cam.position.lerp(tp,.07);lk.lerp(tl,.1);if(mode==='ward'){const sp=Math.hypot(cam.position.x-px,cam.position.z-pz)/Math.max(dt,.001);bobT+=Math.min(sp,2.2)*dt*5.2;cam.position.y=1.6+Math.sin(bobT)*.024*Math.min(1,sp/.9)}}
+ }else{tgt();const px=cam.position.x,pz=cam.position.z;cam.position.lerp(tp,.07);lk.lerp(tl,.1);if(mode==='ward'){const sp=Math.hypot(cam.position.x-px,cam.position.z-pz)/Math.max(dt,.001);bobT+=Math.min(sp,2.2)*dt*5.2;cam.position.y=1.6+gyS+Math.sin(bobT)*.024*Math.min(1,sp/.9)}}
+{const dvx=lk.x-cam.position.x,dvz=lk.z-cam.position.z;sfx.setListener(cam.position.x,cam.position.z,Math.atan2(dvx,-dvz))}
  cam.lookAt(lk);
  P.forEach(p=>{p.ph+=dt*p.v.hr/60;p.vp+=dt*p.v.rr/60;const f=((p.vp%1)+1)%1;p.vo=f<.38?.5-.5*Math.cos(Math.PI*f/.38):.5+.5*Math.cos(Math.PI*(f-.38)/.62)});
  if(mode==='cmd')updateWall(t);
- else if(ward&&!flatMode){if(suite)suite.update(t/1000,dt);ward.loadHumans();const dv=lk.clone().sub(cam.position);ward.update(t/1000,dt,Math.atan2(dv.x,-dv.z),mode==='bed')}
+ else if(ward&&!flatMode){if(suite)suite.update(t/1000,dt,cam.position);ward.loadHumans();const dv=lk.clone().sub(cam.position);ward.update(t/1000,dt,Math.atan2(dv.x,-dv.z),mode==='bed')}
  if(fr++%2==0){
   P.forEach((p,i)=>{if(flatMode&&(mode=='ward'||mode=='travel')&&Math.abs(((BA[i]-yaw+Math.PI*3)%(Math.PI*2))-Math.PI)<1.3)drawBed(i);if(scr.visible)mon(sx,p,340,256,(i%C)*340,Math.floor(i/C)*256)});
   if(scr.visible)stex.needsUpdate=true;if(cur!=null)phd(P[cur])}
@@ -623,11 +659,13 @@ function ivEquipment(p){
  return{bags,pumps,doses};
 }
 try{ward=buildWard(THREE,S,R,P,{mon,rdr,equip:ivEquipment});B.forEach((b,i)=>b.lamp=ward.lamps[i])}catch(e){console.error('3D ward failed; using photo beds.',e);ward=null;B.forEach(b=>b.g.visible=true)}
-try{if(ward){suite=buildSuite(THREE,S,P,{mon},ward.env,{gateSet:a=>ward.setGate(a)});
+try{if(ward){suite=buildSuite(THREE,S,P,{mon},ward.env,{gateSet:a=>ward.setGate(a),onDoor:(d,o)=>sfx.door(o,{x:d.center.x,z:d.center.z},d.id==='gate'?1.1:1)});
  const D=suite.doors,cxA=-15.3;
  D.hub.go=()=>{if(parent!==window)parent.postMessage('universe-hub','*');else location.href='../../hub.html'};
  D.team.go=()=>{if(parent!==window)parent.postMessage('universe-team','*');else toast('The Multidisciplinary Team room opens from the Universe app.')};
- D.cmd.noThrough=true;D.cmd.go=()=>{D.aud.target=1;startRoute([turnLeg([1,0]),{p:new V(cxA,1.6,-8.4),look:new V(cxA,1.5,-4)},{p:new V(cxA,1.6,-3.3),look:new V(-20.4,1.7,-3.3)}])}}}catch(e){console.error('3D command suite failed; using the photo command centre.',e);suite=null}
+ D.exit.noThrough=true;D.exit.go=()=>{const outside=cam.position.z<-21.8;
+  if(!outside)startRoute([{p:new V(cxA,1.6,-22.1),look:new V(cxA,1.6,-30),dur:2000},{p:new V(cxA,1.6,-25.6),look:new V(cxA,1.5,-34),dur:1900}],()=>{$('#hint').textContent=OUTH});
+  else startRoute([{p:new V(cxA,1.6,-19.4),look:new V(cxA,1.5,-12),dur:2200}])}}}catch(e){console.error('3D command suite failed; using the photo command centre.',e);suite=null}
 function endWalk(){const p=cam.position,v=lk.clone().sub(p);yaw=Math.atan2(v.x,-v.z);pit=0;wp.set(p.x,0,p.z);mode='ward';transit=null;updateFov();$('#hint').textContent=WALK}
 function useDoor(d){
  if(transit||!suite||!d||flatMode||mode!=='ward')return;
@@ -782,7 +820,7 @@ scr.visible=true;
 var _goBeds=go,_goPrev=null;
 function stand(x,z,yw){wp.set(x,0,z);yaw=yw;pit=0;if(suite){suite.doors.gate.target=1;suite.doors.gate.set(1)}}
 go=function(m,i){
- if(m==='cmd'&&suite&&!flatMode){if(mode==='bed'){mode='travel';ward.closeAll()}m='ward';stand(-10.7,0,-Math.PI/2)}
+ if(m==='cmd'&&suite&&!flatMode){if(mode==='bed'){mode='travel';ward.closeAll()}m='ward';if(START_AUD){START_AUD=false;stand(-15.3,-7.2,0)}else stand(-10.7,0,-Math.PI/2)}
  else if(m==='ward'&&suite&&!flatMode&&mode!=='bed'&&mode!=='transit'&&mode!=='travel'&&(mode==='cmd'||cam.position.x<-8.6))stand(-6.8,0,Math.PI/2);
  else if(m==='ward'&&mode==='transit')wp.set(0,0,0);
  if(m==='ward'&&mode==='bed'&&ward&&cur!=null){const b=cur;_goBeds('travel');mode='travel';transit={bed:b,stage:'out',start:performance.now(),duration:1300,from:cam.position.clone(),to:ward.approach(b),lookFrom:lk.clone(),lookTo:ward.look(b)};return}

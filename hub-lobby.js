@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { createSfx } from "./critical-care-universe/universe/sfx.js?v=20261120h";
 
 const gate = document.getElementById("icu-gate");
 const canvas = document.getElementById("lobby");
@@ -14,7 +15,11 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   renderer.toneMappingExposure = 1.0;
 
   /* one vivid colour per door, used on the door, its feature wall, its floor path and its lights */
-  const ACC = { icu: 0x12e3c8, path: 0xa073ff, micro: 0x7be34f, rad: 0x3f8cff };
+  const ACC = { icu: 0x12e3c8, micro: 0x7be34f, rad: 0x3f8cff, aud: 0xffb347, path: 0xa073ff };
+  /* a pentagon: five doors, each on its own wall. theta is the compass angle of the door seen from the middle (0 = straight ahead, clockwise). */
+  const KINDS = ["icu", "micro", "rad", "aud", "path"], THETA = {}, N5 = 5, APO = 5.8, DOORR = APO - 0.18, SIDE = 2 * APO * Math.tan(Math.PI / N5), RC = (APO - 0.02) / Math.cos(Math.PI / N5), RT = 7.3;
+  KINDS.forEach((k, i) => { THETA[k] = i * 2 * Math.PI / N5; });
+  const sfx = createSfx();
   const hex = (n) => "#" + n.toString(16).padStart(6, "0");
   const tex = (c) => {
     const t = new THREE.CanvasTexture(c);
@@ -30,8 +35,8 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   };
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x0a1626, 16, 30);
-  const camera = new THREE.PerspectiveCamera(56, 1, 0.08, 40);
+  scene.fog = new THREE.Fog(0x0a1626, 18, 34);
+  const camera = new THREE.PerspectiveCamera(56, 1, 0.08, 44);
   scene.add(new THREE.HemisphereLight(0xf4f8ff, 0x7d93b4, 1.25));
   const sun = new THREE.DirectionalLight(0xffffff, 0.9);
   sun.position.set(2, 8, 3);
@@ -52,7 +57,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
 
   /* ---------- floor: deep navy terrazzo, a medical-cross medallion and a lit path to every door ---------- */
   const floorTex = (() => {
-    const S = 1024, [c, g] = cnv(S, S), px = S / 10;
+    const S = 1024, [c, g] = cnv(S, S), px = S / 10, ppm = S / (2 * RT);
     const bg = g.createRadialGradient(S / 2, S / 2, 20, S / 2, S / 2, S * 0.72);
     bg.addColorStop(0, "#17496a"); bg.addColorStop(0.55, "#0d2740"); bg.addColorStop(1, "#071526");
     g.fillStyle = bg; g.fillRect(0, 0, S, S);
@@ -62,25 +67,25 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       g.fillStyle = "rgba(190,225,255," + (Math.random() * 0.13) + ")";
       g.beginPath(); g.arc(Math.random() * S, Math.random() * S, 1 + Math.random() * 2.2, 0, 6.3); g.fill();
     }
-    /* paths: canvas top is the back wall (radiology), bottom the front (ICU), left the path lab, right the micro lab */
-    const lane = (ang, col) => {
-      g.save(); g.translate(S / 2, S / 2); g.rotate(ang);
-      const gr = g.createLinearGradient(0, 80, 0, S / 2 - 40);
+    /* a glowing lane from the centre to each door; canvas top is -z, so a door at compass angle theta lies along (sin theta, cos theta) */
+    const lane = (theta, col) => {
+      g.save(); g.translate(S / 2, S / 2); g.rotate(-theta);
+      const end = DOORR * ppm - 14, gr = g.createLinearGradient(0, 80, 0, end);
       gr.addColorStop(0, col + "00"); gr.addColorStop(0.35, col + "cc"); gr.addColorStop(1, col + "ff");
-      g.fillStyle = gr; g.fillRect(-16, 80, 32, S / 2 - 120);
+      g.fillStyle = gr; g.fillRect(-16, 80, 32, end - 80);
       g.strokeStyle = col; g.lineWidth = 7; g.lineCap = "round"; g.lineJoin = "round";
-      for (let k = 0; k < 3; k++) { const y = 190 + k * 80; g.globalAlpha = 0.45 + k * 0.25; g.beginPath(); g.moveTo(-34, y - 24); g.lineTo(0, y + 6); g.lineTo(34, y - 24); g.stroke(); }
+      for (let k = 0; k < 3; k++) { const y = 170 + k * 70; g.globalAlpha = 0.45 + k * 0.25; g.beginPath(); g.moveTo(-34, y - 24); g.lineTo(0, y + 6); g.lineTo(34, y - 24); g.stroke(); }
       g.restore();
     };
-    lane(0, hex(ACC.icu)); lane(Math.PI, hex(ACC.rad)); lane(Math.PI / 2, hex(ACC.path)); lane(-Math.PI / 2, hex(ACC.micro));
-    /* medallion */
+    KINDS.forEach((k) => lane(THETA[k], hex(ACC[k])));
     g.save(); g.translate(S / 2, S / 2);
     const disc = g.createRadialGradient(0, 0, 10, 0, 0, 150);
     disc.addColorStop(0, "#1f6e93"); disc.addColorStop(1, "#0f3552");
     g.fillStyle = disc; g.beginPath(); g.arc(0, 0, 150, 0, 6.3); g.fill();
-    ["icu", "micro", "rad", "path"].forEach((k, i) => {
+    KINDS.forEach((k) => {
+      const phi = Math.PI / 2 - THETA[k], half = Math.PI / N5 - 0.12;
       g.strokeStyle = hex(ACC[k]); g.lineWidth = 12; g.lineCap = "round";
-      g.beginPath(); g.arc(0, 0, 168, i * Math.PI / 2 + 0.12, (i + 1) * Math.PI / 2 - 0.12); g.stroke();
+      g.beginPath(); g.arc(0, 0, 168, phi - half, phi + half); g.stroke();
     });
     g.strokeStyle = "rgba(255,255,255,.55)"; g.lineWidth = 3; g.beginPath(); g.arc(0, 0, 138, 0, 6.3); g.stroke();
     g.fillStyle = "#ffffff"; g.shadowColor = "#7ff3ff"; g.shadowBlur = 24;
@@ -88,42 +93,44 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     g.restore();
     return tex(c);
   })();
-  box(10, 0.12, 10, new THREE.MeshStandardMaterial({ color: 0x071526, roughness: 0.5 }), 0, 0, 0);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshStandardMaterial({
+  /* a flat pentagon fan facing up (floor) or down (ceiling) */
+  function pentagon(y, up, mat, uvMap) {
+    const pos = [0, 0, 0], uv = [0.5, 0.5], idx = [];
+    for (let i = 0; i < N5; i++) { const a = Math.PI / N5 + i * 2 * Math.PI / N5; pos.push(Math.sin(a) * RC, 0, Math.cos(a) * RC); uv.push(0.5 + Math.sin(a) * RC / (2 * RT), 0.5 - Math.cos(a) * RC / (2 * RT)); }
+    for (let i = 0; i < N5; i++) { const a = 1 + i, b = 1 + (i + 1) % N5; if (up) idx.push(0, a, b); else idx.push(0, b, a); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, mat); m.position.y = y; scene.add(m); return m;
+  }
+  pentagon(0, true, new THREE.MeshStandardMaterial({ color: 0x071526, roughness: 0.5 }));
+  const floor = pentagon(0.061, true, new THREE.MeshStandardMaterial({
     map: floorTex, emissiveMap: floorTex, emissive: 0xffffff, emissiveIntensity: 0.55, roughness: 0.22, metalness: 0.35
   }));
-  floor.rotation.x = -Math.PI / 2; floor.position.y = 0.061;
-  scene.add(floor);
 
-  /* ---------- ceiling: soft coffers and a slowly turning four-colour ring ---------- */
-  box(10, 0.1, 10, ceilMat, 0, 3.15, 0);
+  /* ---------- ceiling: soft coffers and a slowly turning five-colour ring ---------- */
+  pentagon(3.15, false, ceilMat);
   const lampMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xeaf6ff, emissiveIntensity: 1.1, roughness: 0.4 });
-  [[-2.7, 2.7], [2.7, 2.7], [-2.7, -2.7], [2.7, -2.7]].forEach(([x, z]) => box(1.6, 0.05, 0.5, lampMat, x, 3.08, z));
+  KINDS.forEach((k) => { const a = THETA[k] + Math.PI / N5, l = box(1.6, 0.05, 0.5, lampMat, Math.sin(a) * 3.3, 3.08, Math.cos(a) * 3.3); l.rotation.y = a; });
   const ring = new THREE.Group();
-  ["icu", "micro", "rad", "path"].forEach((k, i) => {
-    const arc = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.045, 10, 48, Math.PI / 2 - 0.14), glow(ACC[k], 2.2));
-    arc.rotation.x = Math.PI / 2; arc.rotation.z = i * Math.PI / 2 + 0.07;
+  KINDS.forEach((k, i) => {
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.045, 10, 48, 2 * Math.PI / N5 - 0.14), glow(ACC[k], 2.2));
+    arc.rotation.x = Math.PI / 2; arc.rotation.z = i * 2 * Math.PI / N5 + 0.07;
     ring.add(arc);
   });
   ring.position.y = 3.07;
   scene.add(ring);
 
-  /* ---------- walls with a door opening in the middle of each ---------- */
-  box(0.16, 3.1, 3.9, wallMat, 5, 1.55, -3.05);
-  box(0.16, 3.1, 3.9, wallMat, 5, 1.55, 3.05);
-  box(0.16, 0.62, 2.2, wallMat, 5, 2.79, 0);
-  box(3.9, 3.1, 0.16, wallMat, -3.05, 1.55, -5);
-  box(3.9, 3.1, 0.16, wallMat, 3.05, 1.55, -5);
-  box(2.2, 0.62, 0.16, wallMat, 0, 2.79, -5);
-  box(3.9, 3.1, 0.16, wallMat, -3.05, 1.55, 5);
-  box(3.9, 3.1, 0.16, wallMat, 3.05, 1.55, 5);
-  box(2.2, 0.62, 0.16, wallMat, 0, 2.79, 5);
-  box(0.16, 3.1, 3.9, wallMat, -5, 1.55, 3.05);
-  box(0.16, 3.1, 3.9, wallMat, -5, 1.55, -3.05);
-  box(0.16, 0.62, 2.2, wallMat, -5, 2.79, 0);
+  /* ---------- five walls, each with a door opening in the middle ---------- */
+  KINDS.forEach((k) => {
+    const th = THETA[k], g = new THREE.Group(), sw = (SIDE + 0.3 - 2.2) / 2;
+    g.position.set(Math.sin(th) * APO, 0, Math.cos(th) * APO); g.rotation.y = th; scene.add(g);
+    box(sw, 3.1, 0.16, wallMat, -(1.1 + sw / 2), 1.55, 0, g);
+    box(sw, 3.1, 0.16, wallMat, 1.1 + sw / 2, 1.55, 0, g);
+    box(2.2, 0.62, 0.16, wallMat, 0, 2.79, 0, g);
+  });
 
   /* corner light columns */
-  [[4.55, 4.55, ACC.icu], [-4.55, 4.55, ACC.path], [-4.55, -4.55, ACC.rad], [4.55, -4.55, ACC.micro]].forEach(([x, z, c]) => {
+  KINDS.forEach((k, i) => {
+    const a = THETA[k] + Math.PI / N5, x = Math.sin(a) * (APO - 0.35) / Math.cos(Math.PI / N5), z = Math.cos(a) * (APO - 0.35) / Math.cos(Math.PI / N5), c = ACC[KINDS[(i + 1) % N5]];
     const col = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 3.0, 20), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: c, emissiveIntensity: 1.0, roughness: 0.3, transparent: true, opacity: 0.92 }));
     col.position.set(x, 1.56, z); scene.add(col);
     [0.08, 3.04].forEach((y) => { const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.07, 20), steel); cap.position.set(x, y, z); scene.add(cap); });
@@ -142,6 +149,9 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     } else if (kind === "micro") {                 /* petri dish with colonies */
       g.beginPath(); g.arc(0, 0, r, 0, 6.3); g.stroke(); g.beginPath(); g.arc(0, 0, r * 0.74, 0, 6.3); g.stroke();
       [[-0.25, -0.2, 0.17], [0.25, -0.05, 0.12], [-0.05, 0.3, 0.14], [0.3, 0.3, 0.08]].forEach(([a, b, s]) => { g.beginPath(); g.arc(a * r, b * r, s * r, 0, 6.3); g.fill(); });
+    } else if (kind === "aud") {                   /* stage with curved seating rows */
+      g.beginPath(); g.arc(0, r * 0.55, r * 0.35, Math.PI, 0); g.stroke();
+      [0.7, 1.0, 1.3].forEach((k) => { g.beginPath(); g.arc(0, r * 0.55, r * 0.35 + r * 0.32 * (k - 0.4), Math.PI * 1.1, Math.PI * 1.9); g.stroke(); });
     } else {                                       /* scan ring with crosshair */
       g.beginPath(); g.arc(0, 0, r, 0, 6.3); g.stroke(); g.beginPath(); g.arc(0, 0, r * 0.5, 0, 6.3); g.stroke();
       g.lineWidth = 4; g.beginPath(); g.moveTo(-r * 1.15, 0); g.lineTo(-r * 0.62, 0); g.moveTo(r * 0.62, 0); g.lineTo(r * 1.15, 0); g.moveTo(0, -r * 1.15); g.lineTo(0, -r * 0.62); g.moveTo(0, r * 0.62); g.lineTo(0, r * 1.15); g.stroke();
@@ -236,18 +246,18 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
 
     /* decoration that shares the door's frame but is not clickable: feature wall, base light, cove, benches, light */
     [-1, 1].forEach((s) => {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(2.95, 2.5, 0.05), panelMat(col, s > 0));
-      p.position.set(s * 2.78, 1.4, -0.075); deco.add(p);
-      box(2.95, 0.04, 0.06, glow(col, 0.95), s * 2.78, 0.2, -0.09, deco);           /* skirting light */
-      box(2.95, 0.04, 0.06, steel, s * 2.78, 2.68, -0.09, deco);
+      const p = new THREE.Mesh(new THREE.BoxGeometry(2.7, 2.5, 0.05), panelMat(col, s > 0));
+      p.position.set(s * 2.6, 1.4, -0.075); deco.add(p);
+      box(2.7, 0.04, 0.06, glow(col, 0.95), s * 2.6, 0.2, -0.09, deco);           /* skirting light */
+      box(2.7, 0.04, 0.06, steel, s * 2.6, 2.68, -0.09, deco);
       const bench = new THREE.Group();
       box(1.5, 0.07, 0.42, new THREE.MeshStandardMaterial({ color: col, roughness: 0.55, emissive: col, emissiveIntensity: 0.12 }), 0, 0.45, 0, bench);
       box(1.54, 0.03, 0.46, steel, 0, 0.405, 0, bench);
       [-0.64, 0.64].forEach((x) => box(0.05, 0.4, 0.34, steel, x, 0.2, 0, bench));
-      bench.position.set(s * 2.78, 0.06, -0.52); deco.add(bench);
+      bench.position.set(s * 2.6, 0.06, -0.52); deco.add(bench);
     });
     box(2.26, 0.04, 0.05, glow(col, 0.95), 0, 0.075, -0.45, deco);                   /* threshold strip */
-    box(9.7, 0.045, 0.05, glow(col, 0.9), 0, 3.0, -0.1, deco);                      /* cove along the top */
+    box(SIDE - 0.3, 0.045, 0.05, glow(col, 0.9), 0, 3.0, -0.1, deco);                      /* cove along the top */
     const pl = new THREE.PointLight(col, 6, 7.5, 2);
     pl.position.set(0, 2.3, -1.3); deco.add(pl); doorLights.push(pl);
     scene.add(deco);
@@ -255,26 +265,22 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     return g;
   }
 
-  const front = door("icu", "ENTER THE ICU");
-  front.position.set(0, 0, 4.82);
-  const leftDoor = door("path", "PATHOPHYSIOLOGY LIVE");
-  leftDoor.position.set(-4.82, 0, 0);
-  leftDoor.rotation.y = -Math.PI / 2;
-  const rightDoor = door("micro", "MICROBIOLOGY LAB");
-  rightDoor.position.set(4.82, 0, 0);
-  rightDoor.rotation.y = Math.PI / 2;
-  const backDoor = door("rad", "RADIOLOGY");
-  backDoor.position.set(0, 0, -4.82);
-  backDoor.rotation.y = Math.PI;
+  const TEXT = { icu: "ENTER THE ICU", micro: "MICROBIOLOGY LAB", rad: "RADIOLOGY", aud: "AUDITORIUM", path: "PATHOPHYSIOLOGY LIVE" };
+  const DOORS = {};
+  KINDS.forEach((k) => {
+    const d = door(k, TEXT[k]), th = THETA[k];
+    d.position.set(Math.sin(th) * DOORR, 0, Math.cos(th) * DOORR); d.rotation.y = th; DOORS[k] = d;
+  });
+  const ALLDOORS = KINDS.map((k) => DOORS[k]);
   decorOf.forEach(([g, d]) => { d.position.copy(g.position); d.rotation.copy(g.rotation); });
 
   /* a few slow motes of light in the air */
   const motes = (() => {
-    const n = 110, pos = new Float32Array(n * 3), col = new Float32Array(n * 3), cs = [ACC.icu, ACC.path, ACC.micro, ACC.rad].map((c) => new THREE.Color(c));
+    const n = 110, pos = new Float32Array(n * 3), col = new Float32Array(n * 3), cs = KINDS.map((k) => new THREE.Color(ACC[k]));
     for (let i = 0; i < n; i++) {
-      let x, z; do { x = (Math.random() - 0.5) * 9; z = (Math.random() - 0.5) * 9; } while (x * x + z * z < 2.4);
+      let x, z; do { x = (Math.random() - 0.5) * 11; z = (Math.random() - 0.5) * 11; } while (x * x + z * z < 2.4 || x * x + z * z > 30);
       pos.set([x, 0.3 + Math.random() * 2.6, z], i * 3);
-      const c = cs[i % 4]; col.set([c.r, c.g, c.b], i * 3);
+      const c = cs[i % 5]; col.set([c.r, c.g, c.b], i * 3);
     }
     const [dc, dg] = cnv(32, 32), dr = dg.createRadialGradient(16, 16, 1, 16, 16, 16);
     dr.addColorStop(0, "#fff"); dr.addColorStop(1, "#fff0"); dg.fillStyle = dr; dg.fillRect(0, 0, 32, 32);
@@ -331,6 +337,8 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     if (kind === "icu") {
       const btn = document.getElementById("icu-enter");
       if (btn) btn.click();
+    } else if (kind === "aud") {
+      location.href = "critical-care-universe/index.html?home=1&to=auditorium&v=20261120h";
     } else if (kind === "rad") {
       location.href = "radiology.html?v=20261119r2";
     } else if (kind === "micro") {
@@ -348,7 +356,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     yaw = 0;
     pit = 0;
     eye.set(0, 1.62, 0);
-    try { shut(front); shut(leftDoor); shut(rightDoor); shut(backDoor); } catch (err) {}
+    try { ALLDOORS.forEach(shut); } catch (err) {}
     if (fade) fade.style.opacity = "0";
     document.body.classList.add("icu-gate");
     document.body.classList.remove("icu-open", "in", "enter", "inside", "lab", "arena", "osce", "reference", "picking", "body-only");
@@ -378,16 +386,16 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     clearTimeout(window.hubVoiceTimer);
     clearTimeout(leaveTimer);
     leaveTimer = setTimeout(() => finish(kind), calm ? 40 : 1800);
-    const door = kind === "icu" ? front : kind === "micro" ? rightDoor : kind === "rad" ? backDoor : leftDoor;
-    const face = kind === "icu" ? 0 : kind === "micro" ? Math.PI / 2 : kind === "rad" ? Math.PI : -Math.PI / 2;
-    const dest = kind === "icu" ? new THREE.Vector3(0, 1.62, 5.5) : kind === "micro" ? new THREE.Vector3(5.5, 1.62, 0) : kind === "rad" ? new THREE.Vector3(0, 1.62, -5.5) : new THREE.Vector3(-5.5, 1.62, 0);
-    job = { kind, door, face, dest, t: 0 };
+    const door = DOORS[kind], face = THETA[kind];
+    const dest = new THREE.Vector3(Math.sin(face) * (APO + 0.7), 1.62, Math.cos(face) * (APO + 0.7));
+    job = { kind, door, face, dest, t: 0, snd: false };
     if (calm) finish(kind);
     if (kind === "icu" && window.playIcuVoice) window.playIcuVoice();
   }
 
   canvas.addEventListener("pointerdown", (ev) => {
     if (Date.now() < (window.hallLock || 0)) return;
+    sfx.unlock();
     dragging = true;
     moved = 0;
     lastX = ev.clientX;
@@ -446,8 +454,8 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       m.setX(i, m.getX(i) + Math.cos(tAmb * 0.4 + i * 1.7) * 0.0010);
     }
     m.needsUpdate = true;
-    [front, leftDoor, rightDoor, backDoor].forEach((d, i) => {
-      const k = 0.5 + 0.5 * Math.sin(tAmb * 1.6 + i * 1.57);
+    ALLDOORS.forEach((d, i) => {
+      const k = 0.5 + 0.5 * Math.sin(tAmb * 1.6 + i * 1.26);
       d.userData.glow[0].material.opacity = 0.42 + 0.3 * k;
     });
   }
@@ -459,14 +467,14 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       const gap = Math.atan2(Math.sin(raw), Math.cos(raw));
       yaw += gap * (calm ? 1 : 0.14);
       pit += (0 - pit) * 0.1;
-      if (job.t > 0.25) job.door.userData.open = Math.min(1, job.door.userData.open + dt * 1.8);
+      if (job.t > 0.25) { job.door.userData.open = Math.min(1, job.door.userData.open + dt * 1.8); if (!job.snd) { job.snd = true; sfx.setListener(0, 0, yaw); sfx.door(true, { x: job.door.position.x, z: job.door.position.z }, 1.3); } }
       const o = job.door.userData.open;
       job.door.userData.left.position.x = -0.48 - o * 0.85;
       job.door.userData.right.position.x = 0.48 + o * 0.85;
       if (o > 0.45) eye.lerp(job.dest, calm ? 1 : 0.08);
-      const along = job.kind === "icu" ? eye.z : job.kind === "micro" ? eye.x : job.kind === "rad" ? -eye.z : -eye.x;
-      if (fade) fade.style.opacity = String(Math.max(0, (along - 2.4) / 2.4));
-      if (along > 4.2 || job.t > 2.2) {
+      const along = eye.x * Math.sin(job.face) + eye.z * Math.cos(job.face);
+      if (fade) fade.style.opacity = String(Math.max(0, (along - 3.2) / 2.4));
+      if (along > 5.0 || job.t > 2.4) {
         finish(job.kind);
         return;
       }

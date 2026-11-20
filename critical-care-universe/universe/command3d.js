@@ -1,11 +1,13 @@
 /* ICU command suite: a walk-in command centre attached to the ICU hall, a sliding door to a modern auditorium,
-   and three portals (Critical Care Hub, Command Centre, Multidisciplinary Team). No people are modelled.
+   and three portals (Critical Care Hub, Exit to the garden, Multidisciplinary Team). No people are modelled.
 
    World layout (x runs along the ICU hall; the hall's left end gate is at x = -8.4):
      command centre   x -20.4..-8.4, z -5..5,   height 4.6   (6 live monitors on the far wall, console desk, racks)
      sliding door     x -15.3, z -5               -> auditorium
      auditorium       x -22..-8.6,  z -21..-5,   height 7.0   (three portals on the far wall z = -21)
    buildSuite(T, scene, P, H, env, {gateSet}) -> { doors, update(t,dt), clamp(x,z), hits, rooms }          */
+
+import { buildOutdoor } from "./outdoor3d.js?v=20261120h";
 
 export function buildSuite(T, S, P, H, env, opt = {}) {
   const V = T.Vector3, G = new T.Group(); G.name = "suite"; S.add(G);
@@ -82,6 +84,7 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
 
   const R = { x0: -20.4, x1: -8.4, z: 5, h: 4.6 }, cxR = (R.x0 + R.x1) / 2;
   const AU = { x0: -22, x1: -8.6, z0: -21, z1: -5, h: 7.0 }, cxA = (AU.x0 + AU.x1) / 2;
+  const out = buildOutdoor(T, S, { cx: cxA, cz: AU.z0 - 1.2 });
 
   /* =============================== COMMAND CENTRE =============================== */
   const room = new T.Group(); G.add(room);
@@ -170,16 +173,16 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
   /* =============================== AUDITORIUM =============================== */
   const aud = new T.Group(); G.add(aud);
   const AW = AU.x1 - AU.x0, AD = AU.z1 - AU.z0;
-  const accent = { hub: 0x27e0b0, cmd: 0x4aa8ff, team: 0xc07bff }, accHex = { hub: "#27e0b0", cmd: "#4aa8ff", team: "#c07bff" };
+  const accent = { hub: 0x27e0b0, exit: 0xffb347, team: 0xc07bff }, accHex = { hub: "#27e0b0", exit: "#ffb347", team: "#c07bff" };
   const px = (x) => (x - AU.x0) / AW * 1024, py = (z) => (z - AU.z0) / AD * 1223;
-  const portalX = { hub: cxA - 4.2, cmd: cxA, team: cxA + 4.2 };
+  const portalX = { hub: cxA - 4.2, exit: cxA, team: cxA + 4.2 };
   const floorT = ctex(1024, 1223, (g, w, h) => {
     const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#0a1522"); gr.addColorStop(1, "#060b12"); g.fillStyle = gr; g.fillRect(0, 0, w, h);
     g.strokeStyle = "rgba(80,160,220,.07)"; g.lineWidth = 2; for (let i = 0; i <= 13; i++) { g.beginPath(); g.moveTo(i * w / 13.4, 0); g.lineTo(i * w / 13.4, h); g.stroke(); } for (let j = 0; j <= 16; j++) { g.beginPath(); g.moveTo(0, j * h / 16); g.lineTo(w, j * h / 16); g.stroke(); }
     g.lineCap = "round"; g.lineJoin = "round";
     const trunk = (col, x1, z1, x2, z2) => { g.strokeStyle = col; g.shadowColor = col; g.shadowBlur = 18; g.lineWidth = 7; g.beginPath(); g.moveTo(px(x1), py(z1)); g.lineTo(px(x2), py(z2)); g.stroke(); };
     g.strokeStyle = "#36d6ff"; g.shadowColor = "#36d6ff"; g.shadowBlur = 18; g.lineWidth = 7; g.beginPath(); g.moveTo(px(cxA), py(-5.6)); g.lineTo(px(cxA), py(-14.5)); g.stroke();
-    ["hub", "cmd", "team"].forEach((k) => { g.strokeStyle = accHex[k]; g.shadowColor = accHex[k]; g.shadowBlur = 18; g.lineWidth = 7; g.beginPath(); g.moveTo(px(cxA), py(-14.5)); g.quadraticCurveTo(px(portalX[k]), py(-14.5), px(portalX[k]), py(-17)); g.lineTo(px(portalX[k]), py(-19.2)); g.stroke();
+    ["hub", "exit", "team"].forEach((k) => { g.strokeStyle = accHex[k]; g.shadowColor = accHex[k]; g.shadowBlur = 18; g.lineWidth = 7; g.beginPath(); g.moveTo(px(cxA), py(-14.5)); g.quadraticCurveTo(px(portalX[k]), py(-14.5), px(portalX[k]), py(-17)); g.lineTo(px(portalX[k]), py(-19.2)); g.stroke();
       g.shadowBlur = 0; g.fillStyle = accHex[k] + "33"; g.beginPath(); g.arc(px(portalX[k]), py(-19.6), 1.15 / AW * 1024, 0, 7); g.fill(); g.strokeStyle = accHex[k]; g.lineWidth = 4; g.beginPath(); g.arc(px(portalX[k]), py(-19.6), 1.15 / AW * 1024, 0, 7); g.stroke(); });
     g.shadowBlur = 0;
   });
@@ -189,7 +192,7 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
   holeWall("z", AU.z1 - 0.02, AU.x0, AU.x1, AU.h, [{ c: cxA, w: 2.4, h: 3.0 }], Math.PI, slats);
   holeWall("x", AU.x0, AU.z0, AU.z1, AU.h, [], Math.PI / 2, slats);
   holeWall("x", AU.x1, AU.z0, AU.z1, AU.h, [], -Math.PI / 2, slats);
-  holeWall("z", AU.z0, AU.x0, AU.x1, AU.h, ["hub", "cmd", "team"].map((k) => ({ c: portalX[k], w: 3.0, h: 4.4 })), 0, acoustic);
+  holeWall("z", AU.z0, AU.x0, AU.x1, AU.h, ["hub", "exit", "team"].map((k) => ({ c: portalX[k], w: 3.0, h: 4.4 })), 0, acoustic);
   /* ambient LED banners on the side walls */
   const banner = ctex(1024, 300, (g, w, h) => { const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, "#06182a"); gr.addColorStop(1, "#0a2a46"); g.fillStyle = gr; g.fillRect(0, 0, w, h); g.strokeStyle = "rgba(54,214,255,.35)"; g.lineWidth = 3; for (let i = 0; i < 9; i++) { g.beginPath(); g.moveTo(0, 190 + i * 7); g.bezierCurveTo(w * 0.3, 120 + i * 9, w * 0.6, 260 - i * 7, w, 170 + i * 6); g.stroke(); } g.fillStyle = "#d8f4ff"; g.font = "700 76px system-ui,sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.shadowColor = "#36d6ff"; g.shadowBlur = 20; g.fillText("CRITICAL CARE UNIVERSE", 50, 92); g.shadowBlur = 0; g.fillStyle = "#7fd4e6"; g.font = "500 38px system-ui,sans-serif"; g.fillText("Learn  ·  Simulate  ·  Decide  ·  Together", 54, 160); });
   [[AU.x0 + 0.06, Math.PI / 2], [AU.x1 - 0.06, -Math.PI / 2]].forEach((o) => { const m = pl(6.4, 6.4 * 300 / 1024, new T.MeshBasicMaterial({ map: banner, toneMapped: false }), o[0], 3.5, -13, o[1], 0, aud); bx(6.5, 0.04, 0.03, cyan, o[0], 3.5 - 0.98, -13, aud); });
@@ -206,14 +209,15 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
     g.shadowColor = accHex[k]; g.shadowBlur = 14; g.strokeStyle = accHex[k]; g.fillStyle = accHex[k]; g.lineWidth = 6;
     const ix = 110, iy = h / 2;
     if (k === "hub") { g.beginPath(); g.arc(ix, iy, 44, 0, 7); g.stroke(); g.fillRect(ix - 8, iy - 28, 16, 56); g.fillRect(ix - 28, iy - 8, 56, 16); }
-    else if (k === "cmd") { g.strokeRect(ix - 46, iy - 34, 92, 56); g.fillRect(ix - 20, iy + 26, 40, 8); g.beginPath(); g.moveTo(ix - 34, iy + 4); g.lineTo(ix - 14, iy - 8); g.lineTo(ix + 6, iy + 8); g.lineTo(ix + 34, iy - 16); g.stroke(); }
+    else if (k === "exit") { g.strokeRect(ix - 30, iy - 40, 46, 80); g.beginPath(); g.moveTo(ix - 4, iy); g.lineTo(ix + 48, iy); g.moveTo(ix + 32, iy - 16); g.lineTo(ix + 48, iy); g.lineTo(ix + 32, iy + 16); g.stroke(); }
     else { [[-30, 8], [0, -10], [30, 8]].forEach((o) => { g.beginPath(); g.arc(ix + o[0], iy + o[1] - 8, 14, 0, 7); g.fill(); g.beginPath(); g.arc(ix + o[0], iy + o[1] + 26, 22, Math.PI, 0); g.fill(); }); }
     g.shadowBlur = 0; g.fillStyle = "#e4f6ff"; g.textAlign = "left"; g.textBaseline = "middle"; let fs = 46; g.font = "700 " + fs + "px system-ui,sans-serif"; while (g.measureText(title).width > w - 210 && fs > 24) { fs -= 2; g.font = "700 " + fs + "px system-ui,sans-serif"; } g.fillText(title, 190, h / 2 - 22); g.fillStyle = accHex[k]; g.font = "500 28px system-ui,sans-serif"; g.fillText(sub, 190, h / 2 + 34);
   });
-  const portalDefs = { hub: ["CRITICAL CARE HUB", "Simulators, labs and atlases"], cmd: ["COMMAND CENTRE", "Live ICU monitors"], team: ["MULTIDISCIPLINARY TEAM", "Case conference room"] };
-  ["hub", "cmd", "team"].forEach((k) => {
+  const portalDefs = { hub: ["CRITICAL CARE HUB", "Simulators, labs and atlases"], exit: ["EXIT", "Step outside to the garden"], team: ["MULTIDISCIPLINARY TEAM", "Case conference room"] };
+  ["hub", "exit", "team"].forEach((k) => {
     const x = portalX[k], zf = AU.z0;
     const d = makeDoor(k, x, zf + 0.02, 3.0, 4.4, accent[k], aud);
+    if (k === "exit") { const disc0 = mesh(new T.RingGeometry(1.0, 1.15, 48), E(accent[k], 2), x, 0.012, zf + 1.4, aud); disc0.rotation.x = -Math.PI / 2; const t0 = sig(k, portalDefs[k][0], portalDefs[k][1]); pl(3.9, 3.9 * 200 / 768, new T.MeshBasicMaterial({ map: t0, toneMapped: false }), x, 5.45, zf + 0.04, 0, 0, aud).userData.door = k; return; }
     const glow = ctex(64, 256, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, accHex[k] + "cc"); gr.addColorStop(1, accHex[k] + "33"); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
     pl(3.0, 4.4, new T.MeshBasicMaterial({ map: glow, toneMapped: false }), x, 2.2, zf - 0.7, 0, 0, aud);
     pl(0.7, 4.4, M(0x0a0f14, { side: T.DoubleSide }), x - 1.5, 2.2, zf - 0.35, Math.PI / 2, 0, aud); pl(0.7, 4.4, M(0x0a0f14, { side: T.DoubleSide }), x + 1.5, 2.2, zf - 0.35, Math.PI / 2, 0, aud);
@@ -274,6 +278,7 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
     const r = [{ x0: -7.3, x1: 7.3, z0: -2.7, z1: 2.7 }, { x0: -19.9, x1: -9.0, z0: -4.4, z1: 4.4 }, { x0: -21.3, x1: -9.3, z0: -20.1, z1: -5.7 }];
     if (dGate.open > 0.85) r.push({ x0: -9.2, x1: -7.2, z0: -0.75, z1: 0.75 });
     if (dAud.open > 0.85) r.push({ x0: cxA - 0.85, x1: cxA + 0.85, z0: -5.8, z1: -4.2 });
+    if (doors.exit.open > 0.85) r.push({ x0: cxA - 0.85, x1: cxA + 0.85, z0: -22.5, z1: -19.9 });
     return r;
   };
   const blocks = [{ x0: -18.5, x1: -16.0, z0: -3.3, z1: 3.3 }, { x0: -14.0, x1: -11.9, z0: 3.8, z1: 5.2 },
@@ -288,17 +293,20 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
         if (m === dl) px = b.x0; else if (m === dr) px = b.x1; else if (m === dt) pz = b.z0; else pz = b.z1;
       }
     });
+    if (doors.exit.open > 0.85 && pz < -20.5) { const o = out.clamp(x, pz); if ((o[0] - x) ** 2 + (o[1] - z) ** 2 < (px - x) ** 2 + (pz - z) ** 2) return o; }
     return [px, pz];
   }
 
   /* =============================== per-frame =============================== */
   let mi = 0, acc = 0, accSlow = 0, first = true;
-  function update(t, dt) {
+  function update(t, dt, cam) {
+    Object.values(doors).forEach((d) => { if (d._tp !== d.target) { if (d._tp !== undefined && opt.onDoor) opt.onDoor(d, d.target > 0); d._tp = d.target; } });
+    if (cam) out.update(t, dt, cam, doors.exit.open > 0.02 || cam.z < -21.3);
     Object.values(doors).forEach((d) => { if (Math.abs(d.open - d.target) > 0.001) { d.set(d.open + (d.target - d.open) * (1 - Math.exp(-dt * 3.2))); } else if (d.open !== d.target) d.set(d.target); });
     acc += dt; accSlow += dt;
     if (first) { mons.forEach(paintMon); deskScr.forEach((s) => painters[s.key](s.d)); paintStatus(); first = false; }
     if (acc > 0.12) { acc = 0; paintMon(mons[mi]); mi = (mi + 1) % mons.length; paintMon(mons[mi]); mi = (mi + 1) % mons.length; }
     if (accSlow > 0.6) { accSlow = 0; deskScr.forEach((s) => painters[s.key](s.d)); paintStatus(); if (rnd() > 0.5) drawLeds(); }
   }
-  return { doors, update, clamp, rooms: { R, AU } };
+  return { doors, update, clamp, rooms: { R, AU }, outdoor: out, groundY: out.groundY };
 }
