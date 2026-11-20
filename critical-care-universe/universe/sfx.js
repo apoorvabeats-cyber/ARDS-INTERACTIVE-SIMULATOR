@@ -109,18 +109,16 @@ export function createSfx() {
   let foot = 0;
   S.step = (vol) => {
     if (!ready()) return;
-    const t0 = ac.currentTime + 0.005, v = (vol == null ? 1 : vol) * 0.2, side = (foot++ % 2) ? 1 : -1, j = 0.92 + Math.random() * 0.16, out = outTo(side * 0.14, 1);
+    /* phone speakers cannot play deep bass, so the step lives in the middle: a firm heel click near 1.6 kHz, a leather slap near 600 Hz and a short knock near 200 Hz */
+    const t0 = ac.currentTime + 0.005, v = (vol == null ? 1 : vol) * 0.9, side = (foot++ % 2) ? 1 : -1, j = 0.93 + Math.random() * 0.14, out = outTo(side * 0.12, 1.4);
     const src = ac.createBufferSource(); src.buffer = noiseBuf(); src.loop = true;
-    /* the heel strikes: a short click */
-    const bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 2300 * j; bp.Q.value = 1.3;
-    const g1 = ac.createGain(); env(g1, t0, 0.002, v * 0.55, 0.026); src.connect(bp); bp.connect(g1); g1.connect(out);
-    /* the sole follows: a muffled slap */
-    const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 780 * j; lp.Q.value = 0.6;
-    const g2 = ac.createGain(); env(g2, t0 + 0.028, 0.006, v * 0.5, 0.07); src.connect(lp); lp.connect(g2); g2.connect(out);
-    /* the weight on the floor: a low thump */
-    const o = ac.createOscillator(); o.type = "sine"; o.frequency.setValueAtTime(130 * j, t0); o.frequency.exponentialRampToValueAtTime(52, t0 + 0.11);
-    const g3 = ac.createGain(); env(g3, t0, 0.004, v * 0.8, 0.12); o.connect(g3); g3.connect(out);
-    src.start(t0, Math.random()); src.stop(t0 + 0.14); o.start(t0); o.stop(t0 + 0.16);
+    const bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1700 * j; bp.Q.value = 0.9;
+    const g1 = ac.createGain(); env(g1, t0, 0.002, v * 0.7, 0.03); src.connect(bp); bp.connect(g1); g1.connect(out);
+    const bp2 = ac.createBiquadFilter(); bp2.type = "bandpass"; bp2.frequency.value = 620 * j; bp2.Q.value = 0.7;
+    const g2 = ac.createGain(); env(g2, t0 + 0.03, 0.006, v * 0.85, 0.09); src.connect(bp2); bp2.connect(g2); g2.connect(out);
+    const o = ac.createOscillator(); o.type = "triangle"; o.frequency.setValueAtTime(240 * j, t0); o.frequency.exponentialRampToValueAtTime(110, t0 + 0.09);
+    const g3 = ac.createGain(); env(g3, t0, 0.004, v * 0.6, 0.1); o.connect(g3); g3.connect(out);
+    src.start(t0, Math.random()); src.stop(t0 + 0.16); o.start(t0); o.stop(t0 + 0.14);
   };
 
   /* ---------- outdoor ambience ---------- */

@@ -32,6 +32,6 @@ if(!hasWebGL()){
   showRoomList();
 }else if(!window.__hudBody3dLoading){
   window.__hudBody3dLoading = true;
-  try{ await import("./hud-body-3d.js?v=20261121a"); }
+  try{ await import("./hud-body-3d.js?v=20261121d"); }
   catch(e){ window.__hudBody3dLoading = false; throw e; }
 }

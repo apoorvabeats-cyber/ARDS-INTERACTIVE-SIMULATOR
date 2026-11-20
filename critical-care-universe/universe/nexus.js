@@ -9,10 +9,10 @@ import { GLTFLoader } from "./vendor/GLTFLoader.js";
 import { createDevices } from "./icu-devices.js?v=20261120o";
 import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261120o";
 import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261120o";
-import { createSfx } from "./sfx.js?v=20261121c";
-import { createDesk, DESK } from "./nexus-desk.js?v=20261121c";
-import { paintMachine } from "./nexus-machines.js?v=20261121c";
-import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261121c";
+import { createSfx } from "./sfx.js?v=20261121d";
+import { createDesk, DESK } from "./nexus-desk.js?v=20261121d";
+import { paintMachine } from "./nexus-machines.js?v=20261121d";
+import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261121d";
 
 const $ = (s) => document.querySelector(s);
 const Q = new URLSearchParams(location.search), DEMO = Q.has("demo");
@@ -335,8 +335,8 @@ const me = { x: 0, z: 9.6, yaw: Math.PI, h: 1.6, pit: 0 };
 if (window.ccuWelcome) window.ccuWelcome("mdt");
 const arrive = { t: 0, t0: performance.now(), from: { x: me.x * 1.62, z: me.z * 1.62 }, to: { x: me.x, z: me.z } };
 /* coming in from the auditorium on foot: begin exactly where the walk left off, under your own control, no scripted walk */
-try { const j = JSON.parse(sessionStorage.getItem("ccu-pose") || "null"); sessionStorage.removeItem("ccu-pose");
-  if (j && j.to === "team" && Date.now() - j.t < 20000) { me.x = j.x; me.z = j.z; me.yaw = j.yaw; arrive.t = 2.4; arrive.fromPose = true; } } catch (e) {}
+try { const j = JSON.parse(sessionStorage.getItem("ccu-pose") || "null"); 
+  if (j && j.to === "team" && Date.now() - j.t < 90000) { me.x = j.x; me.z = j.z; me.yaw = j.yaw; arrive.t = 2.4; arrive.fromPose = true; } } catch (e) {}
 me.x = arrive.from.x; me.z = arrive.from.z;
 /* the camera angle: level (0) up to 60 degrees looking down at the desk. The semicircular arrow sets it. */
 const VP_MAX = Math.PI / 3; let vp = 0.78, vpCur = 0;
@@ -623,7 +623,7 @@ function goAuditorium() {
     sessionStorage.setItem("ccu-pose", JSON.stringify({ to: "aud", x: AUD_X - me.z, z: ZC + me.x, yaw: me.yaw + Math.PI / 2, t: Date.now() }));
   } catch (e) {}
   if (net) { net.close(); net = null; }
-  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261121a";
+  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261121d";
 }
 function leave(type) { if (net) { net.close(); net = null; } post(type); }
 
@@ -658,7 +658,7 @@ function loop(now) {
   else { vpCur += (vp - vpCur) * Math.min(1, dt * 4); const rr0 = Math.hypot(me.x, me.z) || 1, fade = arrive.t < 2.4 ? 0 : clamp((10.0 - rr0) / 2.2, 0, 1), eyeG = Math.max(1.6, Math.min(5.4, 1 + rr0 * Math.tan(vpCur))), eyeT = 1.6 + (eyeG - 1.6) * fade, pitT = vpCur * fade > 0.02 ? -Math.atan((eyeG - 1) / rr0) * fade : 0; me.h += (eyeT - me.h) * Math.min(1, dt * 3); me.pit += (pitT - me.pit) * Math.min(1, dt * 3); if (goal) { const k = 1 - Math.exp(-dt * 2.6); me.x += (goal.x - me.x) * k; me.z += (goal.z - me.z) * k; let dy = faceCenter(me.x, me.z) - me.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); me.yaw += dy * k; if (Math.hypot(goal.x - me.x, goal.z - me.z) < 0.03) goal = null; } if (retreat) { const r = Math.hypot(me.x, me.z); if (r < MINR - 0.01) { const k = Math.min(1, dt * 2.4), nr = r + (MINR - r) * k; me.x *= nr / (r || 1); me.z *= nr / (r || 1); } else retreat = false; } }
   eyeH = me.h; pit = me.pit;
   const sp = Math.hypot(me.x - px, me.z - pz) / Math.max(dt, 0.001); mvSpeed += (sp - mvSpeed) * Math.min(1, dt * 8); px = me.x; pz = me.z;
-  if (dn && mode !== "spin" && mode !== "orbit" && mode !== "dock" && !focus && arrive.t >= 2.4) { stride += Math.hypot(me.x - px0, me.z - pz0); if (stride > 0.62 && now - lastStep > 260) { stride = 0; lastStep = now; sfx.step(Math.min(1, 0.55 + mvSpeed * 0.25)); } } else stride = Math.min(stride, 0.3);
+  if (mvSpeed > 0.2 && mode !== "spin" && mode !== "orbit" && mode !== "dock" && !focus && arrive.t >= 2.4) { stride += Math.hypot(me.x - px0, me.z - pz0); if (stride > 0.4 && now - lastStep > 230) { stride = 0; lastStep = now; sfx.step(Math.min(1, 0.7 + mvSpeed * 0.2)); } } else stride = Math.min(stride, 0.2);
   px0 = me.x; pz0 = me.z;
   bobT += mvSpeed * dt * 2.2; const bob = focus ? 0 : Math.sin(bobT * 3.0) * 0.016 * Math.min(1, mvSpeed);
   { const w = innerWidth, h = innerHeight, pt = cam.aspect < 0.8; const sd = (panes.R.id ? 1 : 0) - (panes.L.id ? 1 : 0); vsh += ((anyOpen() ? 1 : 0) - vsh) * Math.min(1, dt * 5); if (vsh > 0.004) cam.setViewOffset(w, h, pt ? 0 : w * 0.2 * vsh * sd, pt ? h * 0.2 * vsh : 0, w, h); else if (cam.view) cam.clearViewOffset(); }

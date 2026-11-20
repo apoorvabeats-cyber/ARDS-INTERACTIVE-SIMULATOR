@@ -365,7 +365,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     } catch (err) {}
   }
   function readPose() {
-    try { const j = JSON.parse(sessionStorage.getItem("ccu-pose") || "null"); sessionStorage.removeItem("ccu-pose"); if (j && j.to === "hub" && Date.now() - j.t < 20000) return j; } catch (err) {}
+    try { const j = JSON.parse(sessionStorage.getItem("ccu-pose") || "null"); if (j && j.to === "hub" && Date.now() - j.t < 90000) return j; } catch (err) {}
     return null;
   }
 
@@ -379,7 +379,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       if (btn) btn.click();
     } else if (kind === "aud") {
       keepFrame(); keepPose();
-      location.href = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&v=20261121a";
+      location.href = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&v=20261121d";
     } else if (kind === "rad") {
       location.href = "radiology.html?v=20261119r2";
     } else if (kind === "micro") {
