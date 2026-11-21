@@ -3,7 +3,7 @@
    T-pose, so a pose is a rotation per joint), puts them in scrubs and a white coat, and gives them a walking cycle and a name tag.
    createDoctor(T, gltf, { name, spec, sex, label }) -> { group, setMoving(speed 0..1), update(dt), setLabel(text) }          */
 import { GLTFLoader } from "./vendor/GLTFLoader.js";
-import { applyLook, sanitize } from "./doctor-look.js?v=20261122c";
+import { applyLook, sanitize } from "./doctor-look.js?v=20261122e";
 
 const cache = {};
 export function loadDoctorBody(sex) {

@@ -3,7 +3,7 @@
    becomes  lab:cbc, lab:kft, lab:lft, img:cxr, abx:meropenem.
    It matches the longest known phrase first, repairs the usual speech-recognition slips (letters said one by one,
    brand names, near-misses), drops the filler, and says what it could not place. */
-import { CATALOGUE, BY_ID } from "./order-catalogue.js?v=20261122c";
+import { CATALOGUE, BY_ID } from "./order-catalogue.js?v=20261122e";
 
 const UNITS = "mg|mcg|g|gm|gms|gram|grams|ml|mls|l|litre|litres|liter|liters|units?|iu|mmol|meq|mmhg|joules?|hours?|hrs?|minutes?|mins?";
 const FIRST = new Set(["ct", "abg", "cbc", "kft", "lft", "ecg", "cxr", "mri", "cpr", "icd", "niv", "usg", "ekg", "rft", "abx", "crp", "ck", "bnp", "ctpa", "hfnc", "ecmo", "pcc", "txa", "ppi", "nac", "ffp", "tpa", "ivc", "evd", "rbs", "ddimer", "lp", "ua", "mp", "cvc", "ibp", "rrt", "crrt", "ptt", "inr"]);

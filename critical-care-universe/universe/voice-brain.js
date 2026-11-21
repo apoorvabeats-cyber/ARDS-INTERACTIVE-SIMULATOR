@@ -6,8 +6,9 @@
      suggest  : the nearest sensible meanings, when the line fits neither, so there is never a dead end.
    It is a local reader: no network, no model. It knows the patient's numbers (ctx.P), the results that have come back, what has
    been given, and the trend (ctx.hist). It mends the usual speech-recognition slips ("initiate the patient" for "intubate the patient"). */
-import { parseOrders } from "./voice-orders.js?v=20261122c";
-import { BY_ID, CATALOGUE, LABS, PANELS } from "./order-catalogue.js?v=20261122c";
+import { parseOrders } from "./voice-orders.js?v=20261122e";
+import { BY_ID, CATALOGUE, LABS, PANELS } from "./order-catalogue.js?v=20261122e";
+import * as CB from "./clinical-brain.js?v=20261122e";
 
 /* ---------------------------------------------------------------- 1. mending the speech */
 const REPAIRS = [
@@ -25,6 +26,8 @@ const REPAIRS = [
   [/\bs\s*p\s*o\s*(?:2|two|to)\b|\bsp\s*o\s*(?:2|two)\b|\bspo\s*(?:two|2)\b/g, "spo2"],
   [/\b(?:u\.?\s?o\.?|you\s*oh)\b/g, "uo"],
   [/\bg\s*c\s*s\b|\bglasgow\s*coma\s*(?:scale|score)\b|\bglasgow\b|\bcoma\s*(?:scale|score)\b/g, "gcs"],
+  [/\bf\s*i\s*o\s*(?:2|two|to)\b/g, "fio2"],
+  [/\bp\s*e\s*e\s*p\b|\bpee\s*p\b/g, "peep"],
   [/\bb\s*\.?\s*p\b/g, "bp"],
   [/\bh\s*\.?\s*r\b/g, "hr"],
   [/\br\s*\.?\s*r\b/g, "rr"],
@@ -43,7 +46,7 @@ export function repair(text) {
   let t = " " + String(text || "").toLowerCase().replace(/[‘’`´]/g, "'").replace(/\b(what|how|that|it|he|she|there|where|who|when|let|here)'s\b/g, "$1 is").replace(/'s\b/g, "").replace(/[?!]/g, " | ").replace(/[,;:]/g, " | ") + " ";
   for (const [re, to] of REPAIRS) t = t.replace(re, to);
   // "initiate the patient" is "intubate the patient" misheard; "initiate meropenem" is just "start meropenem"
-  t = t.replace(/\binitiat\w*\b((?:\s+\S+){0,3})/g, (m, rest) => (parseOrders(rest).orders.length ? " start" + rest : " intubate" + rest));
+  t = t.replace(/\binitiat\w*\b((?:\s+\S+){0,3})/g, (m, rest, off, whole) => (/\b(?:what does|what is|what do you mean by|define|meaning of|explain|mean by)\s*$/.test(whole.slice(Math.max(0, off - 24), off)) || /^\s*(?:mean|means|meaning|definition)\b/.test(rest) || (!rest.trim() && /^initiate$/.test(m.trim())) ? " initiate" + rest : parseOrders(rest).orders.length ? " start" + rest : " intubate" + rest));
   for (const [re, to] of METRICS) t = t.replace(re, to);
   return t.replace(/\s+/g, " ").trim();
 }
@@ -210,13 +213,17 @@ const REDO = /\b(?:repeat|redo|re do|do again|send again|get again|once more|ano
 const INDICATION = /\b(?:for|because of|due to|in view of|to treat|to correct|secondary to|with|as)\s+(?:the\s+|his\s+|her\s+)?$/;
 
 function splitClauses(t) {
-  const parts = t.split(/\s\|\s|\s\|$|^\|\s/).flatMap((x) => x.split(/\s(?:and then|and also|then|also|plus|and)\s(?=(?:what|how|is|are|does|did|has|have|any|tell|show|check|give|start|do|get|send|call|put|order|run|insert|intubate|ventilate|repeat|see|review|please|can|could|let)\b)/));
+  const parts = t.split(/\s\|\s|\s\|$|^\|\s/).flatMap((x) => x.split(/\s(?:and then|and also|then|also|plus|and)\s(?=(?:what|how|is|are|does|did|has|have|any|tell|show|check|give|start|do|get|send|call|put|order|run|insert|intubate|ventilate|repeat|see|review|please|can|could|let|monitor|reassess|titrate|escalate|continue|wean|stabili[sz]e|resuscitate|withhold|discontinue|optimi[sz]e|restrict|keep)\b)/));
   return parts.map((x) => x.trim()).filter(Boolean);
 }
 
 /* find the answers in one clause; returns { cards, rest } where rest is what is left over for the order parser */
+let HB = null;
+const helpers = () => HB || (HB = { card, latestItem, latestResult, given, lvl, VT, words: wordsOf, summaryCard, trendCard, CONDITIONS, LAB_CONDITIONS, BY_ID, parseOrders, repair });
 function readClause(c, ctx) {
-  const P = ctx.P, cards = [], q = QSTART.test(c) || /\b(?:what|how|is he|is she|is the|are the|does he|does she|any)\b/.test(c), short = c.split(" ").length <= 4, orderish = ORDERISH.test(c) && !/^(?:check|show|give me|tell|let me|read|see|view|review|display|pull|open|look)\b/.test(c);
+  const P = ctx.P;
+  { const pre = CB.pre(helpers(), c, P, ctx); if (pre && pre.length) return { cards: pre, rest: "", hit: true }; }
+  const cards = [], q = QSTART.test(c) || /\b(?:what|how|is he|is she|is the|are the|does he|does she|any)\b/.test(c), short = c.split(" ").length <= 4, orderish = ORDERISH.test(c) && !/^(?:check|show|give me|tell|let me|read|see|view|review|display|pull|open|look)\b/.test(c);
   const has = (re) => re.test(c), stmt = /^(?:he|she|patient|the patient|his|her|bp|pressure|sats?|spo2|urine|uo)\s+(?:is|are|has|have|was|looks|seems|dropped|dropping|came|keeps|going)\b/.test(c) && !q;
   let t = c, hit = false, vitHit = false;
   if (stmt && !parseOrders(c).orders.length) return { cards, rest: "", hit: true, noted: true };
@@ -277,6 +284,7 @@ function readClause(c, ctx) {
       const p2 = parseOrders(c); const gi = [...new Set(p2.orders.map((o) => o.id).filter((id) => BY_ID[id]))]; if (gi.length) take(givenCard(P, gi));
     }
   }
+  if (!hit) { const post = CB.post(helpers(), c, P, ctx); if (post && post.length) post.forEach((x) => take(x)); }
   if (hit) t = "";
   return { cards, rest: t, hit };
 }
@@ -294,7 +302,8 @@ export function understand(text, ctx) {
     if (!r.hit) rest.push(c);
   }
   const parsed = parseOrders(rest.join(" | ").replace(/\b(?:repeat|redo|re do|recheck|re check|again|once more|another|fresh|new)\b/g, " "));
-  out.orders = parsed.orders; out.unknown = parsed.unknown; out.negated = parsed.negated; out.clarify = parsed.clarify;
+  const known = CB.knownWords(helpers(), fixed);
+  out.orders = parsed.orders.filter((o) => o.id !== "shock" || CB.DEFIB.test(rest.join(" ") || fixed)); out.unknown = parsed.unknown.filter((w) => !known.has(String(w).toLowerCase())); out.negated = parsed.negated; out.clarify = parsed.clarify;
   // "show me the ultrasound again": a redo word turns a review into an order
   if (!out.orders.length && !out.answers.length && noted) out.answers.push(card("noted", "Noted", [raw], { tone: "info", spoken: "" }));
   else if (!out.orders.length && !out.answers.length) out.suggest = suggestFor(fixed);

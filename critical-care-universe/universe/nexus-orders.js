@@ -3,9 +3,9 @@
                      and an arrow that sends them to the room.
      createHud():    the LCD that wakes up when something changes: vitals that go wrong on the left, abnormal results on the right,
                      normal results along the top, each with its own alarm. */
-import { parseOrders, toKind } from "./voice-orders.js?v=20261122c";
-import { understand } from "./voice-brain.js?v=20261122c";
-import { BY_ID } from "./order-catalogue.js?v=20261122c";
+import { parseOrders, toKind } from "./voice-orders.js?v=20261122e";
+import { understand } from "./voice-brain.js?v=20261122e";
+import { BY_ID } from "./order-catalogue.js?v=20261122e";
 
 const css = `
 #vc{position:fixed;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));width:min(760px,calc(100vw - 20px));display:grid;gap:7px;padding:10px 12px;border-radius:18px;background:linear-gradient(180deg,rgba(7,26,42,.93),rgba(3,14,24,.95));border:1px solid rgba(95,227,255,.38);box-shadow:0 0 28px rgba(95,227,255,.16),0 14px 40px rgba(0,0,0,.5);backdrop-filter:blur(10px);color:#dff6ff;font:13px/1.35 ui-sans-serif,system-ui,sans-serif}
@@ -109,7 +109,7 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
     chips.innerHTML = orders.map((o, i) => {
       if (o.choose) { const sel = choice[o.id] || o.id; return `<span class="ch fz" data-i="${i}">${esc(o.chooseWhy || "Choose")} <select data-i="${i}">${o.choose.map((c) => `<option value="${esc(c.id)}"${c.id === sel ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select><button type="button" data-rm="${esc(o.id)}" aria-label="Remove">×</button></span>`; }
       return `<span class="ch${o.fuzzy ? " fz" : ""}" title="heard: ${esc(o.heard || "")}">${esc(o.label)}${o.fuzzy ? " <small>?</small>" : ""}<button type="button" data-rm="${esc(o.id)}" aria-label="Remove ${esc(o.label)}">×</button></span>`;
-    }).join("") + parsed.answers.filter((a) => a.title !== "Noted").map((a) => `<span class="ch q" title="I will answer this when you press send">Asking: ${esc(a.title)}</span>`).join("") + parsed.clarify.map((c) => `<span class="ch cl">${esc(c.prompt)} ${c.options.map((o) => `<button type="button" class="opt" data-add="${esc(o.id)}">${esc(o.label.replace(/^CT /, ""))}</button>`).join("")}</span>`).join("");
+    }).join("") + parsed.answers.filter((a) => a.id !== "noted").map((a) => `<span class="ch q" title="I will answer this when you press send">Asking: ${esc(a.title)}</span>`).join("") + parsed.clarify.map((c) => `<span class="ch cl">${esc(c.prompt)} ${c.options.map((o) => `<button type="button" class="opt" data-add="${esc(o.id)}">${esc(o.label.replace(/^CT /, ""))}</button>`).join("")}</span>`).join("");
     const bits = [];
     if (parsed.suggest.length && !orders.length && !parsed.answers.length) chips.innerHTML += `<span class="lead">Did you mean</span>` + parsed.suggest.map((x, i) => `<span class="ch sg" data-sg="${i}">${esc(x.label)}</span>`).join("");
     if (parsed.unknown.length && (orders.length || parsed.answers.length)) bits.push(`Also heard: <b>${esc(parsed.unknown.join(" ").slice(0, 80))}</b>`);
@@ -201,7 +201,7 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
       post("hall-orders", { orders: list });
     }
     const names = orders.map((o) => (o.choose && choice[o.id] ? BY_ID[choice[o.id]].label : o.label));
-    let shown = b.answers.filter((a) => a.title !== "Noted");
+    let shown = b.answers.filter((a) => a.id !== "noted");
     if (!orders.length && !shown.length && !b.answers.length) {
       const sg = b.suggest.length ? b.suggest : [{ kind: "ask", label: "What is the blood pressure?" }, { kind: "ask", label: "How is the patient now?" }, { kind: "ask", label: "What should we do next?" }];
       shown = [{ id: "help", title: "I can answer or do that. Which did you mean?", lines: ["Ask about a vital sign, a result or a condition, or give an order."], tone: "info", spoken: "Which of these did you mean?" }];

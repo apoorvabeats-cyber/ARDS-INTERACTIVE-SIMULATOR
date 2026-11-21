@@ -6,17 +6,17 @@
    Movement is the ICU's finger drag: swipe up to walk, drag sideways to look. Tap your own screen to work at it. */
 import * as T from "./three.module.js";
 import { GLTFLoader } from "./vendor/GLTFLoader.js";
-import { createDevices } from "./icu-devices.js?v=20261122c";
-import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261122c";
-import { loadLook, sanitize as cleanLook } from "./doctor-look.js?v=20261122c";
-import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261122c";
-import { createSfx } from "./sfx.js?v=20261122c";
-import { CSS3DRenderer, CSS3DObject } from "./vendor/CSS3DRenderer.js?v=20261122c";
-import { buildChamber, CH } from "./mdt-chamber.js?v=20261122c";
-import { paintAvail, paintPresent, paintDiscuss, paintConsole, paintPlacard, TAB_LABEL, TAB_ORDER, patientNo } from "./mdt-screens.js?v=20261122c";
-import { paintMachine } from "./nexus-machines.js?v=20261122c";
-import { createOrders, createHud } from "./nexus-orders.js?v=20261122c";
-import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261122c";
+import { createDevices } from "./icu-devices.js?v=20261122e";
+import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261122e";
+import { loadLook, sanitize as cleanLook } from "./doctor-look.js?v=20261122e";
+import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261122e";
+import { createSfx } from "./sfx.js?v=20261122e";
+import { CSS3DRenderer, CSS3DObject } from "./vendor/CSS3DRenderer.js?v=20261122e";
+import { buildChamber, CH } from "./mdt-chamber.js?v=20261122e";
+import { paintAvail, paintPresent, paintDiscuss, paintConsole, paintPlacard, TAB_LABEL, TAB_ORDER, patientNo } from "./mdt-screens.js?v=20261122e";
+import { paintMachine } from "./nexus-machines.js?v=20261122e";
+import { createOrders, createHud } from "./nexus-orders.js?v=20261122e";
+import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261122e";
 
 const $ = (s) => document.querySelector(s);
 const Q = new URLSearchParams(location.search), DEMO = Q.has("demo");
@@ -558,7 +558,7 @@ function goAuditorium() {
     sessionStorage.setItem("ccu-pose", JSON.stringify({ to: "aud", x: AUD_X - me.z, z: ZC + me.x, yaw: me.yaw + Math.PI / 2, t: Date.now() }));
   } catch (e) {}
   if (net) { net.close(); net = null; }
-  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261122c";
+  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261122e";
 }
 function leave(type) { if (net) { net.close(); net = null; } post(type); }
 
@@ -639,7 +639,7 @@ if (DEMO) {
   const room = { id: "demo", code: "DEMO42", status: "live", host: true, slots: { intensivist: 1, pulmonologist: 1, nephrologist: 1 }, you: { specialty: mySpec, inside: true }, members: [{ userId: myId, name: myName, specialty: mySpec, inside: true }, { userId: "x1", name: "Ravi", specialty: "pulmonologist" }, { userId: "x2", name: "Meera", specialty: "nephrologist" }], scenario: { name: "Meera Nair", age: 58, sex: "woman", dx: "Fever and hypoxaemic pneumonia", story: "Three days of fever and a productive cough. She is speaking. The saturation is 91% on air. The pressure, for now, is acceptable." }, patient: { hour: 3, hr: 112, sbp: 104, dbp: 64, map: 77, spo2: 91, rr: 28, gcs: 15, temp: 38.6, lactate: 2.6, cr: 1.4, k: 4.3, rhythm: "sinus", alive: true, tube: false, oxygen: true, norepi: false, problems: [{ id: "a", title: "Pneumonia with falling saturation", specialty: "pulmonologist", open: true, called: false }, { id: "b", title: "Rising lactate", specialty: "intensivist", open: true, called: true }], results: [{ label: "Labs", text: "Lactate 2.6 mmol/L. Creatinine 1.4 mg/dL. Potassium 4.3 mmol/L. Haemoglobin 11.4 g/dL." }], log: [{ t: 1, text: "Asha examined the patient." }, { t: 2, text: "Asha put oxygen on." }] } };
   apply({ room, orders, me: { name: myName } });
   if (Q.has("engine")) {                                   /* ?demo&engine: the real case engine behind the hall, for trying orders */
-    const E = await import("./case-engine.js?v=20261122c"), team = (Q.get("team") || "intensivist,pulmonologist,nephrologist").split(","), sc = E.Dp(7, team, { caseId: Q.get("case") || undefined, noRemember: true, recent: [] });
+    const E = await import("./case-engine.js?v=20261122e"), team = (Q.get("team") || "intensivist,pulmonologist,nephrologist").split(","), sc = E.Dp(7, team, { caseId: Q.get("case") || undefined, noRemember: true, recent: [] });
     const acts = [], t0 = Date.now() - (+Q.get("t") || 0) * 1000, me0 = room.members[0];
     room.slots = {}; team.forEach((sp) => { room.slots[sp] = 1; });
     room.members = team.map((sp, i) => ({ userId: i === 0 ? myId : "x" + i, name: i === 0 ? myName : "Dr " + sp.slice(0, 5), specialty: sp, inside: true })); room.you = { specialty: team[0], inside: true }; mySpec = team[0];
