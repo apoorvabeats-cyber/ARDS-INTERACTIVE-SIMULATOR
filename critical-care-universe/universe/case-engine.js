@@ -123,6 +123,7 @@ export function Np(sc, actions, ms) {
   const vit = (t, extra) => {
     const s = st.s, h = st.h, out = {};
     for (const k of ["hr", "sbp", "dbp", "spo2", "rr", "gcs", "temp"]) out[k] = lerp3(c.v[k], s, h);
+    out.uo = lerp3(c.v.uo || [55, 12, 65], s, h);          // urine output, mL per hour
     // support: what the team has put on the patient lifts the numbers, without curing the cause
     const base = out.spo2, q = [0, 0.45, 0.6, 0.7, 0.82][st.o2] * (c.ox == null ? 1 : c.ox);
     if (q && base < 98) out.spo2 = base + (98.5 - base) * q;
@@ -133,7 +134,7 @@ export function Np(sc, actions, ms) {
     for (const kk of kicks) { const f = Math.exp(-(t - kk.at) / kk.tau); if (t >= kk.at) for (const p in kk.dv) out[p] += kk.dv[p] * f; }
     const wob = Math.sin(t / 6100) + 0.6 * Math.sin(t / 2300);
     out.hr += wob * 1.3; out.spo2 += wob * 0.35; out.sbp += wob * 1.5; out.dbp += wob * 0.8; out.rr += wob * 0.4;
-    out.hr = clamp(out.hr, 28, 190); out.sbp = clamp(out.sbp, 40, 250); out.dbp = clamp(out.dbp, 20, 140); out.spo2 = clamp(out.spo2, 50, 100); out.rr = clamp(out.rr, 4, 60); out.gcs = clamp(out.gcs, 3, 15); out.temp = clamp(out.temp, 33, 42);
+    out.hr = clamp(out.hr, 28, 190); out.sbp = clamp(out.sbp, 40, 250); out.dbp = clamp(out.dbp, 20, 140); out.spo2 = clamp(out.spo2, 50, 100); out.rr = clamp(out.rr, 4, 60); out.uo = clamp(out.uo, 0, 400); out.gcs = clamp(out.gcs, 3, 15); out.temp = clamp(out.temp, 33, 42);
     if (extra) out.map = out.dbp + (out.sbp - out.dbp) / 3;
     return out;
   };
@@ -325,7 +326,7 @@ export function Np(sc, actions, ms) {
   return {
     hour: Math.floor(r / 15000), elapsedMs: r,
     hr: alive ? (arrested ? 0 : Math.round(v.hr)) : 0, sbp: alive && !arrested ? Math.round(v.sbp) : 0, dbp: alive && !arrested ? Math.round(v.dbp) : 0, map: alive && !arrested ? Math.round(v.map) : 0,
-    spo2: alive && !arrested ? Math.round(v.spo2) : 0, rr: alive ? (arrested ? 0 : Math.round(v.rr)) : 0, gcs: Math.round(v.gcs), temp: Math.round(v.temp * 10) / 10,
+    spo2: alive && !arrested ? Math.round(v.spo2) : 0, rr: alive ? (arrested ? 0 : Math.round(v.rr)) : 0, gcs: Math.round(v.gcs), temp: Math.round(v.temp * 10) / 10, uo: alive && !arrested ? Math.round(v.uo) : 0,
     lactate: Math.round(lactate * 10) / 10, cr: Math.round(cr * 10) / 10, k: Math.round(kk * 10) / 10,
     rhythm: !alive ? "pea" : arrested ? (sc.shockable ? "vf" : "pea") : "sinus", alive, outcome, outcomeLine,
     tube: st.tube, oxygen: st.oxygen, norepi: st.norepi, artLine: st.artLine, hdLine: st.hdLine, dialysis: st.dialysis, dialysisWaiting: st.dialysisWaiting, bronch: st.bronch,

@@ -3,8 +3,9 @@
                      and an arrow that sends them to the room.
      createHud():    the LCD that wakes up when something changes: vitals that go wrong on the left, abnormal results on the right,
                      normal results along the top, each with its own alarm. */
-import { parseOrders, toKind } from "./voice-orders.js?v=20261122a";
-import { BY_ID } from "./order-catalogue.js?v=20261122a";
+import { parseOrders, toKind } from "./voice-orders.js?v=20261122c";
+import { understand } from "./voice-brain.js?v=20261122c";
+import { BY_ID } from "./order-catalogue.js?v=20261122c";
 
 const css = `
 #vc{position:fixed;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));width:min(760px,calc(100vw - 20px));display:grid;gap:7px;padding:10px 12px;border-radius:18px;background:linear-gradient(180deg,rgba(7,26,42,.93),rgba(3,14,24,.95));border:1px solid rgba(95,227,255,.38);box-shadow:0 0 28px rgba(95,227,255,.16),0 14px 40px rgba(0,0,0,.5);backdrop-filter:blur(10px);color:#dff6ff;font:13px/1.35 ui-sans-serif,system-ui,sans-serif}
@@ -64,38 +65,62 @@ const css = `
 #rsl .rc.n span{opacity:.75;margin-left:6px;font-family:ui-sans-serif,system-ui,sans-serif}
 @keyframes rcPulse{50%{box-shadow:0 0 30px rgba(255,91,110,.75),inset 0 0 26px rgba(255,91,110,.16)}}
 @media(max-width:700px){#vc{padding:8px 9px}#mic{width:52px;min-height:52px}#rsl .col{top:calc(112px + env(safe-area-inset-top));width:46vw}#rsl .rc .big{font-size:21px}}
+#vans{display:grid;gap:7px;max-height:min(42vh,340px);overflow:auto;overscroll-behavior:contain}
+#vans:empty{display:none}
+#vans .an{position:relative;padding:9px 34px 9px 14px;border-radius:12px;background:linear-gradient(180deg,rgba(2,16,22,.94),rgba(3,22,28,.92));border:1px solid rgba(95,227,255,.5);color:#d6f6ff;overflow:hidden;animation:rcIn .3s cubic-bezier(.2,.9,.3,1.2) both}
+#vans .an::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--a,#5fe3ff)}
+#vans .an.ok{--a:#4fe3b0;border-color:rgba(79,227,176,.55)}
+#vans .an.warn{--a:#ffc24a;border-color:rgba(255,194,74,.65)}
+#vans .an.crit{--a:#ff5b6e;border-color:rgba(255,91,110,.85);animation:rcIn .3s both,rcPulse 1.1s ease-in-out .4s infinite}
+#vans .an.info{--a:#5fe3ff}
+#vans .an h5{margin:0 0 2px;font:700 11px/1.2 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--a)}
+#vans .an .big{font:800 26px/1.1 ui-monospace,Menlo,Consolas,monospace;color:#fff;text-shadow:0 0 10px var(--a)}
+#vans .an .big small{font-size:12px;font-weight:600;opacity:.8;margin-left:6px;text-shadow:none}
+#vans .an p{margin:2px 0 0;font-size:12.5px;line-height:1.4;color:#c4eef9}
+#vans .an .x{position:absolute;right:6px;top:5px;width:22px;height:22px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.12);font-size:14px;line-height:20px}
+#vans .an .acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+#vans .an .acts button{border:1px solid var(--a);background:rgba(95,227,255,.1);border-radius:999px;padding:3px 11px;font-size:12px;font-weight:650}
+#vans .an .acts button:hover{background:rgba(95,227,255,.25)}
+#vchips .ch.q{border-color:rgba(95,227,255,.6);background:rgba(18,70,96,.5)}
+#vchips .ch.sg{border-color:rgba(160,190,255,.55);background:rgba(40,52,110,.45);padding:4px 10px;cursor:pointer}
+#vchips .ch.sg:hover{background:rgba(70,90,170,.55)}
+#vchips .lead{font-size:12px;color:#9fc3d4}
+#vspk{flex:none;width:38px;border-radius:12px;border:1px solid rgba(95,227,255,.4);background:rgba(8,32,47,.8);font-size:17px;padding:0}
+#vspk[data-on="0"]{opacity:.5}
 body.using #vc{display:none}
 `;
 
 const el = (tag, attrs, html) => { const e = document.createElement(tag); Object.entries(attrs || {}).forEach(([k, v]) => e.setAttribute(k, v)); if (html != null) e.innerHTML = html; return e; };
 const MIC = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>';
 
-export function createOrders({ post, sfx, esc, onSent, say }) {
+export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
   if (!document.getElementById("vc-style")) { const s = el("style", { id: "vc-style" }, css); document.head.appendChild(s); }
   const root = el("div", { id: "vc", hidden: "" });
-  root.innerHTML = `<div id="vchips"></div><div id="vmeta"></div><div class="vrow"><button id="mic" type="button" aria-label="Hold to talk, or tap to start and stop">${MIC}</button><button id="vstop" type="button" aria-label="Stop listening" hidden>■</button><textarea id="vtext" rows="2" spellcheck="false" placeholder="Hold the microphone and speak: do CBC, KFT, LFT, chest x-ray, start meropenem"></textarea><button id="vsend" type="button" aria-label="Send the orders" disabled>➤</button></div>`;
+  root.innerHTML = `<div id="vans" aria-live="polite"></div><div id="vchips"></div><div id="vmeta"></div><div class="vrow"><button id="mic" type="button" aria-label="Hold to talk, or tap to start and stop">${MIC}</button><button id="vstop" type="button" aria-label="Stop listening" hidden>■</button><textarea id="vtext" rows="2" spellcheck="false" placeholder="Speak or type: what is the BP? · is he hypotensive? · urine output · get an echo · start meropenem"></textarea><button id="vspk" type="button" aria-label="Speak the answers aloud" data-on="1">🔊</button><button id="vsend" type="button" aria-label="Send" disabled>➤</button></div>`;
   document.body.appendChild(root);
-  const $ = (s) => root.querySelector(s), mic = $("#mic"), stopB = $("#vstop"), text = $("#vtext"), chips = $("#vchips"), meta = $("#vmeta"), sendB = $("#vsend");
+  const $ = (s) => root.querySelector(s), mic = $("#mic"), stopB = $("#vstop"), text = $("#vtext"), ans = $("#vans"), spk = $("#vspk"), chips = $("#vchips"), meta = $("#vmeta"), sendB = $("#vsend");
   const SR = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
-  let rec = null, wantOn = false, listening = false, locked = false, pressAt = 0, finalText = "", parsed = parseOrders(""), removed = new Set(), choice = {}, extra = [], busyMsg = "";
+  let rec = null, wantOn = false, listening = false, locked = false, pressAt = 0, finalText = "", parsed = understand("", null), speak = true, removed = new Set(), choice = {}, extra = [], busyMsg = "";
 
   /* ---- what was heard, and what it means */
   function refresh() {
-    parsed = parseOrders(text.value);
+    parsed = understand(text.value, getCtx());
     const orders = current();
     chips.innerHTML = orders.map((o, i) => {
       if (o.choose) { const sel = choice[o.id] || o.id; return `<span class="ch fz" data-i="${i}">${esc(o.chooseWhy || "Choose")} <select data-i="${i}">${o.choose.map((c) => `<option value="${esc(c.id)}"${c.id === sel ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select><button type="button" data-rm="${esc(o.id)}" aria-label="Remove">×</button></span>`; }
       return `<span class="ch${o.fuzzy ? " fz" : ""}" title="heard: ${esc(o.heard || "")}">${esc(o.label)}${o.fuzzy ? " <small>?</small>" : ""}<button type="button" data-rm="${esc(o.id)}" aria-label="Remove ${esc(o.label)}">×</button></span>`;
-    }).join("") + parsed.clarify.map((c) => `<span class="ch cl">${esc(c.prompt)} ${c.options.map((o) => `<button type="button" class="opt" data-add="${esc(o.id)}">${esc(o.label.replace(/^CT /, ""))}</button>`).join("")}</span>`).join("");
+    }).join("") + parsed.answers.filter((a) => a.title !== "Noted").map((a) => `<span class="ch q" title="I will answer this when you press send">Asking: ${esc(a.title)}</span>`).join("") + parsed.clarify.map((c) => `<span class="ch cl">${esc(c.prompt)} ${c.options.map((o) => `<button type="button" class="opt" data-add="${esc(o.id)}">${esc(o.label.replace(/^CT /, ""))}</button>`).join("")}</span>`).join("");
     const bits = [];
-    if (parsed.unknown.length) bits.push(`<span class="bad">Not understood:</span> <b>${esc(parsed.unknown.join(" ").slice(0, 80))}</b>`);
+    if (parsed.suggest.length && !orders.length && !parsed.answers.length) chips.innerHTML += `<span class="lead">Did you mean</span>` + parsed.suggest.map((x, i) => `<span class="ch sg" data-sg="${i}">${esc(x.label)}</span>`).join("");
+    if (parsed.unknown.length && (orders.length || parsed.answers.length)) bits.push(`Also heard: <b>${esc(parsed.unknown.join(" ").slice(0, 80))}</b>`);
     if (parsed.negated.length) bits.push(`Left out as you said no: ${esc(parsed.negated.join(", "))}`);
     if (!SR) bits.push("This browser has no speech recognition. Type the order and press ➤.");
     if (busyMsg) bits.push(esc(busyMsg));
     meta.innerHTML = bits.join(" · ");
-    sendB.disabled = !orders.length || root.dataset.busy === "1";
+    sendB.disabled = !text.value.trim();
     return orders;
   }
+  const getCtx = () => { try { return ctx ? ctx() : null; } catch (e) { return null; } };
   function current() {
     const base = parsed.orders.filter((o) => !removed.has(o.id) && !(o.id === "abx:any" && choice["abx:any"] && removed.has(choice["abx:any"])));
     const add = extra.filter((x) => !base.some((b) => b.id === x.id) && !removed.has(x.id));
@@ -104,7 +129,8 @@ export function createOrders({ post, sfx, esc, onSent, say }) {
   text.addEventListener("input", () => { removed = new Set(); refresh(); });
   text.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
   chips.addEventListener("click", (e) => {
-    const rm = e.target.closest("[data-rm]"), add = e.target.closest("[data-add]");
+    const rm = e.target.closest("[data-rm]"), add = e.target.closest("[data-add]"), sg = e.target.closest("[data-sg]");
+    if (sg) { const x = parsed.suggest[+sg.dataset.sg]; if (x) { if (x.kind === "order" && x.id && BY_ID[x.id]) { extra.push({ id: x.id, label: BY_ID[x.id].label }); text.value = ""; refresh(); } else { text.value = x.label; refresh(); send(); } } return; }
     if (rm) { removed.add(rm.dataset.rm); refresh(); } else if (add) { const id = add.dataset.add; extra.push({ id, label: BY_ID[id].label }); refresh(); }
   });
   chips.addEventListener("change", (e) => { const s = e.target.closest("select"); if (s) { choice["abx:any"] = s.value; } });
@@ -113,7 +139,7 @@ export function createOrders({ post, sfx, esc, onSent, say }) {
   const setUi = (on) => { listening = on; mic.dataset.on = on ? "1" : "0"; stopB.hidden = !on; text.classList.toggle("live", on); };
   function pick(res) {                       // among the alternatives the engine offers, keep the one that makes the most sense as orders
     let best = res[0].transcript, bn = -1;
-    for (let k = 0; k < res.length; k += 1) { const n = parseOrders(res[k].transcript).orders.length; if (n > bn) { bn = n; best = res[k].transcript; } }
+    for (let k = 0; k < res.length; k += 1) { const u = understand(res[k].transcript, getCtx()), n = u.orders.length + u.answers.length; if (n > bn) { bn = n; best = res[k].transcript; } }
     return best;
   }
   function start() {
@@ -128,7 +154,7 @@ export function createOrders({ post, sfx, esc, onSent, say }) {
     rec.onend = () => { if (wantOn) { try { rec.start(); } catch (e) { wantOn = false; setUi(false); } } else { setUi(false); refresh(); } };
     wantOn = true; busyMsg = ""; try { rec.start(); setUi(true); sfx && sfx.beep && sfx.beep({ f: 740, vol: 0.12 }); } catch (e) { wantOn = false; setUi(false); }
   }
-  function stop() { wantOn = false; locked = false; try { rec && rec.stop(); } catch (e) {} setUi(false); refresh(); }
+  function stop() { const was = listening; wantOn = false; locked = false; try { rec && rec.stop(); } catch (e) {} setUi(false); const o = refresh(); if (was && !o.length && parsed.answers.length && !root.dataset.busyAns) setTimeout(() => { if (!listening && text.value.trim() && !current().length && understand(text.value, getCtx()).answers.length) send(); }, 250); }
   mic.addEventListener("contextmenu", (e) => e.preventDefault());
   mic.addEventListener("pointerdown", (e) => { e.preventDefault(); try { mic.setPointerCapture(e.pointerId); } catch (x) {} if (listening && locked) { stop(); pressAt = 0; return; } pressAt = Date.now(); start(); });
   const release = () => { if (!pressAt) return; const held = Date.now() - pressAt; pressAt = 0; if (!listening) return; if (held > 450) stop(); else locked = true; };
@@ -136,17 +162,56 @@ export function createOrders({ post, sfx, esc, onSent, say }) {
   mic.addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (listening) stop(); else { locked = true; start(); } } });
   stopB.addEventListener("click", stop);
 
+  /* ---- answering */
+  const dismiss = (n) => { if (!n.isConnected) return; n.remove(); };
+  function say1(list) {
+    if (!speak || !list.length || typeof speechSynthesis === "undefined") return;
+    try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(list.map((a) => a.spoken != null ? a.spoken : a.title).filter(Boolean).slice(0, 3).join(" ")); u.lang = "en-IN"; u.rate = 1.02; if (u.text.trim()) speechSynthesis.speak(u); } catch (e) {}
+  }
+  function showAnswers(list, sug) {
+    list.forEach((a) => {
+      ans.querySelectorAll(`[data-id="${CSS.escape(a.id)}"]`).forEach(dismiss);
+      const n = el("div", { class: "an " + (a.tone || "info"), "data-id": a.id });
+      n.innerHTML = `<h5>${esc(a.title)}</h5>${a.big != null ? `<div class="big">${esc(String(a.big))}${a.unit ? `<small>${esc(a.unit)}</small>` : ""}</div>` : ""}${(a.lines || []).map((l) => `<p>${esc(l)}</p>`).join("")}${a.note ? `<p><i>${esc(a.note)}</i></p>` : ""}<button class="x" type="button" aria-label="Close">×</button>` +
+        ((a.actions && a.actions.length) || a.section || (sug && sug.length) ? `<div class="acts">${(a.actions || []).map((x, i) => `<button type="button" data-act="${i}">${esc(x.label)}</button>`).join("")}${a.section && open ? `<button type="button" data-open="1">Open ▸</button>` : ""}${(sug || []).map((x, i) => `<button type="button" data-sg="${i}">${esc(x.label)}</button>`).join("")}</div>` : "");
+      n.querySelector(".x").onclick = () => dismiss(n);
+      n.addEventListener("click", (e) => {
+        const b = e.target.closest("button"); if (!b) return;
+        if (b.dataset.act != null) { const x = a.actions[+b.dataset.act]; if (x && x.order) { post("hall-orders", { orders: [toKind({ id: x.order })] }); sfx && sfx.beep && sfx.beep({ f: 988, vol: 0.14 }); b.disabled = true; b.textContent = "Sent ✓"; } }
+        else if (b.dataset.open) { open && open(a.section); }
+        else if (b.dataset.sg != null) { const x = sug[+b.dataset.sg]; if (x) { if (x.kind === "order" && x.id && BY_ID[x.id]) { post("hall-orders", { orders: [toKind({ id: x.id })] }); b.disabled = true; b.textContent = "Sent ✓"; } else { dismiss(n); text.value = x.label; send(); } } }
+      });
+      ans.prepend(n); while (ans.children.length > 4) ans.lastChild.remove();
+      setTimeout(() => dismiss(n), a.tone === "crit" ? 45000 : 28000);
+    });
+    ans.scrollTop = 0;
+  }
+  spk.addEventListener("click", () => { speak = !speak; spk.dataset.on = speak ? "1" : "0"; try { localStorage.setItem("ccu-voice-speak", speak ? "1" : "0"); } catch (e) {} if (!speak) { try { speechSynthesis.cancel(); } catch (e) {} } });
+  try { if (localStorage.getItem("ccu-voice-speak") === "0") { speak = false; spk.dataset.on = "0"; } } catch (e) {}
+  if (typeof speechSynthesis === "undefined") spk.hidden = true;
+
   /* ---- sending */
   function send() {
-    const orders = refresh(); if (!orders.length || root.dataset.busy === "1") return;
+    if (!text.value.trim()) return;
+    const busy = root.dataset.busy === "1", orders = refresh(), b = parsed;
     if (listening) stop();
-    const list = orders.map((o) => { const id = o.choose && choice[o.id] ? choice[o.id] : o.id; return toKind({ id, specialty: o.specialty }); });
-    post("hall-orders", { orders: list });
+    if (orders.length && busy) { busyMsg = "The room is busy. Press ➤ again in a moment to send the orders."; refresh(); return; }
+    if (orders.length) {
+      const list = orders.map((o) => { const id = o.choose && choice[o.id] ? choice[o.id] : o.id; return toKind({ id, specialty: o.specialty }); });
+      post("hall-orders", { orders: list });
+    }
     const names = orders.map((o) => (o.choose && choice[o.id] ? BY_ID[choice[o.id]].label : o.label));
+    let shown = b.answers.filter((a) => a.title !== "Noted");
+    if (!orders.length && !shown.length && !b.answers.length) {
+      const sg = b.suggest.length ? b.suggest : [{ kind: "ask", label: "What is the blood pressure?" }, { kind: "ask", label: "How is the patient now?" }, { kind: "ask", label: "What should we do next?" }];
+      shown = [{ id: "help", title: "I can answer or do that. Which did you mean?", lines: ["Ask about a vital sign, a result or a condition, or give an order."], tone: "info", spoken: "Which of these did you mean?" }];
+      showAnswers(shown, sg);
+    } else showAnswers(shown, null);
+    if (shown.length) say1(shown);
     sendB.classList.add("ok"); setTimeout(() => sendB.classList.remove("ok"), 1400);
-    text.value = ""; finalText = ""; removed = new Set(); choice = {}; extra = []; parsed = parseOrders("");
-    busyMsg = "Sent: " + names.join(", "); refresh(); setTimeout(() => { busyMsg = ""; refresh(); }, 4200);
-    sfx && sfx.beep && sfx.beep({ f: 988, vol: 0.14 }); onSent && onSent(names);
+    text.value = ""; finalText = ""; removed = new Set(); choice = {}; extra = []; parsed = understand("", null);
+    busyMsg = names.length ? "Sent: " + names.join(", ") : ""; refresh(); if (busyMsg) setTimeout(() => { busyMsg = ""; refresh(); }, 4200);
+    sfx && sfx.beep && sfx.beep({ f: 988, vol: 0.14 }); names.length && onSent && onSent(names);
   }
   sendB.addEventListener("click", send);
   refresh();

@@ -3,7 +3,7 @@
    becomes  lab:cbc, lab:kft, lab:lft, img:cxr, abx:meropenem.
    It matches the longest known phrase first, repairs the usual speech-recognition slips (letters said one by one,
    brand names, near-misses), drops the filler, and says what it could not place. */
-import { CATALOGUE, BY_ID } from "./order-catalogue.js?v=20261122a";
+import { CATALOGUE, BY_ID } from "./order-catalogue.js?v=20261122c";
 
 const UNITS = "mg|mcg|g|gm|gms|gram|grams|ml|mls|l|litre|litres|liter|liters|units?|iu|mmol|meq|mmhg|joules?|hours?|hrs?|minutes?|mins?";
 const FIRST = new Set(["ct", "abg", "cbc", "kft", "lft", "ecg", "cxr", "mri", "cpr", "icd", "niv", "usg", "ekg", "rft", "abx", "crp", "ck", "bnp", "ctpa", "hfnc", "ecmo", "pcc", "txa", "ppi", "nac", "ffp", "tpa", "ivc", "evd", "rbs", "ddimer", "lp", "ua", "mp", "cvc", "ibp", "rrt", "crrt", "ptt", "inr"]);
@@ -23,7 +23,7 @@ export function tokenize(text) {
   return out;
 }
 
-const STOP = new Set("| gluconate chloride sulphate sulfate hydrochloride acetate tartrate succinate gram grams gm gms mg mcg ml mls units unit litre litres liter liters bolus iv im doses tablet tablets she he they their checked sent given started please also urgent please a an the of for on in at to with and then also plus we i me us you your please kindly now stat urgent urgently immediately get do done order send start give put patient him her his hers it this that is are be ok okay sir doctor dr sister nurse as soon possible quickly fast first next after before right away request requesting ordering ordered organise organize arrange run check take make begin commence initiate administer apply set up out off again one two three four five six ten twenty thirty fifty hundred thousand million point per times every hourly hour hours minutes minute mins over dose dosage loading maintenance lets let need needs want would like can could should must have has just so yes yeah okay alright going will shall them they these those some any more another new fresh immediate emergency emergent additionally further continue keep sending giving doing getting starting putting taking making".split(" "));
+const STOP = new Set("| yet gluconate chloride sulphate sulfate hydrochloride acetate tartrate succinate gram grams gm gms mg mcg ml mls units unit litre litres liter liters bolus iv im doses tablet tablets she he they their checked sent given started please also urgent please a an the of for on in at to with and then also plus we i me us you your please kindly now stat urgent urgently immediately get do done order send start give put patient him her his hers it this that is are be ok okay sir doctor dr sister nurse as soon possible quickly fast first next after before right away request requesting ordering ordered organise organize arrange run check take make begin commence initiate administer apply set up out off again one two three four five six ten twenty thirty fifty hundred thousand million point per times every hourly hour hours minutes minute mins over dose dosage loading maintenance lets let need needs want would like can could should must have has just so yes yeah okay alright going will shall them they these those some any more another new fresh immediate emergency emergent additionally further continue keep sending giving doing getting starting putting taking making".split(" "));
 const NEG = new Set(["no", "not", "dont", "dont", "never", "cancel", "stop", "without", "avoid", "hold", "skip", "nope", "negative", "dontt"]);
 
 const SPEC_WORDS = [

@@ -6,17 +6,17 @@
    Movement is the ICU's finger drag: swipe up to walk, drag sideways to look. Tap your own screen to work at it. */
 import * as T from "./three.module.js";
 import { GLTFLoader } from "./vendor/GLTFLoader.js";
-import { createDevices } from "./icu-devices.js?v=20261122a";
-import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261122a";
-import { loadLook, sanitize as cleanLook } from "./doctor-look.js?v=20261122a";
-import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261122a";
-import { createSfx } from "./sfx.js?v=20261122a";
-import { CSS3DRenderer, CSS3DObject } from "./vendor/CSS3DRenderer.js?v=20261122a";
-import { buildChamber, CH } from "./mdt-chamber.js?v=20261122a";
-import { paintAvail, paintPresent, paintDiscuss, paintConsole, paintPlacard, TAB_LABEL, TAB_ORDER, patientNo } from "./mdt-screens.js?v=20261122a";
-import { paintMachine } from "./nexus-machines.js?v=20261122a";
-import { createOrders, createHud } from "./nexus-orders.js?v=20261122a";
-import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261122a";
+import { createDevices } from "./icu-devices.js?v=20261122c";
+import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261122c";
+import { loadLook, sanitize as cleanLook } from "./doctor-look.js?v=20261122c";
+import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261122c";
+import { createSfx } from "./sfx.js?v=20261122c";
+import { CSS3DRenderer, CSS3DObject } from "./vendor/CSS3DRenderer.js?v=20261122c";
+import { buildChamber, CH } from "./mdt-chamber.js?v=20261122c";
+import { paintAvail, paintPresent, paintDiscuss, paintConsole, paintPlacard, TAB_LABEL, TAB_ORDER, patientNo } from "./mdt-screens.js?v=20261122c";
+import { paintMachine } from "./nexus-machines.js?v=20261122c";
+import { createOrders, createHud } from "./nexus-orders.js?v=20261122c";
+import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261122c";
 
 const $ = (s) => document.querySelector(s);
 const Q = new URLSearchParams(location.search), DEMO = Q.has("demo");
@@ -40,8 +40,9 @@ const S = new T.Scene(); S.background = new T.Color(0x040a12);
 const cam = new T.PerspectiveCamera(64, 1, 0.05, 60);
 /* the docked section panels are real LCD screens standing in the hall beside the patient: the page elements are pinned into the 3D scene */
 const lcdScene = new T.Scene(), css3 = new CSS3DRenderer(), lcdEl = css3.domElement; lcdEl.id = "lcd"; document.body.appendChild(lcdEl);
-const fit = () => { const w = innerWidth, h = innerHeight; R.setSize(w, h, false); css3.setSize(w, h); cam.aspect = w / Math.max(1, h); cam.fov = cam.aspect < 0.8 ? 72 : 62; cam.updateProjectionMatrix(); };
-addEventListener("resize", fit); fit();
+let fitW = 0, fitH = 0, fitQ = 0;
+const fit = () => { const w = innerWidth, h = innerHeight; if (w === fitW && h === fitH) return; fitW = w; fitH = h; R.setSize(w, h, false); css3.setSize(w, h); cam.aspect = w / Math.max(1, h); cam.fov = cam.aspect < 0.8 ? 72 : 62; cam.updateProjectionMatrix(); };
+addEventListener("resize", () => { cancelAnimationFrame(fitQ); fitQ = requestAnimationFrame(fit); }); fit();
 
 /* ================================================================ materials and helpers */
 const env = (() => {
@@ -258,8 +259,8 @@ const arrive = { t: 0, t0: performance.now(), from: { x: me.x * 1.62, z: me.z * 
 try { const j = JSON.parse(sessionStorage.getItem("ccu-pose") || "null"); 
   if (j && j.to === "team" && Date.now() - j.t < 90000) { me.x = j.x; me.z = j.z; me.yaw = j.yaw; me.seated = false; arrive.t = 2.4; arrive.fromPose = true; } } catch (e) {}
 me.x = arrive.from.x; me.z = arrive.from.z;
-/* the camera angle: level (0) up to 60 degrees looking down at the desk. The semicircular arrow sets it. */
-const VP_MAX = Math.PI / 3; let vp = 0.34, vpCur = 0;
+/* the camera looks slightly down at the desk, at a fixed angle */
+const vp = 0.34; let vpCur = 0;
 const faceCenter = (x, z) => Math.atan2(-x, z);
 me.yaw = faceCenter(me.x, me.z);
 function clampPos(x, z) { if (!focus && Math.abs(x) < 1.2 && z > MAXR - 1.5) return [clamp(x, -1.2, 1.2), Math.min(z, RH + 3.2)]; const r = Math.hypot(x, z) || 1e-6; if (!focus && r < MINR) { x *= MINR / r; z *= MINR / r; } else if (r > MAXR) { x *= MAXR / r; z *= MAXR / r; } return [x, z]; }
@@ -274,7 +275,7 @@ let dn = 0, mvd = 0, lx = 0, ly = 0, sx = 0, sy = 0, holdDir = 0, lastV = 0, mod
 const ray = new T.Raycaster(), ndc = new T.Vector2();
 const sfx = createSfx();
 const hud = createHud({ sfx, esc, open: (id) => { try { enterScreen(id, 0); } catch (e) {} } });
-const voice = createOrders({ post, sfx, esc });
+const voice = createOrders({ post, sfx, esc, ctx: () => ({ P, hist, story: SC ? { title: SC.age + "-year-old " + (SC.sex === "woman" ? "woman" : "man"), text: SC.story || "" } : null }), open: (id) => { try { enterScreen(id, 0); } catch (e) {} } });
 const setRay = (cx, cy) => { ndc.set(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam); };
 function pointHitsPatient(cx, cy) { setRay(cx, cy); const h = ray.intersectObject(hitCyl, false)[0]; return h ? h.distance : null; }
 cv.addEventListener("pointerdown", (e) => {
@@ -297,21 +298,6 @@ cv.addEventListener("pointerup", (e) => { const was = mvd; stopHold(); if (was >
 function setAuto(on) { autoSpin = on; $("#spin").dataset.on = on ? "1" : "0"; }
 $("#spin").onclick = () => setAuto(!autoSpin);
 $("#xray").onclick = () => { insideWant = !insideWant; $("#xray").dataset.on = insideWant ? "1" : "0"; };
-/* the semicircular arrow: drag the knob round the arc to tilt the camera between level and 60 degrees looking down; the button flips between the two */
-const tsvg = $("#tiltsvg"), tknob = $("#tiltknob"), tfill = $("#tiltfill"), tbtn = $("#tiltbtn"), tdeg = $("#tiltdeg");
-function paintTilt() {
-  const t = vp / VP_MAX, ph = (-90 + t * 180) * Math.PI / 180, x = 10 + 58 * Math.cos(ph), y = 68 - 58 * Math.sin(ph);
-  tknob.setAttribute("cx", x.toFixed(1)); tknob.setAttribute("cy", y.toFixed(1)); tfill.setAttribute("d", t < 0.005 ? "M10 126 A58 58 0 0 1 10 126" : "M10 126 A58 58 0 0 1 " + x.toFixed(1) + " " + y.toFixed(1));
-  const deg = Math.round(vp * 180 / Math.PI); tdeg.textContent = deg + "°"; tsvg.setAttribute("aria-valuenow", String(deg)); tbtn.dataset.on = vp > 0.17 ? "1" : "0"; tbtn.textContent = vp > 0.17 ? "Level view" : "Top view";
-}
-function setTilt(v) { vp = clamp(v, 0, VP_MAX); paintTilt(); }
-function tiltFrom(e) { const r = tsvg.getBoundingClientRect(), k = r.width / 62, cx = r.left + 10 * k, cy = r.top + 68 * k, a = Math.atan2(-(e.clientY - cy), Math.max(0.0001, e.clientX - cx)); setTilt((a + Math.PI / 2) / Math.PI * VP_MAX); }
-let tdrag = false;
-tsvg.addEventListener("pointerdown", (e) => { tdrag = true; try { tsvg.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } tiltFrom(e); sfx.unlock(); e.preventDefault(); });
-tsvg.addEventListener("pointermove", (e) => { if (tdrag) tiltFrom(e); });
-const tend = () => { tdrag = false; }; tsvg.addEventListener("pointerup", tend); tsvg.addEventListener("pointercancel", tend);
-tbtn.onclick = () => setTilt(vp > 0.17 ? 0 : 0.8);
-paintTilt();
 
 /* ================================================================ the other doctors */
 const remotes = new Map(); let peerList = [], net = null, netKey = "";
@@ -440,7 +426,7 @@ function screenPose() {
   const st = myStation(); if (!st) return null; const D = chamber.dims, tv = Math.tan(cam.fov * Math.PI / 360), th = tv * cam.aspect, d = Math.max((D.W / 2) / (0.95 * th), (D.H / 2) / (0.72 * tv)), sv = chamber.screenView(st, d);
   const dx = sv.at.x - sv.pos.x, dy = sv.at.y - sv.pos.y, dz = sv.at.z - sv.pos.z; return { x: sv.pos.x, z: sv.pos.z, h: sv.pos.y, yaw: Math.atan2(dx, -dz), pit: Math.atan2(dy, Math.hypot(dx, dz)) };
 }
-function zoomHero(h) { const v = chamber.heroView(h, 3.6), hh = 2.2; focus = null; me.seated = false; $("#card").hidden = true; viewPose = { x: v.x, z: v.z, h: hh, yaw: Math.atan2(v.at.x - v.x, -(v.at.z - v.z)), pit: Math.atan2(v.at.y - hh, Math.hypot(v.at.x - v.x, v.at.z - v.z)) }; }
+function zoomHero(h) { { const n = performance.now(); if (n - lastZoom < 350) return; lastZoom = n; } const v = chamber.heroView(h, 3.6), hh = 2.2; focus = null; me.seated = false; $("#card").hidden = true; viewPose = { x: v.x, z: v.z, h: hh, yaw: Math.atan2(v.at.x - v.x, -(v.at.z - v.z)), pit: Math.atan2(v.at.y - hh, Math.hypot(v.at.x - v.x, v.at.z - v.z)) }; }
 const mySpecLabel = () => specInfo(mySpec)[0];
 function ordersTabs() {
   const o = mdt.orders, tabs = []; if (!o) return tabs; const arrest = (o.acls || []).length > 0;
@@ -470,25 +456,36 @@ function screenHtml() {
   if (sec) { const g = sec.groups || {}, sub = clamp(scr.sub, 0, sec.subs.length - 1); return head + `<nav class="subs">${sec.subs.map((t, i) => (g[i] ? `<i class="gl">${esc(g[i])}</i>` : "") + `<button type="button" data-i="${i}" data-on="${i === sub ? 1 : 0}">${esc(t)}</button>`).join("")}</nav><div class="sbody"><h3>${esc(sec.subs[sub])}</h3>${P && SC ? buildSection(scr.id, sub, sciCtx()) : `<p class="nt">The case appears here when the shift begins.</p>`}</div>`; }
   return head + (scr.id === "orders" ? ordersHtml() : teamHtml());
 }
-function sciPaint() { const el = scr.el; el.querySelectorAll("canvas.ximg").forEach((c) => paintImage(c, c.dataset.k, c.dataset.r)); el.querySelectorAll("canvas.ecg").forEach((c) => paintEcg(c, +c.dataset.hr, c.dataset.r, c.dataset.a === "1")); paintMachines(0); }
+/* the scans are drawn once and copied afterwards: a screen that refreshes every second must not redraw a CT slice by hand each time */
+const imgCache = new Map();
+function paintImageCached(c, k, r) {
+  const key = k + "|" + r + "|" + c.width + "x" + c.height; let o = imgCache.get(key);
+  if (!o) { o = document.createElement("canvas"); o.width = c.width; o.height = c.height; paintImage(o, k, r); if (imgCache.size > 24) imgCache.delete(imgCache.keys().next().value); imgCache.set(key, o); }
+  c.getContext("2d").drawImage(o, 0, 0);
+}
+function sciPaint() { const el = scr.el; el.querySelectorAll("canvas.ximg").forEach((c) => paintImageCached(c, c.dataset.k, c.dataset.r)); el.querySelectorAll("canvas.ecg").forEach((c) => paintEcg(c, +c.dataset.hr, c.dataset.r, c.dataset.a === "1")); paintMachines(0); }
 /* the machines on the Treatment page move: repaint them a few times a second while the screen shows one */
 let machT = 0;
 function paintMachines(now) {
   if (!scr.on) return; const cs = []; scr.el.querySelectorAll("canvas.mach").forEach((c) => cs.push(c));
   cs.forEach((c) => { let st = {}; try { st = JSON.parse(c.dataset.st || "{}"); } catch (e) { /* ignore */ } paintMachine(c, c.dataset.k, st, now / 1000); });
 }
+let lastRender = 0;
 function renderScreen(force) {
-  if (!scr.on) return; const key = JSON.stringify([scr.id, scr.sub, P && [Math.round(P.hr), Math.round(P.map), Math.round(P.spo2), P.hour, (P.results || []).length, (P.log || []).length, P.tube, P.norepi, P.oxygen, P.artLine, P.hdLine, P.dialysis, P.outcome], mdt.busy, mdt.err, mdt.orders && JSON.stringify(mdt.orders.groups.map((g) => g.items.map((i) => (i.ok ? 1 : 0)))), mdt.room && mdt.room.members && mdt.room.members.length, chat.length, unseen]);
-  if (!force && key === scr.key) return; scr.key = key; const el = scr.el, sb = el.querySelector(".sbody"), top = sb ? sb.scrollTop : 0, ns = el.querySelector(".subs"), nl = ns ? ns.scrollLeft : 0, nt = el.querySelector(".stabs"), ntl = nt ? nt.scrollLeft : 0;
+  if (!scr.on) return;
+  const nowR = performance.now(); if (!force && nowR - lastRender < 900) return; const key = JSON.stringify([scr.id, scr.sub, P && [Math.round(P.hr), Math.round(P.map), Math.round(P.spo2), P.hour, (P.results || []).length, (P.log || []).length, P.tube, P.norepi, P.oxygen, P.artLine, P.hdLine, P.dialysis, P.outcome], mdt.busy, mdt.err, mdt.orders && JSON.stringify(mdt.orders.groups.map((g) => g.items.map((i) => (i.ok ? 1 : 0)))), mdt.room && mdt.room.members && mdt.room.members.length, chat.length, unseen]);
+  if (!force && key === scr.key) return; scr.key = key; lastRender = nowR; const el = scr.el, sb = el.querySelector(".sbody"), top = sb ? sb.scrollTop : 0, ns = el.querySelector(".subs"), nl = ns ? ns.scrollLeft : 0, nt = el.querySelector(".stabs"), ntl = nt ? nt.scrollLeft : 0;
   el.innerHTML = screenHtml(); const nb = el.querySelector(".sbody"); if (nb && !force) nb.scrollTop = top; const n2 = el.querySelector(".subs"); if (n2 && !force) n2.scrollLeft = nl; const n3 = el.querySelector(".stabs"); if (n3) n3.scrollLeft = ntl; sciPaint();
   if (force) { const on = el.querySelector(".stabs [data-on='1']"), sn = el.querySelector(".stabs"); if (on && sn) sn.scrollLeft = on.offsetLeft - (sn.clientWidth - on.offsetWidth) / 2; }
 }
+let lastEnter = 0, lastZoom = 0;
 function enterScreen(id, sub) {
+  { const n = performance.now(); if (scr.on && (n - lastEnter < 300 || (id === scr.id && (sub || 0) === scr.sub))) { lastEnter = n; return; } lastEnter = n; }
   if (id) { scr.id = id; scr.sub = sub || 0; } else if (!scr.on && !SECTIONS.some((x) => x.id === scr.id) && scr.id !== "orders" && scr.id !== "team") scr.id = DEFTAB[mySpec] || "history";
   unseen[scr.id] = 0; if (!scr.obj) { screenSize(); scr.obj = new CSS3DObject(scr.el); scr.el.classList.add("lcd"); lcdScene.add(scr.obj); screenSize(); }
   scr.on = true; scr.el.hidden = false; document.body.classList.add("using"); $("#card").hidden = true; focus = null; viewPose = null; me.seated = false; renderScreen(true); sfx.unlock(); sfx.beep && sfx.beep({ f: 880, vol: 0.25 });
 }
-function exitScreen() { if (!scr.on) return; scr.on = false; scr.el.hidden = true; lcdEl.style.display = "none"; document.body.classList.remove("using"); retreat = false; const st = myStation(); if (st) { goal = { x: st.x, z: st.z }; me.seated = true; } }
+function exitScreen() { if (!scr.on) return; scr.on = false; try { paintHeroes(0, 0, true); } catch (e) {} scr.el.hidden = true; lcdEl.style.display = "none"; document.body.classList.remove("using"); retreat = false; const st = myStation(); if (st) { goal = { x: st.x, z: st.z }; me.seated = true; } }
 scr.el.addEventListener("click", (e) => {
   const t = e.target.closest("button,canvas"); if (!t) return;
   if (t.classList.contains("scix")) return exitScreen();
@@ -561,7 +558,7 @@ function goAuditorium() {
     sessionStorage.setItem("ccu-pose", JSON.stringify({ to: "aud", x: AUD_X - me.z, z: ZC + me.x, yaw: me.yaw + Math.PI / 2, t: Date.now() }));
   } catch (e) {}
   if (net) { net.close(); net = null; }
-  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261122a";
+  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261122c";
 }
 function leave(type) { if (net) { net.close(); net = null; } post(type); }
 
@@ -610,10 +607,10 @@ function loop(now) {
   refreshTubes(false);
   /* the chamber: the rings revolve, the wall displays and the doctors' screens are redrawn */
   chamber.update(dt, t);
-  wallLive.hr = disp.hr; wallLive.map = disp.map; wallLive.spo2 = disp.spo2; wallLive.rr = disp.rr; wallLive.temp = disp.temp; wallLive.lactate = disp.lactate; wallLive.k = disp.k; wallLive.cr = disp.cr; if (!document.hidden) updateWalls(t);
+  wallLive.hr = disp.hr; wallLive.map = disp.map; wallLive.spo2 = disp.spo2; wallLive.rr = disp.rr; wallLive.temp = disp.temp; wallLive.lactate = disp.lactate; wallLive.k = disp.k; wallLive.cr = disp.cr; if (!document.hidden && !scr.on) updateWalls(t);
   if ((machT += dt) > 0.07) { machT = 0; paintMachines(now); }
   { const want = insideWant || !!focus ? 0.17 : 1; bodyMat.opacity += (want - bodyMat.opacity) * Math.min(1, dt * 5); bodyMat.depthWrite = bodyMat.opacity > 0.6; }
-  if (!document.hidden) { paintHeroes(dt, t, false); paintConsoles(dt, t); }
+  if (!document.hidden && !scr.on) { paintHeroes(dt, t, false); paintConsoles(dt, t); }
   if ((stT += dt) > 0.6) { stT = 0; rebuildStations(false); }
   if ((scrT += dt) > 0.25) { scrT = 0; renderScreen(false); }
   /* send my place and my open tab to the others */
@@ -636,13 +633,13 @@ setTimeout(() => { $("#hint").style.opacity = 0; }, 22000);
 chips(); renderDesk(); rebuildStations(true); paintHeroes(0, 0, true);
 post("hall-ready");
 window.__voice = voice; window.__hud = hud;
-window.__nexus = { me, cam, S, turn, chamber, hero, remotes, organs, dev, feed, hist, chat, labSeries, openSection: enterScreen, closeSection: exitScreen, openOrders, scr, bodyMat, tapAt, zoomHero, get mdt() { return mdt; }, eqSet: (x) => { Object.assign(eq, x); refreshTubes(true); }, apply, peers: () => peerList, net: () => net, focusOrgan, sendChat, get P() { return P; } };
+window.__nexus = { R, me, cam, S, turn, chamber, hero, remotes, organs, dev, feed, hist, chat, labSeries, openSection: enterScreen, closeSection: exitScreen, openOrders, scr, bodyMat, tapAt, zoomHero, get mdt() { return mdt; }, eqSet: (x) => { Object.assign(eq, x); refreshTubes(true); }, apply, peers: () => peerList, net: () => net, focusOrgan, sendChat, get P() { return P; } };
 if (DEMO) {
   const orders = { groups: [{ g: "Orders", items: [{ kind: "examine", label: "Examine", ok: true }, { kind: "labs", label: "Send labs", ok: true }, { kind: "antibiotics", label: "Antibiotics", ok: true }, { kind: "fluid", label: "Fluid 500 mL", ok: true }, { kind: "norepi", label: "Noradrenaline", ok: true }, { kind: "art-line", label: "Insert arterial line", ok: true }] }, { g: "Lung", items: [{ kind: "oxygen", label: "Oxygen", ok: true }, { kind: "intubate", label: "Intubate", ok: true }, { kind: "cxr", label: "Chest film", ok: true }, { kind: "ct-chest", label: "CT chest", ok: false }] }, { g: "Heart", items: [{ kind: "echo", label: "Echocardiogram", ok: true }] }], call: [{ id: "pulmonologist", label: "Pulmonologist", ok: true }, { id: "nephrologist", label: "Nephrologist", ok: true }], wrong: [{ kind: "flood", label: "Give 2 litres without looking", ok: true }], acls: [], enter: false };
   const room = { id: "demo", code: "DEMO42", status: "live", host: true, slots: { intensivist: 1, pulmonologist: 1, nephrologist: 1 }, you: { specialty: mySpec, inside: true }, members: [{ userId: myId, name: myName, specialty: mySpec, inside: true }, { userId: "x1", name: "Ravi", specialty: "pulmonologist" }, { userId: "x2", name: "Meera", specialty: "nephrologist" }], scenario: { name: "Meera Nair", age: 58, sex: "woman", dx: "Fever and hypoxaemic pneumonia", story: "Three days of fever and a productive cough. She is speaking. The saturation is 91% on air. The pressure, for now, is acceptable." }, patient: { hour: 3, hr: 112, sbp: 104, dbp: 64, map: 77, spo2: 91, rr: 28, gcs: 15, temp: 38.6, lactate: 2.6, cr: 1.4, k: 4.3, rhythm: "sinus", alive: true, tube: false, oxygen: true, norepi: false, problems: [{ id: "a", title: "Pneumonia with falling saturation", specialty: "pulmonologist", open: true, called: false }, { id: "b", title: "Rising lactate", specialty: "intensivist", open: true, called: true }], results: [{ label: "Labs", text: "Lactate 2.6 mmol/L. Creatinine 1.4 mg/dL. Potassium 4.3 mmol/L. Haemoglobin 11.4 g/dL." }], log: [{ t: 1, text: "Asha examined the patient." }, { t: 2, text: "Asha put oxygen on." }] } };
   apply({ room, orders, me: { name: myName } });
   if (Q.has("engine")) {                                   /* ?demo&engine: the real case engine behind the hall, for trying orders */
-    const E = await import("./case-engine.js?v=20261122a"), team = (Q.get("team") || "intensivist,pulmonologist,nephrologist").split(","), sc = E.Dp(7, team, { caseId: Q.get("case") || undefined, noRemember: true, recent: [] });
+    const E = await import("./case-engine.js?v=20261122c"), team = (Q.get("team") || "intensivist,pulmonologist,nephrologist").split(","), sc = E.Dp(7, team, { caseId: Q.get("case") || undefined, noRemember: true, recent: [] });
     const acts = [], t0 = Date.now() - (+Q.get("t") || 0) * 1000, me0 = room.members[0];
     room.slots = {}; team.forEach((sp) => { room.slots[sp] = 1; });
     room.members = team.map((sp, i) => ({ userId: i === 0 ? myId : "x" + i, name: i === 0 ? myName : "Dr " + sp.slice(0, 5), specialty: sp, inside: true })); room.you = { specialty: team[0], inside: true }; mySpec = team[0];
