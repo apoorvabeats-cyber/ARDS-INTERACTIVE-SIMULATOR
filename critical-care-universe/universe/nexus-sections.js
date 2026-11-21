@@ -9,7 +9,7 @@ export const SECTIONS = [
   { id: "vitals", n: "03", title: "Vitals", tile: "VITALS", subs: ["ECG and heart rate", "BP, MAP and SpO₂", "Respiratory rate and temperature", "Invasive haemodynamic parameters", "Live trends and alarms"] },
   { id: "organ", n: "04", title: "Organ systems", tile: "ORGAN SYSTEMS", subs: ["Brain and neurological status", "Heart and circulation", "Lungs and gas exchange", "Kidneys and urine output", "Liver and gastrointestinal system"] },
   { id: "cultures", n: "05", title: "Cultures", tile: "CULTURES", subs: ["Blood cultures and markers", "Before the first antibiotic"] },
-  { id: "invest", n: "06", title: "Investigations", tile: "INVESTIGATIONS", subs: ["Blood gas and electrolytes", "CBC, renal and liver", "Coagulation", "Serial trends", "X-ray", "CT and MRI", "Echocardiography"] },
+  { id: "invest", n: "06", title: "Investigations", tile: "INVESTIGATIONS", subs: ["Blood gas and electrolytes", "CBC, renal and liver", "Coagulation and cardiac", "Serial trends", "X-ray", "CT and MRI", "Echocardiography"] },
   { id: "issues", n: "07", title: "Current issues", tile: "CURRENT ISSUES", subs: ["Problems and team", "Clinical alerts", "Lines and devices", "Fluid balance"] },
   { id: "treat", n: "08", title: "Treatment", tile: "TREATMENT", subs: ["IV fluids", "Vasopressors", "Antibiotics", "Antifungals", "Oxygen support", "Ventilator: non-invasive", "Ventilator: invasive", "Dialysis support"], groups: { 0: "Treatment", 4: "Management" } },
 ];
@@ -26,12 +26,25 @@ const flag = (bad, warn) => (bad ? "x" : warn ? "w" : "ok");
 
 /* ------------------------------------------------------------ what the team has sent and been told */
 export function labsOf(c) {
-  const out = { sent: false }, rs = (c.P && c.P.results) || [];
-  rs.filter((r) => r.label === "Labs").forEach((r) => {
-    const m = (re) => { const x = r.text.match(re); return x ? parseFloat(x[1]) : null; };
-    out.sent = true; out.lactate = m(/Lactate\s+([\d.]+)/); out.cr = m(/Creatinine\s+([\d.]+)/); out.k = m(/Potassium\s+([\d.]+)/); out.hb = m(/Haemoglobin\s+([\d.]+)/); out.text = r.text;
-  });
+  const out = { sent: false }, rs = (c.P && c.P.results) || [], map = { lactate: "lactate", cr: "cr", k: "k", hb: "hb", ph: "ph", pco2: "pco2", po2: "po2", hco3: "hco3", na: "na", wbc: "wbc", plt: "plt", urea: "urea", glu: "glu" };
+  rs.filter((r) => r.cat === "lab" && r.items && r.items.length).forEach((r) => { out.sent = true; r.items.forEach((i) => { if (map[i.k]) out[map[i.k]] = i.v; }); out.text = r.text; });
   return out;
+}
+const latest = (c, id) => { const L = ((c.P && c.P.results) || []).filter((r) => r.id === id); return L.length ? L[L.length - 1] : null; };
+const sev = (i) => (!i.abn ? "ok" : i.dir === "high" ? ((i.v - i.hi) / Math.max(1e-9, i.hi) > 0.5 ? "x" : "w") : ((i.lo - i.v) / Math.max(1e-9, i.lo) > 0.25 ? "x" : "w"));
+const itemRows = (r) => r.items.map((i) => [i.label, i.text + (i.unit ? " " + i.unit : ""), sev(i), i.abn ? "normal " + i.lo + " to " + i.hi : ""]);
+const pendingOf = (c, ids) => ((c.P && c.P.pending) || []).filter((p) => ids.includes(p.id));
+const sayIt = (what) => nt("Not asked for yet. Hold the microphone and say " + what + ".");
+function panels(c, ids, none) {
+  const got = ids.map((id) => latest(c, id)).filter(Boolean), pend = pendingOf(c, ids);
+  const out = got.map((r) => h4(r.label + (r.abnormal ? " · abnormal" : " · normal")) + kv(itemRows(r))).join("");
+  return (out || "") + (pend.length ? nt("Waiting for: " + pend.map((p) => p.label).join(", ") + ".") : "") + (!got.length && !pend.length ? sayIt(none) : "");
+}
+function micro(c) {
+  const ids = ["lab:cultures", "lab:sputum", "lab:urineculture", "lab:viral", "lab:malaria", "lab:dengue", "lab:ua", "lab:tox", "proc:lp", "lab:pct", "lab:crp"];
+  const got = ids.map((id) => latest(c, id)).filter(Boolean), pend = pendingOf(c, ids);
+  const rows = got.map((r) => `<p class="story ${r.abnormal ? "ab" : ""}"><b>${esc(r.label)}:</b> ${esc(r.text)}</p>`).join("");
+  return (rows || "") + (pend.length ? nt("Waiting for: " + pend.map((p) => p.label).join(", ") + ".") : "") + (!got.length && !pend.length ? sayIt("“send blood cultures”") : "") + nt("Cultures are best sent before the first antibiotic dose, but never delay an antibiotic in shock to do it.");
 }
 const resOf = (c, re) => ((c.P && c.P.results) || []).filter((r) => re.test(r.label));
 const logHas = (c, re) => ((c.P && c.P.log) || []).some((l) => re.test(l.text || ""));
@@ -80,7 +93,7 @@ const imgBlock = (k, report, cap) => `<canvas class="ximg" data-k="${k}" data-r=
 /* ------------------------------------------------------------ the builders */
 const B = {};
 B.overview = [
-  (c) => { const { P, SC } = c; return h4(SC.name + ", " + SC.age) + kv([["Sex", SC.sex === "woman" ? "Woman" : "Man", ""], ["Hour of the shift", P.hour, ""], ["Working diagnosis", SC.dx, "w"]]) + `<p class="story">${esc(SC.story)}</p>`; },
+  (c) => { const { P, SC } = c, ex = ((P.results || []).filter((r) => r.cat === "exam").pop()); return (ex ? h4("Examination") + `<p class="story">${esc(ex.text)}</p>` : "") + h4(SC.name + ", " + SC.age) + kv([["Sex", SC.sex === "woman" ? "Woman" : "Man", ""], ["Hour of the shift", P.hour, ""], ["Working diagnosis", SC.dx, "w"]]) + `<p class="story">${esc(SC.story)}</p>`; },
   (c) => { const P = c.P; return kv([["Heart rate", Math.round(P.hr) + " /min", flag(P.hr > 130 || P.hr < 45, P.hr > 110), P.rhythm || "sinus"], ["Blood pressure", Math.round(P.sbp) + "/" + Math.round(P.dbp), flag(P.map < 60, P.map < 70), "MAP " + Math.round(P.map)], ["SpO₂", Math.round(P.spo2) + " %", flag(P.spo2 < 88, P.spo2 < 93)], ["Respiratory rate", Math.round(P.rr) + " /min", flag(P.rr > 30, P.rr > 24)], ["GCS", Math.round(P.gcs), flag(P.gcs <= 8, P.gcs < 13)], ["Temperature", r1(P.temp) + " °C", flag(P.temp > 39, P.temp > 38.3)]]); },
   (c) => { const P = c.P, pr = (P.problems || []).filter((q) => q.open), mem = (c.room && c.room.members) || []; return h4("Open problems") + (pr.length ? ul(pr.map((q) => [q.title + " · " + (q.resolved ? "treated" : q.called ? "specialist called" : "not called yet"), q.resolved ? "ok" : q.called ? "w" : "x"])) : nt("No open problem.")) + h4("The team") + (mem.length ? ul(mem.map((m) => [m.name + " · " + (m.specialty || "no seat"), ""])) : nt("No one has joined yet.")); },
   (c) => { const P = c.P, eq = c.eq; const L = (n, on, t) => [n + " · " + (on ? t || "in place" : "not in place"), on ? "ok" : ""]; return ul([L("Endotracheal tube and ventilator", P.tube), L("Oxygen", P.oxygen && !P.tube, "on"), L("Arterial line", P.artLine), L("Noradrenaline pump", P.norepi, "running"), L("Crystalloid", eq.fluid > 0, eq.fluid + " bolus(es) given"), L("Antibiotic", eq.abx, "given"), L("Blood", eq.blood, "given"), L("Dialysis line", P.hdLine), L("Dialysis", P.dialysis, "running")]); },
@@ -90,7 +103,7 @@ B.vitals = [
   (c) => `<canvas class="ecg" data-hr="${Math.round(c.P.hr)}" data-r="${esc(c.P.rhythm || "sinus")}" data-a="${c.P.alive === false ? 0 : 1}" width="480" height="150"></canvas>` + kv([["Rhythm", c.P.alive === false ? "no circulation" : (c.P.rhythm || "sinus"), c.P.alive === false ? "x" : ""], ["Heart rate", Math.round(c.P.hr) + " /min", flag(c.P.hr > 130 || c.P.hr < 45, c.P.hr > 110)]]) + nt("A 12-lead tracing is not part of this shift. The strip shows the monitor lead."),
   (c) => { const P = c.P, pp = Math.round(P.sbp - P.dbp), si = P.hr / Math.max(1, P.sbp); return kv([["Blood pressure", Math.round(P.sbp) + "/" + Math.round(P.dbp), flag(P.map < 60, P.map < 70)], ["MAP", Math.round(P.map), flag(P.map < 60, P.map < 65), "target 65 or more"], ["Pulse pressure", pp, pp < 25 ? "w" : ""], ["Shock index", String(r1(si)), flag(si > 1, si > 0.9), "HR ÷ systolic"], ["SpO₂", Math.round(P.spo2) + " %", flag(P.spo2 < 88, P.spo2 < 93)]]); },
   (c) => { const P = c.P, fio2 = fio2Of(P, c.eq), sf = P.spo2 / fio2; return kv([["Respiratory rate", Math.round(P.rr) + " /min", flag(P.rr > 30, P.rr > 24)], ["Temperature", r1(P.temp) + " °C", flag(P.temp > 39, P.temp > 38.3)], ["Oxygen support", P.tube ? "ventilator" : c.eq.oxygen ? "oxygen" : "room air", ""], ["S/F ratio (estimate)", Math.round(sf), flag(sf < 150, sf < 235), "stand-in for P/F"]]); },
-  (c) => { const P = c.P, l = labsOf(c), echo = resOf(c, /Echo/).length || logHas(c, /looked at the heart/), poor = logHas(c, /left ventricle is poor/i) || /cardiogenic|infarct/i.test((c.SC && c.SC.dx) || ""), si = P.hr / Math.max(1, P.sbp), fb = c.eq.fluid;
+  (c) => { const P = c.P, l = labsOf(c), echo = !!latest(c, "img:echo"), poor = /akinesis|hypokinetic|ejection fraction (20|25|30)|poor|severely reduced/i.test((latest(c, "img:echo") || {}).text || ""), si = P.hr / Math.max(1, P.sbp), fb = c.eq.fluid;
     const f = [["MAP under 65", P.map < 65], ["Shock index above 0.9", si > 0.9], ["Lactate above 2", l.lactate != null && l.lactate > 2], ["Lungs still dry (SpO₂ 94 or more)", P.spo2 >= 94], ["Less than 30 mL/kg given so far", fb < 4]], a = [["Oxygenation worsened after fluid", fb > 0 && P.spo2 < 92], ["Poor left ventricle", poor], ["Already 4 or more boluses", fb >= 4]];
     const score = f.filter((x) => x[1]).length - a.filter((x) => x[1]).length * 1.5, verdict = score >= 3 ? "Likely fluid responsive" : score >= 1 ? "Uncertain: test it" : "Unlikely to respond. Think vasopressor or look at the heart.";
     return kv([["Arterial line", P.artLine ? "in place" : "not placed", P.artLine ? "ok" : "w"], ["Central venous pressure", NM, ""], ["Cardiac output", NM, ""], ["Noradrenaline", P.norepi ? "running" : "off", P.norepi ? "ok" : ""]]) + (P.artLine ? "" : orderBtns(c, ["art-line"])) + h4("Fluid responsiveness") + ul(f.map((x) => [x[0], x[1] ? "ok" : ""])) + ul(a.map((x) => [x[0], x[1] ? "x" : ""])) + `<p class="story"><b>${esc(verdict)}</b></p>` + nt("Teaching heuristic. The real test is a passive leg raise with a cardiac output response, or pulse-pressure variation on a ventilated patient. " + (echo ? "An echo has been done." : "No echo has been done.")) + orderBtns(c, ["fluid", "echo", "norepi"]); },
@@ -105,10 +118,10 @@ B.organ = [
   (c) => { const l = labsOf(c), gut = c.blind ? [] : ((c.P.problems || []).filter((q) => q.open && /gastro|surgeon/.test(q.specialty || ""))); return kv([["Bilirubin, ALT, AST", NM, ""], ["Haemoglobin", l.hb != null ? l.hb + " g/dL" : NM, l.hb != null ? flag(l.hb < 7, l.hb < 10) : ""], ["Bowel sounds, abdomen", NM, ""]]) + (gut.length ? h4("Open problems here") + ul(gut.map((q) => [q.title + " · " + (q.resolved ? "treated" : q.called ? "specialist called" : "not called yet"), q.resolved ? "ok" : q.called ? "w" : "x"])) : nt("No open gut problem.")) + orderBtns(c, ["ppi", "endoscopy", "blood"]); },
 ];
 B.lab = [
-  (c) => { const l = labsOf(c); if (!l.sent) return nt("No blood has been sent. A blood gas is not part of this shift's results.") + orderBtns(c, ["labs"]); return kv([["Lactate", l.lactate + " mmol/L", flag(l.lactate > 4, l.lactate > 2)], ["Potassium", l.k + " mmol/L", flag(l.k > 5.5 || l.k < 3, l.k > 5.1 || l.k < 3.5)], ["pH, PaO₂, PaCO₂, HCO₃", NM, "", "no blood gas sent"], ["Sodium", NM, ""]]) + nt("Result of the last blood sent: " + l.text); },
-  (c) => { const l = labsOf(c); if (!l.sent) return nt("Not sent yet.") + orderBtns(c, ["labs"]); return kv([["Haemoglobin", l.hb + " g/dL", flag(l.hb < 7, l.hb < 10)], ["Creatinine", l.cr + " mg/dL", flag(l.cr >= 3.5, l.cr >= 1.5)], ["White cell count", NM, ""], ["Platelets", NM, ""], ["Urea", NM, ""], ["Bilirubin, ALT", NM, ""]]); },
-  (c) => kv([["INR", NM, ""], ["aPTT", NM, ""], ["Fibrinogen", NM, ""], ["Platelets", NM, ""]]) + nt("A clotting screen is not one of this shift's orders. A bleeding patient should have one in real practice."),
-  (c) => { const cu = logLast(c, /blood cultures/); return kv([["Blood cultures", cu ? "sent" : "not sent", cu ? "ok" : "w", cu ? (cu.text || "") : ""], ["Procalcitonin, CRP", NM, ""]]) + nt("Cultures are best sent before the first antibiotic dose.") + orderBtns(c, ["cultures", "source"]); },
+  (c) => panels(c, ["lab:abg", "lab:lactate", "lab:lyte", "lab:glucose", "lab:ketones"], "“ABG”, “lactate” or “electrolytes”"),
+  (c) => panels(c, ["lab:cbc", "lab:kft", "lab:lft", "lab:ck", "lab:amylase", "lab:nh3"], "“CBC, KFT, LFT”"),
+  (c) => panels(c, ["lab:coag", "lab:trop", "lab:bnp", "lab:ddimer"], "“coagulation profile” or “troponin”"),
+  (c) => micro(c),
   (c) => {
     const s = c.labSeries || []; if (!s.length) return nt("No serial results yet. Each blood sent adds a point to these trends.") + orderBtns(c, ["labs"]);
     const pt = (k) => s.filter((x) => x[k] != null).map((x) => ({ h: x.hour, v: x[k] }));
@@ -123,11 +136,11 @@ B.orders = [
   (c) => orderBtns(c, ["art-line", "intubate", "bronchoscopy", "hd-line", "dialysis", "endoscopy", "oxygen", "enter"]),
 ];
 B.rad = [
-  (c) => { const r = resOf(c, /Chest film/)[0]; return r ? imgBlock("cxr", r.text, "Illustrative chest film, drawn from the report. It is not the patient's real image.") + `<p class="story"><b>Report:</b> ${esc(r.text)}</p>` : nt("No chest film yet.") + orderBtns(c, ["cxr"]); },
-  (c) => { const r = resOf(c, /CT chest/)[0], h = resOf(c, /CT head/)[0]; const out = []; if (r) out.push(imgBlock("ctchest", r.text, "Illustrative CT slice of the chest") + `<p class="story"><b>CT chest:</b> ${esc(r.text)}</p>`); if (h) out.push(imgBlock("cthead", h.text, "Illustrative CT slice of the head") + `<p class="story"><b>CT head:</b> ${esc(h.text)}</p>`); return out.length ? out.join("") : nt("No CT has been done. MRI is not available in this shift.") + orderBtns(c, ["ct-chest", "ct-head"]); },
-  (c) => nt("Bedside ultrasound is not one of this shift's orders. The echocardiogram is the ultrasound study the team can request.") + orderBtns(c, ["echo"]),
-  (c) => { const e = logLast(c, /looked at the heart/); return e ? imgBlock("echo", e.text, "Illustrative four-chamber view") + `<p class="story"><b>Echo:</b> ${esc(e.text)}</p>` : nt("No echocardiogram yet.") + orderBtns(c, ["echo"]); },
-  (c) => { const r = resOf(c, /Chest film/)[0]; return nt("Tap the numbered spots to learn the zones of a chest film. The spot that matches the report is marked.") + imgBlock("cxr", r ? r.text : "", r ? "Illustrative chest film" : "Illustrative normal chest film for practice"); },
+  (c) => { const r = latest(c, "img:cxr") || latest(c, "img:xabd"); return r ? h4(r.label + (r.abnormal ? " · abnormal" : " · normal")) + imgBlock("cxr", r.text, "Illustrative film, drawn from the report. It is not the patient's real image.") + `<p class="story"><b>Report:</b> ${esc(r.text)}</p>` : (pendingOf(c, ["img:cxr", "img:xabd"]).length ? nt("The film is being reported.") : sayIt("“chest x-ray”")); },
+  (c) => { const out = []; for (const [id, k] of [["img:ctchest", "ctchest"], ["img:ctpa", "ctchest"], ["img:cthead", "cthead"], ["img:ctabd", ""], ["img:ctangio", ""], ["img:mri", ""]]) { const r = latest(c, id); if (r) out.push(h4(r.label + (r.abnormal ? " · abnormal" : " · normal")) + (k ? imgBlock(k, r.text, "Illustrative slice, drawn from the report") : "") + `<p class="story"><b>Report:</b> ${esc(r.text)}</p>`); } const pend = pendingOf(c, ["img:ctchest", "img:ctpa", "img:cthead", "img:ctabd", "img:ctangio", "img:mri"]); return out.join("") + (pend.length ? nt("Being reported: " + pend.map((p) => p.label).join(", ") + ".") : "") + (!out.length && !pend.length ? sayIt("“CT head”, “CT chest” or “CT abdomen”") : ""); },
+  (c) => { const r = latest(c, "img:usg"); return r ? h4(r.label + (r.abnormal ? " · abnormal" : " · normal")) + `<p class="story">${esc(r.text)}</p>` : (pendingOf(c, ["img:usg"]).length ? nt("The scan is being done.") : sayIt("“bedside ultrasound”")); },
+  (c) => { const e = latest(c, "img:echo"); return e ? h4("Echocardiogram" + (e.abnormal ? " · abnormal" : " · normal")) + imgBlock("echo", e.text, "Illustrative four-chamber view") + `<p class="story"><b>Echo:</b> ${esc(e.text)}</p>` : (pendingOf(c, ["img:echo"]).length ? nt("The echo is being done.") : sayIt("“echo”")); },
+  (c) => { const r = latest(c, "img:cxr"); return nt("Tap the numbered spots to learn the zones of a chest film. The spot that matches the report is marked.") + imgBlock("cxr", r ? r.text : "", r ? "Illustrative chest film" : "Illustrative normal chest film for practice"); },
 ];
 B.intel = [
   (c) => { const s = sofaOf(c), a = apacheOf(c); return h4("SOFA, partly scored") + `<table class="tb">${s.rows.map((r) => `<tr class="${r[3] ? "" : "mis"}"><td>${esc(r[0])}</td><td><b>${esc(r[1])}</b></td><td>${esc(r[2])}</td></tr>`).join("")}</table><p class="story"><b>${s.tot}</b> from ${s.known} of 6 organ systems. The total is a minimum, not the final score.</p>` + h4("APACHE II, partly scored") + `<table class="tb">${a.rows.map((r) => `<tr class="${r[2] === "?" ? "mis" : ""}"><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td><b>${esc(r[2])}</b></td></tr>`).join("")}</table><p class="story"><b>${a.tot}</b> from the parts that could be scored. The total is a minimum.</p>` + nt("Scores built only from what has been measured in this shift. They teach the method. They do not predict this patient's outcome."); },

@@ -6,16 +6,17 @@
    Movement is the ICU's finger drag: swipe up to walk, drag sideways to look. Tap your own screen to work at it. */
 import * as T from "./three.module.js";
 import { GLTFLoader } from "./vendor/GLTFLoader.js";
-import { createDevices } from "./icu-devices.js?v=20261121h";
-import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261121h";
-import { loadLook, sanitize as cleanLook } from "./doctor-look.js?v=20261121h";
-import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261121h";
-import { createSfx } from "./sfx.js?v=20261121h";
-import { CSS3DRenderer, CSS3DObject } from "./vendor/CSS3DRenderer.js?v=20261121h";
-import { buildChamber, CH } from "./mdt-chamber.js?v=20261121h";
-import { paintAvail, paintPresent, paintDiscuss, paintConsole, paintPlacard, TAB_LABEL, TAB_ORDER, patientNo } from "./mdt-screens.js?v=20261121h";
-import { paintMachine } from "./nexus-machines.js?v=20261121h";
-import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261121h";
+import { createDevices } from "./icu-devices.js?v=20261122a";
+import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261122a";
+import { loadLook, sanitize as cleanLook } from "./doctor-look.js?v=20261122a";
+import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261122a";
+import { createSfx } from "./sfx.js?v=20261122a";
+import { CSS3DRenderer, CSS3DObject } from "./vendor/CSS3DRenderer.js?v=20261122a";
+import { buildChamber, CH } from "./mdt-chamber.js?v=20261122a";
+import { paintAvail, paintPresent, paintDiscuss, paintConsole, paintPlacard, TAB_LABEL, TAB_ORDER, patientNo } from "./mdt-screens.js?v=20261122a";
+import { paintMachine } from "./nexus-machines.js?v=20261122a";
+import { createOrders, createHud } from "./nexus-orders.js?v=20261122a";
+import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261122a";
 
 const $ = (s) => document.querySelector(s);
 const Q = new URLSearchParams(location.search), DEMO = Q.has("demo");
@@ -25,7 +26,8 @@ const myLook = loadLook();                       // the avatar this doctor made 
 const V = T.Vector3, TAU = Math.PI * 2, clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const hashN = (s) => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const post = (type, o) => { if (parent !== window) parent.postMessage(Object.assign({ type }, o || {}), "*"); else if (DEMO) { (window.__posts = window.__posts || []).push(Object.assign({ type }, o || {})); } };
+let demoHook = null;
+const post = (type, o) => { if (parent !== window) parent.postMessage(Object.assign({ type }, o || {}), "*"); else if (DEMO) { (window.__posts = window.__posts || []).push(Object.assign({ type }, o || {})); if (demoHook) demoHook(type, o || {}); } };
 
 /* ================================================================ renderer, camera */
 const cv = $("#gl");
@@ -271,6 +273,8 @@ function walkBy(d) {
 let dn = 0, mvd = 0, lx = 0, ly = 0, sx = 0, sy = 0, holdDir = 0, lastV = 0, mode = "", onPatient = false, spinV = 0, autoSpin = false, focus = null, retreat = false, lastMT = 0;
 const ray = new T.Raycaster(), ndc = new T.Vector2();
 const sfx = createSfx();
+const hud = createHud({ sfx, esc, open: (id) => { try { enterScreen(id, 0); } catch (e) {} } });
+const voice = createOrders({ post, sfx, esc });
 const setRay = (cx, cy) => { ndc.set(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam); };
 function pointHitsPatient(cx, cy) { setRay(cx, cy); const h = ray.intersectObject(hitCyl, false)[0]; return h ? h.distance : null; }
 cv.addEventListener("pointerdown", (e) => {
@@ -406,9 +410,9 @@ const FIND_RE = [[/looked at the heart/i, "img", "Echocardiogram"], [/blood cult
 const SECOF = { lab: "invest", img: "invest", find: "history" };
 function scanFeed() {
   if (!P) return; const fresh = [];
-  (P.results || []).forEach((r) => { const k = "r|" + r.label + "|" + r.text; if (!seenKeys.has(k)) { seenKeys.add(k); fresh.push({ kind: /Labs/i.test(r.label) ? "lab" : "img", label: r.label, text: r.text, key: k }); } });
-  (P.log || []).forEach((l) => { const k = "l|" + l.t + "|" + l.text; if (seenKeys.has(k)) return; seenKeys.add(k); const f = FIND_RE.find((x) => x[0].test(l.text || "")); if (f) fresh.push({ kind: f[1], label: f[2], text: l.text, key: k }); });
-  fresh.forEach((i) => { i.hour = P.hour; feed.push(i); if (feedInit) { notify(i); const sc = SECOF[i.kind]; if (!(scr.on && scr.id === sc)) unseen[sc]++; } });
+  (P.results || []).forEach((r) => { const k = "r|" + r.id + "|" + r.readyAtMs; if (!seenKeys.has(k)) { seenKeys.add(k); fresh.push({ kind: r.cat === "lab" ? "lab" : r.cat === "exam" ? "find" : "img", label: r.label, text: r.text, key: k }); } });
+  fresh.forEach((i) => { i.hour = P.hour; feed.push(i); if (feedInit) { const sc = SECOF[i.kind]; if (!(scr.on && scr.id === sc)) unseen[sc]++; } });
+  hud.onPatient(P);
   feedInit = true;
   const l = labsOf({ P }); if (l.sent && l.text !== lastLab) { lastLab = l.text; labSeries.push({ hour: P.hour, lactate: l.lactate, cr: l.cr, k: l.k, hb: l.hb }); }
   const h = { hour: P.hour, hr: P.hr, map: P.map, spo2: P.spo2, temp: P.temp }; if (hist.length && hist[hist.length - 1].hour === P.hour) hist[hist.length - 1] = h; else hist.push(h); if (hist.length > 60) hist.shift();
@@ -527,7 +531,7 @@ addEventListener("keydown", (e) => { if (e.key === "Escape") { if (!$("#say").hi
 function openOrders(group) { const i = ordersTabs().findIndex((t) => t.id === group); enterScreen("orders", Math.max(0, i)); }
 
 /* ================================================================ the state from the Team room */
-const equipFrom = (p) => { const L = (p.log || []).map((x) => x.text || ""), cnt = (re) => L.filter((t) => re.test(t)).length; return { tube: !!p.tube, oxygen: !!p.oxygen, spo2: Math.round(p.spo2), rr: p.rr, norepi: !!p.norepi, fluid: cnt(/fluid bolus/), abx: cnt(/started antibiotics/) > 0, blood: cnt(/transfused blood/) > 0, dialysis: !!p.dialysis, saline: cnt(/3% saline/) > 0, mannitol: cnt(/mannitol/) > 0 }; };
+const equipFrom = (p) => { const g = p.given || {}, any = (re) => Object.keys(g).some((k) => re.test(k) && g[k] > 0); return { tube: !!p.tube, oxygen: !!p.oxygen, spo2: Math.round(p.spo2), rr: p.rr, norepi: !!p.norepi, fluid: g["drug:fluids"] || 0, abx: any(/^abx:/), blood: (g["drug:blood"] || 0) > 0 || (g["drug:mtp"] || 0) > 0, dialysis: !!p.dialysis, saline: (g["drug:saline3"] || 0) > 0, mannitol: (g["drug:mannitol"] || 0) > 0 }; };
 function apply(d) {
   mdt = { room: d.room || null, orders: d.orders || null, busy: !!d.busy, err: d.err || "", line: !!d.line };
   if (d.me) { if (d.me.name) myName = d.me.name; }
@@ -536,7 +540,7 @@ function apply(d) {
   if (room && room.code) startNet();
   if (P) { eq = equipFrom(P); refreshTubes(true); scanFeed(); renderScreen(false); } else if (scr.on) exitScreen();
   const live = !!(room && room.status === "live");
-  $("#line").dataset.on = mdt.line ? "1" : "0"; $("#livep").hidden = !live; $("#rx").hidden = !live || scr.on; $("#acts").hidden = !live;
+  $("#line").dataset.on = mdt.line ? "1" : "0"; voice.show(live && !!P); voice.setBusy(mdt.busy); $("#livep").hidden = !live; $("#rx").hidden = !live || scr.on; $("#acts").hidden = !live;
   chips(); renderDesk(); rebuildStations(false); paintHeroes(0, 0, true);
   if (SC && nameLabel.key !== "Patient " + patientNo(SC)) setNameLabel();
 }
@@ -557,7 +561,7 @@ function goAuditorium() {
     sessionStorage.setItem("ccu-pose", JSON.stringify({ to: "aud", x: AUD_X - me.z, z: ZC + me.x, yaw: me.yaw + Math.PI / 2, t: Date.now() }));
   } catch (e) {}
   if (net) { net.close(); net = null; }
-  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261121h";
+  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261122a";
 }
 function leave(type) { if (net) { net.close(); net = null; } post(type); }
 
@@ -631,10 +635,23 @@ setTimeout(() => { $("#hint").style.opacity = 0; }, 22000);
 /* ================================================================ start */
 chips(); renderDesk(); rebuildStations(true); paintHeroes(0, 0, true);
 post("hall-ready");
+window.__voice = voice; window.__hud = hud;
 window.__nexus = { me, cam, S, turn, chamber, hero, remotes, organs, dev, feed, hist, chat, labSeries, openSection: enterScreen, closeSection: exitScreen, openOrders, scr, bodyMat, tapAt, zoomHero, get mdt() { return mdt; }, eqSet: (x) => { Object.assign(eq, x); refreshTubes(true); }, apply, peers: () => peerList, net: () => net, focusOrgan, sendChat, get P() { return P; } };
 if (DEMO) {
   const orders = { groups: [{ g: "Orders", items: [{ kind: "examine", label: "Examine", ok: true }, { kind: "labs", label: "Send labs", ok: true }, { kind: "antibiotics", label: "Antibiotics", ok: true }, { kind: "fluid", label: "Fluid 500 mL", ok: true }, { kind: "norepi", label: "Noradrenaline", ok: true }, { kind: "art-line", label: "Insert arterial line", ok: true }] }, { g: "Lung", items: [{ kind: "oxygen", label: "Oxygen", ok: true }, { kind: "intubate", label: "Intubate", ok: true }, { kind: "cxr", label: "Chest film", ok: true }, { kind: "ct-chest", label: "CT chest", ok: false }] }, { g: "Heart", items: [{ kind: "echo", label: "Echocardiogram", ok: true }] }], call: [{ id: "pulmonologist", label: "Pulmonologist", ok: true }, { id: "nephrologist", label: "Nephrologist", ok: true }], wrong: [{ kind: "flood", label: "Give 2 litres without looking", ok: true }], acls: [], enter: false };
   const room = { id: "demo", code: "DEMO42", status: "live", host: true, slots: { intensivist: 1, pulmonologist: 1, nephrologist: 1 }, you: { specialty: mySpec, inside: true }, members: [{ userId: myId, name: myName, specialty: mySpec, inside: true }, { userId: "x1", name: "Ravi", specialty: "pulmonologist" }, { userId: "x2", name: "Meera", specialty: "nephrologist" }], scenario: { name: "Meera Nair", age: 58, sex: "woman", dx: "Fever and hypoxaemic pneumonia", story: "Three days of fever and a productive cough. She is speaking. The saturation is 91% on air. The pressure, for now, is acceptable." }, patient: { hour: 3, hr: 112, sbp: 104, dbp: 64, map: 77, spo2: 91, rr: 28, gcs: 15, temp: 38.6, lactate: 2.6, cr: 1.4, k: 4.3, rhythm: "sinus", alive: true, tube: false, oxygen: true, norepi: false, problems: [{ id: "a", title: "Pneumonia with falling saturation", specialty: "pulmonologist", open: true, called: false }, { id: "b", title: "Rising lactate", specialty: "intensivist", open: true, called: true }], results: [{ label: "Labs", text: "Lactate 2.6 mmol/L. Creatinine 1.4 mg/dL. Potassium 4.3 mmol/L. Haemoglobin 11.4 g/dL." }], log: [{ t: 1, text: "Asha examined the patient." }, { t: 2, text: "Asha put oxygen on." }] } };
   apply({ room, orders, me: { name: myName } });
+  if (Q.has("engine")) {                                   /* ?demo&engine: the real case engine behind the hall, for trying orders */
+    const E = await import("./case-engine.js?v=20261122a"), team = (Q.get("team") || "intensivist,pulmonologist,nephrologist").split(","), sc = E.Dp(7, team, { caseId: Q.get("case") || undefined, noRemember: true, recent: [] });
+    const acts = [], t0 = Date.now() - (+Q.get("t") || 0) * 1000, me0 = room.members[0];
+    room.slots = {}; team.forEach((sp) => { room.slots[sp] = 1; });
+    room.members = team.map((sp, i) => ({ userId: i === 0 ? myId : "x" + i, name: i === 0 ? myName : "Dr " + sp.slice(0, 5), specialty: sp, inside: true })); room.you = { specialty: team[0], inside: true }; mySpec = team[0];
+    room.scenario = { name: sc.name, age: sc.age, sex: sc.sex, dx: sc.dx, story: sc.story, shockable: sc.shockable };
+    const publish = () => { room.patient = E.Np(sc, acts, Date.now() - t0); apply({ room, orders, me: { name: myName } }); };
+    demoHook = (type, o) => { const add = (k, spec) => acts.push({ atMs: Date.now() - t0 + acts.length, userId: myId, name: myName, specialty: mySpec, kind: k, payload: k === "call" ? { specialty: spec || "" } : {} }); if (type === "hall-order") add(o.kind, o.specialty); else if (type === "hall-orders") (o.orders || []).forEach((x) => add(x.kind, x.specialty)); publish(); };
+    window.__demo = { sc, acts, publish, shift(sec) { acts.forEach((a) => { a.atMs += 0; }); return sec; }, E };
+    feed.length = 0; hist.length = 0; labSeries.length = 0; seenKeys.clear(); feedInit = false; unseen.invest = 0; unseen.history = 0;
+    setInterval(publish, 1000); publish();
+  }
 }
 

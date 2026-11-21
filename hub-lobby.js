@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createSfx } from "./critical-care-universe/universe/sfx.js?v=20261121h";
+import { createSfx } from "./critical-care-universe/universe/sfx.js?v=20261122a";
 
 const gate = document.getElementById("icu-gate");
 const canvas = document.getElementById("lobby");
@@ -379,7 +379,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       if (btn) btn.click();
     } else if (kind === "aud") {
       keepFrame(); keepPose();
-      location.href = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&v=20261121h";
+      location.href = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&v=20261122a";
     } else if (kind === "rad") {
       location.href = "radiology.html?v=20261119r2";
     } else if (kind === "micro") {
