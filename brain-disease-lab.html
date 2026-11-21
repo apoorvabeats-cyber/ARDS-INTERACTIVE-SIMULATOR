@@ -75,13 +75,17 @@ main{padding:4px 14px 40px}
 .algo button.on{border-color:var(--green)}
 .warn{border-left:3px solid var(--warm);padding-left:10px}
 .backrow{margin:0 0 8px}
+.filmpick{display:flex;gap:6px;margin:0 0 10px}
+.filmpick button{flex:1;border:1px solid var(--line);background:#0c1a24;color:inherit;border-radius:999px;min-height:40px;padding:0 12px;font:inherit}
+.filmpick button.on{background:#12384a;border-color:var(--cyan);color:var(--cyan)}
 @media(min-width:980px){
   header,main,.context,.scroller{padding-left:28px;padding-right:28px}
   .layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:8px;align-items:start;padding-right:20px}
+  .layout:has(#sections[hidden]){grid-template-columns:minmax(0,1fr)}
   .sections{flex-direction:column;max-height:calc(100vh - 150px);position:sticky;top:12px;padding-top:0}
   .sections button{border-radius:12px;width:100%}
   .stage.wide{display:grid;grid-template-columns:minmax(220px,260px) minmax(0,1fr) minmax(220px,280px);grid-template-areas:"left player right" "controls controls controls";gap:12px}
-  .stage.wide .player{grid-area:player;order:0}
+  .stage.wide .player{grid-area:player;order:0;align-self:start}
   .stage.wide .side-l{grid-area:left;order:0}
   .stage.wide .side-r{grid-area:right;order:0}
   .stage.wide .controls{grid-area:controls;order:0}
@@ -146,6 +150,7 @@ let quizLocked = {};
 let spotId = "";
 let anatomyCleanup = null;
 let filmCleanup = null;
+let filmAlt = false;
 
 function esc(s){
   return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
@@ -229,7 +234,7 @@ const CT_SPOTS = [
 ];
 
 const SHOWS = {
-  evd:{dur:43.19, clip:"neuro/evd.mp4", captioned:true, steps:[
+  evdB:{dur:43.19, clip:"neuro/evd.mp4", captioned:true, steps:[
     {t:0, title:"Entry site", text:"Identify the appropriate entry site, usually Kocher's point, followed by sterile preparation and local anesthesia."},
     {t:9.69, title:"Incision and burr hole", text:"A small incision is made in the scalp, and a burr hole is drilled through the skull."},
     {t:14.56, title:"Advance the catheter", text:"The dura is opened, and a catheter is carefully advanced into the lateral ventricle, typically the frontal horn, following a trajectory toward the ipsilateral medial canthus and external auditory meatus."},
@@ -241,48 +246,80 @@ const SHOWS = {
     {t:12, title:"Through the cords", text:"The tube passes between the vocal cords and into the trachea. The cuff sits below the cords."},
     {t:18, title:"Confirm and ventilate", text:"A sustained capnography waveform confirms the tube is in the trachea. Both lungs expand. Then secure the tube and reassess ventilation. In brain injury, do not hyperventilate as a routine."}
   ]},
-  bolt:{dur:10, steps:[
-    {t:0, title:"What it is", text:"A parenchymal monitor sits in the brain substance and measures pressure. It does not drain cerebrospinal fluid."},
-    {t:3, title:"Placement", text:"It is usually placed frontally, through a small hole, by a trained operator. Coagulation is corrected first."},
-    {t:6, title:"The number", text:"The waveform and the number guide treatment. A reading without a clinical story is not a diagnosis."}
-  ]},
-  crani:{dur:25, clip:"neuro/crani-user.mp4?v=attach4", poster:"neuro/crani-poster.jpg", captioned:true, steps:[
+  craniB:{dur:25, clip:"neuro/crani-user.mp4?v=attach4", poster:"neuro/crani-poster.jpg", captioned:true, steps:[
     {t:0, title:"Intracranial hypertension", text:"Severe cerebral edema can cause intracranial hypertension, compromising cerebral perfusion and risking secondary brain injury."},
     {t:4, title:"Surgical exposure", text:"Decompressive craniectomy creates additional intracranial volume when indicated for refractory intracranial hypertension. It is a neurosurgical operation, not a bedside procedure."},
     {t:8, title:"Bone flap", text:"A sufficiently large bone flap is removed to permit expansion of the swollen brain."},
     {t:14, title:"Dural opening", text:"Expansile duraplasty provides additional space. In this illustration the pressure falls as the brain expands."},
     {t:20, title:"Afterwards", text:"Postoperative care focuses on intracranial pressure, cerebral perfusion, hemodynamics, and complications, including bleeding, infection, hydrocephalus, and later the syndrome of the trephined."}
   ]},
+  crani:{dur:15.04, clip:"neuro/proc/crani.mp4?v=20261122a", poster:"neuro/proc/crani.jpg", captioned:true, alt:"craniB", steps:[
+    {t:0, title:"Refractory intracranial pressure", text:"Pressure stays high despite medical measures, and neurosurgery has chosen surgery. The scalp incision is planned over the side that needs the most room."},
+    {t:2.5, title:"Craniectomy and bone flap removal", text:"A large bone flap is removed so the swollen brain can expand outwards instead of being pushed down through the tentorium and foramen magnum."},
+    {t:7.5, title:"Dural opening and duraplasty", text:"The dura is opened and left loose or patched (duraplasty), because a tight dura would still compress the brain."},
+    {t:12.5, title:"Scalp closure and later cranioplasty", text:"The scalp is closed over the swollen brain. The bone is replaced later, in a cranioplasty, once the swelling has settled."}
+  ]},
+  evd:{dur:15.04, clip:"neuro/proc/evd.mp4?v=20261122a", poster:"neuro/proc/evd.jpg", alt:"evdB", steps:[
+    {t:0, title:"The target", text:"The lateral ventricle is the target. A scan shows where the ventricles are and whether they are enlarged."},
+    {t:2.5, title:"Incision and burr hole", text:"A small scalp incision, usually at Kocher point, and a burr hole through the skull."},
+    {t:7.5, title:"Catheter into the ventricle", text:"The dura is opened and the catheter is advanced into the frontal horn. CSF flowing back confirms the position."},
+    {t:10, title:"Connect and drain", text:"The catheter is tunnelled, secured and connected to a closed drainage system. The chamber is levelled to a set height relative to the external auditory canal to control drainage and to measure intracranial pressure."}
+  ]},
+  lp:{dur:15.04, clip:"neuro/proc/lp.mp4?v=20261122a", poster:"neuro/proc/lp.jpg", steps:[
+    {t:0, title:"Position", text:"The patient lies on their side with knees drawn up and the back curved, so the lumbar spinous processes open apart. The level is below the end of the spinal cord."},
+    {t:2.5, title:"The needle", text:"After skin preparation and local anaesthetic, the needle passes between two spinous processes, through the ligaments, into the CSF space."},
+    {t:7.5, title:"Collect the CSF", text:"CSF drips into sterile tubes in order: cells, protein and glucose, culture. Measure the opening pressure first when it will change the decision."},
+    {t:12.5, title:"Withdraw and dress", text:"The needle is withdrawn and the site covered. Watch for headache, back pain, and any new neurological change."}
+  ]},
+  coil:{dur:15.04, clip:"neuro/proc/coil.mp4?v=20261122a", poster:"neuro/proc/coil.jpg", steps:[
+    {t:0, title:"The aneurysm", text:"A saccular aneurysm is a thin-walled sac on a branch point of the circle of Willis. After rupture it has to be secured, or it will bleed again."},
+    {t:2.5, title:"Endovascular coiling", text:"A microcatheter is passed from an arterial puncture, through the vessels, into the aneurysm sac."},
+    {t:5, title:"Packing the coils", text:"Metal coils are released into the sac until blood no longer flows into it."},
+    {t:7.5, title:"Surgical clipping", text:"The open alternative. After a craniotomy, a clip is placed across the neck of the aneurysm."},
+    {t:12.5, title:"Two ways to secure it", text:"Coiling fills the sac from within. Clipping shuts it off from outside. The neurovascular team chooses by the shape and site of the aneurysm and by the patient."}
+  ]},
+  evt:{dur:15.04, clip:"neuro/proc/evt.mp4?v=20261122a", poster:"neuro/proc/evt.jpg", steps:[
+    {t:0, title:"The occlusion", text:"A clot blocks a large intracranial artery and the territory beyond it is starving."},
+    {t:2.5, title:"Reaching the clot", text:"A wire and microcatheter are passed from an arterial puncture up to the clot and across it."},
+    {t:7.5, title:"Stent retriever", text:"The stent retriever opens inside the clot and entangles it."},
+    {t:10, title:"Retrieval", text:"The device and the clot are drawn back together into the catheter and removed."},
+    {t:12.5, title:"Reperfusion", text:"Flow returns. The time to reperfusion decides how much brain survives."}
+  ]},
+  bolt:{dur:15.04, clip:"neuro/proc/bolt.mp4?v=20261122a", poster:"neuro/proc/bolt.jpg", steps:[
+    {t:0, title:"The pressure sensor", text:"A parenchymal monitor is a thin probe that sits in brain tissue and measures pressure. It does not drain CSF."},
+    {t:3.5, title:"Small incision and burr hole", text:"A small scalp incision and a burr hole, usually frontal, after coagulation has been corrected."},
+    {t:5.5, title:"Placing the probe", text:"The probe passes through the hole and the dura into the brain substance."},
+    {t:8.75, title:"Connect", text:"The cable runs to the bedside monitor."},
+    {t:10, title:"Read the numbers", text:"An ICP of 24 mmHg with a mean arterial pressure of 85 mmHg gives a cerebral perfusion pressure of 61 mmHg. An ICP above 22 mmHg is the usual threshold to treat. The trend and the patient matter more than one number."}
+  ]},
+  shunt:{dur:15.04, clip:"neuro/proc/shunt.mp4?v=20261122a", poster:"neuro/proc/shunt.jpg", steps:[
+    {t:0, title:"Hydrocephalus", text:"CSF builds up in enlarged ventricles. An external drain is temporary. A shunt is an implanted, lasting route for the fluid."},
+    {t:2.5, title:"Burr hole", text:"A small burr hole opens the skull."},
+    {t:3.75, title:"The ventricular catheter", text:"The ventricular catheter is passed through the hole into the lateral ventricle."},
+    {t:6.25, title:"The valve", text:"A valve behind the ear controls how fast CSF leaves the ventricle."},
+    {t:7.5, title:"Tunnel under the skin", text:"The distal catheter is tunnelled under the skin, down the neck and chest, to the abdomen."},
+    {t:8.75, title:"The peritoneal end", text:"Through a small abdominal incision, the tip is placed in the peritoneal cavity."},
+    {t:11.25, title:"The complete path", text:"CSF now flows from the ventricle, through the valve, to the peritoneum, where it is absorbed."}
+  ]},
+  vent:{dur:15.04, clip:"neuro/proc/vent.mp4?v=20261122a", poster:"neuro/proc/vent.jpg", steps:[
+    {t:0, title:"The ventilated patient", text:"After intubation the patient is on controlled ventilation, with an arterial line for pressure and blood gases."},
+    {t:2.5, title:"Set the ventilator", text:"Rate and tidal volume are set to hold carbon dioxide in the target range. Hypoxia and hypotension are avoided at the same time."},
+    {t:7.5, title:"Arterial gas", text:"A sample from the arterial line gives PaCO₂, PaO₂ and pH. End-tidal CO₂ is only a guide to it."},
+    {t:10, title:"Read the PaCO₂", text:"A PaCO₂ of 62 mmHg with a pH of 7.27 is hypercapnia with acidosis. In a swollen brain it widens cerebral vessels and raises intracranial pressure."},
+    {t:12.5, title:"The target", text:"Aim for normocapnia, a PaCO₂ of about 35–45 mmHg. Hyperventilation is only a brief bridge for impending herniation, because the vessels narrow and cerebral blood flow can fall."}
+  ]},
+  cvc:{dur:15.04, clip:"neuro/proc/cvc.mp4?v=20261122a", poster:"neuro/proc/cvc.jpg", steps:[
+    {t:0, title:"Ultrasound", text:"The probe shows the internal jugular vein beside the carotid artery. The vein compresses. The artery pulses and does not."},
+    {t:2.5, title:"Needle into the vein", text:"The needle is followed on the screen as it enters the vein."},
+    {t:5, title:"Guidewire", text:"A guidewire passes through the needle into the vein (the Seldinger technique)."},
+    {t:7.5, title:"Dilate and thread", text:"A small skin nick, a dilator, then the catheter is slid over the wire. The wire is held at all times."},
+    {t:10, title:"Tip position", text:"The tip lies in the lower superior vena cava. Confirm the position and look for a pneumothorax before anything caustic is infused."}
+  ]},
   ct:{dur:12, inspect:true, steps:CT_SPOTS.map(function(s,i){ return {t:i*2.2, title:s.title, text:s.text}; })},
   art:{dur:9, steps:[
     {t:0, title:"Why", text:"Beat-to-beat arterial pressure matters when cerebral perfusion is tight. The radial artery is the usual first site."},
     {t:3, title:"The vessel", text:"Ultrasound makes the artery and the nearby structures obvious. A catheter is advanced and connected to a flushed transducer at the right height."},
     {t:6, title:"Afterwards", text:"Watch the hand. Remove the line when it is no longer guiding treatment."}
-  ]},
-  cvc:{dur:10, steps:[
-    {t:0, title:"Why", text:"A central vein is used for reliable access and for some vasoactive infusions. It is not required for every brain injury."},
-    {t:2, title:"Ultrasound", text:"The vein compresses. The artery pulses and does not. The needle is watched entering the vein."},
-    {t:6, title:"Wire and catheter", text:"A wire, then a catheter, then confirmation that the tip is venous before anything caustic is infused. Pneumothorax and arterial puncture are the early risks."}
-  ]},
-  coil:{dur:11, steps:[
-    {t:0, title:"The sac", text:"Most ruptured aneurysms sit at branch points on the circle of Willis. The dome is the weak part."},
-    {t:4, title:"Filling", text:"From an arterial catheter, coils are packed into the sac so blood no longer enters it. Clipping is the open alternative. Both are specialist procedures."},
-    {t:8, title:"After", text:"Securing the aneurysm stops the next rupture. It does not by itself treat hydrocephalus, vasospasm or delayed ischaemia."}
-  ]},
-  evt:{dur:11, steps:[
-    {t:0, title:"The occlusion", text:"A clot in a large intracranial artery, often the middle cerebral stem, threatens a wide territory."},
-    {t:3, title:"Retrieval", text:"A stent retriever or aspiration catheter is used, in a suitably selected patient, to remove the clot."},
-    {t:8, title:"Reperfusion", text:"The aim is restored flow before the territory dies. The time window depends on imaging and the pathway, not on a guess."}
-  ]},
-  lp:{dur:10, steps:[
-    {t:0, title:"Why", text:"A lumbar puncture samples CSF when meningitis or subarachnoid blood is the question and imaging does not already answer it."},
-    {t:3, title:"The pass", text:"The needle passes between lumbar spinous processes into the CSF space."},
-    {t:8, title:"When not to", text:"Do not puncture if a mass or tight brain makes herniation likely, or if coagulation is unsafe. Image first when that risk is real."}
-  ]},
-  shunt:{dur:10, steps:[
-    {t:0, title:"Temporary versus lasting", text:"An external drain is temporary. A shunt is an implanted path from ventricle to another compartment, usually the peritoneum."},
-    {t:4, title:"The path", text:"The ventricular catheter, the valve and the distal catheter are placed in an operation."},
-    {t:7, title:"Failure", text:"Shunts block and they infect. A sleepy patient with a shunt needs that thought early."}
   ]},
   clock:{dur:9, steps:[
     {t:0, title:"The clock", text:"Time starts at last known well, not at the moment the patient was found."},
@@ -406,6 +443,7 @@ const DISEASES = [
     ],
     procedures:[
       proc("ett","Endotracheal intubation","ett","The patient cannot protect the airway, or ventilation must be controlled to protect the brain.",["Monitoring","A plan that avoids hypoxia and hypotension","Cervical spine held if not cleared"],["Failed airway","Hypotension on induction","Right main bronchus"]),
+      proc("vent","Ventilation and PaCO\u2082 control","vent","After intubation, carbon dioxide is aimed for, not left to chance. It changes cerebral blood flow.",["An arterial line or reliable blood gas access","End-tidal CO\u2082 monitoring"],["Hypercapnia, which raises intracranial pressure","Over-ventilation, which can cause cerebral ischaemia","Hypoxia"]),
       evdTopic("Blood in the ventricles, hydrocephalus, or a need to measure and drain when pressure is part of the problem."),
       proc("bolt","Parenchymal ICP monitor","bolt","Pressure monitoring when a drain is not the right catheter, in a patient being managed for severe injury.",["Coagulation plan","A trained operator"],["Haemorrhage","Infection","A number that is disbelieved or worshipped"]),
       proc("crani","Decompressive craniectomy","crani","A surgical mass, or intracranial pressure that does not respond, in a patient selected by neurosurgery.",["Imaging","Theatre, not the ward"],["Bleeding","Infection","Later hydrocephalus and the syndrome of the trephined"]),
@@ -467,7 +505,8 @@ const DISEASES = [
     procedures:[
       evdTopic("Hydrocephalus or intraventricular blood with a falling conscious level."),
       proc("coil","Securing the aneurysm","coil","A ruptured aneurysm needs to be coiled or clipped so it does not bleed again.",["A neurovascular centre","A secured airway if the grade is poor"],["Thromboembolism","Rupture during the procedure","A residual neck"]),
-      proc("ct","Reading the first CT","ct","Blood in cisterns, ventricle size, and an associated haematoma.",["The patient can travel safely"],["A negative early CT does not end a classic story"])
+      proc("ct","Reading the first CT","ct","Blood in cisterns, ventricle size, and an associated haematoma.",["The patient can travel safely"],["A negative early CT does not end a classic story"]),
+      proc("lp","Lumbar puncture","lp","A classic story with a negative CT. The CSF is checked for blood pigment (xanthochromia) at the right time after the headache.",["CT first, within the window that makes it reliable","Safe coagulation","No mass effect"],["Herniation if a mass or tight brain was missed","A traumatic tap that confuses the result","Post-LP headache"])
     ],
     monitor:["Conscious level and a focal chart, several times a day through the spasm window","Blood pressure. After the aneurysm is secure, pressure is supported if delayed ischaemia appears","Sodium. Hyponatraemia is common and is not an instruction to dry the patient out","Transcranial Doppler or perfusion imaging where the centre uses them. They do not replace the examination"],
     complications:[
@@ -642,7 +681,9 @@ const DISEASES = [
     meds:[{id:"osm", name:"Osmotherapy", show:"osm", mech:"Shifts water out of brain.", indication:"A bridge while the cause is treated.", dose:"Local protocol.", harm:"Not a destination."}],
     procedures:[
       evdTopic("Hydrocephalus or blood in the ventricles as the cause of the pressure."),
-      proc("bolt","ICP monitor","bolt","When the number will change care and a drain is not indicated.",["Trained operator"],["Haemorrhage","Infection"])
+      proc("bolt","ICP monitor","bolt","When the number will change care and a drain is not indicated.",["Trained operator"],["Haemorrhage","Infection"]),
+      proc("crani","Decompressive craniectomy","crani","Pressure that stays high despite first-line measures, or a surgical mass, in a patient selected by neurosurgery.",["Imaging","Theatre, not the ward"],["Bleeding","Infection","Later hydrocephalus and the syndrome of the trephined"]),
+      proc("vent","Ventilation and PaCO\u2082 control","vent","Carbon dioxide is one of the quickest handles on intracranial pressure, and one of the easiest to misuse.",["An arterial line or reliable blood gas access","End-tidal CO\u2082 monitoring"],["Hypercapnia, which raises intracranial pressure","Over-ventilation, which can cause cerebral ischaemia","Hypoxia"])
     ],
     monitor:["The cause, not only the number","Pupils and coma scale","Carbon dioxide and temperature"],
     complications:[
@@ -806,7 +847,8 @@ const DISEASES = [
     algo:["Restore circulation and oxygen. Treat the cause of the arrest","Control glucose, carbon dioxide, and temperature on the post-arrest pathway","Do not assign a final prognosis from the first CT","Image again if the story is focal, because that may be a stroke","Death by neurological criteria is a later protocol, not a reading of this film"],
     meds:[{id:"osm", name:"No drug determines the outcome", show:"osm", mech:"Osmotherapy is a bridge for swelling. It does not reverse an anoxic injury and it does not declare death.", indication:"Only if pressure is part of the problem.", dose:"A teaching note only. Osmotherapy is not the treatment of the arrest.", harm:"Do not use a drug from another chapter, such as a lytic or nimodipine, because the CT looks abnormal."}],
     procedures:[
-      proc("ct","Reading the films","ct","Separate a focal infarct from a diffuse hypoxic pattern.",["The caption names what the film actually is"],["Calling a single arterial infarct a global hypoxic injury"])
+      proc("ct","Reading the films","ct","Separate a focal infarct from a diffuse hypoxic pattern.",["The caption names what the film actually is"],["Calling a single arterial infarct a global hypoxic injury"]),
+      proc("vent","Ventilation and PaCO\u2082 control","vent","After cardiac arrest, carbon dioxide is held in the normal range on the post-arrest pathway.",["An arterial line or reliable blood gas access","End-tidal CO\u2082 monitoring"],["Hypercapnia, which raises intracranial pressure","Over-ventilation, which can cause cerebral ischaemia","Hypoxia"])
     ],
     monitor:["The examination, written as numbers, once sedation is gone","Temperature on the post-arrest pathway","Glucose and carbon dioxide"],
     complications:[
@@ -1045,6 +1087,7 @@ function sectionTitle(){
 }
 function openTopic(id){
   topicId = id;
+  filmAlt = false;
   spotId = "";
   chapterMenu = false;
   writeHash();
@@ -1284,7 +1327,8 @@ function bindClip(def, steps){
   if(player.playing) video.play().catch(function(){ player.playing = false; playBtn.textContent = "Play"; });
 }
 function renderShow(d, topic){
-  const def = showDef(topic.show);
+  const base = showDef(topic.show);
+  const def = base && base.alt && filmAlt ? showDef(base.alt) : base;
   if(!def){ work.innerHTML = "<p>This demonstration is not linked.</p>"; return; }
   const steps = def.steps;
   work.innerHTML =
@@ -1292,6 +1336,7 @@ function renderShow(d, topic){
     '<div class="backrow"><button type="button" id="backcat">Back</button></div>'+
     '<div class="stage wide">'+
       '<div class="panel side-l"><span class="badge">'+(def.clip?"Animation":def.inspect?"3D teaching view":"3D teaching sequence")+'</span><h2>'+esc(topic.name)+'</h2>'+
+        (base.alt?'<div class="filmpick" role="group" aria-label="Choose a film"><button type="button" data-film="0" class="'+(filmAlt?'':'on')+'">Film 1</button><button type="button" data-film="1" class="'+(filmAlt?'on':'')+'">Film 2</button></div>':"")+
         (topic.indication?'<h3>Indication</h3><p>'+esc(topic.indication)+'</p>':"")+
         (topic.mech?'<h3>Mechanism</h3><p>'+esc(topic.mech)+'</p>':"")+
         (topic.link?'<p>'+esc(topic.link)+'</p>':"")+
@@ -1308,7 +1353,10 @@ function renderShow(d, topic){
         '<input id="scrub" type="range" min="0" max="'+def.dur+'" step="0.05" value="0" aria-label="Timeline">'+
         '<button type="button" id="slow">0.75×</button><button type="button" id="fast">1.5×</button></div>'+
     '</div>';
-  document.getElementById("backcat").onclick = function(){ topicId=""; writeHash(); render(); };
+  document.getElementById("backcat").onclick = function(){ topicId=""; filmAlt=false; writeHash(); render(); };
+  work.querySelectorAll("[data-film]").forEach(function(btn){
+    btn.onclick = function(){ filmAlt = btn.getAttribute("data-film")==="1"; render(); };
+  });
   if(def.clip){ bindClip(def, steps); return; }
   const canvas = document.getElementById("reel");
   const hud = document.getElementById("hud");
