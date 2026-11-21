@@ -12,7 +12,7 @@ export function buildSegment(oldSegment) {
   const header = oldSegment.slice(0, cut);
   const body = [strip(read("order-catalogue.js")), strip(read("case-pool.js")), strip(read("case-engine.js"))].join("\n");
   const sig = crypto.createHash("sha1").update(body).digest("hex").slice(0, 12);
-  return `${header}/*ccu-engine:${sig}*/var __ccuEngine=(()=>{${body}\nreturn {Dp,Np,Pp,Op,mdtHour,CASES,eligibleCases,caseWeights,pickCase,COVER,BY_ID,CATALOGUE,canon,labelOf,specName};})();var Dp=__ccuEngine.Dp,Np=__ccuEngine.Np,Pp=__ccuEngine.Pp,Op=__ccuEngine.Op,mdtHour=__ccuEngine.mdtHour;`;
+  return `${header}/*ccu-engine:${sig}*/var __ccuEngine=(()=>{${body}\nreturn {Dp,Np,Pp,Op,mdtHour,CASES,eligibleCases,caseWeights,pickCase,COVER,BY_ID,CATALOGUE,canon,labelOf,specName,orderPayload};})();var Dp=__ccuEngine.Dp,Np=__ccuEngine.Np,Pp=__ccuEngine.Pp,Op=__ccuEngine.Op,mdtHour=__ccuEngine.mdtHour;`;
 }
 if (process.argv[1] && process.argv[1].endsWith("build-engine.mjs")) {
   const s = fs.readFileSync(app, "utf8"), a = s.indexOf(START), b = s.indexOf(END);

@@ -20,6 +20,12 @@ export const COVER = {
   "abx:tigecycline": C("strep mssa mrsa gneg esbl anaerobe"), "abx:azithromycin": C("atypical"), "abx:doxycycline": C("atypical"), "abx:levofloxacin": C("atypical strep gneg"),
   "abx:metronidazole": C("anaerobe"), "abx:clindamycin": C("strep mssa anaerobe toxin"), "abx:amikacin": C("gneg pseudo"), "abx:amoxiclav": C("strep mssa gneg anaerobe"),
   "abx:ampicillin": C("strep enterococcus"), "abx:cotrimoxazole": C("mssa gneg"), "abx:oseltamivir": C("flu"), "abx:acyclovir": C("hsv"), "abx:fluconazole": C("candida"),
+  "abx:imipenem": C("strep mssa gneg pseudo esbl anaerobe"), "abx:ertapenem": C("strep mssa gneg esbl anaerobe"), "abx:ceftazavi": C("gneg pseudo esbl"), "abx:cefazolin": C("strep mssa"), "abx:cefuroxime": C("strep mssa gneg"),
+  "abx:cefotaxime": C("strep mssa gneg"), "abx:aztreonam": C("gneg pseudo"), "abx:gentamicin": C("gneg pseudo"), "abx:tobramycin": C("gneg pseudo"), "abx:teicoplanin": C("strep mssa mrsa enterococcus"),
+  "abx:daptomycin": C("strep mssa mrsa enterococcus"), "abx:ciprofloxacin": C("gneg pseudo atypical"), "abx:moxifloxacin": C("atypical strep gneg"), "abx:clarithromycin": C("atypical strep"),
+  "abx:erythromycin": C("atypical strep"), "abx:minocycline": C("atypical mssa mrsa"), "abx:cloxacillin": C("strep mssa"), "abx:flucloxacillin": C("strep mssa"), "abx:penicillin": C("strep"),
+  "abx:amoxicillin": C("strep enterococcus"), "abx:ampsulbactam": C("strep mssa gneg anaerobe enterococcus"), "abx:polymyxinb": C("gneg pseudo esbl"), "abx:fosfomycin": C("gneg"),
+  "abx:amphotericin": C("candida"), "abx:micafungin": C("candida"), "abx:caspofungin": C("candida"), "abx:voriconazole": C("candida"),
   "abx:echinocandin": C("candida"), "abx:any": C("strep mssa gneg pseudo anaerobe enterococcus"),
 };
 const NICE = { strep: "pneumococcus and streptococci", mssa: "staphylococci", mrsa: "MRSA", gneg: "Gram-negative rods", pseudo: "Pseudomonas", esbl: "ESBL producers", anaerobe: "anaerobes", atypical: "atypical organisms", toxin: "toxin production", flu: "influenza" };
@@ -163,6 +169,9 @@ export function Np(sc, actions, ms) {
   }
 
   /* one order, at one time */
+  const lab0 = (id, pl) => (id === "drug:fluids" ? (pl.ml ? volText(pl.ml) + " of IV fluid" : "an IV fluid bolus") : labelOf(id));
+  const fluidTotal = () => ord.filter((o) => o.id === "drug:fluids").reduce((n, o) => n + (o.ml || 0), 0);
+  const fluidName = (say) => (/saline|\bns\b|sodium chloride/i.test(say || "") ? "normal saline" : /ringer|lactate|\brl\b|hartmann/i.test(say || "") ? "Ringer's lactate" : /plasma ?lyte/i.test(say || "") ? "Plasma-Lyte" : "IV fluid");
   function apply(a) {
     const t = a.atMs, raw = a.kind, who_ = who(a);
     if (raw === "enter") { log.push({ t: T(t), text: `${who_} entered the bedspace.` }); return; }
@@ -180,8 +189,9 @@ export function Np(sc, actions, ms) {
     if (id === "drug:adrenaline" && arrestAt != null) { ord.push({ id: "adrenaline", at: t, by: a.userId }); log.push({ t: T(t), text: `${who_} gave adrenaline 1 mg.` }); return; }
     // the repeat rule
     const cat = (BY_ID[id] || {}).cat || "drug", win = id === "drug:fluids" ? FLUID_MS : (DUP_MS[cat] || 60000);
-    if (last[id] != null && t - last[id] < win && id !== "flood") { log.push({ t: T(t), text: `${who_} repeated ${labelOf(id)}. It was already ordered.` }); return; }
-    last[id] = t; if (first[id] == null) first[id] = t;
+    const pl = orderPayload(a.payload), lk = id === "drug:fluids" ? id + ":" + (pl.ml || 0) : id;
+    if (last[lk] != null && t - last[lk] < win && id !== "flood") { log.push({ t: T(t), text: `${who_} repeated ${lab0(id, pl)}. It was already ordered.` }); return; }
+    last[lk] = t; if (first[id] == null) first[id] = t;
     const lab = labelOf(id), vNow = vit(t, true);
 
     // the harm that comes with the wrong order
@@ -193,10 +203,10 @@ export function Np(sc, actions, ms) {
       if (!(unless && unless.some((u) => ordered(u, t)))) { st.s = clamp(st.s + ch[0], 0, 1); harmTotal += ch[0]; harmLog.push({ id, at: t }); log.push({ t: T(t), text: `${who_} gave ${lab}. ${ch[1]}` }); harmed = true; }
     }
     if (INVASIVE.has(id) && !indicated && !(c.ok || []).includes(id)) { st.s = clamp(st.s + 0.05, 0, 1); harmTotal += 0.05; harmLog.push({ id, at: t }); log.push({ t: T(t), text: `${who_} arranged ${lab}. There was no indication, and the trip cost time.` }); ord.push({ id, at: t, by: a.userId, harm: true }); return; }
-    if (id === "flood") { for (let i = 0; i < 4; i += 1) ord.push({ id: "drug:fluids", at: t, by: a.userId }); if (!harmed) log.push({ t: T(t), text: `${who_} gave two litres of crystalloid without checking the response.` }); refreshNeeds(t, a); return; }
+    if (id === "flood") { for (let i = 0; i < 4; i += 1) ord.push({ id: "drug:fluids", at: t, by: a.userId, ml: 500 }); if (!harmed) log.push({ t: T(t), text: `${who_} gave two litres of crystalloid without checking the response.` }); refreshNeeds(t, a); return; }
     if (id === "lay-flat") { if (!harmed) log.push({ t: T(t), text: `${who_} laid the patient flat.` }); return; }
 
-    ord.push({ id, at: t, by: a.userId });
+    ord.push({ id, at: t, by: a.userId, ...(pl.ml ? { ml: pl.ml } : {}), ...(pl.dose ? { dose: pl.dose } : {}), ...(pl.say ? { say: pl.say } : {}) });
     const fresh = refreshNeeds(t, a);
 
     // what the order is, and what it does at the bedside
@@ -250,17 +260,19 @@ export function Np(sc, actions, ms) {
       case "drug:vaso": st.vaso = true; log.push({ t: T(t), text: `${who_} added vasopressin.` }); break;
       case "drug:dobut": st.dobut = true; log.push({ t: T(t), text: `${who_} started dobutamine.` }); break;
       case "drug:adrenaline": st.norepi = true; log.push({ t: T(t), text: `${who_} started an adrenaline infusion.` }); break;
-      case "drug:fluids": { const n = ord.filter((o) => o.id === id).length; if (vNow.spo2 < 90 && /wet|oedema|ARDS|pneumonia/i.test(c.dx + c.title) && !indicated) { log.push({ t: T(t), text: `${who_} gave a fluid bolus into wet lungs. The saturation fell.` }); } else log.push({ t: T(t), text: `${who_} gave a measured fluid bolus${n > 1 ? " (" + n + ")" : ""}.` }); break; }
+      case "drug:fluids": { const tot = fluidTotal(), what = fluidName(pl.say), amt = pl.ml ? volText(pl.ml) + " of " : "", more = pl.ml && tot > pl.ml ? ` ${volText(tot)} in total so far.` : "";
+        if (vNow.spo2 < 90 && /wet|oedema|ARDS|pneumonia/i.test(c.dx + c.title) && !indicated) log.push({ t: T(t), text: `${who_} gave ${amt}${what} into wet lungs. The saturation fell.${more}` });
+        else log.push({ t: T(t), text: `${who_} gave ${amt || "a measured "}${pl.ml ? what : pl.rate ? "IV fluid" : "fluid bolus (the volume was not stated)"}${pl.over ? ", over " + pl.over : ""}${pl.rate ? ", at " + pl.rate : ""}.${more}` }); break; }
       case "drug:blood": log.push({ t: T(t), text: `${who_} transfused blood.${/bleed|haemorrhage|trauma/i.test(c.dx) ? "" : " There is no bleeding, and the haemoglobin was not low."}` }); break;
       case "drug:insulindex": log.push({ t: T(t), text: `${who_} gave insulin with dextrose. Potassium will move inside the cell.` }); break;
       case "drug:calcium": log.push({ t: T(t), text: `${who_} gave calcium. The myocardium is stabilised, not cured.` }); break;
       default:
         if (row.cat === "abx") {
-          const got = cover(); let line = `${who_} started ${id === "abx:any" ? "empirical broad-spectrum antibiotics (piperacillin-tazobactam)" : lab}.`;
+          const got = cover(); let line = `${who_} started ${id === "abx:any" ? "an antibiotic (the drug was not named)" : lab}${pl.dose ? " " + pl.dose : ""}${pl.over ? " over " + pl.over : ""}.`;
           const nd = c.needs.find((x) => x.cover);
           if (nd && !nd.cover.every((x) => got.has(x))) line += " The antibiotics so far leave gaps in the likely organisms.";
           log.push({ t: T(t), text: line });
-        } else if (!harmed) log.push({ t: T(t), text: `${who_} gave ${lab}.${indicated || fresh.length ? "" : " It does not change the picture."}` });
+        } else if (!harmed) log.push({ t: T(t), text: `${who_} gave ${lab}${pl.dose ? " " + pl.dose : ""}${pl.ml && !/^drug:fluids/.test(id) ? " " + volText(pl.ml) : ""}.${indicated || fresh.length ? "" : " It does not change the picture."}` });
     }
   }
 
@@ -330,7 +342,7 @@ export function Np(sc, actions, ms) {
     lactate: Math.round(lactate * 10) / 10, cr: Math.round(cr * 10) / 10, k: Math.round(kk * 10) / 10,
     rhythm: !alive ? "pea" : arrested ? (sc.shockable ? "vf" : "pea") : "sinus", alive, outcome, outcomeLine,
     tube: st.tube, oxygen: st.oxygen, norepi: st.norepi, artLine: st.artLine, hdLine: st.hdLine, dialysis: st.dialysis, dialysisWaiting: st.dialysisWaiting, bronch: st.bronch,
-    arrestAtMs: arrestAt, problems, results: shown, pending, log, missed, score, given,
+    arrestAtMs: arrestAt, problems, results: shown, pending, log, missed, score, given, fluidMl: fluidTotal(),
     needs: c.needs.map((nd) => ({ id: nd.id, label: nd.label, owner: nd.owner, dueMs: nd.due * 1000, w: nd.w, doneAtMs: done[nd.id] == null ? null : done[nd.id] })),
     deterioration: Math.round(st.s * 100) / 100, recovery: Math.round(st.h * 100) / 100,
   };
@@ -341,5 +353,15 @@ export function Pp(kind) {
   const k = String(kind || "");
   return k === "advice" || k === "call" || k === "enter" || k === "bundle" || k === "labs" || k === "flood" || k === "lay-flat" || !!BY_ID[canon(k)];
 }
+/* what an order carries beside its id: the volume, the dose, the drug name as the doctor said it. Nothing is assumed
+   when it is missing. Used by the room and by the engine, so both read an order the same way. */
+export function orderPayload(o) {
+  const p = {}, x = o || {}, ml = Math.round(+x.ml);
+  if (ml > 0 && ml <= 20000) p.ml = ml;
+  const t = (v, n) => String(v == null ? "" : v).replace(/[^\w .,%/\-]/g, "").slice(0, n);
+  if (x.dose) p.dose = t(x.dose, 28); if (x.say) p.say = t(x.say, 40); if (x.over) p.over = t(x.over, 24); if (x.rate) p.rate = t(x.rate, 28);
+  return p;
+}
+const volText = (ml) => (ml >= 1000 && ml % 100 === 0 ? ml / 1000 + " L" : Math.round(ml) + " mL");
 export { mdtHour, specName, labelOf, canon };
 export const Op = new Proxy({}, { get: (_, k) => labelOf(String(k)) });

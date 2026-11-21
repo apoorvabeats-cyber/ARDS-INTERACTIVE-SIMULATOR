@@ -79,7 +79,7 @@ test('filler is ignored, repeats collapse, and a negation cancels', () => {
   same('please, we need to urgently get the chest x-ray done now', ['img:cxr']);
   same('send lactate lactate lactate', ['lab:lactate']);
   same('do not give fluids, start noradrenaline', ['drug:norepi']);
-  assert.deepEqual(parseOrders('do not give fluids').negated, ['IV fluid bolus (500 mL balanced crystalloid)']);
+  assert.deepEqual(parseOrders('do not give fluids').negated, ['IV fluid']);
   same('examine the patient', ['examine']);
 });
 test('calling a specialist', () => {

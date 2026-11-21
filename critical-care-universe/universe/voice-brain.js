@@ -6,9 +6,9 @@
      suggest  : the nearest sensible meanings, when the line fits neither, so there is never a dead end.
    It is a local reader: no network, no model. It knows the patient's numbers (ctx.P), the results that have come back, what has
    been given, and the trend (ctx.hist). It mends the usual speech-recognition slips ("initiate the patient" for "intubate the patient"). */
-import { parseOrders } from "./voice-orders.js?v=20261122e";
-import { BY_ID, CATALOGUE, LABS, PANELS } from "./order-catalogue.js?v=20261122e";
-import * as CB from "./clinical-brain.js?v=20261122e";
+import { parseOrders } from "./voice-orders.js?v=20261122f";
+import { BY_ID, CATALOGUE, LABS, PANELS } from "./order-catalogue.js?v=20261122f";
+import * as CB from "./clinical-brain.js?v=20261122f";
 
 /* ---------------------------------------------------------------- 1. mending the speech */
 const REPAIRS = [

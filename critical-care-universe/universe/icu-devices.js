@@ -98,7 +98,7 @@ export function createDevices(T, env) {
       /* bags and pump rows follow what the team has ordered */
       const rows = [];
       if (s.norepi) rows.push(["Noradrenaline", typeof s.norepi === "number" ? Math.round(s.norepi * 10) / 10 + " mcg/min" : "Running"]);
-      if (s.fluid > 0) rows.push(["Crystalloid", s.fluid + " x 500 mL"]);
+      if (s.fluid > 0) rows.push(["Crystalloid", s.fluidMl ? (s.fluidMl >= 1000 && s.fluidMl % 100 === 0 ? s.fluidMl / 1000 + " L" : s.fluidMl + " mL") : "running"]);
       if (s.abx) rows.push(["Antibiotic", "Running"]);
       if (s.blood) rows.push(["Blood", "Running"]);
       if (s.dialysis) rows.push(["Dialysis", "Running"]);

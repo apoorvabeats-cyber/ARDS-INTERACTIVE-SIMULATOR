@@ -4,7 +4,7 @@
    and post() after them (a plain term that nothing else took). Both return answer cards, or null.
    The cards use only what a doctor in the room could see: the numbers, the results that came back, what was given. They never name
    the hidden diagnosis and never use the teaching hints. */
-import { LEXICON, GROUPS } from "./clinical-lexicon.js?v=20261122e";
+import { LEXICON, GROUPS } from "./clinical-lexicon.js?v=20261122f";
 
 let IDX = null;
 function nk0(s) {
@@ -45,7 +45,7 @@ function facts(P, H) {
   const organ = { Respiratory: P.spo2 < 94 || P.rr > 28 || !!P.tube, Circulation: shock || !!P.norepi, Kidney: (cr && cr.it.v > 1.5) || P.uo < 35, Brain: P.gcs < 15, Lactate: lac && lac.it.v > 2 };
   const nOrgan = Object.values(organ).filter(Boolean).length;
   const arrest = P.alive === false || (P.hr === 0 && P.sbp === 0) || (P.rhythm && P.rhythm !== "sinus");
-  const intake = ((P.given && P.given["drug:fluids"]) || 0) * 500 + ((P.given && P.given["drug:albumin"]) || 0) * 100;
+  const intake = (P.fluidMl != null ? P.fluidMl : ((P.given && P.given["drug:fluids"]) || 0) * 500) + ((P.given && P.given["drug:albumin"]) || 0) * 100;
   return { lac, ph, co2, o2, cr, urea, shock, worst, bad, organ, nOrgan, arrest, intake, unstable: shock || arrest || P.hr > 130 || P.hr < 40 || !!P.norepi };
 }
 function trendOf(P, hist, H) {
@@ -308,14 +308,14 @@ function verbs(H, c, P, ctx) {
     const rows = [], acts = [];
     rows.push(P.gcs <= 8 ? `A: airway at risk, GCS ${P.gcs}` : "A: airway protected"); if (P.gcs <= 8 && !P.tube) acts.push({ label: "Intubate", order: "proc:intubate" });
     rows.push(P.spo2 < 94 ? `B: SpO₂ ${P.spo2}%, RR ${P.rr}` : "B: breathing adequate"); if (P.spo2 < 94 && !P.tube) { const l = ladder(P); if (l) acts.push({ label: l[0], order: l[1] }); }
-    rows.push(P.map < 65 ? `C: MAP ${P.map}, needs the circulation supported` : "C: circulation adequate"); if (P.map < 65) { acts.push({ label: "500 mL bolus", order: "drug:fluids" }); if (!P.norepi) acts.push({ label: "Norepinephrine", order: "drug:norepi" }); }
+    rows.push(P.map < 65 ? `C: MAP ${P.map}, needs the circulation supported` : "C: circulation adequate"); if (P.map < 65) { acts.push({ label: "500 mL bolus", order: "drug:fluids", ml: 500 }); if (!P.norepi) acts.push({ label: "Norepinephrine", order: "drug:norepi" }); }
     rows.push(`D: GCS ${P.gcs}; check the glucose`); if (!gv(P, "lab:glucose")) acts.push({ label: "Blood glucose", order: "lab:glucose" });
     rows.push(`E: temperature ${Number(P.temp).toFixed(1)} °C`);
     return [mk("stabilise", f.worst ? "Resuscitate in order" : "Already stable", rows, f.worst === 2 ? "crit" : f.worst ? "warn" : "ok", { section: "treat", actions: acts.slice(0, 5) })];
   }
   if (/^(?:wean|trial off|extubat)/.test(v)) { const w = makeEvalCache(H); const fn = /extubat/.test(v) ? w["extubation"] : w["oxygen weaning"]; const r = fn(P, ctx); return [mk("wean", r.title, r.lines, r.tone, { section: "treat", note: r.note })]; }
   if (/^restrict/.test(v)) { const w = makeEvalCache(H); const r = w["restrict fluids"](P, ctx); return [mk("restrict", r.title, r.lines, r.tone, { section: "treat" })]; }
-  if (/^maintenance/.test(v)) return [mk("maint", "Maintenance fluids", ["Routine fluid for the day: about 25 to 30 mL/kg. This simulator gives 500 mL boluses.", `Urine ${P.uo} mL/h, MAP ${P.map}`], "info", { section: "treat", actions: [{ label: "500 mL bolus", order: "drug:fluids" }] })];
+  if (/^maintenance/.test(v)) return [mk("maint", "Maintenance fluids", ["Routine fluid for the day: about 25 to 30 mL/kg. Say the volume you want, for example: give 1 litre of Ringer's lactate.", `Urine ${P.uo} mL/h, MAP ${P.map}`], "info", { section: "treat", actions: [{ label: "500 mL bolus", order: "drug:fluids", ml: 500 }] })];
   if (/^rescue/.test(v)) { const rows = [], acts = []; if (P.spo2 < 90) { rows.push("Oxygenation: proning, then ECMO if it keeps failing"); acts.push({ label: "Prone", order: "proc:prone" }, { label: "ECMO", order: "proc:ecmo" }); } if (P.map < 65) { rows.push("Circulation: a second pressor and a steroid"); acts.push({ label: "Vasopressin", order: "drug:vaso" }, { label: "Hydrocortisone", order: "drug:steroid" }); } if (P.uo < 10) { rows.push("Kidney: dialysis"); acts.push({ label: "Dialysis", order: "proc:dialysis" }); } return [mk("rescue", rows.length ? "Rescue options" : "No rescue therapy is needed now", rows.length ? rows : [nums], rows.length ? "warn" : "ok", { section: "treat", actions: acts.slice(0, 5) })]; }
   const def = { "adjunctive therapy": "Extra treatment beside the main one: a steroid, nutrition, thromboprophylaxis, glucose control.", "definitive treatment": "Treatment of the underlying cause. The cause is not named in a blind case; build it from the findings.", "supportive management": "Support the failing organs while the cause is treated: oxygen, fluid, a vasopressor, dialysis.", "conservative management": "No procedure: observe, support and treat with drugs.", "watchful waiting": "Close observation with no immediate action. Set the review time and the triggers to act." }[v];
   if (def) { const rx = Object.keys(P.given || {}).filter((k) => /^(drug|abx|proc):/.test(k)).map((k) => BYL(H, k)); return [mk("mgmt", v[0].toUpperCase() + v.slice(1), [def, rx.length ? "So far: " + rx.join(", ") : "", nums].filter(Boolean), "info", { section: "treat" })]; }

@@ -3,9 +3,9 @@
                      and an arrow that sends them to the room.
      createHud():    the LCD that wakes up when something changes: vitals that go wrong on the left, abnormal results on the right,
                      normal results along the top, each with its own alarm. */
-import { parseOrders, toKind } from "./voice-orders.js?v=20261122e";
-import { understand } from "./voice-brain.js?v=20261122e";
-import { BY_ID } from "./order-catalogue.js?v=20261122e";
+import { parseOrders, toKind } from "./voice-orders.js?v=20261122f";
+import { understand } from "./voice-brain.js?v=20261122f";
+import { BY_ID } from "./order-catalogue.js?v=20261122f";
 
 const css = `
 #vc{position:fixed;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));width:min(760px,calc(100vw - 20px));display:grid;gap:7px;padding:10px 12px;border-radius:18px;background:linear-gradient(180deg,rgba(7,26,42,.93),rgba(3,14,24,.95));border:1px solid rgba(95,227,255,.38);box-shadow:0 0 28px rgba(95,227,255,.16),0 14px 40px rgba(0,0,0,.5);backdrop-filter:blur(10px);color:#dff6ff;font:13px/1.35 ui-sans-serif,system-ui,sans-serif}
@@ -100,15 +100,17 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
   document.body.appendChild(root);
   const $ = (s) => root.querySelector(s), mic = $("#mic"), stopB = $("#vstop"), text = $("#vtext"), ans = $("#vans"), spk = $("#vspk"), chips = $("#vchips"), meta = $("#vmeta"), sendB = $("#vsend");
   const SR = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
-  let rec = null, wantOn = false, listening = false, locked = false, pressAt = 0, finalText = "", parsed = understand("", null), speak = true, removed = new Set(), choice = {}, extra = [], busyMsg = "";
+  let rec = null, wantOn = false, listening = false, locked = false, pressAt = 0, finalText = "", parsed = understand("", null), speak = true, removed = new Set(), choice = {}, volume = {}, extra = [], busyMsg = "";
+  const VOLS = [250, 500, 1000, 2000], vtext = (v) => (v >= 1000 ? v / 1000 + " L" : v + " mL"), needsVolume = (o) => o.id === "drug:fluids" && !(o.qty && (o.qty.ml != null || o.qty.rateMl != null)) && !volume[o.id];
 
   /* ---- what was heard, and what it means */
   function refresh() {
     parsed = understand(text.value, getCtx());
     const orders = current();
     chips.innerHTML = orders.map((o, i) => {
-      if (o.choose) { const sel = choice[o.id] || o.id; return `<span class="ch fz" data-i="${i}">${esc(o.chooseWhy || "Choose")} <select data-i="${i}">${o.choose.map((c) => `<option value="${esc(c.id)}"${c.id === sel ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select><button type="button" data-rm="${esc(o.id)}" aria-label="Remove">×</button></span>`; }
-      return `<span class="ch${o.fuzzy ? " fz" : ""}" title="heard: ${esc(o.heard || "")}">${esc(o.label)}${o.fuzzy ? " <small>?</small>" : ""}<button type="button" data-rm="${esc(o.id)}" aria-label="Remove ${esc(o.label)}">×</button></span>`;
+      if (o.choose) { const sel = choice[o.id] || ""; return `<span class="ch fz" data-i="${i}">${esc(o.chooseWhy || "Choose")} <select data-i="${i}"><option value=""${sel ? "" : " selected"}>Choose…</option>${o.choose.map((c) => `<option value="${esc(c.id)}"${c.id === sel ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select><button type="button" data-rm="${esc(o.id)}" aria-label="Remove">×</button></span>`; }
+      if (needsVolume(o)) return `<span class="ch fz" data-i="${i}">How much ${esc(o.label)}? <select data-vol="${esc(o.id)}"><option value=""${volume[o.id] ? "" : " selected"}>Choose…</option>${VOLS.map((v) => `<option value="${v}"${+volume[o.id] === v ? " selected" : ""}>${v >= 1000 ? v / 1000 + " L" : v + " mL"}</option>`).join("")}</select><button type="button" data-rm="${esc(o.id)}" aria-label="Remove">×</button></span>`;
+      return `<span class="ch${o.fuzzy ? " fz" : ""}" title="heard: ${esc(o.heard || "")}">${esc(o.label)}${o.qtyText || (volume[o.id] ? vtext(volume[o.id]) : "") ? " <b>" + esc(o.qtyText || vtext(volume[o.id])) + "</b>" : ""}${o.fuzzy ? " <small>?</small>" : ""}<button type="button" data-rm="${esc(o.id)}" aria-label="Remove ${esc(o.label)}">×</button></span>`;
     }).join("") + parsed.answers.filter((a) => a.id !== "noted").map((a) => `<span class="ch q" title="I will answer this when you press send">Asking: ${esc(a.title)}</span>`).join("") + parsed.clarify.map((c) => `<span class="ch cl">${esc(c.prompt)} ${c.options.map((o) => `<button type="button" class="opt" data-add="${esc(o.id)}">${esc(o.label.replace(/^CT /, ""))}</button>`).join("")}</span>`).join("");
     const bits = [];
     if (parsed.suggest.length && !orders.length && !parsed.answers.length) chips.innerHTML += `<span class="lead">Did you mean</span>` + parsed.suggest.map((x, i) => `<span class="ch sg" data-sg="${i}">${esc(x.label)}</span>`).join("");
@@ -122,18 +124,18 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
   }
   const getCtx = () => { try { return ctx ? ctx() : null; } catch (e) { return null; } };
   function current() {
-    const base = parsed.orders.filter((o) => !removed.has(o.id) && !(o.id === "abx:any" && choice["abx:any"] && removed.has(choice["abx:any"])));
+    const base = parsed.orders.filter((o) => !removed.has(o.id) && !(o.choose && choice[o.id] && removed.has(choice[o.id])));
     const add = extra.filter((x) => !base.some((b) => b.id === x.id) && !removed.has(x.id));
     return base.concat(add);
   }
-  text.addEventListener("input", () => { removed = new Set(); refresh(); });
+  text.addEventListener("input", () => { removed = new Set(); busyMsg = ""; refresh(); });
   text.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
   chips.addEventListener("click", (e) => {
     const rm = e.target.closest("[data-rm]"), add = e.target.closest("[data-add]"), sg = e.target.closest("[data-sg]");
     if (sg) { const x = parsed.suggest[+sg.dataset.sg]; if (x) { if (x.kind === "order" && x.id && BY_ID[x.id]) { extra.push({ id: x.id, label: BY_ID[x.id].label }); text.value = ""; refresh(); } else { text.value = x.label; refresh(); send(); } } return; }
     if (rm) { removed.add(rm.dataset.rm); refresh(); } else if (add) { const id = add.dataset.add; extra.push({ id, label: BY_ID[id].label }); refresh(); }
   });
-  chips.addEventListener("change", (e) => { const s = e.target.closest("select"); if (s) { choice["abx:any"] = s.value; } });
+  chips.addEventListener("change", (e) => { const s = e.target.closest("select"); if (s && s.dataset.vol) { volume[s.dataset.vol] = +s.value || 0; refresh(); } else if (s) { choice["abx:any"] = s.value; refresh(); } });
 
   /* ---- listening */
   const setUi = (on) => { listening = on; mic.dataset.on = on ? "1" : "0"; stopB.hidden = !on; text.classList.toggle("live", on); };
@@ -177,7 +179,7 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
       n.querySelector(".x").onclick = () => dismiss(n);
       n.addEventListener("click", (e) => {
         const b = e.target.closest("button"); if (!b) return;
-        if (b.dataset.act != null) { const x = a.actions[+b.dataset.act]; if (x && x.order) { post("hall-orders", { orders: [toKind({ id: x.order })] }); sfx && sfx.beep && sfx.beep({ f: 988, vol: 0.14 }); b.disabled = true; b.textContent = "Sent ✓"; } }
+        if (b.dataset.act != null) { const x = a.actions[+b.dataset.act]; if (x && x.order) { post("hall-orders", { orders: [toKind({ id: x.order, qty: x.ml ? { ml: x.ml } : null, heard: x.heard })] }); sfx && sfx.beep && sfx.beep({ f: 988, vol: 0.14 }); b.disabled = true; b.textContent = "Sent ✓"; } }
         else if (b.dataset.open) { open && open(a.section); }
         else if (b.dataset.sg != null) { const x = sug[+b.dataset.sg]; if (x) { if (x.kind === "order" && x.id && BY_ID[x.id]) { post("hall-orders", { orders: [toKind({ id: x.id })] }); b.disabled = true; b.textContent = "Sent ✓"; } else { dismiss(n); text.value = x.label; send(); } } }
       });
@@ -196,11 +198,13 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
     const busy = root.dataset.busy === "1", orders = refresh(), b = parsed;
     if (listening) stop();
     if (orders.length && busy) { busyMsg = "The room is busy. Press ➤ again in a moment to send the orders."; refresh(); return; }
+    const open = orders.filter((o) => (o.choose && !choice[o.id]) || needsVolume(o));
+    if (open.length) { busyMsg = open.map((o) => (o.choose ? (o.chooseWhy || "Which one?") : "How much " + o.label + "?")).join(" ") + " Pick it above, or say it, then press ➤ again."; refresh(); return; }
     if (orders.length) {
-      const list = orders.map((o) => { const id = o.choose && choice[o.id] ? choice[o.id] : o.id; return toKind({ id, specialty: o.specialty }); });
+      const list = orders.map((o) => { const id = o.choose && choice[o.id] ? choice[o.id] : o.id; const q = o.qty || {}; return toKind({ id, specialty: o.specialty, heard: o.choose ? BY_ID[id].label : o.heard, qty: volume[o.id] ? { ...q, ml: volume[o.id] } : q }); });
       post("hall-orders", { orders: list });
     }
-    const names = orders.map((o) => (o.choose && choice[o.id] ? BY_ID[choice[o.id]].label : o.label));
+    const names = orders.map((o) => (o.choose && choice[o.id] ? BY_ID[choice[o.id]].label : o.label) + (o.qtyText ? " " + o.qtyText : volume[o.id] ? " " + vtext(volume[o.id]) : ""));
     let shown = b.answers.filter((a) => a.id !== "noted");
     if (!orders.length && !shown.length && !b.answers.length) {
       const sg = b.suggest.length ? b.suggest : [{ kind: "ask", label: "What is the blood pressure?" }, { kind: "ask", label: "How is the patient now?" }, { kind: "ask", label: "What should we do next?" }];
@@ -209,13 +213,13 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
     } else showAnswers(shown, null);
     if (shown.length) say1(shown);
     sendB.classList.add("ok"); setTimeout(() => sendB.classList.remove("ok"), 1400);
-    text.value = ""; finalText = ""; removed = new Set(); choice = {}; extra = []; parsed = understand("", null);
+    text.value = ""; finalText = ""; removed = new Set(); choice = {}; volume = {}; extra = []; parsed = understand("", null);
     busyMsg = names.length ? "Sent: " + names.join(", ") : ""; refresh(); if (busyMsg) setTimeout(() => { busyMsg = ""; refresh(); }, 4200);
     sfx && sfx.beep && sfx.beep({ f: 988, vol: 0.14 }); names.length && onSent && onSent(names);
   }
   sendB.addEventListener("click", send);
   refresh();
-  return { show(on) { root.hidden = !on; }, setBusy(b) { root.dataset.busy = b ? "1" : "0"; refresh(); }, hear(t) { text.value = t; finalText = t + " "; removed = new Set(); refresh(); }, send, el: root, get listening() { return listening; }, get supported() { return !!SR; }, say };
+  return { show(on) { root.hidden = !on; }, ask(note) { text.value = ""; finalText = ""; busyMsg = note || ""; refresh(); try { text.focus(); } catch (e) {} }, setBusy(b) { root.dataset.busy = b ? "1" : "0"; refresh(); }, hear(t) { text.value = t; finalText = t + " "; removed = new Set(); refresh(); }, send, el: root, get listening() { return listening; }, get supported() { return !!SR; }, say };
 }
 
 /* ====================================================================================== the result screen */
