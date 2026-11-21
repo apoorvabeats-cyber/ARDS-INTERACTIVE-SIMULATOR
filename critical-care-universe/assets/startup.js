@@ -6,7 +6,6 @@
   const skipButton = startup.querySelector(".startup-skip");
   const musicError = startup.querySelector(".startup-music-error");
   const logo = startup.querySelector(".startup-logo");
-  const animations = logo.getAnimations({ subtree: true });
   let started = false;
   let loading = false;
 
@@ -14,7 +13,7 @@
     if (loading) return;
     loading = true;
     const app = document.createElement("script");
-    app.src = "./assets/app.js?v=20261122f";
+    app.src = "./assets/app.js?v=20261122g";
     app.type = "module";
     app.onerror = () => {
       startup.setAttribute("role", "alert");
@@ -31,22 +30,31 @@
   };
 
   let brandAt = 0;
+  let scoreReady = false, timerDone = false;
+  const openHint = document.createElement("p");
+  openHint.className = "startup-opening"; openHint.textContent = "Opening the hall\u2026"; openHint.hidden = true;
+  startup.appendChild(openHint);
 
-  const syncIntro = () => {
-    if (loading) return;
-    const heard = !audio.paused && audio.currentTime > 0.05;
-    const waited = performance.now() - brandAt;
-    // Hold the logo at its opening frame until the music is really playing.
-    // If it still has not started after 5 seconds, carry on silently and offer the tap button.
-    let time;
-    if (heard) time = audio.currentTime * 1000;
-    else if (waited < 5000) time = Math.min(waited, 600);
-    else time = 600 + (waited - 5000);
-    if (!heard && waited > 1500) musicButton.hidden = false;
-    animations.forEach((animation) => { animation.currentTime = time; });
-    if (heard) musicButton.hidden = true;
-    if (time >= 8000) loadApp();
-    else window.requestAnimationFrame(syncIntro);
+  /* The logo runs on its own clock, so it can never wait for the music, and the music can never wait for the logo.
+     The score is downloaded whole while the notices are read, so it starts at once and cannot stall half way. */
+  const prepareScore = () => {
+    const src = audio.currentSrc || audio.src;
+    return fetch(src, { cache: "force-cache" })
+      .then((r) => { if (!r.ok) throw new Error("score"); return r.arrayBuffer(); })
+      .then((buf) => { audio.src = URL.createObjectURL(new Blob([buf], { type: "audio/mpeg" })); audio.dataset.score = "lobby"; audio.load(); })
+      .catch(() => { try { audio.load(); } catch (err) {} })
+      .then(() => { scoreReady = true; maybeEnable(); });
+  };
+  const logoElapsed = () => performance.now() - brandAt;
+  const joinMusic = () => {
+    /* if the music starts a moment late, move it to where the logo is, so the two stay together */
+    const lag = logoElapsed() / 1000;
+    try { if (lag > 0.3 && Math.abs(audio.currentTime - lag) > 0.3 && audio.duration > lag) audio.currentTime = lag; } catch (err) {}
+  };
+  const runLogo = () => {
+    const list = logo.getAnimations({ subtree: true });
+    list.forEach((animation) => { try { animation.pause(); animation.currentTime = 0; animation.play(); } catch (err) {} });
+    window.setTimeout(() => { if (!loading) openHint.hidden = false; loadApp(); }, 8000);
   };
 
   const startMusic = async () => {
@@ -64,7 +72,6 @@
   };
 
   audio.volume = 0.48;
-  audio.load();
   skipButton.addEventListener("click", loadApp);
 
   // Play the score straight from the audio element. Routing it through Web Audio
@@ -89,30 +96,33 @@
   const go = document.getElementById("legal-continue");
   let branded = false;
   go.disabled = true;
+  function maybeEnable() {
+    if (!timerDone) return;
+    if (scoreReady || performance.now() > 40000) { go.disabled = false; go.textContent = "Continue"; }
+    else { go.disabled = true; go.textContent = "Preparing the music\u2026"; window.setTimeout(maybeEnable, 700); }
+  }
+  prepareScore();
   const showBrand = () => {
     if (branded || go.disabled) return;
     branded = true;
+    brandAt = performance.now();
     const pending = armScore();
     startup.classList.add("is-brand");
     legal1.hidden = true;
     legal2.hidden = true;
-    if (!animations.length) animations.push(...logo.getAnimations({ subtree: true }));
-    brandAt = performance.now();
     musicButton.hidden = true;
     skipButton.hidden = true;
-    if (pending && pending.then) {
-      pending.then(() => { musicButton.hidden = !audio.paused; }).catch(() => { musicButton.hidden = false; });
-    }
+    audio.addEventListener("playing", () => { musicButton.hidden = true; joinMusic(); }, { once: true });
+    if (pending && pending.then) pending.then(joinMusic).catch(() => { musicButton.hidden = false; });
+    window.setTimeout(() => { if (audio.paused) musicButton.hidden = false; }, 1500);
     if (reducedMotion) window.setTimeout(loadApp, 400);
-    else window.requestAnimationFrame(syncIntro);
+    else runLogo();
   };
   go.addEventListener("click", showBrand);
   musicButton.addEventListener("click", () => {
-    brandAt = performance.now();
-    try { if (audio.paused) audio.currentTime = 0; } catch (err) {}
     const pending = armScore();
     if (pending && pending.then) {
-      pending.then(() => { musicButton.hidden = !audio.paused; }).catch(() => { musicButton.hidden = false; });
+      pending.then(() => { joinMusic(); musicButton.hidden = !audio.paused; }).catch(() => { musicButton.hidden = false; });
     }
   });
   window.setTimeout(() => {
@@ -127,8 +137,8 @@
         return;
       }
       window.clearInterval(tick);
-      go.disabled = false;
-      go.textContent = "Continue";
+      timerDone = true;
+      maybeEnable();
     }, 1000);
   }, 9000);
 })();

@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { createSfx } from "./critical-care-universe/universe/sfx.js?v=20261122f";
+import { createSfx } from "./critical-care-universe/universe/sfx.js?v=20261122g";
+import { buildRooms } from "./hub-rooms.js?v=20261122g";
 
 const gate = document.getElementById("icu-gate");
 const canvas = document.getElementById("lobby");
@@ -35,8 +36,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   };
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x0a1626, 18, 34);
-  const camera = new THREE.PerspectiveCamera(56, 1, 0.08, 44);
+  const camera = new THREE.PerspectiveCamera(56, 1, 0.08, 90);
   scene.add(new THREE.HemisphereLight(0xf4f8ff, 0x7d93b4, 1.25));
   const sun = new THREE.DirectionalLight(0xffffff, 0.9);
   sun.position.set(2, 8, 3);
@@ -217,17 +217,6 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       bar.position.set(-s * 0.39, 0, -0.07); leaf.add(bar);
     });
     g.add(left, right);
-    /* the light that spills out when it opens */
-    const [pc, pg] = cnv(64, 128);
-    const gr = pg.createLinearGradient(0, 0, 0, 128);
-    gr.addColorStop(0, "#d3dbe5"); gr.addColorStop(0.5, "#4a5462"); gr.addColorStop(1, "#080d14");
-    pg.fillStyle = gr; pg.fillRect(0, 0, 64, 128);
-    const portalTex = tex(pc);
-    if (kind !== "aud") {                     /* the Auditorium door opens onto the real auditorium (see buildAudBeyond) */
-      const portal = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 2.3), new THREE.MeshBasicMaterial({ map: portalTex, side: THREE.DoubleSide }));
-      portal.position.set(0, 1.25, 0.2); portal.rotation.y = Math.PI;
-      g.add(portal);
-    }
     /* sign with a soft halo */
     const plate = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.46, 0.05), sign(kind, text));
     plate.position.set(0, 2.76, -0.09);
@@ -289,6 +278,11 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     return g;
   }
   DOORS.aud.add(buildAudBeyond());
+  /* behind every other door, a bright room: the microbiology lab, the pathophysiology suite, an ICU bay, and the radiology passage with its four scanner rooms */
+  const R = buildRooms(THREE, { cnv, tex, hex, ACC, glow });
+  ["micro", "path", "icu", "rad"].forEach((k) => { R[k].position.z = 0.18; DOORS[k].add(R[k]); });
+  const ROOMKIND = new Set(Object.keys(R.hits));
+  const MODFOR = { rx: "cxr", rct: "ct", rmri: "mri", rus: "us" };
   decorOf.forEach(([g, d]) => { d.position.copy(g.position); d.rotation.copy(g.rotation); });
 
   /* a few slow motes of light in the air */
@@ -379,9 +373,9 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       if (btn) btn.click();
     } else if (kind === "aud") {
       keepFrame(); keepPose();
-      location.href = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&v=20261122f";
-    } else if (kind === "rad") {
-      location.href = "radiology.html?v=20261119r2";
+      location.href = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&v=20261122g";
+    } else if (kind === "rad" || MODFOR[kind]) {
+      location.href = "radiology.html?v=20261122r3" + (MODFOR[kind] ? "&mod=" + MODFOR[kind] : "");
     } else if (kind === "micro") {
       location.href = "microbiology.html?v=20261119g";
     } else {
@@ -399,6 +393,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     pit = 0;
     eye.set(0, 1.62, 0);
     try { ALLDOORS.forEach(shut); } catch (err) {}
+    backB.style.display = "none";
     if (fade) fade.style.opacity = "0";
     document.body.classList.add("icu-gate");
     document.body.classList.remove("icu-open", "in", "enter", "inside", "lab", "arena", "osce", "reference", "picking", "body-only");
@@ -421,19 +416,50 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     frame();
   };
 
+  /* a point inside a room, given in the room's own frame (x across, z away from the hall) */
+  const loc = (k, lx, lz) => { const th = THETA[k], d = DOORS[k], c = Math.cos(th), sn = Math.sin(th), z = lz + 0.18; return new THREE.Vector3(d.position.x + lx * c + z * sn, 1.62, d.position.z - lx * sn + z * c); };
+  const STAND = { micro: 3.9, path: 3.0, icu: 2.9, rad: 1.8 };
+  const setDoor = (d, o) => { d.userData.open = o; d.userData.left.position.x = -0.48 - o * 0.85; d.userData.right.position.x = 0.48 + o * 0.85; };
+  const backB = document.createElement("button");
+  backB.type = "button"; backB.id = "lobby-back"; backB.textContent = "Back to the hall";
+  backB.style.cssText = "position:absolute;z-index:4;top:calc(10px + env(safe-area-inset-top));left:12px;min-height:40px;padding:0 14px;border:0;border-radius:999px;background:#14181c;color:#f3efe6;font:500 14px system-ui,sans-serif;display:none;cursor:pointer";
+  gate.appendChild(backB);
+
   function choose(kind) {
-    if (mode !== "look") return;
+    if (mode === "passage" && ROOMKIND.has(kind)) { enterRoom(kind); return; }
+    if (mode !== "look" || !DOORS[kind]) return;
     mode = "go";
     window.doorChosen = true;
     clearTimeout(window.hubVoiceTimer);
     clearTimeout(leaveTimer);
-    leaveTimer = setTimeout(() => finish(kind), calm ? 40 : kind === "aud" ? 6500 : 1800);
+    leaveTimer = setTimeout(() => finish(kind), calm ? 40 : kind === "aud" ? 6500 : kind === "rad" ? 60000 : 16000);
     const door = DOORS[kind], face = THETA[kind], reach = kind === "aud" ? APO + 1.7 : APO + 0.7;
-    const dest = new THREE.Vector3(Math.sin(face) * reach, 1.62, Math.cos(face) * reach);
-    job = { kind, door, face, dest, t: 0, snd: false };
+    if (kind === "aud") {
+      const dest = new THREE.Vector3(Math.sin(face) * reach, 1.62, Math.cos(face) * reach);
+      job = { kind, door, face, dest, t: 0, snd: false };
+    } else {
+      job = { kind, door, face, t: 0, snd: false, speed: 2.7, hold: 0, holdFor: kind === "rad" ? 0 : 1.5, path: [loc(kind, 0, -1.0), loc(kind, 0, 1.0), loc(kind, 0, STAND[kind])], seg: 0, then: kind === "rad" ? "passage" : "finish" };
+    }
     if (calm) finish(kind);
     if (kind === "icu" && window.playIcuVoice) window.playIcuVoice();
   }
+  /* from the passage into one of its four rooms: along the passage, through the doorway, to the machine */
+  function enterRoom(k) {
+    const d = R.PASS.doors[k], W = R.PASS.W, side = d.side;
+    mode = "go"; backB.style.display = "none"; window.doorChosen = true;
+    clearTimeout(leaveTimer); leaveTimer = setTimeout(() => finish(k), calm ? 40 : 40000);
+    const path = side ? [loc("rad", 0, d.z), loc("rad", side * (W / 2 + 0.3), d.z), loc("rad", side * (W / 2 + 1.0), d.z)] : [loc("rad", 0, d.z + 0.2), loc("rad", 0, d.z + 1.4)];
+    job = { kind: k, door: DOORS.rad, face: THETA.rad, t: 1, snd: true, walking: true, speed: 2.3, hold: 0, holdFor: 1.7, path, seg: 0, then: "finish" };
+    if (calm) finish(k);
+  }
+  function backToHall() {
+    if (mode !== "passage") return;
+    mode = "go"; backB.style.display = "none";
+    job = { kind: "rad", door: DOORS.rad, face: THETA.rad + Math.PI, t: 1, snd: true, walking: true, speed: 2.8, hold: 0, holdFor: 0, path: [loc("rad", 0, -0.9), new THREE.Vector3(0, 1.62, 0)], seg: 0, then: "hall" };
+    DOORS.rad.userData.open = 1;
+  }
+  backB.addEventListener("click", backToHall);
+  const turnTo = (a, rate) => { const raw = a - yaw; yaw += Math.atan2(Math.sin(raw), Math.cos(raw)) * rate; };
 
   canvas.addEventListener("pointerdown", (ev) => {
     if (Date.now() < (window.hallLock || 0)) return;
@@ -445,7 +471,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     canvas.setPointerCapture(ev.pointerId);
   });
   canvas.addEventListener("pointermove", (ev) => {
-    if (!dragging || mode !== "look") return;
+    if (!dragging || (mode !== "look" && mode !== "passage")) return;
     const dx = ev.clientX - lastX;
     const dy = ev.clientY - lastY;
     moved += Math.abs(dx) + Math.abs(dy);
@@ -457,12 +483,13 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   canvas.addEventListener("pointerup", (ev) => {
     dragging = false;
     if (Date.now() < (window.hallLock || 0)) return;
-    if (moved > 12 || mode !== "look") return;
+    if (moved > 12 || (mode !== "look" && mode !== "passage")) return;
     const rect = canvas.getBoundingClientRect();
     pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
     ray.setFromCamera(pointer, camera);
     const hits = ray.intersectObjects(scene.children, true);
+    if (mode === "passage") { const h = hits.find((x) => x.object.userData && ROOMKIND.has(x.object.userData.kind)); if (h) choose(h.object.userData.kind); return; }
     const hit = hits.find((h) => {
       let o = h.object;
       while (o) {
@@ -489,6 +516,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   function ambient(dt) {
     if (calm) return;
     tAmb += dt;
+    R.update(tAmb);
     ring.rotation.y = tAmb * 0.12;
     const m = motes.geometry.attributes.position;
     for (let i = 0; i < m.count; i++) {
@@ -518,7 +546,30 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       if (window.ccuSnapOff && arrive && !arrive.shown) { arrive.shown = true; requestAnimationFrame(() => requestAnimationFrame(() => window.ccuSnapOff && window.ccuSnapOff())); }
       return;
     }
-    if (job) {
+    if (job && job.path) {                                          /* walking to a room: turn, let the door slide open, walk in, linger a moment, go */
+      job.t += dt;
+      const d = job.door;
+      if (!job.walking) {
+        turnTo(job.face, calm ? 1 : 0.14); pit += (0 - pit) * 0.1;
+        if (job.t > 0.25) { setDoor(d, Math.min(1, d.userData.open + dt * 1.8)); if (!job.snd) { job.snd = true; sfx.setListener(0, 0, yaw); sfx.door(true, { x: d.position.x, z: d.position.z }, 1.3); } }
+        if (d.userData.open > 0.4) job.walking = true;
+      }
+      if (job.walking && !job.arrived) {
+        const tgt = job.path[job.seg], dv = tgt.clone().sub(eye); dv.y = 0;
+        const dl = dv.length(), stepLen = job.speed * dt;
+        if (dl <= stepLen) { eye.x = tgt.x; eye.z = tgt.z; job.seg += 1; if (job.seg >= job.path.length) job.arrived = true; }
+        else { eye.addScaledVector(dv.normalize(), stepLen); turnTo(Math.atan2(dv.x, dv.z), 1 - Math.exp(-dt * 5)); }
+        if (job.seg >= 2 && job.then !== "hall" && d.userData.open > 0) setDoor(d, Math.max(0, d.userData.open - dt * 1.4));      /* the door closes behind you */
+        pit += (0 - pit) * 0.08;
+      }
+      if (job.arrived) {
+        if (job.then === "passage") { mode = "passage"; job = null; backB.style.display = "inline-flex"; if (fade) fade.style.opacity = "0"; window.doorChosen = false; clearTimeout(leaveTimer); setDoor(DOORS.rad, 0); }
+        else if (job.then === "hall") { mode = "look"; job = null; window.doorChosen = false; clearTimeout(leaveTimer); setDoor(DOORS.rad, 0); turnTo(THETA.rad + Math.PI, 1); if (fade) fade.style.opacity = "0"; }
+        else { job.hold += dt; if (fade) fade.style.opacity = String(Math.min(1, job.hold / Math.max(0.2, job.holdFor))); if (job.hold >= job.holdFor) { finish(job.kind); return; } }
+      }
+      if (job && job.t > 18) { finish(job.kind); return; }
+      placeCamera();
+    } else if (job) {
       job.t += dt;
       const raw = job.face - yaw;
       const gap = Math.atan2(Math.sin(raw), Math.cos(raw));
@@ -556,7 +607,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     mode = "arrive"; arrive = { t: 0, start, snd: false, shut: false };
     if (fade) { fade.style.transition = "none"; fade.style.opacity = "0"; }
   }
-  window.__hubLobby = { eye, setYaw: (v) => { yaw = v; }, getYaw: () => yaw, mode: () => mode, THETA, openDoor: (k) => { const d = DOORS[k]; d.userData.open = 1; d.userData.left.position.x = -1.33; d.userData.right.position.x = 1.33; } };
+  window.__hubLobby = { R, scene, camera, choose, backToHall, teleport: (x, z, a, p) => { eye.set(x, 1.62, z); yaw = a || 0; pit = p || 0; }, loc, eye, setYaw: (v) => { yaw = v; }, getYaw: () => yaw, mode: () => mode, THETA, openDoor: (k) => { const d = DOORS[k]; d.userData.open = 1; d.userData.left.position.x = -1.33; d.userData.right.position.x = 1.33; } };
   placeCamera();
   if (window.ccuWelcome) window.ccuWelcome("hub");
   frame();

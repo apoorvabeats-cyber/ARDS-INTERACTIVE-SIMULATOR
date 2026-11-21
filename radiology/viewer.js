@@ -722,7 +722,8 @@
   /* start */
   buildTools(); link(); buildMods();
   var start = (location.hash || "").slice(1), sc = byId(start);
-  state.mod = sc ? sc.mod : "cxr";
+  var qm = /[?&]mod=(cxr|ct|mri|us)\b/.exec(location.search);
+  state.mod = sc ? sc.mod : (qm ? qm[1] : "cxr");
   buildMods(); buildList(); setTool("pan");
   select(sc ? sc.id : modCases(state.mod)[0].id);
   window.addEventListener("hashchange", function () { var h = location.hash.slice(1); if (byId(h) && h !== state.id) select(h); });
