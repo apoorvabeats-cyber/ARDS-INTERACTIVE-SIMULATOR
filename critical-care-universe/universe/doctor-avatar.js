@@ -3,6 +3,7 @@
    T-pose, so a pose is a rotation per joint), puts them in scrubs and a white coat, and gives them a walking cycle and a name tag.
    createDoctor(T, gltf, { name, spec, sex, label }) -> { group, setMoving(speed 0..1), update(dt), setLabel(text) }          */
 import { GLTFLoader } from "./vendor/GLTFLoader.js";
+import { applyLook, sanitize } from "./doctor-look.js?v=20261121h";
 
 const cache = {};
 export function loadDoctorBody(sex) {
@@ -40,6 +41,7 @@ export function nameTag(T, name, spec, accent) {
 }
 
 export function createDoctor(T, gltf, o) {
+  const lk = o.look ? sanitize(o.look, o.sex) : null; if (lk) o = { ...o, sex: lk.sex };
   const V = T.Vector3, g = new T.Group(), body = new T.Group(); g.add(body);
   const clone = skeletonClone(T, gltf.scene); body.add(clone);
   const B = (n) => { let f = null; const k = clean(n); clone.traverse((x) => { if (x.isBone && x.name === k) f = x; }); return f; };
@@ -53,7 +55,8 @@ export function createDoctor(T, gltf, o) {
   sm.forEach((x) => { x.frustumCulled = false; x.material = x.material && x.material.name === "gown" ? scrub : skin; });
 
   /* white coat: a slightly inflated copy of the upper part of the hospital top, skinned to the same bones */
-  if (o.spec !== "surgeon") {
+  let coatMesh = null;
+  if (lk ? false : o.spec !== "surgeon") {
     const src = sm.find((x) => x.material === scrub);
     if (src && src.geometry.index) {
       const g0 = src.geometry, pos = g0.attributes.position, nor = g0.attributes.normal, idx = g0.index.array, keep = [];
@@ -63,14 +66,16 @@ export function createDoctor(T, gltf, o) {
         const g1 = new T.BufferGeometry(), n = pos.count, P = new Float32Array(n * 3);
         for (let i = 0; i < n; i++) { P[i * 3] = pos.getX(i) + nor.getX(i) * 0.02; P[i * 3 + 1] = pos.getY(i) + nor.getY(i) * 0.02 - (pos.getY(i) < 0.2 ? 0.5 * (0.2 - pos.getY(i)) : 0); P[i * 3 + 2] = pos.getZ(i) + nor.getZ(i) * 0.02; }
         g1.setAttribute("position", new T.BufferAttribute(P, 3)); g1.setAttribute("normal", nor); g1.setAttribute("skinIndex", g0.attributes.skinIndex); g1.setAttribute("skinWeight", g0.attributes.skinWeight); g1.setIndex(keep);
-        const cm = new T.SkinnedMesh(g1, coatM); cm.frustumCulled = false; src.parent.add(cm); cm.bind(src.skeleton, src.bindMatrix);
+        const cm = new T.SkinnedMesh(g1, coatM); cm.frustumCulled = false; coatMesh = cm; src.parent.add(cm); cm.bind(src.skeleton, src.bindMatrix);
       }
     }
   }
   /* hair, sized from the eye bones */
   const head = B("head"), eL = B("eye.L"), eR = B("eye.R");
   clone.updateMatrixWorld(true);
-  if (head && eL && eR) {
+  let fit = { sx: 1, sz: 1, scale: 1, lean: 0 };
+  if (lk) fit = applyLook(T, { clone, head, eL, eR, B, skin, scrub, coatM, coatMesh, sm, accent, name: o.name, specName }, lk);
+  else if (head && eL && eR) {
     const wl = new V(), wr = new V(); eL.getWorldPosition(wl); eR.getWorldPosition(wr);
     const inv = new T.Matrix4().copy(head.matrixWorld).invert(), lL = wl.clone().applyMatrix4(inv), lR = wr.clone().applyMatrix4(inv), eyeD = lL.distanceTo(lR) || 0.062;
     const hair = new T.MeshStandardMaterial({ color: o.sex === "f" ? 0x1a100c : 0x141414, roughness: 0.85 }), hr = eyeD * 1.62, cx = (lL.x + lR.x) / 2, cy = (lL.y + lR.y) / 2, cz = (lL.z + lR.z) / 2;
@@ -96,7 +101,7 @@ export function createDoctor(T, gltf, o) {
 
   /* scale so the figure matches the real model height, then stand on the floor */
   const box = new T.Box3().setFromObject(clone); const hgt = box.max.y - box.min.y || 1.7;
-  body.position.y = -box.min.y; body.scale.setScalar((o.sex === "f" ? 1.66 : 1.76) / hgt); body.position.y *= body.scale.x;
+  body.position.y = -box.min.y; const k0 = (o.sex === "f" ? 1.66 : 1.76) / hgt * fit.scale; body.scale.set(k0 * fit.sx, k0, k0 * fit.sz); body.position.y *= k0;
 
   const tag = nameTag(T, o.name || "Doctor", specName, accent); tag.position.y = 2.12; g.add(tag);
   let phase = 0, mv = 0, want = 0, look = 0;
@@ -112,7 +117,7 @@ export function createDoctor(T, gltf, o) {
       swing("lowerleg01.L", Math.max(0, Math.sin(phase + 1.6)) * a * 1.5); swing("lowerleg01.R", Math.max(0, Math.sin(phase + 1.6 + Math.PI)) * a * 1.5);
       swing("upperarm01.L", s * a * 0.55); swing("upperarm01.R", -s * a * 0.55);
       swing("lowerarm01.L", -0.12 - mv * 0.25); swing("lowerarm01.R", -0.12 - mv * 0.25);
-      swing("spine05", 0.03 * mv);
+      swing("spine05", 0.03 * mv + fit.lean);
       body.position.y += 0;                                    // keep the feet planted; no bob so the scale stays exact
       const j = joints.head; if (j) { qx.setFromAxisAngle(new V(0, 1, 0), look); j.b.quaternion.copy(qx).multiply(j.q); }
     },

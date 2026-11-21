@@ -53,16 +53,17 @@ export function localSignal(code, onMsg) {
 }
 
 export function createHallNet(o) {
-  const sid = Math.random().toString(36).slice(2, 10), me = { sid, id: o.id, name: o.name, spec: o.spec, sex: o.sex };
+  const sid = Math.random().toString(36).slice(2, 10), me = { sid, id: o.id, name: o.name, spec: o.spec, sex: o.sex, look: o.look || null };
+  const cleanLook = (l) => (l && typeof l === "object" && JSON.stringify(l).length < 400 ? l : null);        // an avatar config is tiny; never relay anything bigger
   const peers = new Map();                       // sid -> { sid, id, name, spec, sex, pc, dc, open, st, t0, init }
   let closed = false, t0 = 0, helloTimer = 0, last = null, lastSend = 0, quiet = 0;
   const ice = o.iceServers || ICE;
   const sig = (o.signal || ntfySignal)(o.code, (d, time) => { if (!closed) handle(d, time); });
   const say = (d) => sig.send(Object.assign({ from: sid }, d));
-  const hello = (re) => say({ t: "hi", id: me.id, name: me.name, spec: me.spec, sex: me.sex, re: !!re });
+  const hello = (re) => say({ t: "hi", id: me.id, name: me.name, spec: me.spec, sex: me.sex, look: me.look, re: !!re });
 
   function emit() { if (o.onPeers) o.onPeers([...peers.values()].map(pub)); }
-  const pub = (p) => ({ sid: p.sid, id: p.id, name: p.name, spec: p.spec, sex: p.sex, connected: !!p.open, st: p.st });
+  const pub = (p) => ({ sid: p.sid, id: p.id, name: p.name, spec: p.spec, sex: p.sex, look: p.look, connected: !!p.open, st: p.st });
 
   function drop(p, why) {
     if (!peers.has(p.sid)) return;
@@ -114,8 +115,8 @@ export function createHallNet(o) {
     if (t0 && time && time < t0 - 40) return;                   // stale history from an earlier visit
     if (d.t === "hi") {
       let p = peers.get(d.from); const known = !!p;
-      if (!p) { p = { sid: d.from, id: d.id, name: d.name, spec: d.spec, sex: d.sex, pc: null, dc: null, open: false, st: null, t0: 0 }; peers.set(d.from, p); }
-      Object.assign(p, { id: d.id, name: d.name, spec: d.spec, sex: d.sex });
+      if (!p) { p = { sid: d.from, id: d.id, name: d.name, spec: d.spec, sex: d.sex, look: cleanLook(d.look), pc: null, dc: null, open: false, st: null, t0: 0 }; peers.set(d.from, p); }
+      Object.assign(p, { id: d.id, name: d.name, spec: d.spec, sex: d.sex, look: cleanLook(d.look) });
       emit();
       if (!d.re && !known) hello(true);
       if (me.sid < p.sid && !p.pc) offerTo(p);                    // the lower id always starts the call

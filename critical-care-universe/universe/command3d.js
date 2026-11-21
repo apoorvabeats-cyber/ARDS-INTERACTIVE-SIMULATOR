@@ -10,9 +10,9 @@
        the real pages take over, from the same pose, a few steps inside.
    buildSuite(T, scene, P, H, env, {gateSet}) -> { doors, update(t,dt), clamp(x,z), hits, rooms }          */
 
-import { buildOutdoor } from "./outdoor3d.js?v=20261121g";
-import { loadVisitorCopy, createVisitor } from "./visitor-avatar.js?v=20261121g";
-import { liveUpdates } from "./live-updates.js?v=20261121g";
+import { buildOutdoor } from "./outdoor3d.js?v=20261121h";
+import { loadVisitorCopy, createVisitor } from "./visitor-avatar.js?v=20261121h";
+import { liveUpdates } from "./live-updates.js?v=20261121h";
 
 export function buildSuite(T, S, P, H, env, opt = {}) {
   const V = T.Vector3, G = new T.Group(); G.name = "suite"; S.add(G);
