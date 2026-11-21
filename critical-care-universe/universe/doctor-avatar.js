@@ -104,21 +104,23 @@ export function createDoctor(T, gltf, o) {
   body.position.y = -box.min.y; const k0 = (o.sex === "f" ? 1.66 : 1.76) / hgt * fit.scale; body.scale.set(k0 * fit.sx, k0, k0 * fit.sz); body.position.y *= k0;
 
   const tag = nameTag(T, o.name || "Doctor", specName, accent); tag.position.y = 2.12; g.add(tag);
-  let phase = 0, mv = 0, want = 0, look = 0;
+  let phase = 0, mv = 0, want = 0, look = 0, seat = 0, seatWant = 0; const by0 = body.position.y;
   return {
     group: g, tag, accent,
     setMoving(v) { want = v; },
     setLook(r) { look = r; },
+    setSeated(v) { seatWant = v ? 1 : 0; },
     setLabel(name, specLabel) { const t = nameTag(T, name, specLabel, accent); tag.material.map.dispose(); tag.material.map = t.material.map; tag.material.needsUpdate = true; },
     update(dt) {
-      mv += (want - mv) * Math.min(1, dt * 8); phase += dt * (3.2 + 4.2 * mv) * (mv > 0.05 ? 1 : 0.2);
+      seat += (seatWant - seat) * Math.min(1, dt * 5); mv += (want * (1 - seat) - mv) * Math.min(1, dt * 8); phase += dt * (3.2 + 4.2 * mv) * (mv > 0.05 ? 1 : 0.2);
       const s = Math.sin(phase), a = mv * 0.62;
-      swing("upperleg01.L", -s * a); swing("upperleg01.R", s * a);
-      swing("lowerleg01.L", Math.max(0, Math.sin(phase + 1.6)) * a * 1.5); swing("lowerleg01.R", Math.max(0, Math.sin(phase + 1.6 + Math.PI)) * a * 1.5);
-      swing("upperarm01.L", s * a * 0.55); swing("upperarm01.R", -s * a * 0.55);
-      swing("lowerarm01.L", -0.12 - mv * 0.25); swing("lowerarm01.R", -0.12 - mv * 0.25);
-      swing("spine05", 0.03 * mv + fit.lean);
-      body.position.y += 0;                                    // keep the feet planted; no bob so the scale stays exact
+      const sa = seat;                                          // seated: thighs level, shins down, hands out onto the table
+      swing("upperleg01.L", -s * a - 1.5 * sa); swing("upperleg01.R", s * a - 1.5 * sa);
+      swing("lowerleg01.L", Math.max(0, Math.sin(phase + 1.6)) * a * 1.5 + 1.5 * sa); swing("lowerleg01.R", Math.max(0, Math.sin(phase + 1.6 + Math.PI)) * a * 1.5 + 1.5 * sa);
+      swing("upperarm01.L", s * a * 0.55 - 0.55 * sa); swing("upperarm01.R", -s * a * 0.55 - 0.55 * sa);
+      swing("lowerarm01.L", -0.12 - mv * 0.25 - 0.8 * sa); swing("lowerarm01.R", -0.12 - mv * 0.25 - 0.8 * sa);
+      swing("spine05", 0.03 * mv + fit.lean + 0.1 * sa);
+      body.position.y = by0 - 0.47 * sa; body.position.z = -0.1 * sa;            // sitting lowers the hips onto the chair
       const j = joints.head; if (j) { qx.setFromAxisAngle(new V(0, 1, 0), look); j.b.quaternion.copy(qx).multiply(j.q); }
     },
   };

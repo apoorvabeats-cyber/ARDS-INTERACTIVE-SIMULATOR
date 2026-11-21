@@ -55,6 +55,7 @@ export function localSignal(code, onMsg) {
 export function createHallNet(o) {
   const sid = Math.random().toString(36).slice(2, 10), me = { sid, id: o.id, name: o.name, spec: o.spec, sex: o.sex, look: o.look || null };
   const cleanLook = (l) => (l && typeof l === "object" && JSON.stringify(l).length < 400 ? l : null);        // an avatar config is tiny; never relay anything bigger
+  const cleanChat = (m) => ({ k: ["propose", "challenge", "agree", "final", "ask"].includes(m.k) ? m.k : "ask", text: String(m.text || "").slice(0, 240), n: Math.max(0, Math.min(99, +m.n || 0)), time: +m.time || Date.now() });   // a team message is short text and a kind; nothing else is trusted
   const peers = new Map();                       // sid -> { sid, id, name, spec, sex, pc, dc, open, st, t0, init }
   let closed = false, t0 = 0, helloTimer = 0, last = null, lastSend = 0, quiet = 0;
   const ice = o.iceServers || ICE;
@@ -86,7 +87,7 @@ export function createHallNet(o) {
     p.dc = dc;
     dc.onopen = () => { p.open = true; emit(); if (last) dc.send(JSON.stringify(last)); };
     dc.onclose = () => { p.open = false; drop(p, "closed"); };
-    dc.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m && m.t === "s") { p.st = m; if (o.onPeerState) o.onPeerState(pub(p), m); } } catch (err) { /* ignore */ } };
+    dc.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m && m.t === "s") { p.st = m; if (o.onPeerState) o.onPeerState(pub(p), m); } else if (m && m.t === "c" && o.onChat) o.onChat(pub(p), cleanChat(m)); } catch (err) { /* ignore */ } };
   }
   const gathered = (pc) => new Promise((res) => {
     if (pc.iceGatheringState === "complete") return res();
@@ -157,6 +158,7 @@ export function createHallNet(o) {
       const b = JSON.stringify(last);
       peers.forEach((p) => { if (p.open && p.dc && p.dc.readyState === "open") { try { p.dc.send(b); } catch (e) { /* ignore */ } } });
     },
+    chat(m) { const b = JSON.stringify(Object.assign({ t: "c" }, cleanChat(m))); peers.forEach((p) => { if (p.open && p.dc && p.dc.readyState === "open") { try { p.dc.send(b); } catch (e) { /* ignore */ } } }); },
     peers: () => [...peers.values()].map(pub),
     close() { closed = true; clearInterval(helloTimer); say({ t: "bye" }); peers.forEach((p) => { try { p.pc && p.pc.close(); } catch (e) { /* ignore */ } }); peers.clear(); setTimeout(() => sig.close(), 400); },
   };
