@@ -100,7 +100,8 @@ import {FOLLOW_UPS,DISTRACTORS} from './case-decisions.js';
 import {ORDER_CASES,assessOrder} from './clinical-orders.js?v=20261115a';
 import {createCaseVoice} from './case-voice.mjs';
 import {buildWard} from './ward3d.js?v=20261122g';
-import {buildSuite} from './command3d.js?v=20261122g';
+import {buildSuite} from './command3d.js?v=20261122h';
+import {mountVideoUI} from './upper-level.js?v=20261122h';
 import {createSfx} from './sfx.js?v=20261122g';
 const $=s=>document.querySelector(s),V=THREE.Vector3,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 function updateLayout(){
@@ -317,7 +318,7 @@ function setV3(on){
  $('#panel').style.display=v3?'none':(mode=='bed'?'block':'none')
 }
 function fitView(){return;if(!v3)return;const w=cv.clientWidth,h=cv.clientHeight,hv=Math.max(120,Math.min(h,parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--photo-bottom'))||h*.45));cam.setViewOffset(w,h,0,(h-hv)/2,w,h);cam.updateProjectionMatrix()}
-function walkBy(d){if(mode!=='ward'||transit)return;let nx=wp.x+Math.sin(yaw)*d,nz=wp.z-Math.cos(yaw)*d;if(suite&&suite.where&&d>0){/* the side gates are narrow: walking towards one draws you in line with it and turns you to it, so a finger-drag always finds the way in */const W=suite.where;[W.AU.x1+1.5,W.AU.x0-1.5].forEach(gx=>{const vx=gx-nx,vz=W.ZC-nz,vl=Math.hypot(vx,vz);if(vl>9||Math.abs(nx-(gx>0?W.AU.x1:W.AU.x0))>8)return;if((Math.sin(yaw)*vx-Math.cos(yaw)*vz)/(vl||1)>.55&&(gx>nx?nx>W.AU.x1-8:nx<W.AU.x0+8)){nz+=(W.ZC-nz)*Math.min(.7,d*2.5);let dy=Math.atan2(vx,-vz)-yaw;dy=Math.atan2(Math.sin(dy),Math.cos(dy));yaw+=dy*Math.min(.5,d*1.5)}})}const ox=wp.x,oz=wp.z;if(suite){const c=suite.clamp(nx,nz);wp.x=c[0];wp.z=c[1]}else{wp.x=clamp(nx,-7.3,7.3);wp.z=clamp(nz,-2.7,2.7)}
+function walkBy(d){if(mode!=='ward'||transit)return;if(suite&&suite.upper&&suite.upper.lift.busy)return;let nx=wp.x+Math.sin(yaw)*d,nz=wp.z-Math.cos(yaw)*d;if(suite&&suite.where&&d>0&&!(suite.upper&&suite.upper.isUp())){/* the side gates are narrow: walking towards one draws you in line with it and turns you to it, so a finger-drag always finds the way in */const W=suite.where;[W.AU.x1+1.5,W.AU.x0-1.5].forEach(gx=>{const vx=gx-nx,vz=W.ZC-nz,vl=Math.hypot(vx,vz);if(vl>9||Math.abs(nx-(gx>0?W.AU.x1:W.AU.x0))>8)return;if((Math.sin(yaw)*vx-Math.cos(yaw)*vz)/(vl||1)>.55&&(gx>nx?nx>W.AU.x1-8:nx<W.AU.x0+8)){nz+=(W.ZC-nz)*Math.min(.7,d*2.5);let dy=Math.atan2(vx,-vz)-yaw;dy=Math.atan2(Math.sin(dy),Math.cos(dy));yaw+=dy*Math.min(.5,d*1.5)}})}const ox=wp.x,oz=wp.z;if(suite){const c=suite.clamp(nx,nz);wp.x=c[0];wp.z=c[1]}else{wp.x=clamp(nx,-7.3,7.3);wp.z=clamp(nz,-2.7,2.7)}
   }
 function tgt(){
  if(mode=='cmd'){const W=14,H=14*(845/1500),half=Math.tan(36*Math.PI/180),fit=Math.max(H/2/half,W/2/(half*cam.aspect)),d=fit*(wallZoom?(cam.aspect<1?.42:.76):1.04);tp.set(100,H/2,-8+d);tl.set(100+Math.sin(cmdYaw)*W*0.48,H/2+Math.sin(cmdPit)*H*0.3,-8)}
@@ -359,10 +360,10 @@ addEventListener('keydown',e=>{if(mode!=='ward'||transit||/INPUT|SELECT|TEXTAREA
 $('#v3d').onclick=()=>setV3(!v3);addEventListener('resize',fitView);
 cv.onpointerup=e=>{dn=0;holdDir=0;if(mv>8||arrive||transit)return;const r=cv.getBoundingClientRect();mv2.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(mv2,cam);
  if(mode==='bed'&&v3&&ward&&ward.select){const nm=ward.select(cur,ray),tg=$('#v3tag');tg.textContent=nm?'Selected: '+nm:'';tg.style.display=nm?'block':'none';return}
- const h=ray.intersectObjects(S.children,true).find(o=>o.object.visible&&((mode==='cmd'&&(o.object===scr||o.object.userData.command))||(mode==='ward'&&(o.object.userData.bed!=null||o.object.userData.door!=null||o.object.userData.cmdBed!=null))));if(!h)return;
+ const h=ray.intersectObjects(S.children,true).find(o=>o.object.visible&&((mode==='cmd'&&(o.object===scr||o.object.userData.command))||(mode==='ward'&&(o.object.userData.bed!=null||o.object.userData.door!=null||o.object.userData.vhall!=null||o.object.userData.cmdBed!=null))));if(!h)return;
  if(mode=='cmd'&&h.object.userData&&h.object.userData.command&&h.uv){var uu=h.uv.x,vv=1-h.uv.y,sc=h.object.userData.screens||[];for(var kk=0;kk<sc.length;kk++){var rr=sc[kk];if(uu>=rr.x&&uu<=rr.x+rr.w&&vv>=rr.y&&vv<=rr.y+rr.h){openFromWall(rr.bed);break}}}
  else if(h.object===scr){const u=h.uv,i=Math.floor((1-u.y)*RW)*C+Math.floor(u.x*C);if(P[i])openFromWall(i)}
- else if(mode=='ward'){const u=h.object.userData;if(u.door!=null&&suite)useDoor(suite.doors[u.door]);else if(u.cmdBed!=null)openBedFromRoom(u.cmdBed);else visit(u.bed)}};
+ else if(mode=='ward'){const u=h.object.userData;if(u.vhall!=null&&suite&&suite.upper){const r=suite.upper.tap(u.vhall,h);if(r==='library'&&suite.upper.openLibrary)suite.upper.openLibrary()}else if(u.door!=null&&suite){const dd=suite.doors[u.door];if(dd&&dd.lift!=null)useLift(dd);else useDoor(dd)}else if(u.cmdBed!=null)openBedFromRoom(u.cmdBed);else visit(u.bed)}};
 const setControl=(id,key)=>{const el=$('#'+id);el.oninput=()=>{const p=P[cur];p[key]=+el.value;el.previousElementSibling.textContent=el.value;showVentMech(p)}};
 setControl('fi','fio2');setControl('rrset','setRate');setControl('vtset','vt');
 $('#pe').oninput=()=>{const p=P[cur],el=$('#pe');p.peep=+el.value;if(p.air==='niv'&&p.ipap<p.peep+2)p.ipap=Math.min(30,p.peep+2);el.previousElementSibling.textContent=el.value;$('#ipap').value=p.ipap;$('#ipap').previousElementSibling.textContent=p.ipap;showVentMech(p)};
@@ -597,6 +598,7 @@ function soundscape(now){
  if(alarmOn&&now>nAlert){const bad=P.map((p,i)=>[p,i]).filter(a=>!a[0].done&&a[0].st>0);if(bad.length){const[p,i]=bad[Math.floor(Math.random()*bad.length)];sfx.alert(p.st>1?2:1,hall?bedPos(i):{x:-20.4,z:(i%3-1)*2.4})}nAlert=now+6500+Math.random()*4500}}
 let wasOut=false;function outdoorLogic(){
  if(!suite||flatMode)return;
+ if(suite.upper&&suite.upper.isUp()){if(!leaving&&!arriving)$('#leave').style.opacity=0;return}
  const D=suite.doors,c=cam.position,ou=suite.outdoor,outside=c.z<-21.9&&c.x<-8.7;if(wasOut&&!outside&&mode==='ward'&&!transit&&!leaving&&window.ccuWelcome)window.ccuWelcome('aud');wasOut=outside;
  if(D.exit.target>0&&!outside&&c.z>-17.5&&mode!=='travel')D.exit.target=0;
  if(mode!=='travel'&&!leaving){
@@ -618,7 +620,7 @@ let wasOut=false;function outdoorLogic(){
 let last=0,fr=0,updateWall=()=>{};
 function loop(t){requestAnimationFrame(loop);if(t-last<1000/30-.5)return;const dt=Math.min((t-last)/1000,.1);last=t;
  if(dn&&holdDir&&mode==='ward'&&!transit&&mv>10&&performance.now()-lastVMove>120)walkBy(holdDir*dt*1.7);
- if(suite)gyS+=(suite.groundY(cam.position.x,cam.position.z)-gyS)*.16;
+ if(suite)gyS+=(suite.groundY(cam.position.x,cam.position.z)-gyS)*(suite.upper&&suite.upper.lift.moving?1:.16);
  soundscape(performance.now());outdoorLogic();
  if(transit){
   const progress=clamp((t-transit.start)/transit.duration,0,1),ease=progress*progress*(3-2*progress);
@@ -679,7 +681,7 @@ try{if(ward){suite=buildSuite(THREE,S,P,{mon},ward.env,{gateSet:a=>ward.setGate(
  const D=suite.doors,cxA=-15.3;
  /* leaving by a door is a straight cut, never a fade: keep the last frame, hand it to the next page, which shows it until its own first frame */
  const keepFrame=()=>{try{R.render(S,cam);const c=R.domElement,w=Math.min(960,c.width),h=Math.round(w*c.height/c.width),t=document.createElement('canvas');t.width=w;t.height=h;t.getContext('2d').drawImage(c,0,0,w,h);sessionStorage.setItem('ccu-snap',t.toDataURL('image/jpeg',.62));sessionStorage.setItem('ccu-snap-t',String(Date.now()))}catch(e){try{sessionStorage.removeItem('ccu-snap')}catch(_){}}};
- window.__keepFrame=keepFrame;
+ window.__keepFrame=keepFrame;if(suite.upper)mountVideoUI(suite.upper,()=>cam.position);
  const cutTo=(msg,fallback)=>{if(leaving)return;leaving=true;keepFrame();sfx.stopOutdoor&&sfx.stopOutdoor();if(parent!==window)parent.postMessage(msg,'*');else if(fallback)location.href=fallback};
  /* the hub and Nexus gates only open; you walk through them yourself, and a few steps inside the real page takes over from exactly where you stand */
  window.__enterPlace=k=>{if(leaving||transit||performance.now()<4000)return;const W=suite.where,c=cam.position,fx=Math.sin(yaw),fz=-Math.cos(yaw);let pose;
@@ -692,6 +694,17 @@ try{if(ward){suite=buildSuite(THREE,S,P,{mon},ward.env,{gateSet:a=>ward.setGate(
  D.exit.noThrough=true;D.exit.go=()=>{const outside=cam.position.z<-21.8;
   if(!outside)startRoute([{p:new V(cxA,1.6,-22.1),look:new V(cxA,1.6,-30),dur:2000},{p:new V(cxA,1.6,-25.6),look:new V(cxA,1.5,-34),dur:1900}],()=>{$('#hint').textContent=OUTH});
   else startRoute([{p:new V(cxA,1.6,-19.4),look:new V(cxA,1.5,-12),dur:2200}])}}}catch(e){console.error('3D command suite failed; using the photo command centre.',e);suite=null}
+function useLift(d){
+ const U=suite&&suite.upper;if(!U||transit||flatMode||mode!=='ward')return;
+ const L=U.lift;if(L.busy||d.lift!==U.level())return;L.busy=true;
+ const fail=setTimeout(()=>{if(!L.moving&&!transit)L.busy=false},150000),fin=()=>{L.busy=false;clearTimeout(fail);$('#hint').textContent=WALK};
+ const lv=d.lift,to=1-lv,fr=U.front(),ins=U.inside();
+ startRoute([{p:fr,look:new V(fr.x,1.4,fr.z-6),dur:Math.max(700,Math.hypot(cam.position.x-fr.x,cam.position.z-fr.z)*380)}],()=>{
+  $('#hint').textContent='The lift is coming…';
+  U.call(lv,()=>{
+   startRoute([{p:ins,look:new V(ins.x,1.4,ins.z-3),dur:1500},{p:ins.clone(),look:new V(ins.x,1.45,ins.z+4),dur:1000}],()=>{
+    $('#hint').textContent=to?'Going up to the Video Auditorium…':'Going down to the Auditorium…';
+    U.ride(to,()=>{const o=U.front();startRoute([{p:o,look:new V(o.x,1.5,o.z+5),dur:1800}],fin)},true)})})})}
 function endWalk(){const p=cam.position,v=lk.clone().sub(p);yaw=Math.atan2(v.x,-v.z);pit=0;wp.set(p.x,0,p.z);mode='ward';transit=null;updateFov();$('#hint').textContent=WALK}
 function useDoor(d){
  if(transit||!suite||!d||flatMode||mode!=='ward')return;
@@ -868,5 +881,5 @@ go=function(m,i){
 };
 
 if(suite&&!flatMode)go('cmd');
-window.__lc={cam:()=>cam,suite:()=>suite,mode:()=>mode,wp,walkBy:d=>walkBy(d),setYaw:v=>{yaw=v},getYaw:()=>yaw};
+window.__lc={lk,useLift:d=>useLift(d),transit:()=>!!transit,cam:()=>cam,suite:()=>suite,mode:()=>mode,wp,walkBy:d=>walkBy(d),setYaw:v=>{yaw=v},getYaw:()=>yaw};
 </script></body></html>

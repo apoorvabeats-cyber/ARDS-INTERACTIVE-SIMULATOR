@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { createSfx } from "./critical-care-universe/universe/sfx.js?v=20261122g";
-import { buildRooms } from "./hub-rooms.js?v=20261122g";
+import { buildRooms } from "./hub-rooms.js?v=20261122h";
 
 const gate = document.getElementById("icu-gate");
 const canvas = document.getElementById("lobby");
@@ -16,6 +16,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   renderer.toneMappingExposure = 1.0;
 
   /* one vivid colour per door, used on the door, its feature wall, its floor path and its lights */
+  const SLIDE = 1.0;                              /* how far each glass leaf slides: far enough that the opening is completely clear of the leaves */
   const ACC = { icu: 0x12e3c8, micro: 0x7be34f, rad: 0x3f8cff, aud: 0xffb347, path: 0xa073ff };
   /* a pentagon: five doors, each on its own wall. theta is the compass angle of the door seen from the middle (0 = straight ahead, clockwise). */
   const KINDS = ["icu", "micro", "rad", "aud", "path"], THETA = {}, N5 = 5, APO = 5.8, DOORR = APO - 0.18, SIDE = 2 * APO * Math.tan(Math.PI / N5), RC = (APO - 0.02) / Math.cos(Math.PI / N5), RT = 7.3;
@@ -363,8 +364,64 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     return null;
   }
 
+  /* The auditorium is its own page, so it is loaded in a frame that sits out of sight while we walk to its door; when the walk ends the
+     frame is simply shown, from exactly the place we stand. There is no navigation and no reload, in either direction. */
+  let audFrame = null, audReady = false, audWait = 0;
+  const AUD_URL = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&embed=1&v=20261122h";
+  function prepareAud(face) {
+    try {
+      const along = 7.25, ex = Math.sin(face) * along, ez = Math.cos(face) * along, wx = HUBC.x + ex * HCS + ez * HSN, wz = HUBC.z + (-ex * HSN + ez * HCS);
+      const fx = Math.sin(face), fz = Math.cos(face), fwx = fx * HCS + fz * HSN, fwz = -fx * HSN + fz * HCS;
+      sessionStorage.setItem("ccu-pose", JSON.stringify({ to: "aud", x: wx, z: wz, yaw: Math.atan2(fwx, -fwz), t: Date.now() }));
+      sessionStorage.removeItem("ccu-snap");
+    } catch (err) {}
+    if (audFrame) return;
+    audReady = false;
+    const f = document.createElement("iframe");
+    f.id = "aud-frame"; f.title = "Auditorium"; f.setAttribute("allow", "autoplay; fullscreen");
+    f.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;border:0;background:#050b18;opacity:0;pointer-events:none;z-index:2147482000";
+    f.src = AUD_URL; document.body.appendChild(f); audFrame = f;
+  }
+  function stopHubSound() {
+    try { if (window.stopWave) window.stopWave(); } catch (err) {}
+    try { document.querySelectorAll("audio").forEach((a) => { a.pause(); }); } catch (err) {}
+  }
+  function revealAud() {
+    if (!audFrame) { prepareAud(THETA.aud); }
+    if (!audReady) {                                       /* not drawn yet: hold this last frame a moment, then fall back to a normal page change */
+      mode = "wait"; cancelAnimationFrame(raf); raf = 0;
+      if (!audWait) audWait = setTimeout(() => { audWait = 0; if (!audReady) { keepFrame(); location.href = AUD_URL.replace("&embed=1", ""); } }, 7000);
+      return;
+    }
+    clearTimeout(audWait); audWait = 0; clearTimeout(leaveTimer);
+    mode = "parked"; cancelAnimationFrame(raf); raf = 0;
+    stopHubSound();
+    audFrame.style.pointerEvents = "auto"; audFrame.style.opacity = "1";
+    try { audFrame.contentWindow.postMessage("ccu-shown", "*"); audFrame.contentWindow.focus(); } catch (err) {}
+  }
+  function backFromAud() {
+    if (mode !== "parked" && mode !== "wait") return;
+    const pz = readPose(), face = THETA.aud, d = DOORS.aud;
+    const start = pz ? new THREE.Vector3(pz.x, 1.62, pz.z) : new THREE.Vector3(Math.sin(face) * (APO - 2.5), 1.62, Math.cos(face) * (APO - 2.5));
+    eye.copy(start); yaw = pz ? pz.yaw : face + Math.PI; pit = 0;
+    setDoor(d, 1);
+    mode = "arrive"; arrive = { t: 0, start, snd: false, shut: false }; window.doorChosen = true; job = null;
+    if (fade) { fade.style.transition = "none"; fade.style.opacity = "0"; }
+    clearTimeout(leaveTimer);
+    try { placeCamera(); renderer.render(scene, camera); } catch (err) {}
+    if (!raf) { clock.getDelta(); raf = requestAnimationFrame(frame); }
+    /* once the hall has drawn its first frame, the auditorium frame is taken away: a straight cut, no flash */
+    requestAnimationFrame(() => requestAnimationFrame(() => { if (audFrame) { audFrame.style.opacity = "0"; audFrame.style.pointerEvents = "none"; const f = audFrame; audFrame = null; audReady = false; setTimeout(() => { try { f.src = "about:blank"; f.remove(); } catch (err) {} }, 400); } }));
+    if (window.playHubVoice && false) window.playHubVoice();
+  }
+  window.addEventListener("message", (ev) => {
+    if (!audFrame || ev.source !== audFrame.contentWindow) return;
+    if (ev.data === "ccu-aud-ready") { audReady = true; if (mode === "wait") revealAud(); }
+    else if (ev.data === "universe-hub") backFromAud();
+  });
+
   function finish(kind) {
-    if (mode === "done") return;
+    if (mode === "done" || mode === "parked") return;
     mode = "done";
     cancelAnimationFrame(raf);
     raf = 0;
@@ -372,8 +429,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       const btn = document.getElementById("icu-enter");
       if (btn) btn.click();
     } else if (kind === "aud") {
-      keepFrame(); keepPose();
-      location.href = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&v=20261122g";
+      revealAud();
     } else if (kind === "rad" || MODFOR[kind]) {
       location.href = "radiology.html?v=20261122r3" + (MODFOR[kind] ? "&mod=" + MODFOR[kind] : "");
     } else if (kind === "micro") {
@@ -419,7 +475,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   /* a point inside a room, given in the room's own frame (x across, z away from the hall) */
   const loc = (k, lx, lz) => { const th = THETA[k], d = DOORS[k], c = Math.cos(th), sn = Math.sin(th), z = lz + 0.18; return new THREE.Vector3(d.position.x + lx * c + z * sn, 1.62, d.position.z - lx * sn + z * c); };
   const STAND = { micro: 3.9, path: 3.0, icu: 2.9, rad: 1.8 };
-  const setDoor = (d, o) => { d.userData.open = o; d.userData.left.position.x = -0.48 - o * 0.85; d.userData.right.position.x = 0.48 + o * 0.85; };
+  const setDoor = (d, o) => { d.userData.open = o; d.userData.left.position.x = -0.48 - o * SLIDE; d.userData.right.position.x = 0.48 + o * SLIDE; };
   const backB = document.createElement("button");
   backB.type = "button"; backB.id = "lobby-back"; backB.textContent = "Back to the hall";
   backB.style.cssText = "position:absolute;z-index:4;top:calc(10px + env(safe-area-inset-top));left:12px;min-height:40px;padding:0 14px;border:0;border-radius:999px;background:#14181c;color:#f3efe6;font:500 14px system-ui,sans-serif;display:none;cursor:pointer";
@@ -437,6 +493,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     if (kind === "aud") {
       const dest = new THREE.Vector3(Math.sin(face) * reach, 1.62, Math.cos(face) * reach);
       job = { kind, door, face, dest, t: 0, snd: false };
+      prepareAud(face);
     } else {
       job = { kind, door, face, t: 0, snd: false, speed: 2.7, hold: 0, holdFor: kind === "rad" ? 0 : 1.5, path: [loc(kind, 0, -1.0), loc(kind, 0, 1.0), loc(kind, 0, STAND[kind])], seg: 0, then: kind === "rad" ? "passage" : "finish" };
     }
@@ -459,12 +516,31 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     DOORS.rad.userData.open = 1;
   }
   backB.addEventListener("click", backToHall);
+  /* walking in the radiology passage: the position is kept inside the passage (local x across, z along), sliding along its walls */
+  let holdDir = 0, lastVMove = 0;
+  function walkPassage(dist) {
+    if (mode !== "passage") return;
+    const th = THETA.rad, dr = DOORS.rad, c = Math.cos(th), sn = Math.sin(th);
+    let nx = eye.x + Math.sin(yaw) * dist, nz = eye.z + Math.cos(yaw) * dist;
+    const dx = nx - dr.position.x, dz = nz - dr.position.z, W = R.PASS.W, D = R.PASS.D;
+    const lx = Math.max(-(W / 2 - 0.55), Math.min(W / 2 - 0.55, dx * c - dz * sn)), lz = Math.max(0.7, Math.min(D - 0.9, dx * sn + dz * c - 0.18));
+    const p = loc("rad", lx, lz); eye.x = p.x; eye.z = p.z;
+  }
+  addEventListener("keydown", (ev) => {
+    if (mode !== "passage" || /INPUT|SELECT|TEXTAREA/.test((ev.target || {}).tagName || "")) return;
+    const k = ev.key;
+    if (k === "ArrowUp" || k === "w" || k === "W") walkPassage(0.45); else if (k === "ArrowDown" || k === "s" || k === "S") walkPassage(-0.45);
+    else if (k === "ArrowLeft" || k === "a" || k === "A") yaw -= 0.12; else if (k === "ArrowRight" || k === "d" || k === "D") yaw += 0.12; else return;
+    ev.preventDefault();
+  });
+  canvas.addEventListener("wheel", (ev) => { if (mode !== "passage") return; ev.preventDefault(); walkPassage(-Math.max(-120, Math.min(120, ev.deltaY)) * 0.004); }, { passive: false });
   const turnTo = (a, rate) => { const raw = a - yaw; yaw += Math.atan2(Math.sin(raw), Math.cos(raw)) * rate; };
 
   canvas.addEventListener("pointerdown", (ev) => {
     if (Date.now() < (window.hallLock || 0)) return;
     sfx.unlock();
     dragging = true;
+    holdDir = 0;
     moved = 0;
     lastX = ev.clientX;
     lastY = ev.clientY;
@@ -478,10 +554,16 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     lastX = ev.clientX;
     lastY = ev.clientY;
     yaw += dx * 0.012;
-    pit = Math.max(-0.45, Math.min(0.35, pit - dy * 0.004));
+    /* in the radiology passage a finger swipe up or down walks you along it, as in the auditorium; sideways turns */
+    if (mode === "passage" && Math.abs(dy) >= Math.abs(dx) * 0.5) {
+      walkPassage(-dy * 0.014);
+      if (Math.abs(dy) >= 1) { holdDir = dy < 0 ? 1 : -1; lastVMove = performance.now(); }
+      pit += (0 - pit) * 0.2;
+    } else pit = Math.max(-0.45, Math.min(0.35, pit - dy * 0.004));
   });
+  canvas.addEventListener("pointercancel", () => { dragging = false; holdDir = 0; });
   canvas.addEventListener("pointerup", (ev) => {
-    dragging = false;
+    dragging = false; holdDir = 0;
     if (Date.now() < (window.hallLock || 0)) return;
     if (moved > 12 || (mode !== "look" && mode !== "passage")) return;
     const rect = canvas.getBoundingClientRect();
@@ -531,6 +613,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   }
   function step() {
     const dt = Math.min(clock.getDelta(), 0.05);
+    if (dragging && holdDir && mode === "passage" && moved > 10 && performance.now() - lastVMove > 120) walkPassage(holdDir * dt * 1.7);
     if (arrive) {
       const d = DOORS.aud;
       arrive.t += dt;
@@ -539,7 +622,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       if (arrive.t > 0.5) {
         if (!arrive.shut) { arrive.shut = true; sfx.door(false, { x: d.position.x, z: d.position.z }, 1.0); }
         const o = Math.max(0, 1 - (arrive.t - 0.5) * 1.6);
-        d.userData.open = o; d.userData.left.position.x = -0.48 - o * 0.85; d.userData.right.position.x = 0.48 + o * 0.85;
+        d.userData.open = o; d.userData.left.position.x = -0.48 - o * SLIDE; d.userData.right.position.x = 0.48 + o * SLIDE;
       }
       if (k >= 1) { shut(d); if (fade) { fade.style.opacity = "0"; fade.style.transition = ""; } document.documentElement.classList.remove("arriving"); if (window.ccuSnapOff) window.ccuSnapOff(); arrive = null; mode = "look"; window.doorChosen = false; }
       placeCamera(); ambient(dt); renderer.render(scene, camera);
@@ -552,7 +635,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       if (!job.walking) {
         turnTo(job.face, calm ? 1 : 0.14); pit += (0 - pit) * 0.1;
         if (job.t > 0.25) { setDoor(d, Math.min(1, d.userData.open + dt * 1.8)); if (!job.snd) { job.snd = true; sfx.setListener(0, 0, yaw); sfx.door(true, { x: d.position.x, z: d.position.z }, 1.3); } }
-        if (d.userData.open > 0.4) job.walking = true;
+        if (d.userData.open > 0.96) job.walking = true;
       }
       if (job.walking && !job.arrived) {
         const tgt = job.path[job.seg], dv = tgt.clone().sub(eye); dv.y = 0;
@@ -577,9 +660,9 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
       pit += (0 - pit) * 0.1;
       if (job.t > 0.25) { job.door.userData.open = Math.min(1, job.door.userData.open + dt * 1.8); if (!job.snd) { job.snd = true; sfx.setListener(0, 0, yaw); sfx.door(true, { x: job.door.position.x, z: job.door.position.z }, 1.3); } }
       const o = job.door.userData.open;
-      job.door.userData.left.position.x = -0.48 - o * 0.85;
-      job.door.userData.right.position.x = 0.48 + o * 0.85;
-      if (o > 0.45) {
+      job.door.userData.left.position.x = -0.48 - o * SLIDE;
+      job.door.userData.right.position.x = 0.48 + o * SLIDE;
+      if (o > 0.96) {
         if (job.kind === "aud" && !calm) { const dv = job.dest.clone().sub(eye), dl = dv.length(); if (dl > 0.001) eye.addScaledVector(dv.normalize(), Math.min(dl, dt * 3.0)); }   /* a steady walking pace so the auditorium can be seen */
         else eye.lerp(job.dest, calm ? 1 : 0.08);
       }
@@ -603,11 +686,11 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     const pz = readPose();
     const start = pz ? new THREE.Vector3(pz.x, 1.62, pz.z) : new THREE.Vector3(Math.sin(face) * (APO - 2.5), 1.62, Math.cos(face) * (APO - 2.5));
     eye.copy(start); yaw = pz ? pz.yaw : face + Math.PI; pit = 0;
-    d.userData.open = 1; d.userData.left.position.x = -0.48 - 0.85; d.userData.right.position.x = 0.48 + 0.85;
+    d.userData.open = 1; d.userData.left.position.x = -0.48 - SLIDE; d.userData.right.position.x = 0.48 + SLIDE;
     mode = "arrive"; arrive = { t: 0, start, snd: false, shut: false };
     if (fade) { fade.style.transition = "none"; fade.style.opacity = "0"; }
   }
-  window.__hubLobby = { R, scene, camera, choose, backToHall, teleport: (x, z, a, p) => { eye.set(x, 1.62, z); yaw = a || 0; pit = p || 0; }, loc, eye, setYaw: (v) => { yaw = v; }, getYaw: () => yaw, mode: () => mode, THETA, openDoor: (k) => { const d = DOORS[k]; d.userData.open = 1; d.userData.left.position.x = -1.33; d.userData.right.position.x = 1.33; } };
+  window.__hubLobby = { R, scene, camera, choose, backToHall, teleport: (x, z, a, p) => { eye.set(x, 1.62, z); yaw = a || 0; pit = p || 0; }, loc, eye, setYaw: (v) => { yaw = v; }, getYaw: () => yaw, mode: () => mode, THETA, openDoor: (k) => { const d = DOORS[k]; d.userData.open = 1; d.userData.left.position.x = -0.48 - SLIDE; d.userData.right.position.x = 0.48 + SLIDE; } };
   placeCamera();
   if (window.ccuWelcome) window.ccuWelcome("hub");
   frame();

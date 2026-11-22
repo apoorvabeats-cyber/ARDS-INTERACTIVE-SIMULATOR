@@ -139,9 +139,23 @@ function updateWalls(t) { for (let j = 0; j < 2; j++) { const w = walls[(wallN +
   const sg = ctex(512, 96, (g, w, h) => { g.fillStyle = "rgba(5,26,42,.8)"; rr(g, 3, 3, w - 6, h - 6, 16); g.fill(); g.strokeStyle = "#5fe3ff"; g.lineWidth = 4; rr(g, 3, 3, w - 6, h - 6, 16); g.stroke(); g.fillStyle = "#cff6ff"; g.font = "700 40px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("AUDITORIUM", w / 2, h / 2); });
   mesh(new T.PlaneGeometry(1.7, 0.32), new T.MeshBasicMaterial({ map: sg, transparent: true, toneMapped: false }), 0, 3.05, 0.06, d); }
 
+/* the gate in the doorway: two solid sliding leaves like every other gate. It opens when you tap it or walk up to it, and shuts again as you leave */
+const gate = (() => {
+  const g = new T.Group(); g.position.set(0, 0, RH - 0.06); g.rotation.y = Math.PI; hall.add(g);
+  const leafM = new T.MeshStandardMaterial({ color: 0x1a232d, metalness: 0.7, roughness: 0.3, envMap: env, envMapIntensity: 1.2 }), glassG = new T.MeshStandardMaterial({ color: 0x1b5f86, emissive: 0x0b3550, emissiveIntensity: 0.8, metalness: 0.3, roughness: 0.1, transparent: true, opacity: 0.55 }), edge = E(0x36d6ff, 2.2), leaves = [];
+  [-1, 1].forEach((k) => {
+    const lf = new T.Group(); lf.position.set(k * 0.65, 0, 0.05); lf.userData = { x0: k * 0.65, k }; g.add(lf);
+    mesh(new T.BoxGeometry(1.28, 2.66, 0.07), leafM, 0, 1.33, 0, lf); mesh(new T.BoxGeometry(0.76, 1.3, 0.02), glassG, 0, 1.62, 0.04, lf); mesh(new T.BoxGeometry(0.03, 2.3, 0.02), edge, -k * 0.6, 1.33, 0.045, lf); mesh(new T.BoxGeometry(0.86, 0.02, 0.02), edge, 0, 0.5, 0.045, lf); mesh(new T.BoxGeometry(0.86, 0.02, 0.02), edge, 0, 2.3, 0.045, lf);
+    leaves.push(lf);
+  });
+  const hit = mesh(new T.BoxGeometry(2.9, 2.9, 0.9), new T.MeshBasicMaterial({ visible: false }), 0, 1.45, 0.4, g);
+  const api = { open: 0, target: 0, hit, set(a) { api.open = a; leaves.forEach((lf) => { lf.position.x = lf.userData.x0 + lf.userData.k * 1.3 * a; }); } };
+  return api;
+})();
 /* beyond the doorway: the real auditorium (a light replica of it), so the door is see-through from both sides */
+let audBeyond = null;
 { const A = typeof window.ccuAudBeyond === "function" ? window.ccuAudBeyond(T, "E") : null;
-  if (A) { A.rotation.y = Math.PI / 2; A.position.set(-ZC, 0, AUD_X); hall.add(A); }
+  if (A) { A.rotation.y = Math.PI / 2; A.position.set(-ZC, 0, AUD_X); A.visible = false; hall.add(A); audBeyond = A; }
   mesh(new T.PlaneGeometry(3.2, 1.0), new T.MeshBasicMaterial({ color: 0x0a1522 }), 0, 0.004, RH + 0.1, hall).rotation.x = -Math.PI / 2; }
 
 /* ================================================================ the table: the disc that revolves, with the patient lying on it */
@@ -263,7 +277,7 @@ me.x = arrive.from.x; me.z = arrive.from.z;
 const vp = 0.34; let vpCur = 0;
 const faceCenter = (x, z) => Math.atan2(-x, z);
 me.yaw = faceCenter(me.x, me.z);
-function clampPos(x, z) { if (!focus && Math.abs(x) < 1.2 && z > MAXR - 1.5) return [clamp(x, -1.2, 1.2), Math.min(z, RH + 3.2)]; const r = Math.hypot(x, z) || 1e-6; if (!focus && r < MINR) { x *= MINR / r; z *= MINR / r; } else if (r > MAXR) { x *= MAXR / r; z *= MAXR / r; } return [x, z]; }
+function clampPos(x, z) { if (!focus && Math.abs(x) < 1.2 && z > MAXR - 1.5) return [clamp(x, -1.2, 1.2), Math.min(z, gate.open > 0.85 ? RH + 3.2 : RH - 0.5)]; const r = Math.hypot(x, z) || 1e-6; if (!focus && r < MINR) { x *= MINR / r; z *= MINR / r; } else if (r > MAXR) { x *= MAXR / r; z *= MAXR / r; } return [x, z]; }
 function walkBy(d) {
   me.seated = false; goal = null; let nx = me.x + Math.sin(me.yaw) * d, nz = me.z - Math.cos(me.yaw) * d;
   if (!focus && d > 0 && nz > 3) { /* walking towards the doorway draws you in line with it and turns you to it, so a finger-drag always finds the way out */
@@ -341,6 +355,8 @@ function tapAt(cx, cy) {
   setRay(cx, cy);
   const sp = ray.intersectObjects(chamber.stations.map((s) => s.screen.plane), false)[0];
   if (sp) { const j = sp.object.userData.station, it = chamber.stations[j].item; if (j === myIdx) enterScreen(); else { const r = remoteOfUid(it.uid); card(`<b>${esc(it.label)}</b><span>${it.state === "open" ? "An open seat." : esc(it.name) + (r && r.tab ? " is on the " + esc(TAB_LABEL[r.tab] || "case") + " tab." : " is at this station.")}</span>`); } return; }
+  const gh = ray.intersectObject(gate.hit, false)[0];
+  if (gh) { gate.until = performance.now() + 9000; if (gate.target < 1) { gate.target = 1; if (sfx.door) sfx.door(true, { x: 0, z: RH }, 1.1); } return; }
   const hh = ray.intersectObjects(Object.values(hero).map((h) => h.mesh), false)[0];
   if (hh) { zoomHero(Object.values(hero).find((h) => h.mesh === hh.object)); return; }
   const docs = []; remotes.forEach((r) => { if (r.doc && r.doc.group.visible) docs.push(r.doc.group); });
@@ -580,6 +596,11 @@ function loop(now) {
   /* arrival: walk in through the door while the opening screen fades */
   if (arrive.t < 2.4 && shown) { arrive.t = (performance.now() - arrive.t0) / 1000; const k = clamp(arrive.t / 2.4, 0, 1), e = k * k * (3 - 2 * k); me.x = arrive.from.x + (arrive.to.x - arrive.from.x) * e; me.z = arrive.from.z + (arrive.to.z - arrive.from.z) * e; me.yaw = faceCenter(me.x, me.z); }
   if (dn && holdDir && mvd > 10 && performance.now() - lastV > 120 && mode !== "spin" && !scr.on) walkBy(holdDir * dt * 1.7);
+  { const near = me.z > RH - 3.4 && Math.abs(me.x) < 2.6, was = gate.target;
+    if (!focus && arrive.t >= 2.4) { if (near) gate.target = 1; else if (me.z < RH - 6.0 && performance.now() > (gate.until || 0)) gate.target = 0; }
+    if (was !== gate.target && sfx.door) sfx.door(gate.target > 0, { x: 0, z: RH }, 1.1);
+    if (Math.abs(gate.open - gate.target) > 0.001) gate.set(gate.open + (gate.target - gate.open) * (1 - Math.exp(-dt * 3.2))); else if (gate.open !== gate.target) gate.set(gate.target);
+    if (audBeyond) audBeyond.visible = gate.open > 0.02; }
   if (me.z > RH + 0.9 && shown && arrive.t >= 2.4 && !leavingTo) goAuditorium();
   /* glide to an organ, to my screen, to a wall display, or to my seat; otherwise the view the arc sets */
   let eyeH = 1.5, pit = 0;
@@ -635,7 +656,7 @@ setTimeout(() => { $("#hint").style.opacity = 0; }, 22000);
 chips(); renderDesk(); rebuildStations(true); paintHeroes(0, 0, true);
 post("hall-ready");
 window.__voice = voice; window.__hud = hud;
-window.__nexus = { R, me, cam, S, turn, chamber, hero, remotes, organs, dev, feed, hist, chat, labSeries, openSection: enterScreen, closeSection: exitScreen, openOrders, scr, bodyMat, tapAt, zoomHero, get mdt() { return mdt; }, eqSet: (x) => { Object.assign(eq, x); refreshTubes(true); }, apply, peers: () => peerList, net: () => net, focusOrgan, sendChat, get P() { return P; } };
+window.__nexus = { R, me, cam, S, turn, gate, chamber, hero, remotes, organs, dev, feed, hist, chat, labSeries, openSection: enterScreen, closeSection: exitScreen, openOrders, scr, bodyMat, tapAt, zoomHero, get mdt() { return mdt; }, eqSet: (x) => { Object.assign(eq, x); refreshTubes(true); }, apply, peers: () => peerList, net: () => net, focusOrgan, sendChat, get P() { return P; } };
 if (DEMO) {
   const orders = { groups: [{ g: "Orders", items: [{ kind: "examine", label: "Examine", ok: true }, { kind: "labs", label: "Send labs", ok: true }, { kind: "antibiotics", label: "Antibiotics", ok: true }, { kind: "fluid", label: "IV fluid", ok: true }, { kind: "norepi", label: "Noradrenaline", ok: true }, { kind: "art-line", label: "Insert arterial line", ok: true }] }, { g: "Lung", items: [{ kind: "oxygen", label: "Oxygen", ok: true }, { kind: "intubate", label: "Intubate", ok: true }, { kind: "cxr", label: "Chest film", ok: true }, { kind: "ct-chest", label: "CT chest", ok: false }] }, { g: "Heart", items: [{ kind: "echo", label: "Echocardiogram", ok: true }] }], call: [{ id: "pulmonologist", label: "Pulmonologist", ok: true }, { id: "nephrologist", label: "Nephrologist", ok: true }], wrong: [{ kind: "flood", label: "Give 2 litres without looking", ok: true }], acls: [], enter: false };
   const room = { id: "demo", code: "DEMO42", status: "live", host: true, slots: { intensivist: 1, pulmonologist: 1, nephrologist: 1 }, you: { specialty: mySpec, inside: true }, members: [{ userId: myId, name: myName, specialty: mySpec, inside: true }, { userId: "x1", name: "Ravi", specialty: "pulmonologist" }, { userId: "x2", name: "Meera", specialty: "nephrologist" }], scenario: { name: "Meera Nair", age: 58, sex: "woman", dx: "Fever and hypoxaemic pneumonia", story: "Three days of fever and a productive cough. She is speaking. The saturation is 91% on air. The pressure, for now, is acceptable." }, patient: { hour: 3, hr: 112, sbp: 104, dbp: 64, map: 77, spo2: 91, rr: 28, gcs: 15, temp: 38.6, lactate: 2.6, cr: 1.4, k: 4.3, rhythm: "sinus", alive: true, tube: false, oxygen: true, norepi: false, problems: [{ id: "a", title: "Pneumonia with falling saturation", specialty: "pulmonologist", open: true, called: false }, { id: "b", title: "Rising lactate", specialty: "intensivist", open: true, called: true }], results: [{ label: "Labs", text: "Lactate 2.6 mmol/L. Creatinine 1.4 mg/dL. Potassium 4.3 mmol/L. Haemoglobin 11.4 g/dL." }], log: [{ t: 1, text: "Asha examined the patient." }, { t: 2, text: "Asha put oxygen on." }] } };

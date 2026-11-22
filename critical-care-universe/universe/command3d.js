@@ -13,6 +13,7 @@
 import { buildOutdoor } from "./outdoor3d.js?v=20261122g";
 import { loadVisitorCopy, createVisitor } from "./visitor-avatar.js?v=20261122g";
 import { liveUpdates } from "./live-updates.js?v=20261122g";
+import { buildUpper } from "./upper-level.js?v=20261122h";
 
 export function buildSuite(T, S, P, H, env, opt = {}) {
   const V = T.Vector3, G = new T.Group(); G.name = "suite"; S.add(G);
@@ -378,7 +379,7 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
 
   /* ---- two large LIVE UPDATES screens, one each side of the exit door: the society feed from the app's home screen ---- */
   const live = liveUpdates(), liveBoards = [];
-  [-1, 1].forEach((k, idx) => {
+  [-1].forEach((k, idx) => {
     const d = dcv(680, 920), m = new T.MeshBasicMaterial({ map: d.t, toneMapped: false }), g = new T.Group(); g.position.set(cxA + k * 4.0, 3.15, AU.z0 + 0.07); aud.add(g);
     bx(3.7, 4.9, 0.1, M(0x07090c, { metalness: 0.6, roughness: 0.35 }), 0, 0, -0.01, g); pl(3.5, 4.72, m, 0, 0, 0.045, 0, 0, g);
     [-1, 1].forEach((j) => bx(0.04, 4.9, 0.03, cyan, j * 1.84, 0, 0.06, g)); bx(3.7, 0.04, 0.03, cyan, 0, 2.46, 0.06, g); bx(3.7, 0.04, 0.03, cyan, 0, -2.46, 0.06, g);
@@ -404,7 +405,7 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
   }).catch(() => {});
   let audAcc = 0, audFirst = true;
   function updateAud(t, dt, cam) {
-    if (!cam || cam.z > -4.5 || cam.z < -48) return;
+    if (!cam || cam.z > -4.5 || cam.z < -48 || cam.y > 4.5) return;
     const sdt = Math.min(dt, 0.1);
     visitors.forEach((o) => {
       if (o.kind === "walk") {
@@ -417,6 +418,8 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
     audAcc += dt; if (cam.z > -22.5 && (audFirst || audAcc > 0.1)) { audFirst = false; audAcc = 0; liveBoards.forEach(paintLive); }
   }
 
+  /* ---- the lift (where the second LIVE UPDATES board was), the lobby above and the video auditorium above the Nexus hall ---- */
+  const upper = buildUpper(T, { G, M, E, mesh, bx, cyl, pl, ctex, dcv, makeDoor, wallMat, slats, acoustic, cyan, cyanDim, white, dark, metal, LOW, AU, cxA, ZC, MDTC, RHN });
   /* lights */
   const pt = (c, k, d, x, y, z) => { const l = new T.PointLight(c, k, d, 1.6); l.position.set(x, y, z); G.add(l); return l; };
   pt(0xdfefff, 12, 18, -15.5, 3.8, 0); pt(0x9fd8ff, 6, 12, -19.2, 3.0, 0);
@@ -512,6 +515,7 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
     if (dGate.open > 0.85) r.push({ x0: -9.2, x1: -7.2, z0: -0.75, z1: 0.75 });
     if (dAud.open > 0.85) r.push({ x0: cxA - 0.85, x1: cxA + 0.85, z0: -5.8, z1: -4.2 });
     if (doors.exit.open > 0.85) r.push({ x0: cxA - 0.85, x1: cxA + 0.85, z0: -22.5, z1: -19.9 });
+    if (upper.doorRectAt(0)) { const q = upper.cabRect(); r.push({ x0: q.x0, x1: q.x1, z0: q.z0, z1: upper.geom.ZF + 0.9 }); }
     /* the side gates: once open you can simply walk through them, into the hub hall or the Nexus hall */
     if (doors.hub.open > 0.85) r.push({ x0: AU.x0 - 2.7, x1: AU.x0 + 1.4, z0: ZC - 0.95, z1: ZC + 0.95 });     /* overlaps the auditorium floor and the hub's round floor by half a metre each, so a small step never snaps back */
     if (doors.team.open > 0.85) r.push({ x0: AU.x1 - 1.4, x1: AU.x1 + 2.7, z0: ZC - 0.95, z1: ZC + 0.95 });
@@ -523,17 +527,18 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
     if (doors.team.open > 0.85) c.push({ x: MDTC.x, z: MDTC.z, r: RHN - 1.0 });
     return c;
   };
-  const blocks = [{ x0: -18.5, x1: -16.0, z0: -3.3, z1: 3.3 }, { x0: -14.0, x1: -11.9, z0: 3.8, z1: 5.2 },
+  const blocks = [upper.towerBlock, { x0: -18.5, x1: -16.0, z0: -3.3, z1: 3.3 }, { x0: -14.0, x1: -11.9, z0: 3.8, z1: 5.2 },
     { x0: cxA - 6.3, x1: cxA - 2.8, z0: -12.9, z1: -6.8 }, { x0: cxA + 2.8, x1: cxA + 6.3, z0: -12.9, z1: -6.8 }];
   const pillars = [{ x: HUBC.x, z: HUBC.z, r: 0.95 }, { x: MDTC.x, z: MDTC.z, r: 3.3 }];       /* the hub's column, the Nexus dais */
   function clamp(x, z) {
+    if (upper.isUp()) return upper.clamp(x, z);
     let best = null, bd = 1e9;
     rects().forEach((r) => { const cx = Math.max(r.x0, Math.min(r.x1, x)), cz = Math.max(r.z0, Math.min(r.z1, z)), d = (cx - x) ** 2 + (cz - z) ** 2; if (d < bd) { bd = d; best = [cx, cz]; } });
     rounds().forEach((c) => { const dx = x - c.x, dz = z - c.z, l = Math.hypot(dx, dz) || 1e-6, k = l <= c.r ? 1 : c.r / l, cx = c.x + dx * k, cz = c.z + dz * k, d = (cx - x) ** 2 + (cz - z) ** 2; if (d < bd) { bd = d; best = [cx, cz]; } });
     let [px, pz] = best;
     blocks.forEach((b) => {
-      if (px > b.x0 && px < b.x1 && pz > b.z0 && pz < b.z1) {
-        const dl = px - b.x0, dr = b.x1 - px, dt = pz - b.z0, db = b.z1 - pz, m = Math.min(dl, dr, dt, db);
+      if (px > b.x0 && px < b.x1 && pz > b.z0 && pz < b.z1 && !(b.except && upper.doorRectAt(0) && upper.inR(b.except, px, pz))) {
+        const dl = px - b.x0, dr = b.x1 - px, dt = b.noBack ? 1e9 : pz - b.z0, db = b.z1 - pz, m = Math.min(dl, dr, dt, db);
         if (m === dl) px = b.x0; else if (m === dr) px = b.x1; else if (m === dt) pz = b.z0; else pz = b.z1;
       }
     });
@@ -553,12 +558,13 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
     if (cam) out.update(t, dt, cam, doors.exit.open > 0.02 || (cam.z < -21.3 && cam.x > -22.2 && cam.x < -8.7 && !hubSee && !mdtSee));
     Object.values(doors).forEach((d) => { if (Math.abs(d.open - d.target) > 0.001) { d.set(d.open + (d.target - d.open) * (1 - Math.exp(-dt * 3.2))); } else if (d.open !== d.target) d.set(d.target); });
     acc += dt; accSlow += dt;
+    upper.update(t, dt, cam);
     updateAud(t, dt, cam);
-    if (cam && cam.z < -12) return;          /* far away in the auditorium or outdoors: nothing to repaint */
+    if (cam && (cam.z < -12 || cam.y > 4.5)) return;          /* far away in the auditorium or outdoors: nothing to repaint */
     if (first) { mons.forEach(paintMon); deskScr.forEach((s) => painters[s.key](s.d)); paintStatus(); feedTick(); feedBoards.forEach(paintFeed); first = false; }
     /* every wall monitor is redrawn on every frame (phones: half of them per frame), so the traces glide instead of stepping */
     const per = LOW ? 3 : 6; for (let k = 0; k < per; k++) { paintMon(mons[mi]); mi = (mi + 1) % mons.length; }
     if (accSlow > 0.6) { accSlow = 0; deskScr.forEach((s) => painters[s.key](s.d)); paintStatus(); if ((feedT += 1) % 3 === 0) feedTick(); feedBoards.forEach(paintFeed); if (rnd() > 0.5) drawLeds(); }
   }
-  return { doors, update, clamp, rooms: { R, AU }, where, room, feeds: feedBoards, outdoor: out, groundY: out.groundY };
+  return { doors, update, clamp, rooms: { R, AU }, where, room, feeds: feedBoards, outdoor: out, groundY: (x, z) => (upper.lift.moving && upper.lift.carry ? upper.lift.y : upper.level() === 1 ? upper.groundY(x, z) : out.groundY(x, z)), upper };
 }
