@@ -555,6 +555,7 @@ function apply(d) {
   if (room && room.code) startNet();
   if (P) { eq = equipFrom(P); refreshTubes(true); scanFeed(); renderScreen(false); } else if (scr.on) exitScreen();
   const live = !!(room && room.status === "live");
+  if (live && !micAsked) { micAsked = true; try { if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: "microphone" }).then((r) => { if (r.state === "prompt") askMic(true); }, () => {}); } catch (e) { /* ignore */ } }   /* a live team shift: ask once so the team can reach each other */
   $("#line").dataset.on = mdt.line ? "1" : "0"; voice.show(live && !!P); voice.setBusy(mdt.busy); $("#livep").hidden = !live; $("#rx").hidden = !live || scr.on; $("#acts").hidden = !live;
   chips(); renderDesk(); rebuildStations(false); paintHeroes(0, 0, true);
   if (SC && nameLabel.key !== "Patient " + patientNo(SC)) setNameLabel();
@@ -564,7 +565,14 @@ function setNameLabel() {
   nameLabel.key = "Patient " + patientNo(SC); const sp = nameTag(T, nameLabel.key, SC.age + " years · " + (SC.sex === "woman" ? "female" : "male"), 0x5fe3ff); sp.position.set(0, 1.05, 0); sp.scale.set(1.2, 0.3, 1); turn.add(sp); nameLabel.sp = sp;
 }
 addEventListener("message", (e) => { const d = e.data; if (d && d.type === "mdt-state") apply(d); });
-$("#exit").onclick = () => leave("hall-exit"); $("#classic").onclick = () => leave("hall-classic"); $("#line").onclick = () => post("hall-line");
+$("#exit").onclick = () => leave("hall-exit"); $("#classic").onclick = () => leave("hall-classic"); /* team voice line: ask for the microphone here, inside the hall frame (it is allowed to use it and the tap is a real gesture), then open the line */
+let micAsked = false;
+async function askMic(quiet) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { if (!quiet) card("<b>No microphone found</b><span>This browser cannot use a microphone here.</span>", 6000); return false; }
+  try { const st = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); st.getTracks().forEach((t) => t.stop()); return true; }
+  catch (e) { if (!quiet) card("<b>Microphone is blocked</b><span>Allow the microphone for this site in your browser settings (the lock or mic icon beside the address), then tap Line again.</span>", 9000); return false; }
+}
+$("#line").onclick = async () => { if (!mdt.line) await askMic(false); post("hall-line"); };
 let leavingTo = false;
 /* walking out through the doorway: keep this frame and the exact place we stand, and the auditorium picks up from there, no fade */
 function goAuditorium() {

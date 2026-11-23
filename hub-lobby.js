@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { createSfx } from "./critical-care-universe/universe/sfx.js?v=20261122g";
-import { buildRooms } from "./hub-rooms.js?v=20261123c";
+import { buildRooms } from "./hub-rooms.js?v=20261123d";
 
 const gate = document.getElementById("icu-gate");
 const canvas = document.getElementById("lobby");
@@ -367,7 +367,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   /* The auditorium is its own page, so it is loaded in a frame that sits out of sight while we walk to its door; when the walk ends the
      frame is simply shown, from exactly the place we stand. There is no navigation and no reload, in either direction. */
   let audFrame = null, audReady = false, audWait = 0;
-  const AUD_URL = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&embed=1&v=20261123c";
+  const AUD_URL = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&embed=1&v=20261123d";
   function prepareAud(face) {
     try {
       const along = 7.25, ex = Math.sin(face) * along, ez = Math.cos(face) * along, wx = HUBC.x + ex * HCS + ez * HSN, wz = HUBC.z + (-ex * HSN + ez * HCS);
@@ -378,7 +378,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     if (audFrame) return;
     audReady = false;
     const f = document.createElement("iframe");
-    f.id = "aud-frame"; f.title = "Auditorium"; f.setAttribute("allow", "autoplay; fullscreen");
+    f.id = "aud-frame"; f.title = "Auditorium"; f.setAttribute("allow", "autoplay; fullscreen; microphone");
     f.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;border:0;background:#050b18;opacity:0;pointer-events:none;z-index:2147482000";
     f.src = AUD_URL; document.body.appendChild(f); audFrame = f;
   }

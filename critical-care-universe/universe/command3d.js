@@ -13,7 +13,7 @@
 import { buildOutdoor } from "./outdoor3d.js?v=20261122g";
 import { loadVisitorCopy, createVisitor } from "./visitor-avatar.js?v=20261122g";
 import { liveUpdates } from "./live-updates.js?v=20261122g";
-import { buildUpper } from "./upper-level.js?v=20261123c";
+import { buildUpper } from "./upper-level.js?v=20261123d";
 
 export function buildSuite(T, S, P, H, env, opt = {}) {
   const V = T.Vector3, G = new T.Group(); G.name = "suite"; S.add(G);
