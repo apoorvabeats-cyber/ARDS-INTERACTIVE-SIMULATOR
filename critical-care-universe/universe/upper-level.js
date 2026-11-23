@@ -267,7 +267,7 @@ export function buildUpper(T, c) {
   const fmt = (s) => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
   fetch(new URL("videos.json", base)).then((r) => r.json()).then((j) => { pl8.list = j; j.forEach((v, i) => { const im = new Image(); im.onload = () => { pl8.dirty = true; paintDir(); }; im.src = new URL(v.poster, base).href; pl8.posters[i] = im; }); pl8.dirty = true; paintDir(); (pl8.onList || (() => {}))(); }).catch(() => {});
   function play(i) {
-    if (!pl8.list.length) return; i = (i + pl8.list.length) % pl8.list.length; pl8.i = i; pl8.mode = "play"; vid.src = new URL(pl8.list[i].file, base).href; vid.volume = pl8.vol;
+    if (!pl8.list.length) return; i = (i + pl8.list.length) % pl8.list.length; pl8.i = i; pl8.mode = "play"; vid.src = new URL(pl8.list[i].file, base).href + "?v=169"; vid.volume = pl8.vol;
     const p = vid.play(); if (p && p.catch) p.catch(() => {}); pl8.dirty = true; if (pl8.onChange) pl8.onChange();
   }
   function toggle() { if (pl8.i < 0) return; if (vid.paused) { const p = vid.play(); if (p && p.catch) p.catch(() => {}); } else vid.pause(); pl8.dirty = true; if (pl8.onChange) pl8.onChange(); }
