@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { createSfx } from "./critical-care-universe/universe/sfx.js?v=20261122g";
-import { buildRooms } from "./hub-rooms.js?v=20261123m";
+import { buildRooms } from "./hub-rooms.js?v=20261123n";
 
 const gate = document.getElementById("icu-gate");
 const canvas = document.getElementById("lobby");
@@ -367,7 +367,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   /* The auditorium is its own page, so it is loaded in a frame that sits out of sight while we walk to its door; when the walk ends the
      frame is simply shown, from exactly the place we stand. There is no navigation and no reload, in either direction. */
   let audFrame = null, audReady = false, audWait = 0;
-  const AUD_URL = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&embed=1&v=20261123m";
+  const AUD_URL = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&embed=1&v=20261123n";
   function prepareAud(face) {
     try {
       const along = 7.25, ex = Math.sin(face) * along, ez = Math.cos(face) * along, wx = HUBC.x + ex * HCS + ez * HSN, wz = HUBC.z + (-ex * HSN + ez * HCS);
