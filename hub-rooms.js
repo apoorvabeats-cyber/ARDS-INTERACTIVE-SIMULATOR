@@ -6,6 +6,8 @@
 export function buildRooms(T, env) {
   const { cnv, tex, hex, ACC, glow } = env;
   const anims = [];
+  let still = false;                                     /* the microbiology, pathophysiology and ICU rooms stand still: no turning holograms, spinning parts or scrolling traces */
+  const anim = (f) => { if (still) f(0); else anims.push(f); };
   const M = (c, o) => new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.5, metalness: 0 }, o || {}));
   const white = M(0xf6f9fd, { roughness: 0.42, emissive: 0xdfe8f4, emissiveIntensity: 0.38 }), wall = M(0xf2f6fb, { roughness: 0.6, emissive: 0xe8eff8, emissiveIntensity: 0.5 }), steel = M(0x9aa6b5, { roughness: 0.28, metalness: 0.85 });
   const dark = M(0x1c2533, { roughness: 0.4, metalness: 0.45 }), graphite = M(0x2c3646, { roughness: 0.45, metalness: 0.3 }), rubber = M(0x111722, { roughness: 0.9 });
@@ -102,7 +104,7 @@ export function buildRooms(T, env) {
     const rot = new T.Group(); rot.position.y = 0.33; g.add(rot);
     for (let i = 0; i < 6; i += 1) { const a = i * Math.PI / 3; const tb = C(0.014, 0.014, 0.1, M(i % 2 ? 0xff7a8a : 0x6bd0ff), Math.cos(a) * 0.17, 0, Math.sin(a) * 0.17, rot, 8); tb.rotation.z = Math.cos(a) * 0.5; tb.rotation.x = Math.sin(a) * 0.5; }
     C(0.05, 0.05, 0.02, steel, 0, 0, 0, rot, 12);
-    anims.push((t) => { rot.rotation.y = t * 9; });
+    anim((t) => { rot.rotation.y = t * 9; });
     return g;
   }
   function tubeRack(n) { const g = new T.Group(); B(0.5, 0.04, 0.12, M(0x2f6fb8), 0, 0.02, 0, g); for (let i = 0; i < n; i += 1) { const x = -0.22 + i * (0.44 / (n - 1)); C(0.016, 0.016, 0.12, M(0xe6f1f7, { transparent: true, opacity: 0.7 }), x, 0.1, 0, g, 10); C(0.018, 0.018, 0.025, M([0xff6a7a, 0xffd23f, 0x6fe36a, 0x59b7ff][i % 4]), x, 0.165, 0, g, 10); } return g; }
@@ -146,7 +148,7 @@ export function buildRooms(T, env) {
     const sc = screenMat(512, Math.round(512 * h / w), () => {}, 1.15), ctx = sc.ctx, cw = sc.canvas.width, ch = sc.canvas.height;
     P(w, h, sc.mat, 0, 0, -0.03, Math.PI, g);
     let x0 = 0, last = -1;
-    anims.push((t) => {
+    anim((t) => {
       const f = Math.floor(t * (rate || 14)); if (f === last) return; last = f;
       if (f % 1) return;
       ctx.fillStyle = "#04101a"; ctx.fillRect(0, 0, cw, ch);
@@ -222,7 +224,7 @@ export function buildRooms(T, env) {
     for (let k = 0; k < 9; k += 1) { const r = mesh(new T.CapsuleGeometry(0.03, 0.12, 4, 8), solid(0xe0306a, { opacity: 0.9 }), 0, 0, 0); const a = k / 9 * 6.28 + 0.3; r.position.set(Math.cos(a) * 0.3, Math.cos(k * 2.1) * 0.22, Math.sin(a) * 0.3); r.rotation.set(k, k * 1.3, k * 0.4); rods.add(r); }
     holo.add(cocci, rods);
     mesh(new T.ConeGeometry(0.72, 1.2, 36, 1, true), additive(col, { opacity: 0.07 }), 0, -0.6, 0, holo);
-    anims.push((t) => { cocci.rotation.y = t * 0.5; rods.rotation.y = -t * 0.7; ring.rotation.z = t * 0.6; ring2.rotation.z = -t * 0.9; holo.position.y = 2.3 + Math.sin(t * 1.3) * 0.04; });
+    anim((t) => { cocci.rotation.y = t * 0.5; rods.rotation.y = -t * 0.7; ring.rotation.z = t * 0.6; ring2.rotation.z = -t * 0.9; holo.position.y = 2.3 + Math.sin(t * 1.3) * 0.04; });
     /* floor ring under the bench */
     mesh(new T.RingGeometry(1.95, 2.05, 64), emit(col, 1.4), bx, 0.006, bz, g).rotation.x = -Math.PI / 2;
     /* left wall: incubators and the safety cabinet */
@@ -274,7 +276,7 @@ export function buildRooms(T, env) {
     const orgs = new T.Group(); cell.add(orgs);
     for (let i = 0; i < 9; i += 1) { const a = i / 9 * 6.28, r = 0.38 + (i % 3) * 0.06; const o = mesh(new T.CapsuleGeometry(0.035, 0.08, 4, 8), solid(i % 2 ? 0x39b54a : 0x2f7de0, { opacity: 0.92 }), Math.cos(a) * r, Math.sin(i * 1.9) * 0.28, Math.sin(a) * r, orgs); o.rotation.set(i, i * 0.8, 0); }
     mesh(new T.TorusGeometry(0.72, 0.01, 8, 70), additive(col, { opacity: 0.95 }), 0, 0, 0, cell).rotation.x = Math.PI / 2;
-    anims.push((t) => { orgs.rotation.y = t * 0.8; nuc.rotation.y = t * 0.4; cell.position.y = 1.75 + Math.sin(t * 1.2) * 0.04; });
+    anim((t) => { orgs.rotation.y = t * 0.8; nuc.rotation.y = t * 0.4; cell.position.y = 1.75 + Math.sin(t * 1.2) * 0.04; });
     /* organ cases along the left wall */
     const organ = (kind, z) => {
       const c = new T.Group(); B(0.9, 0.12, 0.9, dark, 0, 0.06, 0, c); B(0.84, 1.3, 0.84, M(0xcfe0ff, { transparent: true, opacity: 0.12, depthWrite: false, side: T.DoubleSide }), 0, 0.8, 0, c); B(0.84, 0.06, 0.84, emit(col, 1.2), 0, 1.47, 0, c);
@@ -282,7 +284,7 @@ export function buildRooms(T, env) {
       if (kind === "lung") [-0.18, 0.18].forEach((x) => { const l = S(0.2, mat, x, 0.85, 0, c, 20); l.scale.set(0.8, 1.45, 0.7); });
       else if (kind === "heart") { const h = S(0.24, mat, 0, 0.85, 0, c, 22); h.scale.set(0.9, 1.1, 0.85); C(0.045, 0.045, 0.28, M(0xe7566b), 0.08, 1.12, 0, c, 10); }
       else { const k = S(0.17, mat, 0, 0.85, 0, c, 20); k.scale.set(0.75, 1.3, 0.6); }
-      c.userData.spin = true; anims.push((t) => { c.children[3].rotation.y = t * 0.6; }); c.position.set(W / 2 - 0.8, 0, z); c.rotation.y = -Math.PI / 2; return c;
+      c.userData.spin = true; anim((t) => { c.children[3].rotation.y = t * 0.6; }); c.position.set(W / 2 - 0.8, 0, z); c.rotation.y = -Math.PI / 2; return c;
     };
     ["lung", "heart", "kidney"].forEach((k, i) => g.add(organ(k, 2.0 + i * 1.5)));
     /* wall panels, a trends board on the right */
@@ -325,7 +327,7 @@ export function buildRooms(T, env) {
   function holo(w, h, draw, fps, o) {
     o = o || {}; const px = o.px || 512, py = Math.max(64, Math.round(px * h / w)), [c, g] = cnv(px, py), t = tex(c);
     const m = mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, side: T.DoubleSide, toneMapped: false, blending: o.add ? T.AdditiveBlending : T.NormalBlending }), 0, 0, 0);
-    let last = -1; const upd = (tt) => { const f = Math.floor(tt * (fps || 6)); if (f === last) return; last = f; g.clearRect(0, 0, px, py); draw(g, px, py, tt); t.needsUpdate = true; }; upd(0); anims.push(upd); return m;
+    let last = -1; const upd = (tt) => { const f = Math.floor(tt * (fps || 6)); if (f === last) return; last = f; g.clearRect(0, 0, px, py); draw(g, px, py, tt); t.needsUpdate = true; }; upd(0); anim(upd); return m;
   }
   function viewer(g, w, h, col, title, tag) {            /* the frame every viewer shares */
     g.fillStyle = "rgba(4,12,24,.92)"; roundRect(g, 2, 2, w - 4, h - 4, 14); g.fill(); g.strokeStyle = hex(col); g.lineWidth = 3; roundRect(g, 2, 2, w - 4, h - 4, 14); g.stroke();
@@ -361,7 +363,7 @@ export function buildRooms(T, env) {
     const g = new T.Group(), sk = new T.MeshStandardMaterial({ color: 0xa9dcff, emissive: col, emissiveIntensity: 0.45, transparent: true, opacity: 0.5, roughness: 0.25, depthWrite: false });
     S(0.115, sk, 0, 0.12, -0.86, g, 18); cap(0.055, 0.1, sk, 0, 0.09, -0.7, g); cap(0.19, 0.46, sk, 0, 0.1, -0.28, g); cap(0.17, 0.2, sk, 0, 0.08, 0.2, g);
     [-1, 1].forEach((s) => { cap(0.07, 0.62, sk, s * 0.13, 0.07, 0.72, g); const a = cap(0.05, 0.55, sk, s * 0.3, 0.07, -0.18, g); a.rotation.z = 0; });
-    if (organs) { const lm = new T.MeshBasicMaterial({ color: 0x6fd0ff, transparent: true, opacity: 0.35, depthWrite: false }); [-1, 1].forEach((s) => { const l = S(0.11, lm, s * 0.1, 0.18, -0.34, g, 14); l.scale.set(0.8, 0.9, 1.7); }); const ht = S(0.075, new T.MeshBasicMaterial({ color: 0xff5470, transparent: true, opacity: 0.85 }), -0.04, 0.2, -0.27, g, 14); anims.push((t) => { const b = 1 + Math.max(0, Math.sin(t * 7)) * 0.16; ht.scale.set(b, b, b); }); }
+    if (organs) { const lm = new T.MeshBasicMaterial({ color: 0x6fd0ff, transparent: true, opacity: 0.35, depthWrite: false }); [-1, 1].forEach((s) => { const l = S(0.11, lm, s * 0.1, 0.18, -0.34, g, 14); l.scale.set(0.8, 0.9, 1.7); }); const ht = S(0.075, new T.MeshBasicMaterial({ color: 0xff5470, transparent: true, opacity: 0.85 }), -0.04, 0.2, -0.27, g, 14); anim((t) => { const b = 1 + Math.max(0, Math.sin(t * 7)) * 0.16; ht.scale.set(b, b, b); }); }
     return g;
   }
   /* the shell of a suite: lit glossy floor, fins and coves on dark panels, a ring in the ceiling */
@@ -384,7 +386,7 @@ export function buildRooms(T, env) {
     B(0.12, 2.6, 2.4, techPanel, bx0, 1.3, bz, g0); B(0.1, 1.05, 1.6, M(0x7fe0ff, { transparent: true, opacity: 0.28, roughness: 0.05, depthWrite: false }), bx0 - 0.01, 1.6, bz, g0); B(0.14, 0.05, 1.7, emit(col, 1.6), bx0, 2.15, bz, g0); B(0.14, 0.05, 1.7, emit(col, 1.6), bx0, 1.07, bz, g0);
     B(0.5, 0.05, 1.9, pearl, ROOMW / 2 - 0.8, 0.98, bz, g0); B(0.45, 0.94, 1.9, graphite, ROOMW / 2 - 0.82, 0.47, bz, g0);
     [[drawA, -0.45], [drawB, 0.45]].forEach(([dr, dz]) => { const s = holo(0.62, 0.4, dr, 4); s.position.set(ROOMW / 2 - 0.62, 1.38, bz + dz); s.rotation.y = -Math.PI / 2 - 0.15; g0.add(s); B(0.04, 0.4, 0.04, steel, ROOMW / 2 - 0.62, 1.15, bz + dz, g0); });
-    const lampW = B(0.5, 0.12, 0.05, emit(0xff3a4a, 1.6), 0, 2.95, 0.2, g0); anims.push((t) => { lampW.visible = Math.sin(t * 2.2) > -0.2; });
+    const lampW = B(0.5, 0.12, 0.05, emit(0xff3a4a, 1.6), 0, 2.95, 0.2, g0); anim((t) => { lampW.visible = Math.sin(t * 2.2) > -0.2; });
   }
   const sideScreen = (g0, w, h, draw, left, z, y) => { const s = holo(w, h, draw, 4); s.position.set(left ? -ROOMW / 2 + 0.1 : ROOMW / 2 - 0.1, y || 1.8, z); s.rotation.y = left ? Math.PI / 2 : -Math.PI / 2; g0.add(s); return s; };
   const backScreen = (g0, w, h, draw, y, x, o) => { const s = holo(w, h, draw, 5, o); s.position.set(x || 0, y || 1.75, ROOMD - 0.12); s.rotation.y = Math.PI; g0.add(s); return s; };
@@ -399,7 +401,7 @@ export function buildRooms(T, env) {
     B(0.46, 0.2, 0.6, pearl, 0, 0, 0, car); [0.55, 0.38, 0.22].forEach((r, i) => C(0.08 + i * -0.015, 0.08 + i * -0.015, 0.7, i % 2 ? steel : pearl, 0, -0.45 - i * 0.55, 0, car, 16));
     const tube = new T.Group(); tube.position.set(0, -1.75, 0); car.add(tube); C(0.15, 0.15, 0.55, pearl, 0, 0, 0, tube, 24).rotation.z = Math.PI / 2; B(0.44, 0.3, 0.44, graphite, 0, -0.27, 0, tube); B(0.36, 0.03, 0.36, emit(0xfff0b0, 1.4), 0, -0.43, 0, tube); B(0.46, 0.02, 0.46, emit(col, 1.6), 0, -0.14, 0, tube);
     const beam = mesh(new T.ConeGeometry(0.4, 1.0, 4, 1, true), additive(0xfff0b0, { opacity: 0.12 }), 0, -0.95, 0, tube); beam.rotation.y = Math.PI / 4;
-    anims.push((t) => { car.position.z = Math.sin(t * 0.35) * 0.4; });
+    anim((t) => { car.position.z = Math.sin(t * 0.35) * 0.4; });
     /* wall detector stand and the viewer */
     const stand = new T.Group(); stand.position.set(-ROOMW / 2 + 0.55, 0, 0.4); g.add(stand); B(0.14, 2.6, 0.14, steel, 0.05, 1.3, 1.6, stand); B(0.1, 1.5, 0.95, pearl, 0.12, 1.35, 1.6, stand); B(0.03, 1.32, 0.78, M(0x1b2a44, { roughness: 0.2, metalness: 0.5, emissive: 0x0f2a52, emissiveIntensity: 0.9 }), 0.19, 1.35, 1.6, stand); B(0.04, 0.04, 0.86, emit(col, 1.6), 0.2, 2.03, 1.6, stand);
     backScreen(g0, 2.4, 1.6, (c, w, h) => { viewer(c, w, h, col, "DIGITAL RADIOGRAPHY", "CHEST PA"); c.save(); c.translate(w * 0.05, 48); chestXray(c, w * 0.5, h - 70, 0); c.restore(); c.fillStyle = "#9fd6ff"; c.font = "600 22px Figtree, system-ui, sans-serif"; [["kVp", "120"], ["mAs", "3.2"], ["EI", "412"], ["DAP", "0.18 Gy·cm²"], ["SID", "180 cm"]].forEach(([k, v], i) => { c.fillStyle = "#6fa2d8"; c.fillText(k, w * 0.62, 90 + i * 52); c.fillStyle = "#eaf6ff"; c.font = "700 26px Figtree, system-ui, sans-serif"; c.fillText(v, w * 0.76, 90 + i * 52); c.font = "600 22px Figtree, system-ui, sans-serif"; }); c.fillStyle = "#3dff9a"; c.font = "800 26px Figtree, system-ui, sans-serif"; c.fillText("● READY", w * 0.62, h - 36); }, 1.75);
@@ -420,7 +422,7 @@ export function buildRooms(T, env) {
     B(0.2, 0.1, 0.38, M(0xffb347, { emissive: 0xff8a1f, emissiveIntensity: 0.8 }), 0, 0.5, 0, ring); B(0.5, 0.06, 0.34, M(0x7fe8ff, { emissive: 0x2fb6d8, emissiveIntensity: 0.9 }), 0, -0.5, 0, ring); const fan = mesh(new T.CylinderGeometry(0.01, 0.46, 1.0, 3, 1, true), additive(0xfff0a0, { opacity: 0.22 }), 0, 0, 0, ring); fan.scale.z = 0.4;
     const tab = new T.Group(); g.add(tab); B(0.52, 0.1, 2.8, graphite, 0, 0.9, 0, tab); B(0.46, 0.03, 2.7, M(0x4b5a73, { roughness: 0.25, metalness: 0.4 }), 0, 0.96, 0, tab); [-1, 1].forEach((s) => B(0.02, 0.04, 2.7, emit(col, 1.6), s * 0.24, 0.95, 0, tab)); const pt = patient(col, true); pt.position.set(0, 1.0, -0.15); tab.add(pt);
     B(0.62, 0.82, 0.62, graphite, 0, 0.41, -1.35, g); B(0.72, 0.05, 0.72, emit(col, 1.2), 0, 0.02, -1.35, g);
-    anims.push((t) => { ring.rotation.z = t * 3.4; tab.position.z = -0.8 + (Math.sin(t * 0.45) * 0.5 + 0.5) * 1.3; });
+    anim((t) => { ring.rotation.z = t * 3.4; tab.position.z = -0.8 + (Math.sin(t * 0.45) * 0.5 + 0.5) * 1.3; });
     /* the contrast injector on a ceiling arm */
     B(0.08, 1.2, 0.08, steel, 1.3, 2.6, -1.0, g); B(0.5, 0.07, 0.07, steel, 1.05, 2.0, -1.0, g); B(0.22, 0.3, 0.16, pearl, 0.8, 1.9, -1.0, g); C(0.04, 0.04, 0.26, M(0xbfeaff, { transparent: true, opacity: 0.7 }), 0.74, 1.62, -1.0, g, 12); C(0.04, 0.04, 0.26, M(0xffe3a0, { transparent: true, opacity: 0.7 }), 0.86, 1.62, -1.0, g, 12);
     backScreen(g0, 4.7, 0.9, (c, w, h, t) => { viewer(c, w, h, col, "CT · THORAX · SPIRAL", "SLICE " + (1 + Math.floor(t * 3) % 64) + " / 64"); const sz = h - 52; [0, 1, 2].forEach((i) => { const x0 = 18 + i * (sz + 10); c.save(); c.beginPath(); c.rect(x0, 44, sz, sz); c.clip(); c.fillStyle = "#000"; c.fillRect(x0, 44, sz, sz); ctSlice(c, x0 + sz / 2, 44 + sz / 2, sz * 0.4, sz * (i ? 0.44 : 0.36), t + i); c.restore(); c.fillStyle = "#6fa2d8"; c.font = "600 15px Figtree, system-ui, sans-serif"; c.fillText(["AXIAL", "CORONAL", "SAGITTAL"][i], x0 + 6, 62); }); c.font = "600 24px Figtree, system-ui, sans-serif"; [["kV", "120"], ["mA", String(180 + Math.round(Math.sin(t * 2) * 6))], ["CTDIvol", "7.4 mGy"], ["DLP", "212 mGy·cm"], ["W / L", "1500 / -600"]].forEach(([k, v], i) => { const x = 3 * (sz + 10) + 50 + (i % 3) * 200, y = 90 + Math.floor(i / 3) * 62; c.fillStyle = "#6fa2d8"; c.fillText(k, x, y); c.fillStyle = "#eaf6ff"; c.font = "700 28px Figtree, system-ui, sans-serif"; c.fillText(v, x, y + 30); c.font = "600 24px Figtree, system-ui, sans-serif"; }); }, 2.72, 0, { px: 1024 });
@@ -441,7 +443,7 @@ export function buildRooms(T, env) {
     B(0.64, 0.7, 0.64, graphite, 0, 0.35, -1.65, g); B(0.74, 0.05, 0.74, emit(col, 1.2), 0, 0.02, -1.65, g);
     mesh(new T.RingGeometry(2.4, 2.46, 72), emit(0xff5a6a, 1.2), 0, 0.01, 0.85, g).rotation.x = -Math.PI / 2;                    /* the five-gauss line */
     const cove = emit(col, 1.8); B(ROOMW - 0.3, 0.06, 0.06, cove, 0, 3.05, ROOMD - 0.14, g0);
-    anims.push((t) => { coil.rotation.z = t * 2.4; coil2.rotation.z = -t * 1.6; const p = (t * 0.5) % 1; pulse.position.z = -0.75 + p * 1.5; pulse.material.opacity = 0.6 * Math.sin(p * Math.PI); tab.position.z = -1.0 + (Math.sin(t * 0.4) * 0.5 + 0.5) * 1.6; const c = new T.Color().setHSL(0.55 + 0.1 * Math.sin(t * 0.5), 0.9, 0.55); cr1.emissive.copy(c); cr2.emissive.copy(c); cove.emissive.copy(c); });
+    anim((t) => { coil.rotation.z = t * 2.4; coil2.rotation.z = -t * 1.6; const p = (t * 0.5) % 1; pulse.position.z = -0.75 + p * 1.5; pulse.material.opacity = 0.6 * Math.sin(p * Math.PI); tab.position.z = -1.0 + (Math.sin(t * 0.4) * 0.5 + 0.5) * 1.6; const c = new T.Color().setHSL(0.55 + 0.1 * Math.sin(t * 0.5), 0.9, 0.55); cr1.emissive.copy(c); cr2.emissive.copy(c); cove.emissive.copy(c); });
     backScreen(g0, 4.7, 0.9, (c, w, h, t) => { viewer(c, w, h, col, "MRI · BRAIN · 3.0 T", "T2 FLAIR · " + (1 + Math.floor(t * 2) % 40) + " / 40"); const sz = h - 52; [0, 1, 2].forEach((i) => { const x0 = 18 + i * (sz + 10); c.save(); c.beginPath(); c.rect(x0, 44, sz, sz); c.clip(); c.fillStyle = "#000"; c.fillRect(x0, 44, sz, sz); brainSlice(c, x0 + sz / 2, 44 + sz / 2, sz * (0.42 + 0.03 * i), t + i); c.restore(); c.fillStyle = "#6fa2d8"; c.font = "600 15px Figtree, system-ui, sans-serif"; c.fillText(["AXIAL", "SAGITTAL", "CORONAL"][i], x0 + 6, 62); }); c.font = "600 24px Figtree, system-ui, sans-serif"; [["TR", "9000 ms"], ["TE", "120 ms"], ["FOV", "220 mm"], ["Slices", "40 × 4 mm"], ["SAR", "0.8 W/kg"]].forEach(([k, v], i) => { const x = 3 * (sz + 10) + 50 + (i % 3) * 200, y = 90 + Math.floor(i / 3) * 62; c.fillStyle = "#6fa2d8"; c.fillText(k, x, y); c.fillStyle = "#eaf6ff"; c.font = "700 28px Figtree, system-ui, sans-serif"; c.fillText(v, x, y + 30); c.font = "600 24px Figtree, system-ui, sans-serif"; }); }, 2.72, 0, { px: 1024 });
     booth(g0, col, (c, w, h, t) => { c.fillStyle = "#000"; c.fillRect(0, 0, w, h); brainSlice(c, w / 2, h / 2, h * 0.46, t); }, (c, w, h, t) => { viewer(c, w, h, col, "SEQUENCE", "3.0 T"); c.fillStyle = "#eaf6ff"; c.font = "700 34px Figtree, system-ui, sans-serif"; c.fillText("TR 9000 · TE 120", 22, h * 0.52); c.fillStyle = "#3dff9a"; c.font = "700 24px Figtree, system-ui, sans-serif"; c.fillText("▮▮▮▮▮▮▯▯  " + Math.min(99, Math.round(((t * 7) % 100))) + " %", 22, h * 0.8); });
     return g0;
@@ -494,7 +496,7 @@ export function buildRooms(T, env) {
     return g;
   }
 
-  const out = { micro: buildMicro(), path: buildPath(), icu: buildIcu(), rad: buildRad(), hits, PASS, ROOMW, ROOMD };
+  still = true; const out = { micro: buildMicro(), path: buildPath(), icu: buildIcu(), rad: (still = false, buildRad()), hits, PASS, ROOMW, ROOMD };
   out.update = (t) => { for (let i = 0; i < anims.length; i += 1) anims[i](t); };
   return out;
 }

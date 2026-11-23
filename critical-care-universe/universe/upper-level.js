@@ -37,23 +37,15 @@ export function buildUpper(T, c) {
   [2.62, LV - 0.02, LV + 2.62, TOP - 0.03].forEach((y) => trim(2.0, 0.03, 0.03, XT, y, ZF + 0.14, cyan));
   /* floor indicator plates and the large lift sign */
   const ind = [0, 1].map((lv) => { const d = dcv(256, 90), m = new T.Mesh(new T.PlaneGeometry(0.9, 0.9 * 90 / 256), basic(d.t)); m.position.set(XT, lv * LV + 2.88, ZF + 0.135); (lv ? top : tower).add(m); return d; });
-  const liftSign = (lv) => ctex(400, 980, (g, w, h) => {
-    panelBg(g, w, h, "#06141f", "#0b2a42"); frame(g, w, h, "#36d6ff", 8);
-    g.shadowColor = "#36d6ff"; g.shadowBlur = 20; g.strokeStyle = "#36d6ff"; g.fillStyle = "#36d6ff"; g.lineWidth = 10; g.lineJoin = "round";
-    const cx = w / 2, cy = lv ? 210 : 190;
-    g.strokeRect(cx - 70, cy - 90, 140, 180); g.beginPath(); g.moveTo(cx, cy - 90); g.lineTo(cx, cy + 90); g.stroke();
-    g.beginPath(); g.moveTo(cx - 100, cy - 40); g.lineTo(cx - 100, cy - 100); g.moveTo(cx - 118, cy - 80); g.lineTo(cx - 100, cy - 100); g.lineTo(cx - 82, cy - 80); g.stroke();
-    g.beginPath(); g.moveTo(cx + 100, cy + 40); g.lineTo(cx + 100, cy + 100); g.moveTo(cx + 118, cy + 80); g.lineTo(cx + 100, cy + 100); g.lineTo(cx + 82, cy + 80); g.stroke();
-    g.shadowBlur = 0;
-    txt(g, "LIFT", cx, 400, 84, "#eaf6ff", "center", 800, "#36d6ff");
-    g.fillStyle = "#36d6ff"; g.fillRect(48, 450, w - 96, 4);
-    if (!lv) { txt(g, "LEVEL 1", cx, 535, 64, "#9fe8ff", "center", 800, "#36d6ff"); txt(g, "VIDEO", cx, 620, 70, "#eaf6ff", "center", 800); txt(g, "AUDITORIUM", cx, 690, 52, "#eaf6ff", "center", 800);
-      g.shadowColor = "#36d6ff"; g.shadowBlur = 20; g.fillStyle = "#36d6ff"; g.beginPath(); g.moveTo(cx - 40, 830); g.lineTo(cx - 40, 760); g.lineTo(cx + 30, 795); g.closePath(); g.fill(); g.shadowBlur = 0;
-      txt(g, "Tap the doors", cx, 900, 36, "#7fa6c8", "center", 500); }
-    else { txt(g, "GROUND", cx, 535, 64, "#9fe8ff", "center", 800, "#36d6ff"); txt(g, "AUDITORIUM", cx, 620, 50, "#eaf6ff", "center", 800); txt(g, "ICU · HUB · TEAM", cx, 690, 34, "#7fa6c8", "center", 600); txt(g, "Tap the doors", cx, 900, 36, "#7fa6c8", "center", 500); }
+  const liftSign = (lv) => ctex(512, 256, (g, w, h) => {
+    panelBg(g, w, h, "#06141f", "#0b2a42"); frame(g, w, h, "#36d6ff", 6);
+    g.shadowColor = "#36d6ff"; g.shadowBlur = 12; g.strokeStyle = "#36d6ff"; g.lineWidth = 6; g.lineJoin = "round";
+    g.strokeRect(34, 70, 76, 116); g.beginPath(); g.moveTo(72, 70); g.lineTo(72, 186); g.stroke(); g.shadowBlur = 0;
+    txt(g, lv ? "GROUND FLOOR" : "FIRST FLOOR", 134, 100, 42, "#eaf6ff", "left", 800, "#36d6ff");
+    txt(g, lv ? "Auditorium" : "Video Auditorium", 134, 158, 30, "#9fe8ff", "left", 600);
   });
-  { const m0 = new T.Mesh(new T.PlaneGeometry(1.84, 1.84 * 980 / 400), basic(liftSign(0))); m0.position.set(XT, (2.7 + LV) / 2 + 0.05, ZF + 0.135); m0.scale.set(1, (LV - 2.8) / (1.84 * 980 / 400), 1); tower.add(m0);
-    const m1 = new T.Mesh(new T.PlaneGeometry(1.84, 1.84 * 980 / 400), basic(liftSign(1))); m1.position.set(XT, LV + 2.7 + 1.35, ZF + 0.135); m1.scale.set(1, 2.6 / (1.84 * 980 / 400), 1); top.add(m1); }
+  { const m0 = new T.Mesh(new T.PlaneGeometry(1.4, 0.7), basic(liftSign(0))); m0.position.set(XT, 3.5, ZF + 0.135); tower.add(m0);
+    const m1 = new T.Mesh(new T.PlaneGeometry(1.4, 0.7), basic(liftSign(1))); m1.position.set(XT, LV + 3.5, ZF + 0.135); top.add(m1); }
   /* call buttons on the right pillar */
   [0, 1].forEach((lv) => { [1.45, 1.2].forEach((y, i) => { const m = new T.Mesh(new T.CylinderGeometry(0.07, 0.07, 0.04, 20), E(i ? 0x36d6ff : 0xffb347, 2)); m.rotation.x = PI / 2; m.position.set(XT + 1.5, lv * LV + y, ZF + 0.14); (lv ? top : tower).add(m); }); });
   const d0 = makeDoor("lift0", XT, ZF, 2.0, 2.6, 0x36d6ff, tower), d1 = makeDoor("lift1", XT, ZF, 2.0, 2.6, 0x36d6ff, top);
@@ -70,11 +62,40 @@ export function buildUpper(T, c) {
   const board = dcv(512, 256); const bm2 = new T.Mesh(new T.PlaneGeometry(1.7, 0.85), basic(board.t)); bm2.position.set(XT, 1.75, CAB.z0 + 0.04); cab.add(bm2);
   const cabInd = dcv(256, 90); const ci = new T.Mesh(new T.PlaneGeometry(0.9, 0.32), basic(cabInd.t)); ci.position.set(XT, 2.6, CAB.z0 + 0.05); cab.add(ci);
   const cabFront = new T.Mesh(new T.PlaneGeometry(2.4, 0.3), new T.MeshBasicMaterial({ color: 0x06101a })); cabFront.position.set(XT, 2.75, CAB.z1); cab.add(cabFront);
+  /* soft instrumental music and a spoken floor announcement while the lift travels (all made in the browser, no files) */
+  const LA = { ctx: null, on: false, timer: null, master: null, step: 0, t0: 0 };
+  const CH = [[48, [64, 67, 71], [60, 64, 67, 71, 67, 64]], [45, [60, 64, 67], [57, 60, 64, 67, 64, 60]], [41, [57, 60, 64], [53, 57, 60, 64, 60, 57]], [43, [59, 62, 64], [55, 59, 62, 64, 62, 59]]];
+  const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+  function note(c, dest, f, t, dur, type, vol, atk) { const o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + (atk || 0.02)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(g); g.connect(dest); o.start(t); o.stop(t + dur + 0.05); }
+  function liftSched() {
+    const c = LA.ctx; if (!c || !LA.on) return; const beat = 60 / 68;
+    while (LA.t0 < c.currentTime + 1.3) {
+      const bar = Math.floor(LA.step / 8) % CH.length, k = LA.step % 8, t = LA.t0, ch = CH[bar];
+      if (k === 0) { note(c, LA.master, hz(ch[0]), t, beat * 4.2, "sine", 0.32, 0.08); ch[1].forEach((m) => { note(c, LA.master, hz(m - 12), t, beat * 4.2, "triangle", 0.07, 0.9); note(c, LA.master, hz(m - 12) * 1.004, t, beat * 4.2, "triangle", 0.06, 1.1); }); }
+      if (k < 6) note(c, LA.master, hz(ch[2][k]), t, beat * 1.6, "sine", 0.11, 0.015);
+      if (k === 0 || k === 4) note(c, LA.master, hz(ch[2][0] + 12), t + beat * 0.5, beat * 1.2, "sine", 0.04, 0.01);
+      LA.t0 += beat / 2; LA.step++;
+    }
+  }
+  function liftMusic(on) {
+    if (on === LA.on) return;
+    try {
+      if (on) {
+        LA.ctx = LA.ctx || new (window.AudioContext || window.webkitAudioContext)(); const c = LA.ctx; c.resume();
+        LA.master = c.createGain(); LA.master.gain.value = 0; const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 1500; LA.master.connect(lp); lp.connect(c.destination);
+        LA.master.gain.linearRampToValueAtTime(0.5, c.currentTime + 1.6); LA.on = true; LA.step = 0; LA.t0 = c.currentTime + 0.1; liftSched(); LA.timer = setInterval(liftSched, 300);
+      } else {
+        LA.on = false; clearInterval(LA.timer); const c = LA.ctx, m = LA.master; if (c && m) { m.gain.cancelScheduledValues(c.currentTime); m.gain.setValueAtTime(m.gain.value, c.currentTime); m.gain.linearRampToValueAtTime(0.0001, c.currentTime + 1.4); setTimeout(() => { try { m.disconnect(); } catch (e) {} }, 1800); }
+      }
+    } catch (e) { LA.on = on; }
+  }
+  function ding() { try { const c = LA.ctx; if (!c) return; const g = c.createGain(); g.gain.value = 0.5; g.connect(c.destination); const t = c.currentTime; note(c, g, 880, t, 1.2, "sine", 0.18, 0.01); note(c, g, 1318.5, t + 0.28, 1.4, "sine", 0.14, 0.01); } catch (e) {} }
+  function say(txt2) { try { if (!window.speechSynthesis) return; const u = new SpeechSynthesisUtterance(txt2); u.volume = 0.6; u.rate = 0.92; u.pitch = 1.05; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); } catch (e) {} }
   /* the lift: state, and the ride (close doors, travel, open doors) */
   const lift = { y: 0, level: 0, moving: false, carry: false, busy: false }, up = { level: 0 };
   const doorAt = (lv) => (lv ? d1 : d0);
   let job = null, indT = 0, wasLvl = -1;
-  function ride(to, cb, carry) { job = { to, cb, carry: !!carry, from: lift.level, ph: 0, t: 0, y0: lift.y }; if (carry) lift.carry = true; }
+  function ride(to, cb, carry) { job = { to, cb, carry: !!carry, from: lift.level, ph: 0, t: 0, y0: lift.y }; if (carry) { lift.carry = true; liftMusic(true); say(to ? "Going up to the first floor." : "Going down to the ground floor."); } }
   function call(lv, cb) { if (lift.level === lv && !job) { job = { to: lv, cb, carry: false, from: lv, ph: 2, t: 0, y0: lift.y }; } else ride(lv, cb, false); }
   function stepLift(dt) {
     if (!job) return; job.t += dt;
@@ -84,7 +105,7 @@ export function buildUpper(T, c) {
       if (dd.open < 0.03 && job.t > 0.5) { job.ph = 1; job.t = 0; lift.moving = true; job.y1 = job.to ? LV : 0; job.dur = Math.max(1.5, Math.abs(job.y1 - job.y0) / LV * 5.6); }
     } else if (job.ph === 1) {
       const k = clampN(job.t / job.dur, 0, 1); lift.y = job.y0 + (job.y1 - job.y0) * smooth(k);
-      if (k >= 1) { lift.y = job.y1; lift.level = job.to; lift.moving = false; if (job.carry) up.level = job.to; job.ph = 2; job.t = 0; }
+      if (k >= 1) { lift.y = job.y1; lift.level = job.to; lift.moving = false; if (job.carry) { up.level = job.to; liftMusic(false); ding(); say(job.to ? "First floor." : "Ground floor."); } job.ph = 2; job.t = 0; }
     } else {
       const dd = doorAt(job.to); dd.target = 1; if (dd.open > 0.92 || job.t > 4) { const cb = job.cb; lift.carry = false; job = null; if (cb) cb(); }
     }
@@ -93,9 +114,10 @@ export function buildUpper(T, c) {
     const y = lift.y / LV, lab = y < 0.5 ? "G" : "1", mv = lift.moving ? (job && job.to > job.from ? "▲" : "▼") : "•";
     txt(g, lab, 70, h / 2 + 2, 56, "#36d6ff", "center", 800, "#36d6ff"); txt(g, lift.moving ? mv : (lift.level === lv ? "OPEN" : "CALL"), 170, h / 2 + 2, lift.moving ? 52 : 34, lift.moving ? "#ffb347" : "#9fe8ff", "center", 800); d.t.needsUpdate = true; };
   const cabPaint = () => { const g = board.g, w = 512, h = 256; panelBg(g, w, h, "#04101a", "#0a2038"); frame(g, w, h, "#36d6ff", 6);
-    const y = lift.y / LV, lab = y < 0.5 ? "GROUND" : "LEVEL 1", sub = y < 0.5 ? "Auditorium" : "Video Auditorium", mv = lift.moving ? (job && job.to > job.from ? "▲" : "▼") : "";
-    txt(g, lab, w / 2, 96, 74, "#eaf6ff", "center", 800, "#36d6ff"); txt(g, sub, w / 2, 168, 38, "#9fe8ff", "center", 600); txt(g, mv, w - 60, 100, 70, "#ffb347", "center", 800);
-    g.fillStyle = "rgba(54,214,255,.25)"; g.fillRect(40, 205, w - 80, 8); g.fillStyle = "#36d6ff"; g.fillRect(40, 205, (w - 80) * clampN(y, 0, 1), 8); board.t.needsUpdate = true; };
+    const y = lift.y / LV, up2 = job && job.ph === 1 && job.to > job.from, dn = job && job.ph === 1 && job.to < job.from;
+    if (lift.moving) { txt(g, "GOING TO THE", w / 2, 62, 32, "#9fe8ff", "center", 600); txt(g, up2 ? "FIRST FLOOR" : "GROUND FLOOR", w / 2, 128, 62, "#eaf6ff", "center", 800, "#36d6ff"); txt(g, up2 ? "▲" : "▼", w / 2, 192, 44, "#ffb347", "center", 800); }
+    else { txt(g, y < 0.5 ? "GROUND FLOOR" : "FIRST FLOOR", w / 2, 100, 62, "#eaf6ff", "center", 800, "#36d6ff"); txt(g, y < 0.5 ? "Auditorium" : "Video Auditorium", w / 2, 172, 38, "#9fe8ff", "center", 600); }
+    g.fillStyle = "rgba(54,214,255,.25)"; g.fillRect(40, 226, w - 80, 8); g.fillStyle = "#36d6ff"; g.fillRect(40, 226, (w - 80) * clampN(y, 0, 1), 8); board.t.needsUpdate = true; void dn; };
 
   /* ============================== LOBBY (above the auditorium) ============================== */
   const lw = (w, h, x, y, z, ry) => pl(w, h, wallMat(w, h, slats), x, y, z, ry, 0, top);
@@ -136,9 +158,9 @@ export function buildUpper(T, c) {
   const gateSign = ctex(768, 200, (g, w, h) => {
     g.fillStyle = "#06101a"; g.fillRect(0, 0, w, h); g.strokeStyle = "#7aa8ff"; g.lineWidth = 5; g.strokeRect(5, 5, w - 10, h - 10);
     g.shadowColor = "#7aa8ff"; g.shadowBlur = 14; g.strokeStyle = "#7aa8ff"; g.fillStyle = "#7aa8ff"; g.lineWidth = 6; g.strokeRect(70, 60, 90, 62); g.beginPath(); g.moveTo(104, 76); g.lineTo(104, 106); g.lineTo(134, 91); g.closePath(); g.fill(); g.fillRect(96, 132, 38, 8); g.shadowBlur = 0;
-    txt(g, "VIDEO AUDITORIUM", 200, 80, 48, "#e4f6ff", "left", 800); txt(g, "Level 1 · Procedure videos", 200, 140, 30, "#8fb6cf", "left", 500);
+    txt(g, "VIDEO AUDITORIUM", 200, 80, 48, "#e4f6ff", "left", 800); txt(g, "First floor · Procedure videos", 200, 140, 30, "#8fb6cf", "left", 500);
   });
-  { const m = new T.Mesh(new T.PlaneGeometry(3.2, 3.2 * 200 / 768), basic(gateSign)); m.position.set(AU.x1 - 0.05, LV + 4.98, ZC); m.rotation.y = -PI / 2; m.userData.door = "vhall"; top.add(m); }
+  { const m = new T.Mesh(new T.PlaneGeometry(2.4, 2.4 * 200 / 768), basic(gateSign)); m.position.set(AU.x1 - 0.05, LV + 4.98, ZC); m.rotation.y = -PI / 2; m.userData.door = "vhall"; top.add(m); }
   /* the kiosk: a ring base and a slowly turning holographic sphere */
   const kiosk = new T.Group(); kiosk.position.set(cxA, LV, -12.6); top.add(kiosk);
   cyl(1.0, 1.15, 0.9, M(0x121a22, { metalness: 0.7, roughness: 0.3 }), 0, 0.45, 0, kiosk, 32); { const r = new T.Mesh(new T.RingGeometry(0.78, 0.98, 48), E(0x36d6ff, 2)); r.rotation.x = -PI / 2; r.position.y = 0.92; kiosk.add(r); } cyl(1.18, 1.18, 0.05, cyan, 0, 0.03, 0, kiosk, 32);
@@ -388,8 +410,8 @@ export function buildUpper(T, c) {
         kT += sdt; const playing = pl8.mode === "play" && !vid.paused;
         if (playing ? kT > 0.033 : (pl8.dirty ? kT > 0.05 : kT > 0.25)) { kT = 0; if (!theatre) paint(t); }
         vid.volume = clampN(pl8.vol, 0, 1);
-      } else { if (!vid.paused) vid.volume = clampN(pl8.vol * 0.12, 0, 1); }
-    } else if (!vid.paused && up.level !== 1) { vid.pause(); }
+      } else if (!vid.paused && !theatre) { menu(); }
+    } else if (!vid.paused && !theatre) { menu(); }
     wasLvl = lift.level;
   }
   function tap(kind, hit) {
