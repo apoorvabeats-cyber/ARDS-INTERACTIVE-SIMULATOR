@@ -2,9 +2,9 @@
    Two linked models: the kidney (artery, pyramids, pelvis, ureter, bladder) and one nephron (glomerulus, proximal tubule, loop, distal tubule, collecting duct).
    Pick the cause, set the time, then correct it and watch filtration, creatinine, potassium and urine output respond.
    Teaching model: reversible functional loss turns into structural loss the longer the cause persists.
-   Draft · pending clinician review. All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261123i";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261123i";
+   Content aligned to KDIGO 2012 (the current final AKI guideline; the 2026 update was still in public review as of Nov 2026). All numbers are illustrative, not patient data. */
+import { THREE, C } from "../stage.js?v=20261123j";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261123j";
 
 const T = {
   PRE: { label: "Prerenal", sub: "Hypoperfusion", sev: 0.55, irr0: 0, irrMax: 0.8, tau: 2.5, inj: { glom: 0.15, pct: 0.12 },
@@ -177,13 +177,13 @@ export default function create(S, ui) {
   const info = () => { const c = cur(); return { anat: c.anat, patho: c.patho, interv: c.interv }; };
   function clin() {
     const e = est(), c = cur(), L = [];
-    L.push(["Definition and stage (KDIGO)", "AKI: creatinine rise of 0.3 mg/dL or more within 48 h, or 1.5 times baseline within 7 days, or urine output below 0.5 mL/kg/h for 6 h. Stage 1: 1.5–1.9 × baseline; stage 2: 2.0–2.9 ×; stage 3: 3 × or more, or renal replacement therapy. Here: stage " + e.kdigo + " (creatinine " + e.cr.toFixed(1) + " × baseline)."]);
+    L.push(["Definition and stage (KDIGO)", "AKI: creatinine rise of 0.3 mg/dL or more within 48 h, or 1.5 times baseline within 7 days, or urine output below 0.5 mL/kg/h for 6 h. Stage 1: 1.5–1.9 × baseline or a rise of 0.3 mg/dL or more (urine output below 0.5 mL/kg/h for 6–12 h); stage 2: 2.0–2.9 × (below 0.5 mL/kg/h for 12 h or more); stage 3: 3 × or more, creatinine of 4.0 mg/dL or more, or renal replacement therapy (below 0.3 mL/kg/h for 24 h or more, or anuria for 12 h). Here: stage " + e.kdigo + " (creatinine " + e.cr.toFixed(1) + " × baseline)."]);
     L.push(["First questions", "Is it prerenal (volume, pressure), intrinsic (tubule, interstitium, glomerulus, vessel) or postrenal (obstruction)? Look at the history, drugs and contrast exposure, volume status, urine output, urinalysis, bladder scan and renal ultrasound."]);
     L.push(["Urine findings", "Sediment: " + e.sed + ". FeNa: " + e.fena + " (unreliable on diuretics: use FeUrea). Urine osmolality above about 500 mOsm/kg suggests a concentrating (prerenal) kidney; around 300 suggests tubular injury."]);
     L.push(["Imaging and tests", st.tab === "OBS" ? "Ultrasound shows a dilated pelvicalyceal system; non-contrast CT finds the stone." : st.tab === "REN" ? "Doppler ultrasound or CT angiography shows the occlusion or stenosis and an infarcted kidney." : st.tab === "GN" ? "Serology (ANCA, anti-GBM, ANA, complement), urine protein-to-creatinine ratio; renal biopsy confirms the pattern." : "Ultrasound for size and obstruction; biopsy only when the cause is unclear and the result would change treatment."]);
     L.push(["General management", "Treat the cause; keep MAP at about 65 mmHg or higher in shock; give balanced crystalloids rather than excess saline when fluid is indicated; avoid nephrotoxins (NSAIDs, aminoglycosides, contrast when possible); review drug doses; do not use diuretics to treat AKI, only to manage overload; monitor potassium and acid–base."]);
     L.push(["Renal replacement therapy", "Start for refractory hyperkalaemia, severe acidosis, fluid overload not responding to diuretics, uraemic complications (pericarditis, encephalopathy) or dialysable toxins. Trials of earlier (accelerated) initiation in patients without urgent indications have not shown benefit."]);
-    L.push(["After the episode", "Follow creatinine and blood pressure at 3 months: AKI raises the risk of CKD, cardiovascular events and recurrent AKI. Follow your current guideline (KDIGO AKI, with the update in progress) and your local protocol."]);
+    L.push(["After the episode", "Follow creatinine and blood pressure at 3 months: AKI raises the risk of CKD, cardiovascular events and recurrent AKI. Reference: KDIGO 2012 AKI guideline. The KDIGO 2026 AKI/AKD update (draft in public review, not yet final) proposes adding serum cystatin C and structural biomarkers to the definition. Follow your local protocol."]);
     void c; return { lines: L, draw: (el) => drawImaging(el, e) };
   }
   function drawImaging(el, e) {

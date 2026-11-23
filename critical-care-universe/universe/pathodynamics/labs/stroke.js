@@ -1,8 +1,8 @@
 /* STROKE LAB: the master template for PATHODYNAMICS.
    Pick an occlusion, turn the brain, drag the clot out, and watch perfusion, tissue fate and the whole body respond.
    Teaching model: tissue fate depends on TIME and COLLATERALS; reopening the vessel does not undo tissue that has already infarcted.
-   Content is a Draft for clinician review (see ../REVIEWING.md). Numbers are illustrative ranges, not patient data. */
-import { THREE, C, smooth } from "../stage.js?v=20261123i";
+   Content aligned to the 2026 AHA/ASA acute ischaemic stroke guideline (checked Nov 2026 against the published summaries); simplified teaching model. Numbers are illustrative ranges, not patient data. */
+import { THREE, C, smooth } from "../stage.js?v=20261123j";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const BRAIN = { cx: 0.58, rx: 0.56, ry: 0.78, rz: 1.0 };
@@ -277,15 +277,15 @@ export default function create(S, ui) {
     lines.push(["CT brain", "Non-contrast CT first, to exclude haemorrhage. Early ischaemia may be subtle: loss of grey–white differentiation, insular ribbon sign" + (st.tab === "M1" && !st.removed ? ", hyperdense MCA sign" : "") + (asp != null ? ". ASPECTS ≈ " + asp + " (10 = no early change)." : ".")]);
     lines.push(["CTA", "Shows the filling defect at the occlusion site (" + s.label + ") and collateral filling."]);
     lines.push(["CT perfusion", "Core (very low CBF) ≈ " + Math.round(e.cf * 100) + "% of the at-risk territory; the surrounding delayed-flow zone (high Tmax) is the penumbra. A large mismatch favours reperfusion."]);
-    const lys = hrs <= 4.5 ? "the patient is inside the standard thrombolysis window (≤ 4.5 h): IV thrombolysis (tenecteplase or alteplase) is considered if there are no contraindications" : hrs <= 9 ? "the patient is 4.5–9 h from onset: thrombolysis only with imaging selection (perfusion or MRI mismatch)" : "the patient is beyond 9 h: outside the usual thrombolysis windows";
+    const lys = hrs <= 4.5 ? "the patient is inside the standard thrombolysis window (≤ 4.5 h): IV tenecteplase or alteplase is recommended for a disabling deficit regardless of NIHSS, without advanced imaging, if there are no contraindications. For a non-disabling deficit, dual antiplatelet therapy is preferred over thrombolysis" : hrs <= 9 ? "the patient is 4.5–9 h from onset (or onset unknown): extended-window thrombolysis may be considered only in selected patients with favourable advanced imaging (DWI-FLAIR mismatch or perfusion mismatch)" : "the patient is beyond 9 h: outside the usual thrombolysis windows";
     let evt;
-    if (st.tab === "ICA" || st.tab === "M1") evt = hrs <= 6 ? "Large-vessel occlusion within 6 h: thrombectomy is recommended in eligible patients." : hrs <= 24 ? "6–24 h: thrombectomy for selected patients with favourable perfusion/clinical–core mismatch (DAWN, DEFUSE-3 type selection)." : "Beyond 24 h: individualised.";
-    else if (st.tab === "BA") evt = "Basilar occlusion: thrombectomy has shown benefit in selected patients up to about 12–24 h (ATTENTION, BAOCHE).";
+    if (st.tab === "ICA" || st.tab === "M1") evt = hrs <= 6 ? "Large-vessel occlusion within 6 h: thrombectomy is the standard treatment in eligible patients. Do not delay thrombectomy to see whether thrombolysis works: eligible patients get both, rapidly and in sequence." : hrs <= 24 ? "6–24 h: thrombectomy for selected patients with favourable perfusion/clinical–core mismatch (DAWN, DEFUSE-3 type selection)." : "Beyond 24 h: individualised.";
+    else if (st.tab === "BA") evt = "Basilar occlusion: thrombectomy is strongly recommended within 24 h of onset when NIHSS is 10 or more (ATTENTION, BAOCHE).";
     else if (st.tab === "M2") evt = "Proximal M2: individualised; less certain benefit than M1.";
     else evt = "Medium or distal vessel occlusion: thrombectomy benefit not shown in recent randomised trials; individualise.";
-    if (asp != null && asp <= 5 && (st.tab === "ICA" || st.tab === "M1")) evt += " With a large established core (ASPECTS 3–5), recent trials (SELECT2, ANGEL-ASPECT, RESCUE-Japan LIMIT) support thrombectomy in selected patients, with lower expected benefit.";
+    if (asp != null && asp <= 5 && (st.tab === "ICA" || st.tab === "M1")) evt += " With a large established core (ASPECTS 3–5), recent trials (SELECT2, ANGEL-ASPECT, RESCUE-Japan LIMIT) support thrombectomy in selected patients, and the 2026 guideline widens eligibility for larger cores, with lower expected benefit.";
     lines.push(["Treatment pathways to consider", "At " + hrs.toFixed(1) + " h from onset, " + lys + ". " + evt]);
-    lines.push(["Before any treatment", "Glucose, blood pressure (≤ 185/110 mmHg before thrombolysis), anticoagulant history, platelet count and INR where indicated, and airway/swallow safety. Follow your current guideline (AHA/ASA 2026, ESO) and local stroke protocol."]);
+    lines.push(["Before any treatment", "Glucose, blood pressure (≤ 185/110 mmHg before thrombolysis), anticoagulant history, platelet count and INR where indicated, and airway/swallow safety. After treatment, intensive blood-pressure lowering to below 140 mmHg is not recommended (even with complete reperfusion), nor is intensive glucose control to 80–130 mg/dL. Argatroban or eptifibatide added to thrombolysis is not recommended. Reference: 2026 AHA/ASA guideline for early management of acute ischaemic stroke; follow your local stroke protocol."]);
     return { lines, draw: (el) => drawImaging(el, e, asp) };
   }
   function drawImaging(el, e, asp) {

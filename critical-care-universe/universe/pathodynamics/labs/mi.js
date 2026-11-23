@@ -1,9 +1,9 @@
 /* HEART ATTACK LAB (acute myocardial infarction) on the PATHODYNAMICS engine.
    Pick the blocked coronary, read the ECG territory, drag the thrombus out, balloon and stent, or give fibrinolysis.
    Teaching model: myocardium is lost with TIME and COLLATERALS; reopening the artery does not bring back necrosed muscle.
-   Draft · pending clinician review. All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261123i";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261123i";
+   Content aligned to the 2025 ACC/AHA/ACEP/NAEMSP/SCAI ACS guideline (checked Nov 2026 against the published summaries). All numbers are illustrative, not patient data. */
+import { THREE, C } from "../stage.js?v=20261123j";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261123j";
 
 const ROT = 0.4, LVC = [0.22, -0.1, -0.05], LVR = [0.52, 0.86, 0.5], RVC = [-0.42, -0.2, 0.2], RVR = [0.42, 0.66, 0.45];
 const lvPt = (ph, th, k) => { k = k || 1.03; let x = LVR[0] * Math.cos(th) * Math.cos(ph) * k, y = LVR[1] * Math.sin(th) * k, z = LVR[2] * Math.cos(th) * Math.sin(ph) * k; const c = Math.cos(ROT), s = Math.sin(ROT); return [x * c - y * s + LVC[0], x * s + y * c + LVC[1], z + LVC[2]]; };
@@ -191,10 +191,12 @@ export default function create(S, ui) {
     L.push(["Presentation", "Central pressure-type chest pain spreading to the left arm or jaw, sweating, breathlessness. Women, older people and diabetics may present atypically."]);
     L.push(["ECG (first 10 minutes)", pat + " Hyperacute T waves come first; Q waves and T-wave inversion develop over hours to days. Estimated EF here: " + e.ef + "%."]);
     L.push(["Biomarker and echo", "High-sensitivity troponin rises within hours and stays raised for days; do not wait for it when the ECG shows STEMI. Echo shows a regional wall-motion abnormality in the " + k.label + " territory."]);
-    L.push(["Reperfusion strategy", "Primary PCI is preferred when it can be done promptly (target: diagnosis to wire crossing within about 90 minutes, shorter for early presenters). If PCI cannot be delivered within about 120 minutes of diagnosis, give fibrinolysis within 10 minutes and transfer; do rescue PCI if ST resolution is under 50% at 60–90 minutes, otherwise angiography within 2–24 hours. At " + hrs.toFixed(1) + " h from onset the " + (hrs <= 12 ? "patient is inside the usual 12 h reperfusion window." : "patient is beyond 12 h: reperfuse if ischaemia or instability persists.")]);
-    L.push(["Drugs in the first hour", "Aspirin, a P2Y12 inhibitor and parenteral anticoagulation as per local protocol; oxygen only if SpO₂ is low; analgesia and nitrates with caution (avoid nitrates in suspected RV infarction or low BP)."]);
+    L.push(["Reperfusion strategy", "Primary PCI is the preferred strategy: first-medical-contact-to-device time of 90 minutes or less at a PCI-capable hospital, and 120 minutes or less when transferring. If that cannot be met because of unavoidable delay, give fibrinolysis (ACC/AHA: within 30 minutes of arrival; ESC: within 10 minutes of diagnosis) and transfer; do rescue PCI if ST resolution is under 50% at 60–90 minutes, otherwise angiography within 2–24 hours. At " + hrs.toFixed(1) + " h from onset the " + (hrs <= 12 ? "patient is inside the usual 12 h reperfusion window." : "patient is beyond 12 h: reperfuse if ischaemia or instability persists.")]);
+    L.push(["Drugs in the first hour", "Aspirin and an oral P2Y12 inhibitor, with parenteral anticoagulation as per local protocol; oxygen only if SpO₂ is low; analgesia and nitrates with caution (avoid nitrates in suspected RV infarction or low BP)."]);
+    L.push(["At the cath lab", "Radial access is preferred over femoral to cut bleeding and vascular complications. Intravascular imaging is recommended to guide PCI. Complete revascularisation is advised for STEMI with multivessel disease, chosen by lesion complexity. In cardiogenic shock, revascularise promptly; a microaxial flow pump is recommended for selected patients."]);
+    L.push(["After discharge", "Dual antiplatelet therapy for at least 12 months unless the bleeding risk is high (then shorter or alternative strategies), high-intensity statin for everyone, and a non-statin added if LDL-C stays at or above 70 mg/dL on maximum statin."]);
     L.push(["Complications to anticipate", k.vessel === "RCA" ? "RV failure with low BP and clear lungs; bradycardia and AV block (pacing); inferior MI with ST rise in V1." : st.tab === "LM" || st.tab === "LAD" ? "Cardiogenic shock, acute pulmonary oedema, VT/VF, later mechanical complications (septal rupture, papillary muscle rupture, free-wall rupture)." : "Arrhythmia, heart failure; mitral regurgitation from papillary muscle ischaemia."]);
-    L.push(["Reference", "Follow your current guideline (2025 ACC/AHA ACS, 2023 ESC ACS) and your local STEMI protocol."]);
+    L.push(["Reference", "Reference: 2025 ACC/AHA/ACEP/NAEMSP/SCAI ACS guideline (2023 ESC ACS for the ESC time targets). Follow your local STEMI protocol."]);
     return { lines: L, draw: (el) => drawImaging(el, e) };
   }
   function drawImaging(el, e) {

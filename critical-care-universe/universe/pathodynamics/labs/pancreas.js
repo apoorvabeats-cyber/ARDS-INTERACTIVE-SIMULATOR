@@ -1,9 +1,9 @@
 /* PANCREATITIS LAB on the PATHODYNAMICS engine.
    From a normal gland to oedematous and necrotising pancreatitis, then the collections (APFC, ANC, WON, infected necrosis)
    and the step-up approach: support and antibiotics, drainage (endoscopic stent or percutaneous drain), then necrosectomy.
-   Terms follow the Revised Atlanta Classification. Draft · pending clinician review. Numbers are illustrative.  */
-import { THREE, C, smooth } from "../stage.js?v=20261123i";
-import { clamp } from "./common.js?v=20261123i";
+   Terms follow the Revised Atlanta Classification. Management content aligned to ACG 2024, the AGA 2020 necrosis update and the Revised Atlanta Classification (checked Nov 2026). Numbers are illustrative.  */
+import { THREE, C, smooth } from "../stage.js?v=20261123j";
+import { clamp } from "./common.js?v=20261123j";
 
 const T = {
   NORMAL: { label: "Normal", sub: "Healthy pancreas", d0: 0, d1: 14, dv: 0,
@@ -166,7 +166,7 @@ export default function create(S, ui) {
     L.push(["Imaging", "Contrast CT or MRI at 72–96 hours when the diagnosis is in doubt or the patient is not improving: non-enhancing parenchyma means necrosis, gas within a collection suggests infection, and a mature wall means WON or pseudocyst. Estimated collection size here: " + (e.size > 0.02 ? e.cm + " cm" : "none") + "."]);
     L.push(["Intervention: the step-up approach", "1) Support and, if infected, antibiotics. 2) Postpone invasive treatment, ideally to about 4 weeks, until the collection is walled-off, if the patient is stable. 3) Drain: endoscopic transmural (LAMS) or percutaneous. 4) Necrosectomy only if drainage fails to resolve it: endoscopic first, or video-assisted retroperitoneal debridement. Surgery is the last resort. Randomised trials support this order."]);
     L.push(["Cholecystectomy", "In mild biliary pancreatitis, cholecystectomy in the same admission; in necrotising disease, delay until collections resolve or after about 6 weeks."]);
-    L.push(["Reference", "Follow the current guideline (ACG 2024, AGA 2020 update on necrotising pancreatitis, IAP/APA, Revised Atlanta 2012) and your local pancreatitis pathway."]);
+    L.push(["Reference", "Reference: ACG 2024 acute pancreatitis guideline, AGA 2020 clinical practice update on pancreatic necrosis, IAP/APA, Revised Atlanta 2012. Follow your local pancreatitis pathway."]);
     void c; return { lines: L, draw: (el) => drawImaging(el, e) };
   }
   function drawImaging(el, e) {

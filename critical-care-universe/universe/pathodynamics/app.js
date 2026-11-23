@@ -1,11 +1,11 @@
 /* PATHODYNAMICS · Interactive Clinical Pathophysiology
    Every lab follows the same five steps (select, explore, intervene, observe, correlate) and the same three views of a disease
    (anatomical, pathophysiological, interventional), all tied to one whole-body patient model. */
-import { createStage } from "./stage.js?v=20261123i";
-import { bodySVG, paintBody } from "./body.js?v=20261123i";
-import { ecgDraw } from "./charts.js?v=20261123i";
+import { createStage } from "./stage.js?v=20261123j";
+import { bodySVG, paintBody } from "./body.js?v=20261123j";
+import { ecgDraw } from "./charts.js?v=20261123j";
 
-const V = "20261123i", EMBED = /[?&]embed=1/.test(location.search), $ = (s, r) => (r || document).querySelector(s), esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const V = "20261123j", EMBED = /[?&]embed=1/.test(location.search), $ = (s, r) => (r || document).querySelector(s), esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const LABS = [
   { id: "stroke", name: "Stroke Lab", tag: "Acute ischaemic stroke", icon: "🧠", col: "#9b7bff", blurb: "Choose the blocked artery, turn the brain, drag the clot out and watch the penumbra, the deficits and the whole body respond.", mods: "ICA · M1 · M2 · M3 · ACA · PCA · Basilar · Vertebral" },
   { id: "mi", name: "Heart Attack Lab", tag: "Acute myocardial infarction", icon: "🫀", col: "#ff6b7c", blurb: "Block a coronary artery, read the ECG territory, then open it with a balloon and stent or with lysis.", mods: "RCA · LAD · LCx · Left main · PDA" },
@@ -29,7 +29,7 @@ function home() {
 <div class="steps5">${STEPS.map((s) => `<div><b>${s[0]}</b>${s[1]}</div>`).join("")}</div>
 <div class="three"><div><b>Anatomical view</b>What is happening inside the organ?</div><div><b>Pathophysiological view</b>Why is it happening, and what changes?</div><div><b>Interventional view</b>What happens when the doctor treats it?</div></div>
 <h2 class="sec">CHOOSE A LAB</h2><div class="labs">${LABS.map((l) => `<button class="lab" style="--lc:${l.col}" data-a="open" data-id="${l.id}"><em>${l.icon}</em><b>${l.name}</b><i>${esc(l.blurb)}</i><i>${esc(l.mods)}</i><small>OPEN LAB ▸</small></button>`).join("")}</div>
-<div class="note"><b>Educational simulation.</b> These are simplified teaching models with illustrative numbers, not patient data, and not a substitute for current guidelines or local protocols. Content is <b>Draft · pending clinician review</b> until a named clinician signs it off.</div>`;
+<div class="note"><b>Educational simulation.</b> These are simplified teaching models with illustrative numbers, not patient data, and not a substitute for current guidelines or local protocols. Management content is aligned to: <b>AHA/ASA 2026</b> (acute ischaemic stroke), <b>ACC/AHA 2025</b> (acute coronary syndromes), <b>AHA/ACC 2026</b> (acute pulmonary embolism), <b>ACG 2024 / AGA 2020 / Revised Atlanta</b> (pancreatitis) and <b>KDIGO 2012</b> (AKI; the 2026 update is still in draft). Checked November 2026 against the published summaries. Always follow your local protocol.</div>`;
 }
 
 /* ---------------- lab shell ---------------- */

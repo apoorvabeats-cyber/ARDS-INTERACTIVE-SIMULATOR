@@ -1,9 +1,9 @@
 /* PULMONARY EMBOLISM LAB on the PATHODYNAMICS engine.
    Place the clot, watch the right ventricle strain and the oxygen fall, then reperfuse by catheter, lysis or anticoagulation.
    Teaching model: what matters is how much of the pulmonary arterial bed is blocked, how much RV reserve the patient has, and how long it lasts.
-   Draft · pending clinician review. All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261123i";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261123i";
+   Content aligned to the 2026 AHA/ACC acute PE guideline and its Clinical Categories (checked Nov 2026 against the published summaries). All numbers are illustrative, not patient data. */
+import { THREE, C } from "../stage.js?v=20261123j";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261123j";
 
 const SITES = {
   SADDLE: { label: "Saddle", sub: "At the PA bifurcation", vessel: "PA", u: 0.97, big: true, tags: { rul: 1, rml: 1, rll: 1, lul: 1, lll: 1 }, burden: 0.62, lysis: 0.7,
@@ -113,7 +113,8 @@ export default function create(S, ui) {
   function est() {
     const sv = strain(), s = sv.s, obstruct = sv.eff, reperf = st.rAt != null;
     const rvlv = +(0.8 + 1.15 * s).toFixed(2), mpap = Math.round(clamp(16 + 52 * s, 14, 52)), spo2 = Math.round(clamp(98 - 40 * obstruct * (st.reserve === "limited" ? 1.4 : 1) - 5 * s, 62, 99)), hr = Math.round(75 + 50 * s), sbp = Math.round(clamp(125 - 95 * Math.max(0, s - 0.28), 50, 130)), lac = +(1 + 7 * Math.max(0, s - 0.45)).toFixed(1);
-    const cat = sbp < 90 ? "E · cardiopulmonary failure" : s > 0.5 ? "D · impending failure" : rvlv > 1.0 ? "C · RV strain" : obstruct > 0.04 ? "B · symptomatic, low severity" : "A · subclinical";
+    const nab = (rvlv > 1.0 ? 1 : 0) + (s > 0.25 ? 1 : 0) + (s > 0.35 ? 1 : 0);
+    const cat = sbp < 65 ? "E2 · refractory shock" : sbp < 90 ? "E1 · persistent hypotension" : s > 0.5 ? (lac > 2 ? "D2 · normotensive shock physiology" : "D1 · transient hypotension") : nab > 0 ? "C" + nab + " · symptomatic, RV / biomarker abnormality" : obstruct > 0.04 ? "B · symptomatic, low severity" : "A · asymptomatic";
     return { s, obstruct, reperf, rvlv, mpap, spo2, hr, sbp, lac, cat, deficit: Math.round(obstruct * 100) };
   }
   function bodyMap() {
@@ -154,9 +155,9 @@ export default function create(S, ui) {
     L.push(["CT pulmonary angiography", "The first-line test. A filling defect in the " + k.label.toLowerCase() + " artery; RV/LV ratio above 1.0, septal bowing and contrast reflux into the IVC suggest RV strain. Estimated RV/LV ratio here: " + e.rvlv.toFixed(2) + "."]);
     L.push(["Echocardiography and biomarkers", "RV dilatation, a D-shaped LV in systole, McConnell sign, reduced TAPSE, high PA pressure. Raised troponin and natriuretic peptide mark myocardial injury and RV strain."]);
     L.push(["ECG", "Sinus tachycardia is the commonest change; with strain: T-wave inversion in V1–V4, S1Q3T3 pattern, new right bundle branch block."]);
-    L.push(["Severity (AHA/ACC 2026 categories A–E, ESC 2019 risk classes)", "Category here (illustrative): " + e.cat + ". Higher categories combine RV dysfunction, raised biomarkers, rising lactate and haemodynamic instability; hypotension below 90 mmHg is the high-risk marker."]);
-    L.push(["Treatment pathways to consider", "Anticoagulation for all without contraindication (low-molecular-weight heparin is preferred over unfractionated heparin for the initial parenteral phase, unfractionated heparin if reperfusion is likely or renal function is poor). Systemic thrombolysis for patients with haemodynamic collapse. Catheter-directed therapy or surgical embolectomy when thrombolysis is contraindicated or has failed, or in selected intermediate-high-risk patients who deteriorate. Mechanical circulatory support in refractory shock. Involve a PE response team where available."]);
-    L.push(["Cautions", "Check bleeding risk before lysis (recent surgery, stroke, active bleeding). Avoid large fluid boluses in RV failure; use vasopressors early, and avoid intubation where possible because positive pressure can precipitate collapse. Follow the current guideline (2026 AHA/ACC, 2019 ESC) and your local protocol."]);
+    L.push(["Severity (AHA/ACC 2026 Acute PE Clinical Categories)", "Category here (illustrative): " + e.cat + ". A: asymptomatic (often incidental). B: symptomatic, low severity score (sPESI 0, PESI ≤85). C: symptomatic with an elevated score; C1–C3 by the number of RV-imaging and biomarker abnormalities. D: incipient cardiopulmonary failure (D1 transient hypotension, e.g. syncope; D2 normotensive with shock physiology such as raised lactate or AKI). E: persistent hypotension or cardiopulmonary failure (E1 cardiogenic shock; E2 refractory shock or arrest). A respiratory modifier can be added to C–E; if the respiratory and haemodynamic categories differ, use the higher one."]);
+    L.push(["Treatment pathways to consider", "Category A: discharge from the emergency department. Category B: often outpatient oral anticoagulation alone (a DOAC is preferred over a vitamin K antagonist). Categories C–E: hospital admission and a multidisciplinary PE response team (PERT). For parenteral anticoagulation in C–E1, low-molecular-weight heparin is recommended over unfractionated heparin, including before catheter therapy or lysis. Category E: urgent reperfusion, with systemic thrombolysis, catheter-directed therapy or mechanical thrombectomy regarded as equivalent options; surgical embolectomy and VA-ECMO for refractory shock or arrest. Categories C3 and D: advanced therapy may be considered, but the benefit over anticoagulation alone is unclear."]);
+    L.push(["Cautions", "Check bleeding risk before lysis (recent surgery, stroke, active bleeding). Avoid large fluid boluses in RV failure; use vasopressors early, and avoid intubation where possible because positive pressure can precipitate collapse. Reference: 2026 AHA/ACC/ACCP/ACEP/CHEST/SCAI/SHM/SIR/SVM/SVN acute PE guideline (ESC 2019 for comparison). Follow your local protocol."]);
     return { lines: L, draw: (el) => drawImaging(el, e) };
   }
   function drawImaging(el, e) {
