@@ -2,6 +2,7 @@
 import { schedule, preview, fmtIv, retrievability } from "./fsrs.js";
 import { drawWave, WAVES, WAVE_Q, hashStr } from "./waves.js";
 import * as DB from "./store.js";
+import { isDicomFile, dcmParse, dcmFrame, dcmDraw, dcmStack, canvasToJpeg, suggestMod, modLabel, windowPresets } from "./dicom.js";
 
 const $ = (s, r) => (r || document).querySelector(s), $$ = (s, r) => [...(r || document).querySelectorAll(s)];
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -311,12 +312,13 @@ function vOwn() {
 <label>New deck name</label><input id="nd" maxlength="60" placeholder="e.g. My ventilator pearls"><div class="row2"><button class="btn" data-a="newdeck">CREATE DECK</button><span></span></div></div></div>`;
 }
 function vOwnEdit(id) {
+  A.dcm = null;
   const u = A.udecks.find((x) => x.id === id); if (!u) return vOwn();
   return `<div class="pg">${topBar(true)}<h2>${esc(u.name)}</h2><p class="lead">${u.cards.length} cards. Cloze cards use {{c1::hidden text}}.</p>
 <div class="panel"><h3>ADD A CARD</h3><label>Type</label><select id="ct"><option value="b">Question and answer</option><option value="c">Cloze (fill in the blank)</option><option value="m">Multiple choice scenario</option></select>
 <label>Question / text</label><textarea id="cq"></textarea><label>Answer (or correct option for multiple choice)</label><textarea id="ca"></textarea><label>Wrong options for multiple choice (one per line)</label><textarea id="co" placeholder="Used only for multiple choice"></textarea><label>Explanation (optional)</label><input id="ce"><label>Topic tag (optional)</label><input id="cg" maxlength="40"><label>Reference and year (optional)</label><input id="cr" maxlength="160" placeholder="e.g. Surviving Sepsis Campaign 2021">
-<label>Attach an image (optional)</label><input id="cimg" type="file" accept="image/jpeg,image/png,image/webp"><label>Image type</label><select id="cmd">${MODS.map((m) => `<option value="${m[0]}">${m[2]} · ${m[1]}</option>`).join("")}</select><label>Source or licence of the image</label><input id="cli" maxlength="160" placeholder="e.g. My own case, de-identified · or CC BY 4.0, author, link">
-<label class="chk"><input type="checkbox" id="cdi"> <span>This image is de-identified (no name, ID number, date or hospital marks) and I have the right to use it.</span></label><p class="lead" style="margin:4px 0 0">Use screenshots or exports (JPG, PNG, WebP). The image is resized on this device and its metadata is removed. It never leaves this device.</p>
+<label>Attach an image (optional)</label><input id="cimg" type="file" multiple accept="image/jpeg,image/png,image/webp,.dcm,.dicom,application/dicom"><div id="dcmbox"></div><label>Image type</label><select id="cmd">${MODS.map((m) => `<option value="${m[0]}">${m[2]} · ${m[1]}</option>`).join("")}</select><label>Source or licence of the image</label><input id="cli" maxlength="160" placeholder="e.g. My own case, de-identified · or CC BY 4.0, author, link">
+<label class="chk"><input type="checkbox" id="cdi"> <span>This image is de-identified (no name, ID number, date or hospital marks) and I have the right to use it.</span></label><p class="lead" style="margin:4px 0 0">Use screenshots or exports (JPG, PNG, WebP) or DICOM files (.dcm, one file, a multi-frame file or a whole series). The image is resized on this device and its metadata, including every DICOM header tag, is removed. It never leaves this device.</p>
 <div class="row2"><button class="btn" data-a="addcard" data-id="${u.id}">ADD CARD</button><span></span></div></div>
 <div class="panel"><h3>CARDS</h3><div class="lst">${u.cards.map((c, i) => `<div class="li"><div class="g">${esc((c.q || c.x || c.n || "").slice(0, 110))}<small>${esc(c.t === "b" ? "Q&A" : c.t === "c" ? "Cloze" : c.t === "m" ? "Multiple choice" : "Drug")}${c.img ? " · image: " + esc(modName(c.mod)) : ""} · Draft</small></div><button class="btn red" data-a="delcard" data-id="${u.id}" data-i="${i}" style="padding:8px 12px">DELETE</button></div>`).join("") || "<p class='lead' style='margin:0'>No cards yet.</p>"}</div></div>
 <div class="row2"><button class="btn ghost" data-a="exportdeck" data-id="${u.id}">EXPORT DECK (JSON)</button><button class="btn red" data-a="deldeck" data-id="${u.id}">DELETE DECK</button></div></div>`;
@@ -338,7 +340,7 @@ function vInfo() {
 ${P("CLINICAL ACCURACY", "Memory Lab contains educational flashcards that may be AI-generated or imported. Unreviewed cards are marked <b>Draft</b>. Always verify clinical information against current guidelines and institutional protocols before applying it to patient care.")}
 ${P("HOW CARDS ARE VERIFIED", `<span class="vs d">DRAFT · PENDING REVIEW</span> not yet checked by a clinician. You can study these; they are always labelled.<br><br><span class="vs r">✔ CLINICALLY REVIEWED</span> approved by an identified clinician, with reference, year, applicability and verification date.<br><br><span class="vs u">⚠ NEEDS UPDATE · REVIEW REQUIRED</span> guidance or evidence has changed and the card must be revised.<br><br>Cards you create or import are always Draft. Memory Lab never marks AI-generated or imported content as verified.`)}
 ${P("AI-ASSISTED LEARNING", "Card generation currently uses an external AI assistant through copy-and-import functionality. Live AI generation is not yet available within the app.")}
-${P("CLINICAL IMAGES", "Some ECGs and waveforms are schematic illustrations, not patient recordings. You can create your own decks using appropriate clinical images and educational resources. Use only de-identified images that you have the right to use.")}
+${P("CLINICAL IMAGES", "Some ECGs and waveforms are schematic illustrations, not patient recordings. You can create your own decks using appropriate clinical images and educational resources, including DICOM files (.dcm). DICOM files are converted to a picture on this device and every header tag is discarded, but names or dates can be drawn on the picture itself, so check each image. Use only de-identified images that you have the right to use.")}
 ${P("EDUCATIONAL PURPOSE", "Memory Lab is designed for medical education and knowledge reinforcement. It is not a substitute for clinical judgement, specialist advice or institutional protocols.")}
 ${first ? `<button class="cta" data-a="ack">I UNDERSTAND · CONTINUE</button>` : `<div class="row2"><button class="btn ghost" data-a="home">BACK TO MEMORY LAB</button><span></span></div>`}</div>`;
 }
@@ -386,7 +388,9 @@ const H = {
     if (t === "b") c = { t, q, a, tag }; else if (t === "c") c = { t, x: q, tag }; else { const wrong = val("co").split("\n").map((x) => x.trim()).filter(Boolean); const o = [a].concat(wrong); c = { t, q, o, a: 0, e: val("ce").trim(), tag }; }
     const rf = val("cr").trim(); if (rf) c.ref = rf; c = cleanCard(c); if (!c) return toast(t === "c" ? "A cloze needs {{c1::hidden text}}." : t === "m" ? "Add a question, the correct option and at least one wrong option." : "Add a question and an answer.");
     const f = $("#cimg") && $("#cimg").files[0];
-    if (f) { if (t === "c") return toast("Image cards use Question and answer or Multiple choice."); if (!$("#cdi").checked) return toast("Confirm that the image is de-identified and that you may use it."); try { c.img = await imgData(f); } catch (er) { return toast("That image could not be read."); } c.mod = val("cmd") || "other"; const li = val("cli").trim(); if (li) c.imgSrc = li.slice(0, 160); c.k = "image"; }
+    if (A.dcm && A.dcm.err) return toast(A.dcm.err);
+    if (A.dcm && A.dcm.cv) { if (t === "c") return toast("Image cards use Question and answer or Multiple choice."); if (A.dcm.burned) return toast("This file says it has burned-in annotation. Crop or anonymise it first."); if (!$("#cdi").checked) return toast("Confirm that the image is de-identified and that you may use it."); if (!$("#cdb") || !$("#cdb").checked) return toast("Confirm that you checked the picture for visible names, IDs or dates."); c.img = canvasToJpeg(A.dcm.cv); c.mod = val("cmd") || "other"; const li = val("cli").trim(); c.imgSrc = (li || "DICOM, converted on this device; all header tags discarded").slice(0, 160); c.k = "image"; }
+    else if (f) { if (t === "c") return toast("Image cards use Question and answer or Multiple choice."); if (!$("#cdi").checked) return toast("Confirm that the image is de-identified and that you may use it."); try { c.img = await imgData(f); } catch (er) { return toast("That image could not be read."); } c.mod = val("cmd") || "other"; const li = val("cli").trim(); if (li) c.imgSrc = li.slice(0, 160); c.k = "image"; }
     u.cards.push(c); saveU(); await loadDecks(); toast("Card added"); render(); },
   delcard: async (e) => { const u = A.udecks.find((x) => x.id === e.id); u.cards.splice(+e.i, 1); saveU(); await loadDecks(); render(); },
   deldeck: async (e) => { if (!confirm("Delete this deck and its cards?")) return; A.udecks = A.udecks.filter((x) => x.id !== e.id); saveU(); await loadDecks(); go("own"); },
@@ -400,6 +404,61 @@ const H = {
   restore: () => { const f = $("#rf"); f.onchange = async () => { try { const d = JSON.parse(await f.files[0].text()); if (!d.prog || !d.log) throw 0; if (!confirm("Replace the progress on this device with this backup?")) return; await DB.restore(d); location.reload(); } catch (e) { toast("That file is not a Memory Lab backup."); } }; f.click(); },
   reset: async () => { if (!confirm("Erase all progress on this device? This cannot be undone.")) return; await DB.wipe(); location.reload(); },
 };
+
+/* ---------- DICOM import (image cards) ---------- */
+async function dcmShow(light) {
+  const D = A.dcm, box = $("#dcmbox"); if (!D || !box) return;
+  const it = D.items[D.idx];
+  try {
+    const ds = await dcmParse(await it.f.arrayBuffer()); D.ds = ds; D.nf = ds.frames; D.fr = Math.min(D.fr, ds.frames - 1);
+    const fr = await dcmFrame(ds, D.fr), r = dcmDraw(ds, fr, { preset: D.preset, custom: D.custom, invert: D.inv });
+    D.cv = r.canvas; D.fixed = r.fixed; D.win = r.win; D.burned = /^YES$/i.test(ds.burned || ""); D.err = null;
+    const sg = suggestMod(ds); if (sg && D.fresh) { const sel = $("#cmd"); if (sel) sel.value = sg; } D.fresh = false;
+  } catch (e) { D.cv = null; D.err = e.message || "That DICOM file could not be read."; }
+  if (light && !D.err && $("#dcmcv")) { const cv = $("#dcmcv"); cv.width = D.cv.width; cv.height = D.cv.height; cv.getContext("2d").drawImage(D.cv, 0, 0); const lb = $("#dcc") && $("#dcc").previousElementSibling; if (lb && D.win) lb.textContent = "Centre " + Math.round(D.win.c) + " · Width " + Math.round(D.win.w); return; }
+  dcmPaint();
+}
+function dcmPaint() {
+  const D = A.dcm, box = $("#dcmbox"); if (!D || !box) return;
+  if (D.err) { box.innerHTML = `<div class="panel" style="margin:8px 0;border-color:var(--bad,#ff5c7a)"><p class="lead" style="margin:0">${esc(D.err)}</p></div>`; return; }
+  const ds = D.ds, n = D.items.length, tot = n > 1 ? n : D.nf, pos = n > 1 ? D.idx : D.fr, win = D.win;
+  const pr = windowPresets().map((p) => `<option value="${p[0]}"${D.preset === p[0] ? " selected" : ""}>${p[1]}</option>`).join("");
+  box.innerHTML = `<div class="panel" style="margin:8px 0"><h3>DICOM · ${esc(modLabel(ds))} · ${ds.cols}×${ds.rows}${n > 1 ? " · series of " + n : ds.frames > 1 ? " · " + ds.frames + " frames" : ""}</h3>
+<canvas id="dcmcv" style="max-width:100%;max-height:300px;background:#000;border-radius:8px;display:block;margin:6px auto"></canvas>
+${tot > 1 ? `<label>${n > 1 ? "Slice" : "Frame"} ${pos + 1} of ${tot}</label><input id="dcsl" type="range" min="0" max="${tot - 1}" value="${pos}">` : ""}
+${D.fixed ? `<p class="lead" style="margin:4px 0">This file is already a picture (colour or compressed), so brightness windows do not apply.</p>` : `<label>Window</label><select id="dcpr">${pr}</select>
+<label>Centre ${Math.round(win.c)} · Width ${Math.round(win.w)}</label><input id="dcc" type="range" min="${Math.round(win.c - win.w * 2)}" max="${Math.round(win.c + win.w * 2)}" value="${Math.round(win.c)}"><input id="dcw" type="range" min="1" max="${Math.max(10, Math.round(win.w * 4))}" value="${Math.round(win.w)}">
+<label class="chk"><input type="checkbox" id="dcinv"${D.inv ? " checked" : ""}> <span>Invert</span></label>`}
+<p class="lead" style="margin:6px 0">Only the picture is kept. Every DICOM header tag is discarded on this device.${ds.hasIds ? " <b>This file's header holds patient or hospital identifiers; they will not be copied.</b>" : ""} ${D.burned ? "<b>The file states it has burned-in annotation (text drawn on the image). Crop or anonymise it before adding.</b>" : "Ultrasound and some X-ray exports often have names or dates drawn on the picture itself, so look before you add."}</p>
+<label class="chk"><input type="checkbox" id="cdb"> <span>I checked the picture: no name, ID, date or hospital text is visible.</span></label></div>`;
+  const cv = $("#dcmcv"); if (cv && D.cv) { cv.width = D.cv.width; cv.height = D.cv.height; cv.getContext("2d").drawImage(D.cv, 0, 0); }
+}
+document.addEventListener("change", async (ev) => {
+  const t = ev.target; if (!t || !t.id) return;
+  if (t.id === "cimg") {
+    A.dcm = null; const box = $("#dcmbox"); if (box) box.innerHTML = ""; const files = [...t.files]; if (!files.length) return;
+    const flags = await Promise.all(files.map(isDicomFile)), nd = flags.filter(Boolean).length;
+    if (!nd) { if (files.length > 1) { t.value = ""; toast("Choose one JPG, PNG or WebP image, or DICOM files."); } return; }
+    if (nd !== files.length) { t.value = ""; return toast("Choose either DICOM files or one ordinary image, not a mix."); }
+    if (box) box.innerHTML = `<p class="lead">Reading DICOM…</p>`;
+    try {
+      const st = await dcmStack(files.slice(0, 1500), (i, n) => { if (box && n > 40) box.innerHTML = `<p class="lead">Reading DICOM ${i} of ${n}…</p>`; });
+      A.dcm = { items: st.items, idx: Math.floor((st.items.length - 1) / 2), fr: 0, preset: "auto", custom: null, inv: false, fresh: true };
+      if (st.items.length === 1) A.dcm.fr = -1; await dcmShow(); if (A.dcm && A.dcm.fr < 0) A.dcm.fr = 0;
+      if (st.skipped || files.length > 1500) toast(files.length > 1500 ? "Only the first 1500 files were read." : st.skipped + " file(s) without images were skipped.");
+    } catch (e) { A.dcm = { err: e.message || "That DICOM file could not be read." }; dcmPaint(); }
+    return;
+  }
+  const D = A.dcm; if (!D || !D.ds) return;
+  if (t.id === "dcpr") { D.preset = t.value; D.custom = null; await dcmShow(); }
+  else if (t.id === "dcinv") { D.inv = t.checked; await dcmShow(); }
+});
+document.addEventListener("input", (ev) => {
+  const t = ev.target, D = A.dcm; if (!t || !D || !D.ds) return;
+  clearTimeout(dcmShow.t);
+  if (t.id === "dcsl") { const v = +t.value; if (D.items.length > 1) D.idx = v; else D.fr = v; const lb = t.previousElementSibling; if (lb) lb.textContent = (D.items.length > 1 ? "Slice " : "Frame ") + (v + 1) + " of " + (D.items.length > 1 ? D.items.length : D.nf); dcmShow.t = setTimeout(() => dcmShow(true), 40); }
+  else if (t.id === "dcc" || t.id === "dcw") { D.custom = { c: +$("#dcc").value, w: +$("#dcw").value }; dcmShow.t = setTimeout(() => dcmShow(true), 40); }
+});
 document.addEventListener("click", (ev) => { const b = ev.target.closest("[data-a]"); if (!b || !H[b.dataset.a]) return; ev.preventDefault(); H[b.dataset.a](b.dataset); });
 document.addEventListener("keydown", (ev) => {
   if (/INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return; const s = A.se;

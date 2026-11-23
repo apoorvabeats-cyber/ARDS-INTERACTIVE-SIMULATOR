@@ -1,6 +1,6 @@
 /* Memory Lab service worker — stale-while-revalidate, bump V to refresh */
-const V = 'ccmem-v2';
-const SHELL = ['./', 'index.html', 'style.css?v=2', 'app.js?v=2', 'fsrs.js', 'store.js', 'waves.js', 'decks/index.json', 'decks/reviews.json'];
+const V = 'ccmem-v3';
+const SHELL = ['./', 'index.html', 'style.css?v=2', 'app.js?v=3', 'dicom.js', 'fsrs.js', 'store.js', 'waves.js', 'decks/index.json', 'decks/reviews.json'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL).catch(() => {})).then(() => self.skipWaiting()));
 });
