@@ -2,6 +2,7 @@
 import { schedule, preview, fmtIv, retrievability } from "./fsrs.js";
 import { drawWave, WAVES, WAVE_Q, hashStr } from "./waves.js";
 import * as DB from "./store.js";
+import { Focus } from "./focus.js";
 import { isDicomFile, dcmParse, dcmFrame, dcmDraw, dcmStack, canvasToJpeg, suggestMod, modLabel, windowPresets } from "./dicom.js";
 
 const $ = (s, r) => (r || document).querySelector(s), $$ = (s, r) => [...(r || document).querySelectorAll(s)];
@@ -22,7 +23,7 @@ const KINDS = [
 ];
 const kind = (k) => KINDS.find((x) => x.k === k) || KINDS[0];
 const kindMatch = (c, k) => (k === "image" ? c.k === "image" || c.fam === "ecg" || !!c.img : c.k === k);
-const DEF = { newPerDay: 15, maxRev: 200, ret: 0.9, revOnly: false, rvr: "", rvm: false };
+const DEF = { newPerDay: 15, maxRev: 200, ret: 0.9, revOnly: false, rvr: "", rvm: false, mus: true };
 
 /* ------------------------------ state ------------------------------ */
 const A = { decks: [], cards: [], byId: new Map(), prog: new Map(), log: [], kv: {}, set: Object.assign({}, DEF), udecks: [], rev: {}, lrev: {}, mode: "idb", route: "home", se: null, rap: null, ret: null };
@@ -206,7 +207,7 @@ function vSession() {
   else { body += `<div class="ans">${c.t === "c" ? "" : fmt(c.a)}${c.t === "c" && c.x ? `<div class="hint">Cloze ${esc(c.n)} revealed above</div>` : ""}</div>${grades(0)}`; }
   if (isQ ? s.sel != null : s.revealed) body += verifyBlock(c);
   const dk = deckOf(c.deck);
-  return `<div class="sbar"><button class="ib" data-a="endsession" aria-label="End session">✕</button><div class="t"><b>${esc((s.title || "").toUpperCase())}</b><span>${esc(dk ? dk.name : "")} · CARD ${String(pos).padStart(2, "0")} / ${s.total + s.bad}</span></div></div><div class="pbar"><i style="width:${pct}%"></i></div><div class="card">${body}</div>${s.cram ? `<div class="hint" style="margin-top:8px;text-align:center">Practice mode: your schedule is not changed</div>` : ""}`;
+  return `<div class="sbar"><button class="ib" data-a="endsession" aria-label="End session">✕</button><div class="t"><b>${esc((s.title || "").toUpperCase())}</b><span>${esc(dk ? dk.name : "")} · CARD ${String(pos).padStart(2, "0")} / ${s.total + s.bad}</span></div>${musicBtn()}</div><div class="pbar"><i style="width:${pct}%"></i></div><div class="card">${body}</div>${s.cram ? `<div class="hint" style="margin-top:8px;text-align:center">Practice mode: your schedule is not changed</div>` : ""}`;
 }
 /* ------------------------------ rapid recall and image challenge ------------------------------ */
 function startRapid(o) {
@@ -230,7 +231,7 @@ function vRapid() {
 ${r.missed.length ? `<div class="panel" style="text-align:left"><h3>TO REVISE</h3><div class="lst">${[...new Map(r.missed.map((c) => [c.id, c])).values()].slice(0, 8).map((c) => `<div class="li"><div class="g">${esc((c.q || c.name || "").replace(/\*\*/g, "").slice(0, 120))}<small>${esc(c.t === "w" ? c.name : c.o[c.a])}</small></div></div>`).join("")}</div></div>` : ""}
 <div class="row2"><button class="btn" data-a="${r.key === "img" ? "image" : "rapid"}">AGAIN</button><button class="btn ghost" data-a="home">BACK TO MEMORY LAB</button></div></div>`;
   const c = r.cur, sel = r.sel;
-  return `<div class="sbar"><button class="ib" data-a="endrapid" aria-label="Stop">✕</button><div class="t"><b>${esc(r.title.toUpperCase())}</b><span class="score">CORRECT ${r.ok} · STREAK ${r.streak}</span></div>${r.secs ? `<div class="timer" id="rt">${Math.max(0, Math.ceil(r.secs - (Date.now() - r.t0) / 1000))}</div>` : `<span class="score">${r.i + 1} / ${r.n}</span>`}</div>
+  return `<div class="sbar"><button class="ib" data-a="endrapid" aria-label="Stop">✕</button><div class="t"><b>${esc(r.title.toUpperCase())}</b><span class="score">CORRECT ${r.ok} · STREAK ${r.streak}</span></div>${r.secs ? `<div class="timer" id="rt">${Math.max(0, Math.ceil(r.secs - (Date.now() - r.t0) / 1000))}</div>` : `<span class="score">${r.i + 1} / ${r.n}</span>`}${musicBtn()}</div>
 <div class="card"><span class="badge">${esc(kind(c.k).b)}</span>${pills(c)}${c.t === "w" ? `<div class="q">${esc(WAVE_Q[c.fam])}</div><canvas class="wv${c.fam === "vent" ? " tall" : ""}" id="wv"></canvas>` : `<div class="q">${fmt(c.q)}</div>${c.img ? `<img alt="Clinical image" src="${esc(c.img)}">` : ""}`}
 <div class="opts">${r.opts.map((o, i) => `<button class="opt${sel != null ? (o.ok ? " ok" : i === sel ? " no" : " dim") : ""}" data-a="ropt" data-i="${i}" ${sel != null ? "disabled" : ""}><span class="l">${"ABCDE"[i]}</span><span>${fmt(o.t)}</span></button>`).join("")}</div>${sel != null && !r.opts[sel].ok ? `<div class="expl">${fmt(c.e || "")}</div>` : ""}</div>`;
 }
@@ -327,6 +328,7 @@ function vSettings() {
   const s = A.set;
   return `<div class="pg">${topBar(true)}<h2>Settings and backup</h2><p class="lead">Storage: ${A.mode === "idb" ? "saved in this browser (IndexedDB)" : "limited storage mode (localStorage)"}. Clearing site data or switching device loses progress unless you back it up.</p>
 <div class="panel"><h3>DAILY LIMITS</h3><label>New cards per day</label><input id="s1" type="number" min="0" max="60" value="${s.newPerDay}"><label>Maximum reviews per day</label><input id="s2" type="number" min="20" max="600" value="${s.maxRev}"><label>Target retention</label><select id="s3">${[0.8, 0.85, 0.9, 0.95].map((v) => `<option value="${v}" ${s.ret === v ? "selected" : ""}>${Math.round(v * 100)}%${v === 0.9 ? " (recommended)" : ""}</option>`).join("")}</select><div class="row2"><button class="btn" data-a="saveset">SAVE</button><span></span></div></div>
+<div class="panel"><h3>STUDY MUSIC</h3><label>Calm background music while you practise</label><select id="s7"><option value="1" ${s.mus !== false ? "selected" : ""}>On (soft instrumental, no beat)</option><option value="0" ${s.mus === false ? "selected" : ""}>Off</option></select><p class="lead" style="margin:8px 0 0">Plays only during card practice and Rapid Recall. You can also switch it off from the ♫ button on the study screen.</p></div>
 <div class="panel"><h3>CLINICAL CONTENT</h3><label>Study scope</label><select id="s4"><option value="0" ${s.revOnly ? "" : "selected"}>All cards (Draft cards are clearly labelled)</option><option value="1" ${s.revOnly ? "selected" : ""}>Clinically reviewed cards only</option></select>
 <p class="lead" style="margin:8px 0 0"><a data-a="info" role="button" tabindex="0">Important information</a> explains Draft, Clinically reviewed and Needs update.</p>
 <label>Reviewer name and designation</label><input id="s5" maxlength="80" value="${esc(s.rvr || "")}" placeholder="e.g. Dr A. Sharma, Consultant Intensivist"><label>Reviewer controls on cards</label><select id="s6"><option value="0" ${s.rvm ? "" : "selected"}>Off</option><option value="1" ${s.rvm ? "selected" : ""}>On (for clinicians reviewing cards)</option></select>
@@ -357,8 +359,11 @@ ${GROUPS.map((g) => { const o = imgOwn(g[0]), sc = imgSch(g[0]); return `<div cl
 function render() {
   const r = A.route; let h;
   if (r === "session") h = vSession(); else if (r === "rapid") h = vRapid(); else if (r.startsWith("deck:")) h = vDeck(r.slice(5)); else if (r === "stats") h = vStats(); else if (r === "weak") h = vWeak(); else if (r === "own") h = vOwn(); else if (r.startsWith("ownedit:")) h = vOwnEdit(r.slice(8)); else if (r === "settings") h = vSettings(); else if (r === "info") h = vInfo(); else if (r === "images") h = vImages(); else h = vHome();
-  $("#app").innerHTML = h; drawNow();
+  $("#app").innerHTML = h; drawNow(); syncMusic();
 }
+/* calm focus music runs while a card session or Rapid Recall is open */
+function syncMusic() { const live = (A.route === "session" && A.se && A.se.cur) || (A.route === "rapid" && A.rap && !A.rap.end); Focus.set(A.set.mus !== false && !!live); }
+const musicBtn = () => `<button class="ib" data-a="music" aria-label="${A.set.mus !== false ? "Turn study music off" : "Turn study music on"}" title="Study music">${A.set.mus !== false ? "♫" : "🔇"}</button>`;
 function drawNow() { const cv = $("#wv"); if (!cv) return; const c = r0().cur; if (c && c.t === "w") requestAnimationFrame(() => drawWave(cv, c.w)); }
 const r0 = () => (A.route === "rapid" ? A.rap || {} : A.se || {});
 window.addEventListener("resize", () => { clearTimeout(drawNow.t); drawNow.t = setTimeout(drawNow, 150); });
@@ -372,6 +377,7 @@ const H = {
   daily: () => { if (buildQueue(A.cards).length) startSession({ title: "Daily revision", pool: A.cards }); else ahead(A.cards, "Study ahead"); },
   deck: (e) => go("deck:" + e.id), study: (e) => { const d = deckOf(e.id); if (d) studyPool(d.name, d.list); }, ahead: (e) => { const d = deckOf(e.id); if (d) ahead(d.list, d.name + " · ahead"); },
   kind: (e) => { const k = kind(e.k); studyPool(k.n, A.cards.filter((c) => kindMatch(c, e.k))); },
+  music: () => { A.set = Object.assign({}, A.set, { mus: A.set.mus === false }); DB.setKV("settings", A.set); render(); toast(A.set.mus === false ? "Study music off" : "Study music on"); },
   weak: () => go("weak"), drill: () => startSession({ title: "Weak card drill", pool: weakCards().map((x) => x[1]), cram: true, limit: 20 }),
   rapid: () => startRapid({ title: "Rapid Recall · 60 s", pool: A.cards, secs: 60, key: "rapid" }), image: () => startRapid({ title: "Clinical Image Challenge", pool: A.cards.filter((c) => kindMatch(c, "image") && c.t === "w"), n: 10, key: "img" }),
   own: () => go("own"), stats: () => go("stats"), settings: () => go("settings"), info: () => go("info"), images: () => go("images"),
@@ -399,7 +405,7 @@ const H = {
   qadd: async () => { const pick = $$("input[data-q]").filter((x) => x.checked).map((x) => A.qc[+x.dataset.q]); if (!pick.length) return toast("Select at least one card."); let id = val("qd"), u = A.udecks.find((x) => x.id === id); if (!u) { u = { id: uid(), name: "Quick cards " + new Date().toLocaleDateString(), cards: [] }; A.udecks.push(u); } u.cards.push(...pick); saveU(); await loadDecks(); toast(pick.length + " cards added to " + u.name); go("own"); },
   qprompt: async () => { const t = val("qt").trim(), tp = val("qtopic").trim(); if (!t && !tp) return toast("Enter a topic or paste some source text first."); const p = aiPrompt(tp, t, +val("qn") || 20); try { await navigator.clipboard.writeText(p); toast("Prompt copied. Paste it into your AI assistant, then import its JSON in Step 3."); } catch (e) { $("#qt").value = p; toast("Copy the prompt from the box."); } },
   import: async () => { let t = val("im"); const f = $("#imf") && $("#imf").files[0]; if (f) t = await f.text(); const r = parseImport(t); if (!r.cards.length) return toast("No valid cards found in that text."); const u = { id: uid(), name: r.name || "AI import " + new Date().toLocaleDateString(), cards: r.cards }; A.udecks.push(u); saveU(); await loadDecks(); toast(r.cards.length + " cards imported as Draft"); go("ownedit:" + u.id); },
-  saveset: () => { A.set = { newPerDay: Math.max(0, Math.min(60, +val("s1") || 0)), maxRev: Math.max(20, Math.min(600, +val("s2") || 200)), ret: +val("s3") || 0.9, revOnly: val("s4") === "1", rvr: val("s5").trim().slice(0, 80), rvm: val("s6") === "1" }; DB.setKV("settings", A.set); toast("Saved"); go("home"); },
+  saveset: () => { A.set = { newPerDay: Math.max(0, Math.min(60, +val("s1") || 0)), maxRev: Math.max(20, Math.min(600, +val("s2") || 200)), ret: +val("s3") || 0.9, revOnly: val("s4") === "1", rvr: val("s5").trim().slice(0, 80), rvm: val("s6") === "1", mus: val("s7") !== "0" }; DB.setKV("settings", A.set); toast("Saved"); go("home"); },
   backup: () => dl("memory-lab-backup-" + new Date().toISOString().slice(0, 10) + ".json", JSON.stringify({ v: 1, prog: [...A.prog.values()], log: A.log, kv: Object.assign({}, A.kv, { udecks: A.udecks, settings: A.set }) })),
   restore: () => { const f = $("#rf"); f.onchange = async () => { try { const d = JSON.parse(await f.files[0].text()); if (!d.prog || !d.log) throw 0; if (!confirm("Replace the progress on this device with this backup?")) return; await DB.restore(d); location.reload(); } catch (e) { toast("That file is not a Memory Lab backup."); } }; f.click(); },
   reset: async () => { if (!confirm("Erase all progress on this device? This cannot be undone.")) return; await DB.wipe(); location.reload(); },

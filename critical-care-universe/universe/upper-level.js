@@ -5,7 +5,8 @@
 
    buildUpper(T, ctx) -> { lift, doors, player, level(), isUp(), clamp(x,z), groundY(x,z), update(t,dt,cam), tap(kind,hit), inHall(p), ... } */
 
-import { buildMemoryHall } from "./memory-hall.js?v=20261123g";
+import { buildMemoryHall } from "./memory-hall.js?v=20261123h";
+import { play as clipPlay, preload as clipPreload } from "./voice-clips.js?v=20261123h";
 
 export function buildUpper(T, c) {
   const { G, M, E, mesh, bx, cyl, pl, ctex, dcv, makeDoor, wallMat, slats, acoustic, cyan, cyanDim, white, dark, metal, LOW, AU, cxA, ZC, MDTC, RHN } = c;
@@ -92,12 +93,17 @@ export function buildUpper(T, c) {
     } catch (e) { LA.on = on; }
   }
   function ding() { try { const c = LA.ctx; if (!c) return; const g = c.createGain(); g.gain.value = 0.5; g.connect(c.destination); const t = c.currentTime; note(c, g, 880, t, 1.2, "sine", 0.18, 0.01); note(c, g, 1318.5, t + 0.28, 1.4, "sine", 0.14, 0.01); } catch (e) {} }
-  function say(txt2) { try { if (!window.speechSynthesis) return; const u = new SpeechSynthesisUtterance(txt2); u.volume = 0.6; u.rate = 0.92; u.pitch = 1.05; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); } catch (e) {} }
+  function say(txt2) { try { if (!window.speechSynthesis) return; const u = new SpeechSynthesisUtterance(txt2); u.volume = 0.7; u.rate = 0.92; u.pitch = 1.1;
+    const vs = window.speechSynthesis.getVoices(), f = vs.find((v) => /en/i.test(v.lang) && /female|samantha|zira|susan|karen|moira|tessa|hazel|aria|jenny|google uk english female|google us english/i.test(v.name)); if (f) u.voice = f;
+    window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); } catch (e) {} }
+  /* spoken announcements: the recorded female voice, with the browser voice only as a fallback */
+  const LIFT_CLIPS = ["lift_first", "lift_ground", "lift_up", "lift_down"], MEM_CLIPS = ["m_home", "m_start", "m_rapid", "m_weak", "m_stats", "k_recall", "k_image", "k_wave", "k_decision", "k_drug", "k_anat", "k_guide"];
+  const announce = (clip, fallback) => clipPlay(clip).then((ok) => { if (!ok && fallback) say(fallback); return ok; });
   /* the lift: state, and the ride (close doors, travel, open doors) */
   const lift = { y: 0, level: 0, moving: false, carry: false, busy: false }, up = { level: 0 };
   const doorAt = (lv) => (lv ? d1 : d0);
   let job = null, indT = 0, wasLvl = -1;
-  function ride(to, cb, carry) { job = { to, cb, carry: !!carry, from: lift.level, ph: 0, t: 0, y0: lift.y }; if (carry) { lift.carry = true; liftMusic(true); say(to ? "Going up to the first floor." : "Going down to the ground floor."); } }
+  function ride(to, cb, carry) { job = { to, cb, carry: !!carry, from: lift.level, ph: 0, t: 0, y0: lift.y }; if (carry) { lift.carry = true; liftMusic(true); clipPreload(LIFT_CLIPS); if (to) clipPreload(MEM_CLIPS); announce(to ? "lift_up" : "lift_down", to ? "Going up to the first floor." : "Going down to the ground floor."); } }
   function call(lv, cb) { if (lift.level === lv && !job) { job = { to: lv, cb, carry: false, from: lv, ph: 2, t: 0, y0: lift.y }; } else ride(lv, cb, false); }
   function stepLift(dt) {
     if (!job) return; job.t += dt;
@@ -107,8 +113,10 @@ export function buildUpper(T, c) {
       if (dd.open < 0.03 && job.t > 0.5) { job.ph = 1; job.t = 0; lift.moving = true; job.y1 = job.to ? LV : 0; job.dur = Math.max(1.5, Math.abs(job.y1 - job.y0) / LV * 5.6); }
     } else if (job.ph === 1) {
       const k = clampN(job.t / job.dur, 0, 1); lift.y = job.y0 + (job.y1 - job.y0) * smooth(k);
-      if (k >= 1) { lift.y = job.y1; lift.level = job.to; lift.moving = false; if (job.carry) { up.level = job.to; liftMusic(false); ding(); say(job.to ? "First floor." : "Ground floor."); } job.ph = 2; job.t = 0; }
+      if (k >= 1) { lift.y = job.y1; lift.level = job.to; lift.moving = false; if (job.carry) { up.level = job.to; liftMusic(false); ding(); job.vd = false; job.go = false; const jb = job; announce(job.to ? "lift_first" : "lift_ground", job.to ? "First floor." : "Ground floor.").then(() => { jb.vd = true; }); } job.ph = 2; job.t = 0; }
     } else {
+      /* with passengers the lift names the floor first, and only then do the doors open */
+      if (job.carry && !job.go) { if (job.t > 1.1 && (job.vd || job.t > 3.4)) { job.go = true; job.t = 0; } else return; }
       const dd = doorAt(job.to); dd.target = 1; if (dd.open > 0.92 || job.t > 4) { const cb = job.cb; lift.carry = false; job = null; if (cb) cb(); }
     }
   }
@@ -118,7 +126,7 @@ export function buildUpper(T, c) {
   const cabPaint = () => { const g = board.g, w = 512, h = 256; panelBg(g, w, h, "#04101a", "#0a2038"); frame(g, w, h, "#36d6ff", 6);
     const y = lift.y / LV, up2 = job && job.ph === 1 && job.to > job.from, dn = job && job.ph === 1 && job.to < job.from;
     if (lift.moving) { txt(g, "GOING TO THE", w / 2, 62, 32, "#9fe8ff", "center", 600); txt(g, up2 ? "FIRST FLOOR" : "GROUND FLOOR", w / 2, 128, 62, "#eaf6ff", "center", 800, "#36d6ff"); txt(g, up2 ? "▲" : "▼", w / 2, 192, 44, "#ffb347", "center", 800); }
-    else { txt(g, y < 0.5 ? "GROUND FLOOR" : "FIRST FLOOR", w / 2, 100, 62, "#eaf6ff", "center", 800, "#36d6ff"); txt(g, y < 0.5 ? "Auditorium" : "Video Auditorium  ·  Memory Lab", w / 2, 172, y < 0.5 ? 38 : 30, "#9fe8ff", "center", 600); }
+    else { txt(g, y < 0.5 ? "GROUND FLOOR" : "FIRST FLOOR", w / 2, 100, 62, "#eaf6ff", "center", 800, "#36d6ff"); const arr = job && job.carry && !job.go && job.ph === 2; txt(g, arr ? "ARRIVED" : y < 0.5 ? "Auditorium" : "Video Auditorium  ·  Memory Lab", w / 2, 172, arr ? 40 : y < 0.5 ? 38 : 30, arr ? "#ffb347" : "#9fe8ff", "center", arr ? 800 : 600); }
     g.fillStyle = "rgba(54,214,255,.25)"; g.fillRect(40, 226, w - 80, 8); g.fillStyle = "#36d6ff"; g.fillRect(40, 226, (w - 80) * clampN(y, 0, 1), 8); board.t.needsUpdate = true; void dn; };
 
   /* ============================== LOBBY (above the auditorium) ============================== */
@@ -144,18 +152,33 @@ export function buildUpper(T, c) {
   bx(0.06, 0.06, ADp, cyan, AU.x1 - 0.05, TOP - 0.25, (AU.z0 + AU.z1) / 2, top); bx(AWd, 0.05, 0.05, cyanDim, cxA, LV + 0.07, AU.z1 - 0.04, top); bx(0.05, 0.05, ADp, cyanDim, AU.x0 + 0.04, LV + 0.07, (AU.z0 + AU.z1) / 2, top);
   [[1.5, 0.07, 0x36d6ff], [2.8, 0.05, 0xeaf6ff], [4.2, 0.05, 0x2a7fb8]].forEach((r) => { const t = mesh(new T.TorusGeometry(r[0], r[1], 8, 72), E(r[2], 2), cxA, TOP - 0.1, -12.6, top); t.rotation.x = PI / 2; });
   for (let i = -2; i <= 2; i++) bx(0.12, 0.04, 14, white, cxA + i * 2.6, TOP - 0.04, -13, top);
-  /* wall displays: the Critical Care Education wall (west) and the library wall (north) */
+  /* wall boards of the lobby (placed below) */
   const eduWall = ctex(2048, 640, (g, w, h) => {
     panelBg(g, w, h, "#041428", "#08304f"); g.strokeStyle = "rgba(54,214,255,.18)"; g.lineWidth = 2; for (let i = 0; i < 40; i++) { g.beginPath(); g.moveTo(i * 52, 0); g.lineTo(i * 52, h); g.stroke(); }
     frame(g, w, h, "#36d6ff", 8);
     txt(g, "CRITICAL CARE EDUCATION", 90, 200, 128, "#eaf6ff", "left", 800, "#36d6ff");
     txt(g, "Learn  ·  Practice  ·  Excel", 94, 330, 70, "#36d6ff", "left", 600, "#36d6ff");
-    txt(g, "Procedure videos in the Video Auditorium", 94, 470, 44, "#7fa6c8", "left", 500);
+    txt(g, "Video Library on the left  ·  Memory Lab on the right", 94, 470, 44, "#7fa6c8", "left", 500);
     g.strokeStyle = "#36d6ff"; g.lineWidth = 7; g.shadowColor = "#36d6ff"; g.shadowBlur = 20; const cx = w - 300, cy = h / 2; g.beginPath(); g.arc(cx, cy, 150, 0, 7); g.stroke(); g.fillStyle = "#36d6ff"; g.beginPath(); g.moveTo(cx - 40, cy - 70); g.lineTo(cx - 40, cy + 70); g.lineTo(cx + 80, cy); g.closePath(); g.fill(); g.shadowBlur = 0;
   });
-  { const m = new T.Mesh(new T.PlaneGeometry(5.8, 5.8 * 640 / 2048), basic(eduWall)); m.position.set(AU.x0 + 0.05, LV + 2.9, -11.6); m.rotation.y = PI / 2; top.add(m); bx(0.04, 0.05, 5.9, cyan, AU.x0 + 0.04, LV + 2.9 - 0.95, -11.6, top); bx(0.04, 0.05, 5.9, cyan, AU.x0 + 0.04, LV + 2.9 + 0.95, -11.6, top); }
+  /* the three wall boards of the lobby, as you step out of the lift (facing the front wall):
+     front wall: CRITICAL CARE EDUCATION  ·  left wall (east, towards the video gate): VIDEO LIBRARY  ·  right wall (west, towards the Memory Lab gate): MEMORY LAB */
+  { const m = new T.Mesh(new T.PlaneGeometry(8.4, 8.4 * 640 / 2048), basic(eduWall)); m.position.set(cxA, LV + 2.8, AU.z1 - 0.06); m.rotation.y = PI; top.add(m);
+    bx(8.5, 0.05, 0.04, cyan, cxA, LV + 2.8 - 1.38, AU.z1 - 0.05, top); bx(8.5, 0.05, 0.04, cyan, cxA, LV + 2.8 + 1.38, AU.z1 - 0.05, top); }
   const dirTex = dcv(1536, 520);
-  { const m = new T.Mesh(new T.PlaneGeometry(7.4, 7.4 * 520 / 1536), basic(dirTex.t)); m.position.set(cxA - 1.2, LV + 2.8, AU.z1 - 0.06); m.rotation.y = PI; top.add(m); }
+  { const m = new T.Mesh(new T.PlaneGeometry(7.4, 7.4 * 520 / 1536), basic(dirTex.t)); m.position.set(AU.x1 - 0.06, LV + 2.8, -10.25); m.rotation.y = -PI / 2; m.userData.door = "vhall"; top.add(m); }
+  const memWall = ctex(2048, 640, (g, w, h) => {
+    panelBg(g, w, h, "#07091f", "#150f44"); g.strokeStyle = "rgba(155,123,255,.16)"; g.lineWidth = 2; for (let i = 0; i < 40; i++) { g.beginPath(); g.moveTo(i * 52, 0); g.lineTo(i * 52, h); g.stroke(); }
+    frame(g, w, h, "#9b7bff", 8);
+    const nodes = [[0.2, 0.3], [0.62, 0.15], [0.9, 0.5], [0.55, 0.85], [0.1, 0.78], [0.5, 0.5]], cx = w - 240, cy = h / 2, R = 150;
+    g.shadowColor = "#9b7bff"; g.shadowBlur = 20; g.strokeStyle = "#9b7bff"; g.fillStyle = "#9b7bff"; g.lineWidth = 6; g.beginPath(); [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [5, 0], [5, 1], [5, 2], [5, 3], [5, 4]].forEach(([i, j]) => { g.moveTo(cx - R + nodes[i][0] * 2 * R, cy - R + nodes[i][1] * 2 * R); g.lineTo(cx - R + nodes[j][0] * 2 * R, cy - R + nodes[j][1] * 2 * R); }); g.stroke();
+    nodes.forEach((n, i) => { g.beginPath(); g.arc(cx - R + n[0] * 2 * R, cy - R + n[1] * 2 * R, i === 5 ? 22 : 14, 0, 7); g.fill(); }); g.shadowBlur = 0;
+    txt(g, "CRITICAL CARE HUB", 90, 150, 70, "#b9a8ff", "left", 700); txt(g, "MEMORY LAB", 90, 262, 150, "#eef4ff", "left", 800, "#9b7bff");
+    txt(g, "Learn Today.  Recall Tomorrow.  Remember for Life.", 94, 394, 62, "#9fe8ff", "left", 600, "#36d6ff");
+    txt(g, "Spaced-repetition cards  ·  through the gate on this wall", 94, 506, 40, "#8fa6d6", "left", 500);
+  });
+  { const m = new T.Mesh(new T.PlaneGeometry(7.4, 7.4 * 640 / 2048), basic(memWall)); m.position.set(AU.x0 + 0.06, LV + 2.8, -10.25); m.rotation.y = PI / 2; m.userData.door = "mhall"; top.add(m);
+    const vio = new T.MeshBasicMaterial({ color: new T.Color(0x9b7bff).multiplyScalar(2), toneMapped: false }); [-1, 1].forEach((sgn) => { const l = new T.Mesh(new T.BoxGeometry(0.04, 0.05, 7.5), vio); l.position.set(AU.x0 + 0.05, LV + 2.8 + sgn * 1.17, -10.25); top.add(l); }); }
   /* sign above the gate to the video auditorium */
   const gateSign = ctex(768, 200, (g, w, h) => {
     g.fillStyle = "#06101a"; g.fillRect(0, 0, w, h); g.strokeStyle = "#7aa8ff"; g.lineWidth = 5; g.strokeRect(5, 5, w - 10, h - 10);
@@ -350,7 +373,7 @@ export function buildUpper(T, c) {
   function paintDir() {
     const g = dirTex.g, w = 1536, h = 520; panelBg(g, w, h, "#041428", "#08304f"); frame(g, w, h, "#36d6ff", 6);
     txt(g, "VIDEO LIBRARY", 40, 56, 54, "#eaf6ff", "left", 800, "#36d6ff"); txt(g, "Level 1  ·  through the gate", 40, 110, 28, "#36d6ff", "left", 500);
-    const n = pl8.list.length || 15, cols = 8, tw = (w - 80 - (cols - 1) * 10) / cols, th = tw * 1.15;
+    const n = pl8.list.length || 15, cols = 8, rows = Math.ceil(n / cols), tw = (w - 80 - (cols - 1) * 10) / cols, th = Math.min(tw * 1.15, (h - 150 - 22 - (rows - 1) * 8) / rows);
     for (let i = 0; i < n; i++) { const x = 40 + (i % cols) * (tw + 10), y = 150 + Math.floor(i / cols) * (th + 8) - (i >= cols ? 0 : 0); if (y + th > h - 8) break; g.save(); g.beginPath(); g.rect(x, y, tw, th); g.clip(); cover(g, pl8.posters[i], x, y, tw, th); g.restore(); g.strokeStyle = "rgba(54,214,255,.7)"; g.lineWidth = 2; g.strokeRect(x, y, tw, th); }
     dirTex.t.needsUpdate = true;
   }
@@ -423,7 +446,7 @@ export function buildUpper(T, c) {
   function tap(kind, hit) {
     if (kind === "screen") { if (hit && hit.uv) { if (!tapScreen(hit.uv) && pl8.mode === "play") toggle(); } return "screen"; }
     if (kind === "podium") { return "library"; }
-    if (typeof kind === "string" && kind.slice(0, 2) === "m:") { const r = mem.tap(kind); if (r && api.openMemory) api.openMemory(r.route); return "memory"; }
+    if (typeof kind === "string" && kind.slice(0, 2) === "m:") { const r = mem.tap(kind); if (r) { if (r.say) announce(r.say); if (api.openMemory) api.openMemory(r.route); } return "memory"; }
     return null;
   }
   const api = {
