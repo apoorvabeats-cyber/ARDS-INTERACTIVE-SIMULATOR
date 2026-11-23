@@ -1,5 +1,5 @@
 /* Helpers shared by the labs: a draggable clot with its pulsing ring, spring-back and retrieval flight, and a tube/flow builder. */
-import { THREE, smooth } from "../stage.js?v=20261123k";
+import { THREE, smooth } from "../stage.js?v=20261123l";
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 export function clotKit(S, grp, ui, cfg) {
@@ -25,6 +25,25 @@ export function clotKit(S, grp, ui, cfg) {
   return k;
 }
 
+/* A tool to be placed by hand (EVD catheter, chest tube, needle, bronchoscope...): drag its tip to the glowing ring and let go.
+   cfg: { start, target (Vector3, in grp space), thr, len, r, color, onPlaced, msg, go, far } */
+export function toolKit(S, grp, ui, cfg) {
+  const k = { placed: false, grab: false, thr: cfg.thr || 0.3, start: cfg.start.clone(), target: cfg.target.clone(), onPlaced: cfg.onPlaced };
+  const dir = k.target.clone().sub(k.start).normalize(), len = cfg.len || 0.55, r = cfg.r || 0.02;
+  k.mesh = new THREE.Group(); const sh = new THREE.CylinderGeometry(r, r, len, 10); sh.translate(0, -len / 2, 0);
+  k.mesh.add(new THREE.Mesh(sh, new THREE.MeshPhongMaterial({ color: cfg.color || 0xcfe9ff, emissive: 0x203040, shininess: 90 })));
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(r * 1.9, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffd166 })); k.mesh.add(tip);
+  k.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); k.mesh.position.copy(k.start); k.mesh.renderOrder = 7; grp.add(k.mesh);
+  k.hit = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })); k.hit.userData.drag = true; k.mesh.add(k.hit); S.pick.push(k.hit);
+  k.ring = new THREE.Mesh(new THREE.TorusGeometry(cfg.ring || 0.13, 0.01, 8, 40), new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.9 })); k.ring.position.copy(k.target); k.ring.lookAt(k.target.clone().add(dir)); k.ring.renderOrder = 6; grp.add(k.ring);
+  k.grabbed = (o) => { if (o === k.hit && !k.placed) { k.grab = true; return true; } return false; };
+  k.drag = (w) => { if (!k.grab) return false; const p = grp.worldToLocal(w.clone()); k.mesh.position.copy(p); const d = p.distanceTo(k.target); ui.hint(d < k.thr ? (cfg.go || "Release to place it") : (cfg.msg || "Drag the tip to the glowing ring…"), d < k.thr); return true; };
+  k.place = () => { k.placed = true; k.grab = false; k.mesh.position.copy(k.target); k.ring.visible = false; k.hit.userData.drag = false; ui.hint("", false); if (cfg.onPlaced) cfg.onPlaced(); };
+  k.drop = () => { if (!k.grab) return false; k.grab = false; if (k.mesh.position.distanceTo(k.target) < k.thr) k.place(); else ui.hint(cfg.far || "Not there yet: bring the tip to the glowing ring.", false); return true; };
+  k.frame = (dt) => { if (!k.placed) { k.ring.scale.setScalar(1 + 0.12 * Math.sin(S.time() * 5)); k.ring.material.opacity = 0.55 + 0.4 * Math.sin(S.time() * 5); if (!k.grab) k.mesh.position.lerp(k.start, Math.min(1, dt * 8)); } };
+  k.show = (v) => { k.mesh.visible = v; k.ring.visible = v && !k.placed; };
+  return k;
+}
 /* tubes with flow particles; defs: [name, points, radius] */
 export function vessels(S, grp, defs, hex, o) {
   o = o || {}; const T = {}, F = {};
