@@ -5,6 +5,8 @@
 
    buildUpper(T, ctx) -> { lift, doors, player, level(), isUp(), clamp(x,z), groundY(x,z), update(t,dt,cam), tap(kind,hit), inHall(p), ... } */
 
+import { buildMemoryHall } from "./memory-hall.js?v=20261123f";
+
 export function buildUpper(T, c) {
   const { G, M, E, mesh, bx, cyl, pl, ctex, dcv, makeDoor, wallMat, slats, acoustic, cyan, cyanDim, white, dark, metal, LOW, AU, cxA, ZC, MDTC, RHN } = c;
   const V = T.Vector3, PI = Math.PI;
@@ -41,8 +43,8 @@ export function buildUpper(T, c) {
     panelBg(g, w, h, "#06141f", "#0b2a42"); frame(g, w, h, "#36d6ff", 6);
     g.shadowColor = "#36d6ff"; g.shadowBlur = 12; g.strokeStyle = "#36d6ff"; g.lineWidth = 6; g.lineJoin = "round";
     g.strokeRect(34, 70, 76, 116); g.beginPath(); g.moveTo(72, 70); g.lineTo(72, 186); g.stroke(); g.shadowBlur = 0;
-    txt(g, lv ? "GROUND FLOOR" : "FIRST FLOOR", 134, 100, 42, "#eaf6ff", "left", 800, "#36d6ff");
-    txt(g, lv ? "Auditorium" : "Video Auditorium", 134, 158, 30, "#9fe8ff", "left", 600);
+    txt(g, lv ? "GROUND FLOOR" : "FIRST FLOOR", 134, 92, 42, "#eaf6ff", "left", 800, "#36d6ff");
+    txt(g, lv ? "Auditorium" : "Video Auditorium", 134, 148, lv ? 30 : 26, "#9fe8ff", "left", 600); if (!lv) txt(g, "Memory Lab", 134, 190, 26, "#c4b5ff", "left", 600);
   });
   { const m0 = new T.Mesh(new T.PlaneGeometry(1.4, 0.7), basic(liftSign(0))); m0.position.set(XT, 3.5, ZF + 0.135); tower.add(m0);
     const m1 = new T.Mesh(new T.PlaneGeometry(1.4, 0.7), basic(liftSign(1))); m1.position.set(XT, LV + 3.5, ZF + 0.135); top.add(m1); }
@@ -116,7 +118,7 @@ export function buildUpper(T, c) {
   const cabPaint = () => { const g = board.g, w = 512, h = 256; panelBg(g, w, h, "#04101a", "#0a2038"); frame(g, w, h, "#36d6ff", 6);
     const y = lift.y / LV, up2 = job && job.ph === 1 && job.to > job.from, dn = job && job.ph === 1 && job.to < job.from;
     if (lift.moving) { txt(g, "GOING TO THE", w / 2, 62, 32, "#9fe8ff", "center", 600); txt(g, up2 ? "FIRST FLOOR" : "GROUND FLOOR", w / 2, 128, 62, "#eaf6ff", "center", 800, "#36d6ff"); txt(g, up2 ? "▲" : "▼", w / 2, 192, 44, "#ffb347", "center", 800); }
-    else { txt(g, y < 0.5 ? "GROUND FLOOR" : "FIRST FLOOR", w / 2, 100, 62, "#eaf6ff", "center", 800, "#36d6ff"); txt(g, y < 0.5 ? "Auditorium" : "Video Auditorium", w / 2, 172, 38, "#9fe8ff", "center", 600); }
+    else { txt(g, y < 0.5 ? "GROUND FLOOR" : "FIRST FLOOR", w / 2, 100, 62, "#eaf6ff", "center", 800, "#36d6ff"); txt(g, y < 0.5 ? "Auditorium" : "Video Auditorium  ·  Memory Lab", w / 2, 172, y < 0.5 ? 38 : 30, "#9fe8ff", "center", 600); }
     g.fillStyle = "rgba(54,214,255,.25)"; g.fillRect(40, 226, w - 80, 8); g.fillStyle = "#36d6ff"; g.fillRect(40, 226, (w - 80) * clampN(y, 0, 1), 8); board.t.needsUpdate = true; void dn; };
 
   /* ============================== LOBBY (above the auditorium) ============================== */
@@ -127,14 +129,14 @@ export function buildUpper(T, c) {
     const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#0b1624"); gr.addColorStop(1, "#060b12"); g.fillStyle = gr; g.fillRect(0, 0, w, h);
     g.strokeStyle = "rgba(80,160,220,.07)"; g.lineWidth = 2; for (let i = 0; i <= 13; i++) { g.beginPath(); g.moveTo(i * w / 13.4, 0); g.lineTo(i * w / 13.4, h); g.stroke(); } for (let j = 0; j <= 16; j++) { g.beginPath(); g.moveTo(0, j * h / 16); g.lineTo(w, j * h / 16); g.stroke(); }
     g.lineCap = "round"; g.lineJoin = "round"; g.shadowColor = "#36d6ff"; g.shadowBlur = 16; g.strokeStyle = "#36d6ff"; g.lineWidth = 6;
-    g.beginPath(); g.moveTo(px(XT), py(ZF + 0.6)); g.lineTo(px(XT), py(ZC)); g.lineTo(px(AU.x1 - 1.0), py(ZC)); g.stroke();
+    g.beginPath(); g.moveTo(px(XT), py(ZF + 0.6)); g.lineTo(px(XT), py(ZC)); g.lineTo(px(AU.x1 - 1.0), py(ZC)); g.moveTo(px(XT), py(ZC)); g.lineTo(px(AU.x0 + 1.0), py(ZC)); g.stroke();
     g.strokeStyle = "rgba(54,214,255,.55)"; g.lineWidth = 4; [2.1, 3.4].forEach((r) => { g.beginPath(); g.arc(px(cxA), py(-12.6), r / AWd * w, 0, 7); g.stroke(); });
     g.fillStyle = "rgba(54,214,255,.18)"; g.beginPath(); g.arc(px(cxA), py(-12.6), 1.4 / AWd * w, 0, 7); g.fill(); g.shadowBlur = 0;
   });
   mesh(new T.PlaneGeometry(AWd, ADp), M(0xffffff, { map: lobFloor, roughness: 0.2, metalness: 0.5, envMapIntensity: 1.1 }), cxA, LV + 0.004, (AU.z0 + AU.z1) / 2, top).rotation.x = -PI / 2;
   mesh(new T.PlaneGeometry(AWd, ADp), M(0x0b1118, { roughness: 0.9, side: T.DoubleSide }), cxA, TOP, (AU.z0 + AU.z1) / 2, top).rotation.x = PI / 2;
   mesh(new T.PlaneGeometry(AWd, ADp), M(0x05080c, { roughness: 1 }), cxA, CEIL + 0.02, (AU.z0 + AU.z1) / 2, top).rotation.x = -PI / 2;
-  lw(ADp, LH, AU.x0 + 0.01, LV + LH / 2, (AU.z0 + AU.z1) / 2, PI / 2);
+  lw(ZC - 1.5 - AU.z0, LH, AU.x0 + 0.01, LV + LH / 2, (AU.z0 + ZC - 1.5) / 2, PI / 2); lw(AU.z1 - (ZC + 1.5), LH, AU.x0 + 0.01, LV + LH / 2, (AU.z1 + ZC + 1.5) / 2, PI / 2); lw(3.0, LH - 4.4, AU.x0 + 0.01, LV + 4.4 + (LH - 4.4) / 2, ZC, PI / 2);
   lw(AWd, LH, cxA, LV + LH / 2, AU.z1 - 0.01, PI); lw(AWd, LH, cxA, LV + LH / 2, AU.z0 + 0.01, 0);
   lw(ZC - 1.5 - AU.z0, LH, AU.x1 - 0.01, LV + LH / 2, (AU.z0 + ZC - 1.5) / 2, -PI / 2); lw(AU.z1 - (ZC + 1.5), LH, AU.x1 - 0.01, LV + LH / 2, (AU.z1 + ZC + 1.5) / 2, -PI / 2); lw(3.0, LH - 4.4, AU.x1 - 0.01, LV + 4.4 + (LH - 4.4) / 2, ZC, -PI / 2);
   /* cove lines and ceiling rings */
@@ -151,7 +153,7 @@ export function buildUpper(T, c) {
     txt(g, "Procedure videos in the Video Auditorium", 94, 470, 44, "#7fa6c8", "left", 500);
     g.strokeStyle = "#36d6ff"; g.lineWidth = 7; g.shadowColor = "#36d6ff"; g.shadowBlur = 20; const cx = w - 300, cy = h / 2; g.beginPath(); g.arc(cx, cy, 150, 0, 7); g.stroke(); g.fillStyle = "#36d6ff"; g.beginPath(); g.moveTo(cx - 40, cy - 70); g.lineTo(cx - 40, cy + 70); g.lineTo(cx + 80, cy); g.closePath(); g.fill(); g.shadowBlur = 0;
   });
-  { const m = new T.Mesh(new T.PlaneGeometry(8.2, 8.2 * 640 / 2048), basic(eduWall)); m.position.set(AU.x0 + 0.05, LV + 2.9, -12.6); m.rotation.y = PI / 2; top.add(m); bx(8.3, 0.05, 0.04, cyan, AU.x0 + 0.04, LV + 2.9 - 1.33, -12.6, top); bx(8.3, 0.05, 0.04, cyan, AU.x0 + 0.04, LV + 2.9 + 1.33, -12.6, top); }
+  { const m = new T.Mesh(new T.PlaneGeometry(5.8, 5.8 * 640 / 2048), basic(eduWall)); m.position.set(AU.x0 + 0.05, LV + 2.9, -11.6); m.rotation.y = PI / 2; top.add(m); bx(0.04, 0.05, 5.9, cyan, AU.x0 + 0.04, LV + 2.9 - 0.95, -11.6, top); bx(0.04, 0.05, 5.9, cyan, AU.x0 + 0.04, LV + 2.9 + 0.95, -11.6, top); }
   const dirTex = dcv(1536, 520);
   { const m = new T.Mesh(new T.PlaneGeometry(7.4, 7.4 * 520 / 1536), basic(dirTex.t)); m.position.set(cxA - 1.2, LV + 2.8, AU.z1 - 0.06); m.rotation.y = PI; top.add(m); }
   /* sign above the gate to the video auditorium */
@@ -167,7 +169,7 @@ export function buildUpper(T, c) {
   const holo = new T.Mesh(new T.IcosahedronGeometry(0.5, 1), new T.MeshBasicMaterial({ color: 0x36d6ff, wireframe: true, transparent: true, opacity: 0.8, toneMapped: false })); holo.position.set(0, 1.9, 0); kiosk.add(holo);
   const holo2 = new T.Mesh(new T.TorusGeometry(0.72, 0.012, 6, 64), E(0x9fe8ff, 2)); holo2.position.set(0, 1.9, 0); holo2.rotation.x = 1.2; kiosk.add(holo2);
   cyl(0.02, 0.02, 0.8, E(0x36d6ff, 1.2), 0, 1.35, 0, kiosk, 6);
-  [-1, 1].forEach((s) => [-14.5, -10.5].forEach((z) => { bx(0.5, 0.42, 2.4, M(0x16202a, { metalness: 0.5, roughness: 0.4 }), AU.x0 + 0.5 + 0.1, LV + 0.21, z, top); bx(0.05, 0.04, 2.3, cyan, AU.x0 + 0.78, LV + 0.44, z, top); }));
+  [-1, 1].forEach((s) => [-13.4, -10.0].forEach((z) => { bx(0.5, 0.42, 2.4, M(0x16202a, { metalness: 0.5, roughness: 0.4 }), AU.x0 + 0.5 + 0.1, LV + 0.21, z, top); bx(0.05, 0.04, 2.3, cyan, AU.x0 + 0.78, LV + 0.44, z, top); }));
 
   /* ============================== VIDEO AUDITORIUM (above the Nexus hall) ============================== */
   const hall = new T.Group(); top.add(hall);
@@ -357,6 +359,7 @@ export function buildUpper(T, c) {
     const px = (1 - uv.x) * SW, py = (1 - uv.y) * SH; for (let i = hits.length - 1; i >= 0; i--) { const q = hits[i]; if (px >= q.x && px <= q.x + q.w && py >= q.y && py <= q.y + q.h) { q.fn(px, py); return true; } } return false;
   }
   const inHall = (p) => up.level === 1 && p && p.x > -8.2;
+  const mem = buildMemoryHall(T, c, top, LV);
   const gateD = makeDoor("vhall", AU.x1 - 0.02, ZC, 3.0, 4.4, 0x7aa8ff, top); gateD.g.rotation.y = -PI / 2; gateD.g.position.y = LV; gateD.axis = "x"; gateD.center = new V(AU.x1, LV, ZC);
 
   /* ============================== walking ============================== */
@@ -376,6 +379,7 @@ export function buildUpper(T, c) {
     cands.push(nearRect({ x0: S.x - 9.25, x1: S.x - 4.0, z0: S.z - 1.25, z1: S.z + 1.25 }, x, z));
     { const dx = x - S.x, dz = z - S.z, l = Math.hypot(dx, dz), k = l > 4.0 ? 4.0 / l : 1, qx = S.x + dx * k, qz = S.z + dz * k; cands.push([qx, qz, (qx - x) ** 2 + (qz - z) ** 2]); }
     { const q = nearRect({ x0: S.x - 1.0, x1: HC.x + 9.4, z0: ZC - 7.0, z1: ZC + 7.0 }, x, z); const dx = q[0] - HC.x, dz = q[1] - HC.z, l = Math.hypot(dx, dz); if (l > 9.4) { q[0] = HC.x + dx / l * 9.4; q[1] = HC.z + dz / l * 9.4; q[2] = (q[0] - x) ** 2 + (q[1] - z) ** 2; } cands.push(q); }
+    mem.cands(x, z, cands);
     let b = cands[0]; cands.forEach((q) => { if (q[2] < b[2]) b = q; });
     let px = b[0], pz = b[1];
     /* the tiers: keep out of the seating blocks */
@@ -387,6 +391,7 @@ export function buildUpper(T, c) {
         let bo = null, bd = 1e9; opts.forEach((o) => { const d = (o[0] - px) ** 2 + (o[1] - pz) ** 2; if (d < bd) { bd = d; bo = o; } }); px = bo[0]; pz = bo[1]; } }
     { const b2 = towerBlock; if (px > b2.x0 && px < b2.x1 && pz > b2.z0 && pz < b2.z1 && !(doorRectAt(1) && inR(b2.except, px, pz))) { const dl = px - b2.x0, dr = b2.x1 - px, dt = pz - b2.z0, db = b2.z1 - pz, m = Math.min(dl, dr, db); if (m === dl) px = b2.x0; else if (m === dr) px = b2.x1; else pz = b2.z1; } }
     [{ x: cxA, z: -12.6, r: 1.45 }, { x: S.x, z: S.z, r: 0.95 }].forEach((o) => { const dx = px - o.x, dz = pz - o.z, l = Math.hypot(dx, dz); if (l < o.r) { const k = o.r / (l || 1e-6); px = o.x + (l ? dx * k : o.r); pz = o.z + (l ? dz * k : 0); } });
+    { const q = mem.solid(px, pz); px = q[0]; pz = q[1]; }
     return [px, pz];
   }
   const groundUp = (x, z) => { if (x > S.x) return Y0; const r = Math.hypot(x - S.x, z - S.z); return Y0 + 1.9 * clampN((r - 4.2) / 5, 0, 1); };
@@ -412,20 +417,23 @@ export function buildUpper(T, c) {
         vid.volume = clampN(pl8.vol, 0, 1);
       } else if (!vid.paused && !theatre) { menu(); }
     } else if (!vid.paused && !theatre) { menu(); }
+    mem.update(t, dt, cam, up.level === 1 && top.visible);
     wasLvl = lift.level;
   }
   function tap(kind, hit) {
     if (kind === "screen") { if (hit && hit.uv) { if (!tapScreen(hit.uv) && pl8.mode === "play") toggle(); } return "screen"; }
     if (kind === "podium") { return "library"; }
+    if (typeof kind === "string" && kind.slice(0, 2) === "m:") { const r = mem.tap(kind); if (r && api.openMemory) api.openMemory(r.route); return "memory"; }
     return null;
   }
-  return {
-    group: top, tower, lift, doors: { lift0: d0, lift1: d1, vhall: gateD }, player: pl8, geom: { XT, ZF, LV, CAB, S, HC, HR, Y0 },
+  const api = {
+    group: top, tower, lift, doors: { lift0: d0, lift1: d1, vhall: gateD, mhall: mem.gate }, memory: mem, inMemory: (p) => up.level === 1 && mem.inHall(p), player: pl8, geom: { XT, ZF, LV, CAB, S, HC, HR, Y0 },
     level: () => up.level, isUp: () => up.level === 1 || (lift.moving && lift.carry), inHall,
     ride, call, update, tap, theatre: (on) => { theatre = on; if (!on) pl8.dirty = true; },
     clamp: clampUp, groundY: groundUp, towerBlock, cabRect, doorRectAt, inR, setLevel: (n) => { up.level = n; },
     front: () => new V(XT, 0, ZF + 1.7), inside: () => new V(XT, 0, cmid + 0.1), doorOpen: (lv) => doorAt(lv).open,
   };
+  return api;
 }
 
 /* ============================== the console (DOM): library, transport, theatre ============================== */
