@@ -3,8 +3,8 @@
    EVD placement and a stepwise ICP ladder. Teaching model: one intracranial volume budget (Monro-Kellie) drives pressure, perfusion and herniation.
    Content aligned to the 2022 AHA/ASA spontaneous ICH guideline, the 2025 AHA/ACC hypertension guideline (acute ICH blood pressure) and the 2023 AHA/ASA aneurysmal SAH guideline
    (checked Nov 2026 against the published summaries). ICP thresholds follow common neurocritical-care practice. All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261123l";
-import { toolKit, vessels, halo, clamp } from "./common.js?v=20261123l";
+import { THREE, C } from "../stage.js?v=20261123m";
+import { toolKit, vessels, mirrorFlows, halo, clamp } from "./common.js?v=20261123m";
 
 const SITES = { ACOM: { label: "Anterior communicating", p: [0, -0.3, 0.63] }, MCA: { label: "MCA bifurcation", p: [0.75, -0.28, 0.4] }, PCOM: { label: "Posterior communicating", p: [0.34, -0.4, 0.05] }, BASI: { label: "Basilar tip", p: [0, -0.42, -0.22] } };
 const LOCS = { deep: { label: "Deep (basal ganglia)", p: [0.45, 0.02, 0.1] }, lobar: { label: "Lobar (temporo-parietal)", p: [0.72, 0.3, -0.2] }, cereb: { label: "Cerebellar", p: [0.25, -0.5, -0.68] } };
@@ -40,7 +40,7 @@ export default function create(S, ui) {
   const ell = (rx, ry, rz, col, op, p, o) => { const g = new THREE.SphereGeometry(1, 32, 24); g.scale(rx, ry, rz); const m = new THREE.Mesh(g, S.mat(col, Object.assign({ transparent: true, opacity: op, depthWrite: false }, o || {}))); if (p) m.position.set(...p); return m; };
   function build() {
     S.clear(); M = {}; V = {}; F = {}; evd = null;
-    const grp = S.add(new THREE.Group()); M.grp = grp;
+    const grp = S.add(new THREE.Group()); grp.scale.x = -1; /* patient's right on the viewer's left in the front view */ M.grp = grp;
     M.brain = ell(1.0, 0.82, 1.18, 0xe8a3ab, 0.3); M.brain.userData.hemi = 1; M.brain.renderOrder = 1; grp.add(M.brain);
     const wire = new THREE.Mesh(M.brain.geometry, new THREE.MeshBasicMaterial({ color: 0xffd0d8, wireframe: true, transparent: true, opacity: 0.08, depthWrite: false })); wire.renderOrder = 1; grp.add(wire);
     M.skull = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 20).scale(1.1, 0.92, 1.28), new THREE.MeshBasicMaterial({ color: 0xdfe8f5, wireframe: true, transparent: true, opacity: 0.05, depthWrite: false })); grp.add(M.skull);
@@ -52,7 +52,7 @@ export default function create(S, ui) {
     /* circle of Willis */
     const mir = (n, pts, r) => [[n + "_R", pts, r], [n + "_L", pts.map((p) => [-p[0], p[1], p[2]]), r]];
     const defs = [].concat(mir("ICA", [[0.42, -0.72, 0.12], [0.38, -0.5, 0.15], [0.34, -0.38, 0.28]], 0.045), mir("A1", [[0.34, -0.38, 0.28], [0.2, -0.33, 0.52], [0.02, -0.3, 0.63]], 0.032), mir("MCA", [[0.34, -0.38, 0.28], [0.55, -0.33, 0.34], [0.78, -0.28, 0.42]], 0.04), mir("PCOM", [[0.34, -0.38, 0.28], [0.35, -0.4, 0.06], [0.28, -0.42, -0.2]], 0.022), mir("PCA", [[0.0, -0.42, -0.22], [0.2, -0.42, -0.25], [0.44, -0.4, -0.32]], 0.032), [["BA", [[0, -0.66, -0.64], [0, -0.52, -0.42], [0, -0.42, -0.22]], 0.04], ["ACA", [[0.02, -0.3, 0.63], [0.0, -0.1, 0.8], [0, 0.25, 0.85]], 0.03]]);
-    const vv = vessels(S, grp, defs, 0xc9514e, { dens: 12 }); V = vv.T; F = vv.F; Object.keys(V).forEach((n) => halo(S, grp, V[n], n));
+    const fn0 = S.flows.length; const vv = vessels(S, grp, defs, 0xc9514e, { dens: 12 }); mirrorFlows(S, fn0); V = vv.T; F = vv.F; Object.keys(V).forEach((n) => halo(S, grp, V[n], n));
     /* aneurysm sac + treatment */
     M.sac = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 16), S.mat(0xd94a55, { emissive: 0x4a0a14 })); M.sac.userData.site = "sac"; M.sac.renderOrder = 3; grp.add(M.sac); S.pick.push(M.sac);
     M.coil = new THREE.Mesh(new THREE.TorusKnotGeometry(0.6, 0.18, 80, 8, 3, 5), new THREE.MeshPhongMaterial({ color: 0xffe08a, emissive: 0x4a3a10, shininess: 100 })); M.coil.visible = false; M.coil.renderOrder = 4; grp.add(M.coil);

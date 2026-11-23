@@ -1,16 +1,18 @@
 /* PATHODYNAMICS · Interactive Clinical Pathophysiology
    Every lab follows the same five steps (select, explore, intervene, observe, correlate) and the same three views of a disease
    (anatomical, pathophysiological, interventional), all tied to one whole-body patient model. */
-import { createStage } from "./stage.js?v=20261123l";
-import { bodySVG, paintBody } from "./body.js?v=20261123l";
-import { ecgDraw } from "./charts.js?v=20261123l";
+import { createStage } from "./stage.js?v=20261123m";
+import { bodySVG, paintBody } from "./body.js?v=20261123m";
+import { ecgDraw } from "./charts.js?v=20261123m";
 
-const V = "20261123l", EMBED = /[?&]embed=1/.test(location.search), $ = (s, r) => (r || document).querySelector(s), esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const V = "20261123m", EMBED = /[?&]embed=1/.test(location.search), $ = (s, r) => (r || document).querySelector(s), esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const LABS = [
   { id: "stroke", name: "Stroke Lab", tag: "Acute ischaemic stroke", icon: "🧠", col: "#9b7bff", blurb: "Choose the blocked artery, turn the brain, drag the clot out and watch the penumbra, the deficits and the whole body respond.", mods: "ICA · M1 · M2 · M3 · ACA · PCA · Basilar · Vertebral" },
   { id: "mi", name: "Heart Attack Lab", tag: "Acute myocardial infarction", icon: "🫀", col: "#ff6b7c", blurb: "Block a coronary artery, read the ECG territory, then open it with a balloon and stent or with lysis.", mods: "RCA · LAD · LCx · Left main · PDA" },
   { id: "pe", name: "Pulmonary Embolism Lab", tag: "Clot in the pulmonary arteries", icon: "🫁", col: "#36d6ff", blurb: "Place the clot, watch the right ventricle strain and the oxygen fall, then reperfuse by catheter or lysis.", mods: "Saddle · Main PA · Lobar · Segmental · Subsegmental" },
   { id: "neuro", name: "Brain Bleed & ICP Lab", tag: "Haemorrhage, aneurysm, herniation, hydrocephalus", icon: "🧠", col: "#ff7a90", blurb: "Bleed, rupture, herniation: watch pressure rise, then coil, clip, drain and decompress.", mods: "ICH · SAH · Aneurysm · Herniation · Hydrocephalus · EVD" },
+  { id: "aorta", name: "Aorta & Pericardium Lab", tag: "Aortic dissection and tamponade", icon: "🫀", col: "#ff9a5c", blurb: "Tear the aortic wall or fill the pericardium, then control, stent or drain.", mods: "Type A · Type B · Tamponade · TEVAR · Pericardiocentesis" },
+  { id: "resp", name: "Lung & Pleura Lab", tag: "ARDS, pneumonia, pneumothorax, effusion, mucus plug", icon: "🫁", col: "#6fd3ff", blurb: "Recruit the lung, drain the pleura, clear the airway: see pressure, fluid and air change the chest.", mods: "ARDS · Pneumonia · Pneumothorax · Effusion · Mucus plug" },
   { id: "pancreas", name: "Pancreatitis Lab", tag: "Acute pancreatitis and necrosis", icon: "🩻", col: "#ffb347", blurb: "From oedema to infected necrosis: see the collections form, then step up drainage and necrosectomy.", mods: "Interstitial · Necrotising · APFC · ANC · WON · Infected" },
   { id: "aki", name: "Kidney Injury Lab", tag: "Acute kidney injury", icon: "🫘", col: "#27e0b0", blurb: "Follow one nephron from injury to recovery: hypoperfusion, tubular injury, obstruction and renal artery disease.", mods: "Prerenal · ATN · AIN · GN · Obstruction · Renal artery" },
 ];

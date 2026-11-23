@@ -1,5 +1,5 @@
 /* Helpers shared by the labs: a draggable clot with its pulsing ring, spring-back and retrieval flight, and a tube/flow builder. */
-import { THREE, smooth } from "../stage.js?v=20261123l";
+import { THREE, smooth } from "../stage.js?v=20261123m";
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 export function clotKit(S, grp, ui, cfg) {
@@ -53,3 +53,6 @@ export function vessels(S, grp, defs, hex, o) {
 export function halo(S, grp, mesh, key, extra) { const h = new THREE.Mesh(new THREE.TubeGeometry(mesh.userData.curve, 24, Math.max(0.07, mesh.userData.r * 2.6), 6, false), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })); h.userData.site = key; Object.assign(h.userData, extra || {}); grp.add(h); S.pick.push(h); return h; }
 export function ellipsoid(rx, ry, rz, pos) { const g = new THREE.SphereGeometry(1, 40, 30); g.scale(rx, ry, rz); if (pos) g.translate(...pos); return g; }
 export { clamp };
+
+/* labs whose group is mirrored (patient right on the viewer's left) must mirror the flow particles too: they live in root, not in the group */
+export function mirrorFlows(S, n0) { S.flows.slice(n0).forEach((f) => f.pts.forEach((p) => { p.x = -p.x; })); }
