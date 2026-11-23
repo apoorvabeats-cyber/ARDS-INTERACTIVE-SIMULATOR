@@ -287,9 +287,9 @@ export function buildUpper(T, c) {
   const pl8 = { list: [], posters: [], i: -1, mode: "menu", vol: 0.9, dirty: true, hover: -1, auto: true };
   const hits = []; let lastPaint = 0, theatre = false;
   const fmt = (s) => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
-  fetch(new URL("videos.json", base)).then((r) => r.json()).then((j) => { pl8.list = j; j.forEach((v, i) => { const im = new Image(); im.onload = () => { pl8.dirty = true; paintDir(); }; im.src = new URL(v.poster, base).href; pl8.posters[i] = im; }); pl8.dirty = true; paintDir(); (pl8.onList || (() => {}))(); }).catch(() => {});
+  fetch(new URL("videos.json", base)).then((r) => r.json()).then((j) => { pl8.list = j; j.forEach((v, i) => { const im = new Image(); im.onload = () => { pl8.dirty = true; paintDir(); }; im.src = new URL(v.poster, base).href + "?v=169c"; pl8.posters[i] = im; }); pl8.dirty = true; paintDir(); (pl8.onList || (() => {}))(); }).catch(() => {});
   function play(i) {
-    if (!pl8.list.length) return; i = (i + pl8.list.length) % pl8.list.length; pl8.i = i; pl8.mode = "play"; vid.src = new URL(pl8.list[i].file, base).href + "?v=169b"; vid.volume = pl8.vol;
+    if (!pl8.list.length) return; i = (i + pl8.list.length) % pl8.list.length; pl8.i = i; pl8.mode = "play"; vid.src = new URL(pl8.list[i].file, base).href + "?v=169c"; vid.volume = pl8.vol;
     const p = vid.play(); if (p && p.catch) p.catch(() => {}); pl8.dirty = true; if (pl8.onChange) pl8.onChange();
   }
   function toggle() { if (pl8.i < 0) return; if (vid.paused) { const p = vid.play(); if (p && p.catch) p.catch(() => {}); } else vid.pause(); pl8.dirty = true; if (pl8.onChange) pl8.onChange(); }
@@ -454,7 +454,7 @@ export function mountVideoUI(up, getPos) {
   const panel = el('<div id="vh-panel"><h2>VIDEO LIBRARY</h2><p>Critical Care Education · tap a video to play it on the big screen</p><div id="vh-grid"></div></div>'), x = el('<button id="vh-x" type="button" aria-label="Close">✕</button>'), th = el('<div id="vh-theatre"><button type="button" aria-label="Close theatre">✕</button></div>');
   [btn, bar, panel, x, th].forEach((e) => document.body.appendChild(e));
   const $ = (id) => document.getElementById(id); let seeking = false, builtN = -1;
-  function build() { const g = $("vh-grid"); if (builtN === P.list.length) return; builtN = P.list.length; g.innerHTML = ""; P.list.forEach((v, i) => { const b = document.createElement("button"); b.type = "button"; b.dataset.i = i; b.innerHTML = '<img alt="" src="' + new URL("videos/" + v.poster, import.meta.url).href + '"><b>' + (i + 1) + ". " + v.title + "</b><i>" + v.sub + " · " + P.fmt(v.dur) + "</i>"; b.onclick = () => { P.play(i); closeLib(); }; g.appendChild(b); }); }
+  function build() { const g = $("vh-grid"); if (builtN === P.list.length) return; builtN = P.list.length; g.innerHTML = ""; P.list.forEach((v, i) => { const b = document.createElement("button"); b.type = "button"; b.dataset.i = i; b.innerHTML = '<img alt="" src="' + new URL("videos/" + v.poster, import.meta.url).href + '?v=169c"><b>' + (i + 1) + ". " + v.title + "</b><i>" + v.sub + " · " + P.fmt(v.dur) + "</i>"; b.onclick = () => { P.play(i); closeLib(); }; g.appendChild(b); }); }
   const openLib = () => { build(); [...$("vh-grid").children].forEach((b) => b.classList.toggle("cur", +b.dataset.i === P.i)); panel.style.display = "block"; x.style.display = "block"; };
   const closeLib = () => { panel.style.display = "none"; x.style.display = "none"; };
   btn.onclick = openLib; x.onclick = closeLib; $("vh-lib").onclick = openLib;
