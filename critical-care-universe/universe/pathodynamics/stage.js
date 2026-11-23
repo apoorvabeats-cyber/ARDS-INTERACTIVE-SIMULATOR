@@ -32,7 +32,8 @@ export function createStage(host) {
   /* ---------- pointer: tap a thing, drag a draggable thing, otherwise turn the model ---------- */
   const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(), pts = new Map(); let drag = null, mv = 0, pd = 0, last = null;
   const setPtr = (e) => { const r = cv.getBoundingClientRect(); ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ptr, cam); };
-  const hitAt = (e) => { setPtr(e); const hs = ray.intersectObjects(S.pick.filter((m) => m.visible && m.parent), false); return hs.find((x) => x.object.userData.drag) || hs[0] || null; };
+  const shown = (o) => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
+  const hitAt = (e) => { setPtr(e); const hs = ray.intersectObjects(S.pick.filter((m) => m.parent && shown(m)), false); return hs.find((x) => x.object.userData.drag) || hs[0] || null; };
   S.hitAt = hitAt;
   cv.addEventListener("pointerdown", (e) => {
     cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); mv = 0; auto0 = auto;

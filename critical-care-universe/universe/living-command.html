@@ -100,10 +100,10 @@ import {FOLLOW_UPS,DISTRACTORS} from './case-decisions.js';
 import {ORDER_CASES,assessOrder} from './clinical-orders.js?v=20261115a';
 import {createCaseVoice} from './case-voice.mjs';
 import {buildWard} from './ward3d.js?v=20261122g';
-import {buildSuite} from './command3d.js?v=20261123j';
-import {mountVideoUI} from './upper-level.js?v=20261123j';
-import {mountMemoryUI} from './memory-hall.js?v=20261123j';
-import {mountPathoUI} from './pathodynamics-hall.js?v=20261123j';
+import {buildSuite} from './command3d.js?v=20261123k';
+import {mountVideoUI} from './upper-level.js?v=20261123k';
+import {mountMemoryUI} from './memory-hall.js?v=20261123k';
+import {mountPathoUI} from './pathodynamics-hall.js?v=20261123k';
 import {createSfx} from './sfx.js?v=20261122g';
 const $=s=>document.querySelector(s),V=THREE.Vector3,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 function updateLayout(){
@@ -418,7 +418,8 @@ $('#ev').onclick=e=>{const p=P[cur],t=e.target;if(t.dataset.debrief){fin();retur
  evu();speak(message)}
 function fin(){stopVoice();const n=P.filter(p=>p.recovered).length;$('#end').style.display='block';
  $('#end').innerHTML='<h2>Shift debrief: '+n+' of 6 recovered</h2><ol>'+P.map(p=>'<li><b>'+p.n+' · '+p.dx+' · '+(p.recovered?'recovered':'not recovered')+'</b><ul>'+p.answers.map(a=>'<li>'+a.level+' — '+a.question+'<br>Your choice: '+a.selected+'<br>Suggested priority: '+a.best+'</li>').join('')+'</ul>'+(p.orderLog.length?'<b>Simulated orders</b><ul>'+p.orderLog.map(o=>'<li>'+o.label+' — '+o.level+': '+o.text+'</li>').join('')+'</ul>':'')+'</li>').join('')+'</ol><button onclick="document.getElementById(\'end\').style.display=\'none\'">Return to shift</button> <button onclick="location.reload()">Restart shift</button>'}
-function inICU(){return mode==='bed'||cam.position.z>-4.6}
+function onUpper(){return cam.position.y>5.2}
+function inICU(){return mode==='bed'||(cam.position.z>-4.6&&!onUpper())}
 function toast(m,say){const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.opacity=0,say?8000:4000);if(say&&alarmOn&&announcer&&inICU())announcer.announce(m.replace(/^Alarm\s*·\s*/i,''))}
 function beep(){if(!ac)return;const t=ac.currentTime+.01,out=ac.createGain();out.gain.value=.5;out.connect(ac.destination);[[880,.32],[1760,.1],[2640,.04]].forEach(([f,a])=>{const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(a,t+.006);g.gain.exponentialRampToValueAtTime(.0005,t+1.3);o.connect(g);g.connect(out);o.start(t);o.stop(t+1.4)});[0,.5].slice(1).forEach(d=>{const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=880;g.gain.setValueAtTime(0,t+d);g.gain.linearRampToValueAtTime(.26,t+d+.006);g.gain.exponentialRampToValueAtTime(.0005,t+d+1.1);o.connect(g);g.connect(out);o.start(t+d);o.stop(t+d+1.2)})}
 
@@ -594,6 +595,7 @@ function soundscape(now){
   if(alarmOn&&p.st>0&&!p.done&&now>nAlert){sfx.alert(p.st>1?2:1);nAlert=now+7000+Math.random()*3000}
   return}
  if(mode!=='ward'&&mode!=='travel')return;
+ if(onUpper())return; /* the first floor (video hall, Memory Lab, Pathodynamics) is silent: ICU beeps and alarms belong to the command centre */
  const hall=c.x>-8.7&&Math.abs(c.z)<4,room=c.x<=-8.7&&c.z>-5.6&&c.z<5.6;
  if(!hall&&!room)return;
  if(now>nBeep){const i=bi++%6,p=P[i],st=p.st||0;sfx.beep({f:[740,880,1046][st]*(1+i*.035),vol:(hall?.9:.55)*[.5,.75,.95][st],pos:hall?bedPos(i):{x:-20.4,z:(i%3-1)*2.4}});nBeep=now+(hall?520:820)+Math.random()*380}

@@ -1,5 +1,5 @@
 /* Helpers shared by the labs: a draggable clot with its pulsing ring, spring-back and retrieval flight, and a tube/flow builder. */
-import { THREE, smooth } from "../stage.js?v=20261123j";
+import { THREE, smooth } from "../stage.js?v=20261123k";
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 export function clotKit(S, grp, ui, cfg) {
@@ -8,10 +8,12 @@ export function clotKit(S, grp, ui, cfg) {
   for (let i = 0; i < cp.count; i++) { q.fromBufferAttribute(cp, i); const f = 1 + 0.25 * Math.sin(q.x * 90) * Math.cos(q.y * 70 + q.z * 40); cp.setXYZ(i, q.x * f * 1.5, q.y * f * 0.9, q.z * f * 0.9); } cg.computeVertexNormals();
   k.mesh = new THREE.Mesh(cg, new THREE.MeshPhongMaterial({ color: cfg.color || 0x7a0f1e, emissive: 0x3a0610, shininess: 80, transparent: true }));
   k.mesh.userData.drag = true; k.mesh.userData.clot = true; k.mesh.renderOrder = 4; grp.add(k.mesh); S.pick.push(k.mesh);
+  /* a generous invisible hit-sphere so a small clot or stone is easy to catch with a finger */
+  k.hit = new THREE.Mesh(new THREE.SphereGeometry(Math.max(0.16, (cfg.size || 0.075) * 2.6), 10, 8), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })); k.hit.userData.drag = true; k.hit.userData.clot = true; k.mesh.add(k.hit); S.pick.push(k.hit);
   k.ring = new THREE.Mesh(new THREE.TorusGeometry(cfg.ring || 0.13, 0.008, 8, 40), new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.9 })); k.ring.renderOrder = 6; grp.add(k.ring);
   k.place = (curve, u) => { const p = curve.getPointAt(u), tg = curve.getTangentAt(u).normalize(); k.home.copy(p); k.mesh.position.copy(p); k.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), tg); k.ring.position.copy(p); k.ring.lookAt(p.clone().add(tg)); k.mesh.visible = true; k.ring.visible = true; k.mesh.scale.setScalar(1); k.mesh.material.opacity = 1; k.removed = false; k.grab = false; k.tray = null; };
   k.placeAt = (p) => { k.home.copy(p); k.mesh.position.copy(p); k.ring.position.copy(p); k.mesh.visible = true; k.ring.visible = true; k.mesh.scale.setScalar(1); k.mesh.material.opacity = 1; k.removed = false; k.grab = false; k.tray = null; };
-  k.grabbed = (o) => { if (o === k.mesh && !k.removed) { k.grab = true; k.mesh.scale.setScalar(1.15); return true; } return false; };
+  k.grabbed = (o) => { if ((o === k.mesh || o === k.hit) && !k.removed) { k.grab = true; k.mesh.scale.setScalar(1.15); return true; } return false; };
   k.drag = (w) => { if (!k.grab) return false; const p = grp.worldToLocal(w.clone()); k.mesh.position.copy(p); const d = p.distanceTo(k.home); ui.hint(d > k.thr ? "Release to retrieve the clot" : "Pull the clot away from the vessel…", d > k.thr); return true; };
   k.drop = () => { if (!k.grab) return false; k.grab = false; k.mesh.scale.setScalar(1); const d = k.mesh.position.distanceTo(k.home);
     if (d > k.thr) { k.removed = true; const away = k.mesh.position.clone().sub(k.home).normalize().multiplyScalar(0.55).add(k.mesh.position); k.tray = { t: 0, from: k.mesh.position.clone(), to: away }; ui.hint("", false); if (k.onRemoved) k.onRemoved(); } else ui.hint("Drag the clot further out of the vessel to retrieve it.", false); return true; };

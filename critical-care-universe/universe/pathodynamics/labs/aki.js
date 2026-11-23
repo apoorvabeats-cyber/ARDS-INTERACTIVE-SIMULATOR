@@ -3,8 +3,8 @@
    Pick the cause, set the time, then correct it and watch filtration, creatinine, potassium and urine output respond.
    Teaching model: reversible functional loss turns into structural loss the longer the cause persists.
    Content aligned to KDIGO 2012 (the current final AKI guideline; the 2026 update was still in public review as of Nov 2026). All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261123j";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261123j";
+import { THREE, C } from "../stage.js?v=20261123k";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261123k";
 
 const T = {
   PRE: { label: "Prerenal", sub: "Hypoperfusion", sev: 0.55, irr0: 0, irrMax: 0.8, tau: 2.5, inj: { glom: 0.15, pct: 0.12 },
@@ -55,7 +55,7 @@ export default function create(S, ui) {
     const av = vessels(S, kg, [["RA", [[1.5, 0.35, 0.0], [1.0, 0.3, 0.02], [0.6, 0.2, 0.02], [0.3, 0.12, 0.0]], 0.055]], 0xff5a46, { dens: 14 }); segV.RA = av.T.RA; flows.RA = av.F.RA; halo(S, kg, av.T.RA, "RA");
     kg.add(S.tube([[1.5, -0.1, -0.05], [1.0, -0.12, -0.05], [0.5, -0.1, -0.02], [0.3, -0.05, 0]], 0.06, 0x5b78e6));
     flows.UR = S.flow(ureter.userData.curve, 10, 0xffe08a, { speed: 0.12, off: -2.5 }); flows.UR.rate = 0;
-    kit = clotKit(S, kg, ui, { size: 0.06, ring: 0.11, thr: 0.4, color: st.tab === "OBS" ? 0xe8d9a0 : 0x7a1530, onRemoved: () => { st.relief = 1; setFixed("clot"); ui.refresh(st.tab === "OBS" ? "Stone removed. Obstruction relieved; urine flows." : "Clot retrieved. Renal artery open; blood flow restored."); } });
+    kit = clotKit(S, kg, ui, { size: 0.085, ring: 0.15, thr: 0.4, color: st.tab === "OBS" ? 0xe8d9a0 : 0x7a1530, onRemoved: () => { st.relief = 1; setFixed("clot"); ui.refresh(st.tab === "OBS" ? "Stone removed. Obstruction relieved; urine flows." : "Clot retrieved. Renal artery open; blood flow restored."); } });
     kit.mesh.visible = false; kit.ring.visible = false; kit.dead = true;
     /* ----- nephron (right of scene) ----- */
     const ng = new THREE.Group(); ng.position.set(1.5, 0, 0); grp.add(ng); M.ng = ng;
@@ -109,7 +109,7 @@ export default function create(S, ui) {
     casts.forEach((m, i) => { m.visible = st.tab === "ATN" && M.inj.pct > 0.35 && i < Math.round(14 * M.inj.pct * (1 - (st.fixed ? 0.7 * st.rec : 0))); });
     cells.forEach((m, i) => { m.visible = !!c.cells && i < Math.round(26 * (st.fAt != null ? 1 - 0.7 * st.rec * (st.steroid ? 1 : 0.4) : clamp(st.t / 3, 0.2, 1))); });
     rbc.forEach((m, i) => { m.visible = st.tab === "GN" && i < Math.round(12 * clamp(M.inj.glom, 0, 1)); });
-    const hyd = c.dilate ? (1 + 1.6 * (1 - st.relief * st.rec) * (1 - Math.exp(-(st.fAt != null ? st.fAt : st.t) / 2))) : 1; pelvis.scale.setScalar(hyd); ureter.scale.set(c.dilate ? 1 + 0.9 * (hyd - 1) / 1.6 : 1, 1, c.dilate ? 1 + 0.9 * (hyd - 1) / 1.6 : 1);
+    const hyd = c.dilate ? (1 + 1.6 * (1 - st.relief * st.rec) * (1 - Math.exp(-(st.fAt != null ? st.fAt : st.t) / 2))) : 1; pelvis.scale.setScalar(hyd); { const us = c.dilate ? 1 + 0.9 * (hyd - 1) / 1.6 : 1; ureter.scale.set(us, 1, us); ureter.position.set(0.5 * (1 - us), 0, 0.03 * (1 - us)); }
     M.cort.paint((tag, rank, h, out) => { if (c.art || st.tab === "REN") out.lerp(C(0x6a3a5a), 0.45 * (st.fixed ? 1 - st.rec : 1)); else if (c.dilate) out.lerp(C(0xd8b090), 0.25 * (hyd - 1) / 1.6); });
     if (kit && !kit.dead) kit.frame(dt, 1); M.cort.mesh.material.opacity += ((st.ghost ? 0.2 : 0.55) - M.cort.mesh.material.opacity) * Math.min(1, dt * 5);
     const bad = c.art ? kit.dead ? 0 : 1 : 0; const vc = segV.RA.material.color; vc.setRGB(1 * (bad && !st.fixed ? 0.8 : 1), 0.35, 0.27);
