@@ -6,7 +6,7 @@
    buildMemoryHall(T, ctx, top, LV, YCUT) -> { gate, MC, MR, inHall(p), cands(x,z), solid(px,pz), update(t,dt,cam), tap(kind,hit), refresh() }
    mountMemoryUI(up, getPos) -> the DOM button and the full-screen overlay (up.openMemory(route)). */
 
-export const MEM_VER = "20261123n";
+export const MEM_VER = "20261123o";
 const KINDS = [["recall", "Clinical recall", "Question → answer", "#36d6ff"], ["image", "Image recognition", "ECG & findings", "#7aa8ff"], ["wave", "Waveform recognition", "Vent · ECG · art line · capno", "#27e0b0"], ["decision", "Clinical decision", "Scenario → next step", "#ffb347"], ["drug", "Drug recall", "Dose · mechanism · renal", "#ff7ab6"], ["anat", "Anatomy & physiology", "Structures & mechanisms", "#a78bff"], ["guide", "Guideline recall", "KDIGO · SSC · AHA · IDSA", "#8be34f"]];
 const PANELS = [["start", "DAILY REVISION", "Your due cards + new cards", "#36d6ff"], ["rapid", "RAPID RECALL", "60-second challenge", "#ffb347"], ["weak", "WEAK MEMORY ZONE", "Cards you keep missing", "#ff7ab6"], ["stats", "MEMORY ANALYTICS", "Retention · streak · forecast", "#27e0b0"]];
 

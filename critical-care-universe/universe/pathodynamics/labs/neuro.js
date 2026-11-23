@@ -3,8 +3,8 @@
    EVD placement and a stepwise ICP ladder. Teaching model: one intracranial volume budget (Monro-Kellie) drives pressure, perfusion and herniation.
    Content aligned to the 2022 AHA/ASA spontaneous ICH guideline, the 2025 AHA/ACC hypertension guideline (acute ICH blood pressure) and the 2023 AHA/ASA aneurysmal SAH guideline
    (checked Nov 2026 against the published summaries). ICP thresholds follow common neurocritical-care practice. All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261123n";
-import { toolKit, vessels, mirrorFlows, halo, clamp } from "./common.js?v=20261123n";
+import { THREE, C } from "../stage.js?v=20261123o";
+import { toolKit, vessels, mirrorFlows, halo, clamp } from "./common.js?v=20261123o";
 
 const SITES = { ACOM: { label: "Anterior communicating", p: [0, -0.3, 0.63] }, MCA: { label: "MCA bifurcation", p: [0.75, -0.28, 0.4] }, PCOM: { label: "Posterior communicating", p: [0.34, -0.4, 0.05] }, BASI: { label: "Basilar tip", p: [0, -0.42, -0.22] } };
 const LOCS = { deep: { label: "Deep (basal ganglia)", p: [0.45, 0.02, 0.1] }, lobar: { label: "Lobar (temporo-parietal)", p: [0.72, 0.3, -0.2] }, cereb: { label: "Cerebellar", p: [0.25, -0.5, -0.68] } };

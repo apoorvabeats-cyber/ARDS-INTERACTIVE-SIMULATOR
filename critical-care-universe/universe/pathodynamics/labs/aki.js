@@ -3,8 +3,8 @@
    Pick the cause, set the time, then correct it and watch filtration, creatinine, potassium and urine output respond.
    Teaching model: reversible functional loss turns into structural loss the longer the cause persists.
    Content aligned to KDIGO 2012 (the current final AKI guideline; the 2026 update was still in public review as of Nov 2026). All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261123n";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261123n";
+import { THREE, C } from "../stage.js?v=20261123o";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261123o";
 
 const T = {
   PRE: { label: "Prerenal", sub: "Hypoperfusion", sev: 0.55, irr0: 0, irrMax: 0.8, tau: 2.5, inj: { glom: 0.15, pct: 0.12 },
@@ -27,16 +27,22 @@ const T = {
     anat: "A stone (or tumour, clot, enlarged prostate) blocks the ureter or bladder outlet. Urine backs up: the ureter and renal pelvis dilate (hydronephrosis) and the pyramids and cortex are compressed.",
     patho: "Back-pressure is transmitted up the tubules to Bowman's space, which opposes filtration. Early on the effect is functional; with time the cortex thins and nephrons are lost. AKI occurs when both kidneys, or a solitary kidney, are obstructed. After relief there can be a large post-obstructive diuresis.",
     interv: "Relieve the obstruction: ureteric stent or percutaneous nephrostomy to decompress the system urgently, particularly with infection (obstructed infected kidney is an emergency), then definitive stone removal (ureteroscopy, lithotripsy). Watch the diuresis and electrolytes afterwards." },
-  REN: { label: "Renal artery", sub: "Embolus or stenosis", sev: 0.7, irr0: 0.1, irrMax: 0.85, tau: 1.2, inj: { glom: 0.5, pct: 0.4, loop: 0.3, dct: 0.1 }, art: true,
-    anat: "The renal artery arises from the aorta and divides into segmental arteries. An embolus (from the heart or aorta) or in-situ thrombosis can block it; atherosclerotic stenosis narrows it.",
-    patho: "A blocked renal artery cuts off blood flow to the kidney. If both kidneys (or a solitary kidney) are involved, AKI follows. The kidney senses low pressure and releases renin: hypertension and flash pulmonary oedema can result. Ischaemic tolerance is short, so time matters.",
-    interv: "Anticoagulation for embolus or thrombosis, and revascularisation (catheter thrombectomy or thrombolysis, angioplasty and stenting) in selected patients; the benefit is greatest the earlier it is done. Renal artery stenting for chronic atherosclerotic stenosis has limited proven benefit." },
+  RINF: { label: "Renal infarction", sub: "Embolus or thrombosis", sev: 0.9, irr0: 0.05, irrMax: 0.9, tau: 1.0, inj: { glom: 0.5, pct: 0.45, loop: 0.3, dct: 0.1 }, art: true,
+    anat: "The renal artery arises from the aorta and divides into segmental arteries. An embolus (from the heart in atrial fibrillation or endocarditis, or from the aorta), an in-situ thrombosis or a dissection can block it, and a wedge of kidney supplied by the blocked branch dies.",
+    patho: "A sudden block cuts off blood flow to the kidney. The kidney tolerates ischaemia only for hours. Patients have sudden flank pain, raised LDH and haematuria. If both kidneys or a solitary kidney are involved, AKI follows. The kidney releases renin, and hypertension can result.",
+    interv: "Anticoagulation for embolus or thrombosis, a search for the source (echo, rhythm monitoring), and revascularisation (catheter thrombectomy or thrombolysis, angioplasty and stenting) in selected patients; benefit is greatest the earlier it is done and is uncertain after many hours. Treat dissection or the underlying cause." },
+  RAS: { label: "Renal artery stenosis", sub: "Atherosclerotic or fibromuscular", sev: 0.55, irr0: 0.35, irrMax: 0.9, tau: 3.0, inj: { glom: 0.3, pct: 0.3, loop: 0.2, dct: 0.1 }, art: true,
+    anat: "A narrowing of the main renal artery, most often from atherosclerosis near the origin in older patients, or from fibromuscular dysplasia (a 'string of beads' pattern) in younger patients.",
+    patho: "The kidney beyond the narrowing senses low pressure and releases renin: renovascular hypertension, and in bilateral disease, flash pulmonary oedema and AKI after an ACE inhibitor or ARB. Over time the kidney shrinks.",
+    interv: "Treat the hypertension and the vascular risk (statin, antiplatelet, blood-pressure control); use ACE inhibitors or ARBs with caution, with close creatinine monitoring. Trials have not shown a clear benefit of stenting over medical therapy for most atherosclerotic stenosis. Revascularisation is reserved for selected patients, for example flash pulmonary oedema, resistant hypertension with progressive kidney loss, or fibromuscular dysplasia (angioplasty)." },
 };
-const TABS = ["PRE", "ATN", "AIN", "GN", "OBS", "REN"], SEG = ["glom", "pct", "loop", "dct", "cd"];
+const isRen0 = (t) => t === "RINF" || t === "RAS";
+const TABS = ["PRE", "ATN", "AIN", "GN", "OBS", "RINF", "RAS"], SEG = ["glom", "pct", "loop", "dct", "cd"];
 const SC = { glom: 0xe0475a, pct: 0x27c9b0, loop: 0x4a8fe0, dct: 0x6fd06f, cd: 0xe8b04a };
 const CAUSE = { hypo: "Hypovolaemia", lowco: "Low cardiac output", vaso: "Vasodilatory shock" };
 
 export default function create(S, ui) {
+  const isRen = () => isRen0(st.tab);
   const st = { tab: "ATN", t: 3, cause: "hypo", fixed: false, fAt: null, rec: 0, drug: false, steroid: false, immuno: false, pex: false, rrt: false, relief: 0, hint: "", ghost: false, wrong: "" };
   const cur = () => T[st.tab];
   let M = {}, kit = null, segM = {}, segV = {}, flows = {}, cells = [], casts = [], rbc = [], accT = 0, kmesh = null, pelvis = null, ureter = null;
@@ -110,14 +116,14 @@ export default function create(S, ui) {
     cells.forEach((m, i) => { m.visible = !!c.cells && i < Math.round(26 * (st.fAt != null ? 1 - 0.7 * st.rec * (st.steroid ? 1 : 0.4) : clamp(st.t / 3, 0.2, 1))); });
     rbc.forEach((m, i) => { m.visible = st.tab === "GN" && i < Math.round(12 * clamp(M.inj.glom, 0, 1)); });
     const hyd = c.dilate ? (1 + 1.6 * (1 - st.relief * st.rec) * (1 - Math.exp(-(st.fAt != null ? st.fAt : st.t) / 2))) : 1; pelvis.scale.setScalar(hyd); { const us = c.dilate ? 1 + 0.9 * (hyd - 1) / 1.6 : 1; ureter.scale.set(us, 1, us); ureter.position.set(0.5 * (1 - us), 0, 0.03 * (1 - us)); }
-    M.cort.paint((tag, rank, h, out) => { if (c.art || st.tab === "REN") out.lerp(C(0x6a3a5a), 0.45 * (st.fixed ? 1 - st.rec : 1)); else if (c.dilate) out.lerp(C(0xd8b090), 0.25 * (hyd - 1) / 1.6); });
+    M.cort.paint((tag, rank, h, out) => { if (c.art || isRen()) out.lerp(C(0x6a3a5a), 0.45 * (st.fixed ? 1 - st.rec : 1)); else if (c.dilate) out.lerp(C(0xd8b090), 0.25 * (hyd - 1) / 1.6); });
     if (kit && !kit.dead) kit.frame(dt, 1); M.cort.mesh.material.opacity += ((st.ghost ? 0.2 : 0.55) - M.cort.mesh.material.opacity) * Math.min(1, dt * 5);
     const bad = c.art ? kit.dead ? 0 : 1 : 0; const vc = segV.RA.material.color; vc.setRGB(1 * (bad && !st.fixed ? 0.8 : 1), 0.35, 0.27);
     accT += dt;
   }
   S.hooks.push(frame);
   S.onGrab = (o) => { if (kit && !kit.dead) kit.grabbed(o); }; S.onDrag = (o, w) => { if (kit && !kit.dead) kit.drag(w); }; S.onDrop = () => { if (kit && !kit.dead) kit.drop(); };
-  S.onTap = (o) => { if (!o || !o.userData.site) return; if (o.userData.site === "RA" && st.tab !== "REN") { setTab("REN"); ui.refresh(); } };
+  S.onTap = (o) => { if (!o || !o.userData.site) return; if (o.userData.site === "RA" && !isRen()) { setTab("RINF"); ui.refresh(); } };
 
   function setTab(k) { st.tab = k; build(); }
   function setOpt(id, v) { if (id === "cause") { st.cause = v; } else if (id === "ghost") st.ghost = v === "1"; }
@@ -134,22 +140,22 @@ export default function create(S, ui) {
     else if (st.tab === "AIN") { if (id === "stop") { setFixed("stop"); msg("Culprit drug stopped. Inflammation settles; recovery depends on how early."); } else if (id === "steroid") { st.steroid = true; msg("Corticosteroid started; recovery of function is usually faster."); } }
     else if (st.tab === "GN") { if (id === "immuno") { st.immuno = true; setFixed("immuno"); msg("Immunosuppression started. Inflammation controlled: recovery depends on how many glomeruli had crescents."); } else if (id === "pex") { st.pex = true; msg("Plasma exchange added for circulating antibody."); } }
     else if (st.tab === "OBS") { if (id === "djs" || id === "pcn") { st.relief = 1; setFixed(id); msg(id === "djs" ? "Ureteric stent placed. Obstruction relieved; urine drains." : "Nephrostomy placed. Obstruction relieved; urine drains."); } }
-    else if (st.tab === "REN") { if (id === "angio") { st.relief = 1; kit.dead = true; kit.mesh.visible = false; kit.ring.visible = false; setFixed("angio"); msg("Angioplasty and stent: renal artery restored. Blood flow reaches the kidney again."); } else if (id === "hep") { st.drug = true; msg("Anticoagulation started to stop clot propagation."); } }
+    else if (isRen()) { if (id === "angio") { st.relief = 1; kit.dead = true; kit.mesh.visible = false; kit.ring.visible = false; setFixed("angio"); msg("Angioplasty and stent: renal artery restored. Blood flow reaches the kidney again."); } else if (id === "hep") { st.drug = true; msg("Anticoagulation started to stop clot propagation."); } }
     void c;
   }
 
   function est() {
     const c = cur(), g = gfr(), cr = clamp(1 / Math.max(0.08, g / 100), 1, 12), crp = +(cr).toFixed(1), kdigo = cr >= 3 || st.rrt ? 3 : cr >= 2 ? 2 : cr >= 1.5 ? 1 : 0;
     const poly = st.tab === "ATN" && st.fixed && st.rec > 0.3 && st.rec < 0.95, osm = poly ? 1.8 : st.tab === "OBS" && st.relief && st.rec < 1 ? 2.2 : null;
-    let uo = clamp(0.1 + 1.3 * g / 100, 0.05, 1.4); if (st.tab === "OBS" && !st.relief) uo = 0.1 * (1 - 0.8 * (1 - Math.exp(-st.t / 2))) ; if (st.tab === "GN") uo *= 0.8; if (osm) uo = osm; if (st.tab === "REN" && !st.fixed) uo = 0.05;
+    let uo = clamp(0.1 + 1.3 * g / 100, 0.05, 1.4); if (st.tab === "OBS" && !st.relief) uo = 0.1 * (1 - 0.8 * (1 - Math.exp(-st.t / 2))) ; if (st.tab === "GN") uo *= 0.8; if (osm) uo = osm; if (isRen() && !st.fixed) uo = st.tab === "RAS" ? 0.35 : 0.05;
     const k = clamp(4.2 + 2.6 * Math.pow(1 - g / 100, 1.6) * (st.rrt ? 0.2 : 1), 4, 7.8), hco = clamp(24 - 12 * (1 - g / 100) * (st.rrt ? 0.3 : 1), 9, 24);
-    const sed = { PRE: "bland / hyaline casts", ATN: "muddy-brown granular casts", AIN: "WBC casts, eosinophils", GN: "RBC casts, dysmorphic RBC", OBS: "bland; hydronephrosis on US", REN: "bland; absent or reduced flow on Doppler" }[st.tab];
+    const sed = { PRE: "bland / hyaline casts", ATN: "muddy-brown granular casts", AIN: "WBC casts, eosinophils", GN: "RBC casts, dysmorphic RBC", OBS: "bland; hydronephrosis on US", RINF: "bland or haematuria; no flow on Doppler", RAS: "bland; reduced flow on Doppler" }[st.tab];
     const fena = st.tab === "PRE" ? (st.fixed && st.rec > 0.8 ? "<1%" : "<1%") : st.tab === "ATN" ? ">2%" : st.tab === "AIN" ? "variable (1–3%)" : st.tab === "OBS" ? "variable" : st.tab === "GN" ? "<1% early" : "<1% early";
     return { g, cr: crp, kdigo, uo, k, hco, sed, fena, poly, ov: g < 35 && uo < 0.5 ? "risk of overload" : "controlled" };
   }
   function bodyMap() {
     const e = est(), c = cur(), map = {}, lv = (v) => (v > 0.7 ? 3 : v > 0.45 ? 2 : v > 0.2 ? 1 : 0), loss = 1 - e.g / 100; const both = e.g < 100;
-    map["kidney-R"] = st.fixed && st.rec > 0.7 && e.g > 55 ? "rec" : lv(loss); map["kidney-L"] = c.art ? (kit.dead ? 0 : lv(loss)) : map["kidney-R"]; if (c.art && !kit.dead && st.tab === "REN") { map["kidney-R"] = lv(loss); }
+    map["kidney-R"] = st.fixed && st.rec > 0.7 && e.g > 55 ? "rec" : lv(loss); map["kidney-L"] = c.art ? (kit.dead ? 0 : lv(loss)) : map["kidney-R"]; if (c.art && !kit.dead && isRen()) { map["kidney-R"] = lv(loss); }
     if (c.dilate) { map.bladder = st.relief ? 0 : 1; map["kidney-L"] = map["kidney-R"]; } if (e.k > 6) map.heart = e.k > 7 ? 3 : 2; if (loss > 0.55 && !st.rrt) { map["lung-R"] = 1; map["lung-L"] = 1; } if (e.k > 6.5) map.brain = 0; void both;
     return { map, marks: {} };
   }
@@ -164,7 +170,7 @@ export default function create(S, ui) {
       { k: "Bicarbonate", v: Math.round(e.hco) + " mmol/L", tone: e.hco < 15 ? "bad" : e.hco < 20 ? "warn" : "ok" },
       { k: "Urine sediment", v: e.sed, tone: "info" },
       { k: "FeNa", v: e.fena, tone: "info" },
-      { k: st.tab === "REN" ? "Renal artery flow" : st.tab === "OBS" ? "Obstruction" : "Cause", v: st.tab === "REN" ? flow : st.tab === "OBS" ? (st.relief ? "relieved" : "present") : st.tab === "PRE" ? CAUSE[st.cause] : st.fixed ? "removed" : "active", tone: st.fixed || st.relief ? "ok" : "warn" },
+      { k: isRen() ? "Renal artery flow" : st.tab === "OBS" ? "Obstruction" : "Cause", v: isRen() ? flow : st.tab === "OBS" ? (st.relief ? "relieved" : "present") : st.tab === "PRE" ? CAUSE[st.cause] : st.fixed ? "removed" : "active", tone: st.fixed || st.relief ? "ok" : "warn" },
     ];
     let note;
     if (!st.fixed) note = "The cause is still active: filtration is falling" + (st.tab === "PRE" ? " (still reversible if perfusion is restored early; with time it becomes tubular injury)." : st.tab === "ATN" ? ", and the injured tubule cells are dying and plugging the lumen." : ".") + " Move the time slider, then correct the cause in step 3.";
@@ -180,7 +186,7 @@ export default function create(S, ui) {
     L.push(["Definition and stage (KDIGO)", "AKI: creatinine rise of 0.3 mg/dL or more within 48 h, or 1.5 times baseline within 7 days, or urine output below 0.5 mL/kg/h for 6 h. Stage 1: 1.5–1.9 × baseline or a rise of 0.3 mg/dL or more (urine output below 0.5 mL/kg/h for 6–12 h); stage 2: 2.0–2.9 × (below 0.5 mL/kg/h for 12 h or more); stage 3: 3 × or more, creatinine of 4.0 mg/dL or more, or renal replacement therapy (below 0.3 mL/kg/h for 24 h or more, or anuria for 12 h). Here: stage " + e.kdigo + " (creatinine " + e.cr.toFixed(1) + " × baseline)."]);
     L.push(["First questions", "Is it prerenal (volume, pressure), intrinsic (tubule, interstitium, glomerulus, vessel) or postrenal (obstruction)? Look at the history, drugs and contrast exposure, volume status, urine output, urinalysis, bladder scan and renal ultrasound."]);
     L.push(["Urine findings", "Sediment: " + e.sed + ". FeNa: " + e.fena + " (unreliable on diuretics: use FeUrea). Urine osmolality above about 500 mOsm/kg suggests a concentrating (prerenal) kidney; around 300 suggests tubular injury."]);
-    L.push(["Imaging and tests", st.tab === "OBS" ? "Ultrasound shows a dilated pelvicalyceal system; non-contrast CT finds the stone." : st.tab === "REN" ? "Doppler ultrasound or CT angiography shows the occlusion or stenosis and an infarcted kidney." : st.tab === "GN" ? "Serology (ANCA, anti-GBM, ANA, complement), urine protein-to-creatinine ratio; renal biopsy confirms the pattern." : "Ultrasound for size and obstruction; biopsy only when the cause is unclear and the result would change treatment."]);
+    L.push(["Imaging and tests", st.tab === "OBS" ? "Ultrasound shows a dilated pelvicalyceal system; non-contrast CT finds the stone." : isRen() ? "Doppler ultrasound or CT angiography shows the occlusion or stenosis and an infarcted kidney." : st.tab === "GN" ? "Serology (ANCA, anti-GBM, ANA, complement), urine protein-to-creatinine ratio; renal biopsy confirms the pattern." : "Ultrasound for size and obstruction; biopsy only when the cause is unclear and the result would change treatment."]);
     L.push(["General management", "Treat the cause; keep MAP at about 65 mmHg or higher in shock; give balanced crystalloids rather than excess saline when fluid is indicated; avoid nephrotoxins (NSAIDs, aminoglycosides, contrast when possible); review drug doses; do not use diuretics to treat AKI, only to manage overload; monitor potassium and acid–base."]);
     L.push(["Renal replacement therapy", "Start for refractory hyperkalaemia, severe acidosis, fluid overload not responding to diuretics, uraemic complications (pericarditis, encephalopathy) or dialysable toxins. Trials of earlier (accelerated) initiation in patients without urgent indications have not shown benefit."]);
     L.push(["After the episode", "Follow creatinine and blood pressure at 3 months: AKI raises the risk of CKD, cardiovascular events and recurrent AKI. Reference: KDIGO 2012 AKI guideline. The KDIGO 2026 AKI/AKD update (draft in public review, not yet final) proposes adding serum cystatin C and structural biomarkers to the definition. Follow your local protocol."]);
@@ -189,7 +195,7 @@ export default function create(S, ui) {
   function drawImaging(el, e) {
     const mk = (title, f) => { const d = document.createElement("div"); d.className = "img"; const cv = document.createElement("canvas"); cv.width = 300; cv.height = 300; const t = document.createElement("small"); t.textContent = title; d.append(cv, t); el.append(d); f(cv.getContext("2d")); };
     mk("Renal ultrasound (schematic)", (g) => { g.fillStyle = "#101010"; g.fillRect(0, 0, 300, 300); const hyd = st.tab === "OBS" && !st.relief; g.fillStyle = st.tab === "ATN" || st.tab === "AIN" || st.tab === "GN" ? "#8a8a8a" : "#6c6c6c"; g.beginPath(); g.ellipse(150, 150, 70, 120, 0, 0, 7); g.fill(); g.fillStyle = "#3b3b3b"; for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28; g.beginPath(); g.ellipse(150 + 28 * Math.cos(a), 150 + 52 * Math.sin(a), 11, 16, a, 0, 7); g.fill(); }
-      g.fillStyle = hyd ? "#050505" : "#c8c8c8"; g.beginPath(); g.ellipse(150, 150, hyd ? 40 : 14, hyd ? 70 : 22, 0, 0, 7); g.fill(); g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText(hyd ? "dilated pelvis (hydronephrosis)" : st.tab === "REN" && !st.fixed ? "no flow on Doppler" : "no hydronephrosis", 8, 292); });
+      g.fillStyle = hyd ? "#050505" : "#c8c8c8"; g.beginPath(); g.ellipse(150, 150, hyd ? 40 : 14, hyd ? 70 : 22, 0, 0, 7); g.fill(); g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText(hyd ? "dilated pelvis (hydronephrosis)" : isRen() && !st.fixed ? (st.tab === "RAS" ? "reduced flow beyond the narrowing" : "no flow on Doppler") : "no hydronephrosis", 8, 292); });
     mk("Urine microscopy (schematic)", (g) => { g.fillStyle = "#e9eef0"; g.fillRect(0, 0, 300, 300); const rnd = (i) => (Math.sin(i * 91.7) * 0.5 + 0.5); const tag = st.tab;
       if (tag === "ATN") { g.fillStyle = "#8a6a45"; for (let i = 0; i < 5; i++) { g.beginPath(); g.roundRect(30 + rnd(i) * 160, 40 + i * 48, 90, 22, 10); g.fill(); } }
       else if (tag === "GN") { g.fillStyle = "#c04050"; for (let i = 0; i < 40; i++) { g.beginPath(); g.arc(rnd(i) * 280 + 10, rnd(i + 50) * 260 + 10, 5, 0, 7); g.fill(); } g.fillStyle = "#e07a86"; g.beginPath(); g.roundRect(80, 120, 130, 26, 8); g.fill(); }
@@ -214,7 +220,7 @@ export default function create(S, ui) {
         AIN: [{ id: "stop", label: "STOP THE DRUG", hint: "Withdraw the culprit." }, { id: "steroid", label: "STEROID", hint: "If no early recovery." }],
         GN: [{ id: "immuno", label: "IMMUNOSUPPRESSION", hint: "Steroid + cyclophosphamide / rituximab." }, { id: "pex", label: "PLASMA EXCHANGE", hint: "Selected cases." }],
         OBS: [{ id: "djs", label: "URETERIC STENT", hint: "Decompress from below." }, { id: "pcn", label: "NEPHROSTOMY", hint: "Decompress from the flank." }],
-        REN: [{ id: "hep", label: "ANTICOAGULATE", hint: "Stop clot growth." }, { id: "angio", label: "ANGIOPLASTY + STENT", hint: "Reopen the artery." }] }[st.tab];
+        RINF: [{ id: "hep", label: "ANTICOAGULATE", hint: "Stop clot growth." }, { id: "angio", label: "THROMBECTOMY / STENT", hint: "Reopen the artery." }], RAS: [{ id: "hep", label: "BP + RISK CONTROL", hint: "Medical therapy first." }, { id: "angio", label: "ANGIOPLASTY + STENT", hint: "Selected patients." }] }[st.tab];
       return A.map((a) => Object.assign({ off: (a.id === "steroid" && st.steroid) || (a.id === "pex" && (st.pex || !st.immuno)) || (st.fixed && ["stop", "fluid", "pressor", "cardiac", "immuno", "djs", "pcn", "angio"].includes(a.id)) }, a)).concat([{ id: "rrt", label: "DIALYSIS (RRT)", hint: "Support: K⁺, acid, volume.", off: st.rrt }, { id: "reset", label: "RESET", hint: "Start again.", off: false }]);
     },
     dragHint: "In Obstruction: drag the stone out of the ureter. In Renal artery: drag the clot out of the artery. Otherwise use the treatment buttons.",

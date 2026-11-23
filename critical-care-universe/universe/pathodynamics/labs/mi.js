@@ -2,8 +2,8 @@
    Pick the blocked coronary, read the ECG territory, drag the thrombus out, balloon and stent, or give fibrinolysis.
    Teaching model: myocardium is lost with TIME and COLLATERALS; reopening the artery does not bring back necrosed muscle.
    Content aligned to the 2025 ACC/AHA/ACEP/NAEMSP/SCAI ACS guideline (checked Nov 2026 against the published summaries). All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261123n";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261123n";
+import { THREE, C } from "../stage.js?v=20261123o";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261123o";
 
 const ROT = 0.4, LVC = [0.22, -0.1, -0.05], LVR = [0.52, 0.86, 0.5], RVC = [-0.42, -0.2, 0.2], RVR = [0.42, 0.66, 0.45];
 const lvPt = (ph, th, k) => { k = k || 1.03; let x = LVR[0] * Math.cos(th) * Math.cos(ph) * k, y = LVR[1] * Math.sin(th) * k, z = LVR[2] * Math.cos(th) * Math.sin(ph) * k; const c = Math.cos(ROT), s = Math.sin(ROT); return [x * c - y * s + LVC[0], x * s + y * c + LVC[1], z + LVC[2]]; };
@@ -44,7 +44,7 @@ const ST = {
 const LEADS = ["I", "aVR", "II", "aVL", "III", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"];
 
 export default function create(S, ui) {
-  const st = { tab: "LAD", coll: "mod", t: 1, removed: false, lysed: false, balloon: false, stent: false, reper: 0, rAt: null, rec: 0, vf: false, ghost: false, pulse: 0 };
+  const st = { acs: "stemi", tab: "LAD", coll: "mod", t: 1, removed: false, lysed: false, balloon: false, stent: false, reper: 0, rAt: null, rec: 0, vf: false, ghost: false, pulse: 0 };
   const site = () => SITES[st.tab];
   let M = {}, V = {}, F = {}, tis = [], kit = null, rings = {}, dirty = true, accT = 0, stentM = null, balM = null, plaque = null, lvm = null;
 
@@ -99,7 +99,7 @@ export default function create(S, ui) {
 
   /* ---------- time and tissue ---------- */
   const tNow = () => (st.rAt != null ? st.rAt : st.t);
-  const cfOf = () => { const tau = COLL[st.coll].tau, t = tNow(); return t <= 0.3 ? 0 : 1 - Math.exp(-(t - 0.3) / tau); };
+  const cfOf = () => { const tau = COLL[st.coll].tau, t = tNow(); return (st.acs === "nstemi" ? 0.45 : 1) * (t <= 0.3 ? 0 : 1 - Math.exp(-(t - 0.3) / tau)); };
   const frac = () => site().frac * (st.tab === "RCA" ? 1 : 1);
   function paintAll() {
     const tg = site().tags, cf = cfOf(), core = C(0x3a1f2c), pen = C(0xffb347), rec = C(0x8fe8b0), reperf = st.rAt != null;
@@ -131,7 +131,7 @@ export default function create(S, ui) {
   S.onTap = (o) => { if (!o || !o.userData.site) return; const n = o.userData.site, m = { LM: "LM", LAD: "LAD", DIAG: "LAD", LCX: "LCX", OM: "LCX", RCA: "RCA", PDA: "PDA" }[n]; if (m && m !== st.tab) { setTab(m); ui.refresh(); } };
 
   function setTab(k) { st.tab = k; build(); }
-  function setOpt(id, v) { if (id === "coll") { st.coll = v; dirty = true; } else if (id === "ghost") st.ghost = v === "1"; }
+  function setOpt(id, v) { if (id === "coll" || id === "acs") { st[id] = v; dirty = true; } else if (id === "ghost") st.ghost = v === "1"; }
   function setT(v) { if (st.rAt != null) return; st.t = v; dirty = true; }
   function act(id) {
     const ok = st.removed || st.lysed;
@@ -154,6 +154,7 @@ export default function create(S, ui) {
     const k = site(), vec = ST[k.lead], e = est(), t = st.t, onset = 1 - Math.exp(-t / 0.2), resolve = st.rAt != null ? 1 - st.rec * 0.85 : 1;
     return LEADS.map((n) => { const v = vec[n] || 0, hot = v > 0.15, st0 = v * onset * resolve, q = v > 0.12 ? 0.5 * e.cf : 0;
       const tw = v > 0.1 ? (st.rAt != null ? 0.35 - 0.75 * st.rec * Math.min(1, e.cf * 2 + 0.3) : t < 0.5 ? 0.8 : 0.35 - 0.25 * Math.min(1, (t - 0.5) / 6)) : 0.35;
+      if (st.acs === "nstemi") { const dep = Math.abs(v) > 0.12 && n !== "aVR"; return { n, hot: dep, r: 1, st: dep ? -0.16 * onset * resolve : n === "aVR" && Math.abs(v) > 0.12 ? 0.08 * onset : 0, q: 0, t: dep ? 0.35 - 0.6 * onset * resolve : n === "aVR" ? -0.2 : 0.35 }; }
       return { n, hot, r: n === "aVR" ? -0.6 : 1 - (v > 0.12 ? 0.4 * e.cf : 0), st: st0, q, t: n === "aVR" ? -0.2 : tw }; });
   }
   function bodyMap() {
@@ -163,7 +164,7 @@ export default function create(S, ui) {
   }
   function obs() {
     const k = site(), e = est(), bm = bodyMap(), reperf = e.reperf;
-    const flow = st.stent ? "TIMI 3 · stented" : st.balloon ? "TIMI 2–3 · ballooned" : st.removed ? "TIMI 2 · residual stenosis" : st.lysed ? "Partial after lysis" : "TIMI 0 (occluded)";
+    const flow = st.stent ? "TIMI 3 · stented" : st.balloon ? "TIMI 2–3 · ballooned" : st.removed ? "TIMI 2 · residual stenosis" : st.lysed ? "Partial after lysis" : st.acs === "nstemi" ? "TIMI 1–2 (subtotal)" : "TIMI 0 (occluded)";
     const rhythm = st.vf ? "VENTRICULAR FIBRILLATION" : k.vessel === "RCA" && !reperf ? "Sinus bradycardia, AV block risk" : st.tab === "LM" || st.tab === "LAD" ? (e.cf > 0.4 && !reperf ? "Sinus tachycardia, VT/VF risk" : "Sinus") : "Sinus";
     const params = [
       { k: "Artery flow", v: flow, tone: st.reper > 0.9 ? "ok" : st.reper > 0.4 ? "warn" : "bad" },
@@ -177,6 +178,7 @@ export default function create(S, ui) {
     ];
     let note;
     if (st.vf) note = "Ventricular fibrillation: no cardiac output. Immediate CPR and defibrillation are the priority; the coronary artery is dealt with after the rhythm is restored.";
+    else if (!reperf && st.acs === "nstemi") note = "Subtotal occlusion: partial flow, so less muscle is at risk. ST depression, not elevation. Risk-stratify, then choose an immediate, early or selective invasive strategy; unstable features mean angiography now. Collaterals: " + { poor: "poor", mod: "moderate", good: "good" }[st.coll] + ".";
     else if (!reperf) note = "The artery is blocked: muscle in its territory is ischaemic (amber) and starts to die with time (dark). Move the time slider, then drag the thrombus out or give lysis. Collaterals: " + { poor: "poor", mod: "moderate", good: "good" }[st.coll] + ".";
     else if (e.cf > 0.5) note = "Artery open, but most of the territory had already died: reperfusion does not bring back necrosed muscle, so the ejection fraction stays low. Time is muscle.";
     else if (e.cf > 0.15) note = "Artery open and a useful amount of muscle was saved. Part of the wall is still infarcted, so some ejection fraction is lost.";
@@ -189,7 +191,8 @@ export default function create(S, ui) {
     const k = site(), e = est(), hrs = tNow(), L = [];
     const pat = { inf: "ST elevation in II, III and aVF (III higher than II suggests RCA), reciprocal ST depression in I and aVL. Add right-sided leads (V4R) to look for RV involvement.", inf2: "Modest ST elevation in II, III, aVF with reciprocal change in aVL.", ant: "ST elevation in V1–V4 (to V5–V6 with a long LAD), with reciprocal depression in the inferior leads. Q waves develop over hours.", lat: "Subtle or absent ST elevation in I, aVL, V5–V6; look for ST depression with tall R waves in V1–V2 (posterior infarction) and record V7–V9.", lm: "Widespread ST depression (inferolateral and V2–V6) with ST elevation in aVR. Can be called 'STEMI equivalent' in the right clinical context." }[k.lead];
     L.push(["Presentation", "Central pressure-type chest pain spreading to the left arm or jaw, sweating, breathlessness. Women, older people and diabetics may present atypically."]);
-    L.push(["ECG (first 10 minutes)", pat + " Hyperacute T waves come first; Q waves and T-wave inversion develop over hours to days. Estimated EF here: " + e.ef + "%."]);
+    if (st.acs === "nstemi") L.push(["NSTEMI pathway (ACC/AHA 2025; ESC 2023)", "No persistent ST elevation: ST depression or T-wave inversion (or a normal ECG) with a rise and fall of high-sensitivity troponin. Risk-stratify (for example GRACE). Immediate invasive strategy (within about 2 hours) for very-high-risk features: refractory pain, haemodynamic instability or cardiogenic shock, life-threatening arrhythmia, acute heart failure, mechanical complication. Early invasive strategy (within about 24 hours) for high-risk features: a diagnostic rise and fall in troponin, dynamic ST-T change, or a high risk score. Otherwise a selective invasive strategy. Antiplatelet and anticoagulant therapy per protocol. Some NSTEMI are occlusion MI (for example a left circumflex occlusion with a quiet ECG): persistent pain or ST change on posterior leads warrants urgent angiography."]);
+    L.push(["ECG (first 10 minutes)", (st.acs === "nstemi" ? "NSTEMI: ST depression and T-wave inversion in the leads facing the territory, usually without Q waves. " : "") + pat + " Hyperacute T waves come first; Q waves and T-wave inversion develop over hours to days. Estimated EF here: " + e.ef + "%."]);
     L.push(["Biomarker and echo", "High-sensitivity troponin rises within hours and stays raised for days; do not wait for it when the ECG shows STEMI. Echo shows a regional wall-motion abnormality in the " + k.label + " territory."]);
     L.push(["Reperfusion strategy", "Primary PCI is the preferred strategy: first-medical-contact-to-device time of 90 minutes or less at a PCI-capable hospital, and 120 minutes or less when transferring. If that cannot be met because of unavoidable delay, give fibrinolysis (ACC/AHA: within 30 minutes of arrival; ESC: within 10 minutes of diagnosis) and transfer; do rescue PCI if ST resolution is under 50% at 60–90 minutes, otherwise angiography within 2–24 hours. At " + hrs.toFixed(1) + " h from onset the " + (hrs <= 12 ? "patient is inside the usual 12 h reperfusion window." : "patient is beyond 12 h: reperfuse if ischaemia or instability persists.")]);
     L.push(["Drugs in the first hour", "Aspirin and an oral P2Y12 inhibitor, with parenteral anticoagulation as per local protocol; oxygen only if SpO₂ is low; analgesia and nitrates with caution (avoid nitrates in suspected RV infarction or low BP)."]);
@@ -220,7 +223,7 @@ export default function create(S, ui) {
     id: "mi", name: "Heart Attack Lab", tag: "Acute myocardial infarction", icon: "🫀",
     tabs: TABS.map((k) => ({ id: k, label: SITES[k].label, sub: SITES[k].sub })), get tab() { return st.tab; },
     selectHint: "Tap a coronary artery in the 3D heart to select it. Start with the LAD.",
-    opts: () => [{ id: "coll", label: "Collateral circulation", cur: st.coll, choices: [["poor", "Poor"], ["mod", "Moderate"], ["good", "Good"]] }],
+    opts: () => [{ id: "acs", label: "Presentation", cur: st.acs, choices: [["stemi", "STEMI (occluded artery)"], ["nstemi", "NSTEMI (subtotal occlusion)"]] }, { id: "coll", label: "Collateral circulation", cur: st.coll, choices: [["poor", "Poor"], ["mod", "Moderate"], ["good", "Good"]] }],
     slider: () => ({ id: "t", label: st.rAt != null ? "Reperfused at (hours from onset)" : "Time from onset of pain (hours)", min: 0.25, max: 12, step: 0.25, v: st.rAt != null ? st.rAt : st.t, locked: st.rAt != null, unit: " h" }),
     actions: () => st.vf ? [{ id: "shock", label: "DEFIBRILLATE", hint: "Shock the fibrillating heart.", off: false }] : [
       { id: "balloon", label: "BALLOON", hint: "Open the channel (after thrombus removal or lysis).", off: !(st.removed || st.lysed) || st.balloon || st.stent },
