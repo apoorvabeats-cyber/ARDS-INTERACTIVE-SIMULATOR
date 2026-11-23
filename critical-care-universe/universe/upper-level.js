@@ -5,7 +5,7 @@
 
    buildUpper(T, ctx) -> { lift, doors, player, level(), isUp(), clamp(x,z), groundY(x,z), update(t,dt,cam), tap(kind,hit), inHall(p), ... } */
 
-import { buildMemoryHall } from "./memory-hall.js?v=20261123f";
+import { buildMemoryHall } from "./memory-hall.js?v=20261123g";
 
 export function buildUpper(T, c) {
   const { G, M, E, mesh, bx, cyl, pl, ctex, dcv, makeDoor, wallMat, slats, acoustic, cyan, cyanDim, white, dark, metal, LOW, AU, cxA, ZC, MDTC, RHN } = c;

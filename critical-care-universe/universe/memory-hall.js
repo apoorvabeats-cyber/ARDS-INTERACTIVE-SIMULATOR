@@ -6,7 +6,7 @@
    buildMemoryHall(T, ctx, top, LV, YCUT) -> { gate, MC, MR, inHall(p), cands(x,z), solid(px,pz), update(t,dt,cam), tap(kind,hit), refresh() }
    mountMemoryUI(up, getPos) -> the DOM button and the full-screen overlay (up.openMemory(route)). */
 
-export const MEM_VER = "20261123f";
+export const MEM_VER = "20261123g";
 const KINDS = [["recall", "Clinical recall", "Question → answer", "#36d6ff"], ["image", "Image recognition", "ECG & findings", "#7aa8ff"], ["wave", "Waveform recognition", "Vent · ECG · art line · capno", "#27e0b0"], ["decision", "Clinical decision", "Scenario → next step", "#ffb347"], ["drug", "Drug recall", "Dose · mechanism · renal", "#ff7ab6"], ["anat", "Anatomy & physiology", "Structures & mechanisms", "#a78bff"], ["guide", "Guideline recall", "KDIGO · SSC · AHA · IDSA", "#8be34f"]];
 const PANELS = [["start", "DAILY REVISION", "Your due cards + new cards", "#36d6ff"], ["rapid", "RAPID RECALL", "60-second challenge", "#ffb347"], ["weak", "WEAK MEMORY ZONE", "Cards you keep missing", "#ff7ab6"], ["stats", "MEMORY ANALYTICS", "Retention · streak · forecast", "#27e0b0"]];
 
@@ -152,6 +152,7 @@ export function buildMemoryHall(T, c, top, LV) {
     txt(g, has ? (S.pct || 0) + "%" : "—", rx + 0.12 * w, ry + 0.055 * h, 40 * k, "#fff", "center", 800); txt(g, "TODAY'S PROGRESS", rx + 0.12 * w, ry + 0.055 * h + rr + 28 * k, 16 * k, "#9fb4dc", "center", 700);
     /* decks */
     txt(g, "YOUR DECKS", 0.04 * w, 0.545 * h, 22 * k, "#b9a8ff", "left", 700);
+    if (has && S.n) txt(g, S.n + " cards  ·  " + (S.rv || 0) + " clinically reviewed  ·  " + (S.n - (S.rv || 0)) + " draft", 0.96 * w, 0.545 * h, 18 * k, "#ffd166", "right", 700);
     const list = (has && S.decks && S.decks.length ? S.decks : deckNames.map((d) => ({ id: d.id, n: d.name, due: null, f: null }))).slice(0, 18);
     const cols = 6, dx0 = 0.04 * w, dy0 = 0.575 * h, dW = 0.92 * w, dH = 0.3 * h, dg = 0.007 * w, dtw = (dW - (cols - 1) * dg) / cols, dth = (dH - 2 * dg) / 3;
     list.forEach((d, i) => { const x = dx0 + (i % cols) * (dtw + dg), y = dy0 + Math.floor(i / cols) * (dth + dg), due = d.due || 0; g.fillStyle = due ? "rgba(70,40,10,.7)" : "rgba(8,24,60,.85)"; g.fillRect(x, y, dtw, dth); g.strokeStyle = due ? "#ffb347" : "rgba(130,150,255,.55)"; g.lineWidth = 2 * k; g.strokeRect(x, y, dtw, dth);
