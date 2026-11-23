@@ -1,20 +1,21 @@
 /* PATHODYNAMICS – Interactive Clinical Pathophysiology: the first-floor hall north of the lobby, on the same level as (and running parallel to) the Command Centre below.
-   A holographic patient turns on a dais; its organs are the doors into the labs. Five lab pedestals curve round the far wall under an LED wall.
+   A holographic patient turns on a dais; its organs are the doors into the labs. Six system pedestals curve round the far wall under an LED wall.
    Everything is tappable and opens the PATHODYNAMICS app (./pathodynamics/) in a full-screen overlay.
 
    buildPathoHall(T, ctx, top, LV) -> { gate, GX, inHall(p), cands(x,z,out), solid(px,pz), update(t,dt,cam,lvl1), tap(kind), group }
    mountPathoUI(up, getPos) -> the DOM button and the full-screen overlay (up.openPatho(route)). */
 
-export const PATHO_VER = "20261123o";
-export const PATHO_CLIPS = ["p_home", "p_stroke", "p_mi", "p_pe", "p_pancreas", "p_aki", "p_steps", "p_views"];
+export const PATHO_VER = "20261123p";
+export const PATHO_CLIPS = ["p_home", "p_neuro", "p_cardio", "p_resp", "p_nephro", "p_gi", "p_gcc", "p_steps", "p_views"];
 const LABS = [
-  ["stroke", "STROKE LAB", "Acute ischaemic stroke", "ICA · M1 · M2 · M3 · ACA · PCA · Basilar", "#9b7bff"],
-  ["mi", "HEART ATTACK LAB", "Acute myocardial infarction", "RCA · LAD · LCx · Left main · PDA", "#ff6b7c"],
-  ["pe", "PULMONARY EMBOLISM LAB", "Clot in the pulmonary arteries", "Saddle · Main · Lobar · Segmental", "#36d6ff"],
-  ["pancreas", "PANCREATITIS LAB", "Necrosis, collections, drainage", "APFC · ANC · WON · Infected necrosis", "#ffb347"],
-  ["aki", "KIDNEY INJURY LAB", "Acute kidney injury", "Prerenal · ATN · AIN · GN · Obstruction", "#27e0b0"],
+  ["neuro", "NEUROLOGY", "Brain and cerebral vessels", "Stroke · ICH · SAH · Aneurysm · Herniation · Hydrocephalus", "#9b7bff", "stroke"],
+  ["cardio", "CARDIOLOGY", "Heart, aorta and pericardium", "STEMI · NSTEMI · Dissection · Tamponade · PE", "#ff6b7c", "mi"],
+  ["resp", "RESPIRATORY", "Lungs, airways and pleura", "ARDS · Pneumonia · PTX · Effusion · Mucus plug · PE", "#36d6ff", "pe"],
+  ["nephro", "NEPHROLOGY", "Kidneys and urinary tract", "ATN · AIN · GN · Obstruction · Infarct · Stenosis", "#27e0b0", "aki"],
+  ["gi", "GASTROENTEROLOGY", "Pancreas and gut", "Pancreatitis · Necrosis · Drainage", "#ffb347", "pancreas"],
+  ["gcc", "GENERAL CRITICAL CARE", "Shock and metabolic crises", "Septic shock · DIC · Anaphylaxis · DKA · HHS", "#ff6b8a", "gcc"],
 ];
-const TEAL = 0x27e0b0;
+const TEAL = 0x27e0b0, SYS = { stroke: "neuro", mi: "cardio", pe: "resp", pancreas: "gi", aki: "nephro" };
 
 export function buildPathoHall(T, c, top, LV) {
   const { mesh, bx, cyl, pl, ctex, dcv, makeDoor, wallMat, slats, cyan, cyanDim, white, M, E, LOW, AU, ZC } = c;
@@ -79,7 +80,7 @@ export function buildPathoHall(T, c, top, LV) {
     g.strokeStyle = "#7fffc8"; g.lineWidth = 3.5 * k; g.shadowColor = "#27e0b0"; g.shadowBlur = 12 * k; g.beginPath(); const cur = (t * 0.35) % 1;
     for (let i = 0; i <= 300; i++) { const u = i / 300, ph2 = ((u * 3 + 0.0) % 1), y = (ph2 > 0.40 && ph2 < 0.44 ? Math.sin((ph2 - 0.40) / 0.04 * PI) * 0.9 : 0) - (ph2 > 0.44 && ph2 < 0.47 ? 0.2 : 0) + (ph2 > 0.15 && ph2 < 0.25 ? 0.12 * Math.sin((ph2 - 0.15) / 0.10 * PI) : 0) + (ph2 > 0.6 && ph2 < 0.74 ? 0.25 * Math.sin((ph2 - 0.6) / 0.14 * PI) : 0); const X = px + 6 + u * (pw - 12), Y = py + ph * 0.62 - y * ph * 0.5; if (Math.abs(u - cur) < 0.04) continue; i ? g.lineTo(X, Y) : g.moveTo(X, Y); }
     g.stroke(); g.shadowBlur = 0; g.fillStyle = "#eafff8"; g.fillRect(px + 6 + cur * (pw - 12), py + 4, 3 * k, ph - 8);
-    LABS.forEach((l, i) => { const x = 0.63 * w + (i % 3) * 0.112 * w, y = 0.68 * h + Math.floor(i / 3) * 0.1 * h; g.fillStyle = "rgba(6,22,40,.9)"; g.fillRect(x, y, 0.105 * w, 0.085 * h); g.strokeStyle = l[4]; g.lineWidth = 2 * k; g.strokeRect(x, y, 0.105 * w, 0.085 * h); txt(g, l[1].replace(" LAB", ""), x + 0.0525 * w, y + 0.0425 * h, 14 * k, "#eef4ff", "center", 700); });
+    LABS.forEach((l, i) => { const x = 0.63 * w + (i % 3) * 0.112 * w, y = 0.68 * h + Math.floor(i / 3) * 0.1 * h; g.fillStyle = "rgba(6,22,40,.9)"; g.fillRect(x, y, 0.105 * w, 0.085 * h); g.strokeStyle = l[4]; g.lineWidth = 2 * k; g.strokeRect(x, y, 0.105 * w, 0.085 * h); txt(g, l[1].replace(" LAB", "").replace("GENERAL CRITICAL CARE", "CRITICAL CARE").replace("GASTROENTEROLOGY", "GASTRO"), x + 0.0525 * w, y + 0.0425 * h, 14 * k, "#eef4ff", "center", 700); });
     const pulse = 0.55 + 0.45 * Math.sin(t * 3); g.fillStyle = "rgba(39,224,176," + (0.15 + 0.15 * pulse).toFixed(3) + ")"; g.fillRect(0.63 * w + 2 * 0.112 * w, 0.78 * h, 0.105 * w, 0.1 * h); g.strokeStyle = "#27e0b0"; g.lineWidth = 2.5 * k; g.strokeRect(0.63 * w + 2 * 0.112 * w, 0.78 * h, 0.105 * w, 0.1 * h); txt(g, "TAP TO ENTER", 0.63 * w + 2 * 0.112 * w + 0.0525 * w, 0.83 * h, 15 * k, "#eafff8", "center", 800);
     const sx = ((t * 260) % (w + 400)) - 400; g.fillStyle = "rgba(39,224,176,.5)"; g.fillRect(sx, h - 6 * k, 400, 3 * k); scr.t.needsUpdate = true;
   }
@@ -106,11 +107,11 @@ export function buildPathoHall(T, c, top, LV) {
   part(new T.CapsuleGeometry(0.3, 0.7, 6, 18), 0, 1.55, 0); part(new T.SphereGeometry(0.2, 18, 14), 0, 2.5, 0); part(new T.CylinderGeometry(0.08, 0.09, 0.15, 10), 0, 2.28, 0);
   [-1, 1].forEach((s) => { part(new T.CapsuleGeometry(0.075, 0.72, 4, 10), s * 0.46, 1.5, 0, s * 0.08); part(new T.CapsuleGeometry(0.11, 0.78, 6, 12), s * 0.15, 0.5, 0); });
   const organs = [];
-  const organ = (lab, hex, geo, x, y, z, sx, sy, sz) => { const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color: new T.Color(hex).multiplyScalar(1.5), transparent: true, opacity: 0.85, toneMapped: false })); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.userData.vhall = "p:" + lab; body.add(m); organs.push({ m, lab, s: [sx, sy, sz], ph: organs.length * 1.1 }); return m; };
+  const organ = (lab, hex, geo, x, y, z, sx, sy, sz) => { const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color: new T.Color(hex).multiplyScalar(1.5), transparent: true, opacity: 0.85, toneMapped: false })); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.userData.vhall = "p:" + (SYS[lab] || lab); body.add(m); organs.push({ m, lab, s: [sx, sy, sz], ph: organs.length * 1.1 }); return m; };
   const sph = new T.SphereGeometry(1, 16, 12);
   organ("stroke", 0x9b7bff, sph, 0, 2.51, 0, 0.17, 0.13, 0.15); organ("mi", 0xff6b7c, sph, 0.07, 1.9, 0.05, 0.09, 0.11, 0.08);
   [-1, 1].forEach((s) => { organ("pe", 0x36d6ff, sph, s * 0.17, 1.92, 0, 0.1, 0.21, 0.1); organ("aki", 0x27e0b0, sph, s * 0.14, 1.35, -0.08, 0.05, 0.09, 0.04); }); organ("pancreas", 0xffb347, sph, 0, 1.5, 0.02, 0.2, 0.04, 0.05);
-  [["stroke", 0, 2.52, 0], ["mi", 0.07, 1.9, 0.05], ["pe", -0.17, 1.92, 0], ["pe", 0.17, 1.92, 0], ["pancreas", 0, 1.5, 0.02], ["aki", -0.14, 1.35, -0.08], ["aki", 0.14, 1.35, -0.08]].forEach(([lab, x, y, z]) => { const h = new T.Mesh(new T.SphereGeometry(0.2, 8, 6), new T.MeshBasicMaterial({ visible: false })); h.position.set(x, y, z); h.userData.vhall = "p:" + lab; body.add(h); });
+  [["stroke", 0, 2.52, 0], ["mi", 0.07, 1.9, 0.05], ["pe", -0.17, 1.92, 0], ["pe", 0.17, 1.92, 0], ["pancreas", 0, 1.5, 0.02], ["aki", -0.14, 1.35, -0.08], ["aki", 0.14, 1.35, -0.08]].forEach(([lab, x, y, z]) => { const h = new T.Mesh(new T.SphereGeometry(0.2, 8, 6), new T.MeshBasicMaterial({ visible: false })); h.position.set(x, y, z); h.userData.vhall = "p:" + (SYS[lab] || lab); body.add(h); });
   const scan = new T.Mesh(new T.TorusGeometry(0.62, 0.012, 8, 72), E(TEAL, 2.6)); scan.rotation.x = PI / 2; body.add(scan);
   const scan2 = new T.Mesh(new T.TorusGeometry(0.5, 0.008, 8, 72), E(0x36d6ff, 2)); scan2.rotation.x = PI / 2; body.add(scan2);
   const beam = new T.Mesh(new T.CylinderGeometry(0.02, 0.02, YC - LV - 0.5, 8, 1, true), new T.MeshBasicMaterial({ color: TEAL, transparent: true, opacity: 0.35, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false })); beam.position.set(0, (YC - LV - 0.5) / 2 + 0.5, 0); dais.add(beam);
@@ -119,7 +120,7 @@ export function buildPathoHall(T, c, top, LV) {
   const tagTx = ctex(2048, 96, (g, w, h) => { g.clearRect(0, 0, w, h); const s = "PATHODYNAMICS  ·  EXPLORE  ·  INTERVENE  ·  OBSERVE  ·  "; g.font = "800 54px system-ui,sans-serif"; g.textBaseline = "middle"; g.fillStyle = "#cffff0"; g.shadowColor = "#27e0b0"; g.shadowBlur = 16; const sw = g.measureText(s).width, n = Math.ceil(w / sw) + 1; for (let i = 0; i < n; i++) g.fillText(s, i * sw, h / 2); });
   tagTx.wrapS = T.RepeatWrapping; const ring = new T.Mesh(new T.CylinderGeometry(1.75, 1.75, 0.3, 96, 1, true), new T.MeshBasicMaterial({ map: tagTx, transparent: true, depthWrite: false, toneMapped: false })); ring.position.y = 0.9; dais.add(ring);
 
-  /* ---------- five lab pedestals ---------- */
+  /* ---------- six system pedestals ---------- */
   const minis = [], peds = [];
   const R = 4.7;
   const miniFor = (id, hex) => {
@@ -129,19 +130,20 @@ export function buildPathoHall(T, c, top, LV) {
     else if (id === "mi") { add(new T.SphereGeometry(0.2, 18, 14), 0, 0.05, 0, [1, 1.1, 0.9]); add(new T.ConeGeometry(0.19, 0.34, 18), 0, -0.2, 0, [1, 1, 0.9]); }
     else if (id === "pe") { [-1, 1].forEach((s) => add(new T.SphereGeometry(0.14, 16, 12), s * 0.17, 0, 0, [0.9, 1.9, 0.9])); }
     else if (id === "pancreas") { const cv = new T.CatmullRomCurve3([new V(-0.32, 0.04, 0), new V(-0.1, -0.02, 0), new V(0.12, 0.04, 0), new V(0.32, 0.12, 0)]); add(new T.TubeGeometry(cv, 24, 0.055, 10, false)); add(new T.SphereGeometry(0.1, 14, 10), -0.34, 0.0, 0); }
+    else if (id === "gcc") { add(new T.SphereGeometry(0.16, 18, 14), 0, -0.06, 0); add(new T.ConeGeometry(0.13, 0.3, 18), 0, 0.17, 0); }
     else { add(new T.SphereGeometry(0.15, 18, 14), 0, 0, 0, [0.9, 1.5, 0.7]); }
     return g;
   };
   LABS.forEach((l, i) => {
-    const a = [-1.0, -0.5, 0, 0.5, 1.0][i], x = CX + R * Math.sin(a), z = CZ + R * Math.cos(a), col = hx(l[4]);
+    const a = [1.2, 0.72, 0.24, -0.24, -0.72, -1.2][i], x = CX + R * Math.sin(a), z = CZ + R * Math.cos(a), col = hx(l[4]);
     const g = new T.Group(); g.position.set(x, LV, z); hall.add(g);
     cyl(0.42, 0.55, 0.9, M(0x0e1a22, { metalness: 0.7, roughness: 0.3, envMapIntensity: 1.2 }), 0, 0.45, 0, g, 24).userData.vhall = "p:" + l[0];
     cyl(0.5, 0.5, 0.04, E(col, 2.2), 0, 0.92, 0, g, 24); cyl(0.68, 0.68, 0.03, cyanDim, 0, 0.02, 0, g, 24);
-    const mini = miniFor(l[0], col); mini.position.y = 1.5; mini.userData.vhall = "p:" + l[0]; g.add(mini); const mh = new T.Mesh(new T.SphereGeometry(0.4, 10, 8), new T.MeshBasicMaterial({ visible: false })); mh.position.y = 1.5; mh.userData.vhall = "p:" + l[0]; g.add(mh); minis.push({ mini, ph: i * 0.8 });
+    const mini = miniFor(l[5], col); mini.position.y = 1.5; mini.userData.vhall = "p:" + l[0]; g.add(mini); const mh = new T.Mesh(new T.SphereGeometry(0.4, 10, 8), new T.MeshBasicMaterial({ visible: false })); mh.position.y = 1.5; mh.userData.vhall = "p:" + l[0]; g.add(mh); minis.push({ mini, ph: i * 0.8 });
     const tex = ctex(512, 320, (q, w, h) => { panelBg(q, w, h, "#06141f", "#0a2338"); frame(q, w, h, l[4], 6); q.shadowColor = l[4]; q.shadowBlur = 16; q.fillStyle = l[4]; q.beginPath(); q.arc(52, 56, 22, 0, 7); q.fill(); q.shadowBlur = 0; txt(q, String(i + 1), 52, 58, 28, "#04101a", "center", 800);
       txt(q, l[1], 90, 56, l[1].length > 18 ? 27 : 33, "#eef4ff", "left", 800); txt(q, l[2], 30, 128, 25, "#a9d0e0", "left", 500); txt(q, l[3], 30, 176, 19, "#7fa6b8", "left", 500); txt(q, "TAP TO ENTER  ▸", 30, 268, 26, l[4], "left", 800); });
-    const card = new T.Mesh(new T.PlaneGeometry(1.5, 1.5 * 320 / 512), basic(tex, { transparent: true, side: T.DoubleSide })); card.position.y = 2.3; card.userData.vhall = "p:" + l[0]; g.add(card);
-    g.rotation.y = Math.atan2(CX - x, CZ - z); peds.push({ x, z, card, ph: i * 0.9 });
+    const card = new T.Mesh(new T.PlaneGeometry(1.5, 1.5 * 320 / 512), basic(tex, { transparent: true, side: T.DoubleSide })); card.position.y = 2.3 + (i % 2) * 0.6; card.userData.vhall = "p:" + l[0]; g.add(card);
+    g.rotation.y = Math.atan2(CX - x, CZ - z); peds.push({ x, z, card, ph: i * 0.9, base: 2.3 + (i % 2) * 0.6 });
   });
 
   /* ---------- walking ---------- */
@@ -163,7 +165,7 @@ export function buildPathoHall(T, c, top, LV) {
     organs.forEach((o) => { const s = 1 + 0.12 * Math.sin(tt * 2.2 + o.ph), q = o.m.userData.lab === "mi" ? 1 : 1; o.m.scale.set(o.s[0] * s * q, o.s[1] * s, o.s[2] * s); });
     ring.material.map.offset.x = (ring.material.map.offset.x + sdt * 0.02) % 1;
     minis.forEach((m) => { m.mini.rotation.y += sdt * 0.8; m.mini.position.y = 1.5 + 0.06 * Math.sin(tt * 1.6 + m.ph); });
-    peds.forEach((p) => { p.card.position.y = 2.3 + 0.05 * Math.sin(tt * 1.5 + p.ph); });
+    peds.forEach((p) => { p.card.position.y = p.base + 0.05 * Math.sin(tt * 1.5 + p.ph); });
     if (cam) { paintT += sdt; if (paintT > (inHall(cam) ? 0.14 : 0.8)) { paintT = 0; paintLed(tt); } }
   }
   function tap(kind) {
@@ -171,7 +173,7 @@ export function buildPathoHall(T, c, top, LV) {
     if (r === "home") return { route: "", say: "p_home" };
     if (r === "steps") return { route: "", say: "p_steps" };
     if (r === "views") return { route: "", say: "p_views" };
-    return { route: "lab/" + r, say: "p_" + r };
+    return { route: "sys/" + r, say: "p_" + r };
   }
   return { gate, GX, inHall, cands, solid: solidFn, update, tap, group: hall };
 }

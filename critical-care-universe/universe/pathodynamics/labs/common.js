@@ -1,5 +1,5 @@
 /* Helpers shared by the labs: a draggable clot with its pulsing ring, spring-back and retrieval flight, and a tube/flow builder. */
-import { THREE, smooth } from "../stage.js?v=20261123o";
+import { THREE, smooth } from "../stage.js?v=20261123p";
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 export function clotKit(S, grp, ui, cfg) {
