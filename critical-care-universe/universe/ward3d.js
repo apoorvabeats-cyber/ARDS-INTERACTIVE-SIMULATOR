@@ -7,7 +7,7 @@
    buildWard(THREE, scene, renderer, P, H) -> { BP, BA, hits, lamps, update(t,dt,yaw,facingAll), setDoor(i,open), door(i), approach(i) }
      H.mon(ctx,p,w,h,x,y)   monitor painter       H.rdr(ctx,p)  ventilator painter
      H.equip(p) -> {bags,pumps,doses}              Visual only. Clinical text is original and needs review.        */
-import { loadArchetype, build as buildPerson, breathe, patientFile } from "./patient3d.js?v=20261120j";
+import { loadGLB, assetURL, assignModels, makePatient, placeMask, placeTube, shrinkTextures, FLOOR } from "./icu-actors.js?v=20261125c";
 
 import { buildBed } from "./icu-bed.js?v=20261120j";
 export function buildWard(T, S, R, P, H) {
@@ -341,14 +341,17 @@ export function buildWard(T, S, R, P, H) {
       const e = c.open * c.open * (3 - 2 * c.open); c.leaf.position.x = -1.64 * e;
       c.dled.material.color.set(e > 0.5 ? 0x3dff9a : 0x36d6ff).multiplyScalar(2.4);
       const p = c.p, face = all || angd(BA[c.i], yaw) < 1.35; c.facing = face;
-      if (c.human) breathe(c.human, p.vo || 0, 0.035 + 0.02 * Math.min(1, Math.max(0, (p.v.rr - 16) / 20))); else c.chest.scale.set(c.chest0.x * (1 + 0.09 * (p.vo || 0)), c.chest0.y, c.chest0.z * (1 + 0.04 * (p.vo || 0)));
+      if (c.act) c.act.tick(t, p.vo || 0, p.v.rr, p.sev || 0); else c.chest.scale.set(c.chest0.x * (1 + 0.09 * (p.vo || 0)), c.chest0.y, c.chest0.z * (1 + 0.04 * (p.vo || 0)));
       const key = [p.st, p.done, p.dx].join("|"); if (key !== c.sign.key) drawSign(c, p, c.i);
       const air = p.air, iv = p.iv;
-      c.supp.imv.visible = air === "imv"; c.supp.niv.visible = air === "niv"; c.supp.mask.visible = air === "mask";
-      c.circ.visible = !!iv; c.vent.visible = !!iv; c.fm.visible = air === "mask" || air === "room";
+      if (c.act) {
+        const A = c.act; A.tube.visible = air === "imv"; A.mask.niv.visible = air === "niv"; A.mask.mask.visible = air === "mask";
+        c.circImv.visible = air === "imv"; c.circNiv.visible = air === "niv"; c.o2line.visible = air === "mask";
+      } else { c.supp.imv.visible = air === "imv"; c.supp.niv.visible = air === "niv"; c.supp.mask.visible = air === "mask"; c.circ.visible = !!iv; c.vent.visible = !!iv; }
+      c.fm.visible = air === "mask" || air === "room";
       if (face && n % 2 === 0) {
         H.mon(c.mon.userData.g, p, 512, 362, 0, 0); c.mon.needsUpdate = true;
-        if (iv) { H.rdr(c.vtex.userData.g, p); c.vtex.needsUpdate = true; }
+        if (iv || c.act) { H.rdr(c.vtex.userData.g, p); c.vtex.needsUpdate = true; }
       }
     });
     if (t - eq > 1) { eq = t; cubicles.forEach(refreshEquip); drawCmd(); }
@@ -356,36 +359,41 @@ export function buildWard(T, S, R, P, H) {
   drawCmd();
   cubicles.forEach(refreshEquip);
 
-  /* ---------- real human bodies (GLB), loaded after the first frame; the procedural patient stays as the fallback ---------- */
-  const skins = [0xb98262, 0xa9714f, 0xc28e68, 0xb07a58, 0xc69773, 0x9f6a49];
+  /* ---------- patients on their beds, ventilators and masks (GLB, see icu-actors.js); the simple figure stays as the fallback ---------- */
+  const MODELS = assignModels(P), LOWMEM = typeof matchMedia === "function" && matchMedia("(pointer:coarse)").matches;
+  const shrunk = new Set();
   function attachHuman(c) {
-    const f = patientFile(c.p), url = new URL("./patients/" + f.key + ".glb", import.meta.url).href;
-    loadArchetype(url).then((gltf) => {
-      const h = buildPerson(T, gltf, c.p, { skin: skins[c.i % skins.length], hair: f.age > 60 ? 0x9a9a9a : 0x15110f, longHair: f.sex === "f", incline: TH, pose: c.i });
-      h.group.userData.part = "Patient"; c.bed.add(h.group);
-      h.group.scale.setScalar((gltf.scene.userData && gltf.scene.userData.patientScale) || (gltf.scene.children[1] && gltf.scene.children[1].userData.patientScale) || (f.sex === "m" ? 1.1 : 1.04));
-      c.bed.updateMatrixWorld(true);
-      const bedPos = (o) => c.bed.worldToLocal(o.getWorldPosition(new V()));
-      /* seat the hips on the mattress: the pelvis joint sits just above the seat, the spine follows the raised back section */
-      h.group.position.set(0, 0, 0); h.group.updateMatrixWorld(true);
-      const hip = bedPos(h.B("spine05")), want = c.onBack(0.1, c.bedX.SB + 0.115);
-      h.group.position.copy(want).sub(hip); h.group.position.z = 0; h.group.updateMatrixWorld(true);
-      /* move the airway equipment to the real face (it was placed for the simple figure) */
-      const a = h.B("eye.L"), b = h.B("eye.R");
-      if (a && b) {
-        const m = new V().addVectors(bedPos(a), bedPos(b)).multiplyScalar(0.5), d = m.clone().sub(c.eyeAnchor);
-        ["imv", "niv", "mask"].forEach((k) => { if (c.supp[k]) c.supp[k].position.add(d); });
-        const vis = c.circ.visible; g_remove(c.circ); c.circ = c.mkCirc(d); c.circ.userData.part = "Ventilator circuit"; c.circ.visible = vis; c.g.add(c.circ);
-        /* sheet follows the real legs */
-        const hp = bedPos(h.B("spine05")), thL = bedPos(h.B("upperleg02.L")), kn = bedPos(h.B("lowerleg01.L")), an = bedPos(h.B("lowerleg02.L")), lz = Math.abs(thL.z) || 0.11;
-        const pts = [[hp.x, hp.y + 0.02, 0.13], [(hp.x + kn.x) / 2, (hp.y + kn.y) / 2 + 0.025, 0.115], [kn.x, kn.y + 0.02, 0.09], [an.x, an.y + 0.015, 0.066]];
-        c.bedX.setLegs([{ z: lz, pts }, { z: -lz, pts }], -0.02, an.x + 0.03);
-        /* IV cannula on the wrist nearest the glass */
-        const wl = h.B("wrist.L"), wr = h.B("wrist.R"); let best = null, bz = -9;
-        [wl, wr].forEach((w) => { if (!w) return; const q = bedPos(w); if (q.z > bz) { bz = q.z; best = q; } });
-        if (best) { const ge = best.clone().add(new V(BED.x, 0.02, BED.z)); const vis2 = c.line.visible; g_remove(c.line); c.line = c.mkLine(ge); c.line.userData.part = "IV line"; c.line.visible = vis2; c.g.add(c.line); }
-      }
-      c.proc.visible = false; c.human = h;
+    const key = MODELS[c.i];
+    Promise.all([loadGLB(assetURL(key)), loadGLB(assetURL("vent")), loadGLB(assetURL("niv")), loadGLB(assetURL("o2"))]).then(([pg, vg, ng, og]) => {
+      if (LOWMEM) [pg, vg, ng, og].forEach((x) => { if (!shrunk.has(x)) { shrunk.add(x); shrinkTextures(x.scene, 1024); } });
+      const g = c.g, S = 1.05;
+      const act = makePatient(T, pg, key, c.i * 2.7 + 0.4);
+      act.root.scale.setScalar(S); act.root.rotation.y = Math.PI / 2; act.root.position.set(BED.x + 0.2, -FLOOR * S, BED.z);
+      act.root.userData.part = "Patient"; g.add(act.root);
+      placeMask(T, act, ng, "niv"); placeMask(T, act, og, "mask"); placeTube(T, act);
+      /* ventilator on every bed, screen on the front shows the live settings */
+      const vv = new T.Group(), vm = vg.scene.clone(true), VS = 0.78; vv.add(vm); vv.scale.setScalar(VS);
+      vv.position.set(-1.85, 0.95 * VS, -CD + 0.85); vv.rotation.y = 0.3; vv.userData.part = "Ventilator"; g.add(vv);
+      const scr = new T.Mesh(new T.PlaneGeometry(0.624, 0.427), new T.MeshBasicMaterial({ map: c.vtex, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      scr.position.set(0.114, 0.652, 0.004); scr.rotation.x = -0.08; vm.add(scr);
+      g.updateMatrixWorld(true);
+      const toG = (o, v) => g.worldToLocal(o.localToWorld(v.clone()));
+      const mkTube = (pts, r, col, op) => new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 40, r, 8), new T.MeshStandardMaterial({ color: col, roughness: 0.35, transparent: true, opacity: op || 0.92 }));
+      const pIn = toG(vm, new V(-0.045, 0.24, 0.13)), pOut = toG(vm, new V(0.255, 0.24, 0.13));
+      const circuit = (a, side) => {
+        const k = new T.Group(), mid = (u, w) => new V((u.x + w.x) / 2, Math.max(u.y, w.y) + 0.16, (u.z + w.z) / 2);
+        [[pIn, 0], [pOut, 0.03]].forEach(([b, dz], n) => { const a2 = a.clone().add(new V(0.01 * n, 0.012 * n, 0.015 * n)); k.add(mkTube([a2, a2.clone().add(new V(0.07, 0.1, side * 0.04)), mid(a2, b).add(new V(0, 0, dz)), b.clone().add(new V(0.04, -0.04, 0.12)), b], 0.014, 0xe4edf1)); });
+        k.userData.part = "Ventilator circuit"; k.visible = false; g.add(k); return k;
+      };
+      c.circImv = circuit(toG(act.model, act.connector), 1);
+      const nivElbow = toG(act.mask.niv.children[0], new V(0, -0.76, 0.9)); c.circNiv = circuit(nivElbow, -1);
+      const inlet = toG(act.mask.mask.children[0], new V(0, -0.92, 0.45)), fmP = c.fm.position;
+      c.o2line = mkTube([inlet, inlet.clone().add(new V(0.12, -0.25, -0.12)), new V(0.9, 0.62, -2.55), new V(fmP.x - 0.2, fmP.y - 0.5, fmP.z + 0.5), new V(fmP.x, fmP.y - 0.1, fmP.z + 0.05)], 0.007, 0x7fd8a0, 0.85);
+      c.o2line.userData.part = "Oxygen tubing"; c.o2line.visible = false; g.add(c.o2line);
+      /* IV cannula on the wrist nearest the glass (model -x side faces the corridor) */
+      { const ge = toG(act.model, new V(-0.165, 0.12, -0.05)), vis = c.line.visible; g_remove(c.line); c.line = c.mkLine(ge); c.line.userData.part = "IV line"; c.line.visible = vis; g.add(c.line); }
+      c.bed.visible = false; c.vent.visible = false; c.circ.visible = false;
+      c.act = act; c.vv = vv;
     }).catch((e) => console.warn("Patient model not loaded; using the simple figure.", e));
   }
   const g_remove = (o) => { if (o.parent) o.parent.remove(o); };

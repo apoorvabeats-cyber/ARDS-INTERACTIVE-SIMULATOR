@@ -109,29 +109,41 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
   bx(0.04, 0.05, 10, cyan, R.x0 + 0.03, 0.06, 0, room); bx(12, 0.05, 0.04, cyanDim, cxR, 0.06, R.z - 0.03, room); bx(12, 0.05, 0.04, cyanDim, cxR, 0.06, -R.z + 0.03, room);
   for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) { const m = pl(1.7, 0.5, white, R.x0 + 2.2 + i * 2.7, R.h - 0.005, -2.8 + j * 2.8, 0, Math.PI / 2, room); }
   /* wall plinth under the screens */
-  bx(0.2, 0.5, 7.7, dark, R.x0 + 0.1, 0.25, 0, room);
-  bx(0.06, 0.03, 7.7, cyan, R.x0 + 0.21, 0.5, 0, room);
+  bx(0.2, 0.28, 9.0, dark, R.x0 + 0.1, 0.14, 0, room);
+  bx(0.06, 0.03, 9.0, cyan, R.x0 + 0.21, 0.28, 0, room);
 
-  /* ---- video wall: 6 live monitors, 3 across x 2 rows, wall mounted ---- */
-  const MW = 640, MH = 452;
-  bx(0.06, 3.6, 7.7, dark, R.x0 + 0.05, 2.44, 0, room);      /* mounting frame */
+  /* ---- video wall: 6 large live monitors, 3 across x 2 rows, wall mounted, thin bezels with a lit edge and a soft backlight ---- */
+  const MW = 768, MH = 520, SW = 2.66, SH = 1.8;
+  bx(0.06, 3.95, 9.0, dark, R.x0 + 0.05, 2.25, 0, room);      /* mounting frame */
+  bx(0.02, 0.03, 9.0, cyan, R.x0 + 0.095, 0.29, 0, room); bx(0.02, 0.03, 9.0, cyan, R.x0 + 0.095, 4.2, 0, room);
+  const glowTex = ctex(256, 256, (g, w, h) => { const q = g.createRadialGradient(w / 2, h / 2, w * 0.18, w / 2, h / 2, w / 2); q.addColorStop(0, "rgba(255,255,255,.55)"); q.addColorStop(0.55, "rgba(255,255,255,.16)"); q.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = q; g.fillRect(0, 0, w, h); });
+  const bezelM = M(0x05070a, { metalness: 0.7, roughness: 0.25 });
   const mons = [];
   for (let i = 0; i < 6; i++) {
-    const row = i < 3 ? 0 : 1, col = i % 3, zc = (col - 1) * 2.4, yc = row === 0 ? 3.28 : 1.58;
+    const row = i < 3 ? 0 : 1, col = i % 3, zc = (col - 1) * 2.95, yc = row === 0 ? 3.2 : 1.3;
     const g = new T.Group(); g.position.set(R.x0 + 0.1, yc, zc); g.rotation.y = Math.PI / 2; room.add(g);
-    bx(2.3, 1.64, 0.07, M(0x07090c, { metalness: 0.6, roughness: 0.3 }), 0, 0, 0, g);
+    bx(SW + 0.1, SH + 0.1, 0.06, bezelM, 0, 0, 0, g);
     const cv = document.createElement("canvas"); cv.width = MW; cv.height = MH; const tx = new T.CanvasTexture(cv); tx.colorSpace = T.SRGBColorSpace; tx.anisotropy = 4;
-    const sc = mesh(new T.PlaneGeometry(2.2, 1.55), new T.MeshBasicMaterial({ map: tx, toneMapped: false }), 0, 0, 0.037, g);
+    const sc = mesh(new T.PlaneGeometry(SW, SH), new T.MeshBasicMaterial({ map: tx, toneMapped: false }), 0, 0, 0.032, g);
     sc.userData.cmdBed = i; g.children[0].userData.cmdBed = i;
-    bx(2.3, 0.025, 0.02, cyan, 0, -0.83, 0.04, g);
-    mons.push({ ctx: cv.getContext("2d"), tex: tx, i });
+    /* lit edge in the patient's status colour, a status bar under the screen and a backlight on the wall */
+    const edge = new T.MeshBasicMaterial({ color: 0x36d6ff, toneMapped: false });
+    [[0, SH / 2 + 0.05, SW + 0.12, 0.016], [0, -SH / 2 - 0.05, SW + 0.12, 0.016], [-SW / 2 - 0.05, 0, 0.016, SH + 0.12], [SW / 2 + 0.05, 0, 0.016, SH + 0.12]].forEach((e) => bx(e[2], e[3], 0.02, edge, e[0], e[1], 0.034, g));
+    const bar = bx(1.1, 0.02, 0.02, edge, 0, -SH / 2 - 0.1, 0.034, g);
+    const glow = new T.Mesh(new T.PlaneGeometry(SW + 1.1, SH + 0.9), new T.MeshBasicMaterial({ map: glowTex, color: 0x36d6ff, transparent: true, opacity: 0.5, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false }));
+    glow.position.z = -0.03; g.add(glow);
+    mons.push({ ctx: cv.getContext("2d"), tex: tx, i, edge, glow, st: -1 });
   }
   /* header sign */
-  const sign = ctex(1024, 160, (g, w, h) => {
-    g.fillStyle = "#06131f"; g.fillRect(0, 0, w, h); g.strokeStyle = "#36d6ff"; g.lineWidth = 4; g.strokeRect(4, 4, w - 8, h - 8);
-    g.fillStyle = "#d8f4ff"; g.font = "700 70px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.shadowColor = "#36d6ff"; g.shadowBlur = 24; g.fillText("ICU COMMAND CENTRE", w / 2, h / 2 + 4);
+  const sign = ctex(1536, 150, (g, w, h) => {
+    const q = g.createLinearGradient(0, 0, w, 0); q.addColorStop(0, "#04101b"); q.addColorStop(0.5, "#0a2236"); q.addColorStop(1, "#04101b"); g.fillStyle = q; g.fillRect(0, 0, w, h);
+    g.strokeStyle = "#36d6ff"; g.lineWidth = 3; g.strokeRect(3, 3, w - 6, h - 6);
+    g.fillStyle = "#36d6ff"; [[0, 0, 1, 1], [w, 0, -1, 1], [0, h, 1, -1], [w, h, -1, -1]].forEach((c) => { g.fillRect(c[0] - (c[2] < 0 ? 46 : 0), c[1] - (c[3] < 0 ? 8 : 0), 46, 8); g.fillRect(c[0] - (c[2] < 0 ? 8 : 0), c[1] - (c[3] < 0 ? 46 : 0), 8, 46); });
+    g.fillStyle = "#e4f8ff"; g.font = "700 70px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.shadowColor = "#36d6ff"; g.shadowBlur = 26; g.fillText("ICU COMMAND CENTRE", w / 2, h / 2 + 4);
+    g.shadowBlur = 0; g.fillStyle = "#3dff9a"; g.beginPath(); g.arc(150, h / 2, 12, 0, 7); g.fill(); g.fillStyle = "#7fd8ff"; g.font = "600 30px ui-monospace,Menlo,monospace"; g.textAlign = "left"; g.fillText("LIVE", 176, h / 2 + 2);
+    g.textAlign = "right"; g.fillText("6 BEDS · TELEMETRY", w - 150, h / 2 + 2);
   });
-  const sg = mesh(new T.PlaneGeometry(2.7, 0.42), new T.MeshBasicMaterial({ map: sign, toneMapped: false }), R.x0 + 0.075, 4.4, 0, room); sg.rotation.y = Math.PI / 2;
+  const sg = mesh(new T.PlaneGeometry(3.5, 0.342), new T.MeshBasicMaterial({ map: sign, toneMapped: false }), R.x0 + 0.075, 4.39, 0, room); sg.rotation.y = Math.PI / 2;
 
   /* ---- operator console, curved like the reference: centre desk and two angled wings, no chairs and no people ---- */
   const desk = new T.Group(); desk.position.set(-17.0, 0, 0); room.add(desk);
@@ -428,11 +440,36 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
 
   /* =============================== painters =============================== */
   const col = (st) => ["#3dff9a", "#ffc24a", "#ff4d5e"][st || 0];
+  const SCAN = (() => { const c = document.createElement("canvas"); c.width = 4; c.height = 4; const g = c.getContext("2d"); g.fillStyle = "rgba(0,0,0,.2)"; g.fillRect(0, 0, 4, 1); return c; })();
+  const GRID = (() => { const c = document.createElement("canvas"); c.width = 36; c.height = 36; const g = c.getContext("2d"); g.strokeStyle = "rgba(80,190,255,.07)"; g.lineWidth = 1; g.strokeRect(0.5, 0.5, 36, 36); return c; })();
+  const SUP = { imv: "VENTILATOR", niv: "NIV MASK", mask: "O₂ MASK", hf: "HIGH-FLOW", room: "ROOM AIR" };
+  const rrect = (g, x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
   function paintMon(m) {
-    const p = P[m.i], g = m.ctx;
-    g.fillStyle = "#050b14"; g.fillRect(0, 0, MW, MH);
-    if (H && H.mon) H.mon(g, p, MW, MH, 0, 0);
-    g.strokeStyle = col(p.st); g.lineWidth = 7; g.strokeRect(3.5, 3.5, MW - 7, MH - 7);
+    const p = P[m.i], g = m.ctx, st = p.st || 0, c = col(st), tn = performance.now() / 1000;
+    if (m.st !== st) { m.st = st; const k = [0x2dffa0, 0xffc24a, 0xff4d5e][st]; m.edge.color.setHex(k); m.glow.material.color.setHex(k); m.glow.material.opacity = st === 2 ? 0.62 : 0.42; }
+    const q = g.createLinearGradient(0, 0, 0, MH); q.addColorStop(0, "#071b2c"); q.addColorStop(1, "#030a12"); g.fillStyle = q; g.fillRect(0, 0, MW, MH);
+    g.fillStyle = g.createPattern(GRID, "repeat"); g.fillRect(0, 0, MW, MH);
+    /* waveforms: the bedside monitor painter, clipped under our own header */
+    g.save(); g.beginPath(); g.rect(14, 74, MW - 28, 392); g.clip();
+    if (H && H.mon) H.mon(g, p, MW - 28, 392 + 71, 14, 74 - 71);
+    g.restore();
+    /* header */
+    g.fillStyle = "rgba(8,30,48,.92)"; g.fillRect(0, 0, MW, 66); g.fillStyle = "rgba(54,214,255,.35)"; g.fillRect(0, 65, MW, 2);
+    g.fillStyle = c; rrect(g, 14, 10, 112, 46, 9); g.fill(); g.fillStyle = "#031018"; g.font = "800 32px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("BED " + (m.i + 1), 70, 34);
+    g.textAlign = "left"; g.fillStyle = "#eaf8ff"; g.font = "700 31px system-ui,sans-serif"; g.fillText((p.n || "").slice(0, 20), 142, 26);
+    g.fillStyle = "#7fc8e8"; g.font = "600 19px system-ui,sans-serif"; g.fillText((p.dx || "").slice(0, 34), 142, 51);
+    const sup = SUP[p.air] || "ROOM AIR", sw = 24 + sup.length * 12.5; g.strokeStyle = "#36d6ff"; g.lineWidth = 2; rrect(g, MW - sw - 66, 17, sw, 32, 8); g.stroke(); g.fillStyle = "#9fe6ff"; g.font = "700 17px ui-monospace,Menlo,monospace"; g.textAlign = "center"; g.fillText(sup, MW - sw / 2 - 66, 34);
+    g.textAlign = "left"; g.fillStyle = st && Math.sin(tn * 7) < 0 ? "rgba(0,0,0,0)" : c; g.beginPath(); g.arc(MW - 36, 33, 12, 0, 7); g.fill();
+    /* data strip */
+    g.fillStyle = "rgba(8,30,48,.92)"; g.fillRect(0, MH - 52, MW, 52); g.fillStyle = "rgba(54,214,255,.35)"; g.fillRect(0, MH - 54, MW, 2);
+    const v = p.v, map = Math.round((v.sbp + 2 * v.dbp) / 3), chips = [["MAP", map, "#ff9ab0"], ["HR", Math.round(v.hr), "#53ef98"], ["SpO₂", Math.min(100, Math.round(v.spo2)) + "%", "#48d9ff"], ["RR", Math.round(v.rr), "#f4d45a"], ["STATUS", ["STABLE", "WATCH", "CRITICAL"][st], c]];
+    chips.forEach((k, n) => { const x = 20 + n * 148; g.fillStyle = "#6f9bb8"; g.font = "600 16px ui-monospace,Menlo,monospace"; g.textAlign = "left"; g.fillText(k[0], x, MH - 36); g.fillStyle = k[2]; g.font = "800 " + (n === 4 ? 22 : 28) + "px ui-monospace,Menlo,monospace"; g.fillText(String(k[1]), x, MH - 14); });
+    /* screen finish: scanlines, a slow sweep, status-coloured corner brackets */
+    g.fillStyle = g.createPattern(SCAN, "repeat"); g.fillRect(0, 0, MW, MH);
+    const sx = ((tn * 150 + m.i * 120) % (MW + 260)) - 130, sw2 = g.createLinearGradient(sx - 130, 0, sx + 130, 0); sw2.addColorStop(0, "rgba(120,220,255,0)"); sw2.addColorStop(0.5, "rgba(120,220,255,.07)"); sw2.addColorStop(1, "rgba(120,220,255,0)"); g.fillStyle = sw2; g.fillRect(sx - 130, 67, 260, MH - 121);
+    g.strokeStyle = c; g.lineWidth = 6; g.shadowColor = c; g.shadowBlur = 14; const L = 46, e = 5;
+    [[e, e, 1, 1], [MW - e, e, -1, 1], [e, MH - e, 1, -1], [MW - e, MH - e, -1, -1]].forEach((k) => { g.beginPath(); g.moveTo(k[0] + k[2] * L, k[1]); g.lineTo(k[0], k[1]); g.lineTo(k[0], k[1] + k[3] * L); g.stroke(); });
+    g.shadowBlur = 0; g.strokeStyle = c; g.globalAlpha = 0.35; g.lineWidth = 2; g.strokeRect(e, e, MW - 2 * e, MH - 2 * e); g.globalAlpha = 1;
     m.tex.needsUpdate = true;
   }
   const bg = (g, w, h, title) => { g.fillStyle = "#06121f"; g.fillRect(0, 0, w, h); g.fillStyle = "#0c2236"; g.fillRect(0, 0, w, 52); g.fillStyle = "#36d6ff"; g.font = "700 30px system-ui,sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(title, 20, 27); };
