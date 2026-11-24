@@ -3,9 +3,9 @@
    short "hello / offer / answer" handshake, which uses the same free public ntfy.sh topic service the Multidisciplinary
    Team room already uses, so there is nothing to host or sign up for. A BroadcastChannel signal is provided for tests.
 
-   createHallNet({ code, id, name, spec, sex, signal?, iceServers?, onPeers, onPeerState, onPeerLeave }) ->
+   createHallNet({ code, id, name, spec, sex, av?, signal?, iceServers?, onPeers, onPeerState, onPeerLeave }) ->
      { send(state), peers(), close() }
-   state = { x, z, y (yaw), a (0 idle / 1 walking), bed (-1 or the bed index you stand beside) }                    */
+   state = { x, z, y (yaw), a (0 idle / 1 walking), s (1 = sitting in my chair), bed (-1 or the bed index you stand beside) }                    */
 
 export const ICE = [
   { urls: "stun:stun.l.google.com:19302" },
@@ -13,6 +13,7 @@ export const ICE = [
   { urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turns:openrelay.metered.ca:443?transport=tcp"], username: "openrelayproject", credential: "openrelayproject" },
 ];
 
+const cleanAv = (a) => (/^dr[1-9]$/.test(String(a || "")) ? String(a) : "");       // which of the avatar models this doctor chose
 const clean = (s) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
 
 /* ---- signalling over ntfy.sh (works from any browser; no account) ---- */
@@ -53,7 +54,7 @@ export function localSignal(code, onMsg) {
 }
 
 export function createHallNet(o) {
-  const sid = Math.random().toString(36).slice(2, 10), me = { sid, id: o.id, name: o.name, spec: o.spec, sex: o.sex, look: o.look || null };
+  const sid = Math.random().toString(36).slice(2, 10), me = { sid, id: o.id, name: o.name, spec: o.spec, sex: o.sex, look: o.look || null, av: cleanAv(o.av) };
   const cleanLook = (l) => (l && typeof l === "object" && JSON.stringify(l).length < 400 ? l : null);        // an avatar config is tiny; never relay anything bigger
   const cleanChat = (m) => ({ k: ["propose", "challenge", "agree", "final", "ask"].includes(m.k) ? m.k : "ask", text: String(m.text || "").slice(0, 240), n: Math.max(0, Math.min(99, +m.n || 0)), time: +m.time || Date.now() });   // a team message is short text and a kind; nothing else is trusted
   const peers = new Map();                       // sid -> { sid, id, name, spec, sex, pc, dc, open, st, t0, init }
@@ -61,10 +62,10 @@ export function createHallNet(o) {
   const ice = o.iceServers || ICE;
   const sig = (o.signal || ntfySignal)(o.code, (d, time) => { if (!closed) handle(d, time); });
   const say = (d) => sig.send(Object.assign({ from: sid }, d));
-  const hello = (re) => say({ t: "hi", id: me.id, name: me.name, spec: me.spec, sex: me.sex, look: me.look, re: !!re });
+  const hello = (re) => say({ t: "hi", id: me.id, name: me.name, spec: me.spec, sex: me.sex, look: me.look, av: me.av, re: !!re });
 
   function emit() { if (o.onPeers) o.onPeers([...peers.values()].map(pub)); }
-  const pub = (p) => ({ sid: p.sid, id: p.id, name: p.name, spec: p.spec, sex: p.sex, look: p.look, connected: !!p.open, st: p.st });
+  const pub = (p) => ({ sid: p.sid, id: p.id, name: p.name, spec: p.spec, sex: p.sex, look: p.look, av: p.av, connected: !!p.open, st: p.st });
 
   function drop(p, why) {
     if (!peers.has(p.sid)) return;
@@ -116,8 +117,8 @@ export function createHallNet(o) {
     if (t0 && time && time < t0 - 40) return;                   // stale history from an earlier visit
     if (d.t === "hi") {
       let p = peers.get(d.from); const known = !!p;
-      if (!p) { p = { sid: d.from, id: d.id, name: d.name, spec: d.spec, sex: d.sex, look: cleanLook(d.look), pc: null, dc: null, open: false, st: null, t0: 0 }; peers.set(d.from, p); }
-      Object.assign(p, { id: d.id, name: d.name, spec: d.spec, sex: d.sex, look: cleanLook(d.look) });
+      if (!p) { p = { sid: d.from, id: d.id, name: d.name, spec: d.spec, sex: d.sex, look: cleanLook(d.look), av: cleanAv(d.av), pc: null, dc: null, open: false, st: null, t0: 0 }; peers.set(d.from, p); }
+      Object.assign(p, { id: d.id, name: d.name, spec: d.spec, sex: d.sex, look: cleanLook(d.look), av: cleanAv(d.av) });
       emit();
       if (!d.re && !known) hello(true);
       if (me.sid < p.sid && !p.pc) offerTo(p);                    // the lower id always starts the call

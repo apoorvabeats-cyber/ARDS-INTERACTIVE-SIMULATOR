@@ -9,7 +9,8 @@ import { GLTFLoader } from "./vendor/GLTFLoader.js";
 import { createDevices } from "./icu-devices.js?v=20261124g";
 import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261124g";
 import { loadLook, sanitize as cleanLook } from "./doctor-look.js?v=20261124g";
-import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261124g";
+import { AVATARS, AVATAR_KEYS, avatarThumb, loadAvatar, createRigDoctor } from "./doctor-rig.js?v=20261125e";
+import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261125d";
 import { createSfx } from "./sfx.js?v=20261124g";
 import { CSS3DRenderer, CSS3DObject } from "./vendor/CSS3DRenderer.js?v=20261124g";
 import { buildChamber, CH } from "./mdt-chamber.js?v=20261124g";
@@ -22,7 +23,11 @@ const $ = (s) => document.querySelector(s);
 const Q = new URLSearchParams(location.search), DEMO = Q.has("demo");
 const myId = Q.get("id") || ("u" + Math.random().toString(36).slice(2, 8));
 let myName = (Q.get("name") || "Doctor").slice(0, 40), mySpec = Q.get("spec") || "intensivist";
-const myLook = loadLook();                       // the avatar this doctor made in the creator (null = not made yet)
+const myLook = loadLook();
+let myAv = ""; try { myAv = localStorage.getItem("ccu.doctorAvatar") || ""; } catch (e) { /* ignore */ }
+if (!AVATARS[myAv]) myAv = AVATAR_KEYS[hashN0(myId) % AVATAR_KEYS.length];       /* until a doctor chooses one, each gets a different avatar */
+function hashN0(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }
+const pickAvatar = (k) => { if (!AVATARS[k]) return; myAv = k; try { localStorage.setItem("ccu.doctorAvatar", k); } catch (e) { /* ignore */ } if (net) { netKey = ""; startNet(); } };                       // the avatar this doctor made in the creator (null = not made yet)
 const V = T.Vector3, TAU = Math.PI * 2, clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const hashN = (s) => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -318,19 +323,25 @@ $("#xray").onclick = () => { insideWant = !insideWant; $("#xray").dataset.on = i
 const remotes = new Map(); let peerList = [], net = null, netKey = "";
 function remoteFor(p) {
   let r = remotes.get(p.sid); if (r) return r;
-  r = { sid: p.sid, doc: null, x: 0, z: 9.6, yaw: Math.PI, tx: 0, tz: 9.6, ty: Math.PI, last: performance.now(), info: p, near: false, seen: false, tab: "" }; remotes.set(p.sid, r);
+  r = { sid: p.sid, doc: null, x: 0, z: 9.6, yaw: Math.PI, tx: 0, tz: 9.6, ty: Math.PI, last: performance.now(), info: p, near: false, seen: false, tab: "", sit: -1, av: "" }; remotes.set(p.sid, r);
+  buildRemote(r, p); return r;
+}
+/* the doctor appears as the avatar they chose; a visitor without a choice (older version) keeps the original figure */
+function buildRemote(r, p) {
+  const av = AVATARS[p.av] ? p.av : "", mount = (d) => { if (!remotes.has(p.sid) || r.av !== av) return; if (r.doc) S.remove(r.doc.group); r.doc = d; d.group.visible = r.seen; d.group.userData.sid = p.sid; S.add(d.group); };
+  r.av = av;
+  if (av) { loadAvatar(av).then((gltf) => mount(createRigDoctor(T, gltf, { name: p.name, spec: p.spec, key: av }))).catch((e) => console.warn("avatar not loaded", e)); return; }
   const look = p.look ? cleanLook(p.look, p.sex) : null, sex = look ? look.sex : p.sex === "f" ? "f" : "m";
-  loadDoctorBody(sex).then((gltf) => { if (!remotes.has(p.sid)) return; r.doc = createDoctor(T, gltf, { name: r.info.name, spec: r.info.spec, sex, look }); r.doc.group.visible = r.seen; r.doc.group.userData.sid = p.sid; S.add(r.doc.group); }).catch((e) => console.warn("doctor body not loaded", e));
-  return r;
+  loadDoctorBody(sex).then((gltf) => mount(createDoctor(T, gltf, { name: p.name, spec: p.spec, sex, look }))).catch((e) => console.warn("doctor body not loaded", e));
 }
 function startNet() {
   const code = mdt.room && mdt.room.code; if (!code) return; const key = code + "|" + mySpec; if (key === netKey) return;
   if (net) net.close(); netKey = key; peerList = []; remotes.forEach((r) => { if (r.doc) S.remove(r.doc.group); }); remotes.clear();
   net = createHallNet({
-    code, id: myId, name: myName, spec: mySpec, sex: myLook ? myLook.sex : Q.get("sex") || "m", look: myLook, signal: Q.get("net") === "local" ? localSignal : ntfySignal, iceServers: Q.get("ice") === "none" ? [] : undefined,
+    code, id: myId, name: myName, spec: mySpec, sex: AVATARS[myAv].sex, look: myLook, av: myAv, signal: Q.get("net") === "local" ? localSignal : ntfySignal, iceServers: Q.get("ice") === "none" ? [] : undefined,
     onChat: (p, m) => { chat.push({ k: m.k, text: m.text, n: m.n, time: m.time, name: p.name || "Doctor", spec: specInfo(p.spec)[0], uid: p.id }); if (chat.length > 60) chat.shift(); sfx.chime && sfx.chime("find"); paintHeroes(0, 0, true); scr.key = ""; renderScreen(true); },
-    onPeers: (list) => { peerList = list; list.forEach((p) => { const r = remoteFor(p); r.info = p; }); chips(); },
-    onPeerState: (p, st) => { const r = remoteFor(p); r.tx = st.x; r.tz = st.z; r.ty = st.y; r.near = st.bed >= 0; r.tab = typeof st.tb === "string" ? st.tb.slice(0, 16) : ""; r.last = performance.now(); if (!r.seen) { r.seen = true; r.x = st.x; r.z = st.z; r.yaw = st.y; if (r.doc) r.doc.group.visible = true; } },
+    onPeers: (list) => { peerList = list; list.forEach((p) => { const r = remoteFor(p); r.info = p; const av = AVATARS[p.av] ? p.av : ""; if (av !== r.av) buildRemote(r, p); }); chips(); },
+    onPeerState: (p, st) => { const r = remoteFor(p); r.tx = st.x; r.tz = st.z; r.ty = st.y; r.near = st.bed >= 0; r.tab = typeof st.tb === "string" ? st.tb.slice(0, 16) : ""; r.sit = st.s === 1 ? 1 : st.s === 0 ? 0 : -1; r.last = performance.now(); if (!r.seen) { r.seen = true; r.x = st.x; r.z = st.z; r.yaw = st.y; if (r.doc) r.doc.group.visible = true; } },
     onPeerLeave: (p) => { const r = remotes.get(p.sid); if (r) { if (r.doc) S.remove(r.doc.group); remotes.delete(p.sid); } chips(); },
   });
 }
@@ -380,13 +391,17 @@ let goal = null;
 
 /* ================================================================ the shift desk: open, join, choose a seat, begin */
 let desk = { name: "", slots: { intensivist: 1 }, code: "" }, deskKey = "";
+/* the doctor chooses one of the five avatars here, with the specialty; the others see this avatar sitting or standing */
+const avPicker = () => `<h2 style="margin:8px 0 0">Your avatar</h2><div class="avs">${AVATAR_KEYS.map((k) => `<button type="button" class="av" data-av="${k}" data-on="${k === myAv ? 1 : 0}" aria-label="${esc(AVATARS[k].label)}"><img src="${avatarThumb(k)}" alt="" width="60" height="75"><small>${esc(AVATARS[k].label)}</small></button>`).join("")}</div>`;
+const wireAv = (el) => el.querySelectorAll("button[data-av]").forEach((b) => { b.onclick = () => { pickAvatar(b.dataset.av); deskKey = ""; renderDesk(); }; });
 function renderDesk() {
   const el = $("#desk"), room = mdt.room, err = mdt.err ? `<p class="err">${esc(mdt.err)}</p>` : "";
   let key = JSON.stringify([!!room, room && room.status, room && room.members, room && room.slots, room && P && P.outcome, desk.slots, mdt.busy, mdt.err, room && room.you]);
   if (key === deskKey) return; deskKey = key;
   if (!room) {
     el.hidden = false; const tot = Object.values(desk.slots).reduce((a, b) => a + b, 0);
-    el.innerHTML = `<h2>Multidisciplinary team</h2><h1>Open a shift</h1><p>Up to five doctors share one patient. Set the seats, then open the shift. Others join with the code.</p><input id="dn" maxlength="48" value="${esc(desk.name || myName)}" placeholder="Your name"><div class="seats">${SPECS.map((s) => `<div class="g seat" style="border-radius:10px"><span>${esc(SPEC[s][0])}</span><span class="step"><button data-s="${s}" data-a="-1" type="button">−</button><b>${desk.slots[s] || 0}</b><button data-s="${s}" data-a="1" type="button">+</button></span></div>`).join("")}</div><button class="go" id="mk" type="button" ${mdt.busy || tot < 1 ? "disabled" : ""}>Create the shift</button><input id="jc" maxlength="6" placeholder="Or join with a code" value="${esc(desk.code)}"><button class="go" id="jn" type="button" ${mdt.busy ? "disabled" : ""}>Join</button><a class="go" id="av" href="avatar-creator.html" style="display:block;text-align:center;text-decoration:none;margin-top:8px">${myLook ? "Edit my doctor" : "Create my doctor"}</a>${err}`;
+    el.innerHTML = `<h2>Multidisciplinary team</h2><h1>Open a shift</h1><p>Up to five doctors share one patient. Set the seats, then open the shift. Others join with the code.</p><input id="dn" maxlength="48" value="${esc(desk.name || myName)}" placeholder="Your name">${avPicker()}<h2 style="margin:6px 0 0">Seats in the team</h2><div class="seats">${SPECS.map((s) => `<div class="g seat" style="border-radius:10px"><span>${esc(SPEC[s][0])}</span><span class="step"><button data-s="${s}" data-a="-1" type="button">−</button><b>${desk.slots[s] || 0}</b><button data-s="${s}" data-a="1" type="button">+</button></span></div>`).join("")}</div><button class="go" id="mk" type="button" ${mdt.busy || tot < 1 ? "disabled" : ""}>Create the shift</button><input id="jc" maxlength="6" placeholder="Or join with a code" value="${esc(desk.code)}"><button class="go" id="jn" type="button" ${mdt.busy ? "disabled" : ""}>Join</button><a class="go" id="av" href="avatar-creator.html" style="display:block;text-align:center;text-decoration:none;margin-top:8px">${myLook ? "Edit my doctor" : "Create my doctor"}</a>${err}`;
+    wireAv(el);
     $("#dn").oninput = (e) => { desk.name = e.target.value; }; $("#jc").oninput = (e) => { desk.code = e.target.value.toUpperCase(); e.target.value = desk.code; };
     el.querySelectorAll("button[data-s]").forEach((b) => { b.onclick = () => { const s = b.dataset.s, n = clamp((desk.slots[s] || 0) + +b.dataset.a, 0, 5); if (Object.values(desk.slots).reduce((a, c) => a + c, 0) - (desk.slots[s] || 0) + n > 5) return; desk.slots[s] = n; deskKey = ""; renderDesk(); }; });
     $("#mk").onclick = () => { myName = (desk.name || myName).slice(0, 40); post("hall-create", { name: myName, slots: desk.slots }); };
@@ -395,7 +410,8 @@ function renderDesk() {
   }
   if (room.status === "lobby") {
     el.hidden = false; const taken = (id) => room.members.filter((m) => m.specialty === id).length;
-    el.innerHTML = `<h2>Waiting room</h2><div class="code">${esc(room.code)}</div><p>Share this code. The case is built from the seats that are taken.</p><div class="seats">${SPECS.filter((s) => (room.slots[s] || 0) > 0).map((s) => { const open = room.slots[s] - taken(s), mine = room.you && room.you.specialty === s; return `<button class="seat" data-seat="${s}" data-on="${mine ? 1 : 0}" ${!mine && open <= 0 || mdt.busy ? "disabled" : ""} type="button"><span>${esc(SPEC[s][0])}</span><small>${mine ? "Your seat" : open > 0 ? open + " open" : "Full"}</small></button>`; }).join("")}</div><ul>${room.members.map((m) => `<li><b>${esc(m.name)}</b><span>${m.specialty ? esc(SPEC[m.specialty] ? SPEC[m.specialty][0] : m.specialty) : "No seat yet"}</span></li>`).join("")}</ul>${room.host ? `<button class="go" id="bg" type="button" ${mdt.busy ? "disabled" : ""}>Begin the shift</button>` : "<p>Wait for the doctor who opened the shift.</p>"}${err}`;
+    el.innerHTML = `<h2>Waiting room</h2><div class="code">${esc(room.code)}</div><p>Share this code. The case is built from the seats that are taken.</p>${avPicker()}<h2 style="margin:6px 0 0">Your seat</h2><div class="seats">${SPECS.filter((s) => (room.slots[s] || 0) > 0).map((s) => { const open = room.slots[s] - taken(s), mine = room.you && room.you.specialty === s; return `<button class="seat" data-seat="${s}" data-on="${mine ? 1 : 0}" ${!mine && open <= 0 || mdt.busy ? "disabled" : ""} type="button"><span>${esc(SPEC[s][0])}</span><small>${mine ? "Your seat" : open > 0 ? open + " open" : "Full"}</small></button>`; }).join("")}</div><ul>${room.members.map((m) => `<li><b>${esc(m.name)}</b><span>${m.specialty ? esc(SPEC[m.specialty] ? SPEC[m.specialty][0] : m.specialty) : "No seat yet"}</span></li>`).join("")}</ul>${room.host ? `<button class="go" id="bg" type="button" ${mdt.busy ? "disabled" : ""}>Begin the shift</button>` : "<p>Wait for the doctor who opened the shift.</p>"}${err}`;
+    wireAv(el);
     el.querySelectorAll("button[data-seat]").forEach((b) => { b.onclick = () => post("hall-seat", { specialty: b.dataset.seat }); });
     const bg = $("#bg"); if (bg) bg.onclick = () => post("hall-begin");
     return;
@@ -652,11 +668,15 @@ function loop(now) {
   if ((stT += dt) > 0.6) { stT = 0; rebuildStations(false); }
   if ((scrT += dt) > 0.25) { scrT = 0; renderScreen(false); }
   /* send my place and my open tab to the others */
-  if ((sendT += dt) > 0.1) { sendT = 0; if (net) net.send({ x: +me.x.toFixed(2), z: +me.z.toFixed(2), y: +me.yaw.toFixed(3), a: mvSpeed > 0.15 ? 1 : 0, bed: Math.hypot(me.x, me.z) < 4.2 ? 1 : -1, tb: scr.on ? scr.id : "" }); }
+  if ((sendT += dt) > 0.1) { sendT = 0; if (net) net.send({ x: +me.x.toFixed(2), z: +me.z.toFixed(2), y: +me.yaw.toFixed(3), a: mvSpeed > 0.15 ? 1 : 0, s: me.seated ? 1 : 0, bed: Math.hypot(me.x, me.z) < 4.2 ? 1 : -1, tb: scr.on ? scr.id : "" }); }
   remotes.forEach((r) => {
     if (!r.doc) return; const k = Math.min(1, dt * 9), ox = r.x, oz = r.z; r.x += (r.tx - r.x) * k; r.z += (r.tz - r.z) * k; let dy = r.ty - r.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); r.yaw += dy * k;
-    const v = Math.hypot(r.x - ox, r.z - oz) / Math.max(dt, 0.001), seat = chamber.stations.find((s) => Math.hypot(s.x - r.x, s.z - r.z) < 0.55), sit = !!seat && v < 0.35;      /* a doctor who stands at a station sits in its chair */
-    r.doc.setSeated(sit); r.doc.setMoving(sit ? 0 : Math.min(1, v / 1.6)); r.doc.group.position.set(sit ? seat.x : r.x, 0, sit ? seat.z : r.z); r.doc.group.rotation.y = Math.PI - r.yaw; r.doc.update(dt);
+    let v = Math.hypot(r.x - ox, r.z - oz) / Math.max(dt, 0.001), seat = chamber.stations.reduce((b, s) => { const d = Math.hypot(s.x - r.x, s.z - r.z); return d < (b ? b.d : r.sit === 1 ? 1.2 : 0.55) ? { s, d } : b; }, null), sit = !!seat && (r.sit === 1 || (r.sit < 0 && v < 0.35));
+    if (seat) seat = seat.s;      /* a doctor who stands at a station sits in its chair */
+    r.doc.setSeated(sit); r.doc.setMoving(sit ? 0 : Math.min(1, v / 1.6)); r.doc.group.position.set(sit ? seat.x : r.x, 0, sit ? seat.z : r.z);
+    if (sit) { const d = Math.atan2(Math.sin(Math.PI - r.yaw - seat.yaw), Math.cos(Math.PI - r.yaw - seat.yaw)); r.doc.group.rotation.y = seat.yaw; r.doc.setLook && r.doc.setLook(clamp(d, -1.1, 1.1)); }       /* seated: the body faces the table, the head turns to where they look */
+    else { r.doc.group.rotation.y = Math.PI - r.yaw; r.doc.setLook && r.doc.setLook(0); }
+    r.doc.update(dt);
     if (performance.now() - r.last > 15000 && r.info && !r.info.connected) r.doc.group.visible = false;
   });
   sounds(now); R.render(S, cam); placeLcd();

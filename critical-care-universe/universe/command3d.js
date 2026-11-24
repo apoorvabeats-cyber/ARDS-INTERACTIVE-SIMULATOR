@@ -1,5 +1,6 @@
 /* ICU command suite: a walk-in command centre attached to the ICU hall, a sliding door to a modern auditorium,
-   and three portals (Critical Care Hub, Exit to the garden, Multidisciplinary Team). No people are modelled.
+   and three portals (Critical Care Hub, Exit to the garden, Multidisciplinary Team). Three operators (one woman, two men) sit at the console; a few visitors
+   walk and sit in the auditorium and plaza.
 
    World layout (x runs along the ICU hall; the hall's left end gate is at x = -8.4):
      command centre   x -20.4..-8.4, z -5..5,   height 4.6   (6 live monitors on the far wall, console desk, racks)
@@ -14,6 +15,7 @@ import { buildOutdoor } from "./outdoor3d.js?v=20261124g";
 import { loadVisitorCopy, createVisitor } from "./visitor-avatar.js?v=20261124g";
 import { liveUpdates } from "./live-updates.js?v=20261124g";
 import { buildUpper } from "./upper-level.js?v=20261124g";
+import { loadAvatar, createRigDoctor } from "./doctor-rig.js?v=20261125e";
 
 export function buildSuite(T, S, P, H, env, opt = {}) {
   const V = T.Vector3, G = new T.Group(); G.name = "suite"; S.add(G);
@@ -145,7 +147,7 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
   });
   const sg = mesh(new T.PlaneGeometry(3.5, 0.342), new T.MeshBasicMaterial({ map: sign, toneMapped: false }), R.x0 + 0.075, 4.39, 0, room); sg.rotation.y = Math.PI / 2;
 
-  /* ---- operator console, curved like the reference: centre desk and two angled wings, no chairs and no people ---- */
+  /* ---- operator console, curved like the reference: centre desk and two angled wings, with three operators on swivel chairs ---- */
   const desk = new T.Group(); desk.position.set(-17.0, 0, 0); room.add(desk);
   const top = M(0x161b22, { metalness: 0.55, roughness: 0.22, envMapIntensity: 1.3 });
   const body = M(0x0c1015, { metalness: 0.5, roughness: 0.5 });
@@ -170,6 +172,29 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
   deskMonitor(cen, -0.34, 1.2, 0, Math.PI / 2, 0.84, 0.52, "worst");
   deskMonitor(wl, -0.28, 1.1, -0.1, Math.PI / 2 - 0.27, 0.6, 0.38, "vent");
   deskMonitor(wr, -0.28, 1.1, 0.1, Math.PI / 2 + 0.27, 0.6, 0.38, "vent");
+  /* three operators at the console: office chairs on the room side of the desk, people posed by the doctor rig (seated) in everyday clothes */
+  const chairM = { seat: M(0x151a21, { roughness: 0.7 }), frame: M(0x2a323c, { metalness: 0.7, roughness: 0.35 }) };
+  function chair(x, z, yaw) {
+    const c = new T.Group(); c.position.set(x, 0, z); c.rotation.y = yaw; room.add(c);
+    cyl(0.035, 0.035, 0.3, chairM.frame, 0, 0.3, 0, c, 10); cyl(0.07, 0.05, 0.08, chairM.frame, 0, 0.42, 0, c, 12);
+    for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5, l = bx(0.3, 0.035, 0.05, chairM.frame, Math.sin(a) * 0.15, 0.1, Math.cos(a) * 0.15, c); l.rotation.y = a - Math.PI / 2; cyl(0.03, 0.03, 0.04, chairM.seat, Math.sin(a) * 0.29, 0.04, Math.cos(a) * 0.29, c, 8); }
+    bx(0.5, 0.08, 0.5, chairM.seat, 0, 0.46, 0, c); bx(0.5, 0.012, 0.012, cyan, 0, 0.425, 0.25, c);
+    const bk = bx(0.46, 0.5, 0.07, chairM.seat, 0, 0.79, -0.27, c); bk.rotation.x = -0.1; const hd = bx(0.26, 0.14, 0.06, chairM.seat, 0, 1.12, -0.31, c); hd.rotation.x = -0.1;
+    [-1, 1].forEach((sd) => { bx(0.04, 0.2, 0.04, chairM.frame, sd * 0.27, 0.58, -0.04, c); bx(0.07, 0.035, 0.3, chairM.seat, sd * 0.27, 0.69, 0.04, c); });
+    return c;
+  }
+  const sitters = [];
+  [
+    { key: "dr1", x: -16.55, z: 1.5, face: -1.05, look: 0.0, outfit: { coat: 0x1b2a45, scrub: 0xb9b2a2 } },        /* navy blazer over a stone shirt */
+    { key: "dr2", x: -15.9, z: 0.0, face: -Math.PI / 2, look: 1.7, outfit: { coat: 0xb98a5a, scrub: 0x5e1f3a } },                     /* camel cardigan over a plum top */
+    { key: "dr4", x: -16.55, z: -1.5, face: -2.09, look: 3.4, outfit: { coat: 0x4a5a38, scrub: 0x23272d } },                    /* olive jacket over charcoal */
+  ].forEach((d) => {
+    chair(d.x, d.z, d.face);
+    loadAvatar(d.key).then((gl) => {
+      const r = createRigDoctor(T, gl, { key: d.key, noTag: true, outfit: d.outfit });
+      r.group.position.set(d.x, 0, d.z); r.group.rotation.y = d.face; room.add(r.group); r.setSeated(true); r.update(5); sitters.push({ r, ph: d.look });
+    }).catch(() => {});
+  });
   /* keyboard, mouse, trackball, mixer panel, headset, mug */
   const kb = ctex(256, 96, (g, w, h) => { g.fillStyle = "#0b0e12"; g.fillRect(0, 0, w, h); for (let r = 0; r < 5; r++) for (let c = 0; c < 17; c++) { g.fillStyle = "#222a33"; g.fillRect(6 + c * 14.4, 6 + r * 16.4, 12, 13); } });
   const kbm = new T.MeshBasicMaterial({ map: kb }); bx(0.46, 0.02, 0.17, kbm, 0.22, 0.83, 0, cen); bx(0.06, 0.02, 0.1, M(0x0b0e12), 0.24, 0.83, 0.42, cen);
@@ -564,7 +589,7 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
     if (doors.team.open > 0.85) c.push({ x: MDTC.x, z: MDTC.z, r: RHN - 1.0 });
     return c;
   };
-  const blocks = [upper.towerBlock, { x0: -18.5, x1: -16.0, z0: -3.3, z1: 3.3 }, { x0: -14.0, x1: -11.9, z0: 3.8, z1: 5.2 },
+  const blocks = [upper.towerBlock, { x0: -18.5, x1: -15.3, z0: -3.3, z1: 3.3 }, { x0: -14.0, x1: -11.9, z0: 3.8, z1: 5.2 },
     { x0: cxA - 6.3, x1: cxA - 2.8, z0: -12.9, z1: -6.8 }, { x0: cxA + 2.8, x1: cxA + 6.3, z0: -12.9, z1: -6.8 }];
   const pillars = [{ x: HUBC.x, z: HUBC.z, r: 0.95 }, { x: MDTC.x, z: MDTC.z, r: 3.3 }];       /* the hub's column, the Nexus dais */
   function clamp(x, z) {
@@ -588,6 +613,7 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
   /* =============================== per-frame =============================== */
   let mi = 0, acc = 0, accSlow = 0, first = true;
   function update(t, dt, cam) {
+    sitters.forEach((o) => { o.r.setLook(Math.sin(t * 0.37 + o.ph) * 0.3 * (Math.sin(t * 0.11 + o.ph) > 0 ? 1 : 0.35)); o.r.update(dt); });
     Object.values(doors).forEach((d) => { if (d._tp !== d.target) { if (d._tp !== undefined && opt.onDoor) opt.onDoor(d, d.target > 0); d._tp = d.target; } });
     const hubSee = doors.hub.open > 0.02 && !(doors.exit.open > 0.02), mdtSee = doors.team.open > 0.02 && !(doors.exit.open > 0.02);
     hubHall.visible = hubSee; if (hubBack) hubBack.visible = !hubSee;
