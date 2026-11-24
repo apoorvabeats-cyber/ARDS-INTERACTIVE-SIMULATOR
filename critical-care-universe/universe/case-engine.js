@@ -43,6 +43,7 @@ const GLOBAL_HARM = {
 };
 const DUP_MS = { lab: 60000, img: 60000, proc: 60000, drug: 60000, abx: 120000, exam: 30000 };
 const FLUID_MS = 15000;
+const SHIFT_MS = 1200000;                     /* a case that is still open after 20 minutes ends as a handover */
 const TD = { 1: 600000, 2: 520000, 3: 450000 };
 
 const DEFAULT_IMG = {
@@ -121,7 +122,7 @@ export function Np(sc, actions, ms) {
   const last = {};                 // last time, for the repeat rule
   const kicks = [];                // short-lived improvements or worsenings: {at, dv, tau}
   const results = [], log = [{ t: "Hour 0", text: c.story }];
-  const done = {}, announced = {}; let alive = true, arrestAt = null, rosc = 0, diedAt = null, heldAt = null, harmTotal = 0, ai = 0;
+  const done = {}, announced = {}; let alive = true, arrestAt = null, rosc = 0, diedAt = null, heldAt = null, harmTotal = 0, ai = 0, stableMs = 0, stableNoted = false;
   const harmLog = [], needHit = {};
   const who = (a) => `${specName(a.specialty)} · ${a.name}`;
   const T = (ms2) => mdtHour(ms2);
@@ -296,7 +297,14 @@ export function Np(sc, actions, ms) {
       else if (t > arrestAt + 60000) { alive = false; diedAt = t; log.push({ t: T(t), text: "The patient has died. The team did not get the circulation back." }); }
     }
     const wDone = c.needs.reduce((a, nd) => a + (done[nd.id] != null ? nd.w : 0), 0), wAll = c.needs.reduce((a, nd) => a + nd.w, 0), bigMiss = c.needs.some((nd) => done[nd.id] == null && nd.w >= 2);
-    if (alive && arrestAt == null && wDone >= 0.85 * wAll && !bigMiss && st.s <= 0.12 && st.h >= 0.8 && t >= 150000) { heldAt = t; log.push({ t: T(t), text: "The patient is holding. Every step that mattered was taken." }); }
+    /* the case ends when the patient has settled. Strict: every step that mattered is done. Otherwise: the patient has been stable for a
+       while (vitals near the best, recovery well under way), most of the weight of the care is done, and nothing urgent is overdue. */
+    const overdueBig = c.needs.some((nd) => done[nd.id] == null && nd.w >= 2 && t >= nd.due * 1000);
+    stableMs = alive && arrestAt == null && st.s <= 0.15 && st.h >= 0.55 ? stableMs + 1000 : 0;
+    if (stableMs >= 30000 && !stableNoted) { stableNoted = true; log.push({ t: T(t), text: "The patient is stabilising. The vitals are settling and the results are improving." }); }
+    const strict = wDone >= 0.85 * wAll && !bigMiss && st.s <= 0.12 && st.h >= 0.8 && t >= 150000;
+    const settled = stableMs >= 90000 && wDone >= 0.6 * wAll && !overdueBig && t >= 150000;
+    if (alive && arrestAt == null && (strict || settled)) { heldAt = t; log.push({ t: T(t), text: "The patient has stabilised and survives. The diagnosis was " + c.dx + "." }); }
     prevT = t;
   }
   while (ai < acts.length && alive && heldAt == null && acts[ai].atMs <= r) { apply(acts[ai]); ai += 1; }
@@ -305,17 +313,17 @@ export function Np(sc, actions, ms) {
   const problems = (sc.problems || []).map((p) => {
     const all = p.needs.length ? p.needs.every((id) => done[id] != null) : needsDone() === c.needs.length;
     const called = acts.some((a) => a.kind === "call" && a.payload && a.payload.specialty === p.specialty && a.atMs <= r);
-    return { ...p, open: p.opensAtMs <= r, resolved: all, called };
+    return { ...p, open: p.opensAtMs <= r, resolved: all || heldAt != null, called, closed: heldAt != null && !all };
   });
 
   const tEnd = heldAt != null ? heldAt : alive ? r : diedAt;
   const v = vit(tEnd, true), arrested = alive && arrestAt != null;
   const lactate = labv("lactate", tEnd), cr = labv("cr", tEnd), kk = labv("k", tEnd);
   const missed = c.needs.filter((nd) => done[nd.id] == null).map((nd) => `${nd.label}`);
-  const shown = results.filter((x) => x.readyAtMs <= r).sort((a, b) => a.readyAtMs - b.readyAtMs);
-  const pending = results.filter((x) => x.readyAtMs > r).map((x) => ({ id: x.id, label: x.label, readyAtMs: x.readyAtMs }));
+  const shown = results.filter((x) => heldAt != null || x.readyAtMs <= r).sort((a, b) => a.readyAtMs - b.readyAtMs);
+  const pending = heldAt != null ? [] : results.filter((x) => x.readyAtMs > r).map((x) => ({ id: x.id, label: x.label, readyAtMs: x.readyAtMs }));
   let outcome = "", outcomeLine = "";
-  if (!alive) { outcome = "died"; outcomeLine = "The patient died. What was not done is listed below."; } else if (heldAt != null) { outcome = "held"; outcomeLine = "The patient is holding. Every step that mattered was taken."; }
+  if (!alive) { outcome = "died"; outcomeLine = "The patient died. What was not done is listed below."; } else if (heldAt == null && r >= SHIFT_MS && !arrested) { outcome = "handover"; outcomeLine = "The shift is over and the patient is not yet stable. Hand over to the next team. What was not done is listed below."; } else if (heldAt != null) { outcome = "held"; outcomeLine = "Congratulations. The patient survives. The vitals have settled and the results are improving. The diagnosis was " + c.dx + "."; }
 
   // scoring, out of 100: assessment 15, differential 20, investigations 15, treatment 25, collaboration 15, timeliness 10
   const dxNeeds = c.needs.filter((nd) => /^(ecg|echo|dx|fast|ct|img|gas|labs|cbc|kft|enz|coag|lac|cx|sugar|usg|mp|cta|viral)$/.test(nd.id)), dxDone = dxNeeds.filter((nd) => done[nd.id] != null).length;

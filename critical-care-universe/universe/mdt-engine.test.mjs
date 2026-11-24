@@ -54,6 +54,19 @@ test('every case can be saved by the right steps, and gets the patient holding',
   }
 });
 
+test('a patient who has settled ends the case as survived, even when a few minor steps were skipped', () => {
+  const sc = mk('cap'), c = CASE_BY_ID.cap, full = ideal(c), part = full.filter((_, i) => i < Math.ceil(full.length * 0.8));
+  const r = firstOutcome(sc, part); assert.equal(r.outcome, 'held', 'did not end: ' + r.outcome); assert.ok(r.alive && /survives/i.test(r.outcomeLine) && r.outcomeLine.includes(c.dx));
+  assert.equal(r.pending.length, 0, 'nothing is awaited once the case has ended'); assert.ok(r.problems.every((p) => p.resolved));
+  assert.ok(r.log.some((l) => /stabilis/i.test(l.text)));
+});
+
+test('a case that stays unstable for the whole shift ends as a handover, and a late recovery still ends as survived', () => {
+  const sc = mk('cap'), half = ideal(CASE_BY_ID.cap).slice(0, 4);
+  const r = Np(sc, half, 1300000); assert.ok(['handover', 'died', 'held'].includes(r.outcome), 'a case must end: ' + r.outcome);
+  const none = Np(mk('cap'), [A(2000, 'examine')], 1210000); assert.ok(['died', 'handover'].includes(none.outcome));
+});
+
 test('doing nothing is fatal, but only after minutes, never within the first few', () => {
   for (const c of CASES) {
     const sc = mk(c.id), early = Np(sc, [], 240000), end = firstOutcome(sc, [], 1500000);
