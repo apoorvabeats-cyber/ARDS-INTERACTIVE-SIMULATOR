@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Critical Care Universe</title>
+<meta name="theme-color" content="#030813">
+<link rel="icon" href="../favicon.svg">
+<script type="importmap">{"imports":{"three":"../../vendor/three/three.module.js","three/addons/":"../../vendor/three/addons/"}}</script>
+<style>
+:root{--bg:#030813;--ink:#eaf6ff;--mut:#8fb2d4;--cy:#36d6ff;--bl:#2b7bff;--gold:#ffc24a;--glass:rgba(9,22,46,.66);--line:rgba(110,190,255,.26);--ok:#3dff9a;--bad:#ff5a6e;--safe-b:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:#02060f;color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+body{height:100dvh;overflow:hidden;display:grid;place-items:center}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;padding:0}
+a{color:inherit;text-decoration:none}
+svg{display:block}
+
+/* ---------- the 16:9 stage ---------- */
+#stage{position:relative;width:min(100vw,177.7778vh);height:min(56.25vw,100vh);font-size:min(1.25vw,2.2222vh);overflow:hidden;
+ background:radial-gradient(60% 70% at 50% 46%,#0b2650 0%,#071632 38%,var(--bg) 78%);
+ display:grid;grid-template-rows:3.5em minmax(0,1fr) 7.6em 4.7em 3.6em;row-gap:.45em;padding:0 1.1em 0}
+#stage:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+ background:repeating-linear-gradient(0deg,rgba(80,160,255,.05) 0 1px,transparent 1px 3.2em),repeating-linear-gradient(90deg,rgba(80,160,255,.05) 0 1px,transparent 1px 3.2em);
+ -webkit-mask:radial-gradient(70% 75% at 50% 45%,#000,transparent);mask:radial-gradient(70% 75% at 50% 45%,#000,transparent)}
+#top,#main,#live,#quick,#nav{position:relative;z-index:1}
+
+/* top */
+#top{display:flex;align-items:center;gap:1em;padding-top:.5em}
+.brand{display:flex;align-items:center;gap:.7em;min-width:0}
+.brand svg{width:3.3em;height:2.4em;flex:none}
+.brand b{display:block;font-style:italic;font-weight:900;font-size:1.28em;letter-spacing:.02em;line-height:1;background:linear-gradient(180deg,#fff,#a9d3ff 70%,#6aa6ff);-webkit-background-clip:text;background-clip:text;color:transparent;white-space:nowrap}
+.brand small{display:block;font-style:italic;font-size:.62em;color:var(--mut);letter-spacing:.14em;margin-top:.3em;white-space:nowrap}
+.grow{flex:1}
+.pill{display:flex;align-items:center;gap:.5em;height:2.5em;padding:0 .9em;border-radius:2em;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(6px)}
+#bell{position:relative;width:2.5em;padding:0;justify-content:center}
+#bell svg{width:1.25em;height:1.25em}
+#bell i{position:absolute;top:-.25em;right:-.25em;min-width:1.35em;height:1.35em;border-radius:1em;background:var(--bad);font:700 .62em/1.35em system-ui;text-align:center;font-style:normal;padding:0 .3em;display:none}
+#bell.has i{display:block}
+#me{padding:0 .5em 0 .35em;gap:.6em}
+#me .av{width:1.9em;height:1.9em;border-radius:50%;background:linear-gradient(145deg,#2b7bff,#36d6ff);display:grid;place-items:center;font-weight:800;font-size:.8em;color:#031023}
+#me b{display:block;font-size:.82em;line-height:1.1;white-space:nowrap}#me small{display:block;font-size:.62em;color:var(--mut)}
+
+/* main: portals around the body */
+#main{position:relative;display:grid;grid-template-columns:22.5em minmax(0,1fr) 22.5em;column-gap:.8em;min-height:0}
+.col{display:grid;grid-template-rows:repeat(3,minmax(0,1fr));row-gap:.6em;min-height:0}
+.portal{position:relative;display:grid;grid-template-columns:3.1em 1fr;grid-template-rows:1fr auto;column-gap:.8em;align-items:center;text-align:left;padding:.75em .9em .6em;border-radius:1.1em;
+ background:linear-gradient(135deg,rgba(14,34,68,.82),rgba(7,18,40,.7));border:1px solid color-mix(in srgb,var(--c) 45%,transparent);
+ box-shadow:0 0 1.4em -.4em color-mix(in srgb,var(--c) 55%,transparent),inset 0 0 1.6em -1em var(--c);transition:transform .2s,box-shadow .2s,border-color .2s;overflow:hidden;min-height:0}
+.portal:before{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,color-mix(in srgb,var(--c) 18%,transparent) 50%,transparent 70%);transform:translateX(-120%);transition:transform .7s}
+.portal:hover,.portal:focus-visible{transform:translateY(-.15em);border-color:var(--c);box-shadow:0 0 2em -.2em var(--c),inset 0 0 1.6em -.8em var(--c);outline:0}
+.portal:hover:before{transform:translateX(120%)}
+.portal .ic{grid-row:1/3;width:3.1em;height:3.1em;border-radius:.9em;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 16%,#07142c);border:1px solid color-mix(in srgb,var(--c) 55%,transparent);color:var(--c)}
+.portal .ic svg{width:1.8em;height:1.8em}
+.portal h3{margin:0;font-size:1.12em;font-weight:800;letter-spacing:.01em;line-height:1.1}
+.portal p{margin:.25em 0 0;font-size:.74em;color:var(--mut);line-height:1.3}
+.portal .go{display:flex;gap:.45em;margin-top:.5em;font-size:.66em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;grid-column:2}
+.portal .go span{padding:.28em .7em;border-radius:2em;border:1px solid color-mix(in srgb,var(--c) 60%,transparent);color:var(--c);background:color-mix(in srgb,var(--c) 10%,transparent)}
+.portal .go span.d:hover{background:var(--c);color:#04101f}
+.portal .tag{position:absolute;top:.6em;right:.8em;font-size:.56em;letter-spacing:.14em;color:color-mix(in srgb,var(--c) 80%,#fff);opacity:.9;font-weight:700}
+
+/* hero */
+#hero{position:relative;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+#bodyc{position:absolute;inset:-.4em 0 2.6em;width:100%;height:calc(100% - 2.2em);cursor:grab;touch-action:pan-y;outline:0}
+#bodyc:active{cursor:grabbing}
+#heroFall{position:absolute;inset:0 0 3em;display:none;place-items:center;color:var(--mut);font-size:.8em;text-align:center}
+#orbit{position:absolute;left:50%;top:46%;width:90%;aspect-ratio:1;transform:translate(-50%,-50%);pointer-events:none;opacity:.5}
+#orbit circle{fill:none;stroke:var(--cy);stroke-width:.4;stroke-dasharray:1 5;transform-origin:50% 50%;animation:spin 60s linear infinite}
+#orbit circle:nth-child(2){stroke-dasharray:14 9;stroke-width:.25;animation-duration:90s;animation-direction:reverse;opacity:.7}
+@keyframes spin{to{transform:rotate(360deg)}}
+#enter{position:relative;z-index:2;display:flex;align-items:center;gap:.8em;padding:.55em 1.6em .55em 1.1em;border-radius:3em;background:linear-gradient(180deg,#ffd978,#ffb92e);color:#1b1100;box-shadow:0 0 2.2em -.3em rgba(255,185,46,.75),0 .3em .9em rgba(0,0,0,.4);transition:transform .2s}
+#enter:hover{transform:translateY(-.12em) scale(1.02)}
+#enter svg{width:1.7em;height:1.7em;flex:none}
+#enter b{display:block;font-size:1.05em;letter-spacing:.07em;font-weight:900;line-height:1.1}
+#enter small{display:block;font-size:.66em;font-weight:600;opacity:.8}
+#credit{position:absolute;left:.4em;top:.3em;font-size:.5em;line-height:1.5;color:#5f81a6;letter-spacing:.04em;max-width:11em}
+#lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:visible}
+#lines path{fill:none;stroke-width:1.2;stroke-dasharray:4 6;animation:flow 2.2s linear infinite;opacity:.75}
+#lines circle{animation:ping 2.4s ease-in-out infinite}
+@keyframes flow{to{stroke-dashoffset:-20}}@keyframes ping{50%{opacity:.35}}
+
+/* universe live */
+#live{display:grid;grid-template-columns:13.5em minmax(0,1fr);border-radius:1.1em;background:var(--glass);border:1px solid var(--line);overflow:hidden;backdrop-filter:blur(6px)}
+#liveHead{padding:.7em .9em;border-right:1px solid var(--line);display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(160deg,rgba(43,123,255,.16),transparent)}
+#liveHead b{display:flex;align-items:center;gap:.5em;font-size:.95em;letter-spacing:.14em;font-weight:900}
+#liveHead b:before{content:"";width:.6em;height:.6em;border-radius:50%;background:var(--bad);box-shadow:0 0 .8em var(--bad);animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.25}}
+#ecg{width:100%;height:2.2em}
+#liveHead small{font-size:.62em;color:var(--mut);letter-spacing:.04em}
+#liveScroll{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;display:flex;align-items:stretch;gap:.7em;padding:.6em .7em;-webkit-overflow-scrolling:touch}
+#liveScroll::-webkit-scrollbar{display:none}
+.lv{flex:none;width:21em;text-align:left;display:flex;flex-direction:column;gap:.25em;padding:.55em .8em;border-radius:.9em;background:rgba(255,255,255,.045);border:1px solid rgba(120,190,255,.2);transition:background .2s,border-color .2s,transform .2s}
+.lv:hover{background:rgba(54,214,255,.12);border-color:var(--cy);transform:translateY(-.1em)}
+.lv .r1{display:flex;align-items:center;gap:.5em;font-size:.62em;letter-spacing:.1em;font-weight:800}
+.lane{padding:.2em .65em;border-radius:.5em;background:var(--lc,#2b7bff);color:#041022}
+.nw{padding:.15em .5em;border-radius:2em;border:1px solid var(--gold);color:var(--gold)}
+.nw.br{border-color:var(--bad);color:var(--bad)}
+.lv .r1 em{margin-left:auto;font-style:normal;color:var(--mut);font-weight:600;letter-spacing:.02em}
+.lv b{font-size:.84em;line-height:1.25;font-weight:700;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lv small{font-size:.64em;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* quick access */
+#quick{display:grid;grid-template-columns:8.8em repeat(4,minmax(0,1fr));gap:.7em;align-items:stretch}
+#quick h4{margin:0;align-self:center;font-size:.72em;letter-spacing:.18em;color:var(--mut);font-weight:700;line-height:1.5}
+.qa{display:flex;align-items:center;gap:.8em;padding:0 1em;border-radius:1em;background:var(--glass);border:1px solid var(--line);text-align:left;transition:.2s}
+.qa:hover{border-color:var(--cy);background:rgba(54,214,255,.1);transform:translateY(-.1em)}
+.qa svg{width:1.9em;height:1.9em;flex:none;color:var(--cy)}
+.qa b{display:block;font-size:.92em;line-height:1.15}.qa small{display:block;font-size:.66em;color:var(--mut);margin-top:.15em}
+
+/* bottom nav */
+#nav{display:grid;grid-template-columns:repeat(5,1fr);align-items:center;margin:0 -1.1em;padding:0 3em;background:linear-gradient(180deg,rgba(6,16,36,.9),rgba(3,8,19,.98));border-top:1px solid var(--line)}
+#nav button{display:flex;flex-direction:column;align-items:center;gap:.15em;font-size:.7em;letter-spacing:.08em;font-weight:700;color:var(--mut);padding:.5em 0;position:relative}
+#nav button svg{width:1.8em;height:1.8em}
+#nav button.on{color:var(--cy)}
+#nav button.on:after{content:"";position:absolute;top:-.55em;left:30%;right:30%;height:.2em;border-radius:1em;background:var(--cy);box-shadow:0 0 .9em var(--cy)}
+#nav .gate{color:var(--gold)}
+
+/* overlays (views) */
+.view{position:absolute;left:0;right:0;top:3.9em;bottom:3.6em;z-index:5;display:none;padding:.4em 1.4em 1em;background:rgba(3,8,19,.94);backdrop-filter:blur(10px);overflow:auto}
+.view.on{display:block;animation:fade .25s}
+@keyframes fade{from{opacity:0;transform:translateY(.4em)}}
+.view h2{margin:.2em 0 .6em;font-size:1.3em;letter-spacing:.06em}
+.chips{display:flex;gap:.5em;flex-wrap:wrap;margin-bottom:.8em}
+.chip{padding:.35em .9em;border-radius:2em;border:1px solid var(--line);font-size:.75em;font-weight:700;letter-spacing:.06em;color:var(--mut)}
+.chip.on{background:var(--cy);color:#031023;border-color:var(--cy)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(19em,1fr));gap:.7em}
+.grid .lv{width:auto}
+.tool{display:flex;align-items:center;gap:.8em;padding:.9em 1em;border-radius:1em;background:var(--glass);border:1px solid var(--line)}
+.tool:hover{border-color:var(--cy)}
+.tool svg{width:1.8em;height:1.8em;color:var(--cy);flex:none}
+.tool b{display:block;font-size:.95em}.tool small{color:var(--mut);font-size:.7em}
+.set{display:flex;align-items:center;justify-content:space-between;gap:1em;padding:.75em 0;border-bottom:1px solid var(--line);font-size:.9em}
+.set small{display:block;color:var(--mut);font-size:.75em;margin-top:.2em}
+.seg{display:flex;border:1px solid var(--line);border-radius:2em;overflow:hidden}
+.seg button{padding:.35em .9em;font-size:.8em;font-weight:700;color:var(--mut)}
+.seg button.on{background:var(--cy);color:#031023}
+input.nm{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:.6em;color:var(--ink);padding:.45em .7em;font:inherit;font-size:.9em;width:15em}
+.note{font-size:.7em;color:#6f93b8;line-height:1.5;margin-top:1.2em}
+
+/* notification popover + detail sheet */
+#pop{position:absolute;z-index:9;top:3.6em;right:7.2em;width:26em;max-height:60%;overflow:auto;border-radius:1em;background:rgba(6,16,36,.97);border:1px solid var(--line);box-shadow:0 1em 3em rgba(0,0,0,.6);display:none;padding:.5em}
+#pop.on{display:block;animation:fade .2s}
+#pop h5{margin:.4em .6em;font-size:.72em;letter-spacing:.16em;color:var(--mut)}
+#pop .lv{width:100%;margin-bottom:.4em}
+#sheet{position:absolute;inset:0;z-index:12;display:none;place-items:center;background:rgba(2,6,15,.72);backdrop-filter:blur(4px)}
+#sheet.on{display:grid;animation:fade .2s}
+#sheet .card{width:min(38em,92%);border-radius:1.2em;background:linear-gradient(160deg,#0d2347,#061226);border:1px solid var(--cy);box-shadow:0 0 3em -.5em var(--cy);padding:1.3em 1.5em}
+#sheet h3{margin:.6em 0 .4em;font-size:1.25em;line-height:1.25}
+#sheet p{margin:.2em 0;color:var(--mut);font-size:.9em;line-height:1.5}
+#sheet .row{display:flex;gap:.7em;margin-top:1.1em}
+.btn{padding:.6em 1.3em;border-radius:2em;font-weight:800;font-size:.85em;letter-spacing:.05em;border:1px solid var(--line)}
+.btn.p{background:var(--cy);color:#031023;border-color:var(--cy)}
+
+/* universe overlay */
+#uni{position:fixed;inset:0;z-index:50;background:#050b18;display:none}
+#uni.on{display:block}
+#uni iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#050b18}
+#uniVeil{position:absolute;inset:0;display:grid;place-items:center;background:#050b18;color:var(--mut);letter-spacing:.2em;font-size:.8rem;transition:opacity .6s;text-align:center}
+#uniVeil.off{opacity:0;pointer-events:none}
+#uniVeil b{display:block;color:var(--cy);font-size:1.1rem;margin-bottom:.8rem;letter-spacing:.3em}
+#uniVeil i{display:block;width:12rem;height:2px;background:rgba(255,255,255,.1);margin:.9rem auto 0;overflow:hidden}
+#uniVeil i:after{content:"";display:block;width:40%;height:100%;background:var(--cy);animation:ld 1.1s infinite}
+@keyframes ld{from{transform:translateX(-100%)}to{transform:translateX(260%)}}
+#uniHome{position:absolute;left:.7rem;top:.7rem;z-index:3;padding:.45rem .9rem;border-radius:2rem;background:rgba(5,15,32,.82);border:1px solid var(--line);font-size:.75rem;font-weight:700;letter-spacing:.08em;backdrop-filter:blur(6px)}
+
+/* intro */
+#intro{position:fixed;inset:0;z-index:100;background:#02060f;display:grid;place-items:center;transition:opacity .8s}
+#intro.off{opacity:0;pointer-events:none}
+#intro .in{text-align:center;width:min(90vw,62rem)}
+#intro svg{width:100%;height:auto;max-height:34vh}
+#intro .ecg{stroke-dasharray:900;stroke-dashoffset:900;animation:draw 1.6s .2s ease-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+#intro h1{margin:.2em 0 .1em;font-style:italic;font-weight:900;font-size:clamp(1.2rem,4.6vw,3.2rem);letter-spacing:.06em;white-space:nowrap;background:linear-gradient(180deg,#fff,#8cc2ff);-webkit-background-clip:text;background-clip:text;color:transparent;opacity:0;animation:rise .9s .9s forwards}
+#intro p{margin:0;color:var(--mut);letter-spacing:.34em;font-size:clamp(.6rem,1.7vw,.95rem);opacity:0;animation:rise .9s 1.4s forwards}
+@keyframes rise{from{opacity:0;transform:translateY(.6em)}to{opacity:1;transform:none}}
+#intro .bar{width:14rem;height:2px;background:rgba(255,255,255,.1);margin:1.6rem auto 0;overflow:hidden;border-radius:2px}
+#intro .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--bl),var(--cy));transition:width .3s}
+#intro button{margin-top:1rem;font-size:.7rem;letter-spacing:.2em;color:#4f7396}
+
+/* ---------- portrait / narrow phones: flowing layout ---------- */
+@media (orientation:portrait),(max-aspect-ratio:5/4){
+ body{display:block;height:auto;min-height:100dvh;overflow:auto}
+ #stage{width:100%;height:auto;min-height:100dvh;font-size:15px;display:flex;flex-direction:column;gap:.8em;padding:0 .8em calc(4.6em + var(--safe-b));overflow:visible}
+ #stage:before{position:fixed}
+ #top{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,#030813 70%,transparent);padding:.5em 0 .3em;height:3.6em}
+ .brand svg{width:2.6em}.brand b{font-size:1.02em}.brand small{display:none}
+ #me b,#me small{display:none}#me{padding:.25em}
+ #main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.6em}
+ #hero{order:-1;grid-column:1/-1;height:min(52vh,26em);margin-bottom:.2em}
+ .col{display:contents}
+ #lines{display:none}
+ .portal{padding:.7em .7em .55em;grid-template-columns:2.6em minmax(0,1fr);min-width:0}.portal .go{flex-wrap:nowrap;white-space:nowrap}.portal .tag{display:none}.portal h3{overflow-wrap:anywhere}
+ .portal .ic{width:2.6em;height:2.6em}.portal h3{font-size:1em}.portal p{font-size:.7em}
+ #live{grid-template-columns:1fr;grid-template-rows:auto 7.2em}
+ #liveHead{flex-direction:row;align-items:center;border-right:0;border-bottom:1px solid var(--line);gap:.8em}
+ #ecg{width:7em;height:1.6em;flex:none}#liveHead small{display:none}
+ .lv{width:17em}
+ #quick{grid-template-columns:1fr 1fr}#quick h4{grid-column:1/3}
+ .qa{padding:.8em}
+ #nav{position:fixed;left:0;right:0;bottom:0;margin:0;padding:.2em .5em calc(.2em + var(--safe-b));z-index:30;height:auto}
+ .view{position:fixed;top:3.6em;bottom:4.2em}
+ #pop{position:fixed;top:3.6em;right:.6em;left:.6em;width:auto}
+ #credit{position:static;margin-top:.5em;max-width:none;text-align:center;font-size:.62em}
+}
+@media (max-width:430px){.portal{grid-template-columns:2.1em minmax(0,1fr);column-gap:.55em}.portal .ic{width:2.1em;height:2.1em;border-radius:.7em}.portal .ic svg{width:1.3em;height:1.3em}.portal h3{font-size:.88em;overflow-wrap:normal}.portal p{font-size:.66em}}
+@media (prefers-reduced-motion:reduce){#orbit circle,#lines path,#lines circle{animation:none}}
+</style>
+</head>
+<body>
+<div id="stage">
+ <header id="top">
+  <a class="brand" href="#/home" aria-label="Critical Care Universe home">
+   <svg viewBox="0 0 66 48" aria-hidden="true"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#7db6ff"/></linearGradient></defs>
+    <text x="2" y="38" font-family="Segoe UI,Arial" font-weight="900" font-style="italic" font-size="40" fill="url(#g1)" stroke="#2b7bff" stroke-width=".8">CU</text>
+    <path d="M30 20h7l3-11 5 26 4-15h9" fill="none" stroke="#ff4d5e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+   <span><b>CRITICAL CARE UNIVERSE</b><small>Learn • Practice • Excel</small></span>
+  </a>
+  <span class="grow"></span>
+  <button class="pill" id="bell" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.3 20a2 2 0 0 0 3.4 0"/></svg><i id="bn">0</i></button>
+  <button class="pill" id="me" aria-label="Profile"><span class="av" id="av">A</span><span><b id="nm">Dr Apoorva Chandra</b><small>Intensivist</small></span></button>
+ </header>
+
+ <main id="main">
+  <div class="col portals" id="colL"></div>
+  <section id="hero" aria-label="Rotating 3D anatomy">
+   <svg id="orbit" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="48"/><circle cx="50" cy="50" r="40"/></svg>
+   <canvas id="bodyc" tabindex="0" aria-label="3D human body. Drag to rotate."></canvas>
+   <div id="heroFall">3D anatomy needs WebGL.<br>The portals still work.</div>
+   <button id="enter" data-at="gate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-7h6v7"/></svg><span><b>ENTER THE UNIVERSE</b><small>Stand at the gate, first person</small></span></button>
+   <div id="credit">Anatomy: HuBMAP Human Reference Atlas, CC BY 4.0</div>
+  </section>
+  <div class="col portals" id="colR"></div>
+  <svg id="lines" aria-hidden="true"></svg>
+ </main>
+
+ <section id="live" aria-label="Universe Live">
+  <div id="liveHead"><b>UNIVERSE LIVE</b><canvas id="ecg" width="400" height="60"></canvas><small id="liveMeta">Guidelines and papers</small></div>
+  <div id="liveScroll" role="list"></div>
+ </section>
+
+ <section id="quick" aria-label="Quick access">
+  <h4>QUICK<br>ACCESS</h4>
+ </section>
+
+ <nav id="nav" aria-label="Main"></nav>
+
+ <div id="pop" role="dialog" aria-label="Notifications"></div>
+ <section class="view" id="vLive"><h2>UNIVERSE LIVE</h2><div class="chips" id="laneChips"></div><div class="grid" id="liveGrid"></div></section>
+ <section class="view" id="vTools"><h2>TOOLS</h2><div class="grid" id="toolGrid"></div></section>
+ <section class="view" id="vMe"><h2>PROFILE &amp; PREFERENCES</h2>
+  <div class="set"><div>Name<small>Shown at the top of the home screen</small></div><input class="nm" id="inName" maxlength="40"></div>
+  <div class="set"><div>Gate time of day<small>Lighting when you stand outside the building</small></div><div class="seg" id="segTime"><button data-v="auto">Auto</button><button data-v="day">Day</button><button data-v="night">Night</button></div></div>
+  <div class="set"><div>Body rotation<small>Turn off to keep the body still</small></div><div class="seg" id="segRot"><button data-v="on">On</button><button data-v="off">Off</button></div></div>
+  <div class="set"><div>Live ticker<small>Auto-scroll of Universe Live</small></div><div class="seg" id="segTick"><button data-v="on">On</button><button data-v="off">Off</button></div></div>
+  <div class="set"><div>Opening animation<small>Plays once per session</small></div><button class="btn" id="replay">Replay now</button></div>
+  <p class="note">Anatomy: 3D Reference Organ Set, United Male v1.5, HuBMAP Human Reference Atlas (Browne and Schlehlein, 2023), built on the NLM Visible Human data, licensed CC BY 4.0; stomach from BodyParts3D, CC BY 4.0. Live items come from Europe PMC and society pages; they are pointers to the source, not medical advice.</p>
+ </section>
+ <div id="sheet"><div class="card" id="sheetCard"></div></div>
+</div>
+
+<div id="uni"><iframe id="uniFrame" title="Critical Care Universe" allow="autoplay; fullscreen"></iframe><div id="uniVeil"><div><b>CRITICAL CARE UNIVERSE</b><span id="uniMsg">Walking to the gate</span><i></i></div></div><button id="uniHome">&#8962; HOME</button></div>
+
+<div id="intro"><div class="in">
+ <svg viewBox="0 0 400 130"><path class="ecg" d="M10 80h90l14-52 22 96 20-70 14 26h60l10-22 12 44 10-22h138" fill="none" stroke="#ff4d5e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+ <h1>CRITICAL CARE UNIVERSE</h1><p>LEARN &bull; PRACTICE &bull; EXCEL</p>
+ <div class="bar"><i id="introBar"></i></div><button id="skip">TAP TO SKIP</button>
+</div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+
+/* =============== small helpers =============== */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const PREF=Object.assign({time:'auto',rot:'on',tick:'on'},store.get('ccu-home-v1',{}));
+const savePref=()=>store.set('ccu-home-v1',PREF);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const ICON={
+ hub:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><ellipse cx="12" cy="12" rx="9" ry="3.8"/><ellipse cx="12" cy="12" rx="9" ry="3.8" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="3.8" transform="rotate(120 12 12)"/></svg>',
+ cmd:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M6 11h3l1.5-4 3 8 1.5-4H18M9 21h6M12 17v4"/></svg>',
+ team:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3"/><circle cx="5" cy="10" r="2.2"/><circle cx="19" cy="10" r="2.2"/><path d="M6.5 20c0-3.3 2.4-5.5 5.5-5.5s5.5 2.2 5.5 5.5M1.5 18c0-2.2 1.5-3.8 3.5-3.8M22.5 18c0-2.2-1.5-3.8-3.5-3.8"/></svg>',
+ vid:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10 9l5 3-5 3z" fill="currentColor"/></svg>',
+ mem:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a2 2 0 0 0-3-1z"/><path d="M15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/><path d="M12 8v8"/></svg>',
+ pat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-8-4.6-8-10.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8 2.5C20 15.4 12 20 12 20z"/><path d="M6 12h3l1.5-3 2 6 1.5-3H18"/></svg>',
+ abg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/><path d="M9 14.5h1.5l1-2 1.5 4 1-2H15"/></svg>',
+ mcq:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9.5 9.3a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 16.6v.1"/></svg>',
+ drug:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="8.5" width="19" height="7" rx="3.5" transform="rotate(-35 12 12)"/><path d="M9.2 7.2l7 9.6" transform="rotate(0 12 12)"/></svg>',
+ sig:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 5H7l6 7-6 7h11"/></svg>',
+ home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>',
+ gate:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l8-5 8 5v13M9 21v-6a3 3 0 0 1 6 0v6"/></svg>',
+ live:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>',
+ tools:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg>',
+ user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>'
+};
+
+/* =============== portals =============== */
+/* at = where the first-person view starts inside the Universe; direct = open the module itself */
+const PORTALS=[
+ {id:'hub',  name:'Hub',            sub:'Cases, guidelines and practice',       c:'#36d6ff', ic:'hub',  at:'hub',     direct:'../../hub.html?home=1',               tag:'ATLAS'},
+ {id:'cmd',  name:'Command Center', sub:'Six patients, live alarms',            c:'#ffc24a', ic:'cmd',  at:'command', direct:null,                                  tag:'ICU'},
+ {id:'team', name:'Teams',          sub:'Multidisciplinary team chamber',       c:'#b48cff', ic:'team', at:'team',    direct:'../universe/nexus.html',              tag:'MDT'},
+ {id:'vid',  name:'Video Library',  sub:'Procedures and bedside skills',        c:'#5b9bff', ic:'vid',  at:'video',   direct:null,                                  tag:'LEVEL 1'},
+ {id:'mem',  name:'Memory Lab',     sub:'Spaced-repetition recall',             c:'#ff7ad9', ic:'mem',  at:'memory',  direct:'../universe/memory-lab/index.html',   tag:'LEVEL 1'},
+ {id:'pat',  name:'Pathodynamics',  sub:'Six systems of live pathophysiology',  c:'#3dff9a', ic:'pat',  at:'patho',   direct:'../universe/pathodynamics/index.html',tag:'LEVEL 1'}
+];
+const QUICK=[
+ {name:'ABG Photo Simulator',sub:'Read the gas, then the patient',ic:'abg',href:'../../ABG_Photo_Interpreter_Simulator.html'},
+ {name:'MCQs',sub:'Question bank by system',ic:'mcq',href:'../../index.html'},
+ {name:'Drugs and Doses',sub:'ICU drug reference',ic:'drug',href:'../../antibiotics.html'},
+ {name:'Criteria and Formulas',sub:'Scores and calculators',ic:'sig',href:'../../formulas.html'}
+];
+const MORE=[
+ {name:'Pathology Live',href:'../../pathology-live.html',ic:'pat'},{name:'POCUS Lab',href:'../../pocus-lab.html',ic:'live'},
+ {name:'Hemodynamics',href:'../../hemodynamics.html',ic:'live'},{name:'Cardiac Lab',href:'../../cardiac-lab.html',ic:'pat'},
+ {name:'Nephrology Lab',href:'../../nephrology-lab.html',ic:'hub'},{name:'Neuro Lab',href:'../../neuro-lab.html',ic:'mem'},
+ {name:'Microbiology Lab',href:'../../microbiology-lab.html',ic:'hub'},{name:'Critical Care Human Atlas',href:'../../index.html',ic:'hub'}
+];
+function portalHTML(p){
+ const d=p.direct?`<span class="d" data-direct="${p.id}">Open</span>`:'';
+ return `<div class="portal" role="button" tabindex="0" data-at="${p.at}" data-id="${p.id}" style="--c:${p.c}"><span class="tag">${p.tag}</span>
+  <span class="ic">${ICON[p.ic]}</span><div><h3>${p.name}</h3><p>${p.sub}</p></div>
+  <div class="go"><span>Enter</span>${d}</div></div>`}
+$('#colL').innerHTML=PORTALS.slice(0,3).map(portalHTML).join('');
+$('#colR').innerHTML=PORTALS.slice(3).map(portalHTML).join('');
+$('#quick').insertAdjacentHTML('beforeend',QUICK.map(q=>`<a class="qa" href="${q.href}">${ICON[q.ic]}<span><b>${q.name}</b><small>${q.sub}</small></span></a>`).join(''));
+$('#toolGrid').innerHTML=QUICK.concat(MORE).map(q=>`<a class="tool" href="${q.href}">${ICON[q.ic]}<span><b>${q.name}</b>${q.sub?`<small>${q.sub}</small>`:''}</span></a>`).join('');
+$('#nav').innerHTML=[['home','Home','#/home'],['gate','Universe','#/enter/gate'],['live','Live','#/live'],['tools','Tools','#/tools'],['user','Me','#/me']]
+ .map(([i,l,h])=>`<button data-h="${h}" class="${i==='gate'?'gate':''}">${ICON[i]}<span>${l.toUpperCase()}</span></button>`).join('');
+
+/* connector lines between the portals and the body (landscape stage only) */
+function drawLines(){
+ const svg=$('#lines'),m=$('#main').getBoundingClientRect();
+ if(getComputedStyle(svg).display==='none')return;
+ const cx=m.width/2,ys=[.2,.46,.72].map(f=>m.height*f);let out='';
+ $$('.portal').forEach((el,i)=>{const r=el.getBoundingClientRect(),left=i<3,k=i%3,c=el.style.getPropertyValue('--c');
+  const x1=left?r.right-m.left:r.left-m.left,y1=r.top-m.top+r.height/2,x2=cx+(left?-1:1)*m.width*.07,y2=ys[k],mx=(x1+x2)/2;
+  out+=`<path d="M${x1} ${y1}C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}" stroke="${c}"/><circle cx="${x2}" cy="${y2}" r="3" fill="${c}"/>`});
+ svg.setAttribute('viewBox',`0 0 ${m.width} ${m.height}`);svg.innerHTML=out}
+addEventListener('resize',drawLines);
+
+/* =============== Universe live feed (same sources and cache key as the app) =============== */
+const LKEY='ccu-live-v1',LTTL=18e5,MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const LANEC={SCCM:'#ff7a8a',ESICM:'#7ab8ff',KDIGO:'#ffc24a',IDSA:'#7dffb8',ATS:'#6fe6ff',ICMR:'#ffa56b',ARDS:'#c9a6ff'};
+const FIXED=[
+ {lane:'SCCM',topic:'Guidelines',title:'Surviving Sepsis Campaign',detail:'International guidance for sepsis and septic shock',href:'https://www.sccm.org/SurvivingSepsisCampaign/Guidelines',when:'Guideline'},
+ {lane:'ESICM',topic:'Guidelines',title:'ESICM intensive care guidance',detail:'Haemodynamics, ventilation, and ICU practice',href:'https://www.esicm.org/resources/guidelines/',when:'Guideline'},
+ {lane:'KDIGO',topic:'Kidney',title:'KDIGO acute kidney injury',detail:'Prevention, staging, and renal replacement',href:'https://kdigo.org/guidelines/acute-kidney-injury/',when:'Guideline'},
+ {lane:'IDSA',topic:'Infection',title:'IDSA antimicrobial stewardship',detail:'Using the right drug, for the right duration',href:'https://www.idsociety.org/practice-guideline/antimicrobial-stewardship/',when:'Guideline'},
+ {lane:'ATS',topic:'Respiratory',title:'ATS official documents',detail:'Respiratory and critical care statements',href:'https://www.thoracic.org/statements/',when:'Guideline'},
+ {lane:'ICMR',topic:'India',title:'ICMR public health guidance',detail:'Indian Council of Medical Research',href:'https://www.icmr.gov.in/',when:'Guidance'},
+ {lane:'ARDS',topic:'Landmark',title:'ARDS lung-protective ventilation',detail:'Low tidal volume and pressure limitation',href:'https://pubmed.ncbi.nlm.nih.gov/10793162/',when:'Landmark'}];
+const LANES=[
+ ['SCCM','Sepsis',['(TITLE:"Surviving Sepsis Campaign" OR TITLE:"Society of Critical Care Medicine") AND (guideline OR consensus OR recommendation OR update) NOT TITLE:corrigendum']],
+ ['ESICM','Intensive care',['TITLE:"European Society of Intensive Care Medicine" NOT TITLE:corrigendum NOT TITLE:erratum']],
+ ['KDIGO','Kidney',['TITLE:"Kidney Disease: Improving Global Outcomes" OR (TITLE:KDIGO AND (TITLE:guideline OR TITLE:"clinical practice" OR TITLE:recommendation))']],
+ ['IDSA','Infection',['TITLE:"Infectious Diseases Society of America" AND (guideline OR stewardship OR antimicrobial OR resistance OR fungal OR sepsis)','TITLE:ESCMID AND (TITLE:guideline OR TITLE:guidance OR TITLE:consensus)']],
+ ['ATS','Respiratory',['TITLE:"American Thoracic Society" AND (TITLE:ARDS OR TITLE:"mechanical ventilation" OR TITLE:"noninvasive respiratory" OR TITLE:pneumonia OR TITLE:"critical care" OR TITLE:sepsis OR TITLE:"respiratory failure")']],
+ ['ICMR','India',['(AFF:"Indian Council of Medical Research" OR TITLE:"Indian Council of Medical Research") AND (TITLE:"intensive care" OR TITLE:ICU OR TITLE:sepsis OR TITLE:antimicrobial OR TITLE:fungal OR TITLE:ventilator OR TITLE:stewardship)']]];
+const clean=s=>String(s==null?'':s).replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1').replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\s+/g,' ').trim();
+const fmtDate=t=>{const d=new Date(t);return isNaN(d)?'':d.getDate()+' '+MON[d.getMonth()]+' '+d.getFullYear()};
+const parseWhen=w=>{const m=/^(\d{1,2}) ([A-Za-z]{3}) (\d{4})$/.exec(w||'');if(!m)return 0;const i=MON.indexOf(m[2]);return i<0?0:Date.UTC(+m[3],i,+m[1])};
+let LIVE={items:FIXED.map(x=>({...x,fresh:false})),at:0,live:0};
+try{const j=JSON.parse(sessionStorage.getItem(LKEY)||'null');if(j&&j.items&&j.items.length)LIVE={items:j.items,at:j.at||0,live:j.live||0}}catch(e){}
+async function fetchLane([lane,topic,queries]){
+ const out=[];
+ for(const q of queries){try{
+  const r=await fetch('https://www.ebi.ac.uk/europepmc/webservices/rest/search?format=json&pageSize=4&resultType=lite&sort=P_PDATE_D%20desc&query='+encodeURIComponent(q),{signal:AbortSignal.timeout(8000)});
+  if(!r.ok)continue;let a=(await r.json()).resultList;a=a&&a.result;a=a?(Array.isArray(a)?a:[a]):[];
+  const items=a.map(e=>{const title=clean(e.title);if(!title||title.length<12||title.startsWith('[')||/corrigendum|erratum|author correction/i.test(title))return null;
+   const pm=clean(e.pmid),doi=clean(e.doi),href=pm?'https://pubmed.ncbi.nlm.nih.gov/'+pm+'/':doi?'https://doi.org/'+doi:'';if(!href)return null;
+   const ts=Date.parse(e.firstPublicationDate||e.pubYear||'')||0,age=Date.now()-ts;
+   return{lane,topic,title,detail:clean(e.journalTitle)||'Europe PMC',href,when:fmtDate(ts),fresh:true,breaking:ts>0&&age>=-1728e5&&age<2592e6}}).filter(Boolean);
+  items.sort((x,y)=>Number(/guideline|guidance|consensus|recommendation|official|statement|update/i.test(y.title))-Number(/guideline|guidance|consensus|recommendation|official|statement|update/i.test(x.title)));
+  if(items[0])out.push(items[0])}catch(e){}}
+ return out.slice(0,queries.length>1?2:1)}
+async function refreshLive(force){
+ if(!force&&LIVE.at&&Date.now()-LIVE.at<(LIVE.live?LTTL:12e4))return;
+ $('#liveMeta').textContent='Checking sources…';
+ const got=(await Promise.all(LANES.map(fetchLane))).flat(),seen=new Set(),fresh=got.filter(e=>!seen.has(e.href)&&seen.add(e.href));
+ fresh.sort((a,b)=>!!b.breaking===!!a.breaking?parseWhen(b.when)-parseWhen(a.when):Number(!!b.breaking)-Number(!!a.breaking));
+ const items=fresh.length?fresh.concat(FIXED.filter(f=>!seen.has(f.href)).map(x=>({...x,fresh:false}))):FIXED.map(x=>({...x,fresh:false}));
+ LIVE={items,at:Date.now(),live:fresh.length};
+ try{sessionStorage.setItem(LKEY,JSON.stringify(LIVE))}catch(e){}
+ renderLive()}
+const lvCard=(it,i)=>`<button class="lv" role="listitem" data-i="${i}" style="--lc:${LANEC[it.lane]||'#7ab8ff'}"><span class="r1"><span class="lane">${esc(it.lane)}</span>${it.breaking?'<span class="nw br">NEW</span>':it.fresh?'<span class="nw">LATEST</span>':''}<em>${esc(it.when||'')}</em></span><b>${esc(it.title)}</b><small>${esc(it.topic)} · ${esc(it.detail)}</small></button>`;
+let tickAcc=0,tickPause=0;
+function renderLive(){
+ const els=$('#liveScroll'),its=LIVE.items,h=its.map(lvCard).join('');
+ /* the list is shown twice so the loop has no seam; indexes map back with % */
+ els.innerHTML=h+its.map((it,i)=>lvCard(it,i)).join('');
+ $$('.lv',els).forEach((b,k)=>b.dataset.i=k%its.length);
+ const t=LIVE.at?new Date(LIVE.at):null;
+ $('#liveMeta').textContent=(LIVE.live?'Live from Europe PMC':'Society guidance')+(t?' · '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0'):'');
+ renderGrid();renderBell();tickAcc=0;els.scrollLeft=0}
+function renderGrid(){
+ const lanes=['ALL',...new Set(LIVE.items.map(i=>i.lane))],cur=renderGrid.f||'ALL';
+ $('#laneChips').innerHTML=lanes.map(l=>`<button class="chip ${l===cur?'on':''}" data-l="${l}">${l}</button>`).join('')+'<button class="chip" id="rf">REFRESH</button>';
+ $('#liveGrid').innerHTML=LIVE.items.map((it,i)=>cur==='ALL'||it.lane===cur?lvCard(it,i):'').join('')}
+/* continuous running: gentle auto-scroll, pauses while you touch or hover, resumes after a moment */
+(function loop(){let last=performance.now();
+ const els=$('#liveScroll');
+ els.addEventListener('pointerdown',()=>tickPause=Infinity);
+ ['pointerup','pointercancel','pointerleave'].forEach(e=>els.addEventListener(e,()=>{tickPause=performance.now()+2500}));
+ els.addEventListener('wheel',()=>{tickPause=performance.now()+2500},{passive:true});
+ els.addEventListener('mouseenter',()=>tickPause=Infinity);
+ function f(t){requestAnimationFrame(f);const dt=Math.min(t-last,80);last=t;
+  if(PREF.tick!=='on'||document.hidden||reduce||$('#uni').classList.contains('on'))return;
+  if(tickPause===Infinity||t<tickPause){tickAcc=els.scrollLeft;return}
+  const half=els.scrollWidth/2;if(!half)return;
+  tickAcc+=dt*.045;if(tickAcc>=half)tickAcc-=half;els.scrollLeft=tickAcc}
+ requestAnimationFrame(f)})();
+
+/* sheet for one update: always tappable, opens the source */
+function openSheet(it){
+ $('#sheetCard').innerHTML=`<span class="lane" style="--lc:${LANEC[it.lane]||'#7ab8ff'};font-size:.7em;font-weight:800;letter-spacing:.1em">${esc(it.lane)}</span> <small style="color:var(--mut)">${esc(it.topic)} · ${esc(it.when||'')}</small>
+ <h3>${esc(it.title)}</h3><p>${esc(it.detail)}</p><div class="row"><a class="btn p" href="${esc(it.href||('https://europepmc.org/search?query='+encodeURIComponent(it.title)))}" target="_blank" rel="noopener">OPEN SOURCE &#8599;</a><button class="btn" id="shX">CLOSE</button></div>`;
+ $('#sheet').classList.add('on');$('#shX').onclick=()=>$('#sheet').classList.remove('on')}
+$('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')$('#sheet').classList.remove('on')});
+document.addEventListener('click',e=>{const b=e.target.closest('.lv');if(b){const it=LIVE.items[+b.dataset.i];if(it){$('#pop').classList.remove('on');openSheet(it)}}
+ const c=e.target.closest('.chip');if(c){if(c.id==='rf'){refreshLive(true);return}renderGrid.f=c.dataset.l;renderGrid()}});
+
+/* notifications: the newest items you have not opened yet */
+const seenSet=new Set(store.get('ccu-home-seen',[]));
+const idOf=it=>it.href||it.title;
+const unseen=()=>LIVE.items.filter(i=>(i.fresh||i.breaking)&&!seenSet.has(idOf(i)));
+function renderBell(){const n=unseen().length,b=$('#bell');b.classList.toggle('has',n>0);$('#bn').textContent=n>9?'9+':n}
+$('#bell').onclick=e=>{e.stopPropagation();const pop=$('#pop');
+ if(pop.classList.toggle('on')){const list=LIVE.items.map((it,i)=>({it,i})).filter(o=>o.it.fresh||o.it.breaking).slice(0,8);
+  pop.innerHTML='<h5>NOTIFICATIONS</h5>'+(list.length?list.map(o=>lvCard(o.it,o.i)).join(''):'<p style="margin:.6em;color:var(--mut);font-size:.8em">All caught up. New guidelines and papers from the societies appear here.</p>');
+  list.forEach(o=>seenSet.add(idOf(o.it)));store.set('ccu-home-seen',[...seenSet].slice(-80));renderBell()}};
+document.addEventListener('click',e=>{if(!e.target.closest('#pop'))$('#pop').classList.remove('on')});
+
+/* ECG trace: canvas, runs continuously */
+(function(){const c=$('#ecg'),g=c.getContext('2d');let x=0;const W=c.width,H=c.height,beat=t=>{const p=t%1;return p<.08?-.15*Math.sin(p/.08*Math.PI):p<.17?0:p<.2?-.2:p<.24?1:p<.28?-.35:p<.4?0:p<.52?.22*Math.sin((p-.4)/.12*Math.PI):0};
+ let t0=performance.now(),last=0;g.lineWidth=2.4;g.lineCap='round';
+ (function f(t){requestAnimationFrame(f);if(document.hidden)return;const dt=(t-t0)/1000;t0=t;const nx=(x+dt*110)%W;
+  g.shadowBlur=0;g.globalCompositeOperation='destination-out';g.fillStyle='rgba(0,0,0,.16)';g.fillRect(0,0,W,H);g.globalCompositeOperation='source-over';
+  g.strokeStyle='#3dff9a';g.shadowColor='#3dff9a';g.shadowBlur=6;g.beginPath();
+  for(let px=Math.floor(x);px<=nx&&px<W;px++){const ph=px/W*3.2,y=H*.62-beat(ph)*H*.5;px===Math.floor(x)?g.moveTo(px,y):g.lineTo(px,y)}g.stroke();g.shadowBlur=0;
+  g.clearRect(nx+2,0,16,H);x=nx})(performance.now())})();
+
+/* =============== the rotating 3D body =============== */
+const body={ready:false,paused:false};
+function initBody(onProgress){return new Promise(res=>{
+ const canvas=$('#bodyc');let renderer;
+ try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:'high-performance'})}catch(e){$('#heroFall').style.display='grid';return res(false)}
+ renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.setClearColor(0,0);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
+ const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(28,1,.1,40);cam.position.set(0,.98,4.15);cam.lookAt(0,.9,0);
+ scene.add(new THREE.HemisphereLight(0xcfeaff,0x081428,1.15));
+ const key=new THREE.DirectionalLight(0xffffff,2.1);key.position.set(2,3,4);scene.add(key);
+ const rim=new THREE.DirectionalLight(0x36d6ff,3.2);rim.position.set(-3,2,-3);scene.add(rim);
+ const warm=new THREE.PointLight(0xffb36b,6,6);warm.position.set(1.2,1.2,1.6);scene.add(warm);
+ const spin=new THREE.Group();scene.add(spin);
+ /* floor: glowing rings under the feet */
+ const ringM=(r0,r1,o,col=0x36d6ff)=>{const m=new THREE.Mesh(new THREE.RingGeometry(r0,r1,96),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:o,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.y=.003;scene.add(m);return m};
+ ringM(.62,.655,.95);const r2=ringM(.82,.835,.5);ringM(1.02,1.03,.25,0x2b7bff);
+ const g=document.createElement('canvas');g.width=g.height=128;const gx=g.getContext('2d'),gr=gx.createRadialGradient(64,64,0,64,64,64);gr.addColorStop(0,'rgba(54,214,255,.55)');gr.addColorStop(.6,'rgba(43,123,255,.16)');gr.addColorStop(1,'rgba(43,123,255,0)');gx.fillStyle=gr;gx.fillRect(0,0,128,128);
+ const disc=new THREE.Mesh(new THREE.PlaneGeometry(2.6,2.6),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(g),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));disc.rotation.x=-Math.PI/2;disc.position.y=.001;scene.add(disc);
+ /* rising particles */
+ const N=140,pp=new Float32Array(N*3),sp=new Float32Array(N);for(let i=0;i<N;i++){const a=Math.random()*6.28,r=.5+Math.random()*.9;pp[i*3]=Math.cos(a)*r;pp[i*3+1]=Math.random()*2;pp[i*3+2]=Math.sin(a)*r;sp[i]=.05+Math.random()*.12}
+ const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pp,3));
+ const pts=new THREE.Points(pg,new THREE.PointsMaterial({color:0x7fe0ff,size:.018,transparent:true,opacity:.7,blending:THREE.AdditiveBlending,depthWrite:false}));scene.add(pts);
+ /* skin: a hologram shell, so the real organs show through */
+ const skinMat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,
+  uniforms:{uTime:{value:0},uScan:{value:0},uColor:{value:new THREE.Color(0x2b9bff)}},
+  vertexShader:'varying vec3 vN;varying vec3 vV;varying vec3 vW;void main(){vec4 wp=modelMatrix*vec4(position,1.);vW=wp.xyz;vec4 mv=viewMatrix*wp;vN=normalize(normalMatrix*normal);vV=-mv.xyz;gl_Position=projectionMatrix*mv;}',
+  fragmentShader:'uniform float uScan;uniform vec3 uColor;varying vec3 vN;varying vec3 vV;varying vec3 vW;void main(){vec3 n=normalize(vN),v=normalize(vV);float f=1.-abs(dot(n,v));float rim=pow(f,2.4);float ln=smoothstep(.45,.5,abs(fract(vW.y*40.)-.5));float d=(vW.y-uScan)*9.;float band=exp(-d*d);float a=.035+rim*.5+ln*.045+band*.5;if(!gl_FrontFacing)a*=.45;vec3 c=mix(uColor,vec3(.85,.98,1.),clamp(band+rim*.4,0.,1.));gl_FragColor=vec4(c,clamp(a,0.,1.));}'});
+ let heart=null,lungs=null;
+ const done=ok=>{body.ready=ok;res(ok)};
+ new GLTFLoader().load('../../models/anatomy/human-reference.glb',gltf=>{
+  const root=gltf.scene,box=new THREE.Box3().setFromObject(root),size=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3());
+  const s=1.86/size.y;root.scale.setScalar(s);root.position.set(-c.x*s,-box.min.y*s,-c.z*s);
+  root.traverse(o=>{if(!o.isMesh)return;const n=(o.name||'').toLowerCase()+'|'+((o.parent&&o.parent.name)||'').toLowerCase();
+   if(/body/.test(n)&&!/(eye|iris|pupil)/.test(n)){o.material=skinMat;o.renderOrder=3;return}
+   const m=o.material.clone();m.emissive=m.color.clone().multiplyScalar(.35);m.emissiveIntensity=.55;m.roughness=.5;m.metalness=.05;o.material=m;o.renderOrder=1;
+   if(/heart/.test(n))heart=m;if(/lung/.test(n))lungs=m});
+  spin.add(root);
+  /* the model faces +z; show it three-quarter on arrival */
+  spin.rotation.y=-.5;done(true)},
+  e=>{if(e.total)onProgress&&onProgress(e.loaded/e.total)},
+  err=>{console.warn('body model',err);$('#heroFall').style.display='grid';done(false)});
+ /* sizing */
+ const host=$('#hero');function size(){const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;renderer.setSize(r.width,r.height,false);cam.aspect=r.width/r.height;
+  const fit=Math.min(1,cam.aspect/.62);cam.position.z=4.15/fit;cam.updateProjectionMatrix()}
+ new ResizeObserver(size).observe(host);size();
+ /* drag to turn, with a little inertia; hands off and it resumes by itself */
+ let drag=false,lx=0,vel=0,idle=0;
+ canvas.addEventListener('pointerdown',e=>{drag=true;lx=e.clientX;vel=0;canvas.setPointerCapture(e.pointerId)});
+ canvas.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-lx;lx=e.clientX;spin.rotation.y+=dx*.011;vel=dx*.011});
+ const up=()=>{drag=false;idle=performance.now()};canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
+ canvas.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')spin.rotation.y-=.2;if(e.key==='ArrowRight')spin.rotation.y+=.2});
+ let last=performance.now();
+ (function frame(t){requestAnimationFrame(frame);const dt=Math.min((t-last)/1000,.1);last=t;
+  if(body.paused||document.hidden||!body.ready)return;
+  const sec=t/1000;skinMat.uniforms.uTime.value=sec;skinMat.uniforms.uScan.value=(sec*.38%1.6)*1.3-.1;
+  if(!drag){if(Math.abs(vel)>.0004){spin.rotation.y+=vel;vel*=.94}else if(PREF.rot==='on'&&!reduce&&t-idle>2200)spin.rotation.y+=dt*.42}
+  const beat=Math.pow(Math.max(0,Math.sin(sec*Math.PI*2*1.15)),10);
+  if(heart)heart.emissiveIntensity=.5+beat*1.5;if(lungs)lungs.emissiveIntensity=.5+.25*Math.sin(sec*1.6);
+  r2.rotation.z=sec*.25;warm.intensity=5+Math.sin(sec*2)*1.2;
+  const a=pg.attributes.position;for(let i=0;i<N;i++){let y=a.getY(i)+sp[i]*dt;if(y>2.1)y=0;a.setY(i,y)}a.needsUpdate=true;
+  renderer.render(scene,cam)})(performance.now())})}
+
+/* =============== Universe overlay: first-person entry to any part =============== */
+const uni=$('#uni'),uf=$('#uniFrame');let uniOpen=false;
+const MSG={gate:'Walking to the gate',hub:'Opening the hub door',command:'Entering the command centre',team:'Opening the team chamber',video:'Taking the lift to the video library',memory:'Taking the lift to the Memory Lab',patho:'Taking the lift to Pathodynamics'};
+function hourParam(){return PREF.time==='day'?'&hour=14':PREF.time==='night'?'&hour=22':''}
+function openUniverse(at){
+ at=MSG[at]?at:'gate';uniOpen=true;body.paused=true;
+ $('#uniMsg').textContent=MSG[at];$('#uniVeil').classList.remove('off');uni.classList.add('on');
+ uf.onload=()=>setTimeout(()=>$('#uniVeil').classList.add('off'),1800);
+ uf.src='../universe/living-command.html?start=aud&at='+at+hourParam()+'&v='+Date.now().toString(36)}
+function closeUniverse(){if(!uniOpen)return;uniOpen=false;uni.classList.remove('on');uf.onload=null;uf.src='about:blank';body.paused=false;if(/^#\/enter/.test(location.hash))location.hash='#/home'}
+$('#uniHome').onclick=closeUniverse;
+addEventListener('message',e=>{if(e.source!==uf.contentWindow)return;
+ if(e.data==='universe-home')closeUniverse();
+ else if(e.data==='universe-hub')location.href='../../hub.html?home=1&from=auditorium';
+ else if(e.data==='universe-team')location.href='../universe/nexus.html'});
+
+/* =============== routing =============== */
+const VIEWS={'/live':'#vLive','/tools':'#vTools','/me':'#vMe'};
+function route(){
+ const h=location.hash.replace(/^#/,'')||'/home',m=/^\/enter\/([a-z]+)/.exec(h);
+ $$('.view').forEach(v=>v.classList.remove('on'));$('#pop').classList.remove('on');
+ if(m){if(!uniOpen)openUniverse(m[1]);}else{closeUniverse();if(VIEWS[h])$(VIEWS[h]).classList.add('on')}
+ const key=m?'/enter/gate':(VIEWS[h]?h:'/home');
+ $$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.h==='#'+key&&key!=='/enter/gate'))}
+addEventListener('hashchange',route);
+$('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(location.hash===b.dataset.h)route();else location.hash=b.dataset.h});
+/* portals: a tap walks in at that door; "Open" jumps into the module itself */
+document.addEventListener('click',e=>{
+ const d=e.target.closest('[data-direct]');
+ if(d){e.stopPropagation();const p=PORTALS.find(x=>x.id===d.dataset.direct);if(p&&p.direct)location.href=p.direct;return}
+ const p=e.target.closest('.portal');if(p){location.hash='#/enter/'+p.dataset.at;return}
+ if(e.target.closest('#enter')){location.hash='#/enter/gate'}});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('portal')){e.preventDefault();e.target.click()}});
+$('#me').onclick=()=>{location.hash='#/me'};
+
+/* preferences */
+function paintPrefs(){
+ [['#segTime','time'],['#segRot','rot'],['#segTick','tick']].forEach(([s,k])=>$$('button',$(s)).forEach(b=>b.classList.toggle('on',b.dataset.v===PREF[k])));
+ const nm=store.get('ccu-doctor-name','Dr Apoorva Chandra')||'Dr Apoorva Chandra';$('#nm').textContent=nm;$('#inName').value=nm;
+ $('#av').textContent=(nm.replace(/^dr\.?\s*/i,'').trim()[0]||'A').toUpperCase()}
+[['#segTime','time'],['#segRot','rot'],['#segTick','tick']].forEach(([s,k])=>$(s).addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;PREF[k]=b.dataset.v;savePref();paintPrefs()}));
+$('#inName').addEventListener('input',e=>{store.set('ccu-doctor-name',e.target.value.slice(0,40));paintPrefs();$('#inName').value=e.target.value});
+$('#replay').onclick=()=>{location.hash='#/home';playIntro(true)};
+
+/* =============== opening animation =============== */
+const intro=$('#intro');let introDone=false;
+function endIntro(){if(introDone)return;introDone=true;intro.classList.add('off');setTimeout(()=>{intro.style.display='none'},900);try{sessionStorage.setItem('ccu-home-intro','1')}catch(e){}}
+$('#skip').onclick=endIntro;intro.addEventListener('click',endIntro);
+function playIntro(again){introDone=false;intro.style.display='grid';requestAnimationFrame(()=>intro.classList.remove('off'));
+ $$('#intro .ecg,#intro h1,#intro p').forEach(n=>{n.style.animation='none';void n.getBoundingClientRect();n.style.animation=''});
+ setTimeout(endIntro,again?3200:4200)}
+
+/* =============== go =============== */
+paintPrefs();renderLive();route();drawLines();
+const seen=(()=>{try{return sessionStorage.getItem('ccu-home-intro')}catch(e){return null}})();
+const skipIntro=/[?&]intro=0/.test(location.search)||(seen&&!/[?&]intro=1/.test(location.search))||/^#\/enter/.test(location.hash);
+if(skipIntro){intro.style.display='none';introDone=true}
+const minT=new Promise(r=>setTimeout(r,skipIntro?0:2600));
+const bar=$('#introBar');bar.style.width='12%';
+Promise.all([initBody(p=>{bar.style.width=Math.max(12,p*100)+'%'}),minT]).then(()=>{bar.style.width='100%';drawLines();setTimeout(endIntro,350)});
+setTimeout(endIntro,9000);
+new ResizeObserver(drawLines).observe($('#main'));
+refreshLive(false);setInterval(()=>refreshLive(false),LTTL);
+window.__home={PORTALS,openUniverse,closeUniverse,body,LIVE:()=>LIVE};
+</script>
+</body>
+</html>

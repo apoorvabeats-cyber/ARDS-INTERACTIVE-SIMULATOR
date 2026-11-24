@@ -283,7 +283,7 @@ function drawBed(i){const p=P[i],b=B[i],c=b.ctx,W=1280,H=720,im=(typeof bedShot=
  b.tex.needsUpdate=true}
 
 // camera modes
-let arrive=null,ent=0,mode='cmd',yaw=0,pit=0,cmdYaw=0,cmdPit=0,cur=null,transit=null,voiceOn=true,alarmOn=true,wallZoom=true;const tp=new V(),tl=new V(),lk=new V(100,4,-8),wp=new V(0,0,0);let bobT=0;const WALK='Swipe up to walk · drag sideways to look · tap a door, bed or monitor';let suite=null,gyS=0,START_AUD=/[?&]start=aud/.test(location.search),START_FROM=((location.search.match(/[?&]from=(hub|team)/)||[])[1])||'hub';
+let arrive=null,ent=0,mode='cmd',yaw=0,pit=0,cmdYaw=0,cmdPit=0,cur=null,transit=null,voiceOn=true,alarmOn=true,wallZoom=true;const tp=new V(),tl=new V(),lk=new V(100,4,-8),wp=new V(0,0,0);let bobT=0;const WALK='Swipe up to walk · drag sideways to look · tap a door, bed or monitor';let suite=null,gyS=0,START_AUD=/[?&](start=aud|at=)/.test(location.search),START_FROM=((location.search.match(/[?&]from=(hub|team)/)||[])[1])||'hub';
 function readPose(to){try{const j=JSON.parse(sessionStorage.getItem('ccu-pose')||'null');/* kept for a minute and a half: if the phone reloads the page while it settles, you still land where you walked in, not back at the gate */if(j&&j.to===to&&Date.now()-j.t<90000)return j}catch(e){}return null}
 function freshSnap(){try{const t=+sessionStorage.getItem('ccu-snap-t')||0,v=sessionStorage.getItem('ccu-snap');return v&&Date.now()-t<15000?v:null}catch(e){return null}}
 if(START_AUD){const sn=freshSnap();if(sn){const l=document.getElementById('leave');l.style.transition='none';l.style.opacity=1;l.style.background='#050b18 url('+sn+') center/cover no-repeat'}}const OUTH='Swipe up to walk · drag to look around · turn round to see the building · keep walking ahead to leave';
@@ -867,8 +867,19 @@ go=function(m,i){
    if(START_FROM==='team'){sx=W.AU.x1-1.9;sz=W.ZC;sy=-Math.PI/2;D.team.target=1;D.team.set(1)}
    else{sx=W.AU.x0+1.9;sz=W.ZC;sy=Math.PI/2;D.hub.target=1;D.hub.set(1)}
    if(pz){sx=pz.x;sz=pz.z;sy=pz.yaw}
-   if(!/[?&]from=(hub|team)/.test(location.search)&&window.ccuWelcome)window.ccuWelcome('aud');
-   stand(sx,sz,sy);arriving=true;const l=$('#leave');l.style.transition='none';l.style.opacity=1;
+   /* direct entry from the new home: at=gate|hub|team|video|memory|patho|command puts you at that door, first person */
+   const AT=(location.search.match(/[?&]at=([a-z]+)/)||[])[1];let atPit=0,atUp=false;
+   if(AT){const Hc=W.hub||{x:W.AU.x0,z:W.ZC};
+    if(AT==='gate'){sx=-15.3;sz=-31.4;sy=Math.PI;atPit=.3}
+    else if(AT==='hub'){sx=W.AU.x0+1.9;sz=W.ZC;sy=-Math.PI/2;D.hub.target=1;D.hub.set(1)}
+    else if(AT==='team'){sx=W.AU.x1-1.9;sz=W.ZC;sy=Math.PI/2;D.team.target=1;D.team.set(1)}
+    else if(AT==='video'){sx=-12.5;sz=-17;sy=Math.PI/2;atUp=true}
+    else if(AT==='memory'){sx=-17.7;sz=-17;sy=-Math.PI/2;atUp=true}
+    else if(AT==='patho'){sx=-11.4;sz=-12;sy=Math.PI;atUp=true}
+    else if(AT==='command'){sx=-10.7;sz=0;sy=-Math.PI/2}}
+   if(AT&&atUp&&suite.upper){const U=suite.upper;U.setLevel(1);U.lift.level=1;U.lift.y=U.geom.LV}
+   if(!AT&&!/[?&]from=(hub|team)/.test(location.search)&&window.ccuWelcome)window.ccuWelcome('aud');
+   stand(sx,sz,sy);if(AT){pit=atPit;if(atUp)gyS=suite.groundY(sx,sz)}arriving=true;const l=$('#leave');l.style.transition='none';l.style.opacity=1;
    /* a straight cut, never a fade: the last frame of the place we left stays up until this room has drawn once */
    requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(()=>{l.style.transition='none';l.style.opacity=0;l.style.background='#050b18';arriving=false;try{sessionStorage.removeItem('ccu-snap');if(parent!==window&&parent.ccuSnapOff)parent.ccuSnapOff()}catch(e){}},120)))}else {stand(-10.7,0,-Math.PI/2);if(window.ccuWelcome)setTimeout(()=>window.ccuWelcome('cmd'),500)}}
  else if(m==='ward'&&suite&&!flatMode&&mode!=='bed'&&mode!=='transit'&&mode!=='travel'&&(mode==='cmd'||cam.position.x<-8.6))stand(-6.8,0,Math.PI/2);
