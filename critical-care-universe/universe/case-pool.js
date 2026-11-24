@@ -339,3 +339,36 @@ export const CASES = [
 
 export const CASE_BY_ID = Object.fromEntries(CASES.map((c) => [c.id, c]));
 export const ALL_SPECS = ["pulmonologist", "cardiologist", "nephrologist", "infectious", "gastroenterologist", "surgeon", "neurologist"];
+
+/* How each case ends, disease by disease.
+     pct  - the share of the care (by weight) that must be done, 0.85 to 0.90: the harder the case, the more of it has to be right
+     must - the steps that decide this disease: the case does not end as survived without every one of them
+     win  - what the team is told when the patient settles
+   The patient also has to be settling (the pressure of the illness gone and the vitals coming back) before the case ends. */
+export const END = {
+  cap: { pct: 0.85, must: ["o2", "abx"], win: "Oxygen was in time, and the antibiotics cover the pneumococcus and the atypical organisms. The fever is settling and the oxygen need is falling. She can leave the high-dependency bed for the ward." },
+  ards: { pct: 0.9, must: ["vent", "viral", "prone"], win: "Lung-protective ventilation, prone positioning and antiviral cover turned the oxygenation. The driving pressure is falling and the saturation holds. The long road of weaning begins, but the crisis is over." },
+  copd: { pct: 0.88, must: ["niv", "bd"], win: "Non-invasive ventilation and bronchodilators brought the carbon dioxide down without intubation. He is awake, breathing easier, and the acidosis is clearing." },
+  pe: { pct: 0.9, must: ["lyse", "hep"], win: "Reperfusion opened the pulmonary circulation and anticoagulation is running. The right ventricle is unloading, the pressure is back and the saturation is climbing." },
+  cardiogenic: { pct: 0.88, must: ["cath", "press"], win: "The culprit artery was opened in time and the circulation was supported. The pressure is holding, the lactate is clearing and the heart is beginning to recover." },
+  pedema: { pct: 0.85, must: ["niv", "nit"], win: "Positive pressure and nitrates unloaded the lungs within the hour. The crackles are clearing and he is off the mask by the evening." },
+  tamponade: { pct: 0.88, must: ["drain"], win: "Draining the pericardium released the heart. The pressure rose as the fluid came off and the pulse settled. The cause is still to be found, but the emergency is over." },
+  aki: { pct: 0.88, must: ["ca", "shift", "hd"], win: "Calcium protected the heart, potassium was shifted, and dialysis took it out. The ECG is back to normal and the potassium is safe." },
+  mala: { pct: 0.9, must: ["hd", "vol"], win: "Dialysis cleared the metformin and the acid. The lactate is falling, the pH is rising and the pressure is holding without escalation." },
+  rhabdo: { pct: 0.88, must: ["vol", "cool"], win: "Fluids and cooling got ahead of the muscle breakdown. The urine is flowing, the potassium is safe and the kidneys are being spared." },
+  clabsi: { pct: 0.88, must: ["abx", "line"], win: "The infected line is out and the antibiotics cover MRSA and resistant Gram-negatives. The pressure is holding on less support and the lactate is clearing. The source is controlled." },
+  mening: { pct: 0.88, must: ["abx", "dex"], win: "Antibiotics and dexamethasone were given together and early, and the lumbar puncture was done safely. The fever and headache are easing and the GCS is rising." },
+  malaria: { pct: 0.88, must: ["art", "dex"], win: "Intravenous artesunate is running and the hypoglycaemia was caught. The parasite count is falling, the sugar is steady and he is waking up." },
+  nsti: { pct: 0.9, must: ["source", "abx"], win: "Surgery removed the dead tissue and the antibiotics cover the toxin-producing organisms. The shock is reversing and he is stable enough to go back for a second look." },
+  varices: { pct: 0.88, must: ["vaso", "endo"], win: "The bleeding vessel was banded and the vasoconstrictor held the pressure down. The haemoglobin is stable, the vitals are settling and antibiotic cover is in place." },
+  alf: { pct: 0.9, must: ["nac", "dex"], win: "N-acetylcysteine started early and the hypoglycaemia was treated. The coagulation and the ammonia are steadying and the brain is protected. She is listed for close monitoring." },
+  pancreatitis: { pct: 0.88, must: ["vol"], win: "Early balanced fluids, analgesia and oxygen kept the perfusion up. The organ failure has not progressed, the pain is easing and the urine output is good." },
+  perf: { pct: 0.88, must: ["source", "abx"], win: "The perforation was closed and the antibiotics covered the gut flora. The pressure is stable, the abdomen is settling and the lactate is falling." },
+  mesenteric: { pct: 0.9, must: ["source", "hep"], win: "Anticoagulation started early and the occluded vessel was reopened, with the dead bowel removed. The lactate is falling and the circulation is holding." },
+  trauma: { pct: 0.9, must: ["blood", "source"], win: "Blood was given in balance and the bleeding was stopped surgically. The pressure and haemoglobin are holding and the lactate is clearing. He is out of the lethal triad." },
+  tbi: { pct: 0.88, must: ["air", "osm", "evd"], win: "The airway was secured, the pressure in the skull was brought down, and the clot was evacuated. The pupils are equal and the intracranial pressure is controlled." },
+  status: { pct: 0.88, must: ["benzo", "aed"], win: "The seizure stopped with the first drug and the second-line drug is on board. The glucose and oxygen were right. He is waking slowly, and the cause is being looked for." },
+  ich: { pct: 0.9, must: ["bp", "rev"], win: "The warfarin was reversed and the pressure was brought down in a controlled way. The haematoma has not grown and the GCS is stable." },
+  dka: { pct: 0.85, must: ["vol", "ins"], win: "Fluids and a fixed-rate insulin infusion closed the gap. The ketones are falling, the pH is climbing and the potassium was watched. She is ready to eat." },
+  asthma: { pct: 0.88, must: ["bd", "o2"], win: "Back-to-back bronchodilators, steroid and magnesium opened the airways without intubation. The chest is moving air again and the saturation is steady." },
+};

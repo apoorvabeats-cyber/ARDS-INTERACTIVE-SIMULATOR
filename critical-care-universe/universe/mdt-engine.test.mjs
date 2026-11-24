@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
 import { Dp, Np, Pp, COVER, eligibleCases, caseWeights, pickCase } from './case-engine.js';
-import { CASES, CASE_BY_ID, ALL_SPECS } from './case-pool.js';
+import { CASES, CASE_BY_ID, ALL_SPECS, END } from './case-pool.js';
 import { BY_ID, canon } from './order-catalogue.js';
 import { buildSegment } from './build-engine.mjs';
 
@@ -54,17 +54,43 @@ test('every case can be saved by the right steps, and gets the patient holding',
   }
 });
 
-test('a patient who has settled ends the case as survived, even when a few minor steps were skipped', () => {
-  const sc = mk('cap'), c = CASE_BY_ID.cap, full = ideal(c), part = full.filter((_, i) => i < Math.ceil(full.length * 0.8));
-  const r = firstOutcome(sc, part); assert.equal(r.outcome, 'held', 'did not end: ' + r.outcome); assert.ok(r.alive && /survives/i.test(r.outcomeLine) && r.outcomeLine.includes(c.dx));
-  assert.equal(r.pending.length, 0, 'nothing is awaited once the case has ended'); assert.ok(r.problems.every((p) => p.resolved));
-  assert.ok(r.log.some((l) => /stabilis/i.test(l.text)));
+test('each disease ends by its own mark: 85 to 90% of the care, and the steps that decide that disease', () => {
+  for (const c of CASES) {
+    const e = END[c.id]; assert.ok(e, c.id + ' has no ending'); assert.ok(e.pct >= 0.85 && e.pct <= 0.9, c.id + ' pct ' + e.pct); assert.ok(e.must.length >= 1 && e.must.every((id) => c.needs.some((nd) => nd.id === id)), c.id + ' must'); assert.ok(e.win.length > 60, c.id + ' win text');
+  }
+  assert.ok(new Set(CASES.map((c) => END[c.id].win)).size === CASES.length, 'every ending is its own');
 });
 
-test('a case that stays unstable for the whole shift ends as a handover, and a late recovery still ends as survived', () => {
-  const sc = mk('cap'), half = ideal(CASE_BY_ID.cap).slice(0, 4);
-  const r = Np(sc, half, 1300000); assert.ok(['handover', 'died', 'held'].includes(r.outcome), 'a case must end: ' + r.outcome);
-  const none = Np(mk('cap'), [A(2000, 'examine')], 1210000); assert.ok(['died', 'handover'].includes(none.outcome));
+test('the case does not end below its mark, however long it runs, and ends once the mark is reached', () => {
+  const c = CASE_BY_ID.cap, full = ideal(c); // o2, abx, img, gas, cx
+  const lacking = full.filter((a) => !/lab:(abg|lactate)|lab:cultures/.test(a.kind)); // img only: 7/9 = 78%
+  for (const m of [300000, 600000, 1100000]) { const r = Np(mk('cap'), lacking, m); assert.notEqual(r.outcome, 'held', 'ended at ' + m + ' with ' + r.pctDone + '%'); assert.ok(r.pctDone < r.pctNeeded); }
+  const enough = full.filter((a) => !/lab:cultures/.test(a.kind)); // 8/9 = 89%
+  const r = firstOutcome(mk('cap'), enough); assert.equal(r.outcome, 'held'); assert.ok(r.pctDone >= r.pctNeeded && r.outcomeLine.includes('Oxygen was in time'));
+  assert.equal(r.pending.length, 0); assert.ok(r.problems.every((p) => p.resolved));
+});
+
+test('the steps that decide a disease cannot be skipped even when the percentage is high', () => {
+  const c = CASE_BY_ID.tamponade, full = ideal(c), noDrain = full.filter((a) => !/pericard/.test(a.kind));
+  const r = Np(mk('tamponade'), noDrain, 600000); assert.notEqual(r.outcome, 'held');
+  assert.ok(r.left.some((x) => x.id === 'drain' && x.must));
+});
+
+test('asking what is left returns the steps still open, the most urgent first, with the mark to reach', () => {
+  const sc = mk('aki'), r = Np(sc, [A(2000, 'examine')], 200000);
+  assert.ok(r.left.length >= 4 && r.left[0].overdue && typeof r.pctDone === 'number' && r.pctNeeded >= 85);
+  assert.ok(r.left.every((x, i, a) => i === 0 || !(a[i - 1].overdue === false && x.overdue)), 'overdue first');
+  const done = Np(sc, ideal(CASE_BY_ID.aki), 200000); assert.ok(done.left.length < r.left.length && done.pctDone > r.pctDone);
+});
+
+test('a specialist who has done nothing is flagged, and any doctor can continue the part', () => {
+  const sc = mk('aki'), acts = [A(2000, 'examine', 'intensivist'), A(10000, 'proc:oxygen', 'intensivist')];
+  const idle = Np(sc, acts, 200000).problems.find((p) => p.specialty === 'nephrologist'); assert.ok(idle.idle && !idle.covered);
+  const cov = Np(sc, [...acts, A(150000, 'cover', 'intensivist', { specialty: 'nephrologist' })], 200000);
+  const p = cov.problems.find((q) => q.specialty === 'nephrologist'); assert.ok(p.covered && !p.idle); assert.ok(cov.log.some((l) => /continues the Nephrologist part/.test(l.text)));
+  assert.ok(Pp('cover'));
+  const full = firstOutcome(mk('aki'), ideal(CASE_BY_ID.aki).map((a) => ({ ...a, specialty: 'intensivist', userId: 'u-i' })));
+  assert.equal(full.outcome, 'held', 'the intensivist alone can finish the case');
 });
 
 test('doing nothing is fatal, but only after minutes, never within the first few', () => {

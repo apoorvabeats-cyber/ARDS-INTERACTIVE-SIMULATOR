@@ -3,7 +3,7 @@
    becomes  lab:cbc, lab:kft, lab:lft, img:cxr, abx:meropenem.
    It matches the longest known phrase first, repairs the usual speech-recognition slips (letters said one by one,
    brand names, near-misses), drops the filler, and says what it could not place. */
-import { CATALOGUE, BY_ID } from "./order-catalogue.js?v=20261122g";
+import { CATALOGUE, BY_ID } from "./order-catalogue.js?v=20261124g";
 
 const UNITS = "mg|mgs|mcg|mcgs|microgram|micrograms|g|gm|gms|gram|grams|ml|mls|cc|l|ltr|ltrs|lit|litre|litres|liter|liters|units?|iu|mmol|meq|mmhg|joules?|hours?|hrs?|minutes?|mins?";
 
@@ -80,9 +80,9 @@ const STOP = new Set("| yet gluconate chloride sulphate sulfate hydrochloride ac
 const NEG = new Set(["no", "not", "dont", "dont", "never", "cancel", "stop", "without", "avoid", "hold", "skip", "nope", "negative", "dontt"]);
 
 const SPEC_WORDS = [
-  ["nephrologist", ["nephrologist", "nephrology", "nephro", "renal doctor", "kidney doctor", "renal physician", "renal team"]],
-  ["cardiologist", ["cardiologist", "cardiology", "cardio", "heart doctor", "cardiac team"]],
-  ["pulmonologist", ["pulmonologist", "pulmonology", "pulmo", "chest physician", "lung doctor", "respiratory physician"]],
+  ["nephrologist", ["nephrologist", "nephrology", "nephro", "renal doctor", "kidney doctor", "renal physician", "renal team", "kidney specialist"]],
+  ["cardiologist", ["cardiologist", "cardiology", "cardio", "heart doctor", "cardiac team", "heart specialist"]],
+  ["pulmonologist", ["pulmonologist", "pulmonology", "pulmo", "chest physician", "lung doctor", "respiratory physician", "lung specialist"]],
   ["infectious", ["infectious disease", "infectious diseases", "infectious", "id doctor", "id specialist", "id team", "id consultant", "microbiologist", "microbiology"]],
   ["gastroenterologist", ["gastroenterologist", "gastroenterology", "gastro", "gi doctor", "gi team", "hepatologist", "gi specialist"]],
   ["surgeon", ["surgeon", "surgical team", "surgery team", "general surgeon", "surgical registrar", "surgeons", "surgical"]],
@@ -243,7 +243,7 @@ function groupUnknown(ws) { return ws.length ? [ws.join(" ")] : []; }
 
 /* what the room is told for one order: the canonical kind, and the specialty for a call */
 export function toKind(o) {
-  if (o.id === "call") return { kind: "call", specialty: o.specialty };
+  if (o.id === "call" || o.id === "cover") return { kind: o.id, specialty: o.specialty };
   const k = { kind: o.id }, q = o.qty;
   if (q) { if (q.ml != null) k.ml = Math.round(q.ml); if (q.dose) k.dose = q.dose; if (q.over) k.over = q.over; if (q.rateText) k.rate = q.rateText; }
   const nm = (o.heard || "").replace(/[^a-z0-9 .\-]/gi, "").slice(0, 40); if (nm && (o.id.startsWith("abx:") || o.id.startsWith("drug:"))) k.say = nm;

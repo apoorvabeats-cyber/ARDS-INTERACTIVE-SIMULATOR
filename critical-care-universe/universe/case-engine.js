@@ -4,7 +4,7 @@
    Pp(kind, ...)  says whether an order is one the room understands.
    Everything is deterministic: the same orders at the same times always give the same patient. */
 import { BY_ID, canon, labelOf, LABS, NORMAL, PANELS, BUNDLE } from "./order-catalogue.js";
-import { CASES, CASE_BY_ID } from "./case-pool.js";
+import { CASES, CASE_BY_ID, END } from "./case-pool.js";
 
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const mdtHour = (ms) => `Hour ${Math.floor(ms / 15000)}`;
@@ -122,8 +122,8 @@ export function Np(sc, actions, ms) {
   const last = {};                 // last time, for the repeat rule
   const kicks = [];                // short-lived improvements or worsenings: {at, dv, tau}
   const results = [], log = [{ t: "Hour 0", text: c.story }];
-  const done = {}, announced = {}; let alive = true, arrestAt = null, rosc = 0, diedAt = null, heldAt = null, harmTotal = 0, ai = 0, stableMs = 0, stableNoted = false;
-  const harmLog = [], needHit = {};
+  const done = {}, announced = {}; let alive = true, arrestAt = null, rosc = 0, diedAt = null, heldAt = null, harmTotal = 0, ai = 0, stableNoted = false;
+  const harmLog = [], needHit = {}, covered = {};
   const who = (a) => `${specName(a.specialty)} · ${a.name}`;
   const T = (ms2) => mdtHour(ms2);
 
@@ -177,6 +177,7 @@ export function Np(sc, actions, ms) {
     const t = a.atMs, raw = a.kind, who_ = who(a);
     if (raw === "enter") { log.push({ t: T(t), text: `${who_} entered the bedspace.` }); return; }
     if (raw === "advice") { const x = String((a.payload && a.payload.text) || "").slice(0, 240); if (x) log.push({ t: T(t), text: `${who_}: ${x}` }); return; }
+    if (raw === "cover") { const sp = (a.payload && a.payload.specialty) || ""; covered[sp] = a.userId; log.push({ t: T(t), text: `${who_} continues the ${specName(sp)} part of the case.` }); return; }
     if (raw === "call") {
       const sp = (a.payload && a.payload.specialty) || "", relevant = [...c.must, ...c.fit].includes(sp) || (sc.team || []).includes(sp);
       if (relevant) log.push({ t: T(t), text: `${who_} called ${specName(sp)}.` }); else { st.s = clamp(st.s + 0.03, 0, 1); log.push({ t: T(t), text: `${who_} called ${specName(sp)}. That is not the problem in front of them. A little time was lost.` }); }
@@ -296,15 +297,13 @@ export function Np(sc, actions, ms) {
       if (hasCpr && hasAdr && okShock) { rosc += 1; arrestAt = null; st.s = 0.6; kicks.push({ at: t, dv: { sbp: 10, spo2: 4 }, tau: 60000 }); log.push({ t: T(t), text: "Return of circulation. The cause is still in the room." }); }
       else if (t > arrestAt + 60000) { alive = false; diedAt = t; log.push({ t: T(t), text: "The patient has died. The team did not get the circulation back." }); }
     }
-    const wDone = c.needs.reduce((a, nd) => a + (done[nd.id] != null ? nd.w : 0), 0), wAll = c.needs.reduce((a, nd) => a + nd.w, 0), bigMiss = c.needs.some((nd) => done[nd.id] == null && nd.w >= 2);
-    /* the case ends when the patient has settled. Strict: every step that mattered is done. Otherwise: the patient has been stable for a
-       while (vitals near the best, recovery well under way), most of the weight of the care is done, and nothing urgent is overdue. */
-    const overdueBig = c.needs.some((nd) => done[nd.id] == null && nd.w >= 2 && t >= nd.due * 1000);
-    stableMs = alive && arrestAt == null && st.s <= 0.15 && st.h >= 0.55 ? stableMs + 1000 : 0;
-    if (stableMs >= 30000 && !stableNoted) { stableNoted = true; log.push({ t: T(t), text: "The patient is stabilising. The vitals are settling and the results are improving." }); }
-    const strict = wDone >= 0.85 * wAll && !bigMiss && st.s <= 0.12 && st.h >= 0.8 && t >= 150000;
-    const settled = stableMs >= 90000 && wDone >= 0.6 * wAll && !overdueBig && t >= 150000;
-    if (alive && arrestAt == null && (strict || settled)) { heldAt = t; log.push({ t: T(t), text: "The patient has stabilised and survives. The diagnosis was " + c.dx + "." }); }
+    const wDone = c.needs.reduce((a, nd) => a + (done[nd.id] != null ? nd.w : 0), 0), wAll = c.needs.reduce((a, nd) => a + nd.w, 0);
+    /* The case ends when the care is complete, by percentage and not by time: the share of the weighted care that is done has to reach this
+       disease's own mark (85 to 90%), every step that decides this disease has to be done, and the patient has to be settling. */
+    const E0 = END[c.id] || { pct: 0.85, must: [] }, pctDone = wAll ? wDone / wAll : 1, mustDone = E0.must.every((id) => done[id] != null);
+    if (arrestAt == null && st.s >= 0.2) stableNoted = false;
+    if (alive && arrestAt == null && !stableNoted && st.s <= 0.12 && st.h >= 0.5) { stableNoted = true; log.push({ t: T(t), text: "The patient is settling. The vitals are coming back." }); }
+    if (alive && arrestAt == null && pctDone >= E0.pct - 1e-9 && mustDone && st.s <= 0.12 && st.h >= 0.85 * pctDone) { heldAt = t; log.push({ t: T(t), text: "The patient has stabilised and survives. " + E0.win }); }
     prevT = t;
   }
   while (ai < acts.length && alive && heldAt == null && acts[ai].atMs <= r) { apply(acts[ai]); ai += 1; }
@@ -313,7 +312,10 @@ export function Np(sc, actions, ms) {
   const problems = (sc.problems || []).map((p) => {
     const all = p.needs.length ? p.needs.every((id) => done[id] != null) : needsDone() === c.needs.length;
     const called = acts.some((a) => a.kind === "call" && a.payload && a.payload.specialty === p.specialty && a.atMs <= r);
-    return { ...p, open: p.opensAtMs <= r, resolved: all || heldAt != null, called, closed: heldAt != null && !all };
+    /* a specialist who is seated but has done nothing for two minutes: any doctor can carry the part on (kind "cover") */
+    const mine = acts.filter((a) => a.specialty === p.specialty && a.kind !== "enter" && a.atMs <= r), lastAct = mine.length ? mine[mine.length - 1].atMs : 0;
+    const isCovered = !!covered[p.specialty], idle = !all && heldAt == null && !isCovered && p.specialty !== "intensivist" && r - lastAct > 120000 && r > 120000;
+    return { ...p, open: p.opensAtMs <= r, resolved: all || heldAt != null, called, closed: heldAt != null && !all, idle, covered: isCovered, quietMs: Math.max(0, r - lastAct) };
   });
 
   const tEnd = heldAt != null ? heldAt : alive ? r : diedAt;
@@ -323,14 +325,14 @@ export function Np(sc, actions, ms) {
   const shown = results.filter((x) => heldAt != null || x.readyAtMs <= r).sort((a, b) => a.readyAtMs - b.readyAtMs);
   const pending = heldAt != null ? [] : results.filter((x) => x.readyAtMs > r).map((x) => ({ id: x.id, label: x.label, readyAtMs: x.readyAtMs }));
   let outcome = "", outcomeLine = "";
-  if (!alive) { outcome = "died"; outcomeLine = "The patient died. What was not done is listed below."; } else if (heldAt == null && r >= SHIFT_MS && !arrested) { outcome = "handover"; outcomeLine = "The shift is over and the patient is not yet stable. Hand over to the next team. What was not done is listed below."; } else if (heldAt != null) { outcome = "held"; outcomeLine = "Congratulations. The patient survives. The vitals have settled and the results are improving. The diagnosis was " + c.dx + "."; }
+  if (!alive) { outcome = "died"; outcomeLine = "The patient died. In " + c.dx.toLowerCase() + ", what decided the outcome was: " + ((END[c.id] || { must: [] }).must.map((id) => (c.needs.find((x) => x.id === id) || {}).label).filter(Boolean).join("; ").toLowerCase() || "the first steps of care") + ". What was not done is listed below."; } else if (heldAt == null && r >= SHIFT_MS && !arrested) { outcome = "handover"; outcomeLine = "The shift is over and the patient is not yet stable. Hand over to the next team. What was not done is listed below."; } else if (heldAt != null) { outcome = "held"; outcomeLine = "Congratulations. The patient survives. " + ((END[c.id] || {}).win || "The vitals have settled and the results are improving.") + " The diagnosis was " + c.dx + "."; }
 
   // scoring, out of 100: assessment 15, differential 20, investigations 15, treatment 25, collaboration 15, timeliness 10
   const dxNeeds = c.needs.filter((nd) => /^(ecg|echo|dx|fast|ct|img|gas|labs|cbc|kft|enz|coag|lac|cx|sugar|usg|mp|cta|viral)$/.test(nd.id)), dxDone = dxNeeds.filter((nd) => done[nd.id] != null).length;
   const rxNeeds = c.needs.filter((nd) => !dxNeeds.includes(nd)), rxW = rxNeeds.reduce((a, x) => a + x.w, 0), rxDone = rxNeeds.reduce((a, x) => a + (done[x.id] != null ? x.w : 0), 0);
   const firstExam = first.examine != null ? first.examine : null, labsGot = Object.keys(first).filter((i) => /^(lab|img):/.test(i)).length;
   const irrelevant = Object.keys(first).filter((i) => /^(lab|img):/.test(i) && !c.needs.some((nd) => (nd.any || []).includes(i))).length;
-  const docs = new Set(acts.filter((a) => a.atMs <= r).map((a) => a.userId)), teamN = Math.max(1, (sc.team || []).length);
+  const docs = new Set(acts.filter((a) => a.atMs <= r).map((a) => a.userId)), teamN = Math.max(1, (sc.team || []).filter((sp) => !covered[sp]).length);
   const inTime = c.needs.filter((nd) => done[nd.id] != null && done[nd.id] <= nd.due * 1000 * 1.25).length;
   const score = {
     assessment: Math.round(15 * ((firstExam != null && firstExam < 120000 ? 0.6 : firstExam != null ? 0.3 : 0) + (first["lab:abg"] != null || first["lab:lactate"] != null || first["img:ecg"] != null ? 0.4 : 0))),
@@ -342,6 +344,11 @@ export function Np(sc, actions, ms) {
   };
   score.total = score.assessment + score.differential + score.investigations + score.treatment + score.collaboration + score.timeliness;
 
+  /* what is left behind, for the hint: the most urgent first (overdue and decisive before the rest) */
+  const E1 = END[c.id] || { pct: 0.85, must: [] }, wAll2 = c.needs.reduce((a, nd) => a + nd.w, 0), wDone2 = c.needs.reduce((a, nd) => a + (done[nd.id] != null ? nd.w : 0), 0);
+  const left = c.needs.filter((nd) => done[nd.id] == null).map((nd) => ({ id: nd.id, label: nd.label, owner: nd.owner, dueMs: nd.due * 1000, w: nd.w, overdue: tEnd >= nd.due * 1000, must: E1.must.includes(nd.id), covered: !!covered[nd.owner] }))
+    .sort((a, b) => (b.overdue - a.overdue) || (b.must - a.must) || (b.w - a.w) || (a.dueMs - b.dueMs));
+  const pctDoneOut = wAll2 ? Math.round((100 * wDone2) / wAll2) : 100;
   const given = {}; ord.forEach((o) => { given[o.id] = (given[o.id] || 0) + 1; });
   return {
     hour: Math.floor(r / 15000), elapsedMs: r,
@@ -352,6 +359,7 @@ export function Np(sc, actions, ms) {
     tube: st.tube, oxygen: st.oxygen, norepi: st.norepi, artLine: st.artLine, hdLine: st.hdLine, dialysis: st.dialysis, dialysisWaiting: st.dialysisWaiting, bronch: st.bronch,
     arrestAtMs: arrestAt, problems, results: shown, pending, log, missed, score, given, fluidMl: fluidTotal(),
     needs: c.needs.map((nd) => ({ id: nd.id, label: nd.label, owner: nd.owner, dueMs: nd.due * 1000, w: nd.w, doneAtMs: done[nd.id] == null ? null : done[nd.id] })),
+    left, pctDone: pctDoneOut, pctNeeded: Math.round(E1.pct * 100), mustLeft: left.filter((x) => x.must).length, covered: { ...covered },
     deterioration: Math.round(st.s * 100) / 100, recovery: Math.round(st.h * 100) / 100,
   };
 }
@@ -359,7 +367,7 @@ export function Np(sc, actions, ms) {
 /* may this order be given? every doctor who is seated can order anything the room knows */
 export function Pp(kind) {
   const k = String(kind || "");
-  return k === "advice" || k === "call" || k === "enter" || k === "bundle" || k === "labs" || k === "flood" || k === "lay-flat" || !!BY_ID[canon(k)];
+  return k === "advice" || k === "call" || k === "cover" || k === "enter" || k === "bundle" || k === "labs" || k === "flood" || k === "lay-flat" || !!BY_ID[canon(k)];
 }
 /* what an order carries beside its id: the volume, the dose, the drug name as the doctor said it. Nothing is assumed
    when it is missing. Used by the room and by the engine, so both read an order the same way. */

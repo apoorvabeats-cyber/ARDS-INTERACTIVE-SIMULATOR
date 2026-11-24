@@ -3,9 +3,10 @@
                      and an arrow that sends them to the room.
      createHud():    the LCD that wakes up when something changes: vitals that go wrong on the left, abnormal results on the right,
                      normal results along the top, each with its own alarm. */
-import { parseOrders, toKind } from "./voice-orders.js?v=20261122g";
-import { understand } from "./voice-brain.js?v=20261122g";
-import { BY_ID } from "./order-catalogue.js?v=20261122g";
+import { parseOrders, toKind } from "./voice-orders.js?v=20261124g";
+import { understand } from "./voice-brain.js?v=20261124g";
+import { isHigh } from "./voice-intent.js?v=20261124g";
+import { BY_ID } from "./order-catalogue.js?v=20261124g";
 
 const css = `
 #vc{position:fixed;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));width:min(760px,calc(100vw - 20px));display:grid;gap:7px;padding:10px 12px;border-radius:18px;background:linear-gradient(180deg,rgba(7,26,42,.93),rgba(3,14,24,.95));border:1px solid rgba(95,227,255,.38);box-shadow:0 0 28px rgba(95,227,255,.16),0 14px 40px rgba(0,0,0,.5);backdrop-filter:blur(10px);color:#dff6ff;font:13px/1.35 ui-sans-serif,system-ui,sans-serif}
@@ -82,6 +83,8 @@ const css = `
 #vans .an .acts button{border:1px solid var(--a);background:rgba(95,227,255,.1);border-radius:999px;padding:3px 11px;font-size:12px;font-weight:650}
 #vans .an .acts button:hover{background:rgba(95,227,255,.25)}
 #vchips .ch.q{border-color:rgba(95,227,255,.6);background:rgba(18,70,96,.5)}
+#vchips .ch.hi{border-color:rgba(255,120,110,.85);background:rgba(110,24,24,.45)}
+#vans .acts button.sure{background:rgba(190,40,40,.9);border-color:#ff8a80;color:#fff}
 #vchips .ch.sg{border-color:rgba(160,190,255,.55);background:rgba(40,52,110,.45);padding:4px 10px;cursor:pointer}
 #vchips .ch.sg:hover{background:rgba(70,90,170,.55)}
 #vchips .lead{font-size:12px;color:#9fc3d4}
@@ -100,7 +103,7 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
   document.body.appendChild(root);
   const $ = (s) => root.querySelector(s), mic = $("#mic"), stopB = $("#vstop"), text = $("#vtext"), ans = $("#vans"), spk = $("#vspk"), chips = $("#vchips"), meta = $("#vmeta"), sendB = $("#vsend");
   const SR = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
-  let rec = null, wantOn = false, listening = false, locked = false, pressAt = 0, finalText = "", parsed = understand("", null), speak = true, removed = new Set(), choice = {}, volume = {}, extra = [], busyMsg = "";
+  let committing = false, confirmSig = "", rec = null, wantOn = false, listening = false, locked = false, pressAt = 0, finalText = "", parsed = understand("", null), speak = true, removed = new Set(), choice = {}, volume = {}, extra = [], busyMsg = "";
   const VOLS = [250, 500, 1000, 2000], vtext = (v) => (v >= 1000 ? v / 1000 + " L" : v + " mL"), needsVolume = (o) => o.id === "drug:fluids" && !(o.qty && (o.qty.ml != null || o.qty.rateMl != null)) && !volume[o.id];
 
   /* ---- what was heard, and what it means */
@@ -110,11 +113,12 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
     chips.innerHTML = orders.map((o, i) => {
       if (o.choose) { const sel = choice[o.id] || ""; return `<span class="ch fz" data-i="${i}">${esc(o.chooseWhy || "Choose")} <select data-i="${i}"><option value=""${sel ? "" : " selected"}>Choose…</option>${o.choose.map((c) => `<option value="${esc(c.id)}"${c.id === sel ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select><button type="button" data-rm="${esc(o.id)}" aria-label="Remove">×</button></span>`; }
       if (needsVolume(o)) return `<span class="ch fz" data-i="${i}">How much ${esc(o.label)}? <select data-vol="${esc(o.id)}"><option value=""${volume[o.id] ? "" : " selected"}>Choose…</option>${VOLS.map((v) => `<option value="${v}"${+volume[o.id] === v ? " selected" : ""}>${v >= 1000 ? v / 1000 + " L" : v + " mL"}</option>`).join("")}</select><button type="button" data-rm="${esc(o.id)}" aria-label="Remove">×</button></span>`;
-      return `<span class="ch${o.fuzzy ? " fz" : ""}" title="heard: ${esc(o.heard || "")}">${esc(o.label)}${o.qtyText || (volume[o.id] ? vtext(volume[o.id]) : "") ? " <b>" + esc(o.qtyText || vtext(volume[o.id])) + "</b>" : ""}${o.fuzzy ? " <small>?</small>" : ""}<button type="button" data-rm="${esc(o.id)}" aria-label="Remove ${esc(o.label)}">×</button></span>`;
+      return `<span class="ch${o.fuzzy ? " fz" : ""}${isHigh(o.id) ? " hi" : ""}" title="heard: ${esc(o.heard || "")}${isHigh(o.id) ? " · high risk: asks to be confirmed" : ""}">${isHigh(o.id) ? "⚠ " : ""}${esc(o.label)}${o.qtyText || (volume[o.id] ? vtext(volume[o.id]) : "") ? " <b>" + esc(o.qtyText || vtext(volume[o.id])) + "</b>" : ""}${o.fuzzy ? " <small>?</small>" : ""}<button type="button" data-rm="${esc(o.id)}" aria-label="Remove ${esc(o.label)}">×</button></span>`;
     }).join("") + parsed.answers.filter((a) => a.id !== "noted").map((a) => `<span class="ch q" title="I will answer this when you press send">Asking: ${esc(a.title)}</span>`).join("") + parsed.clarify.map((c) => `<span class="ch cl">${esc(c.prompt)} ${c.options.map((o) => `<button type="button" class="opt" data-add="${esc(o.id)}">${esc(o.label.replace(/^CT /, ""))}</button>`).join("")}</span>`).join("");
     const bits = [];
     if (parsed.suggest.length && !orders.length && !parsed.answers.length) chips.innerHTML += `<span class="lead">Did you mean</span>` + parsed.suggest.map((x, i) => `<span class="ch sg" data-sg="${i}">${esc(x.label)}</span>`).join("");
     if (parsed.unknown.length && (orders.length || parsed.answers.length)) bits.push(`Also heard: <b>${esc(parsed.unknown.join(" ").slice(0, 80))}</b>`);
+    if (parsed.held && parsed.held.length) bits.push(`Not an order: ${esc([...new Set(parsed.held.map((h) => ({ question: "a question", consider: "a thought", recommend: "a recommendation", hypo: "a what-if", prepare: "preparation", negative: "a negative opinion", prohibit: "a prohibition", reverse: "a reversal", reason: "reasoning" })[h.mode] || h.mode))].join(", "))}`);
     if (parsed.negated.length) bits.push(`Left out as you said no: ${esc(parsed.negated.join(", "))}`);
     if (!SR) bits.push("This browser has no speech recognition. Type the order and press ➤.");
     if (busyMsg) bits.push(esc(busyMsg));
@@ -122,7 +126,7 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
     sendB.disabled = !text.value.trim();
     return orders;
   }
-  const getCtx = () => { try { return ctx ? ctx() : null; } catch (e) { return null; } };
+  const getCtx = () => { try { const c = ctx ? ctx() : null; return c ? Object.assign({}, c, { commit: committing }) : null; } catch (e) { return null; } };
   function current() {
     const base = parsed.orders.filter((o) => !removed.has(o.id) && !(o.choose && choice[o.id] && removed.has(choice[o.id])));
     const add = extra.filter((x) => !base.some((b) => b.id === x.id) && !removed.has(x.id));
@@ -179,14 +183,15 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
       n.querySelector(".x").onclick = () => dismiss(n);
       n.addEventListener("click", (e) => {
         const b = e.target.closest("button"); if (!b) return;
-        if (b.dataset.act != null) { const x = a.actions[+b.dataset.act]; if (x && x.order) { post("hall-orders", { orders: [toKind({ id: x.order, qty: x.ml ? { ml: x.ml } : null, heard: x.heard })] }); sfx && sfx.beep && sfx.beep({ f: 988, vol: 0.14 }); b.disabled = true; b.textContent = "Sent ✓"; } }
+        if (b.dataset.act != null) { const x = a.actions[+b.dataset.act]; if (x && x.confirm && !b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Tap again to confirm"; b.classList.add("sure"); setTimeout(() => { if (b.isConnected && !b.disabled) { delete b.dataset.sure; b.textContent = x.label; b.classList.remove("sure"); } }, 5000); return; } if (x && x.order) { post("hall-orders", { orders: [toKind({ id: x.order, specialty: x.specialty, qty: x.ml ? { ml: x.ml } : null, heard: x.heard })] }); sfx && sfx.beep && sfx.beep({ f: 988, vol: 0.14 }); b.disabled = true; b.textContent = "Sent ✓"; } }
         else if (b.dataset.open) { open && open(a.section); }
         else if (b.dataset.sg != null) { const x = sug[+b.dataset.sg]; if (x) { if (x.kind === "order" && x.id && BY_ID[x.id]) { post("hall-orders", { orders: [toKind({ id: x.id })] }); b.disabled = true; b.textContent = "Sent ✓"; } else { dismiss(n); text.value = x.label; send(); } } }
       });
-      ans.prepend(n); while (ans.children.length > 4) ans.lastChild.remove();
+      ans.prepend(n); while (ans.children.length > 8) ans.lastChild.remove();
       setTimeout(() => dismiss(n), a.tone === "crit" ? 45000 : 28000);
     });
     ans.scrollTop = 0;
+    const ao = list.find((a) => a.autoOpen && a.section); if (ao && open) { try { open(ao.section); } catch (e) {} }
   }
   spk.addEventListener("click", () => { speak = !speak; spk.dataset.on = speak ? "1" : "0"; try { localStorage.setItem("ccu-voice-speak", speak ? "1" : "0"); } catch (e) {} if (!speak) { try { speechSynthesis.cancel(); } catch (e) {} } });
   try { if (localStorage.getItem("ccu-voice-speak") === "0") { speak = false; spk.dataset.on = "0"; } } catch (e) {}
@@ -195,11 +200,15 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
   /* ---- sending */
   function send() {
     if (!text.value.trim()) return;
-    const busy = root.dataset.busy === "1", orders = refresh(), b = parsed;
+    committing = true; let orders, b; try { orders = refresh(); b = parsed; } finally { committing = false; }
+    const busy = root.dataset.busy === "1";
     if (listening) stop();
     if (orders.length && busy) { busyMsg = "The room is busy. Press ➤ again in a moment to send the orders."; refresh(); return; }
     const open = orders.filter((o) => (o.choose && !choice[o.id]) || needsVolume(o));
     if (open.length) { busyMsg = open.map((o) => (o.choose ? (o.chooseWhy || "Which one?") : "How much " + o.label + "?")).join(" ") + " Pick it above, or say it, then press ➤ again."; refresh(); return; }
+    const hi = orders.filter((o) => isHigh(o.choose && choice[o.id] ? choice[o.id] : o.id)), sig = orders.map((o) => o.id).join(",");
+    if (hi.length && confirmSig !== sig) { confirmSig = sig; busyMsg = "High risk: " + hi.map((o) => o.label).join(", ") + ". Press ➤ again to confirm."; refresh(); return; }
+    confirmSig = "";
     if (orders.length) {
       const list = orders.map((o) => { const id = o.choose && choice[o.id] ? choice[o.id] : o.id; const q = o.qty || {}; return toKind({ id, specialty: o.specialty, heard: o.choose ? BY_ID[id].label : o.heard, qty: volume[o.id] ? { ...q, ml: volume[o.id] } : q }); });
       post("hall-orders", { orders: list });

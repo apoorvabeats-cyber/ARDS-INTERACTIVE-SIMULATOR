@@ -6,9 +6,10 @@
      suggest  : the nearest sensible meanings, when the line fits neither, so there is never a dead end.
    It is a local reader: no network, no model. It knows the patient's numbers (ctx.P), the results that have come back, what has
    been given, and the trend (ctx.hist). It mends the usual speech-recognition slips ("initiate the patient" for "intubate the patient"). */
-import { parseOrders } from "./voice-orders.js?v=20261122g";
-import { BY_ID, CATALOGUE, LABS, PANELS } from "./order-catalogue.js?v=20261122g";
-import * as CB from "./clinical-brain.js?v=20261122g";
+import { parseOrders } from "./voice-orders.js?v=20261124g";
+import { BY_ID, CATALOGUE, LABS, PANELS } from "./order-catalogue.js?v=20261124g";
+import * as CB from "./clinical-brain.js?v=20261124g";
+import { intent, hinglish, tier } from "./voice-intent.js?v=20261124g";
 
 /* ---------------------------------------------------------------- 1. mending the speech */
 const REPAIRS = [
@@ -219,7 +220,9 @@ function splitClauses(t) {
 
 /* find the answers in one clause; returns { cards, rest } where rest is what is left over for the order parser */
 let HB = null;
-const helpers = () => HB || (HB = { card, latestItem, latestResult, given, lvl, VT, words: wordsOf, summaryCard, trendCard, CONDITIONS, LAB_CONDITIONS, BY_ID, parseOrders, repair });
+/* the whole sentence is one glossary term or spoken form ("wait and watch", "no significant events") */
+function lexHit(t) { try { const w = String(t).trim().split(/\s+/).length; return CB.find(HB || helpers(), repair(t)).some((h) => h.key.split(" ").length >= Math.max(2, w - 1)); } catch (e) { return false; } }
+const helpers = () => HB || (HB = { card, latestItem, latestResult, given, lvl, VT, words: wordsOf, summaryCard, trendCard, CONDITIONS, LAB_CONDITIONS, BY_ID, parseOrders, repair, readClause, lexHit });
 function readClause(c, ctx) {
   const P = ctx.P;
   { const pre = CB.pre(helpers(), c, P, ctx); if (pre && pre.length) return { cards: pre, rest: "", hit: true }; }
@@ -237,9 +240,13 @@ function readClause(c, ctx) {
   else if (/\b(?:what is new|any new|anything new|new results|latest results|what is back|results back|what came back|any results|any result)\b/.test(c)) take(whatsNewCard(P));
   else if (/\b(?:what (?:have we|has been|all have we|did we)|so far|what is done|what we have done|summary of (?:care|orders)|orders so far)\b/.test(c) && /\b(?:done|given|ordered|started|sent|so far|have we)\b/.test(c)) take(doneCard(P));
   else if (/\b(?:how long|what time|how much time|elapsed|time since|how many minutes|clock)\b/.test(c)) take(card("time", `${Math.floor((P.elapsedMs || 0) / 60000)} min ${Math.floor(((P.elapsedMs || 0) % 60000) / 1000)} s`, ["Since the shift began."], { tone: "info", spoken: `${Math.floor((P.elapsedMs || 0) / 60000)} minutes.` }));
-  else if (/\b(?:what next|what now|what should we|what do we do|what else|any suggestion|suggest|advice|hint|stuck|next step|missing|left to do|forgot\w*|overlook\w*)\b/.test(c)) {
+  else if (/\b(?:what next|what now|what should we|what do we do|what else|any suggestion|suggest|advice|hint|stuck|next step|missing|left to do|left behind|forgot\w*|overlook\w*|what.s left|what is left|what are we missing|what am i missing)\b/.test(c)) {
+    const eng = engineHint(P, ctx);
+    if (eng) take(eng);
+    else {
     const need = [["examine", "Examine the patient"], ["lab:abg", "Blood gas"], ["lab:lactate", "Lactate"], ["lab:cbc", "CBC"], ["lab:kft", "Kidney function"], ["img:ecg", "ECG"], ["img:cxr", "Chest X-ray"], ["lab:cultures", "Cultures"]].filter(([id]) => !given(P, id));
     take(card("next", need.length ? "Not yet looked at" : "The usual first steps are done", need.length ? need.slice(0, 5).map(([, l]) => l) : ["Now treat what the results show, and call the specialists the case needs."], { tone: "info", spoken: need.length ? "Not yet done: " + need.slice(0, 4).map(([, l]) => l).join(", ") + "." : "The usual first steps are done.", actions: need.slice(0, 3).map(([id, l]) => ({ label: l, order: id })), note: "This is a blind case, so the engine will not name the diagnosis." }));
+    }
   }
   else if (/\b(?:what can i say|help|commands|what can you do|how do i)\b/.test(c)) take(card("help", "You can say", ["Orders: do CBC, KFT, LFT · get an echo · start meropenem · intubate the patient · call the nephrologist", "Questions: what is the BP · is he hypotensive · urine output · what is the lactate · what is pending", "Reviews: show me the ultrasound again · what did the chest X-ray show"], { tone: "info", spoken: "Say an order, or ask a question about the patient." }));
   // 3. is he on / has he got / did we give
@@ -290,11 +297,37 @@ function readClause(c, ctx) {
 }
 
 /* ---------------------------------------------------------------- 6. the whole line */
+/* what is left behind, from the case engine (P.left): the first ask is a nudge, the next asks name the steps */
+const OWNER = { intensivist: "the intensivist", pulmonologist: "the pulmonologist", cardiologist: "the cardiologist", nephrologist: "the nephrologist", neurologist: "the neurologist", surgeon: "the surgeon", infectious: "the infectious disease doctor", gastroenterologist: "the gastroenterologist" };
+function engineHint(P, ctx) {
+  if (!P || !Array.isArray(P.left)) return null;
+  if (P.outcome) { tier("hint", ctx, true); return card("next", P.outcome === "held" ? "Nothing is left" : "The case has ended", [P.outcome === "held" ? "The patient has survived. Well done." : "Open the diagnosis tab to see what was missed."], { tone: P.outcome === "held" ? "ok" : "info", spoken: P.outcome === "held" ? "Nothing is left. The patient survives." : "The case has ended." }); }
+  const hintN = tier("hint", ctx);
+  const L = P.left, done = P.pctDone == null ? 0 : P.pctDone, need = P.pctNeeded || 85, urgent = L.filter((x) => x.overdue || x.must);
+  const top = (urgent.length ? urgent : L).slice(0, 4), lines = [`${done}% of the care is done. The case ends as the patient settles at ${need}% or more${P.mustLeft ? ", with the decisive steps in" : ""}.`];
+  const spoken = [`${done} percent done, ${need} needed.`];
+  if (!L.length) { lines.push("Every step is done. Give the patient a little time to settle."); spoken.push("Everything is done. Let him settle."); }
+  else if (hintN === 1) {
+    const who = [...new Set(top.map((x) => x.owner))].slice(0, 3).map((o) => OWNER[o] || o);
+    lines.push(`${L.length} step${L.length > 1 ? "s" : ""} still open${urgent.length ? ", " + urgent.length + " urgent" : ""}. Look at what ${who.join(", ")} should be doing. Ask again for the steps.`);
+    spoken.push(`${L.length} steps are still open. Think about ${who[0] || "the team"}. Ask again and I will name them.`);
+  } else {
+    top.forEach((x) => lines.push(`${x.label}${x.overdue ? " (overdue)" : ""}${x.must ? " (decisive)" : ""} — ${OWNER[x.owner] || x.owner}`));
+    spoken.push("Missing: " + top.map((x) => x.label).join(", ") + ".");
+  }
+  const idle = (P.problems || []).filter((q) => q.idle && !q.covered && q.specialty);
+  if (idle.length) { lines.push(`${(idle.map((q) => OWNER[q.specialty] || q.specialty).join(" and ")).replace(/^t/, "T")} has been quiet. Any doctor can continue that part.`); }
+  return card("next", L.length ? "What is left" : "All done", lines, { tone: "info", spoken: spoken.join(" "), actions: idle.slice(0, 2).map((q) => ({ label: "Continue the " + (q.specialty || "") + " part", order: "cover", specialty: q.specialty })) });
+}
+
 export function understand(text, ctx) {
   ctx = ctx || {}; const P = ctx.P || null, raw = String(text || "").trim();
   const out = { text: raw, orders: [], answers: [], unknown: [], negated: [], clarify: [], suggest: [], heard: "" };
   if (!raw) return out;
-  const fixed = repair(raw); out.heard = fixed;
+  /* layer 3: the meaning of each sentence. A question, a thought, a negative opinion or a what-if is answered and held; only an order goes on. */
+  const I = intent(helpers(), hinglish(raw), ctx); out.held = I.held;
+  I.cards.forEach((x) => { if (!out.answers.some((a) => a.id === x.id)) out.answers.push(x); }); out.negated.push(...I.negated);
+  const fixed = repair(I.pass); out.heard = repair(hinglish(raw));
   const clauses = splitClauses(fixed), rest = []; let noted = false;
   for (const c of clauses) {
     if (!P) { rest.push(c); continue; }
@@ -303,7 +336,7 @@ export function understand(text, ctx) {
   }
   const parsed = parseOrders(rest.join(" | ").replace(/\b(?:repeat|redo|re do|recheck|re check|again|once more|another|fresh|new)\b/g, " "));
   const known = CB.knownWords(helpers(), fixed);
-  out.orders = parsed.orders.filter((o) => o.id !== "shock" || CB.DEFIB.test(rest.join(" ") || fixed)); out.unknown = parsed.unknown.filter((w) => !known.has(String(w).toLowerCase())); out.negated = parsed.negated; out.clarify = parsed.clarify;
+  out.orders = I.orders.concat(parsed.orders.filter((o) => (o.id !== "shock" || CB.DEFIB.test(rest.join(" ") || fixed)) && !(o.id === "call" && I.orders.some((x) => x.id === "call" && x.specialty === o.specialty)))); out.unknown = parsed.unknown.filter((w) => !known.has(String(w).toLowerCase())); out.negated = out.negated.concat(parsed.negated); out.clarify = parsed.clarify;
   // "show me the ultrasound again": a redo word turns a review into an order
   if (!out.orders.length && !out.answers.length && noted) out.answers.push(card("noted", "Noted", [raw], { tone: "info", spoken: "" }));
   else if (!out.orders.length && !out.answers.length) out.suggest = suggestFor(fixed);

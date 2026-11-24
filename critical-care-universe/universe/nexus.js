@@ -6,17 +6,17 @@
    Movement is the ICU's finger drag: swipe up to walk, drag sideways to look. Tap your own screen to work at it. */
 import * as T from "./three.module.js";
 import { GLTFLoader } from "./vendor/GLTFLoader.js";
-import { createDevices } from "./icu-devices.js?v=20261124b";
-import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261124b";
-import { loadLook, sanitize as cleanLook } from "./doctor-look.js?v=20261124b";
-import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261124b";
-import { createSfx } from "./sfx.js?v=20261124b";
-import { CSS3DRenderer, CSS3DObject } from "./vendor/CSS3DRenderer.js?v=20261124b";
-import { buildChamber, CH } from "./mdt-chamber.js?v=20261124b";
-import { paintAvail, paintPresent, paintDiscuss, paintConsole, paintPlacard, TAB_LABEL, TAB_ORDER, patientNo } from "./mdt-screens.js?v=20261124b";
-import { paintMachine } from "./nexus-machines.js?v=20261124b";
-import { createOrders, createHud } from "./nexus-orders.js?v=20261124b";
-import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261124b";
+import { createDevices } from "./icu-devices.js?v=20261124g";
+import { loadDoctorBody, createDoctor, specInfo, nameTag, SPEC } from "./doctor-avatar.js?v=20261124g";
+import { loadLook, sanitize as cleanLook } from "./doctor-look.js?v=20261124g";
+import { createHallNet, localSignal, ntfySignal } from "./hall-net.js?v=20261124g";
+import { createSfx } from "./sfx.js?v=20261124g";
+import { CSS3DRenderer, CSS3DObject } from "./vendor/CSS3DRenderer.js?v=20261124g";
+import { buildChamber, CH } from "./mdt-chamber.js?v=20261124g";
+import { paintAvail, paintPresent, paintDiscuss, paintConsole, paintPlacard, TAB_LABEL, TAB_ORDER, patientNo } from "./mdt-screens.js?v=20261124g";
+import { paintMachine } from "./nexus-machines.js?v=20261124g";
+import { createOrders, createHud } from "./nexus-orders.js?v=20261124g";
+import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261124g";
 
 const $ = (s) => document.querySelector(s);
 const Q = new URLSearchParams(location.search), DEMO = Q.has("demo");
@@ -290,7 +290,7 @@ const ray = new T.Raycaster(), ndc = new T.Vector2();
 const sfx = createSfx();
 const hud = createHud({ sfx, esc, open: (id) => { try { enterScreen(id, 0); } catch (e) {} } });
 const ASK = { fluid: "How much fluid, and which? Say or type it, for example: give 2 litres of normal saline.", antibiotics: "Which antibiotic, and what dose? Say or type it, for example: start piperacillin-tazobactam 4.5 g.", flood: "How much fluid? Say or type the volume, for example: give 1 litre of Ringer's lactate." };
-const voice = createOrders({ post, sfx, esc, ctx: () => ({ P, hist, story: SC ? { title: SC.age + "-year-old " + (SC.sex === "woman" ? "woman" : "man"), text: SC.story || "" } : null }), open: (id) => { try { enterScreen(id, 0); } catch (e) {} } });
+const voice = createOrders({ post, sfx, esc, ctx: () => ({ P, hist, team: (mdt && mdt.room && mdt.room.members) || [], story: SC ? { title: SC.age + "-year-old " + (SC.sex === "woman" ? "woman" : "man"), text: SC.story || "" } : null }), open: (id) => { try { enterScreen(id, 0); } catch (e) {} } });
 const setRay = (cx, cy) => { ndc.set(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam); };
 function pointHitsPatient(cx, cy) { setRay(cx, cy); const h = ray.intersectObject(hitCyl, false)[0]; return h ? h.distance : null; }
 cv.addEventListener("pointerdown", (e) => {
@@ -591,7 +591,7 @@ function goAuditorium() {
     sessionStorage.setItem("ccu-pose", JSON.stringify({ to: "aud", x: AUD_X - me.z, z: ZC + me.x, yaw: me.yaw + Math.PI / 2, t: Date.now() }));
   } catch (e) {}
   if (net) { net.close(); net = null; }
-  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261124b";
+  if (parent !== window) post("hall-aud"); else location.href = "living-command.html?start=aud&from=team&v=20261124g";
 }
 function leave(type) { if (net) { net.close(); net = null; } post(type); }
 
@@ -677,13 +677,13 @@ if (DEMO) {
   const room = { id: "demo", code: "DEMO42", status: "live", host: true, slots: { intensivist: 1, pulmonologist: 1, nephrologist: 1 }, you: { specialty: mySpec, inside: true }, members: [{ userId: myId, name: myName, specialty: mySpec, inside: true }, { userId: "x1", name: "Ravi", specialty: "pulmonologist" }, { userId: "x2", name: "Meera", specialty: "nephrologist" }], scenario: { name: "Meera Nair", age: 58, sex: "woman", dx: "Fever and hypoxaemic pneumonia", story: "Three days of fever and a productive cough. She is speaking. The saturation is 91% on air. The pressure, for now, is acceptable." }, patient: { hour: 3, hr: 112, sbp: 104, dbp: 64, map: 77, spo2: 91, rr: 28, gcs: 15, temp: 38.6, lactate: 2.6, cr: 1.4, k: 4.3, rhythm: "sinus", alive: true, tube: false, oxygen: true, norepi: false, problems: [{ id: "a", title: "Pneumonia with falling saturation", specialty: "pulmonologist", open: true, called: false }, { id: "b", title: "Rising lactate", specialty: "intensivist", open: true, called: true }], results: [{ label: "Labs", text: "Lactate 2.6 mmol/L. Creatinine 1.4 mg/dL. Potassium 4.3 mmol/L. Haemoglobin 11.4 g/dL." }], log: [{ t: 1, text: "Asha examined the patient." }, { t: 2, text: "Asha put oxygen on." }] } };
   apply({ room, orders, me: { name: myName } });
   if (Q.has("engine")) {                                   /* ?demo&engine: the real case engine behind the hall, for trying orders */
-    const E = await import("./case-engine.js?v=20261124b"), team = (Q.get("team") || "intensivist,pulmonologist,nephrologist").split(","), sc = E.Dp(7, team, { caseId: Q.get("case") || undefined, noRemember: true, recent: [] });
+    const E = await import("./case-engine.js?v=20261124g"), team = (Q.get("team") || "intensivist,pulmonologist,nephrologist").split(","), sc = E.Dp(7, team, { caseId: Q.get("case") || undefined, noRemember: true, recent: [] });
     const acts = [], t0 = Date.now() - (+Q.get("t") || 0) * 1000, me0 = room.members[0];
     room.slots = {}; team.forEach((sp) => { room.slots[sp] = 1; });
     room.members = team.map((sp, i) => ({ userId: i === 0 ? myId : "x" + i, name: i === 0 ? myName : "Dr " + sp.slice(0, 5), specialty: sp, inside: true })); room.you = { specialty: team[0], inside: true }; mySpec = team[0];
     room.scenario = { name: sc.name, age: sc.age, sex: sc.sex, dx: sc.dx, story: sc.story, shockable: sc.shockable };
     const publish = () => { room.patient = E.Np(sc, acts, Date.now() - t0); apply({ room, orders, me: { name: myName } }); };
-    demoHook = (type, o) => { const add = (k, spec, x) => acts.push({ atMs: Date.now() - t0 + acts.length, userId: myId, name: myName, specialty: mySpec, kind: k, payload: k === "call" ? { specialty: spec || "" } : E.orderPayload(x) }); if (type === "hall-order") add(o.kind, o.specialty); else if (type === "hall-orders") (o.orders || []).forEach((x) => add(x.kind, x.specialty, x)); publish(); };
+    demoHook = (type, o) => { const add = (k, spec, x) => acts.push({ atMs: Date.now() - t0 + acts.length, userId: myId, name: myName, specialty: mySpec, kind: k, payload: (k === "call" || k === "cover") ? { specialty: spec || "" } : E.orderPayload(x) }); if (type === "hall-order") add(o.kind, o.specialty); else if (type === "hall-orders") (o.orders || []).forEach((x) => add(x.kind, x.specialty, x)); publish(); };
     window.__demo = { sc, acts, publish, shift(sec) { acts.forEach((a) => { a.atMs += 0; }); return sec; }, E };
     feed.length = 0; hist.length = 0; labSeries.length = 0; seenKeys.clear(); feedInit = false; unseen.invest = 0; unseen.history = 0;
     setInterval(publish, 1000); publish();

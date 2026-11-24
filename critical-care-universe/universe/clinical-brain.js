@@ -4,7 +4,7 @@
    and post() after them (a plain term that nothing else took). Both return answer cards, or null.
    The cards use only what a doctor in the room could see: the numbers, the results that came back, what was given. They never name
    the hidden diagnosis and never use the teaching hints. */
-import { LEXICON, GROUPS } from "./clinical-lexicon.js?v=20261122g";
+import { LEXICON, GROUPS } from "./clinical-lexicon.js?v=20261124g";
 
 let IDX = null;
 function nk0(s) {
