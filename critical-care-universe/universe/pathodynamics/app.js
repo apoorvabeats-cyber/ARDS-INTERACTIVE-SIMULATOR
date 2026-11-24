@@ -1,11 +1,11 @@
 /* PATHODYNAMICS · Interactive Clinical Pathophysiology
    Every lab follows the same five steps (select, explore, intervene, observe, correlate) and the same three views of a disease
    (anatomical, pathophysiological, interventional), all tied to one whole-body patient model. */
-import { createStage } from "./stage.js?v=20261123p";
-import { bodySVG, paintBody } from "./body.js?v=20261123p";
-import { ecgDraw } from "./charts.js?v=20261123p";
+import { createStage } from "./stage.js?v=20261124a";
+import { bodySVG, paintBody } from "./body.js?v=20261124a";
+import { ecgDraw } from "./charts.js?v=20261124a";
 
-const V = "20261123p", EMBED = /[?&]embed=1/.test(location.search), $ = (s, r) => (r || document).querySelector(s), esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const V = "20261124a", EMBED = /[?&]embed=1/.test(location.search), $ = (s, r) => (r || document).querySelector(s), esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const LABS = [
   { id: "stroke", name: "Stroke Lab", tag: "Acute ischaemic stroke", icon: "🧠", col: "#9b7bff", blurb: "Choose the blocked artery, turn the brain, drag the clot out and watch the penumbra, the deficits and the whole body respond.", mods: "ICA · M1 · M2 · M3 · ACA · PCA · Basilar · Vertebral" },
   { id: "mi", name: "Heart Attack Lab", tag: "Acute myocardial infarction (STEMI and NSTEMI)", icon: "🫀", col: "#ff6b7c", blurb: "Block a coronary artery, read the ECG territory, then open it with a balloon and stent or with lysis.", mods: "STEMI · NSTEMI · RCA · LAD · LCx · Left main · PDA" },

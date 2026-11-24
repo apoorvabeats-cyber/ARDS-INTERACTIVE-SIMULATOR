@@ -13,7 +13,7 @@
 import { buildOutdoor } from "./outdoor3d.js?v=20261122g";
 import { loadVisitorCopy, createVisitor } from "./visitor-avatar.js?v=20261122g";
 import { liveUpdates } from "./live-updates.js?v=20261122g";
-import { buildUpper } from "./upper-level.js?v=20261123p";
+import { buildUpper } from "./upper-level.js?v=20261124a";
 
 export function buildSuite(T, S, P, H, env, opt = {}) {
   const V = T.Vector3, G = new T.Group(); G.name = "suite"; S.add(G);
@@ -377,9 +377,9 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
   }
   [seatBase, seatBack, seatLeg].forEach((m) => { m.instanceMatrix.needsUpdate = true; aud.add(m); });
 
-  /* ---- two large LIVE UPDATES screens, one each side of the exit door: the society feed from the app's home screen ---- */
+  /* ---- the auditorium LIVE UPDATES screen has been removed (the feed lives on the new home screen); liveBoards stays empty ---- */
   const live = liveUpdates(), liveBoards = [];
-  [-1].forEach((k, idx) => {
+  [].forEach((k, idx) => {
     const d = dcv(680, 920), m = new T.MeshBasicMaterial({ map: d.t, toneMapped: false }), g = new T.Group(); g.position.set(cxA + k * 4.0, 3.15, AU.z0 + 0.07); aud.add(g);
     bx(3.7, 4.9, 0.1, M(0x07090c, { metalness: 0.6, roughness: 0.35 }), 0, 0, -0.01, g); pl(3.5, 4.72, m, 0, 0, 0.045, 0, 0, g);
     [-1, 1].forEach((j) => bx(0.04, 4.9, 0.03, cyan, j * 1.84, 0, 0.06, g)); bx(3.7, 0.04, 0.03, cyan, 0, 2.46, 0.06, g); bx(3.7, 0.04, 0.03, cyan, 0, -2.46, 0.06, g);
