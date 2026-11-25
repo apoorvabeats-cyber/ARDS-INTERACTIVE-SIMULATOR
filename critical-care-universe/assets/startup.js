@@ -16,7 +16,7 @@
     const q = new URLSearchParams(location.search);
     if (q.get("old") !== "1" && !q.has("to")) {
       startup.classList.add("is-finished");
-      location.replace("./home/index.html?v=20261126r1");
+      location.replace("./home/index.html?v=20261126r2");
       return;
     }
     const app = document.createElement("script");
