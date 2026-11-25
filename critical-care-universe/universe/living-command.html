@@ -61,7 +61,7 @@ input[type=range]{width:100%}
 <canvas id="gl"></canvas>
 <canvas id="flat-gl" aria-hidden="true"></canvas>
 <div id="door"><h1>Intensive Care Unit</h1><div class="frame" id="dr" style="background:radial-gradient(#39e6ff66,#02060f)"><div class="leaf l"></div><div class="leaf r"></div></div><p>Six patients. One doctor.</p><button id="enter">Enter the ICU</button></div>
-<div id="leave" style="position:fixed;inset:0;z-index:8;background:#050b18;opacity:0;pointer-events:none;transition:opacity .9s"></div><div id="top"><b>ICU · Sim</b><button id="home" type="button">Universe</button><button data-m="cmd">Command center</button><button data-m="ward">ICU</button><span id="hud">0:00 · 0/6</span><details id="settings-menu"><summary>Options</summary><div id="audio-controls"><button id="zoom-wall" type="button" aria-pressed="true">Fit wall</button><button id="flat-toggle" type="button" aria-pressed="false">2D view</button><button id="voice" type="button" aria-pressed="true">Voice on</button><button id="alarm" type="button" aria-pressed="true">Alarms on</button><button id="snd" type="button" aria-pressed="true">Sound on</button></div></details></div>
+<div id="leave" style="position:fixed;inset:0;z-index:8;background:#050b18;opacity:0;pointer-events:none;transition:opacity .9s"></div><script>/* at the Gate the picture of the building is up from the very first paint, so the dark hall never shows while the 3D scene starts */if(/[?&]at=gate/.test(location.search)){window.__gateHold=1;var G0=document.createElement('div');G0.id='gcover';G0.style.cssText="position:fixed;inset:0;z-index:9;pointer-events:none;background:#050b18 url(../home/gate-front.jpg?v=2) center/cover no-repeat";document.body.appendChild(G0);window.__gateOff=function(){window.__gateHold=0;var e=document.getElementById('gcover');if(e)e.remove()};setTimeout(window.__gateOff,12000)}</script><div id="top"><b>ICU · Sim</b><button id="home" type="button">Universe</button><button data-m="cmd">Command center</button><button data-m="ward">ICU</button><span id="hud">0:00 · 0/6</span><details id="settings-menu"><summary>Options</summary><div id="audio-controls"><button id="zoom-wall" type="button" aria-pressed="true">Fit wall</button><button id="flat-toggle" type="button" aria-pressed="false">2D view</button><button id="voice" type="button" aria-pressed="true">Voice on</button><button id="alarm" type="button" aria-pressed="true">Alarms on</button><button id="snd" type="button" aria-pressed="true">Sound on</button></div></details></div>
 <div id="toast"></div>
 <div id="hint"></div>
 <div id="photo"><div id="pw"><div id="pb"></div><canvas id="pc" width="640" height="360" aria-hidden="true"></canvas><canvas id="iv" width="1280" height="720" aria-hidden="true"></canvas><canvas id="pl" width="720" height="508"></canvas><canvas id="pr" width="300" height="200"></canvas><div id="pi"></div></div></div>
@@ -602,7 +602,7 @@ function soundscape(now){
  if(alarmOn&&now>nAlert){const bad=P.map((p,i)=>[p,i]).filter(a=>!a[0].done&&a[0].st>0);if(bad.length){const[p,i]=bad[Math.floor(Math.random()*bad.length)];sfx.alert(p.st>1?2:1,hall?bedPos(i):{x:-20.4,z:(i%3-1)*2.4})}nAlert=now+6500+Math.random()*4500}}
 let wasOut=false;function outdoorLogic(){
  if(!suite||flatMode)return;
- if(suite.upper&&suite.upper.isUp()){if(!leaving&&!arriving)$('#leave').style.opacity=0;return}
+ if(suite.upper&&suite.upper.isUp()){if(!leaving&&!arriving&&!window.__gateHold)$('#leave').style.opacity=0;return}
  const D=suite.doors,c=cam.position,ou=suite.outdoor,outside=c.z<-21.9&&c.x<-8.7;if(wasOut&&!outside&&mode==='ward'&&!transit&&!leaving&&window.ccuWelcome)window.ccuWelcome('aud');wasOut=outside;
  if(D.exit.target>0&&!outside&&c.z>-17.5&&mode!=='travel')D.exit.target=0;
  if(mode!=='travel'&&!leaving){
@@ -614,7 +614,7 @@ let wasOut=false;function outdoorLogic(){
    else if(inMdt&&c.x>W.AU.x1+1.7)window.__enterPlace('team')}}
  if(D.exit.open>.05&&D.exit.target>0)sfx.startOutdoor(ou.info.phase);
  else if(D.exit.open<.02&&D.exit.target===0&&sfx.outdoorOn())sfx.stopOutdoor();
- if(!outside){if(!leaving&&!arriving)$('#leave').style.opacity=0;sfx.outdoorGain(.3);return}
+ if(!outside){if(!leaving&&!arriving&&!window.__gateHold)$('#leave').style.opacity=0;sfx.outdoorGain(.3);return}
  const ex=ou.exitness(wp.x,wp.z);
  if(mode==='ward'&&!transit&&!leaving){
   sfx.outdoorGain(1-ex*.9);
@@ -882,7 +882,10 @@ go=function(m,i){
    if(!AT&&!/[?&]from=(hub|team)/.test(location.search)&&window.ccuWelcome)window.ccuWelcome('aud');
    stand(sx,sz,sy);if(AT){pit=atPit;if(atUp)gyS=suite.groundY(sx,sz)}arriving=true;const l=$('#leave');l.style.transition='none';l.style.opacity=1;
    /* a straight cut, never a fade: the last frame of the place we left stays up until this room has drawn once */
-   requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(()=>{l.style.transition='none';l.style.opacity=0;l.style.background='#050b18';arriving=false;try{sessionStorage.removeItem('ccu-snap');if(parent!==window&&parent.ccuSnapOff)parent.ccuSnapOff()}catch(e){}},120)))}else {stand(-10.7,0,-Math.PI/2);if(window.ccuWelcome)setTimeout(()=>window.ccuWelcome('cmd'),500)}}
+   const lift=()=>{if(window.__gateOff)window.__gateOff();l.style.transition='none';l.style.opacity=0;l.style.background='#050b18';arriving=false;try{sessionStorage.removeItem('ccu-snap');if(parent!==window&&parent.ccuSnapOff)parent.ccuSnapOff()}catch(e){}};
+   /* at the Gate the picture of the building stays up until the outdoor scene has really drawn, so the dark hall is never seen first */
+   if(AT==='gate'){const t0=performance.now();let n=0;const wait=()=>{n++;const o=suite.outdoor&&suite.outdoor.group;if((o&&o.visible&&n>10&&performance.now()-t0>1100)||performance.now()-t0>7000)lift();else setTimeout(wait,100)};setTimeout(wait,100)}
+   else requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(lift,120)))}else {stand(-10.7,0,-Math.PI/2);if(window.ccuWelcome)setTimeout(()=>window.ccuWelcome('cmd'),500)}}
  else if(m==='ward'&&suite&&!flatMode&&mode!=='bed'&&mode!=='transit'&&mode!=='travel'&&(mode==='cmd'||cam.position.x<-8.6))stand(-6.8,0,Math.PI/2);
  else if(m==='ward'&&mode==='transit')wp.set(0,0,0);
  if(m==='ward'&&mode==='bed'&&ward&&cur!=null){const b=cur;_goBeds('travel');mode='travel';transit={bed:b,stage:'out',start:performance.now(),duration:1300,from:cam.position.clone(),to:ward.approach(b),lookFrom:lk.clone(),lookTo:ward.look(b)};return}
