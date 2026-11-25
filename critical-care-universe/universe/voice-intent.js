@@ -11,8 +11,8 @@
    Only an order reaches the order parser. Everything else is held, said back in plain words, and offered as a button.
    It also runs the meeting: "ask the intensivist", "call all specialists", "summarise the discussion", "assign tasks".
    No network, no model. The opinions of the specialists are worked out from the patient's numbers and are teaching aids, not advice. */
-import { parseOrders } from "./voice-orders.js?v=20261124g";
-import { BY_ID } from "./order-catalogue.js?v=20261124g";
+import { parseOrders } from "./voice-orders.js?v=20261125a";
+import { BY_ID } from "./order-catalogue.js?v=20261125a";
 
 /* ---------------------------------------------------------------- risk */
 export const HIGH_RISK = new Set(["proc:intubate", "proc:ecmo", "proc:pericard", "proc:evd", "proc:chestdrain", "proc:cardioversion", "proc:pacing", "proc:source", "proc:cath", "proc:trach", "proc:tips", "proc:balloon", "drug:alteplase", "drug:kcl", "drug:anaesthetic", "drug:mtp", "drug:adrenaline", "drug:amiodarone", "shock"]);
@@ -239,7 +239,8 @@ function opinion(H, sp, q, P, ctx, st) {
   const A = (label, order, confirm) => acts.push({ label, order, confirm: !!confirm });
   const shock = P.map < 65 || P.sbp < 90, wet = (P.spo2 < 92 && P.rr > 24) || (P.fluidMl || 0) > 3000;
   const ask = (re) => re.test(q || "");
-  const lac = num(P.lactate, 10), cr = num(P.cr, 10), k = num(P.k, 10), uo = num(P.uo);
+  const rv = (key) => { const m = H.latestItem ? H.latestItem(P, key) : null; return m ? num(m.it.v, 10) : null; };   /* only a result that is back: the specialists do not know a value nobody has measured */
+  const lac = rv("lactate"), cr = rv("cr"), k = rv("k"), uo = num(P.uo);
   switch (sp) {
     case "nephrologist":
       L.push(`Urine output ${uo == null ? "not measured" : uo + " mL/h"}${cr != null ? ", creatinine " + cr : ""}${k != null ? ", potassium " + k : ""}${P.fluidMl ? ", about " + P.fluidMl + " mL of fluid so far" : ""}.`);
@@ -510,4 +511,116 @@ export function intent(H, raw, ctx) {
     if (c.mode !== "negative" && c.mode !== "prohibit" && c.mode !== "reverse" && c.mode !== "reason" && P) { try { const r = H.readClause(H.repair(s), ctx); if (r && r.cards) r.cards.forEach((x) => { if (!cards.some((y) => y.id === x.id)) cards.push(x); }); } catch (e) { /* the held card stands alone */ } }
   }
   return { pass: pass.join(" . "), cards, orders, negated, held };
+}
+
+/* ======================================================================================
+   THE UNIVERSAL QUESTION LAYER
+   Any question a doctor asks the room gets an answer. First the intent (why, what next, what if ...), then the specialists who
+   should speak, then one lead card that answers the intent from the live numbers. This is the offline answer. With the MDT model
+   connected (mdt-ask.js) the model answers instead, and this is what stands in when the model is not there.
+   The room only knows what the room has seen: vitals, results that are back, what has been given. Nothing hidden.
+   ====================================================================================== */
+const QINTENT = [
+  ["challenge", /\b(?:challenge (?:me|my|this)|critique|devil s advocate|poke holes|am i wrong|what is wrong with (?:my|this)|argue against|disagree with me|play devil)\b/],
+  ["evaluate", /\b(?:is (?:this|that|it|my (?:plan|decision|approach)) (?:correct|right|ok|okay|safe|reasonable|appropriate|good)|am i right|is this the right|did i do (?:the right|it right|well)|was (?:that|this) (?:right|correct)|check my (?:plan|decision))\b/],
+  ["missing", /\b(?:what (?:am i|are we|have i|have we) (?:missing|forgotten|overlooked|overlooking)|what (?:did|have) (?:i|we) (?:miss|missed|forget|forgot)|anything (?:i am|we are|i have|we have) (?:missing|missed|forgotten)|what else (?:should|do) (?:i|we) (?:check|consider|look)|any gaps|did i miss|did we miss|overlook\w*)\b/],
+  ["calculate", /\b(?:calculate|calculation|compute|\bcalc\b|what is the (?:map|shock index|anion gap|qsofa|pulse pressure|corrected \w+|p f|pf ratio)|anion gap|shock index|qsofa|pulse pressure|corrected (?:calcium|sodium)|map from)\b/],
+  ["whatif", /\b(?:what (?:if|happens|will happen|would happen|can happen)|if (?:i|we) (?:give|start|increase|decrease|stop|add|do|intubate|put)|consequences?|predict|simulate|effect of|what is the risk of)\b/],
+  ["compare", /\b(?:compare|comparison|versus|\bvs\b|instead of|rather than|which is better|better than|difference between|or should (?:i|we)|can i use \w+(?: \w+)? instead|choose between)\b/],
+  ["stop", /\b(?:when (?:should|do|can|to) (?:i|we)? ?(?:stop|wean|withdraw|discontinue|taper|extubate)|can (?:i|we) stop|should (?:i|we) stop|time to stop|stop criteria|wean(?:ing)?)\b/],
+  ["guidelines", /\b(?:guidelines?|evidence|surviving sepsis|\bssc\b|\bkdigo\b|\bats\b|\besicm\b|\bscc?m\b|trial|protocols?|recommendations? (?:say|suggest|state)|what does the .{2,30} (?:say|recommend|suggest)|is there (?:any )?evidence|is it evidence based)\b/],
+  ["why", /^ ?(?:why|how come)\b|\bwhy (?:is|are|does|did|do|has|have|was|would|am|can t|cannot)\b|\b(?:what (?:is|are) (?:the )?(?:cause|causes|reason|reasons|causing)|what (?:caused|causes|explains|is behind)|causes? of|reason for|reasons for|mechanism behind)\b/],
+  ["else", /\b(?:what else|differential|differentials|other (?:causes|options|possibilities|diagnoses|explanations)|alternatives?|could it be|could this be|what other|rule out|anything else)\b/],
+  ["explain", /\b(?:explain|pathophysiology|mechanism|teach me|walk me through|like an? (?:intensivist|consultant|resident|student)|in simple terms|simply)\b/],
+  ["next", /\b(?:what (?:should|do|can|shall|must) (?:i|we)|what next|next (?:best )?(?:step|steps|action|move)|what now|what to do|how (?:do|should|can|shall) (?:i|we)|should (?:i|we)|do (?:i|we) need to|is it time to|plan|management|how to manage|how to treat|best (?:option|approach|step)|priorities|priority|can (?:i|we)|may (?:i|we))\b/],
+];
+export function questionIntent(text) { const n = norm(text); for (const [k, re] of QINTENT) if (re.test(n)) return k; return /\?\s*$/.test(String(text).trim()) || /^ ?(?:what|how|is|are|does|do|can|could|would|will|which|who|where|when|tell|explain|give me|show me)\b/.test(n) ? "general" : null; }
+/* a question the room should think about, not just look up. A plain "what is the BP?" is not one of these. */
+export const isDeepQuestion = (text) => { const k = questionIntent(text); return !!k && k !== "general"; };
+
+const WHO = [
+  ["pulmonologist", /\b(?:lung|lungs|ventilat\w*|oxygen\w*|spo2|sats?|hypox\w*|intubat\w*|extubat\w*|peep|fio2|ards|pneumonia|niv|bipap|cpap|hfnc|prone|proning|ecmo|bronch\w*|breath\w*|respirat\w*|abg|gas|pco2|hypercap\w*|asthma|copd|pleural|chest drain|tracheost\w*)\b/],
+  ["cardiologist", /\b(?:bp|blood pressure|hypotens\w*|hypertens\w*|shock|pressor\w*|vasopress\w*|noradrenaline|norepinephrine|vasopressin|dobutamine|inotrop\w*|echo|ecg|ekg|arrhythm\w*|troponin|fluid\w*|map|heart|cardiac|tamponade|pericard\w*|tachycardi\w*|bradycardi\w*|rhythm|afib|infarct\w*|mi|stemi|embol\w*|preload|afterload|cardiogenic)\b/],
+  ["nephrologist", /\b(?:kidney|renal|aki|creatinine|urine|oligur\w*|anuri\w*|dialysis|crrt|rrt|potassium|hyperkal\w*|hypokal\w*|sodium|hyponat\w*|hypernat\w*|electrolytes?|acidosis|alkalosis|bicarb\w*|acid base|diuretic\w*|furosemide|fluid balance|uremi\w*|rhabdo\w*)\b/],
+  ["infectious", /\b(?:antibiotic\w*|antimicrob\w*|infect\w*|sepsis|septic|culture\w*|fever|febrile|source|fung\w*|viral|virus|bacteri\w*|malaria|meningitis|mrsa|resistan\w*|de escalat\w*|procalcitonin|pct|crp|line sepsis)\b/],
+  ["neurologist", /\b(?:seizure\w*|fit|fits|status|gcs|conscious\w*|stroke|icp|intracranial|brain|head|neuro\w*|sedat\w*|pupil\w*|coma|encephal\w*|cerebral|delirium|hemorrhage in the brain|ich|subdural)\b/],
+  ["gastroenterologist", /\b(?:liver|hepat\w*|bleed\w*|variceal|varices|cirrho\w*|pancreat\w*|gi bleed|haematemesis|melaena|ascites|jaundice|bilirubin|inr|ammonia|encephalopathy|endoscop\w*|ulcer|gut|feeding|nutrition)\b/],
+  ["surgeon", /\b(?:surg\w*|operat\w*|theatre|laparotomy|perforat\w*|debrid\w*|abdomen|abdominal|peritonit\w*|ischaemi\w*|ischemi\w*|trauma|source control|drain\w*|necrotis\w*|collection|abscess)\b/],
+];
+const DRUGQ = /\b(?:dose|dosing|dosage|how much|how many mg|rate|infusion rate|dilut\w*|prepar\w*|mg|mcg|units?|interaction\w*|contraindicat\w*|side effects?|adverse|toxicity|renal adjust\w*|loading|maintenance|titrat\w*)\b/;
+export function whoShouldSpeak(text, P) {
+  const n = norm(text), out = [];
+  for (const [sp, re] of WHO) if (re.test(n)) out.push(sp);
+  const named = findSpec(n); if (named && !out.includes(named)) out.unshift(named);
+  if (!out.length && P) { if (P.spo2 < 92 || P.rr > 28) out.push("pulmonologist"); if (P.map < 65 || P.sbp < 90) out.push("cardiologist"); if (P.uo != null && P.uo < 35) out.push("nephrologist"); if (P.gcs < 13) out.push("neurologist"); if (P.temp > 38.3) out.push("infectious"); }
+  return ["intensivist", ...out.filter((x) => x !== "intensivist")].slice(0, 4);
+}
+export const wantsPharmacology = (text) => DRUGQ.test(norm(text));
+
+/* what the room can see: only numbers that are back */
+const seen = (H, P, key) => { const m = H.latestItem ? H.latestItem(P, key) : null; return m ? m.it.v : null; };
+function missingNow(H, P) {
+  const out = [], g = (id) => H.given(P, id);
+  if (P.map < 65 && !P.norepi && !g("drug:norepi")) out.push(["MAP is low and no vasopressor is running.", { label: "Noradrenaline", order: "drug:norepi" }]);
+  if ((P.spo2 < 92) && !P.oxygen && !P.tube) out.push(["SpO₂ is low and he is not on any oxygen.", { label: "Oxygen", order: "proc:oxygen" }]);
+  if ((P.temp > 38 || P.map < 65) && !g("lab:cultures")) out.push(["Cultures have not been sent. Send them before the antibiotic.", { label: "Blood cultures", order: "lab:cultures" }]);
+  if (P.gcs < 13 && !g("lab:glucose") && !g("lab:abg")) out.push(["GCS is low and nobody has checked the glucose.", { label: "Blood glucose", order: "lab:glucose" }]);
+  if (!g("lab:abg") && !g("lab:lactate")) out.push(["No blood gas or lactate yet.", { label: "ABG with lactate", order: "lab:abg" }]);
+  if (!g("img:ecg") && (P.hr > 120 || P.hr < 50 || P.map < 65)) out.push(["No ECG yet, with an abnormal pulse or pressure.", { label: "ECG", order: "img:ecg" }]);
+  if (!g("lab:kft") && !g("lab:lyte")) out.push(["No kidney profile or electrolytes yet.", { label: "Kidney function", order: "lab:kft" }]);
+  if (!g("proc:foley") && P.map < 65) out.push(["No hourly urine output is being measured.", { label: "Urinary catheter", order: "proc:foley" }]);
+  if (!g("examine")) out.push(["He has not been examined yet.", { label: "Examine now", order: "examine" }]);
+  const ab = Object.keys(P.given || {}).some((x) => x.startsWith("abx:"));
+  if (!ab && (P.temp > 38 || P.map < 65) && g("lab:cultures")) out.push(["Cultures are sent but no antibiotic is on.", { label: "Antibiotics", order: "abx:any" }]);
+  return out;
+}
+function flawsIn(H, P) {
+  const out = [], g = (id) => H.given(P, id);
+  if (P.map < 65 && !P.norepi && (P.fluidMl || 0) >= 2000) out.push("About " + P.fluidMl + " mL of fluid is in and the MAP is still low. More fluid without a pressor risks wet lungs. Think about a vasopressor.");
+  if ((P.fluidMl || 0) > 3000 && P.spo2 < 93) out.push("A lot of fluid has gone in and the saturation is low. Is he wet? Stop and test fluid responsiveness.");
+  if (P.spo2 < 90 && !P.tube && P.rr > 30) out.push("He is tiring: RR " + P.rr + " and SpO₂ " + P.spo2 + "%. Waiting is a decision too.");
+  if (Object.keys(P.given || {}).some((x) => x.startsWith("abx:")) && !g("lab:cultures")) out.push("Antibiotics went in with no cultures sent first. The yield falls.");
+  if (P.gcs <= 8 && !P.tube) out.push("GCS " + P.gcs + " and the airway is not secured.");
+  if (P.map >= 65 && P.norepi && P.sbp > 140) out.push("The pressure is good and a vasopressor is still running. Can it be weaned?");
+  return out;
+}
+const calc = (H, P, n) => {
+  const L = [], num1 = (x) => Math.round(x * 10) / 10;
+  if (/shock index/.test(n) || /calculate|compute|calc/.test(n) && !/anion|corrected|qsofa|map|pulse pressure/.test(n)) if (P.sbp > 0) L.push(`Shock index = HR ÷ SBP = ${P.hr} ÷ ${P.sbp} = ${num1(P.hr / P.sbp)}. Above 0.9 to 1.0 suggests shock.`);
+  if (/\bmap\b/.test(n) || /calculate|compute|calc/.test(n) && !/anion|corrected|qsofa|shock index|pulse pressure/.test(n)) L.push(`MAP = DBP + (SBP − DBP) ÷ 3 = ${P.dbp} + (${P.sbp} − ${P.dbp}) ÷ 3 = ${num1(P.dbp + (P.sbp - P.dbp) / 3)} mmHg.`);
+  if (/pulse pressure/.test(n)) L.push(`Pulse pressure = SBP − DBP = ${P.sbp - P.dbp} mmHg.`);
+  if (/qsofa/.test(n) || /calculate|compute|calc/.test(n) && /sofa|sepsis/.test(n)) { const pts = (P.rr >= 22 ? 1 : 0) + (P.sbp <= 100 ? 1 : 0) + (P.gcs < 15 ? 1 : 0); L.push(`qSOFA = ${pts} of 3 (RR ${P.rr}: ${P.rr >= 22 ? "1" : "0"}, SBP ${P.sbp}: ${P.sbp <= 100 ? "1" : "0"}, GCS ${P.gcs}: ${P.gcs < 15 ? "1" : "0"}). 2 or more is a high-risk screen. It screens, it does not diagnose.`); }
+  if (/anion gap/.test(n)) { const na = seen(H, P, "na"), cl = seen(H, P, "cl"), hc = seen(H, P, "hco3"); L.push(na != null && cl != null && hc != null ? `Anion gap = Na − (Cl + HCO₃) = ${na} − (${cl} + ${hc}) = ${num1(na - cl - hc)} mmol/L. About 8 to 12 is normal; higher is a raised-gap acidosis.` : "I need the sodium, chloride and bicarbonate results. Send the electrolytes and a gas first."); }
+  if (/corrected (?:calcium|sodium)/.test(n)) L.push("I need a reported calcium and albumin (or glucose and sodium) from the lab. Send them first.");
+  return L.length ? L : [`I can work out the MAP, shock index, pulse pressure, qSOFA and the anion gap from what is on the monitor and in the results. For doses and infusion rates, use your validated protocol or the pharmacist.`];
+};
+
+const INTENT_TITLE = { next: "Next step", why: "Why this is happening", else: "What else it could be", whatif: "What if", evaluate: "Is this right?", missing: "What we may be missing", compare: "Comparing the options", stop: "When to stop or step down", guidelines: "Guidelines and evidence", calculate: "Calculation", challenge: "The team challenges the plan", explain: "Explained", general: "The team's view" };
+/* the lead card for a question: answers the intent from the live numbers */
+export function leadFor(H, intentKey, question, P, ctx) {
+  const { card } = H, n = norm(question), r = labelsOf(question), os = quoteFor(r), A = (label, order, confirm) => ({ label, order, confirm: !!confirm });
+  const base = { tone: "info" }, title = "MDT: " + (INTENT_TITLE[intentKey] || "Answer"), id = "mdt:ask:" + intentKey;
+  switch (intentKey) {
+    case "next": { const p = priority(P, H); return card(id, title + ": " + p.title.toLowerCase(), [...p.lines], { ...base, actions: p.acts.slice(0, 3), spoken: p.title + ". " + p.lines.join(" ") }); }
+    case "missing": { const m = missingNow(H, P); const lines = m.length ? m.slice(0, 4).map((x) => x[0]) : ["Nothing obvious from the numbers. Reassess the trend, the examination and the pending results."]; return card(id, title, lines, { ...base, actions: m.slice(0, 3).map((x) => x[1]), spoken: lines.slice(0, 2).join(" ") }); }
+    case "else": { const d = differential(P, H); return card(id, title, d, { ...base, spoken: d[0] }); }
+    case "why": { const d = differential(P, H), pr = priority(P, H); return card(id, title, [pr.title + ".", ...pr.lines, "The usual causes, from the numbers:", ...d], { ...base, spoken: d[0] }); }
+    case "stop": { const L = []; if (P.norepi) L.push("Vasopressor: wean once MAP stays above 65 with a falling lactate and good perfusion, and the cause is being treated."); if (P.tube) L.push("Ventilator: look for a spontaneous breathing trial when oxygenation is acceptable, the cause is improving, and he is awake and cardiovascularly stable."); if (Object.keys(P.given || {}).some((x) => x.startsWith("abx:"))) L.push("Antibiotics: review at 48 to 72 hours against the cultures, the source and the response. De-escalate or stop."); if ((P.fluidMl || 0) > 0) L.push("Fluids: stop when he is no longer fluid responsive, or when the lungs get wetter."); if (!L.length) L.push("Nothing is running that needs a stopping rule yet. Say what you are thinking of stopping."); return card(id, title, L, { ...base, spoken: L[0] }); }
+    case "whatif": case "compare": { const L = []; for (const o of os.slice(0, 3)) { const a = advise(o.id, P, H); L.push(o.label + (a ? ": " + a : ".")); } if (!L.length) L.push(intentKey === "compare" ? "Name the options, for example ‘noradrenaline or vasopressin’." : "Say what you would give or change, for example ‘what if I give 1 litre of fluid?’"); L.push("Nothing was given. The simulation changes only when you give the order."); return card(id, title, L, { ...base, actions: actionsFor(os, P, H).slice(0, 3), spoken: L[0] }); }
+    case "evaluate": case "challenge": { const f = flawsIn(H, P), m = missingNow(H, P); const L = f.length ? f.slice(0, 3) : ["On the numbers I do not see a clear error."]; if (intentKey === "challenge") { L.push("The questions I would ask: is the MAP above 65? Is he fluid responsive? Is the airway safe? Has the source been found? What does the next result change?"); if (m.length) L.push(m[0][0]); } return card(id, title, L, { ...base, actions: m.slice(0, 2).map((x) => x[1]), spoken: L[0] }); }
+    case "calculate": { const L = calc(H, P, n); return card(id, title, L, { ...base, spoken: L[0] }); }
+    case "guidelines": return card(id, title, ["The built-in team gives teaching points, not guideline text. Guideline wording and version need the MDT model, or your own institutional protocol.", "Doses, rates and preparation always come from a validated protocol or the pharmacist, never from this room."], { ...base, spoken: "Guideline wording needs the model or your protocol." });
+    default: return null;
+  }
+}
+/* the offline answer: a lead card, then the specialists who should speak */
+export function teamAnswer(H, question, P, ctx) {
+  if (!P) return { intent: questionIntent(question) || "general", cards: [], specs: [] };
+  const key = questionIntent(question) || "general", specs = whoShouldSpeak(question, P), st = mstate(ctx), n = norm(question), cards = [];
+  const lead = leadFor(H, key, question, P, ctx); if (lead) cards.push(lead);
+  const room = specs.filter((sp) => sp !== "intensivist").slice(0, key === "calculate" || key === "guidelines" ? 0 : 2);
+  const first = key === "general" || key === "explain" ? ["intensivist"] : [];
+  for (const sp of [...first, ...room]) cards.push(opinion(H, sp, n, P, ctx, st));
+  if (wantsPharmacology(question)) cards.push(H.card("mdt:pharm", "Clinical pharmacologist", ["Dose, infusion rate, dilution, renal and hepatic adjustment and interactions come from your validated protocol or the hospital pharmacist.", "This room does not generate doses."], { tone: "warn", spoken: "Doses come from a validated protocol, not from here." }));
+  return { intent: key, cards, specs };
 }

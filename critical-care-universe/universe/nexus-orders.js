@@ -3,10 +3,11 @@
                      and an arrow that sends them to the room.
      createHud():    the LCD that wakes up when something changes: vitals that go wrong on the left, abnormal results on the right,
                      normal results along the top, each with its own alarm. */
-import { parseOrders, toKind } from "./voice-orders.js?v=20261124g";
-import { understand } from "./voice-brain.js?v=20261124g";
-import { isHigh } from "./voice-intent.js?v=20261124g";
-import { BY_ID } from "./order-catalogue.js?v=20261124g";
+import { parseOrders, toKind } from "./voice-orders.js?v=20261125a";
+import { understand, teamCards, questionIntent, whoShouldSpeak } from "./voice-brain.js?v=20261125a";
+import { askModel, cardsFromModel, endpoint } from "./mdt-ask.js?v=20261125a";
+import { isHigh, hinglish } from "./voice-intent.js?v=20261125a";
+import { BY_ID } from "./order-catalogue.js?v=20261125a";
 
 const css = `
 #vc{position:fixed;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));width:min(760px,calc(100vw - 20px));display:grid;gap:7px;padding:10px 12px;border-radius:18px;background:linear-gradient(180deg,rgba(7,26,42,.93),rgba(3,14,24,.95));border:1px solid rgba(95,227,255,.38);box-shadow:0 0 28px rgba(95,227,255,.16),0 14px 40px rgba(0,0,0,.5);backdrop-filter:blur(10px);color:#dff6ff;font:13px/1.35 ui-sans-serif,system-ui,sans-serif}
@@ -102,7 +103,7 @@ const MIC = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx
 export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
   if (!document.getElementById("vc-style")) { const s = el("style", { id: "vc-style" }, css); document.head.appendChild(s); }
   const root = el("div", { id: "vc", hidden: "" });
-  root.innerHTML = `<div id="vans" aria-live="polite"></div><div id="vchips"></div><div id="vmeta"></div><div class="vrow"><button id="mic" type="button" aria-label="Hold to talk, or tap to start and stop">${MIC}</button><button id="vstop" type="button" aria-label="Stop listening" hidden>■</button><textarea id="vtext" rows="2" spellcheck="false" placeholder="Speak or type: what is the BP? · is he hypotensive? · urine output · get an echo · start meropenem"></textarea><button id="vspk" type="button" aria-label="Speak the answers aloud" data-on="1">🔊</button><button id="vsend" type="button" aria-label="Send" disabled>➤</button></div>`;
+  root.innerHTML = `<div id="vans" aria-live="polite"></div><div id="vchips"></div><div id="vmeta"></div><div class="vrow"><button id="mic" type="button" aria-label="Hold to talk, or tap to start and stop">${MIC}</button><button id="vstop" type="button" aria-label="Stop listening" hidden>■</button><textarea id="vtext" rows="2" spellcheck="false" placeholder="Ask anything or give an order: why is he hypotensive? · what next? · what if I give a litre? · get an echo · start meropenem"></textarea><button id="vspk" type="button" aria-label="Speak the answers aloud" data-on="1">🔊</button><button id="vsend" type="button" aria-label="Send" disabled>➤</button></div>`;
   document.body.appendChild(root);
   const $ = (s) => root.querySelector(s), mic = $("#mic"), stopB = $("#vstop"), text = $("#vtext"), ans = $("#vans"), spk = $("#vspk"), chips = $("#vchips"), meta = $("#vmeta"), sendB = $("#vsend");
   const SR = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -194,7 +195,7 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
         else if (b.dataset.sg != null) { const x = sug[+b.dataset.sg]; if (x) { if (x.kind === "order" && x.id && BY_ID[x.id]) { post("hall-orders", { orders: [toKind({ id: x.id })] }); b.disabled = true; b.textContent = "Sent ✓"; } else { dismiss(n); text.value = x.label; send(); } } }
       });
       ans.prepend(n); while (ans.children.length > 8) ans.lastChild.remove();
-      setTimeout(() => dismiss(n), a.tone === "crit" ? 45000 : 28000);
+      setTimeout(() => dismiss(n), a.ttl || (a.tone === "crit" ? 45000 : 28000));
     });
     ans.scrollTop = 0;
     const ao = list.find((a) => a.autoOpen && a.section); if (ao && open) { try { open(ao.section); } catch (e) {} }
@@ -202,6 +203,27 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
   spk.addEventListener("click", () => { speak = !speak; spk.dataset.on = speak ? "1" : "0"; try { localStorage.setItem("ccu-voice-speak", speak ? "1" : "0"); } catch (e) {} if (!speak) { try { speechSynthesis.cancel(); } catch (e) {} } });
   try { if (localStorage.getItem("ccu-voice-speak") === "0") { speak = false; spk.dataset.on = "0"; } } catch (e) {}
   if (typeof speechSynthesis === "undefined") spk.hidden = true;
+
+  /* ---- the team: ask anything */
+  const convo = []; let asking = 0, offlineNotes = 0;
+  const showTeam = (cards) => { const head = cards.slice(0, -1).reverse().concat(cards.slice(-1)); showAnswers(head, null); say1(cards.slice(-1)); };
+  async function askTeam(q) {
+    const c = getCtx(); if (!c || !c.P) { showAnswers([{ id: "mdt:none", title: "No patient yet", lines: ["The team answers once a case is running."], tone: "info" }], null); return; }
+    const key = questionIntent(hinglish(q)) || "general", specs = whoShouldSpeak(q, c.P), mark = (asking += 1), url = endpoint();
+    const offline = (why) => {
+      let r; try { r = teamCards(q, c); } catch (e) { r = { cards: [] }; }
+      const cards = (r.cards || []).map((x) => ({ ...x, ttl: 90000 }));
+      if (cards.length && (why || offlineNotes < 3)) { offlineNotes += 1; cards[0] = { ...cards[0], note: why || "Answered by the built-in team. Open-ended questions need the MDT model." }; }
+      return cards;
+    };
+    if (!url) { const cards = offline(); if (cards.length) { showAnswers(cards.slice().reverse(), null); say1(cards.slice(0, 1)); } return; }
+    showAnswers([{ id: "mdt:wait", title: "The team is thinking", lines: ["Reading the numbers and asking the specialists."], tone: "info", ttl: 30000 }], null);
+    const res = await askModel(q, key, specs, c, convo);
+    ans.querySelectorAll('[data-id="mdt:wait"]').forEach(dismiss);
+    if (mark !== asking) return;
+    if (res) { convo.push({ question: q.slice(0, 200), answer: res.consensus.slice(0, 300) }); showTeam(cardsFromModel(res, ({ next: "next step", why: "why", else: "what else", whatif: "what if", evaluate: "is this right", missing: "what we may be missing", compare: "compare", stop: "when to stop", guidelines: "guidelines", calculate: "calculation", challenge: "challenge", explain: "explained" })[key] || "")); return; }
+    const cards = offline("The MDT model did not answer. This is the built-in team."); if (cards.length) { showAnswers(cards.slice().reverse(), null); say1(cards.slice(0, 1)); }
+  }
 
   /* ---- sending */
   function send() {
@@ -221,12 +243,15 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
     }
     const names = orders.map((o) => (o.choose && choice[o.id] ? BY_ID[choice[o.id]].label : o.label) + (o.qtyText ? " " + o.qtyText : volume[o.id] ? " " + vtext(volume[o.id]) : ""));
     let shown = b.answers.filter((a) => a.id !== "noted");
-    if (!orders.length && !shown.length && !b.answers.length) {
+    /* any question that is not a plain lookup goes to the team: the model if it is connected, the built-in specialists if not */
+    const qText = text.value.trim(), qi = questionIntent(hinglish(qText)), askIt = !orders.length && !!qi && (qi !== "general" || !shown.length);
+    if (!orders.length && !shown.length && !b.answers.length && !askIt) {
       const sg = b.suggest.length ? b.suggest : [{ kind: "ask", label: "What is the blood pressure?" }, { kind: "ask", label: "How is the patient now?" }, { kind: "ask", label: "What should we do next?" }];
       shown = [{ id: "help", title: "I can answer or do that. Which did you mean?", lines: ["Ask about a vital sign, a result or a condition, or give an order."], tone: "info", spoken: "Which of these did you mean?" }];
       showAnswers(shown, sg);
     } else showAnswers(shown, null);
     if (shown.length) say1(shown);
+    if (askIt) askTeam(qText);
     sendB.classList.add("ok"); setTimeout(() => sendB.classList.remove("ok"), 1400);
     text.value = ""; finalText = ""; removed = new Set(); choice = {}; volume = {}; extra = []; parsed = understand("", null);
     busyMsg = names.length ? "Sent: " + names.join(", ") : ""; refresh(); if (busyMsg) setTimeout(() => { busyMsg = ""; refresh(); }, 4200);

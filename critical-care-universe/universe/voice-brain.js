@@ -6,10 +6,10 @@
      suggest  : the nearest sensible meanings, when the line fits neither, so there is never a dead end.
    It is a local reader: no network, no model. It knows the patient's numbers (ctx.P), the results that have come back, what has
    been given, and the trend (ctx.hist). It mends the usual speech-recognition slips ("initiate the patient" for "intubate the patient"). */
-import { parseOrders } from "./voice-orders.js?v=20261124g";
-import { BY_ID, CATALOGUE, LABS, PANELS } from "./order-catalogue.js?v=20261124g";
-import * as CB from "./clinical-brain.js?v=20261124g";
-import { intent, hinglish, tier } from "./voice-intent.js?v=20261124g";
+import { parseOrders } from "./voice-orders.js?v=20261125a";
+import { BY_ID, CATALOGUE, LABS, PANELS } from "./order-catalogue.js?v=20261125a";
+import * as CB from "./clinical-brain.js?v=20261125a";
+import { intent, hinglish, tier, teamAnswer, questionIntent, isDeepQuestion, whoShouldSpeak } from "./voice-intent.js?v=20261125a";
 
 /* ---------------------------------------------------------------- 1. mending the speech */
 const REPAIRS = [
@@ -355,3 +355,7 @@ function suggestFor(t) {
   const scored = CATALOGUE.map((o) => { const toks = new Set([o.label, ...(o.say || [])].join(" ").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2)); let s = 0; words.forEach((w) => { if (toks.has(w)) s += 2; else for (const x of toks) if (x.length > 3 && w.length > 3 && (x.startsWith(w.slice(0, 4)) || w.startsWith(x.slice(0, 4)))) { s += 1; break; } }); return { kind: "order", id: o.id, label: o.label, score: s }; }).filter((x) => x.score > 0);
   return sug.concat(scored).sort((a, b) => b.score - a.score).slice(0, 4);
 }
+
+/* ---------------------------------------------------------------- 6. any question: the offline team answer */
+export { questionIntent, isDeepQuestion, whoShouldSpeak };
+export const teamCards = (question, ctx) => teamAnswer(helpers(), question, (ctx && ctx.P) || null, ctx || {});
