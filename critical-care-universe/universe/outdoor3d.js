@@ -129,29 +129,27 @@ export function buildOutdoor(T, S, opt = {}) {
     for (let f = 0; f < floors; f++) for (let c = 0; c < cols; c++) {
       const x0 = c * cw + 3, y0 = fasc + f * fh + 4, pw = cw - 6, ph = fh - 8, sp = 0.46;      /* each bay: a tall light and a lower light under a transom */
       [[y0, ph * sp - 2], [y0 + ph * sp + 2, ph * (1 - sp) - 2]].forEach(([yy, hh], k) => {
-        const v = rnd(), teal = rnd() < 0.18, dark = rnd() < 0.12, warm = lit && rnd() < 0.3;
+        /* clear glass: the pane is cut out of the frame and only a faint cool sheen is laid over it, so the front reads as transparent */
+        g.clearRect(x0, yy, pw, hh);
         const gr = g.createLinearGradient(0, yy, 0, yy + hh);
-        if (warm) { gr.addColorStop(0, "#ffd58a"); gr.addColorStop(1, "#ffb25a"); }
-        else if (teal) { gr.addColorStop(0, "#0e7f8c"); gr.addColorStop(1, "#37d0cf"); }
-        else if (dark) { gr.addColorStop(0, "#050f22"); gr.addColorStop(1, "#0d2a52"); }
-        else { gr.addColorStop(0, cTop); gr.addColorStop(1, cHor); }
+        gr.addColorStop(0, "rgba(120,190,235,0.16)"); gr.addColorStop(1, "rgba(190,235,255,0.07)");
         g.fillStyle = gr; g.fillRect(x0, yy, pw, hh);
-        const rg = g.createLinearGradient(x0, yy, x0 + pw, yy + hh); rg.addColorStop(0, "rgba(255,255,255,0)"); rg.addColorStop(0.5, "rgba(255,255,255," + (0.16 + v * 0.22) + ")"); rg.addColorStop(1, "rgba(255,255,255,0)");
-        g.fillStyle = rg; g.beginPath(); g.moveTo(x0, yy + hh); g.lineTo(x0 + pw * 0.5, yy); g.lineTo(x0 + pw * 0.95, yy); g.lineTo(x0 + pw * 0.45, yy + hh); g.fill();        /* a hard diagonal reflection */
-        g.fillStyle = "rgba(190,235,255,.55)"; g.fillRect(x0, yy, pw, 2);                                                                                                 /* bright top edge of each pane */
+        const v = rnd(), rg = g.createLinearGradient(x0, yy, x0 + pw, yy + hh); rg.addColorStop(0, "rgba(255,255,255,0)"); rg.addColorStop(0.5, "rgba(255,255,255," + (0.07 + v * 0.07) + ")"); rg.addColorStop(1, "rgba(255,255,255,0)");
+        g.fillStyle = rg; g.beginPath(); g.moveTo(x0, yy + hh); g.lineTo(x0 + pw * 0.5, yy); g.lineTo(x0 + pw * 0.95, yy); g.lineTo(x0 + pw * 0.45, yy + hh); g.fill();        /* a soft diagonal reflection */
+        g.fillStyle = "rgba(210,240,255,.32)"; g.fillRect(x0, yy, pw, 2);                                                                                                 /* bright top edge of each pane */
       });
     }
     g.fillStyle = "#0b1b3a"; g.fillRect(0, 0, w, fasc); g.fillStyle = "#36d6ff"; g.fillRect(0, fasc - 3, w, 3);                       /* the navy fascia with a cyan line */
     g.fillStyle = "#2a3948"; for (let f = 1; f < floors; f++) { g.fillRect(0, fasc + f * fh - 4, w, 8); g.fillStyle = "rgba(170,210,240,.5)"; g.fillRect(0, fasc + f * fh - 4, w, 1.5); g.fillStyle = "#2a3948"; }   /* floor bands */
   });
-  const fMat = BM({ map: facadeTex, color: mix(0xffffff, 1) });
+  const fMat = BM({ map: facadeTex, color: mix(0xffffff, 1), transparent: true, depthWrite: false });
   const wallY0 = GY - 0.05, wallH = HB - wallY0;
   const fpiece = (xa, xb, ya, yb) => { const w = xb - xa, h = yb - ya, m = add(new T.PlaneGeometry(w, h), fMat, (xa + xb) / 2, (ya + yb) / 2, cz - 0.01, OUT); const uv = m.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) { uv.setXY(i, ((i % 2 === 0 ? xb : xa) - bx0) / BW, ((i < 2 ? yb : ya) - wallY0) / wallH); } uv.needsUpdate = true; m.rotation.y = Math.PI; return m; };
   fpiece(bx0, cx - OW / 2, wallY0, HB); fpiece(cx + OW / 2, bx0 + BW, wallY0, HB); fpiece(cx - OW / 2, cx + OW / 2, OH, HB); fpiece(cx - OW / 2, cx + OW / 2, wallY0, 0);
   /* the planes face the viewer outside (towards -z), so rotation.y = PI keeps the front texture the right way round */
   /* returns, roof and mass behind */
-  const sideTex = ctex(256, 512, (g, w, h) => { g.fillStyle = "#14295a"; g.fillRect(0, 0, w, h); for (let y = 10; y < h; y += 27) { g.fillStyle = "rgba(235,240,248,.75)"; g.fillRect(0, y, w, 2); } g.fillStyle = "rgba(255,255,255,.05)"; for (let x = 0; x < w; x += 64) g.fillRect(x, 0, 2, h); });
-  const sideM = BM({ map: sideTex, color: mix(0xffffff, 0.95) });
+  const sideTex = ctex(256, 512, (g, w, h) => { g.fillStyle = "rgba(130,195,235,.14)"; g.fillRect(0, 0, w, h); for (let y = 10; y < h; y += 27) { g.fillStyle = "rgba(60,80,100,.8)"; g.fillRect(0, y, w, 2); } g.fillStyle = "rgba(60,80,100,.6)"; for (let x = 0; x < w; x += 64) g.fillRect(x, 0, 2, h); });
+  const sideM = BM({ map: sideTex, color: mix(0xffffff, 0.95), transparent: true, depthWrite: false });
   [bx0, bx0 + BW].forEach((x, i) => { const m = add(new T.PlaneGeometry(10, wallH), sideM, x, wallY0 + wallH / 2, cz + 5, OUT); m.rotation.y = Math.PI / 2 * (i ? -1 : 1); m.material.side = T.DoubleSide; });
   const roof = add(new T.BoxGeometry(BW + 0.6, 0.4, 3.4), BM({ color: mix(0xe4e9ef, 1) }), cx, HB + 0.12, cz + 0.8, OUT);
   const roofGlow = add(new T.BoxGeometry(BW + 0.4, 0.06, 0.06), BM({ color: C(0x36d6ff).multiplyScalar(1.6), toneMapped: false }), cx, HB - 0.12, cz - 0.9, OUT);

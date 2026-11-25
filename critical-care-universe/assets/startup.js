@@ -20,7 +20,7 @@
       return;
     }
     const app = document.createElement("script");
-    app.src = "./assets/app.js?v=20261122g";
+    app.src = "./assets/app.js?v=20261126i";
     app.type = "module";
     app.onerror = () => {
       startup.setAttribute("role", "alert");
@@ -93,7 +93,7 @@
 
   const legal1 = document.getElementById("legal-1");
   const legal2 = document.getElementById("legal-2");
-  if (new URLSearchParams(location.search).get("home") === "1") {
+  if (new URLSearchParams(location.search).get("home") === "1" || new URLSearchParams(location.search).get("to") === "team") {
     legal1.hidden = true;
     legal2.hidden = true;
     startup.classList.add("is-finished");

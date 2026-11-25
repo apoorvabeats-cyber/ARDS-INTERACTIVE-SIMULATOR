@@ -3,8 +3,8 @@
 import * as THREE from "../universe/three.module.js";
 import { GLTFLoader } from "../universe/vendor/GLTFLoader.js";
 import { AVATARS, AVATAR_KEYS, avatarThumb, loadAvatar, createRigDoctor } from "../universe/doctor-rig.js?v=20261125e";
-import { createHero } from "./hero-doctor.js";
-import { createHero as createWaveHero } from "./hero-wave.js";
+import { createHero } from "./hero-doctor.js?v=3";
+import { createHero as createWaveHero } from "./hero-wave.js?v=3";
 import { liveUpdates } from "../universe/live-updates.js";
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -132,7 +132,7 @@ function mkTile(d, slot, big) {
   place(el, slot); el.style.display = "none"; field.appendChild(el);
   const T = { el, slab: $(".slab", el), bob: $(".bob", el), rx: 0, ry: 0, tx: 0, ty: 0, ph: Math.random() * 6, lift: 0, hov: false, d };
   el._t = T;
-  el.addEventListener("pointermove", (e) => { const r = el.getBoundingClientRect(); T.tx = (e.clientX - r.left) / r.width - 0.5; T.ty = (e.clientY - r.top) / r.height - 0.5; T.hov = true; });
+  el.addEventListener("pointermove", (e) => { const r = el.getBoundingClientRect(); if (PORT()) { const sg = FLIP() ? -1 : 1; T.tx = sg * (e.clientY - (r.top + r.height / 2)) / r.height; T.ty = -sg * (e.clientX - (r.left + r.width / 2)) / r.width; } else { T.tx = (e.clientX - r.left) / r.width - 0.5; T.ty = (e.clientY - r.top) / r.height - 0.5; } T.hov = true; });
   el.addEventListener("pointerleave", () => { T.hov = false; T.tx = T.ty = 0; });
   return el;
 }
@@ -258,6 +258,18 @@ const toast = (m) => { const t = $("#toast"); t.textContent = m; tw(300, (p) => 
 const info = $("#info");
 const stageC = () => { const r = stage.getBoundingClientRect(); return { x: r.left + r.width * 0.52, y: r.top + r.height * 0.42, em: parseFloat(getComputedStyle(stage).fontSize) }; };
 const centre = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+/* held upright, the stage is turned a quarter turn (see home.css): a screen-space offset is turned back into the stage's own axes */
+const PORT = () => matchMedia("(orientation: portrait) and (max-width: 1100px)").matches;
+const FLIP = () => document.documentElement.classList.contains("ccw");
+const loc = (dx, dy) => (PORT() ? (FLIP() ? { x: -dy, y: dx } : { x: dy, y: -dx }) : { x: dx, y: dy });
+/* A phone whose screen is locked upright keeps a portrait page even when it is turned on its side. The stage is turned a quarter turn so it fills the
+   screen; which way follows how the phone is physically held (left-side-up or right-side-up), read from the tilt sensor. */
+{ const root = document.documentElement; let lastG = null;
+  const onTilt = (e) => { const g = e.gamma; if (typeof g !== "number" || !PORT()) return; if (g < -32) root.classList.remove("ccw"); else if (g > 32) root.classList.add("ccw"); lastG = g; };
+  const start = () => addEventListener("deviceorientation", onTilt);
+  if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+    addEventListener("pointerdown", function ask() { removeEventListener("pointerdown", ask); DeviceOrientationEvent.requestPermission().then((r) => { if (r === "granted") start(); }).catch(() => {}); }, { once: true });
+  } else start(); }
 const hideHero = () => tw(520, (p) => { const f = $("#heroFrame"); f.style.opacity = 1 - p; f.style.transform = `translate3d(-${p * 3}em,0,0) scale(${1 - p * 0.05})`; }, { ease: E.in }).then(() => { H.shown = false; $("#heroFrame").style.visibility = "hidden"; });
 const showHero = () => { const f = $("#heroFrame"); f.style.visibility = "visible"; H.shown = true; return tw(800, (p) => { f.style.opacity = p; f.style.transform = `translate3d(${(1 - p) * -3}em,0,0) scale(${0.95 + p * 0.05})`; }, { ease: E.out }).then(() => (f.style.transform = "")); };
 
@@ -269,11 +281,11 @@ async function openParent(id) {
   hideHero();
   /* 1. the tile zooms up softly towards the viewer */
   const C = stageC(), I = centre(el); el.style.zIndex = 6; el.style.pointerEvents = "none"; el._t.hov = false;
-  const dx = C.x - I.x, dy = C.y - I.y;
+  const { x: dx, y: dy } = loc(C.x - I.x, C.y - I.y);
   await tw(750, (p) => { el.style.transform = `translate3d(${dx * p}px,${dy * p}px,${p * 9 * C.em}px) scale(${1 + p * 0.55})`; }, { ease: E.out });
   await wait(260);
   /* 2. it glides to the left and sticks there */
-  const from = centre(el); el.style.transform = ""; place(el, "p"); el.classList.add("stuck"); const to = centre(el); const ddx = from.x - to.x, ddy = from.y - to.y;
+  const from = centre(el); el.style.transform = ""; place(el, "p"); el.classList.add("stuck"); const to = centre(el); const { x: ddx, y: ddy } = loc(from.x - to.x, from.y - to.y);
   tw(800, (p) => { const k = 1 - p; el.style.transform = k > 0.001 ? `translate3d(${ddx * k}px,${ddy * k}px,${k * 9 * C.em}px) scale(${1 + k * 0.55})` : ""; }, { ease: E.io });
   await wait(650);
   info.innerHTML = `<h3>${P.name}</h3><p>${P.desc}</p><button type="button" class="back" id="infoBack">← Back to home</button>`;
@@ -305,17 +317,17 @@ async function goHome() {
   boxOut(info); if (cur === "cmd") { boxOut(live); boxOut($("#cmdImg")); }
   if (cur === "team") { const f = $("#teamFrame"); f.style.pointerEvents = "none"; await tw(450, (p) => { f.style.opacity = 1 - p; f.style.transform = `translate3d(0,${p * 3}em,${-p * 10}em) rotateX(${p * 40}deg)`; }, { ease: E.in }); f.style.display = "none"; f.style.transform = ""; TV.on = false; }
   else await wait(420);
-  const from = centre(el); place(el, P.slot); el.classList.remove("stuck"); const to = centre(el), C = stageC();
-  tw(780, (p) => { const k = 1 - p; el.style.transform = k > 0.001 ? `translate3d(${(from.x - to.x) * k}px,${(from.y - to.y) * k}px,0)` : ""; }, { ease: E.io });
+  const from = centre(el); place(el, P.slot); el.classList.remove("stuck"); const to = centre(el), C = stageC(), gd = loc(from.x - to.x, from.y - to.y);
+  tw(780, (p) => { const k = 1 - p; el.style.transform = k > 0.001 ? `translate3d(${gd.x * k}px,${gd.y * k}px,0)` : ""; }, { ease: E.io });
   await wait(600); el.style.zIndex = "";
   Object.values(parentEl).filter((t) => t !== el).forEach((t, i) => rise(t, i * 130, 950)); sfx("whoosh");
   await showHero(); Object.values(parentEl).forEach((t) => { t.style.pointerEvents = "auto"; setRise(t, 1); });
   view = "home"; $("#bHome").classList.add("on"); busy = false;
 }
 async function openLeaf(k, el) {
-  if (busy) return; busy = true; sfx("tick"); el._t.hov = false; const C = stageC(), I = centre(el); el.style.zIndex = 8;
+  if (busy) return; busy = true; sfx("tick"); el._t.hov = false; const C = stageC(), I = centre(el), od = loc(C.x - I.x, C.y - I.y); el.style.zIndex = 8;
   kidEls.filter((x) => x !== el).forEach((x) => sink(x, 0, 380));
-  await tw(700, (p) => { el.style.transform = `translate3d(${(C.x - I.x) * p}px,${(C.y - I.y) * p}px,${p * 12 * C.em}px) scale(${1 + p * 0.9})`; el.style.opacity = 1 - p * p * 0.3; }, { ease: E.in });
+  await tw(700, (p) => { el.style.transform = `translate3d(${od.x * p}px,${od.y * p}px,${p * 12 * C.em}px) scale(${1 + p * 0.9})`; el.style.opacity = 1 - p * p * 0.3; }, { ease: E.in });
   await launch(k.name, k.href); busy = false;
   if (NONAV) { el.style.transform = ""; el.style.opacity = 1; el.style.zIndex = ""; kidEls.forEach((x) => { x.style.display = ""; setRise(x, 1); }); }
 }
@@ -415,8 +427,8 @@ $("#bProfile").onclick = () => { if (!busy) openFly("profile"); };
 $("#bSet").onclick = () => { if (!busy) openFly("settings"); };
 $("#bQuick").onclick = () => (qOpen ? closeQuick() : openQuick());
 $("#bHome").onclick = async () => { sfx("tick"); await Promise.all([closeFly(), closeQuick()]); goHome(); };
-$("#bGate").onclick = async () => { if (busy) return; busy = true; sfx("tick"); await Promise.all([closeFly(), closeQuick()]); await launch("", "../universe/living-command.html?at=gate", "./gate-front.jpg"); busy = false; };
-$("#teamGo").onclick = () => { if (!busy) { busy = true; launch("Team room", "../universe/nexus.html").then(() => (busy = false)); } };
+$("#bGate").onclick = async () => { if (busy) return; busy = true; sfx("tick"); await Promise.all([closeFly(), closeQuick()]); await launch("", "../universe/living-command.html?at=gate", "./gate-front.jpg?v=2"); busy = false; };
+$("#teamGo").onclick = () => { if (!busy) { busy = true; launch("Team room", "../index.html?to=team").then(() => (busy = false)); } };
 addEventListener("keydown", (e) => { if (e.key === "Escape") { closeFly(); closeQuick(); if (view !== "home") goHome(); } });
 
 /* ======================================================================== live updates footer: runs on its own, pauses under the pointer */

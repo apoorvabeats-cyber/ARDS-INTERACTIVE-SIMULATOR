@@ -16,7 +16,7 @@ export function createHero(THREE, scene) {
   scene.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
 
   const D = {}, E = new THREE.Euler(), Q = new THREE.Quaternion(), Pq = new THREE.Quaternion(), Pi = new THREE.Quaternion();
-  const add = (name, x, y, z) => { const d = D[name] || (D[name] = [0, 0, 0]); d[0] += x || 0; d[1] += y || 0; d[2] += z || 0; };
+  const add = (name, x, y, z) => { const d = D[name] || (D[name] = [0, 0, 0]); const hn = name === "Head" || name === "Neck"; d[0] += (x || 0) * (hn ? 0.5 : 1); d[1] += (y || 0) * (hn ? 0.18 : 1); d[2] += (z || 0) * (hn ? 0.5 : 1); };   /* head and neck: only a slight movement */
   const rad = Math.PI / 180;
   function apply() {
     Object.keys(bones).forEach((n) => {
@@ -78,7 +78,7 @@ export function createHero(THREE, scene) {
     if (act === "shake") { add("Head", 0.02 * e, 0.46 * Math.sin(tt * 3.8) * e, 0.05 * Math.sin(tt * 3.8) * e); add("Neck", 0, 0.12 * Math.sin(tt * 3.8 - 0.5) * e, 0); add("Hand_L", 0, 0, 0.25 * e); add("Hand_R", 0, 0, -0.25 * e); }
     if (act === "look") {                                                             /* looks left, up, right, down */
       const p = a0 / dur; add("Head", (-0.22 * Math.sin(p * 6.28 * 1.5 + 0.8)) * e, 0.9 * Math.sin(p * 6.28) * e, 0.08 * Math.sin(p * 6.28 + 1) * e);
-      add("Neck", 0.05 * Math.sin(p * 9) * e, 0.35 * Math.sin(p * 6.28) * e, 0); add("Chest", 0, 0.18 * Math.sin(p * 6.28) * e, 0);
+      add("Neck", 0.05 * Math.sin(p * 9) * e, 0.35 * Math.sin(p * 6.28) * e, 0); add("Chest", 0, 0.05 * Math.sin(p * 6.28) * e, 0);
     }
     if (act === "turn") {                                                            /* feet planted, a slow turn on the spot with a little sway in the shoulders */
       const sw2 = Math.sin(tt * 1.6); add("Chest", 0, 0.05 * sw2 * e, 0); add("Hips", 0, -0.03 * sw2 * e, 0);

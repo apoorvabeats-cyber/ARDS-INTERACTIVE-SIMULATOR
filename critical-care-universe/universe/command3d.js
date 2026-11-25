@@ -11,7 +11,7 @@
        the real pages take over, from the same pose, a few steps inside.
    buildSuite(T, scene, P, H, env, {gateSet}) -> { doors, update(t,dt), clamp(x,z), hits, rooms }          */
 
-import { buildOutdoor } from "./outdoor3d.js?v=20261124g";
+import { buildOutdoor } from "./outdoor3d.js?v=20261126k";
 import { loadVisitorCopy, createVisitor } from "./visitor-avatar.js?v=20261124g";
 import { liveUpdates } from "./live-updates.js?v=20261124g";
 import { buildUpper } from "./upper-level.js?v=20261124g";

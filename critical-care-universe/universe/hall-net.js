@@ -7,10 +7,12 @@
      { send(state), peers(), close() }
    state = { x, z, y (yaw), a (0 idle / 1 walking), s (1 = sitting in my chair), bed (-1 or the bed index you stand beside) }                    */
 
+import { ccuFetch } from "./relay.js?v=20261126h";
+
 export const ICE = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:global.stun.twilio.com:3478" },
-  { urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turns:openrelay.metered.ca:443?transport=tcp"], username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "stun:stun.cloudflare.com:3478" },
 ];
 
 const cleanAv = (a) => (/^dr[1-9]$/.test(String(a || "")) ? String(a) : "");       // which of the avatar models this doctor chose
@@ -24,7 +26,7 @@ export function ntfySignal(code, onMsg) {
     if (closed) return;
     ctl = new AbortController();
     try {
-      const r = await fetch(url + "/json?since=40s", { signal: ctl.signal });
+      const r = await ccuFetch(url + "/json?since=40s", { signal: ctl.signal });
       if (!r.ok || !r.body) throw new Error("no feed");
       backoff = 1000;
       const rd = r.body.getReader(), dec = new TextDecoder(); let buf = "";
@@ -41,7 +43,7 @@ export function ntfySignal(code, onMsg) {
   };
   run();
   return {
-    send(d) { const b = JSON.stringify(d); if (b.length > 3900) return Promise.resolve(); return fetch(url, { method: "POST", body: b }).catch(() => {}); },
+    send(d, quick) { const b = JSON.stringify(d); if (b.length > 3900) return Promise.resolve(); return ccuFetch(url, { method: "POST", body: b, headers: quick ? { "X-Ccu": "brokers" } : undefined }).catch(() => {}); },
     close() { closed = true; try { ctl && ctl.abort(); } catch (e) { /* ignore */ } },
   };
 }
@@ -58,14 +60,14 @@ export function createHallNet(o) {
   const cleanLook = (l) => (l && typeof l === "object" && JSON.stringify(l).length < 400 ? l : null);        // an avatar config is tiny; never relay anything bigger
   const cleanChat = (m) => ({ k: ["propose", "challenge", "agree", "final", "ask"].includes(m.k) ? m.k : "ask", text: String(m.text || "").slice(0, 240), n: Math.max(0, Math.min(99, +m.n || 0)), time: +m.time || Date.now() });   // a team message is short text and a kind; nothing else is trusted
   const peers = new Map();                       // sid -> { sid, id, name, spec, sex, pc, dc, open, st, t0, init }
-  let closed = false, t0 = 0, helloTimer = 0, last = null, lastSend = 0, quiet = 0;
+  let closed = false, t0 = 0, helloTimer = 0, last = null, lastSend = 0, lastRelay = 0, quiet = 0;
   const ice = o.iceServers || ICE;
   const sig = (o.signal || ntfySignal)(o.code, (d, time) => { if (!closed) handle(d, time); });
-  const say = (d) => sig.send(Object.assign({ from: sid }, d));
+  const say = (d, quick) => sig.send(Object.assign({ from: sid }, d), quick);
   const hello = (re) => say({ t: "hi", id: me.id, name: me.name, spec: me.spec, sex: me.sex, look: me.look, av: me.av, re: !!re });
 
   function emit() { if (o.onPeers) o.onPeers([...peers.values()].map(pub)); }
-  const pub = (p) => ({ sid: p.sid, id: p.id, name: p.name, spec: p.spec, sex: p.sex, look: p.look, av: p.av, connected: !!p.open, st: p.st });
+  const pub = (p) => ({ sid: p.sid, id: p.id, name: p.name, spec: p.spec, sex: p.sex, look: p.look, av: p.av, connected: !!p.open || (!!p.rt && Date.now() - p.rt < 9000), st: p.st });
 
   function drop(p, why) {
     if (!peers.has(p.sid)) return;
@@ -136,6 +138,11 @@ export function createHallNet(o) {
       if (self.__hallDebug) console.log('answer <-', d.from);
       const p = peers.get(d.from);
       if (p && p.pc && p.pc.signalingState === "have-local-offer") await p.pc.setRemoteDescription(d.sdp).catch(() => {});
+    } else if ((d.t === "s" || d.t === "c") && d.from) {            // the brokers carry positions and chat for a doctor whose direct link has not opened
+      const p = peers.get(d.from); if (!p || p.open) return;
+      const first = !p.rt; p.rt = Date.now();
+      if (d.t === "s") { p.st = d; if (o.onPeerState) o.onPeerState(pub(p), d); } else if (o.onChat) o.onChat(pub(p), cleanChat(d));
+      if (first) emit();
     } else if (d.t === "bye") {
       const p = peers.get(d.from); if (p) drop(p, "left");
     }
@@ -157,9 +164,11 @@ export function createHallNet(o) {
       last = Object.assign({ t: "s" }, st);
       const now = performance.now(); if (now - lastSend < 90) return; lastSend = now;
       const b = JSON.stringify(last);
-      peers.forEach((p) => { if (p.open && p.dc && p.dc.readyState === "open") { try { p.dc.send(b); } catch (e) { /* ignore */ } } });
+      let viaRelay = false;
+      peers.forEach((p) => { if (p.open && p.dc && p.dc.readyState === "open") { try { p.dc.send(b); } catch (e) { /* ignore */ } } else viaRelay = true; });
+      if (viaRelay && now - lastRelay > 330) { lastRelay = now; say(last, true); }
     },
-    chat(m) { const b = JSON.stringify(Object.assign({ t: "c" }, cleanChat(m))); peers.forEach((p) => { if (p.open && p.dc && p.dc.readyState === "open") { try { p.dc.send(b); } catch (e) { /* ignore */ } } }); },
+    chat(m) { const c = Object.assign({ t: "c" }, cleanChat(m)), b = JSON.stringify(c); let viaRelay = false; peers.forEach((p) => { if (p.open && p.dc && p.dc.readyState === "open") { try { p.dc.send(b); } catch (e) { /* ignore */ } } else viaRelay = true; }); if (viaRelay) say(c, true); },
     peers: () => [...peers.values()].map(pub),
     close() { closed = true; clearInterval(helloTimer); say({ t: "bye" }); peers.forEach((p) => { try { p.pc && p.pc.close(); } catch (e) { /* ignore */ } }); peers.clear(); setTimeout(() => sig.close(), 400); },
   };
