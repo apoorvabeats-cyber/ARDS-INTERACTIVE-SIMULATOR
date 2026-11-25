@@ -2,9 +2,10 @@
    From a normal gland to oedematous and necrotising pancreatitis, then the collections (APFC, ANC, WON, infected necrosis)
    and the step-up approach: support and antibiotics, drainage (endoscopic stent or percutaneous drain), then necrosectomy.
    Terms follow the Revised Atlanta Classification. Management content aligned to ACG 2024, the AGA 2020 necrosis update and the Revised Atlanta Classification (checked Nov 2026). Numbers are illustrative.  */
-import { THREE, C, smooth } from "../stage.js?v=20261126gk";
-import { clamp } from "./common.js?v=20261126gk";
-import { organ } from "../anatomy.js?v=20261126gk";
+import { THREE, C, smooth } from "../stage.js?v=20261126r";
+import { clamp } from "./common.js?v=20261126r";
+import { organ } from "../anatomy.js?v=20261126r";
+import { stomachGeom, spleenGeom, beanGeom } from "../organ-shapes.js?v=20261126r";
 
 const T = {
   NORMAL: { label: "Normal", sub: "Healthy pancreas", d0: 0, d1: 14, dv: 0,
@@ -62,9 +63,9 @@ export default function create(S, ui) {
     const duo = S.tube([[-0.45, 0.38, 0.05], [-0.98, 0.25, 0.0], [-1.1, -0.35, 0.0], [-0.85, -0.78, 0.05], [-0.2, -0.88, 0.05], [0.45, -0.82, 0.0]], 0.1, 0xc99a6a, { seg: 40 }); grp.add(duo);
     const cbd = S.tube([[-0.62, 0.85, 0.02], [-0.7, 0.4, 0.0], [-0.74, -0.15, 0.0]], 0.04, 0x6ab06a); grp.add(cbd);
     M.gs = null; if (st.tab !== "NORMAL" && st.cause === "gallstone") { const gs = plain(new THREE.SphereGeometry(0.06, 14, 10), 0xf0d060, [-0.74, -0.38, 0.02]); gs.material.emissive = new THREE.Color(0x403000); M.gs = gs; }
-    const stom = plain((() => { const g = new THREE.SphereGeometry(1, 44, 32); g.scale(0.98, 0.56, 0.42); return g; })(), 0xd88a8a, [0.45, 0.58, 0.74], { transparent: true, opacity: 0.32, depthWrite: false }); stom.userData.hemi = 1; stom.renderOrder = 3; M.stom = stom;
-    plain((() => { const g = new THREE.SphereGeometry(1, 28, 20); g.scale(0.2, 0.4, 0.2); return g; })(), 0x7a5a9a, [1.72, 0.6, -0.25]);
-    [[1.4, 0.15], [-1.1, 0.15]].forEach(([x, y]) => plain((() => { const g = new THREE.SphereGeometry(1, 24, 18); g.scale(0.2, 0.32, 0.17); return g; })(), 0xb06a5a, [x, y, -0.55]));
+    const stom = plain(stomachGeom(1), 0xe89a96, [0.1, 0.08, 0.74], { transparent: true, opacity: 0.5, depthWrite: false, shininess: 40 }); stom.userData.hemi = 1; stom.renderOrder = 3; M.stom = stom;   /* J-shaped stomach */
+    const spl = plain(spleenGeom(0.42), 0x7a5a9a, [1.72, 0.6, -0.25]); spl.rotation.z = -0.25;   /* crescent spleen */
+    [[1.4, 0.15, -1], [-1.1, 0.15, 1]].forEach(([x, y, d]) => plain(beanGeom([0.2, 0.32, 0.17], d), 0xb06a5a, [x, y, -0.55]));   /* bean-shaped kidneys, hilum facing the spine */
     grp.add(S.tube([[0.1, 1.1, -0.38], [0.1, -1.1, -0.38]], 0.09, 0xd9524a, { emis: 0x200000 }));
     grp.add(S.tube([[1.5, 0.5, -0.2], [0.9, 0.2, -0.12], [0.15, 0.0, -0.09], [-0.15, -0.12, -0.06]], 0.05, 0x5b78e6)); grp.add(S.tube([[-0.15, -0.12, -0.06], [-0.12, -0.6, -0.06], [-0.1, -1.1, -0.06]], 0.05, 0x5b78e6));
     /* collection: fluid + wall + debris + gas */

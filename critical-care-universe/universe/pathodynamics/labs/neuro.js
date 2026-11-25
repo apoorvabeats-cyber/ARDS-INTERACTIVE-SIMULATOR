@@ -3,9 +3,10 @@
    EVD placement and a stepwise ICP ladder. Teaching model: one intracranial volume budget (Monro-Kellie) drives pressure, perfusion and herniation.
    Content aligned to the 2022 AHA/ASA spontaneous ICH guideline, the 2025 AHA/ACC hypertension guideline (acute ICH blood pressure) and the 2023 AHA/ASA aneurysmal SAH guideline
    (checked Nov 2026 against the published summaries). ICP thresholds follow common neurocritical-care practice. All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261126gk";
-import { toolKit, vessels, mirrorFlows, halo, clamp } from "./common.js?v=20261126gk";
-import { organ } from "../anatomy.js?v=20261126gk";
+import { THREE, C } from "../stage.js?v=20261126r";
+import { toolKit, vessels, mirrorFlows, halo, clamp } from "./common.js?v=20261126r";
+import { organ } from "../anatomy.js?v=20261126r";
+import { clotGeom } from "../organ-shapes.js?v=20261126r";
 
 const SITES = { ACOM: { label: "Anterior communicating", p: [0, -0.3, 0.63] }, MCA: { label: "MCA bifurcation", p: [0.75, -0.28, 0.4] }, PCOM: { label: "Posterior communicating", p: [0.34, -0.4, 0.05] }, BASI: { label: "Basilar tip", p: [0, -0.42, -0.22] } };
 const LOCS = { deep: { label: "Deep (basal ganglia)", p: [0.45, 0.02, 0.1] }, lobar: { label: "Lobar (temporo-parietal)", p: [0.72, 0.3, -0.2] }, cereb: { label: "Cerebellar", p: [0.25, -0.5, -0.68] } };
@@ -61,7 +62,7 @@ export default function create(S, ui) {
     M.coil = new THREE.Mesh(new THREE.TorusKnotGeometry(0.6, 0.18, 80, 8, 3, 5), new THREE.MeshPhongMaterial({ color: 0xffe08a, emissive: 0x4a3a10, shininess: 100 })); M.coil.visible = false; M.coil.renderOrder = 4; grp.add(M.coil);
     M.clip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.025, 0.045), new THREE.MeshPhongMaterial({ color: 0xcfd8e8, shininess: 120 })); M.clip.visible = false; M.clip.renderOrder = 4; grp.add(M.clip);
     /* haematoma, oedema, IVH, SAH, herniation */
-    M.hem = ell(1, 1, 1, 0x8a0f1e, 0.95, null, { emissive: 0x3a0610 }); M.hem.renderOrder = 3; grp.add(M.hem); M.oed = ell(1, 1, 1, 0xffd27a, 0.2); M.oed.renderOrder = 2; grp.add(M.oed);
+    M.hem = ell(1, 1, 1, 0x8a0f1e, 0.95, null, { emissive: 0x3a0610 }); M.hem.geometry.dispose(); M.hem.geometry = clotGeom(3);   /* irregular clot, not a ball */ M.hem.renderOrder = 3; grp.add(M.hem); M.oed = ell(1, 1, 1, 0xffd27a, 0.2); M.oed.renderOrder = 2; grp.add(M.oed);
     const loop = new THREE.CatmullRomCurve3([[0.0, -0.3, 0.63], [0.34, -0.38, 0.28], [0.36, -0.4, 0.0], [0.0, -0.44, -0.24], [-0.36, -0.4, 0.0], [-0.34, -0.38, 0.28]].map((p) => new THREE.Vector3(...p)), true);
     M.sah = new THREE.Mesh(new THREE.TubeGeometry(loop, 48, 0.17, 10, true), new THREE.MeshBasicMaterial({ color: 0xb01a2a, transparent: true, opacity: 0, depthWrite: false })); M.sah.renderOrder = 2; grp.add(M.sah);
     M.uncus = ell(0.1, 0.1, 0.14, 0xffb36b, 0.9, [0.52, -0.44, 0.02]); grp.add(M.uncus); M.tonsil = ell(0.1, 0.12, 0.1, 0xffb36b, 0.9, [0, -0.78, -0.52]); grp.add(M.tonsil);

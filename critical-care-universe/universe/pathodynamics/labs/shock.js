@@ -4,9 +4,9 @@
    Content aligned to the Surviving Sepsis Campaign adult guidance (2026 update), the 2025 ISTH update on DIC, the 2024 ADA/EASD/JBDS consensus on hyperglycaemic crises,
    and current anaphylaxis guidance (intramuscular adrenaline first). Checked Nov 2026 against published summaries; where a figure could not be confirmed, the wording is general.
    All numbers are illustrative, not patient data. */
-import { THREE } from "../stage.js?v=20261126gk";
-import { clamp } from "./common.js?v=20261126gk";
-import { organ } from "../anatomy.js?v=20261126gk";
+import { THREE } from "../stage.js?v=20261126r";
+import { clamp } from "./common.js?v=20261126r";
+import { organ } from "../anatomy.js?v=20261126r";
 
 const TABS = {
   SEP: { label: "Septic shock", sub: "Infection, vasoplegia, leak",

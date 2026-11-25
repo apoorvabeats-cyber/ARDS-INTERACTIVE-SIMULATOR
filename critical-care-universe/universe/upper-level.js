@@ -6,7 +6,7 @@
    buildUpper(T, ctx) -> { lift, doors, player, level(), isUp(), clamp(x,z), groundY(x,z), update(t,dt,cam), tap(kind,hit), inHall(p), ... } */
 
 import { buildMemoryHall } from "./memory-hall.js?v=20261124g";
-import { buildPathoHall, PATHO_CLIPS } from "./pathodynamics-hall.js?v=20261126gk";
+import { buildPathoHall, PATHO_CLIPS } from "./pathodynamics-hall.js?v=20261126r";
 import { play as clipPlay, preload as clipPreload } from "./voice-clips.js?v=20261124g";
 
 export function buildUpper(T, c) {

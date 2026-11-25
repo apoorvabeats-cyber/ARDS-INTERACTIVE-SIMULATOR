@@ -5,10 +5,10 @@
    Content aligned to the ACG 2023 acute liver failure guideline (intravenous NAC in paracetamol ALF and suggested in non-paracetamol ALF, early CRRT for hyperammonaemia
    with grade 2 or higher encephalopathy, routine ICP monitoring no longer recommended, early transplant-centre contact and King's College or MELD prognostication) and standard practice for the rest.
    Checked Nov 2026 against published summaries. All numbers are illustrative, not patient data. Every view is 3D. */
-import { THREE, C, smooth } from "../stage.js?v=20261126gk";
-import { clamp } from "./common.js?v=20261126gk";
-import { seg, ball, loadLiver, ellip, rate, V3, rng, CREDIT_BP3D } from "./gi-kit.js?v=20261126gk";
-import { organ } from "../anatomy.js?v=20261126gk";
+import { THREE, C, smooth } from "../stage.js?v=20261126r";
+import { clamp } from "./common.js?v=20261126r";
+import { seg, ball, loadLiver, ellip, rate, V3, rng, CREDIT_BP3D } from "./gi-kit.js?v=20261126r";
+import { organ } from "../anatomy.js?v=20261126r";
 
 const T = {
   PARA: { label: "Paracetamol", sub: "Zone 3 necrosis, NAPQI", unit: " h", min: 0, max: 96, v0: 14, fmax: 0.95, tau: 30, peak: 9000, eStop: 0.25, freq: 4.2, days: false, cause: "STOP EXPOSURE", causeHint: "No more drug; charcoal only if very early.",

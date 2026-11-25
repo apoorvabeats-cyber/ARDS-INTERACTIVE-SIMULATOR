@@ -3,9 +3,10 @@
    Pick the cause, set the time, then correct it and watch filtration, creatinine, potassium and urine output respond.
    Teaching model: reversible functional loss turns into structural loss the longer the cause persists.
    Content aligned to KDIGO 2012 (the current final AKI guideline; the 2026 update was still in public review as of Nov 2026). All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261126gk";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261126gk";
-import { kidney as loadKidney } from "../anatomy.js?v=20261126gk";
+import { THREE, C } from "../stage.js?v=20261126r";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261126r";
+import { kidney as loadKidney } from "../anatomy.js?v=20261126r";
+import { bladderGeom } from "../organ-shapes.js?v=20261126r";
 
 const T = {
   PRE: { label: "Prerenal", sub: "Hypoperfusion", sev: 0.55, irr0: 0, irrMax: 0.8, tau: 2.5, inj: { glom: 0.15, pct: 0.12 },
@@ -62,7 +63,7 @@ export default function create(S, ui) {
     else { pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.2, 22, 16), S.mat(0xf0c46a, { transparent: true, opacity: 0.85 })); pelvis.position.set(0.22, 0, 0); }
     kg.add(pelvis);
     ureter = S.tube(KD ? [[0.3, -0.3, 0.04], [0.42, -0.7, 0.05], [0.5, -1.1, 0.06], [0.46, -1.55, 0.08]] : [[0.3, -0.05, 0], [0.5, -0.5, 0.02], [0.58, -1.05, 0.05], [0.5, -1.55, 0.08]], 0.04, 0xf0c46a, { seg: 30 }); kg.add(ureter); M.ur = ureter;
-    const bl = new THREE.Mesh(new THREE.SphereGeometry(0.24, 24, 18), S.mat(0xe8d09a, { transparent: true, opacity: 0.5 })); bl.position.set(0.45, -1.8, 0.08); kg.add(bl);
+    const bl = new THREE.Mesh(bladderGeom(0.34), S.mat(0xe8b08a, { transparent: true, opacity: 0.6, shininess: 50 })); bl.position.set(0.46, -1.85, 0.08); kg.add(bl);
     const av = vessels(S, kg, [["RA", KD ? [[1.5, 0.35, 0.0], [1.1, 0.3, 0.02], [0.7, 0.2, 0.03], [0.3, 0.14, 0.04]] : [[1.5, 0.35, 0.0], [1.0, 0.3, 0.02], [0.6, 0.2, 0.02], [0.3, 0.12, 0.0]], 0.055]], 0xff5a46, { dens: 14 }); segV.RA = av.T.RA; flows.RA = av.F.RA; halo(S, kg, av.T.RA, "RA");
     kg.add(S.tube(KD ? [[1.5, -0.1, -0.05], [1.1, -0.12, -0.05], [0.7, -0.08, -0.02], [0.3, -0.04, 0]] : [[1.5, -0.1, -0.05], [1.0, -0.12, -0.05], [0.5, -0.1, -0.02], [0.3, -0.05, 0]], 0.06, 0x5b78e6));
     flows.UR = S.flow(ureter.userData.curve, 10, 0xffe08a, { speed: 0.12, off: -2.5 }); flows.UR.rate = 0;

@@ -3,9 +3,9 @@
    Pulmonary embolism has its own lab (./pe.js). Content aligned to the 2024 ATS ARDS guideline and 2024 global ARDS definition, the 2025 ATS community-acquired pneumonia guideline
    (corticosteroids for severe CAP other than influenza) and the 2023 BTS pleural disease guideline (conservative or ambulatory management of minimally symptomatic primary spontaneous
    pneumothorax; needle aspiration or tube drainage otherwise). Checked Nov 2026 against the published summaries. All numbers are illustrative, not patient data. */
-import { THREE } from "../stage.js?v=20261126gk";
-import { toolKit, vessels, mirrorFlows, clamp } from "./common.js?v=20261126gk";
-import { organ, splitLR, fitGeom } from "../anatomy.js?v=20261126gk";
+import { THREE } from "../stage.js?v=20261126r";
+import { toolKit, vessels, mirrorFlows, clamp } from "./common.js?v=20261126r";
+import { organ, splitLR, fitGeom } from "../anatomy.js?v=20261126r";
 
 const TABS = {
   ARDS: { label: "ARDS", sub: "Diffuse alveolar injury",
@@ -35,7 +35,8 @@ const LOBES = { RUL: { p: [0.5, 0.4, 0.05], r: [0.28, 0.26, 0.26], b: [0.5, 0.35
 export default function create(S, ui) {
   const st = { tab: "ARDS", sev: "mod", peep: 8, vt: "high", prone: false, rec: false, ster: false, ecmo: false, abx: false, o2: false, t: 6, t0: -1, lobe: "RLL", comp: "none", ptx: "simple", air: 60, needle: false, tube: false, vol: 1200, etype: "exud", tapped: false, fibr: false, plugLobe: "RLL", physio: false, mucol: false, bronch: false, ghost: false, cur: { air: 0, fluid: 0, cons: 0, plug: 0, ten: 0 } };
   const T = () => TABS[st.tab];
-  let M = {}, V = {}, kits = [], act_kit = null, alv = [], LUNG = null;
+  let M = {}, V = {}, kits = [], act_kit = null, alv = [], LUNG = null, HG = null;
+  organ("heart", { flipX: true, fit: { c: [0, 0, 0], r: [0.22, 0.27, 0.19] } }).then((g) => { HG = g; if (M.grp) build(); }).catch(() => {});   /* real heart (BodyParts3D) instead of a ball */
   organ("lung", { bigX: 1 }).then((g) => { const [l, r] = splitLR(g); LUNG = { R: fitGeom(r, { c: [0, 0, 0], r: [0.42, 0.75, 0.4] }), L: fitGeom(l, { c: [0, 0, 0], r: [0.36, 0.72, 0.38] }) }; if (M.grp) build(); }).catch(() => {});   /* real lungs (BodyParts3D); the simple shapes stay if they cannot load */
   const lungMesh = (g, p) => { const m = new THREE.Mesh(g.clone(), S.mat(0xf0a0a8, { transparent: true, opacity: 0.42, depthWrite: false })); m.position.set(...p); return m; };
 
@@ -45,7 +46,7 @@ export default function create(S, ui) {
     const grp = S.add(new THREE.Group()); grp.scale.x = -1; /* patient's right on the viewer's left in the front view */ M.grp = grp;
     M.lungR = LUNG ? lungMesh(LUNG.R, [0.5, 0, 0]) : ell(0.42, 0.75, 0.4, 0xf0a0a8, 0.42, [0.5, 0, 0]); M.lungL = LUNG ? lungMesh(LUNG.L, [-0.5, 0, 0]) : ell(0.36, 0.72, 0.38, 0xf0a0a8, 0.42, [-0.5, 0, 0]); M.lungR.userData.hemi = 1; M.lungL.userData.hemi = 1; M.lungR.renderOrder = M.lungL.renderOrder = 1; grp.add(M.lungR, M.lungL);
     M.shellR = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16).scale(0.46, 0.8, 0.44), new THREE.MeshBasicMaterial({ color: 0xc8d8f0, wireframe: true, transparent: true, opacity: 0.1, depthWrite: false })); M.shellR.position.set(0.5, 0, 0); M.shellL = M.shellR.clone(); M.shellL.scale.set(0.9, 1, 1); M.shellL.position.set(-0.5, 0, 0); if (!LUNG) grp.add(M.shellR, M.shellL);
-    M.med = new THREE.Group(); grp.add(M.med); M.heart = ell(0.17, 0.22, 0.17, 0xb5323c, 0.8, [-0.08, -0.12, 0.12], { emissive: 0x3a0810 }); M.med.add(M.heart);
+    M.med = new THREE.Group(); grp.add(M.med); M.heart = ell(0.17, 0.22, 0.17, 0xb5323c, 0.8, [-0.08, -0.12, 0.12], { emissive: 0x3a0810 }); if (HG) { M.heart.geometry.dispose(); M.heart.geometry = HG.clone(); M.heart.material.opacity = 0.92; } M.heart.renderOrder = 2; M.med.add(M.heart);
     const a = (n) => LOBES[n].b, defs = [["TR", [[0, 1.0, 0], [0, 0.7, 0], [0, 0.35, 0]], 0.07], ["RMB", [[0, 0.35, 0], [0.15, 0.25, 0], [0.34, 0.1, 0]], 0.05], ["LMB", [[0, 0.35, 0], [-0.15, 0.25, 0], [-0.34, 0.1, 0]], 0.045], ["B_RUL", [[0.34, 0.1, 0], [0.42, 0.25, 0.03], a("RUL")], 0.03], ["B_RML", [[0.34, 0.1, 0], [0.46, 0.04, 0.1], a("RML")], 0.028], ["B_RLL", [[0.34, 0.1, 0], [0.4, -0.05, 0], a("RLL")], 0.03], ["B_LUL", [[-0.34, 0.1, 0], [-0.42, 0.22, 0.02], a("LUL")], 0.03], ["B_LLL", [[-0.34, 0.1, 0], [-0.4, -0.05, 0], a("LLL")], 0.03]];
     const fn0 = S.flows.length; const vv = vessels(S, grp, defs, 0xa8d8ff, { dens: 7 }); mirrorFlows(S, fn0); V = vv.T; M.F = vv.F; Object.keys(V).forEach((n) => { if (n !== "TR") M.med.add; });
     M.cons = ell(1, 1, 1, 0xd9c7a2, 0.0, [0, 0, 0]); M.cons.renderOrder = 3; grp.add(M.cons); M.cons2 = ell(0.4, 0.75, 0.16, 0xd9c7a2, 0, [-0.5, 0, 0]); M.cons2.renderOrder = 3; grp.add(M.cons2); M.cons3 = ell(0.44, 0.78, 0.16, 0xd9c7a2, 0, [0.5, 0, 0]); M.cons3.renderOrder = 3; grp.add(M.cons3);
@@ -170,7 +171,7 @@ export default function create(S, ui) {
 
   const lab = {
     id: "resp", name: "Lung & Pleura Lab", tag: "ARDS, pneumonia, pneumothorax, effusion, mucus plug", icon: "🫁", tabs: ORDER.map((k) => ({ id: k, label: TABS[k].label, sub: TABS[k].sub })), get tab() { return st.tab; },
-    credit: "Lungs: BodyParts3D © DBCLS, CC BY-SA 2.1 JP. Adapted for teaching.",
+    credit: "Lungs and heart: BodyParts3D © DBCLS, CC BY-SA 2.1 JP. Adapted for teaching.",
     selectHint: "Pick a condition, then treat it. For drains, needles and the bronchoscope, drag the tool tip to the glowing ring (or use the button). PE has its own lab.",
     opts: () => {
       const o = [];

@@ -1,7 +1,7 @@
 /* Small 3D helpers shared by the gastroenterology and hepatology labs: ducts that can widen, a fixed branching tree, a gall-stone-like pebble,
    bubbles, and one place to load the liver and the bowel meshes. Everything here is 3D; nothing draws a flat picture. */
-import { THREE } from "../stage.js?v=20261126gk";
-import { organ } from "../anatomy.js?v=20261126gk";
+import { THREE } from "../stage.js?v=20261126r";
+import { organ } from "../anatomy.js?v=20261126r";
 
 export const V3 = (a) => new THREE.Vector3(a[0], a[1], a[2]);
 export const lerp = (a, b, k) => a + (b - a) * k;
