@@ -2,9 +2,9 @@
    Place the clot, watch the right ventricle strain and the oxygen fall, then reperfuse by catheter, lysis or anticoagulation.
    Teaching model: what matters is how much of the pulmonary arterial bed is blocked, how much RV reserve the patient has, and how long it lasts.
    Content aligned to the 2026 AHA/ACC acute PE guideline and its Clinical Categories (checked Nov 2026 against the published summaries). All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261126gj";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261126gj";
-import { organ } from "../anatomy.js?v=20261126gj";
+import { THREE, C } from "../stage.js?v=20261126gk";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261126gk";
+import { organ } from "../anatomy.js?v=20261126gk";
 
 const SITES = {
   SADDLE: { label: "Saddle", sub: "At the PA bifurcation", vessel: "PA", u: 0.97, big: true, tags: { rul: 1, rml: 1, rll: 1, lul: 1, lll: 1 }, burden: 0.62, lysis: 0.7,
@@ -167,20 +167,7 @@ export default function create(S, ui) {
     L.push(["Severity (AHA/ACC 2026 Acute PE Clinical Categories)", "Category here (illustrative): " + e.cat + ". A: asymptomatic (often incidental). B: symptomatic, low severity score (sPESI 0, PESI ≤85). C: symptomatic with an elevated score; C1–C3 by the number of RV-imaging and biomarker abnormalities. D: incipient cardiopulmonary failure (D1 transient hypotension, e.g. syncope; D2 normotensive with shock physiology such as raised lactate or AKI). E: persistent hypotension or cardiopulmonary failure (E1 cardiogenic shock; E2 refractory shock or arrest). A respiratory modifier can be added to C–E; if the respiratory and haemodynamic categories differ, use the higher one."]);
     L.push(["Treatment pathways to consider", "Category A: discharge from the emergency department. Category B: often outpatient oral anticoagulation alone (a DOAC is preferred over a vitamin K antagonist). Categories C–E: hospital admission and a multidisciplinary PE response team (PERT). For parenteral anticoagulation in C–E1, low-molecular-weight heparin is recommended over unfractionated heparin, including before catheter therapy or lysis. Category E: urgent reperfusion, with systemic thrombolysis, catheter-directed therapy or mechanical thrombectomy regarded as equivalent options; surgical embolectomy and VA-ECMO for refractory shock or arrest. Categories C3 and D: advanced therapy may be considered, but the benefit over anticoagulation alone is unclear."]);
     L.push(["Cautions", "Check bleeding risk before lysis (recent surgery, stroke, active bleeding). Avoid large fluid boluses in RV failure; use vasopressors early, and avoid intubation where possible because positive pressure can precipitate collapse. Reference: 2026 AHA/ACC/ACCP/ACEP/CHEST/SCAI/SHM/SIR/SVM/SVN acute PE guideline (ESC 2019 for comparison). Follow your local protocol."]);
-    return { lines: L, draw: (el) => drawImaging(el, e) };
-  }
-  function drawImaging(el, e) {
-    const mk = (title, f) => { const d = document.createElement("div"); d.className = "img"; const c = document.createElement("canvas"); c.width = 300; c.height = 300; const t = document.createElement("small"); t.textContent = title; d.append(c, t); el.append(d); f(c.getContext("2d")); };
-    const tg = site().tags, k = site();
-    mk("CT pulmonary angiogram (schematic)", (g) => { g.fillStyle = "#000"; g.fillRect(0, 0, 300, 300); g.fillStyle = "#2a2a2a"; g.beginPath(); g.ellipse(150, 150, 130, 105, 0, 0, 7); g.fill(); g.fillStyle = "#101010"; g.beginPath(); g.ellipse(82, 150, 50, 72, 0, 0, 7); g.ellipse(218, 150, 50, 72, 0, 0, 7); g.fill();
-      g.fillStyle = "#e8e8e8"; g.beginPath(); g.arc(160, 140, 18, 0, 7); g.fill(); g.beginPath(); g.arc(130, 120, 22, 0, 7); g.fill(); g.strokeStyle = "#e8e8e8"; g.lineWidth = 14; g.lineCap = "round"; g.beginPath(); g.moveTo(130, 120); g.lineTo(80, 110); g.stroke(); g.beginPath(); g.moveTo(130, 120); g.lineTo(215, 105); g.stroke();
-      if (!st.removed && st.reper < 0.7) { g.fillStyle = "#3a3a3a"; if (st.tab === "SADDLE") { g.beginPath(); g.ellipse(130, 118, 17, 9, 0, 0, 7); g.fill(); g.beginPath(); g.ellipse(95, 112, 10, 5, 0, 0, 7); g.ellipse(190, 108, 10, 5, 0, 0, 7); g.fill(); } else if (st.tab === "MAIN") { g.beginPath(); g.ellipse(95, 112, 20, 6, 0, 0, 7); g.fill(); } else { g.beginPath(); g.ellipse(64, 175, 6, 4, 0, 0, 7); g.fill(); } }
-      g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText(st.removed ? "no filling defect" : "dark = filling defect: " + k.label, 8, 292); g.fillStyle = "#e8e8e8"; g.fillText("R", 8, 18); g.fillText("L", 284, 18); });
-    mk("Echo four-chamber view (schematic)", (g) => { g.fillStyle = "#0a0f16"; g.fillRect(0, 0, 300, 300); const lvw = 56, rvw = lvw * e.rvlv; g.fillStyle = "rgba(120,170,255,.55)"; g.beginPath(); g.ellipse(190, 170, lvw, 90, 0.15, 0, 7); g.fill(); g.fillStyle = e.rvlv > 1 ? "rgba(255,179,71,.65)" : "rgba(160,200,255,.45)"; g.beginPath(); g.ellipse(110, 170, rvw, 92, -0.15, 0, 7); g.fill(); g.strokeStyle = "#e8e8e8"; g.lineWidth = 3; g.beginPath(); g.moveTo(150 + Math.max(0, e.rvlv - 1) * 18, 70); g.quadraticCurveTo(150 + (e.rvlv - 0.8) * 25, 170, 150, 260); g.stroke();
-      g.fillStyle = "#e8e8e8"; g.font = "600 12px system-ui"; g.fillText("RV", 100, 30); g.fillText("LV", 186, 30); g.fillStyle = "#ffd166"; g.fillText("RV/LV " + e.rvlv.toFixed(2) + (e.rvlv > 1 ? " · septum bows into LV" : ""), 8, 292); });
-    mk("Lung perfusion scan (schematic)", (g) => { g.fillStyle = "#0a0f16"; g.fillRect(0, 0, 300, 300); const lung = (cx, side) => { g.fillStyle = "#58c8ff"; g.beginPath(); g.ellipse(cx, 150, 62, 112, 0, 0, 7); g.fill(); };
-      lung(88); lung(212); g.fillStyle = "#0a0f16"; const R = ["rul", "rml", "rll"], Lb = ["lul", "lll"]; R.forEach((l, i) => { if (tg[l]) { const h = tg[l]; g.beginPath(); g.ellipse(88, 70 + i * 55 + (l === "rll" ? 20 : 0), 62 * Math.min(1, h + 0.2), (l === "rll" ? 60 : 30) * Math.min(1, h + 0.3), 0, 0, 7); g.globalAlpha = 1 - 0.85 * (st.reper > 0.6 ? 0.5 : 1) * 1; g.fill(); g.globalAlpha = 1; } }); Lb.forEach((l, i) => { if (tg[l]) { g.beginPath(); g.ellipse(212, 80 + i * 70, 62, 52, 0, 0, 7); g.fill(); } });
-      g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText("dark = no perfusion (dead space)", 8, 292); g.fillStyle = "#e8e8e8"; g.fillText("R", 8, 18); g.fillText("L", 284, 18); });
+    return { lines: L };
   }
 
   const lab = {

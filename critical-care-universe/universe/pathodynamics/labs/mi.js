@@ -2,9 +2,9 @@
    Pick the blocked coronary, read the ECG territory, drag the thrombus out, balloon and stent, or give fibrinolysis.
    Teaching model: myocardium is lost with TIME and COLLATERALS; reopening the artery does not bring back necrosed muscle.
    Content aligned to the 2025 ACC/AHA/ACEP/NAEMSP/SCAI ACS guideline (checked Nov 2026 against the published summaries). All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261126gj";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261126gj";
-import { organ } from "../anatomy.js?v=20261126gj";
+import { THREE, C } from "../stage.js?v=20261126gk";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261126gk";
+import { organ } from "../anatomy.js?v=20261126gk";
 
 const ROT = 0.4, LVC = [0.22, -0.1, -0.05], LVR = [0.52, 0.86, 0.5], RVC = [-0.42, -0.2, 0.2], RVR = [0.42, 0.66, 0.45];
 const lvPt = (ph, th, k) => { k = k || 1.03; let x = LVR[0] * Math.cos(th) * Math.cos(ph) * k, y = LVR[1] * Math.sin(th) * k, z = LVR[2] * Math.cos(th) * Math.sin(ph) * k; const c = Math.cos(ROT), s = Math.sin(ROT); return [x * c - y * s + LVC[0], x * s + y * c + LVC[1], z + LVC[2]]; };
@@ -210,23 +210,7 @@ export default function create(S, ui) {
     L.push(["After discharge", "Dual antiplatelet therapy for at least 12 months unless the bleeding risk is high (then shorter or alternative strategies), high-intensity statin for everyone, and a non-statin added if LDL-C stays at or above 70 mg/dL on maximum statin."]);
     L.push(["Complications to anticipate", k.vessel === "RCA" ? "RV failure with low BP and clear lungs; bradycardia and AV block (pacing); inferior MI with ST rise in V1." : st.tab === "LM" || st.tab === "LAD" ? "Cardiogenic shock, acute pulmonary oedema, VT/VF, later mechanical complications (septal rupture, papillary muscle rupture, free-wall rupture)." : "Arrhythmia, heart failure; mitral regurgitation from papillary muscle ischaemia."]);
     L.push(["Reference", "Reference: 2025 ACC/AHA/ACEP/NAEMSP/SCAI ACS guideline (2023 ESC ACS for the ESC time targets). Follow your local STEMI protocol."]);
-    return { lines: L, draw: (el) => drawImaging(el, e) };
-  }
-  function drawImaging(el, e) {
-    const mk = (title, f) => { const d = document.createElement("div"); d.className = "img"; const c = document.createElement("canvas"); c.width = 300; c.height = 300; const t = document.createElement("small"); t.textContent = title; d.append(c, t); el.append(d); f(c.getContext("2d")); };
-    const tg = site().tags;
-    mk("Coronary angiogram (schematic)", (g) => { g.fillStyle = "#0a0f16"; g.fillRect(0, 0, 300, 300); g.lineCap = "round"; const ln = (pts, col, w) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo(...p) : g.moveTo(...p))); g.stroke(); };
-      const occ = st.reper < 0.98, col = (nm, vs) => (vs.includes(site().vessel) && occ ? "rgba(255,255,255,.12)" : "#e8e8e8");
-      ln([[150, 40], [150, 70]], "#e8e8e8", 9); ln([[150, 70], [120, 95]], col("LM", ["LM"]), 7); ln([[120, 95], [95, 150], [85, 230], [95, 275]], col("LAD", ["LAD", "LM"]), 5); ln([[120, 95], [150, 110], [215, 140], [235, 200]], col("LCX", ["LCX", "LM"]), 5);
-      ln([[150, 50], [195, 70], [235, 110], [250, 170], [215, 250]], col("RCA", ["RCA"]), 5); ln([[215, 250], [170, 275]], col("PDA", ["RCA", "PDA"]), 4);
-      g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText(st.stent ? "stented · TIMI 3" : st.reper < 0.3 ? "abrupt cut-off: " + site().label : "partial flow", 8, 292); });
-    mk("Echo wall motion (schematic polar map)", (g) => { g.fillStyle = "#0a0f16"; g.fillRect(0, 0, 300, 300);
-      const secs = [["lad", -150, -90], ["lad", -90, -30], ["lcx", -30, 30], ["lcx", 30, 90], ["rca", 90, 150], ["pda", 150, 210]];
-      [[120, 80], [78, 40], [36, 0]].forEach(([ro, ri], rg) => { secs.forEach(([tag, a0, a1]) => { const hit = rg === 2 ? tag === "lad" && tg.lad : tg[tag]; const dead = hit ? e.cf : 0; g.fillStyle = hit ? `rgb(${Math.round(70 + 150 * (1 - dead))},${Math.round(60 + 90 * (1 - dead))},${Math.round(70 + 60 * (1 - dead))})` : "#3a8f6a"; g.beginPath(); g.arc(150, 150, ro, a0 * Math.PI / 180, a1 * Math.PI / 180); g.arc(150, 150, ri, a1 * Math.PI / 180, a0 * Math.PI / 180, true); g.closePath(); g.fill(); g.strokeStyle = "#0a0f16"; g.lineWidth = 2; g.stroke(); }); });
-      g.fillStyle = "#e8e8e8"; g.font = "600 11px system-ui"; g.fillText("anterior", 118, 14); g.fillText("inferior", 120, 296); g.fillStyle = "#ffd166"; g.fillText("dark = akinetic (non-contracting)", 8, 292); });
-    mk("Troponin curve (illustrative)", (g) => { g.fillStyle = "#0a0f16"; g.fillRect(0, 0, 300, 300); g.strokeStyle = "rgba(255,255,255,.2)"; g.beginPath(); g.moveTo(24, 20); g.lineTo(24, 270); g.lineTo(290, 270); g.stroke();
-      g.strokeStyle = "#ff8a8a"; g.lineWidth = 2.5; g.beginPath(); const inf = e.inf; for (let x = 0; x <= 260; x++) { const h = (x / 260) * 72, y = 270 - 230 * Math.min(1, inf * 2.8 + 0.04) * (1 - Math.exp(-h / 4)) * Math.exp(-Math.max(0, h - 18) / 60); x ? g.lineTo(24 + x, y) : g.moveTo(24 + x, y); } g.stroke();
-      g.fillStyle = "#e8e8e8"; g.font = "600 11px system-ui"; g.fillText("0", 24, 284); g.fillText("72 h", 262, 284); g.fillText("rise within hours, falls over days", 40, 18); });
+    return { lines: L };
   }
 
   const lab = {

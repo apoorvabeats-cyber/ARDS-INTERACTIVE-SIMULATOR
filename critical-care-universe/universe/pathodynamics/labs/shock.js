@@ -4,9 +4,9 @@
    Content aligned to the Surviving Sepsis Campaign adult guidance (2026 update), the 2025 ISTH update on DIC, the 2024 ADA/EASD/JBDS consensus on hyperglycaemic crises,
    and current anaphylaxis guidance (intramuscular adrenaline first). Checked Nov 2026 against published summaries; where a figure could not be confirmed, the wording is general.
    All numbers are illustrative, not patient data. */
-import { THREE } from "../stage.js?v=20261126gj";
-import { clamp } from "./common.js?v=20261126gj";
-import { organ } from "../anatomy.js?v=20261126gj";
+import { THREE } from "../stage.js?v=20261126gk";
+import { clamp } from "./common.js?v=20261126gk";
+import { organ } from "../anatomy.js?v=20261126gk";
 
 const TABS = {
   SEP: { label: "Septic shock", sub: "Infection, vasoplegia, leak",
@@ -190,16 +190,7 @@ export default function create(S, ui) {
       DKA: ["Glucose above about 11 mmol/L (200 mg/dL) or known diabetes, ketones above 3 mmol/L (or ketonuria), and pH below 7.3 or bicarbonate below 18 mmol/L. Euglycaemic DKA occurs with SGLT2 inhibitors.", "ADA/EASD/JBDS 2024 consensus: IV fluids first; potassium check before insulin; fixed-rate IV insulin (about 0.1 units/kg/h); potassium replacement to keep 4–5.5 mmol/L; dextrose when glucose is about 14 mmol/L; continue until ketones and pH have normalised; then overlapping subcutaneous insulin."],
       HHS: ["Glucose above about 33 mmol/L (600 mg/dL), effective osmolality above about 320 mOsm/kg, no significant ketosis, and marked dehydration with altered consciousness.", "ADA/EASD/JBDS 2024 consensus: careful fluid resuscitation first; lower-dose insulin after initial fluids, once glucose stops falling; avoid a rapid fall in osmolality; replace potassium; VTE prophylaxis; treat the trigger."],
     }[t];
-    return { lines: [["Diagnosis", L[0]], ["Management", L[1]], ["Reference", "Surviving Sepsis Campaign 2026; ISTH 2025 DIC update; 2024 ADA/EASD/JBDS hyperglycaemic crises consensus; current anaphylaxis guidance; local protocols. Numbers are illustrative."]], draw: (el) => draw(el) };
-  }
-  function draw(el) {
-    const mk = (title, f) => { const d = document.createElement("div"); d.className = "img"; const c = document.createElement("canvas"); c.width = 300; c.height = 300; const tt = document.createElement("small"); tt.textContent = title; d.append(c, tt); el.append(d); f(c.getContext("2d")); };
-    const t = st.tab, axes = (g) => { g.fillStyle = "#0a0f16"; g.fillRect(0, 0, 300, 300); g.strokeStyle = "rgba(255,255,255,.25)"; g.beginPath(); g.moveTo(34, 20); g.lineTo(34, 270); g.lineTo(290, 270); g.stroke(); }, cap = (g, s) => { g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText(s, 8, 292); };
-    if (t === "SEP") mk("Fluid response (Frank–Starling)", (g) => { axes(g); g.strokeStyle = "#7ec8ff"; g.lineWidth = 2.5; g.beginPath(); for (let x = 0; x <= 250; x++) { const f = (x / 250) * 60, co = 4.2 + 2.6 * (1 - Math.exp(-f / 14)) - 0.05 * Math.max(0, f - 35), y = 270 - (co / 9) * 230; x ? g.lineTo(34 + x, y) : g.moveTo(34 + x, y); } g.stroke(); const p = sep(); g.fillStyle = "#fff"; g.beginPath(); g.arc(34 + (st.f / 60) * 250, 270 - (p.co / 9) * 230, 6, 0, 7); g.fill(); cap(g, "output rises, then plateaus; more fluid leaks (" + st.f + " mL/kg)"); });
-    if (t === "DIC") mk("Coagulation panel", (g) => { axes(g); const d = dic(), bars = [["Plt", d.plt / 250, d.plt < 50], ["Fib", d.fib / 4.5, d.fib < 1], ["PT↑", d.pt / 12, d.pt > 6], ["Score", d.score / 8, d.score >= 5]]; bars.forEach((b, i) => { g.fillStyle = b[2] ? "#ff6b6b" : "#7ec8ff"; g.fillRect(50 + i * 62, 270 - clamp(b[1], 0, 1) * 230, 42, clamp(b[1], 0, 1) * 230); g.fillStyle = "#e8e8e8"; g.font = "600 11px system-ui"; g.fillText(b[0], 56 + i * 62, 286); }); cap(g, ""); });
-    if (t === "ANAPH") mk("Blood pressure over time (untreated vs now)", (g) => { axes(g); g.strokeStyle = "#555"; g.beginPath(); for (let x = 0; x <= 250; x++) { const m = (x / 250) * 30, s = 1 - Math.exp(-m / 6), y = 270 - (clamp(122 - 68 * s * 1.05, 45, 125) / 140) * 230; x ? g.lineTo(34 + x, y) : g.moveTo(34 + x, y); } g.stroke(); const a = ana(); g.fillStyle = "#fff"; g.beginPath(); g.arc(34 + (st.pmin / 30) * 250, 270 - (a.sbp / 140) * 230, 6, 0, 7); g.fill(); cap(g, "grey: untreated; dot: now (SBP " + a.sbp + ")"); });
-    if (t === "ACID") mk("pH vs bicarbonate (Davenport-style)", (g) => { axes(g); [[40, "#555"], [20, "#7a6a3a"]].forEach(([p, c]) => { g.strokeStyle = c; g.beginPath(); for (let x = 0; x <= 250; x++) { const hc = 4 + (x / 250) * 24, ph = 6.1 + Math.log10(hc / (0.03 * p)); const y = 270 - ((ph - 6.8) / 0.8) * 230; x ? g.lineTo(34 + x, y) : g.moveTo(34 + x, y); } g.stroke(); }); const a = acid(); g.fillStyle = "#fff"; g.beginPath(); g.arc(34 + ((a.hco3 - 4) / 24) * 250, 270 - ((a.ph - 6.8) / 0.8) * 230, 6, 0, 7); g.fill(); cap(g, "grey line PCO₂ 40, brown PCO₂ 20; pH " + a.ph.toFixed(2)); });
-    if (t === "DKA" || t === "HHS") mk(t === "DKA" ? "Glucose and ketones over 24 h" : "Glucose and osmolality over 24 h", (g) => { axes(g); const ev = (h) => (t === "DKA" ? dka(h) : hhs(h)); [["g", "#ffd84d", t === "DKA" ? 34 : 52], [t === "DKA" ? "ket" : "osm", "#ff9a5c", t === "DKA" ? 6 : 360]].forEach(([k, c, mx]) => { g.strokeStyle = c; g.lineWidth = 2; g.beginPath(); for (let x = 0; x <= 250; x++) { const v = ev((x / 250) * 24)[k], y = 270 - clamp(v / mx, 0, 1) * 230; x ? g.lineTo(34 + x, y) : g.moveTo(34 + x, y); } g.stroke(); }); g.fillStyle = "#fff"; g.fillRect(34 + (st.h / 24) * 250 - 1, 30, 2, 240); cap(g, "yellow glucose, orange " + (t === "DKA" ? "ketones" : "osmolality") + "; white line now"); });
+    return { lines: [["Diagnosis", L[0]], ["Management", L[1]], ["Reference", "Surviving Sepsis Campaign 2026; ISTH 2025 DIC update; 2024 ADA/EASD/JBDS hyperglycaemic crises consensus; current anaphylaxis guidance; local protocols. Numbers are illustrative."]] };
   }
 
   const lab = {

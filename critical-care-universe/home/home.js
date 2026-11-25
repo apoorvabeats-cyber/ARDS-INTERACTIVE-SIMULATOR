@@ -48,7 +48,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) music
 addEventListener("pageshow", (e) => { if (e.persisted) { $("#veil").classList.remove("on"); applyMusic(); } });
 
 /* ---------------------------------------------------------------- what the screen offers */
-const U = "../universe/", R = "../../", V = "20261126gj";
+const U = "../universe/", R = "../../", V = "20261126gk";
 const CHEV = '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
 const QUICK = [
   { name: "Formulas and criteria", sub: "Scores, calculators", href: R + "formulas.html" },

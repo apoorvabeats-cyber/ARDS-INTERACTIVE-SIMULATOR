@@ -3,9 +3,9 @@
    EVD placement and a stepwise ICP ladder. Teaching model: one intracranial volume budget (Monro-Kellie) drives pressure, perfusion and herniation.
    Content aligned to the 2022 AHA/ASA spontaneous ICH guideline, the 2025 AHA/ACC hypertension guideline (acute ICH blood pressure) and the 2023 AHA/ASA aneurysmal SAH guideline
    (checked Nov 2026 against the published summaries). ICP thresholds follow common neurocritical-care practice. All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261126gj";
-import { toolKit, vessels, mirrorFlows, halo, clamp } from "./common.js?v=20261126gj";
-import { organ } from "../anatomy.js?v=20261126gj";
+import { THREE, C } from "../stage.js?v=20261126gk";
+import { toolKit, vessels, mirrorFlows, halo, clamp } from "./common.js?v=20261126gk";
+import { organ } from "../anatomy.js?v=20261126gk";
 
 const SITES = { ACOM: { label: "Anterior communicating", p: [0, -0.3, 0.63] }, MCA: { label: "MCA bifurcation", p: [0.75, -0.28, 0.4] }, PCOM: { label: "Posterior communicating", p: [0.34, -0.4, 0.05] }, BASI: { label: "Basilar tip", p: [0, -0.42, -0.22] } };
 const LOCS = { deep: { label: "Deep (basal ganglia)", p: [0.45, 0.02, 0.1] }, lobar: { label: "Lobar (temporo-parietal)", p: [0.72, 0.3, -0.2] }, cereb: { label: "Cerebellar", p: [0.25, -0.5, -0.68] } };
@@ -174,22 +174,7 @@ export default function create(S, ui) {
     if (tn === "ANEU") L.push(["Unruptured aneurysm", "Decide by size, site, shape, growth, symptoms, age, comorbidity and PHASES-type risk against procedural risk. Smoking cessation and blood-pressure control for all. Follow ESO and AHA/ASA unruptured-aneurysm guidance and your neurovascular team's protocol."]);
     if (tn === "HERN" || tn === "HCP") L.push(["ICP ladder", "Tier 1: head up 30°, midline head, normocapnia, normothermia, treat pain and agitation. Tier 2: osmotherapy, CSF drainage by EVD, deeper sedation. Tier 3: brief hyperventilation as a bridge, barbiturate or hypothermia in selected patients, and decompressive craniectomy or removal of the mass."]);
     L.push(["Reference", "2022 AHA/ASA spontaneous ICH guideline; 2025 AHA/ACC hypertension guideline; 2023 AHA/ASA aneurysmal SAH guideline; Brain Trauma Foundation and neurocritical-care ICP guidance. Follow your local neurosurgical protocol."]);
-    return { lines: L, draw: (el) => drawImaging(el, e) };
-  }
-  function drawImaging(el, e) {
-    const mk = (title, f) => { const d = document.createElement("div"); d.className = "img"; const c = document.createElement("canvas"); c.width = 300; c.height = 300; const t = document.createElement("small"); t.textContent = title; d.append(c, t); el.append(d); f(c.getContext("2d")); };
-    mk("CT head, axial (schematic)", (g) => { g.fillStyle = "#000"; g.fillRect(0, 0, 300, 300); g.fillStyle = "#e8e8e8"; g.beginPath(); g.ellipse(150, 150, 118, 132, 0, 0, 7); g.fill(); g.fillStyle = "#6a6a6a"; g.beginPath(); g.ellipse(150, 150, 108, 122, 0, 0, 7); g.fill();
-      const sh = e.v > 20 ? Math.min(26, e.v / 5) : 0, hy = 1 + 0.9 * e.hyd; g.fillStyle = "#111"; [-1, 1].forEach((s) => { g.beginPath(); g.ellipse(150 + s * 22 * hy - sh * 0.6, 135, 11 * hy, 28 * (0.8 + 0.4 * hy), s * 0.15, 0, 7); g.fill(); });
-      if (st.tab === "ICH" && e.ich > 0.5) { const p = { deep: [180, 140], lobar: [220, 120], cereb: [160, 240] }[st.loc], r = Math.cbrt(e.ich) * 7; g.fillStyle = "rgba(60,60,60,.9)"; g.beginPath(); g.ellipse(p[0], p[1], r * 1.4, r * 1.4, 0, 0, 7); g.fill(); g.fillStyle = "#f4f4f4"; g.beginPath(); g.ellipse(p[0], p[1], r, r, 0.3, 0, 7); g.fill(); }
-      if (st.tab === "SAH") { g.strokeStyle = "#f4f4f4"; g.lineWidth = 7; g.lineCap = "round"; g.beginPath(); g.moveTo(150, 205); g.lineTo(150, 170); g.moveTo(150, 205); g.lineTo(108, 190); g.moveTo(150, 205); g.lineTo(192, 190); g.moveTo(150, 170); g.lineTo(125, 160); g.moveTo(150, 170); g.lineTo(175, 160); g.stroke(); }
-      if (sh) { g.strokeStyle = "#ffd166"; g.lineWidth = 2; g.beginPath(); g.moveTo(150, 40); g.lineTo(150 - sh * 0.9, 260); g.stroke(); g.setLineDash([4, 4]); g.beginPath(); g.moveTo(150, 40); g.lineTo(150, 260); g.stroke(); g.setLineDash([]); }
-      g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText(sh ? "midline shift ≈ " + Math.round(sh / 3) + " mm" : st.tab === "SAH" ? "bright blood in the cisterns" : "no shift", 8, 292); g.fillStyle = "#e8e8e8"; g.fillText("R", 8, 18); g.fillText("L", 284, 18); });
-    mk("Pressure–volume curve (Monro–Kellie)", (g) => { g.fillStyle = "#0a0f16"; g.fillRect(0, 0, 300, 300); g.strokeStyle = "rgba(255,255,255,.25)"; g.beginPath(); g.moveTo(34, 20); g.lineTo(34, 270); g.lineTo(290, 270); g.stroke(); g.strokeStyle = "#ff8a8a"; g.lineWidth = 2.5; g.beginPath(); for (let x = 0; x <= 250; x++) { const v = (x / 250) * 140, p = 8 * Math.exp(v / 52), y = 270 - Math.min(240, p * 3.1); x ? g.lineTo(34 + x, y) : g.moveTo(34 + x, y); } g.stroke();
-      g.strokeStyle = "rgba(255,209,102,.6)"; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(34, 270 - 22 * 3.1); g.lineTo(290, 270 - 22 * 3.1); g.stroke(); g.setLineDash([]); const px = 34 + clamp(e.v / 140, 0, 1) * 250, py = 270 - Math.min(240, e.icp * 3.1); g.fillStyle = "#fff"; g.beginPath(); g.arc(px, py, 6, 0, 7); g.fill();
-      g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText("22 mmHg treatment line · ICP " + e.icp, 40, 292); g.fillStyle = "#e8e8e8"; g.fillText("ICP", 6, 16); g.fillText("added volume →", 200, 286); });
-    mk("Angiogram (schematic)", (g) => { g.fillStyle = "#000"; g.fillRect(0, 0, 300, 300); g.strokeStyle = "#e8e8e8"; g.lineWidth = 9; g.lineCap = "round"; g.beginPath(); g.moveTo(150, 260); g.lineTo(150, 200); g.moveTo(150, 200); g.lineTo(100, 150); g.lineTo(80, 100); g.moveTo(150, 200); g.lineTo(200, 150); g.lineTo(220, 100); g.moveTo(100, 150); g.lineTo(150, 90); g.lineTo(200, 150); g.stroke();
-      const P = { ACOM: [150, 90], MCA: [220, 100], PCOM: [200, 150], BASI: [150, 200] }[st.site], r = { small: 8, med: 14, large: 22 }[st.size]; if (st.tab === "SAH" || st.tab === "ANEU") { g.fillStyle = secured() ? "#555" : "#f4f4f4"; g.beginPath(); g.arc(P[0], P[1] - r - 6, r, 0, 7); g.fill(); if (st.coil) { g.strokeStyle = "#ffe08a"; g.lineWidth = 2; g.beginPath(); g.arc(P[0], P[1] - r - 6, r - 3, 0, 7); g.stroke(); } if (st.clip) { g.fillStyle = "#cfd8e8"; g.fillRect(P[0] - r, P[1] - 8, r * 2, 5); } }
-      g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText(st.tab === "SAH" || st.tab === "ANEU" ? SITES[st.site].label + (secured() ? " · secured" : " · aneurysm filling") : "vessels shifted by mass effect", 8, 292); });
+    return { lines: L };
   }
 
   const lab = {
