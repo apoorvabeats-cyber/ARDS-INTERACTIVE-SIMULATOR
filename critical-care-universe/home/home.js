@@ -5,7 +5,7 @@ import { GLTFLoader } from "../universe/vendor/GLTFLoader.js";
 import { AVATARS, AVATAR_KEYS, avatarThumb, loadAvatar, createRigDoctor } from "../universe/doctor-rig.js?v=20261126m";
 import { createHero } from "./hero-doctor.js?v=3";
 import { createHero as createWaveHero } from "./hero-wave.js?v=3";
-import { liveUpdates } from "../universe/live-updates.js?v=20261126n";
+import { liveUpdates } from "../universe/live-updates.js?v=20261128a";
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -65,10 +65,17 @@ function sfx(kind) {
     }
   } catch (e) { /* ignore */ }
 }
+/* the opening: the rail and the live strip come first, then one section lands on every beat of the music (see seqStart) */
+const SEQ = { t0: 0, run: false, audio: false, tiles: [7.74, 8.44, 9.16, 9.85], b0: 7.05, bp: 0.705, last: -1 };
+const seqTime = () => (clock - SEQ.t0) / 1000;
+function syncAudio() { try { const d = music.duration || 144, t = seqTime() % d; if (Math.abs(music.currentTime - t) > 0.35) music.currentTime = t; } catch (e) { /* ignore */ } }
 const music = $("#music");
-function applyMusic() { music.volume = S.mute ? 0 : Math.min(1, S.music); }
-let musicTried = false;
-addEventListener("pointerdown", () => { if (musicTried) return; musicTried = true; applyMusic(); if (S.music > 0 && !S.mute && !NONAV) music.play().catch(() => {}); }, { once: false });
+let gestured = false;
+function applyMusic() {
+  music.volume = S.mute ? 0 : Math.min(1, S.music);
+  if (gestured && SEQ.run && !NONAV && music.volume > 0 && music.paused) music.play().then(() => { SEQ.audio = true; syncAudio(); }).catch(() => {});
+}
+addEventListener("pointerdown", () => { gestured = true; if (SEQ.audio) return; applyMusic(); if (!NONAV && S.music > 0 && !S.mute && SEQ.run) music.play().then(() => { SEQ.audio = true; syncAudio(); }).catch(() => {}); });
 
 /* ======================================================================== data */
 const IC = {
@@ -123,11 +130,12 @@ const TEAM = [
 
 /* ======================================================================== tiles: elevated slabs that stand up out of the floor */
 const field = $("#field"), stage = $("#stage"), main = $("#main");
+const esc2 = (x) => String(x).replace(/[&<>"]/g, "");
 function mkTile(d, slot, big) {
   const el = document.createElement("div"); el.className = "tile"; el.style.setProperty("--c", d.c); el.tabIndex = 0; el.setAttribute("role", "button"); el.setAttribute("aria-label", d.name);
   el.innerHTML = `<div class="ground"></div><div class="bob"><i class="shadow"></i><div class="slab">
     <i class="face f-back"></i><i class="face f-l"></i><i class="face f-r"></i><i class="face f-t"></i><i class="face f-b"></i>
-    <div class="face f-front"><div class="t-ic">${svg(d.ic)}</div>${d.tag ? `<span class="t-go">${d.tag}</span>` : `<span class="t-go">OPEN</span>`}<div class="t-tt"><b>${d.name}</b><small>${d.sub}</small></div></div>
+    <div class="face f-front"><div class="t-ic">${svg(d.ic)}</div>${d.tag ? `<span class="t-go">${d.tag}</span>` : `<span class="t-go">OPEN</span>`}<div class="t-meta"><i></i>${esc2((d.id || d.name.replace(/\W/g, "")).slice(0, 4).toUpperCase())} // ONLINE<u></u></div><div class="t-tt"><b>${d.name}</b><small>${d.sub}</small></div></div>
     </div></div>`;
   place(el, slot); el.style.display = "none"; field.appendChild(el);
   const T = { el, slab: $(".slab", el), bob: $(".bob", el), rx: 0, ry: 0, tx: 0, ty: 0, ph: Math.random() * 6, lift: 0, hov: false, d };
@@ -174,7 +182,7 @@ function plinth(sc, r) {
 }
 const heroCv = $("#heroCv");
 const H = { r: null, sc: new THREE.Scene(), cam: new THREE.PerspectiveCamera(26, 0.5, 0.1, 60), holder: new THREE.Group(), actor: null, on: false, kind: "default", gen: 0, pl: null, popT: 1 };
-H.cam.position.set(0, 1.0, 4.8); H.cam.lookAt(0, 0.86, 0); lights(H.sc); H.sc.add(H.holder); H.pl = plinth(H.sc, 0.78);
+H.cam.position.set(0, 1.0, 4.8); H.cam.lookAt(0, 0.86, 0); lights(H.sc); H.sc.add(H.holder); H.pl = plinth(H.sc, 0.56);
 let defaultGltf = null;
 const loader = new GLTFLoader();
 const loadDefault = () => defaultGltf || (defaultGltf = new Promise((res, rej) => loader.load(new URL("./hero.glb", import.meta.url).href, res, undefined, rej)));
@@ -439,14 +447,17 @@ addEventListener("keydown", (e) => { if (e.key === "Escape") { closeFly(); close
 const LANEC = { SCCM: "#ff7a8a", ESICM: "#7ab8ff", KDIGO: "#ffc24a", IDSA: "#7dffb8", ATS: "#6fe6ff", ICMR: "#ffa56b", ARDS: "#c9a6ff" };
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const FT = { x: 0, half: 0, em: 16, hover: false, n: -1 }, footTrack = $("#footTrack");
-const fvCard = (it) => `<a class="fv" href="${esc(it.href || "#")}" target="_blank" rel="noopener noreferrer" title="${esc(it.title)}" style="--lc:${LANEC[it.lane] || "#7ab8ff"}"><span class="r1"><span class="lane">${esc(it.lane)}</span>${it.breaking ? '<span class="nw br">NEW</span>' : it.fresh ? '<span class="nw">LATEST</span>' : ""}<em>${esc(it.when || "")}</em></span><b>${esc(it.title)}</b></a>`;
+const MONS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], p2 = (n) => String(n).padStart(2, "0");
+const stampTxt = (ms) => { const d = new Date(ms || Date.now()); return d.getDate() + " " + MONS[d.getMonth()] + ", " + p2(d.getHours()) + ":" + p2(d.getMinutes()); };
+const fvCard = (it) => `<a class="fv" href="${esc(it.href || "#")}" target="_blank" rel="noopener noreferrer" title="${esc(it.title)}" style="--lc:${LANEC[it.lane] || "#7ab8ff"}"><span class="r1"><span class="lane">${esc(it.lane)}</span>${it.breaking ? '<span class="nw br">NEW</span>' : it.fresh ? '<span class="nw">LATEST</span>' : ""}<em>${esc(it.ms ? it.when : (it.when || "") + " · " + stampTxt(LIVE && LIVE.updated()))}</em></span><b>${esc(it.title)}</b></a>`;
 let LIVE = null; try { LIVE = liveUpdates(); } catch (e) {}
 function renderFoot() {
   const its = LIVE ? LIVE.items() : []; const vk = its.length + ":" + (LIVE ? LIVE.version() : 0); if (!its.length || vk === FT.n) return; FT.n = vk;
   const one = its.map(fvCard).join(""); footTrack.innerHTML = one + one;                           /* shown twice, so the loop has no seam */
   FT.half = footTrack.scrollWidth / 2;
 }
-renderFoot(); setInterval(renderFoot, 4000);
+function footStamp() { const m = $("#footMeta"), u = LIVE ? LIVE.updated() : Date.now(); const d = new Date(u); m.textContent = "Updated " + d.getDate() + " " + MONS[d.getMonth()] + ", " + p2(d.getHours()) + ":" + p2(d.getMinutes()); }
+renderFoot(); footStamp(); setInterval(() => { renderFoot(); footStamp(); }, 4000);
 $("#footWin").addEventListener("pointerenter", () => { FT.hover = true; }); $("#footWin").addEventListener("pointerleave", () => { FT.hover = false; });
 const fEm = () => { FT.em = parseFloat(getComputedStyle(stage).fontSize) || 16; }; fEm(); addEventListener("resize", fEm);
 function stepFoot(dt) {
@@ -462,11 +473,11 @@ function frame(now) {
   /* tiles: they float a little and lean towards the pointer */
   $$(".tile", field).forEach((el) => {
     const T = el._t; if (el.style.display === "none") return; const k = Math.min(1, dt * 9);
-    const wantX = -11 + (T.hov ? -T.ty * 16 : 0) + (reduced ? 0 : Math.sin(tAcc * 0.9 + T.ph) * 1.4), wantY = 14 + (T.hov ? T.tx * 24 : 0) + (reduced ? 0 : Math.cos(tAcc * 0.7 + T.ph) * 1.8);
+    const wantX = 0 + (T.hov ? -T.ty * 16 : 0) + (reduced ? 0 : Math.sin(tAcc * 0.9 + T.ph) * 0.4), wantY = 0 + (T.hov ? T.tx * 24 : 0) + (reduced ? 0 : Math.cos(tAcc * 0.7 + T.ph) * 0.35);
     T.rx += (wantX - T.rx) * k; T.ry += (wantY - T.ry) * k; T.lift += ((T.hov ? 1.1 : 0) - T.lift) * k;
     T.slab.style.transform = `translateZ(${T.lift}em) rotateX(${T.rx}deg) rotateY(${T.ry}deg)`; T.bob.style.transform = reduced ? "" : `translateY(${Math.sin(tAcc * 1.1 + T.ph) * 0.35}em)`;
   });
-  stepFoot(dt);
+  stepFoot(dt); seqFrame();
   if (view === "cmd") drawLive(tAcc);
   /* the hero */
   if (H.shown !== false && H.actor) {
@@ -489,5 +500,28 @@ window.__ccu = { step(ms) { clock += ms; frame(clock); }, manual() { manual = tr
 applyS(); paintProfile(); H.shown = true; $("#teamFrame").style.display = "none";
 window.__ccu.ready = setHeroSafe(avKey || "default").then(() => Promise.all(AVATAR_KEYS.map((k) => loadAvatar(k).catch(() => {}))));
 Object.values(parentEl).forEach((el) => { el.style.display = "none"; });
-(async () => { await wait(300); sfx("whoosh"); PARENTS.forEach((P, i) => rise(parentEl[P.id], i * 170, 1100)); })();
+function seqStart() {
+  const pre = document.getElementById("pre"); if (pre) pre.remove();
+  SEQ.t0 = clock; SEQ.run = true; SEQ.audio = false; SEQ.last = -1;
+  const rail = [...$$("#rail > *")], foot = $("#foot");
+  rail.forEach((el) => { el.style.opacity = 0; }); foot.style.opacity = 0;
+  sfx("whoosh");
+  rail.forEach((el, i) => tw(650, (p) => { el.style.opacity = p; el.style.transform = p >= 1 ? "" : `translateX(${-(1 - p) * 3}em)`; }, { delay: 250 + i * 330, ease: E.out }));
+  tw(800, (p) => { foot.style.opacity = p; foot.style.transform = p >= 1 ? "" : `translateY(${(1 - p) * 2.5}em)`; }, { delay: 250 + rail.length * 330 + 300, ease: E.out });
+  const brand = $("#brand"), hf = $("#heroFrame"); brand.style.opacity = 0; hf.style.opacity = 0;
+  tw(450, (p) => { brand.style.opacity = p; hf.style.opacity = p; hf.style.transform = p >= 1 ? "" : `translate3d(${(1 - p) * -3}em,0,0) scale(${0.95 + p * 0.05})`; }, { delay: Math.max(0, SEQ.b0 * 1000 - 60), ease: E.out });
+  PARENTS.forEach((P, i) => rise(parentEl[P.id], Math.max(0, SEQ.tiles[i] * 1000 - 130), 520));
+  applyMusic(); music.loop = true; music.preload = "auto"; try { music.currentTime = 0; } catch (e) { /* ignore */ }
+  if (!NONAV && S.music > 0 && !S.mute) music.play().then(() => { SEQ.audio = true; syncAudio(); }).catch(() => {});
+}
+const glowEl = document.createElement("div"); glowEl.id = "beatGlow"; $("#stage").insertBefore(glowEl, $("#stage").firstChild);
+function seqFrame() {
+  if (!SEQ.run) return; const d = music.duration || 144, t = seqTime() % d;
+  const g = t >= SEQ.b0 - 0.02 ? Math.exp(-(((t - SEQ.b0) % SEQ.bp) / SEQ.bp) * 5.5) : 0;
+  glowEl.style.opacity = (g * 0.85).toFixed(3);
+  const s = Math.floor(seqTime()); if (s !== SEQ.last) { SEQ.last = s; if (SEQ.audio) syncAudio(); }
+}
+addEventListener("pageshow", (e) => { if (e.persisted) location.reload(); });
+document.addEventListener("visibilitychange", () => { if (!SEQ.run || NONAV) return; if (document.hidden) music.pause(); else if (gestured || SEQ.audio) music.play().then(() => { SEQ.audio = true; syncAudio(); }).catch(() => {}); });
+seqStart();
 if (!manual) requestAnimationFrame(loop);

@@ -52,7 +52,7 @@ async function lane(L) {
 const order = (a, b) => (!!b.breaking === !!a.breaking ? (b.ms || 0) - (a.ms || 0) : Number(!!b.breaking) - Number(!!a.breaking));
 
 export function liveUpdates() {
-  let list = FIXED.slice(), at = 0, live = 0, ver = 0, busy = null;
+  let list = FIXED.slice(), at = 0, live = 0, ver = 0, busy = null, checked = Date.now();
   try {
     const j = JSON.parse(sessionStorage.getItem(KEY) || "null");
     if (j && j.items && j.items.length && j.at) { list = j.items.map((x) => (x.href ? x : Object.assign({}, x, (FIXED.find((f) => f.lane === x.lane) || {}).href ? { href: FIXED.find((f) => f.lane === x.lane).href } : {}))); at = j.at; live = j.live || 0; }
@@ -66,11 +66,11 @@ export function liveUpdates() {
           list = fresh.concat(FIXED.filter((f) => !seen.has(f.href))); at = Date.now(); live = fresh.length; ver++;
           try { sessionStorage.setItem(KEY, JSON.stringify({ at, items: list, live })); } catch (e) {}
         }
-      } catch (e) {} busy = null;
+      } catch (e) {} checked = Date.now(); ver++; busy = null;
     })();
     return busy;
   }
   if (!at || Date.now() - at > (live ? LIVE_MS : COLD_MS)) refresh();
   setInterval(refresh, LIVE_MS);
-  return { items: () => list, version: () => ver, refresh };
+  return { items: () => list, version: () => ver, refresh, updated: () => Math.max(at, checked), live: () => live };
 }
