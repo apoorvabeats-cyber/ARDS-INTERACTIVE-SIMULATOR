@@ -1,11 +1,11 @@
 /* PATHODYNAMICS · Interactive Clinical Pathophysiology
    Every lab follows the same five steps (select, explore, intervene, observe, correlate) and the same three views of a disease
    (anatomical, pathophysiological, interventional), all tied to one whole-body patient model. */
-import { createStage } from "./stage.js?v=20261124b";
-import { bodySVG, paintBody } from "./body.js?v=20261124b";
-import { ecgDraw } from "./charts.js?v=20261124b";
+import { createStage } from "./stage.js?v=20261126gi";
+import { bodySVG, paintBody } from "./body.js?v=20261126gi";
+import { ecgDraw } from "./charts.js?v=20261126gi";
 
-const V = "20261124b", EMBED = /[?&]embed=1/.test(location.search), $ = (s, r) => (r || document).querySelector(s), esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const V = "20261126gi", EMBED = /[?&]embed=1/.test(location.search), $ = (s, r) => (r || document).querySelector(s), esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const LABS = [
   { id: "stroke", name: "Stroke Lab", tag: "Acute ischaemic stroke", icon: "🧠", col: "#9b7bff", blurb: "Choose the blocked artery, turn the brain, drag the clot out and watch the penumbra, the deficits and the whole body respond.", mods: "ICA · M1 · M2 · M3 · ACA · PCA · Basilar · Vertebral" },
   { id: "mi", name: "Heart Attack Lab", tag: "Acute myocardial infarction (STEMI and NSTEMI)", icon: "🫀", col: "#ff6b7c", blurb: "Block a coronary artery, read the ECG territory, then open it with a balloon and stent or with lysis.", mods: "STEMI · NSTEMI · RCA · LAD · LCx · Left main · PDA" },
@@ -15,6 +15,9 @@ const LABS = [
   { id: "resp", name: "Lung & Pleura Lab", tag: "ARDS, pneumonia, pneumothorax, effusion, mucus plug", icon: "🫁", col: "#6fd3ff", blurb: "Recruit the lung, drain the pleura, clear the airway: see pressure, fluid and air change the chest.", mods: "ARDS · Pneumonia · Pneumothorax · Effusion · Mucus plug" },
   { id: "shock", name: "Shock & Metabolic Crisis Lab", tag: "Septic shock, DIC, anaphylaxis, acidosis, DKA, HHS", icon: "🩸", col: "#ff6b8a", blurb: "Watch the microcirculation: vasoplegia, clots, mast cells, acid and glucose, then correct them.", mods: "Septic shock · DIC · Anaphylaxis · Acidosis · DKA · HHS" },
   { id: "pancreas", name: "Pancreatitis Lab", tag: "Acute pancreatitis and necrosis", icon: "🩻", col: "#ffb347", blurb: "From oedema to infected necrosis: see the collections form, then step up drainage and necrosectomy.", mods: "Interstitial · Necrotising · APFC · ANC · WON · Infected" },
+  { id: "hepbil", name: "Liver & Biliary Lab", tag: "Cholangitis and liver abscess", icon: "🟢", col: "#7fc46a", blurb: "Block the bile duct and watch the pressure and bacteria rise, then drain it. Seed an abscess in the liver and drain it.", mods: "Cholangitis · Pyogenic abscess · Amoebic abscess · ERCP · PTBD · Drain" },
+  { id: "alf", name: "Acute Liver Failure Lab", tag: "Acute liver failure", icon: "🟠", col: "#ff9a3c", blurb: "Watch liver cells die from the central vein outwards, ammonia reach the brain, then give NAC, CRRT, hypertonic saline or a transplant.", mods: "Paracetamol · Viral hepatitis · Ischaemic hepatitis · Drug-induced · NAC · CRRT · Transplant" },
+  { id: "bowel", name: "Bowel Ischaemia Lab", tag: "Acute mesenteric ischaemia", icon: "🟣", col: "#c77dff", blurb: "Block the mesenteric artery or vein, watch the bowel wall die layer by layer, then reopen the vessel and resect what is dead.", mods: "SMA embolus · SMA thrombosis · NOMI · Venous thrombosis · Stent · Resection · Second look" },
   { id: "aki", name: "Kidney Injury Lab", tag: "Acute kidney injury", icon: "🫘", col: "#27e0b0", blurb: "Follow one nephron from injury to recovery: hypoperfusion, tubular injury, obstruction and renal artery disease.", mods: "Prerenal · ATN · AIN · GN · Obstruction · Renal infarction · Renal artery stenosis" },
 ];
 const SYSTEMS = [
@@ -22,7 +25,7 @@ const SYSTEMS = [
   { id: "cardio", name: "Cardiology", icon: "🫀", col: "#ff6b7c", labs: ["mi", "aorta", "pe"], what: "STEMI · NSTEMI · coronary occlusion · aortic dissection · tamponade · pulmonary embolism" },
   { id: "resp", name: "Respiratory", icon: "🫁", col: "#36d6ff", labs: ["resp", "pe"], what: "ARDS · pneumonia · pulmonary embolism · pneumothorax · pleural effusion · mucus plug" },
   { id: "nephro", name: "Nephrology", icon: "🫘", col: "#27e0b0", labs: ["aki"], what: "Tubular injury · interstitial nephritis · glomerulonephritis · obstruction · renal infarction · renal artery stenosis" },
-  { id: "gi", name: "Gastroenterology", icon: "🩻", col: "#ffb347", labs: ["pancreas"], what: "Acute pancreatitis and necrosis (more GI topics to follow)" },
+  { id: "gi", name: "Gastroenterology", icon: "🩻", col: "#ffb347", labs: ["pancreas", "hepbil", "alf", "bowel"], what: "Acute pancreatitis · pancreatic necrosis · acute cholangitis · liver abscess · acute liver failure · bowel ischaemia" },
   { id: "gcc", name: "General Critical Care", icon: "🩸", col: "#ff6b8a", labs: ["shock"], what: "Septic shock · DIC · anaphylaxis · metabolic acidosis · DKA · HHS" },
 ];
 const STEPS = [["1", "SELECT"], ["2", "EXPLORE"], ["3", "INTERVENE"], ["4", "OBSERVE"], ["5", "CORRELATE"]];
@@ -46,7 +49,7 @@ function home(sysId) {
 <div class="steps5">${STEPS.map((s) => `<div><b>${s[0]}</b>${s[1]}</div>`).join("")}</div>
 <div class="three"><div><b>Anatomical view</b>What is happening inside the organ?</div><div><b>Pathophysiological view</b>Why is it happening, and what changes?</div><div><b>Interventional view</b>What happens when the doctor treats it?</div></div>
 ${sysBlocks(sysId)}
-<div class="note"><b>Educational simulation.</b> These are simplified teaching models with illustrative numbers, not patient data, and not a substitute for current guidelines or local protocols. Management content is aligned to: <b>AHA/ASA 2026</b> (acute ischaemic stroke), <b>ACC/AHA 2025</b> (acute coronary syndromes), <b>AHA/ACC 2026</b> (acute pulmonary embolism), <b>ACG 2024 / AGA 2020 / Revised Atlanta</b> (pancreatitis) and <b>KDIGO 2012</b> (AKI; the 2026 update is still in draft), <b>AHA/ASA 2022</b> (intracerebral haemorrhage) with <b>AHA/ACC 2025</b> (blood pressure), <b>AHA/ASA 2023</b> (aneurysmal SAH), <b>ACC/AHA 2022</b> (aortic disease), <b>ATS 2024</b> (ARDS) and <b>ATS 2025</b> (pneumonia), <b>BTS 2023</b> (pleural disease), <b>Surviving Sepsis Campaign 2026</b>, <b>ISTH 2025</b> (DIC) and <b>ADA/EASD/JBDS 2024</b> (DKA and HHS). Checked November 2026 against the published summaries. Always follow your local protocol.</div>`;
+<div class="note"><b>Educational simulation.</b> These are simplified teaching models with illustrative numbers, not patient data, and not a substitute for current guidelines or local protocols. Management content is aligned to: <b>AHA/ASA 2026</b> (acute ischaemic stroke), <b>ACC/AHA 2025</b> (acute coronary syndromes), <b>AHA/ACC 2026</b> (acute pulmonary embolism), <b>ACG 2024 / AGA 2020 / Revised Atlanta</b> (pancreatitis), <b>Tokyo Guidelines 2018</b> (acute cholangitis), <b>ACG 2023</b> (acute liver failure), <b>WSES 2022</b> (acute mesenteric ischaemia) and <b>KDIGO 2012</b> (AKI; the 2026 update is still in draft), <b>AHA/ASA 2022</b> (intracerebral haemorrhage) with <b>AHA/ACC 2025</b> (blood pressure), <b>AHA/ASA 2023</b> (aneurysmal SAH), <b>ACC/AHA 2022</b> (aortic disease), <b>ATS 2024</b> (ARDS) and <b>ATS 2025</b> (pneumonia), <b>BTS 2023</b> (pleural disease), <b>Surviving Sepsis Campaign 2026</b>, <b>ISTH 2025</b> (DIC) and <b>ADA/EASD/JBDS 2024</b> (DKA and HHS). Checked November 2026 against the published summaries. Always follow your local protocol.</div>`;
 }
 
 /* ---------------- lab shell ---------------- */

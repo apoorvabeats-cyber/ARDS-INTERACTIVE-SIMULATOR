@@ -2,9 +2,9 @@
    Place the clot, watch the right ventricle strain and the oxygen fall, then reperfuse by catheter, lysis or anticoagulation.
    Teaching model: what matters is how much of the pulmonary arterial bed is blocked, how much RV reserve the patient has, and how long it lasts.
    Content aligned to the 2026 AHA/ACC acute PE guideline and its Clinical Categories (checked Nov 2026 against the published summaries). All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261124b";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261124b";
-import { organ } from "../anatomy.js?v=20261124b";
+import { THREE, C } from "../stage.js?v=20261126gi";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261126gi";
+import { organ } from "../anatomy.js?v=20261126gi";
 
 const SITES = {
   SADDLE: { label: "Saddle", sub: "At the PA bifurcation", vessel: "PA", u: 0.97, big: true, tags: { rul: 1, rml: 1, rll: 1, lul: 1, lll: 1 }, burden: 0.62, lysis: 0.7,

@@ -7,7 +7,7 @@
    Each loader returns plain BufferGeometry, already centred and fitted to the box the lab was built around, so the lab's own
    coordinates (vessels, clots, territories, painting) still land on the right place. The labs keep their simple shape until the mesh
    arrives, then swap. If a mesh cannot be loaded the lab keeps the simple shape and still works. */
-import { THREE } from "./stage.js?v=20261124b";
+import { THREE } from "./stage.js?v=20261126gi";
 import { GLTFLoader } from "../vendor/GLTFLoader.js";
 import { mergeGeometries } from "../vendor/BufferGeometryUtils.js";
 

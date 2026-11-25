@@ -2,9 +2,9 @@
    From a normal gland to oedematous and necrotising pancreatitis, then the collections (APFC, ANC, WON, infected necrosis)
    and the step-up approach: support and antibiotics, drainage (endoscopic stent or percutaneous drain), then necrosectomy.
    Terms follow the Revised Atlanta Classification. Management content aligned to ACG 2024, the AGA 2020 necrosis update and the Revised Atlanta Classification (checked Nov 2026). Numbers are illustrative.  */
-import { THREE, C, smooth } from "../stage.js?v=20261124b";
-import { clamp } from "./common.js?v=20261124b";
-import { organ } from "../anatomy.js?v=20261124b";
+import { THREE, C, smooth } from "../stage.js?v=20261126gi";
+import { clamp } from "./common.js?v=20261126gi";
+import { organ } from "../anatomy.js?v=20261126gi";
 
 const T = {
   NORMAL: { label: "Normal", sub: "Healthy pancreas", d0: 0, d1: 14, dv: 0,
@@ -39,7 +39,7 @@ const T = {
 const TABS = ["NORMAL", "INT", "NEC", "APFC", "ANC", "WON", "INF"];
 
 export default function create(S, ui) {
-  const st = { tab: "WON", day: 35, inf: false, abx: false, support: false, stent: false, perc: false, sess: 0, dr: 0, grab: false, ghost: false, cause: "gallstone", wallLeak: false };
+  const st = { tab: "WON", day: 35, inf: false, abx: false, support: false, stent: false, perc: false, sess: 0, dr: 0, grab: false, ghost: false, cause: "gallstone", wallLeak: false, bil: false, ercp: false };
   const cur = () => T[st.tab];
   let M = {}, tis = [], coll = null, lams = null, drain = null, debris = [], gas = [], panGrp = null, dirty = true, accT = 0;
   let PG = null;
@@ -61,7 +61,7 @@ export default function create(S, ui) {
     body.mesh.userData.hemi = 1;
     const duo = S.tube([[-0.45, 0.38, 0.05], [-0.98, 0.25, 0.0], [-1.1, -0.35, 0.0], [-0.85, -0.78, 0.05], [-0.2, -0.88, 0.05], [0.45, -0.82, 0.0]], 0.1, 0xc99a6a, { seg: 40 }); grp.add(duo);
     const cbd = S.tube([[-0.62, 0.85, 0.02], [-0.7, 0.4, 0.0], [-0.74, -0.15, 0.0]], 0.04, 0x6ab06a); grp.add(cbd);
-    if (st.tab !== "NORMAL" && st.cause === "gallstone") { const gs = plain(new THREE.SphereGeometry(0.06, 14, 10), 0xf0d060, [-0.74, -0.38, 0.02]); gs.material.emissive = new THREE.Color(0x403000); }
+    M.gs = null; if (st.tab !== "NORMAL" && st.cause === "gallstone") { const gs = plain(new THREE.SphereGeometry(0.06, 14, 10), 0xf0d060, [-0.74, -0.38, 0.02]); gs.material.emissive = new THREE.Color(0x403000); M.gs = gs; }
     const stom = plain((() => { const g = new THREE.SphereGeometry(1, 44, 32); g.scale(0.98, 0.56, 0.42); return g; })(), 0xd88a8a, [0.45, 0.58, 0.74], { transparent: true, opacity: 0.32, depthWrite: false }); stom.userData.hemi = 1; stom.renderOrder = 3; M.stom = stom;
     plain((() => { const g = new THREE.SphereGeometry(1, 28, 20); g.scale(0.2, 0.4, 0.2); return g; })(), 0x7a5a9a, [1.72, 0.6, -0.25]);
     [[1.4, 0.15], [-1.1, 0.15]].forEach(([x, y]) => plain((() => { const g = new THREE.SphereGeometry(1, 24, 18); g.scale(0.2, 0.32, 0.17); return g; })(), 0xb06a5a, [x, y, -0.55]));
@@ -78,7 +78,7 @@ export default function create(S, ui) {
     const lg = new THREE.CylinderGeometry(0.05, 0.05, 0.16, 16); lg.rotateX(Math.PI / 2); lams = new THREE.Mesh(lg, S.mat(0xcfe9ff, { emissive: 0x143040 })); lams.userData.drag = true; lams.position.copy(SP); lams.rotation.x = 0.0; lams.renderOrder = 6; grp.add(lams); S.pick.push(lams);
     const fl1 = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.016, 8, 20), new THREE.MeshBasicMaterial({ color: 0xffd166 })); lams.add(fl1); fl1.position.z = 0.09; M.ring = fl1;
     M.lab = S.label("stomach wall", [SP.x, SP.y + 0.22, SP.z + 0.1], "#ffd166"); grp.add(M.lab);
-    Object.assign(st, { day: cur().dv, stent: false, perc: false, sess: 0, dr: 0, abx: false, support: false, wallLeak: false });
+    Object.assign(st, { day: cur().dv, stent: false, perc: false, sess: 0, dr: 0, abx: false, support: false, wallLeak: false, ercp: false });
     S.view({ ry: 0.25, rx: 0.18, d: 6.2, tx: 0.3, ty: 0.1, tz: 0 }); dirty = true;
   }
 
@@ -90,7 +90,8 @@ export default function create(S, ui) {
   function sizeNow() { const c = cur(); if (st.tab === "NEC") return day() > 5 ? 0.18 * clamp((day() - 5) / 7, 0, 1) : 0; if (!c.col) return 0; const [a, b] = c.size; let s = a + (b - a) * smooth(clamp(day() / 28, 0, 1)); if (st.tab === "APFC" && day() > 28 && !st.stent) s *= 1; return s; }
   const resid = () => { let f = 1; if (st.stent) f *= 1 - 0.8 * st.dr; if (st.perc) f *= 1 - 0.55 * st.dr; return f; };
   const debrisN = () => (cur().solid ? Math.round(16 * (1 - st.sess / 3) * (st.stent ? 1 - 0.1 * st.dr : 1)) : st.tab === "NEC" && day() > 5 ? 3 : 0);
-  function sepsis() { if (!isInf()) return clamp(nf() * 0.7 * (day() < 10 ? 1 : 0.6), 0, 0.6) * (st.support ? 0.9 : 1); const dr = (st.stent || st.perc) ? st.dr : 0; return clamp(0.85 - 0.45 * dr - 0.3 * (st.abx ? 1 : 0) - 0.2 * (st.sess / 3), 0.08, 0.9); }
+  const cholX = () => (st.bil && !st.ercp && st.cause === "gallstone" && st.tab !== "NORMAL" ? 0.28 : 0);
+  function sepsis() { const b = cholX(); if (!isInf()) return clamp(clamp(nf() * 0.7 * (day() < 10 ? 1 : 0.6), 0, 0.6) * (st.support ? 0.9 : 1) + b, 0, 0.9); const dr = (st.stent || st.perc) ? st.dr : 0; return clamp(0.85 - 0.45 * dr - 0.3 * (st.abx ? 1 : 0) - 0.2 * (st.sess / 3) + b, 0.08, 0.95); }
   function paintAll() {
     const n = nf(), oed = (cur().oed || 0) * (st.tab === "INT" ? Math.exp(-Math.max(0, day() - 4) / 4) : 1), core = C(0x5a4034), pale = C(0xf0d9a0);
     tis.forEach((t) => t.paint((tag, rank, h, out) => { if (oed > 0) out.lerp(pale, 0.5 * oed); if (rank < n && h < 0.95) out.lerp(core, 0.88); }));
@@ -103,7 +104,7 @@ export default function create(S, ui) {
     M.wl.material.opacity = 0.08 + 0.75 * wallF(); const dn = debrisN(); debris.forEach((m, i) => { m.visible = i < dn; m.position.copy(m.userData.p).multiplyScalar(0.95); m.rotation.y = t * 0.1 + i; });
     gas.forEach((m, i) => { m.visible = inf && !(st.stent && st.dr > 0.6); m.position.copy(m.userData.p).multiplyScalar(0.9); m.position.y += 0.03 * Math.sin(t * 2 + i); });
     if (lams) { lams.visible = vis; M.ring.visible = !st.stent; lams.scale.setScalar(st.grab ? 1.15 : 1); if (!st.grab && !st.stent) lams.position.lerp(SP, Math.min(1, dt * 8)); if (st.stent) lams.position.lerp(SP.clone().lerp(CP, 0.45), Math.min(1, dt * 6)); }
-    M.lab.visible = vis && !st.stent; accT += dt; if (accT > 0.08) { accT = 0; paintAll(); dirty = false; }
+    M.lab.visible = vis && !st.stent; if (M.gs) M.gs.visible = !st.ercp; accT += dt; if (accT > 0.08) { accT = 0; paintAll(); dirty = false; }
     M.stom.material.opacity += ((st.ghost ? 0.1 : 0.32) - M.stom.material.opacity) * Math.min(1, dt * 5);
   }
   S.hooks.push(frame);
@@ -114,7 +115,7 @@ export default function create(S, ui) {
   S.onDrop = () => { if (!st.grab) return; st.grab = false; const d = lams.position.distanceTo(CP); if (d < 0.3) { st.stent = true; const wf = wallF(); st.wallLeak = wf < 0.5; ui.hint("", false); ui.refresh(st.wallLeak ? "Stent deployed into an immature collection. Risk of leak and bleeding. Wait for a wall to form whenever possible." : "Stent deployed. The collection drains into the stomach."); } else ui.hint("Drag the stent further, into the middle of the collection.", false); };
   S.onTap = () => {};
   function setTab(k) { st.tab = k; build(); }
-  function setOpt(id, v) { if (id === "inf") { st.inf = v === "1"; } else if (id === "cause") { st.cause = v; build(); } else if (id === "ghost") st.ghost = v === "1"; dirty = true; }
+  function setOpt(id, v) { if (id === "bil") { st.bil = v === "1"; } else if (id === "inf") { st.inf = v === "1"; } else if (id === "cause") { st.cause = v; build(); } else if (id === "ghost") st.ghost = v === "1"; dirty = true; }
   function setT(v) { st.day = v; dirty = true; }
   function act(id) {
     if (id === "inject") { setTab("INT"); ui.refresh("Acinar cells activate enzymes inside the gland. The pancreas swells: interstitial oedematous pancreatitis."); }
@@ -122,6 +123,7 @@ export default function create(S, ui) {
     else if (id === "abx") { st.abx = true; ui.refresh("Antibiotics started (targeted to proven or strongly suspected infection)."); }
     else if (id === "perc") { if (!st.perc && cur().col) { st.perc = true; const tube = S.tube([[2.0, 0.05, -0.55], [1.5, 0.12, -0.3], [CP.x + 0.2, CP.y, CP.z - 0.05]], 0.03, 0x66d9ff, { op: 0.85 }); M.grp.add(tube); drain = tube; ui.refresh("Percutaneous drain placed through the left flank. Fluid drains; solid debris stays."); } }
     else if (id === "necro") { if (st.stent && st.sess < 3) { st.sess++; ui.refresh("Endoscopic necrosectomy session " + st.sess + ": debris removed through the stent."); } }
+    else if (id === "ercp") { if (st.bil && !st.ercp) { st.ercp = true; ui.refresh("ERCP: sphincterotomy and stone extraction decompress the bile duct. Cholangitis settles; the pancreatitis itself is not treated by ERCP."); } }
     else if (id === "reset") build();
   }
 
@@ -149,9 +151,11 @@ export default function create(S, ui) {
       { k: "Revised Atlanta severity", v: e.sev, tone: e.sev === "Severe" ? "bad" : e.sev === "Moderately severe" ? "warn" : "ok" },
       { k: "Lipase · CRP", v: "×" + e.lip + " ULN · " + e.crp + " mg/L", tone: "info" },
       { k: "Drainage", v: drainTxt, tone: st.stent || st.perc ? "ok" : "info" },
+      { k: "Bile duct", v: st.cause !== "gallstone" || st.tab === "NORMAL" ? "not obstructed" : st.bil ? (st.ercp ? "decompressed (ERCP)" : "stone at ampulla: cholangitis") : "stone passed, no cholangitis", tone: st.bil && !st.ercp && st.cause === "gallstone" && st.tab !== "NORMAL" ? "bad" : "ok" },
     ];
     const lead = [];
     if (st.tab === "NORMAL") lead.push("Healthy gland. Use INDUCE INJURY in step 3 to start an attack.");
+    if (cholX() > 0) lead.push("Gallstone pancreatitis with cholangitis: the stone at the ampulla needs urgent ERCP (within about 24 hours) to decompress the bile duct. Without cholangitis or persistent obstruction, ERCP is not needed.");
     if (st.wallLeak) lead.push("Drained before a wall had formed: risk of leak, bleeding and a more complicated course.");
     if (isInf() && !(st.stent || st.perc)) lead.push("Infected necrosis causes fever, a rising CRP and organ failure. Antibiotics help, and drainage is the key step once infection is established.");
     if ((st.stent || st.perc) && e.dn > 3) lead.push("The fluid has drained but solid debris remains. If the patient is not improving, the next step is necrosectomy." + (st.stent ? " Use ENDOSCOPIC NECROSECTOMY." : ""));
@@ -188,12 +192,13 @@ export default function create(S, ui) {
     id: "pancreas", name: "Pancreatitis Lab", tag: "Acute pancreatitis and necrosis", icon: "🩻",
     tabs: TABS.map((k) => ({ id: k, label: T[k].label, sub: T[k].sub })), get tab() { return st.tab; },
     selectHint: "Start with Normal, press INDUCE INJURY in step 3 and follow the disease, or jump to WON to practise drainage.",
-    opts: () => [(st.tab === "ANC" || st.tab === "WON") && { id: "inf", label: "Superinfection", cur: st.inf ? "1" : "0", choices: [["0", "Sterile"], ["1", "Infected"]] }, st.tab !== "NORMAL" && { id: "cause", label: "Cause", cur: st.cause, choices: [["gallstone", "Gallstone"], ["other", "Alcohol / other"]] }].filter(Boolean),
+    opts: () => [(st.tab === "ANC" || st.tab === "WON") && { id: "inf", label: "Superinfection", cur: st.inf ? "1" : "0", choices: [["0", "Sterile"], ["1", "Infected"]] }, st.tab !== "NORMAL" && { id: "cause", label: "Cause", cur: st.cause, choices: [["gallstone", "Gallstone"], ["other", "Alcohol / other"]] }, st.tab !== "NORMAL" && st.cause === "gallstone" && { id: "bil", label: "Bile duct", cur: st.bil ? "1" : "0", choices: [["0", "Stone passed"], ["1", "Stone stuck: cholangitis"]] }].filter(Boolean),
     slider: () => ({ id: "t", label: "Days from onset of pain", min: cur().d0, max: cur().d1, step: 1, v: clamp(st.day, cur().d0, cur().d1), locked: st.tab === "NORMAL", unit: " d" }),
     actions: () => [
       st.tab === "NORMAL" && { id: "inject", label: "INDUCE INJURY", hint: "Start an attack of acute pancreatitis.", off: false },
       { id: "support", label: "SUPPORTIVE CARE", hint: "Fluids, analgesia, early feeding.", off: st.support },
       { id: "abx", label: "ANTIBIOTICS", hint: "For proven or strongly suspected infection.", off: st.abx },
+      { id: "ercp", label: "ERCP · BILIARY DECOMPRESSION", hint: "Only if cholangitis or a stuck stone.", off: !st.bil || st.ercp || st.cause !== "gallstone" || st.tab === "NORMAL" },
       { id: "perc", label: "PERCUTANEOUS DRAIN", hint: "Drain through the left flank.", off: st.perc || !cur().col },
       { id: "necro", label: "NECROSECTOMY", hint: "Remove debris through the stent (needs the stent).", off: !st.stent || st.sess >= 3 },
       { id: "reset", label: "RESET", hint: "Start this stage again.", off: false }].filter(Boolean),

@@ -3,9 +3,9 @@
    Content aligned to the ACC/AHA 2022 aortic disease guideline (acute aortic syndromes: reduce SBP to below 120 mmHg with a negative inotrope-led, heart-rate-lowering strategy;
    type A: emergency surgery; type B: medical therapy first, TEVAR for complicated disease) and to current ESC pericardial-disease practice (urgent drainage of tamponade).
    Checked Nov 2026 against published summaries. All numbers are illustrative, not patient data. */
-import { THREE } from "../stage.js?v=20261124b";
-import { toolKit, vessels, mirrorFlows, clamp } from "./common.js?v=20261124b";
-import { organ } from "../anatomy.js?v=20261124b";
+import { THREE } from "../stage.js?v=20261126gi";
+import { toolKit, vessels, mirrorFlows, clamp } from "./common.js?v=20261126gi";
+import { organ } from "../anatomy.js?v=20261126gi";
 
 const TABS = {
   DA: { label: "Type A dissection", sub: "Ascending aorta involved",

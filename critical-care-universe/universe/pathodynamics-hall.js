@@ -5,14 +5,14 @@
    buildPathoHall(T, ctx, top, LV) -> { gate, GX, inHall(p), cands(x,z,out), solid(px,pz), update(t,dt,cam,lvl1), tap(kind), group }
    mountPathoUI(up, getPos) -> the DOM button and the full-screen overlay (up.openPatho(route)). */
 
-export const PATHO_VER = "20261124a";
+export const PATHO_VER = "20261126gi";
 export const PATHO_CLIPS = ["p_home", "p_neuro", "p_cardio", "p_resp", "p_nephro", "p_gi", "p_gcc", "p_steps", "p_views"];
 const LABS = [
   ["neuro", "NEUROLOGY", "Brain and cerebral vessels", "Stroke · ICH · SAH · Aneurysm · Herniation · Hydrocephalus", "#9b7bff", "stroke"],
   ["cardio", "CARDIOLOGY", "Heart, aorta and pericardium", "STEMI · NSTEMI · Dissection · Tamponade · PE", "#ff6b7c", "mi"],
   ["resp", "RESPIRATORY", "Lungs, airways and pleura", "ARDS · Pneumonia · PTX · Effusion · Mucus plug · PE", "#36d6ff", "pe"],
   ["nephro", "NEPHROLOGY", "Kidneys and urinary tract", "ATN · AIN · GN · Obstruction · Infarct · Stenosis", "#27e0b0", "aki"],
-  ["gi", "GASTROENTEROLOGY", "Pancreas and gut", "Pancreatitis · Necrosis · Drainage", "#ffb347", "pancreas"],
+  ["gi", "GASTROENTEROLOGY", "Pancreas, bile ducts, liver and gut", "Pancreatitis · Necrosis · Cholangitis · Liver abscess · Liver failure · Bowel ischaemia", "#ffb347", "pancreas"],
   ["gcc", "GENERAL CRITICAL CARE", "Shock and metabolic crises", "Septic shock · DIC · Anaphylaxis · DKA · HHS", "#ff6b8a", "gcc"],
 ];
 const TEAL = 0x27e0b0, SYS = { stroke: "neuro", mi: "cardio", pe: "resp", pancreas: "gi", aki: "nephro" };

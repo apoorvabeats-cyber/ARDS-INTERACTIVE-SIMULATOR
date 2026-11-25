@@ -16,6 +16,8 @@ ${P("arm-R", armR)}${P("arm-L", armL)}${P("leg-R", legR)}${P("leg-L", legL)}
 ${E("brain", 100, 36, 17, 14, "org")}
 ${E("lung-R", 80, 119, 15, 29, "org")}${E("lung-L", 120, 119, 15, 29, "org")}
 ${P("heart", "M100 112 Q110 104 119 112 Q123 126 108 144 Q96 130 100 112 Z", "org")}
+${E("liver", 78, 166, 21, 9, "org")}
+${E("bowel", 100, 219, 27, 13, "org")}
 ${P("pancreas", "M84 182 Q96 172 108 178 Q120 184 130 176 Q132 184 122 190 Q106 192 96 190 Q86 192 84 182 Z", "org")}
 ${E("kidney-R", 80, 196, 6, 12, "org")}${E("kidney-L", 120, 196, 6, 12, "org")}${E("bladder", 100, 238, 8, 7, "org")}
 ${P("veins-R", "M82 262 Q80 330 82 420", "ven")}${P("veins-L", "M118 262 Q120 330 118 420", "ven")}
@@ -26,7 +28,7 @@ ${P("veins-R", "M82 262 Q80 330 82 420", "ven")}${P("veins-L", "M118 262 Q120 33
 }
 /* map: { regionId: level }  level 0..3 = none, mild, moderate, severe; "rec:n" = recovering (green), "info" = highlighted. marks: { gaze:'R'|'L'|null, speech, neglect, field, pain } */
 export function paintBody(root, map, marks) {
-  root.querySelectorAll(".rg").forEach((el) => { el.setAttribute("class", "rg" + (el.id.match(/brain|lung|heart|pancreas|kidney|bladder/) ? " org" : "")); });
+  root.querySelectorAll(".rg").forEach((el) => { el.setAttribute("class", "rg" + (el.id.match(/brain|lung|heart|pancreas|kidney|bladder|liver|bowel/) ? " org" : "")); });
   root.querySelectorAll(".ven").forEach((el) => el.setAttribute("class", "ven"));
   Object.entries(map || {}).forEach(([id, v]) => { const el = root.querySelector("#b-" + id); if (!el) return; const cls = typeof v === "string" ? v : "l" + v; el.classList.add(...cls.split(" ")); });
   const mk = marks || {}, set = (id, on) => { const el = root.querySelector("#mk-" + id); if (el) el.style.opacity = on ? 1 : 0; };
