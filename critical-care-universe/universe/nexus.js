@@ -15,7 +15,7 @@ import { createSfx } from "./sfx.js?v=20261124g";
 import { CSS3DRenderer, CSS3DObject } from "./vendor/CSS3DRenderer.js?v=20261124g";
 import { buildChamber, CH } from "./mdt-chamber.js?v=20261124g";
 import { paintAvail, paintPresent, paintDiscuss, paintConsole, paintPlacard, TAB_LABEL, TAB_ORDER, patientNo } from "./mdt-screens.js?v=20261124g";
-import { paintMachine } from "./nexus-machines.js?v=20261124g";
+import { paintMachine } from "./nexus-machines.js?v=20261126a";
 import { createOrders, createHud } from "./nexus-orders.js?v=20261126f";
 import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261124g";
 
@@ -204,6 +204,26 @@ const nameLabel = { sp: null, key: "" };
 /* ================================================================ ICU devices (ventilator, IV pole, pumps) */
 const dev = createDevices(T, env);
 { const put = (g, x, z) => { g.position.set(x, 0, z); g.rotation.y = Math.atan2(-x, -z); S.add(g); }; put(dev.vent, -3.7, -3.0); put(dev.pole, 3.7, -2.8); dev.vent.scale.setScalar(1.15); dev.pole.scale.setScalar(1.15); }     /* standing either side of his head */
+/* the dialysis machine (Dialysis_machine, a Meshy AI model): wheeled in beside the table once a dialysis catheter is in or dialysis is running.
+   It is not there before: a machine in the room would give away a kidney diagnosis in a blind case. */
+const dial = { g: new T.Group(), led: null, ready: false, tubes: [], key: "" };
+dial.g.visible = false; S.add(dial.g);
+{ const DS = 0.82; new GLTFLoader().load(new URL("./icu-assets/dialysis.glb", import.meta.url).href, (gltf) => {
+    const m = gltf.scene; m.traverse((o) => { if (o.isMesh) { o.frustumCulled = true; if (o.material) { o.material.envMap = env; o.material.envMapIntensity = 0.7; } } });
+    m.scale.setScalar(DS); m.position.y = 0.95 * DS; dial.g.add(m);
+    dial.led = new T.Mesh(new T.SphereGeometry(0.022, 12, 8), new T.MeshBasicMaterial({ color: 0x3dff9a, toneMapped: false })); dial.led.position.set(0.0, 1.78 * DS, 0.0); dial.led.visible = false; dial.g.add(dial.led);
+    dial.g.position.set(3.55, 0, 0.8); dial.g.rotation.y = Math.atan2(-3.55, -0.8); dial.ready = true;
+  }, undefined, () => {}); }
+const dialMat = [M(0xd9364a, { roughness: 0.35 }), M(0x3a7fd0, { roughness: 0.35 })];
+function refreshDial(on, running) {
+  const key = [on, running, turn.rotation.y.toFixed(2)].join(); if (key === dial.key) return; dial.key = key;
+  dial.g.visible = !!on; dial.tubes.forEach((m) => { S.remove(m); m.geometry.dispose(); }); dial.tubes = [];
+  if (dial.led) dial.led.visible = !!running; if (!on || !running) return;
+  dial.g.updateMatrixWorld(true); patient.updateMatrixWorld(true);
+  const neck = patient.localToWorld(new V(0.06, 1.46, 0.1)), ports = [new V(0.33, 1.05, 0.22), new V(0.33, 0.88, 0.22)].map((p) => dial.g.localToWorld(p));
+  ports.forEach((a, k) => { const b = neck.clone().add(new V(0.03 * (k ? 1 : -1), 0, 0.02)), mid = a.clone().lerp(b, 0.5); mid.y = Math.max(a.y, b.y) + 0.25 - 0.1 * k;
+    const m = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3([a, a.clone().lerp(mid, 0.5).setY(a.y + 0.1), mid, mid.clone().lerp(b, 0.6).setY(b.y + 0.08), b]), 24, 0.008, 6), dialMat[k]); S.add(m); dial.tubes.push(m); });
+}
 const tubeMat = M(0xe4edf1, { roughness: 0.35, transparent: true, opacity: 0.9, envMapIntensity: 1.2 });
 const tubes = { circ: null, iv: null, ck: "" };
 function setTube(k, a, b, lift, on) {
@@ -584,7 +604,7 @@ addEventListener("keydown", (e) => { if (e.key === "Escape") { if (!$("#say").hi
 function openOrders(group) { const i = ordersTabs().findIndex((t) => t.id === group); enterScreen("orders", Math.max(0, i)); }
 
 /* ================================================================ the state from the Team room */
-const equipFrom = (p) => { const g = p.given || {}, any = (re) => Object.keys(g).some((k) => re.test(k) && g[k] > 0); return { tube: !!p.tube, oxygen: !!p.oxygen, spo2: Math.round(p.spo2), rr: p.rr, norepi: !!p.norepi, fluid: g["drug:fluids"] || 0, fluidMl: p.fluidMl || 0, abx: any(/^abx:/), blood: (g["drug:blood"] || 0) > 0 || (g["drug:mtp"] || 0) > 0, dialysis: !!p.dialysis, saline: (g["drug:saline3"] || 0) > 0, mannitol: (g["drug:mannitol"] || 0) > 0 }; };
+const equipFrom = (p) => { const g = p.given || {}, any = (re) => Object.keys(g).some((k) => re.test(k) && g[k] > 0); return { tube: !!p.tube, oxygen: !!p.oxygen, spo2: Math.round(p.spo2), rr: p.rr, norepi: !!p.norepi, fluid: g["drug:fluids"] || 0, fluidMl: p.fluidMl || 0, abx: any(/^abx:/), blood: (g["drug:blood"] || 0) > 0 || (g["drug:mtp"] || 0) > 0, dialysis: !!p.dialysis, hdLine: !!p.hdLine, saline: (g["drug:saline3"] || 0) > 0, mannitol: (g["drug:mannitol"] || 0) > 0 }; };
 function apply(d) {
   mdt = { room: d.room || null, orders: d.orders || null, busy: !!d.busy, err: d.err || "", line: !!d.line };
   if (d.me) { if (d.me.name) myName = d.me.name; }
@@ -673,7 +693,7 @@ function loop(now) {
   Object.keys(organs).forEach((n) => { const o = organs[n], on = hot.has(n) || n === sel, base = 0.2; o.mesh.material.emissiveIntensity = base + (on ? 0.5 + 0.35 * Math.sin(t * 4) : 0); });
   if (shown || arrive.t > 0.2) dev.update(eq, t);
   if (nameLabel.sp) nameLabel.sp.material.opacity = clamp((Math.hypot(cam.position.x, cam.position.z) - 2.0) / 1.6, 0, 1);
-  refreshTubes(false);
+  refreshTubes(false); refreshDial(!!(eq.dialysis || eq.hdLine), !!eq.dialysis); if (dial.led && dial.led.visible) dial.led.material.color.setHex(Math.sin(t * 4) > 0 ? 0x3dff9a : 0x1a8f55);
   /* the chamber: the rings revolve, the wall displays and the doctors' screens are redrawn */
   chamber.update(dt, t);
   wallLive.hr = disp.hr; wallLive.map = disp.map; wallLive.spo2 = disp.spo2; wallLive.rr = disp.rr; wallLive.temp = disp.temp; wallLive.lactate = disp.lactate; wallLive.k = disp.k; wallLive.cr = disp.cr; if (!document.hidden && !scr.on) updateWalls(t);

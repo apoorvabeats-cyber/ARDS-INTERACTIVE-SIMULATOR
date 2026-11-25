@@ -12,6 +12,13 @@
   const loadApp = () => {
     if (loading) return;
     loading = true;
+    /* the home screen (home/index.html) is the fourth screen, after the two notices and the logo; ?old=1 or a ?to= link still opens the earlier universe app */
+    const q = new URLSearchParams(location.search);
+    if (q.get("old") !== "1" && !q.has("to")) {
+      startup.classList.add("is-finished");
+      location.replace("./home/index.html?v=20261126a");
+      return;
+    }
     const app = document.createElement("script");
     app.src = "./assets/app.js?v=20261122g";
     app.type = "module";

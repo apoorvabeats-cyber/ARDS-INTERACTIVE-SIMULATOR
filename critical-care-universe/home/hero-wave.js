@@ -8,7 +8,8 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const sm = (k) => { k = clamp(k, 0, 1); return k * k * (3 - 2 * k); };
 const env = (t, a, b, f) => sm((t - a) / f) * (1 - sm((t - b + f) / f));        /* rises over f seconds from a, falls over f seconds to b */
 
-export function createHero(THREE, scene) {
+export function createHero(THREE, scene, opts) {
+  const SIDE = !!(opts && opts.rest === "side");                                                    /* the female doctor: arms at her sides / forearms forward instead of the pocket poses */
   const root = new THREE.Group(); root.add(scene);
   scene.updateMatrixWorld(true);
   const bones = {}, rest = {}; scene.traverse((o) => { if (o.isBone) { bones[o.name] = o; } });
@@ -24,7 +25,7 @@ export function createHero(THREE, scene) {
     if (!(bones.UpperArm_R && bones.LowerArm_R && bones.Hand_R)) return;
     const wp = (n) => bones[n].getWorldPosition(new V()), wq = (n) => bones[n].getWorldQuaternion(new Qt());
     const S = wp("UpperArm_R"), El = wp("LowerArm_R"), Wr = wp("Hand_R");
-    const sh = new V(-0.205, 0.56, -0.085), el = new V(-0.31, 0.31, -0.17), wr = new V(-0.21, 0.11, -0.06);
+    const sh = new V(-0.205, 0.56, -0.085), el = SIDE ? new V(-0.30, 0.32, -0.10) : new V(-0.31, 0.31, -0.17), wr = SIDE ? new V(-0.27, 0.29, 0.15) : new V(-0.21, 0.11, -0.06);
     const dU0 = El.clone().sub(S).normalize(), dU1 = el.clone().sub(sh).normalize();
     const dF0 = Wr.clone().sub(El).normalize(), dF1 = wr.clone().sub(el).normalize();
     const sU = new Qt().setFromUnitVectors(dU0, dU1);
@@ -33,12 +34,25 @@ export function createHero(THREE, scene) {
     const dF0n = dF0.clone().applyQuaternion(sU), sF = new Qt().setFromUnitVectors(dF0n, dF1);          /* forearm: after the upper arm has swung */
     const wF = sF.clone().multiply(sU).multiply(wq("LowerArm_R"));
     POCKET.LowerArm_R = wU.clone().invert().multiply(wF);
-    const hand = new Qt().setFromAxisAngle(new V(1, 0, 0), 0.0);                                         /* wrist bend: fingers pointing down into the pocket */
+    const hand = new Qt().setFromAxisAngle(dF1, SIDE ? 0.2 : 0.0);                                         /* wrist bend: fingers pointing down into the pocket */
     const wH = hand.multiply(sF).multiply(sU).multiply(wq("Hand_R"));
     POCKET.Hand_R = wF.clone().invert().multiply(wH);
   })();
-  let hold = 1;                                                                                        /* 1: right hand in its pocket, 0: raised */
-  const baseQ = (n, r) => (POCKET[n] && hold > 0.001 ? (hold > 0.999 ? POCKET[n] : r.q.clone().slerp(POCKET[n], hold)) : r.q);
+  /* the left hand (models whose left arm is modelled forearm-out): the forearm swings down and in to the coat pocket */
+  (function () {
+    const V = THREE.Vector3, Qt = THREE.Quaternion;
+    if (!(bones.LowerArm_L && bones.Hand_L)) return;
+    const wp = (n) => bones[n].getWorldPosition(new V()), wq = (n) => bones[n].getWorldQuaternion(new Qt());
+    const El = wp("LowerArm_L"), Wr = wp("Hand_L");
+    const dF0 = Wr.clone().sub(El).normalize(), dF1 = (SIDE ? new V(-0.12, -0.42, 1) : new V(-0.22, -1, 0.12)).normalize();
+    const sF = new Qt().setFromUnitVectors(dF0, dF1);
+    const wF = sF.clone().multiply(wq("LowerArm_L"));
+    POCKET.LowerArm_L = bones.LowerArm_L.parent.getWorldQuaternion(new Qt()).invert().multiply(wF);
+    const wH = sF.clone().multiply(wq("Hand_L"));
+    POCKET.Hand_L = wF.clone().invert().multiply(wH);
+  })();
+  let hold = 1, holdL = 1;                                                                             /* 1: hand in its pocket, 0: out (the right one raised, the left one open) */
+  const baseQ = (n, r) => { const h = n.endsWith("_L") ? holdL : hold; return POCKET[n] && h > 0.001 ? (h > 0.999 ? POCKET[n] : r.q.clone().slerp(POCKET[n], h)) : r.q; };
 
   const D = {}, E = new THREE.Euler(), Q = new THREE.Quaternion(), Pq = new THREE.Quaternion(), Pi = new THREE.Quaternion();
   const add = (name, x, y, z) => { const d = D[name] || (D[name] = [0, 0, 0]); d[0] += x || 0; d[1] += y || 0; d[2] += z || 0; };
@@ -74,13 +88,17 @@ export function createHero(THREE, scene) {
     let yaw = 0;
 
     /* the right hand: in the pocket, out to wave (the arm is already in the waving pose of the model), and back in */
-    hold = 1;
+    hold = 1; holdL = 1;
     if (act === "wave") {
       const up = 1 - env(a0, 0, dur, 1.3);                                                  /* hold: 1 in the pocket, 0 raised */
       hold = up;
       const wv = sm((a0 - 1.1) / 0.5) * (1 - sm((a0 - (dur - 1.9)) / 0.5)), w = Math.sin(tt * 7.6) * wv;
       add("Hand_R", 0, 0, 0.55 * w); add("LowerArm_R", 0, 0, 0.14 * w);                     /* the hand sways left and right, palm to the viewer */
       add("Head", 0.02 * e, 0.16 * e, 0); add("Chest", 0, 0.08 * e, 0);                      /* a friendly turn of the head towards the viewer */
+    }
+    if (act === "explain" && POCKET.LowerArm_L) {                                     /* the left hand comes out and opens as she explains, then goes back */
+      holdL = 1 - env(a0, 0, dur, 1.0); const g = Math.sin(tt * 2.1) * (1 - holdL);
+      add("Hand_L", 0.10 * g, 0, 0.12 * g); add("LowerArm_L", 0.06 * g, 0.05 * g, 0);
     }
     if (act === "explain") {                                                          /* a conversational nod and a little lean, hands stay in the pockets */
       const c = Math.sin(tt * 1.3);

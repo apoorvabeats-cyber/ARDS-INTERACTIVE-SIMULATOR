@@ -10,6 +10,7 @@ import { liveUpdates } from "../universe/live-updates.js";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const Q = new URLSearchParams(location.search);
+const HEROES = { wave: { glb: "./hero-wave.glb", thumb: "./hero-wave.jpg", label: "Doctor", replaces: "dr4" }, rt: { glb: "./hero-rt.glb?v=20261126e", thumb: "./hero-rt.jpg", label: "Doctor", replaces: "dr3", rest: "side" } };   /* skinned doctors that wave, put their hands in the pockets and move their heads; each takes the place of its look-alike in the picker */
 const NONAV = Q.has("nonav");
 
 /* ======================================================================== clock and tweens */
@@ -44,7 +45,7 @@ const S = Object.assign({ music: 0.5, fx: 0.7, mute: false, heroAnim: true, qual
 const saveS = () => store.set("ccu.home.settings", S);
 let prof = store.get("ccu.profile", { name: "", id: "" });
 let avKey = ""; try { avKey = localStorage.getItem("ccu.doctorAvatar") || ""; } catch (e) { /* ignore */ }
-if (!AVATARS[avKey] && avKey !== "wave") avKey = "";                                     // until a doctor chooses, the default doctor stays
+if (!AVATARS[avKey] && !HEROES[avKey]) avKey = "";                                     // until a doctor chooses, the default doctor stays
 reduced = S.reduced || matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ======================================================================== sound: a soft whoosh and tick, made on the spot */
@@ -177,8 +178,9 @@ H.cam.position.set(0, 1.0, 4.8); H.cam.lookAt(0, 0.86, 0); lights(H.sc); H.sc.ad
 let defaultGltf = null;
 const loader = new GLTFLoader();
 const loadDefault = () => defaultGltf || (defaultGltf = new Promise((res, rej) => loader.load(new URL("./hero.glb", import.meta.url).href, res, undefined, rej)));
-let waveGltf = null;
-const loadWave = () => waveGltf || (waveGltf = new Promise((res, rej) => loader.load(new URL("./hero-wave.glb", import.meta.url).href, res, undefined, rej)));
+const heroLoads = {};
+const loadHeroGltf = (k) => heroLoads[k] || (heroLoads[k] = new Promise((res, rej) => loader.load(new URL(HEROES[k].glb, import.meta.url).href, res, undefined, rej)));
+const heroThumb = (k) => new URL(HEROES[k].thumb, import.meta.url).href;
 
 /* the five avatars are one static mesh each, posed by the shader: they walk on the spot, look about and turn through a full circle */
 function rigActor(gltf, key, o) {
@@ -194,15 +196,16 @@ function rigActor(gltf, key, o) {
 async function setHero(kind) {
   const gen = ++H.gen; H.kind = kind;
   let act;
-  if (kind === "wave") {
-    const gl = await loadWave(); if (gen !== H.gen) return;
-    if (!H.waveAct) {
+  if (HEROES[kind]) {
+    const gl = await loadHeroGltf(kind); if (gen !== H.gen) return;
+    if (!H.skAct) H.skAct = {};
+    if (!H.skAct[kind]) {
       const use = gl.scene; use.updateMatrixWorld(true);
       const bx = new THREE.Box3().setFromObject(use), sz = bx.getSize(new THREE.Vector3()), c = bx.getCenter(new THREE.Vector3());
-      use.position.set(-c.x, -bx.min.y, -c.z); const hero = createWaveHero(THREE, use); const g = new THREE.Group(); g.add(hero.root); g.scale.setScalar(1.82 / sz.y);
-      H.waveAct = { group: g, hero, update(dt, anim) { hero.update(anim ? dt : 0); } };
+      use.position.set(-c.x, -bx.min.y, -c.z); const hero = createWaveHero(THREE, use, { rest: HEROES[kind].rest }); const g = new THREE.Group(); g.add(hero.root); g.scale.setScalar(1.82 / sz.y);
+      H.skAct[kind] = { group: g, hero, update(dt, anim) { hero.update(anim ? dt : 0); } };
     }
-    act = H.waveAct;
+    act = H.skAct[kind];
   } else if (kind === "default") {
     const gl = await loadDefault(); if (gen !== H.gen) return;
     if (!H.defAct) {
@@ -363,14 +366,14 @@ async function closeQuick() {
 const pP = $("#pProfile"), pS = $("#pSettings");
 function paintProfile() {
   $("#railName").textContent = prof.name || "Doctor"; $("#railId").textContent = prof.id || "Tap to sign in";
-  $("#railAv").src = avKey === "wave" ? new URL("./hero-wave.jpg", import.meta.url).href : avKey ? avatarThumb(avKey) : new URL("./hero.jpg", import.meta.url).href;
-  $("#heroName").textContent = prof.name ? "Welcome, " + prof.name : "Welcome, Doctor"; $("#heroRole").textContent = avKey === "wave" ? "Doctor" : avKey ? AVATARS[avKey].label : "Your doctor";
+  $("#railAv").src = HEROES[avKey] ? heroThumb(avKey) : avKey ? avatarThumb(avKey) : new URL("./hero.jpg", import.meta.url).href;
+  $("#heroName").textContent = prof.name ? "Welcome, " + prof.name : "Welcome, Doctor"; $("#heroRole").textContent = HEROES[avKey] ? HEROES[avKey].label : avKey ? AVATARS[avKey].label : "Your doctor";
   $$(".avb", pP).forEach((b) => b.classList.toggle("on", b.dataset.k === avKey));
 }
 pP.innerHTML = `<button class="x" type="button" aria-label="Close">✕</button><h2>Profile</h2><p class="sub">Your sign-in and your doctor. Both are kept on this device.</p>
 <label for="pfName">Name</label><input id="pfName" type="text" maxlength="40" autocomplete="name" placeholder="Dr. Your name">
 <label for="pfId">Login ID</label><input id="pfId" type="email" maxlength="60" autocomplete="username" placeholder="you@hospital.org">
-<label>Choose your doctor</label><div class="avs">${AVATAR_KEYS.map((k) => k === "dr4" ? `<button class="avb" type="button" data-k="wave" aria-label="Doctor"><img src="${new URL("./hero-wave.jpg", import.meta.url).href}" alt=""></button>` : `<button class="avb" type="button" data-k="${k}" aria-label="${AVATARS[k].label}"><img src="${avatarThumb(k)}" alt=""></button>`).join("")}</div>
+<label>Choose your doctor</label><div class="avs">${AVATAR_KEYS.map((k) => { const hk = Object.keys(HEROES).find((x) => HEROES[x].replaces === k); return hk ? `<button class="avb" type="button" data-k="${hk}" aria-label="Doctor"><img src="${heroThumb(hk)}" alt=""></button>` : `<button class="avb" type="button" data-k="${k}" aria-label="${AVATARS[k].label}"><img src="${avatarThumb(k)}" alt=""></button>`; }).join("")}</div>
 <div class="row"><button class="btn" id="pfSave" type="button">Save</button><button class="btn q" id="pfDef" type="button">Use default doctor</button><button class="btn q" id="pfOut" type="button">Sign out</button></div>`;
 $$(".avb", pP).forEach((b) => b.addEventListener("click", () => { avKey = b.dataset.k; try { localStorage.setItem("ccu.doctorAvatar", avKey); } catch (e) { /* ignore */ } sfx("tick"); paintProfile(); setHeroSafe(avKey); }));
 $("#pfSave").onclick = () => { prof = { name: $("#pfName").value.trim(), id: $("#pfId").value.trim() }; store.set("ccu.profile", prof); sfx("tick"); paintProfile(); closeFly(); };

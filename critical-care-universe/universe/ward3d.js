@@ -316,7 +316,24 @@ export function buildWard(T, S, R, P, H) {
   }
 
   /* ---------- pump and bag state ---------- */
+  /* the dialysis machine (Dialysis_machine, a Meshy AI model) is wheeled in beside the bed once the team has arranged dialysis for that patient */
+  function refreshDialysis(c) {
+    const on = !!(c.p && c.p.dz && c.p.dz.hd > 0); if (c.dOn === on) return; c.dOn = on;
+    if (c.dg) { c.dg.visible = on; (c.dg.userData.tubes || []).forEach((x) => { x.visible = on; }); return; } if (!on || c.dLoading) return; c.dLoading = true;
+    loadGLB(assetURL("dialysis")).then((gl) => {
+      if (LOWMEM && !shrunk.has(gl)) { shrunk.add(gl); shrinkTextures(gl.scene, 1024); }
+      const DS = 0.84, g = new T.Group(), m = gl.scene.clone(true); m.scale.setScalar(DS); m.position.y = 0.95 * DS; g.add(m);
+      g.position.set(1.95, 0, -CD + 0.8); g.rotation.y = -0.22; g.userData.part = "Dialysis machine"; c.g.add(g);
+      const led = new T.Mesh(new T.SphereGeometry(0.02, 10, 8), new T.MeshBasicMaterial({ color: 0x3dff9a, toneMapped: false })); led.position.set(0, 1.76 * DS, 0); g.add(led); c.dialLed = led;
+      c.g.updateMatrixWorld(true);
+      const cols = [0xd9364a, 0x3a7fd0], pb = new V(BED.x + 0.55, 1.0, BED.z + 0.1);
+      [[new V(0.33, 1.0, 0.2), 0], [new V(0.33, 0.84, 0.2), 1]].forEach(([lp, k]) => { const a = c.g.worldToLocal(g.localToWorld(lp)), b = pb.clone().add(new V(0, 0, 0.06 * (k ? 1 : -1))), mid = a.clone().lerp(b, 0.5); mid.y = Math.min(a.y, b.y) - 0.35 + 0.08 * k;
+        const tb = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3([a, a.clone().lerp(mid, 0.5).setY(a.y - 0.1), mid, mid.clone().lerp(b, 0.55).setY(b.y - 0.1), b]), 28, 0.012, 6), new T.MeshStandardMaterial({ color: cols[k], roughness: 0.35 })); g.parent.add(tb); (g.userData.tubes = g.userData.tubes || []).push(tb); });
+      c.dg = g; g.visible = c.dOn; if (g.userData.tubes) g.userData.tubes.forEach((x) => { x.visible = c.dOn; });
+    }).catch((e) => { c.dLoading = false; console.warn("Dialysis machine not loaded.", e); });
+  }
   function refreshEquip(c) {
+    refreshDialysis(c);
     const gear = H.equip(c.p), bags = gear.bags.slice(0, 4), pumps = gear.pumps.slice(0, 6);
     const key = bags.map((b) => b.key).join() + "|" + pumps.map((x) => x.name + x.dose).join();
     if (key === c.pkey) return; c.pkey = key;

@@ -1,6 +1,7 @@
 /* Pictures of the machines on the Treatment page: a ventilator (invasive), a non-invasive ventilator with a mask, a CRRT machine and an
    intermittent haemodialysis machine. They are drawn on a canvas and move: the ventilator's waveforms scroll with the set rate, the pump
    rollers turn only while the machine is running, and the blood and dialysate lines show their flow.
+   The CRRT and haemodialysis pictures use the 3D dialysis machine model (Dialysis_machine, Meshy AI) drawn from fixed angles.
    paintMachine(canvas, kind, st, t)   kind: "vent" | "niv" | "crrt" | "ihd"
    st: { running, rr, vt, peep, fio2, ipap, epap, bf, df, rf, uf }    t: seconds */
 const TAU = Math.PI * 2;
@@ -89,48 +90,29 @@ function niv(g, W, H, st, t) {
   g.fillStyle = "#cfe9f3"; g.font = sans(11, 600); g.fillText("full-face mask · leak port", W * 0.04, H * 0.97);
 }
 
-function crrt(g, W, H, st, t) {
-  const run = st.running; g.clearRect(0, 0, W, H);
-  const bag = (x, y, c, n, f) => { g.fillStyle = "#3a4650"; g.fillRect(x + 29, y - 14, 3, 16); g.fillStyle = "rgba(255,255,255,.14)"; rr(g, x, y, 62, 96, 9); g.fill(); g.strokeStyle = "rgba(220,235,245,.6)"; g.lineWidth = 2; g.stroke(); g.fillStyle = c; rr(g, x + 4, y + 92 - 88 * f, 54, 88 * f, 6); g.fill(); g.fillStyle = "#cfe9f3"; g.font = sans(9, 600); g.fillText(n, x, y + 110); };
-  bag(W * 0.02, H * 0.1, "#e8c75a", "Dialysate", 0.8 - (run ? (t * 0.004) % 0.3 : 0)); bag(W * 0.17, H * 0.1, "#e8c75a", "Replacement", 0.66 - (run ? (t * 0.004) % 0.3 : 0)); bag(W * 0.02, H * 0.56, "#e7a24a", "Effluent", 0.22 + (run ? (t * 0.005) % 0.55 : 0));
-  body(g, W * 0.32, H * 0.04, W * 0.38, H * 0.9, [[0, "#e3eaef"], [0.5, "#bcc8d1"], [1, "#8f9ea9"]]);
-  const sx = W * 0.34, sy = H * 0.07, sw = W * 0.34, sh = H * 0.37; screen(g, sx, sy, sw, sh);
-  g.fillStyle = "#7fe9ff"; g.font = sans(12, 700); g.fillText("CVVHDF", sx + 8, sy + 17); g.fillStyle = run ? "#3dff9a" : "#ffc24a"; g.fillText(run ? "RUNNING" : "STOPPED", sx + sw - 66, sy + 17);
-  [["Blood flow", (st.bf || 200) + " mL/min", "#ff7b86"], ["Dialysate", (st.df || 1000) + " mL/h", "#ffd84a"], ["Replacement", (st.rf || 1000) + " mL/h", "#ffd84a"], ["Net UF", (st.uf || 100) + " mL/h", "#48d9ff"], ["Access P", run ? String(-80 - Math.round(Math.sin(t * 1.1) * 6)) : "--", "#e9fbff"], ["Return P", run ? String(110 + Math.round(Math.sin(t * 0.9) * 8)) : "--", "#e9fbff"], ["Filter ΔP", run ? String(30 + Math.round(Math.sin(t * 0.5) * 4)) : "--", "#3dff9a"]].forEach((r, i) => { const y = sy + 36 + i * 17; g.fillStyle = "#7d95a1"; g.font = sans(10, 600); g.fillText(r[0], sx + 8, y); g.fillStyle = r[2]; g.font = mono(11, 700); g.fillText(r[1], sx + sw * 0.5, y); });
-  const PY = H * 0.57; [[0.4, "Replace", "#e8c75a"], [0.51, "Dialysate", "#e8c75a"], [0.62, "Blood", "#ff5468"]].forEach(([fx, n, c]) => { const px = W * fx, py = PY; g.fillStyle = "#2a3641"; g.beginPath(); g.arc(px, py, 22, 0, TAU); g.fill(); g.strokeStyle = c; g.lineWidth = 4; g.beginPath(); g.arc(px, py, 22, 0, TAU); g.stroke();
-    for (let k = 0; k < 3; k++) { const a = (run ? t * 3.2 : 0) + k * TAU / 3; g.fillStyle = "#cfe0ea"; g.beginPath(); g.arc(px + Math.cos(a) * 11, py + Math.sin(a) * 11, 5, 0, TAU); g.fill(); } g.fillStyle = "#16202a"; g.font = sans(9, 700); g.fillText(n, px - 17, py + 38); });
-  const fx = W * 0.51, fy = H * 0.72; g.fillStyle = "#f2f6f9"; rr(g, fx - 15, fy, 30, 90, 13); g.fill(); g.strokeStyle = "#7a8a96"; g.lineWidth = 2; g.stroke(); g.fillStyle = "rgba(255,84,104,.55)"; rr(g, fx - 9, fy + 8, 18, 74, 8); g.fill();
-  hose(g, [[W * 0.97, H * 0.15], [W * 0.8, H * 0.15], [W * 0.8, PY], [W * 0.62 + 22, PY]], "#d9364a", 6, 1, t, run);
-  hose(g, [[W * 0.62, PY + 22], [W * 0.62, H * 0.66], [fx + 6, fy + 2]], "#d9364a", 6, 1, t, run);
-  hose(g, [[fx, fy + 90], [fx, H * 0.97], [W * 0.9, H * 0.97], [W * 0.9, H * 0.3], [W * 0.97, H * 0.26]], "#3a7fd0", 6, 1, t, run);
-  hose(g, [[W * 0.08, H * 0.38], [W * 0.08, H * 0.47], [W * 0.51, H * 0.47], [W * 0.51, PY - 22]], "#e8c75a", 4, 1, t, run);
-  hose(g, [[W * 0.23, H * 0.38], [W * 0.23, PY], [W * 0.4 - 22, PY]], "#e8c75a", 4, 1, t, run);
-  hose(g, [[fx - 8, fy + 60], [W * 0.1, fy + 60], [W * 0.1, H * 0.56 + 96]], "#e7a24a", 4, 1, t, run);
-  g.fillStyle = "#cfe9f3"; g.font = sans(10, 600); g.fillText("patient", W * 0.9, H * 0.1); g.fillText("access ▸", W * 0.84, H * 0.135); g.fillText("◂ return", W * 0.83, H * 0.215);
-  wheels(g, W * 0.38, W * 0.64, H * 0.975);
+/* the dialysis machine (a 3D model, Meshy AI, drawn from two fixed angles in ./icu-assets) with this patient's settings beside it */
+const SPR = {};
+function spr(n) { if (!SPR[n]) { const im = new Image(); im.src = new URL("./icu-assets/dialysis-" + n + ".webp", import.meta.url).href; SPR[n] = im; } return SPR[n]; }
+if (typeof Image !== "undefined") { spr("3q"); spr("front"); }   /* load both pictures up front */
+function dial(g, W, H, st, t, kind) {
+  const run = st.running, im = spr(kind === "crrt" ? "3q" : "front"); g.clearRect(0, 0, W, H);
+  if (im.complete && im.naturalWidth) { const h = H * 0.95, w = h * im.naturalWidth / im.naturalHeight; g.save(); g.shadowColor = "rgba(0,0,0,.55)"; g.shadowBlur = 22; g.shadowOffsetY = 10; g.drawImage(im, W * 0.03, H * 0.025, w, h); g.restore(); }
+  const px = W * 0.5, pw = W * 0.47, py = H * 0.06;
+  g.fillStyle = "rgba(3,22,33,.82)"; rr(g, px, py, pw, H * 0.88, 14); g.fill(); g.strokeStyle = "rgba(95,227,255,.28)"; g.lineWidth = 1.5; rr(g, px, py, pw, H * 0.88, 14); g.stroke();
+  g.fillStyle = "#7fe9ff"; g.font = sans(13, 800); g.fillText(kind === "crrt" ? "CRRT · CVVHDF" : "HAEMODIALYSIS · 4 h", px + 14, py + 26);
+  const on = run ? 0.65 + 0.35 * Math.sin(t * 4) : 1; g.fillStyle = run ? "rgba(61,255,154," + on + ")" : "#ffc24a"; g.beginPath(); g.arc(px + 20, py + 50, 5, 0, TAU); g.fill();
+  g.fillStyle = run ? "#3dff9a" : "#ffc24a"; g.font = sans(12, 800); g.fillText(run ? "RUNNING" : "STOPPED", px + 32, py + 55);
+  const rows = kind === "crrt"
+    ? [["Blood flow", (st.bf || 200) + " mL/min", "#ff7b86"], ["Dialysate", (st.df || 1000) + " mL/h", "#ffd84a"], ["Replacement", (st.rf || 1000) + " mL/h", "#ffd84a"], ["Net UF", (st.uf || 100) + " mL/h", "#48d9ff"], ["Access P", run ? String(-80 - Math.round(Math.sin(t * 1.1) * 6)) + " mmHg" : "--", "#e9fbff"], ["Return P", run ? String(110 + Math.round(Math.sin(t * 0.9) * 6)) + " mmHg" : "--", "#e9fbff"]]
+    : [["Blood flow", (st.bf || 300) + " mL/min", "#ff7b86"], ["Dialysate flow", "500 mL/min", "#ffd84a"], ["UF rate", (st.uf || 400) + " mL/h", "#48d9ff"], ["Venous P", run ? String(120 + Math.round(Math.sin(t) * 6)) + " mmHg" : "--", "#e9fbff"], ["Conductivity", "14.0 mS/cm", "#e9fbff"], ["Dialysate temp", "36.5 °C", "#e9fbff"]];
+  rows.forEach((r, i) => { const y = py + 84 + i * 34; g.fillStyle = "#7d95a1"; g.font = sans(10, 600); g.fillText(r[0], px + 14, y); g.fillStyle = r[2]; g.font = mono(15, 700); g.fillText(r[1], px + 14, y + 16); });
+  const hy = py + 84 + rows.length * 34 + 8;
+  g.fillStyle = "#cfe9f3"; g.font = sans(9, 700); g.fillText("blood", px + 14, hy + 4); g.fillText("dialysate", px + 14, hy + 28);
+  [["#d9364a", 0], ["#3a7fd0", 24]].forEach(([c, d]) => { g.strokeStyle = c; g.lineWidth = 5; g.lineCap = "round"; g.beginPath(); g.moveTo(px + 70, hy + d + 1); g.lineTo(px + pw - 14, hy + d + 1); g.stroke();
+    if (run) { g.save(); g.setLineDash([2, 14]); g.lineDashOffset = -t * 40; g.strokeStyle = "rgba(255,255,255,.8)"; g.lineWidth = 2; g.beginPath(); g.moveTo(px + 70, hy + d + 1); g.lineTo(px + pw - 14, hy + d + 1); g.stroke(); g.restore(); } });
 }
-
-function ihd(g, W, H, st, t) {
-  const run = st.running; g.clearRect(0, 0, W, H);
-  body(g, W * 0.06, H * 0.08, W * 0.52, H * 0.82, [[0, "#e3eaef"], [0.5, "#bcc8d1"], [1, "#8f9ea9"]]);
-  const sx = W * 0.09, sy = H * 0.12, sw = W * 0.46, sh = H * 0.34; screen(g, sx, sy, sw, sh);
-  g.fillStyle = "#7fe9ff"; g.font = sans(12, 700); g.fillText("HAEMODIALYSIS · 4 h", sx + 8, sy + 17);
-  [["Blood flow", (st.bf || 300) + " mL/min"], ["Dialysate flow", "500 mL/min"], ["UF rate", (st.uf || 400) + " mL/h"], ["Venous P", run ? String(120 + Math.round(Math.sin(t) * 6)) : "--"], ["Conductivity", "14.0 mS/cm"]].forEach((r, i) => { g.fillStyle = "#7d95a1"; g.font = sans(10, 600); g.fillText(r[0], sx + 8, sy + 40 + i * 19); g.fillStyle = "#3dff9a"; g.font = mono(11, 700); g.fillText(r[1], sx + sw * 0.5, sy + 40 + i * 19); });
-  knob(g, W * 0.2, H * 0.66, 20, (run ? t * 0.3 : 0) + 1); ["Start", "Stop", "Bolus"].forEach((n, i) => { g.fillStyle = i === 0 ? "#2b8f6a" : i === 1 ? "#a8434f" : "#2c3b47"; rr(g, W * 0.3 + i * 52, H * 0.63, 46, 22, 6); g.fill(); g.fillStyle = "#fff"; g.font = sans(10, 700); g.fillText(n, W * 0.3 + i * 52 + 7, H * 0.63 + 15); });
-  g.fillStyle = "#6c7c88"; rr(g, W * 0.1, H * 0.76, W * 0.44, 10, 4); g.fill(); g.fillStyle = "#7d95a1"; g.font = sans(10, 600); g.fillText("dialysate in / out", W * 0.1, H * 0.84);
-  const dx = W * 0.8, dy = H * 0.2, dh = H * 0.42, py = H * 0.78;
-  g.fillStyle = "#5c6d7a"; rr(g, dx - 4, dy - 8, 8, dh + 30, 3); g.fill(); g.fillStyle = "#f2f6f9"; rr(g, dx - 20, dy, 40, dh, 16); g.fill(); g.strokeStyle = "#7a8a96"; g.lineWidth = 2; g.stroke(); g.fillStyle = "rgba(255,84,104,.5)"; rr(g, dx - 13, dy + 12, 26, dh - 24, 11); g.fill();
-  g.fillStyle = "#2a3641"; g.beginPath(); g.arc(dx, py, 24, 0, TAU); g.fill(); g.strokeStyle = "#ff5468"; g.lineWidth = 4; g.stroke();
-  for (let k = 0; k < 2; k++) { const a = (run ? t * 3 : 0) + k * Math.PI; g.fillStyle = "#cfe0ea"; g.beginPath(); g.arc(dx + Math.cos(a) * 13, py + Math.sin(a) * 13, 6, 0, TAU); g.fill(); }
-  g.fillStyle = "#cfe9f3"; g.font = sans(9, 700); g.fillText("Blood pump", dx - 30, py + 42); g.fillText("dialyser", dx - 20, dy - 14);
-  hose(g, [[W * 0.97, H * 0.93], [dx, H * 0.93], [dx, py + 24]], "#d9364a", 6, 1, t, run);
-  hose(g, [[dx, py - 24], [dx, dy + dh]], "#d9364a", 6, 1, t, run);
-  hose(g, [[dx, dy], [dx, H * 0.09], [W * 0.97, H * 0.09]], "#3a7fd0", 6, 1, t, run);
-  hose(g, [[W * 0.58, H * 0.5], [dx - 20, H * 0.5]], "#e8c75a", 4, 1, t, run);
-  hose(g, [[dx + 20, dy + 28], [W * 0.93, dy + 28], [W * 0.93, H * 0.6], [W * 0.58, H * 0.6]], "#e7a24a", 4, 1, t, run);
-  g.fillStyle = "#cfe9f3"; g.font = sans(10, 600); g.fillText("return to patient ▸", W * 0.7, H * 0.06); g.fillText("◂ from patient (catheter)", W * 0.6, H * 0.985);
-  wheels(g, W * 0.14, W * 0.5, H * 0.945);
-}
+function crrt(g, W, H, st, t) { dial(g, W, H, st, t, "crrt"); }
+function ihd(g, W, H, st, t) { dial(g, W, H, st, t, "ihd"); }
 
 export function paintMachine(cv, kind, st, t) {
   const g = cv.getContext("2d"), W = cv.width, H = cv.height;
