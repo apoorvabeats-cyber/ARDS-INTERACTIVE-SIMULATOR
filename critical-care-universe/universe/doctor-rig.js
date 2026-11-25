@@ -5,7 +5,7 @@
    createRigDoctor(T, gltf, { name, spec, key, outfit:{coat,scrub}, noTag }) -> { group, tag, accent, setMoving(0..1), setSeated(bool), setLook(rad), setLabel(name, spec), update(dt) }
    Visual only. */
 import { GLTFLoader } from "./vendor/GLTFLoader.js";
-import { nameTag, specInfo } from "./doctor-avatar.js?v=20261124g";
+import { nameTag, specInfo } from "./doctor-avatar.js?v=20261126m";
 
 export const AVATARS = {
   dr1: { sex: "m", label: "Dark hair, beard", h: 1.78 },
@@ -104,7 +104,7 @@ export function createRigDoctor(T, gltf, o) {
   const ease = (a, b, f) => a + (b - a) * f;
   return {
     group: g, tag, accent, key, sex: A.sex,
-    setMoving(v) { want = v; }, setLook(r) { look = r; }, setSeated(v) { seatWant = v ? 1 : 0; },
+    setMoving(v) { want = v; }, setLook(r) { look = Math.max(-0.1, Math.min(0.1, r * 0.18)); }   /* only a slight turn of the head */, setSeated(v) { seatWant = v ? 1 : 0; },
     setLabel(name, specLabel) { if (!tag) return; const n = nameTag(T, name, specLabel, accent); tag.material.map.dispose(); tag.material.map = n.material.map; tag.material.needsUpdate = true; },
     update(dt) {
       t += dt; const f = Math.min(1, dt * 5);
@@ -116,7 +116,7 @@ export function createRigDoctor(T, gltf, o) {
       U.uHip.value.set(hl, hr); U.uKnee.value.set(kl, kr);
       U.uSh.value.set(s * a * 0.4 + 0.38 * sa, -s * a * 0.4 + 0.38 * sa);              /* arms swing, or rest forward when seated */
       U.uEl.value.set(0.08 + mv * 0.12 + 0.8 * sa, 0.08 + mv * 0.12 + 0.8 * sa);
-      U.uLean.value = 0.03 * mv + 0.07 * sa + br * 3; U.uYaw.value = look + Math.sin(t * 0.37) * 0.05 * (1 - mv);
+      U.uLean.value = 0.03 * mv + 0.07 * sa + br * 3; U.uYaw.value = look + Math.sin(t * 0.37) * 0.02 * (1 - mv);
       body.position.y = ease(by0, by0 - (hipH - SEAT_HIP), sa) + Math.abs(s) * 0.012 * mv;
       body.position.z = -0.06 * sa;
     },

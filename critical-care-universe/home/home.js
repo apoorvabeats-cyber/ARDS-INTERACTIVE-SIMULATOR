@@ -2,7 +2,7 @@
    Everything that moves is driven by one clock (tween engine below), so the whole screen can also be stepped frame by frame for a recording. */
 import * as THREE from "../universe/three.module.js";
 import { GLTFLoader } from "../universe/vendor/GLTFLoader.js";
-import { AVATARS, AVATAR_KEYS, avatarThumb, loadAvatar, createRigDoctor } from "../universe/doctor-rig.js?v=20261125e";
+import { AVATARS, AVATAR_KEYS, avatarThumb, loadAvatar, createRigDoctor } from "../universe/doctor-rig.js?v=20261126m";
 import { createHero } from "./hero-doctor.js?v=3";
 import { createHero as createWaveHero } from "./hero-wave.js?v=3";
 import { liveUpdates } from "../universe/live-updates.js";
@@ -262,6 +262,10 @@ const centre = (el) => { const r = el.getBoundingClientRect(); return { x: r.lef
 const PORT = () => matchMedia("(orientation: portrait) and (max-width: 1100px)").matches;
 const FLIP = () => document.documentElement.classList.contains("ccw");
 const loc = (dx, dy) => (PORT() ? (FLIP() ? { x: -dy, y: dx } : { x: dy, y: -dx }) : { x: dx, y: dy });
+/* open in landscape: ask the phone to lock to it (works where the browser allows it, e.g. full screen or an installed app); where it does not, the stage is turned by hand below */
+{ const lock = () => { try { const p = screen.orientation && screen.orientation.lock && screen.orientation.lock("landscape"); if (p && p.catch) p.catch(() => {}); } catch (e) {} };
+  lock();
+  addEventListener("pointerdown", function fs() { removeEventListener("pointerdown", fs); if (!PORT()) return; const el = document.documentElement; try { const r = el.requestFullscreen && el.requestFullscreen({ navigationUI: "hide" }); if (r && r.then) r.then(lock, () => {}); } catch (e) {} }, { once: true }); }
 /* A phone whose screen is locked upright keeps a portrait page even when it is turned on its side. The stage is turned a quarter turn so it fills the
    screen; which way follows how the phone is physically held (left-side-up or right-side-up), read from the tilt sensor. */
 { const root = document.documentElement; let lastG = null;

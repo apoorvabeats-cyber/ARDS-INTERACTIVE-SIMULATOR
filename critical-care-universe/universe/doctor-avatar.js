@@ -108,7 +108,7 @@ export function createDoctor(T, gltf, o) {
   return {
     group: g, tag, accent,
     setMoving(v) { want = v; },
-    setLook(r) { look = r; },
+    setLook(r) { look = Math.max(-0.1, Math.min(0.1, r * 0.18)); }   /* only a slight turn of the head */,
     setSeated(v) { seatWant = v ? 1 : 0; },
     setLabel(name, specLabel) { const t = nameTag(T, name, specLabel, accent); tag.material.map.dispose(); tag.material.map = t.material.map; tag.material.needsUpdate = true; },
     update(dt) {
