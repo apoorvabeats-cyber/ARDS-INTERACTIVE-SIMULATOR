@@ -1,11 +1,10 @@
 /* PATHODYNAMICS · Interactive Clinical Pathophysiology
    Every lab follows the same five steps (select, explore, intervene, observe, correlate) and the same three views of a disease
    (anatomical, pathophysiological, interventional), all tied to one whole-body patient model. */
-import { createStage } from "./stage.js?v=20261126gi";
-import { bodySVG, paintBody } from "./body.js?v=20261126gi";
-import { ecgDraw } from "./charts.js?v=20261126gi";
+import { createStage } from "./stage.js?v=20261126gj";
+import { ecgDraw } from "./charts.js?v=20261126gj";
 
-const V = "20261126gi", EMBED = /[?&]embed=1/.test(location.search), $ = (s, r) => (r || document).querySelector(s), esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const V = "20261126gj", EMBED = /[?&]embed=1/.test(location.search), $ = (s, r) => (r || document).querySelector(s), esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const LABS = [
   { id: "stroke", name: "Stroke Lab", tag: "Acute ischaemic stroke", icon: "🧠", col: "#9b7bff", blurb: "Choose the blocked artery, turn the brain, drag the clot out and watch the penumbra, the deficits and the whole body respond.", mods: "ICA · M1 · M2 · M3 · ACA · PCA · Basilar · Vertebral" },
   { id: "mi", name: "Heart Attack Lab", tag: "Acute myocardial infarction (STEMI and NSTEMI)", icon: "🫀", col: "#ff6b7c", blurb: "Block a coronary artery, read the ECG territory, then open it with a balloon and stent or with lysis.", mods: "STEMI · NSTEMI · RCA · LAD · LCx · Left main · PDA" },
@@ -108,8 +107,7 @@ function dyn(force) {
   if (step === 3) { const o = lab.obs(), s = JSON.stringify([o.params, o.note]); if (!force && s === lastObs) return; lastObs = s; box.innerHTML = `<div class="params">${o.params.slice(0, 4).map(prm).join("")}</div><div class="note2">${esc(o.note)}</div>`; }
   else if (step === 4) {
     const o = lab.obs(), s = JSON.stringify([o.params, o.note, o.body, o.marks, o.ecgKey]); if (!force && s === lastObs) return; lastObs = s;
-    box.innerHTML = `<div class="obs2"><div id="bodybox">${bodySVG()}</div><div><div class="params">${o.params.map(prm).join("")}</div></div></div>${o.ecg ? `<canvas class="ecg" id="ecg" width="640" height="${o.ecg.h || 220}"></canvas>` : ""}<div class="note2">${esc(o.note)}</div>`;
-    paintBody($("#bodybox"), o.body, o.marks);
+    box.innerHTML = `<div class="params">${o.params.map(prm).join("")}</div>${o.ecg ? `<canvas class="ecg" id="ecg" width="640" height="${o.ecg.h || 220}"></canvas>` : ""}<div class="note2">${esc(o.note)}</div>`;
   } else if (step === 5) {
     if (!force) return; const c = lab.clin(); box.innerHTML = `<dl class="corr">${c.lines.map((l) => `<dt>${esc(l[0]).toUpperCase()}</dt><dd>${esc(l[1])}</dd>`).join("")}</dl><div class="imgs" id="imgs"></div><div class="note" style="margin-top:12px">Teaching logic only. Follow your current guideline and local protocol.</div>`; if (c.draw) c.draw($("#imgs"));
   }

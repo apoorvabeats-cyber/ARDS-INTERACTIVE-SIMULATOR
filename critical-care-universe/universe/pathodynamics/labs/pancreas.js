@@ -2,9 +2,9 @@
    From a normal gland to oedematous and necrotising pancreatitis, then the collections (APFC, ANC, WON, infected necrosis)
    and the step-up approach: support and antibiotics, drainage (endoscopic stent or percutaneous drain), then necrosectomy.
    Terms follow the Revised Atlanta Classification. Management content aligned to ACG 2024, the AGA 2020 necrosis update and the Revised Atlanta Classification (checked Nov 2026). Numbers are illustrative.  */
-import { THREE, C, smooth } from "../stage.js?v=20261126gi";
-import { clamp } from "./common.js?v=20261126gi";
-import { organ } from "../anatomy.js?v=20261126gi";
+import { THREE, C, smooth } from "../stage.js?v=20261126gj";
+import { clamp } from "./common.js?v=20261126gj";
+import { organ } from "../anatomy.js?v=20261126gj";
 
 const T = {
   NORMAL: { label: "Normal", sub: "Healthy pancreas", d0: 0, d1: 14, dv: 0,
@@ -174,20 +174,8 @@ export default function create(S, ui) {
     L.push(["Intervention: the step-up approach", "1) Support and, if infected, antibiotics. 2) Postpone invasive treatment, ideally to about 4 weeks, until the collection is walled-off, if the patient is stable. 3) Drain: endoscopic transmural (LAMS) or percutaneous. 4) Necrosectomy only if drainage fails to resolve it: endoscopic first, or video-assisted retroperitoneal debridement. Surgery is the last resort. Randomised trials support this order."]);
     L.push(["Cholecystectomy", "In mild biliary pancreatitis, cholecystectomy in the same admission; in necrotising disease, delay until collections resolve or after about 6 weeks."]);
     L.push(["Reference", "Reference: ACG 2024 acute pancreatitis guideline, AGA 2020 clinical practice update on pancreatic necrosis, IAP/APA, Revised Atlanta 2012. Follow your local pancreatitis pathway."]);
-    void c; return { lines: L, draw: (el) => drawImaging(el, e) };
+    void c; return { lines: L };
   }
-  function drawImaging(el, e) {
-    const mk = (title, f) => { const d = document.createElement("div"); d.className = "img"; const cv = document.createElement("canvas"); cv.width = 300; cv.height = 300; const t = document.createElement("small"); t.textContent = title; d.append(cv, t); el.append(d); f(cv.getContext("2d")); };
-    const c = cur();
-    mk("Contrast CT (schematic)", (g) => { g.fillStyle = "#000"; g.fillRect(0, 0, 300, 300); g.fillStyle = "#555"; g.beginPath(); g.ellipse(150, 150, 135, 105, 0, 0, 7); g.fill(); g.fillStyle = "#e8e8e8"; g.beginPath(); g.arc(150, 210, 20, 0, 7); g.fill(); g.fillStyle = "#fff"; g.beginPath(); g.arc(142, 175, 9, 0, 7); g.fill();
-      g.fillStyle = "#8a8a8a"; g.beginPath(); g.ellipse(150, 78, 80, 34, 0, 0, 7); g.fill();
-      g.fillStyle = "#9c9c9c"; g.beginPath(); g.ellipse(150, 150, 92, 20, -0.05, 0, 7); g.fill(); if (e.n > 0) { g.fillStyle = "#3a3a3a"; g.beginPath(); g.ellipse(150, 150, 14 + 70 * e.n, 11, 0, 0, 7); g.fill(); }
-      if (e.size > 0.02) { const r = (30 + 55 * e.size) * (0.2 + 0.8 * resid()); g.fillStyle = "#242424"; g.beginPath(); g.ellipse(165, 128, r * 1.2, r * 0.75, 0, 0, 7); g.fill(); if (wallF() > 0.2) { g.strokeStyle = `rgba(230,230,230,${0.25 + 0.7 * wallF()})`; g.lineWidth = 4; g.stroke(); } if (c.solid) { g.fillStyle = "#6a6a6a"; for (let i = 0; i < Math.min(8, e.dn / 2); i++) { g.beginPath(); g.arc(150 + i * 9 - 28, 126 + (i % 3) * 8 - 8, 5, 0, 7); g.fill(); } } if (isInf() && !(st.stent && st.dr > 0.6)) { g.fillStyle = "#000"; for (let i = 0; i < 4; i++) { g.beginPath(); g.arc(158 + i * 8, 112 + (i % 2) * 6, 3, 0, 7); g.fill(); } } }
-      g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText("pancreas · collection with wall · gas", 8, 292); g.fillStyle = "#e8e8e8"; g.fillText("R", 8, 18); g.fillText("L", 284, 18); });
-    mk("Step-up approach", (g) => { g.fillStyle = "#0a0f16"; g.fillRect(0, 0, 300, 300); const steps = [["1 Support ± antibiotics", st.support || st.abx], ["2 Wait for a wall (~4 wk)", wallF() > 0.6], ["3 Drain (endoscopic / perc)", st.stent || st.perc], ["4 Necrosectomy if needed", st.sess > 0]];
-      steps.forEach(([t, done], i) => { const y = 20 + i * 66; g.fillStyle = done ? "rgba(61,255,154,.25)" : "rgba(120,150,255,.15)"; g.strokeStyle = done ? "#3dff9a" : "rgba(150,170,255,.5)"; g.lineWidth = 2; g.beginPath(); g.roundRect(14, y, 272, 48, 10); g.fill(); g.stroke(); g.fillStyle = "#eaf6ff"; g.font = "600 14px system-ui"; g.fillText(t, 28, y + 29); if (i < 3) { g.fillStyle = "#98acd0"; g.fillText("▼", 144, y + 62); } }); });
-  }
-
   const lab = {
     id: "pancreas", name: "Pancreatitis Lab", tag: "Acute pancreatitis and necrosis", icon: "🩻",
     tabs: TABS.map((k) => ({ id: k, label: T[k].label, sub: T[k].sub })), get tab() { return st.tab; },

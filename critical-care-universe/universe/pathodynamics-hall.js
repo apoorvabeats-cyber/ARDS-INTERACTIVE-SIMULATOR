@@ -5,7 +5,7 @@
    buildPathoHall(T, ctx, top, LV) -> { gate, GX, inHall(p), cands(x,z,out), solid(px,pz), update(t,dt,cam,lvl1), tap(kind), group }
    mountPathoUI(up, getPos) -> the DOM button and the full-screen overlay (up.openPatho(route)). */
 
-export const PATHO_VER = "20261126gi";
+export const PATHO_VER = "20261126gj";
 export const PATHO_CLIPS = ["p_home", "p_neuro", "p_cardio", "p_resp", "p_nephro", "p_gi", "p_gcc", "p_steps", "p_views"];
 const LABS = [
   ["neuro", "NEUROLOGY", "Brain and cerebral vessels", "Stroke · ICH · SAH · Aneurysm · Herniation · Hydrocephalus", "#9b7bff", "stroke"],

@@ -6,10 +6,10 @@
    Content aligned to the 2022 WSES guideline on acute mesenteric ischaemia (immediate CT angiography and heparin, endovascular first where available, NOMI managed by
    restoring flow and minimising vasopressors, MVT treated with heparin, resection of non-viable bowel with damage control and a second look at 24 to 48 hours).
    Checked Nov 2026 against published summaries. All numbers are illustrative, not patient data. Every view is 3D. */
-import { THREE, C, smooth } from "../stage.js?v=20261126gi";
-import { clotKit, toolKit, clamp } from "./common.js?v=20261126gi";
-import { subset } from "../anatomy.js?v=20261126gi";
-import { seg, ball, loadBowel, rate, V3, rng, pebble, CREDIT_BP3D } from "./gi-kit.js?v=20261126gi";
+import { THREE, C, smooth } from "../stage.js?v=20261126gj";
+import { clotKit, toolKit, clamp } from "./common.js?v=20261126gj";
+import { subset } from "../anatomy.js?v=20261126gj";
+import { seg, ball, loadBowel, rate, V3, rng, pebble, CREDIT_BP3D } from "./gi-kit.js?v=20261126gj";
 
 const T = {
   SMAE: { label: "SMA embolus", sub: "Embolus from the heart", min: 0, max: 48, v0: 8, tr: 20, base: [1.0, 0.12, 0.08],

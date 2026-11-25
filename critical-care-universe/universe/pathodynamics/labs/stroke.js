@@ -2,8 +2,8 @@
    Pick an occlusion, turn the brain, drag the clot out, and watch perfusion, tissue fate and the whole body respond.
    Teaching model: tissue fate depends on TIME and COLLATERALS; reopening the vessel does not undo tissue that has already infarcted.
    Content aligned to the 2026 AHA/ASA acute ischaemic stroke guideline (checked Nov 2026 against the published summaries); simplified teaching model. Numbers are illustrative ranges, not patient data. */
-import { THREE, C, smooth } from "../stage.js?v=20261126gi";
-import { organ, splitLR } from "../anatomy.js?v=20261126gi";
+import { THREE, C, smooth } from "../stage.js?v=20261126gj";
+import { organ, splitLR } from "../anatomy.js?v=20261126gj";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const BRAIN = { cx: 0.58, rx: 0.56, ry: 0.78, rz: 1.0 };

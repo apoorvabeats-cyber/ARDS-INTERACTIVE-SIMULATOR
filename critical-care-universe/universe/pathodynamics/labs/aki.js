@@ -3,9 +3,9 @@
    Pick the cause, set the time, then correct it and watch filtration, creatinine, potassium and urine output respond.
    Teaching model: reversible functional loss turns into structural loss the longer the cause persists.
    Content aligned to KDIGO 2012 (the current final AKI guideline; the 2026 update was still in public review as of Nov 2026). All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261126gi";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261126gi";
-import { kidney as loadKidney } from "../anatomy.js?v=20261126gi";
+import { THREE, C } from "../stage.js?v=20261126gj";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261126gj";
+import { kidney as loadKidney } from "../anatomy.js?v=20261126gj";
 
 const T = {
   PRE: { label: "Prerenal", sub: "Hypoperfusion", sev: 0.55, irr0: 0, irrMax: 0.8, tau: 2.5, inj: { glom: 0.15, pct: 0.12 },

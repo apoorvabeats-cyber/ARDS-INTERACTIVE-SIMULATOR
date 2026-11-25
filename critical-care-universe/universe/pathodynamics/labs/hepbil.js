@@ -3,9 +3,9 @@
    Interactions: biliary decompression (ERCP stone extraction or stent, percutaneous drain), abscess drainage (needle, catheter), source control, and how injury progresses with time.
    Content aligned to the Tokyo Guidelines 2018 (acute cholangitis: diagnosis, severity grade, timing of drainage) and current teaching for pyogenic and amoebic liver abscess.
    Checked Nov 2026 against published summaries. All numbers are illustrative, not patient data. Nothing here is a flat picture: every view is the 3D model. */
-import { THREE, C, smooth } from "../stage.js?v=20261126gi";
-import { clotKit, toolKit, clamp } from "./common.js?v=20261126gi";
-import { seg, setWidth, branchTree, ball, loadLiver, ellip, rate, V3, rng, CREDIT_BP3D } from "./gi-kit.js?v=20261126gi";
+import { THREE, C, smooth } from "../stage.js?v=20261126gj";
+import { clotKit, toolKit, clamp } from "./common.js?v=20261126gj";
+import { seg, setWidth, branchTree, ball, loadLiver, ellip, rate, V3, rng, CREDIT_BP3D } from "./gi-kit.js?v=20261126gj";
 
 const T = {
   NORMAL: { label: "Normal", sub: "Liver, bile ducts, gallbladder", min: 0, max: 1, unit: "",

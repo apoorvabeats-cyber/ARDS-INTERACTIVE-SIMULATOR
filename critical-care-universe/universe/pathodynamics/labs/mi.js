@@ -2,9 +2,9 @@
    Pick the blocked coronary, read the ECG territory, drag the thrombus out, balloon and stent, or give fibrinolysis.
    Teaching model: myocardium is lost with TIME and COLLATERALS; reopening the artery does not bring back necrosed muscle.
    Content aligned to the 2025 ACC/AHA/ACEP/NAEMSP/SCAI ACS guideline (checked Nov 2026 against the published summaries). All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261126gi";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261126gi";
-import { organ } from "../anatomy.js?v=20261126gi";
+import { THREE, C } from "../stage.js?v=20261126gj";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261126gj";
+import { organ } from "../anatomy.js?v=20261126gj";
 
 const ROT = 0.4, LVC = [0.22, -0.1, -0.05], LVR = [0.52, 0.86, 0.5], RVC = [-0.42, -0.2, 0.2], RVR = [0.42, 0.66, 0.45];
 const lvPt = (ph, th, k) => { k = k || 1.03; let x = LVR[0] * Math.cos(th) * Math.cos(ph) * k, y = LVR[1] * Math.sin(th) * k, z = LVR[2] * Math.cos(th) * Math.sin(ph) * k; const c = Math.cos(ROT), s = Math.sin(ROT); return [x * c - y * s + LVC[0], x * s + y * c + LVC[1], z + LVC[2]]; };

@@ -100,19 +100,19 @@ const PARENTS = [
   { id: "hub", name: "Hub", sub: "Cases, labs and imaging", c: "#36d6ff", ic: "hub", tag: "ATLAS", slot: "a",
     desc: "Four rooms under one roof: walk the ICU floor, work in the microbiology lab, watch pathophysiology move, or read the scans.",
     kids: [
-      { id: "icu", name: "ICU", sub: "The intensive care floor", ic: "icu", c: "#2fe3c4", href: U + "living-command.html?v=20261126gi&at=icu" },
+      { id: "icu", name: "ICU", sub: "The intensive care floor", ic: "icu", c: "#2fe3c4", href: U + "living-command.html?v=20261126gj&at=icu" },
       { id: "micro", name: "Microbiology", sub: "Cultures, stains, antibiograms", ic: "micro", c: "#7bd96a", href: R + "microbiology-lab.html" },
       { id: "path", name: "Pathophysiology", sub: "Disease in motion", ic: "patho", c: "#ff8f5a", href: R + "pathology-live.html" },
       { id: "rad", name: "Radiology", sub: "X-ray, CT, MRI and ultrasound", ic: "radio", c: "#7aa7ff", href: R + "radiology.html" }] },
   { id: "cmd", name: "Command Center", sub: "Six beds, live alarms", c: "#ffc24a", ic: "cmd", tag: "LIVE", slot: "b",
     desc: "Everything the unit is doing right now. Open the live ICU and take the call.",
-    kids: [{ id: "live", name: "ICU (live)", sub: "Six patients, one team", ic: "cmd", c: "#ffc24a", href: U + "living-command.html?v=20261126gi&at=command" }] },
+    kids: [{ id: "live", name: "ICU (live)", sub: "Six patients, one team", ic: "cmd", c: "#ffc24a", href: U + "living-command.html?v=20261126gj&at=command" }] },
   { id: "team", name: "Teams", sub: "The multidisciplinary team", c: "#b48cff", ic: "team", tag: "MDT", slot: "c",
     desc: "Your colleagues, standing by. Open the team room to review a patient together.", kids: [] },
   { id: "edu", name: "Education", sub: "Watch, explore, remember", c: "#ff7ad9", ic: "edu", tag: "LEARN", slot: "d",
     desc: "Learn the procedure, see the physiology, then lock it in with spaced recall.",
     kids: [
-      { id: "vid", name: "Video library", sub: "Procedures and bedside skills", ic: "vid", c: "#5b9bff", href: U + "living-command.html?v=20261126gi&at=video" },
+      { id: "vid", name: "Video library", sub: "Procedures and bedside skills", ic: "vid", c: "#5b9bff", href: U + "living-command.html?v=20261126gj&at=video" },
       { id: "patho3", name: "Pathodynamics", sub: "Organs that move and respond", ic: "patho", c: "#3dff9a", href: U + "pathodynamics/index.html" },
       { id: "mem", name: "Memory lab", sub: "Spaced-repetition recall", ic: "mem", c: "#ff7ad9", href: U + "memory-lab/index.html" }] },
 ];
@@ -439,7 +439,7 @@ $("#bProfile").onclick = () => { if (!busy) openFly("profile"); };
 $("#bSet").onclick = () => { if (!busy) openFly("settings"); };
 $("#bQuick").onclick = () => (qOpen ? closeQuick() : openQuick());
 $("#bHome").onclick = async () => { sfx("tick"); await Promise.all([closeFly(), closeQuick()]); goHome(); };
-$("#bGate").onclick = async () => { if (busy) return; busy = true; sfx("tick"); await Promise.all([closeFly(), closeQuick()]); await launch("", "../universe/living-command.html?v=20261126gi&at=gate"); busy = false; };
+$("#bGate").onclick = async () => { if (busy) return; busy = true; sfx("tick"); await Promise.all([closeFly(), closeQuick()]); await launch("", "../universe/living-command.html?v=20261126gj&at=gate"); busy = false; };
 $("#teamGo").onclick = () => { if (!busy) { busy = true; launch("Team room", "../index.html?to=team").then(() => (busy = false)); } };
 addEventListener("keydown", (e) => { if (e.key === "Escape") { closeFly(); closeQuick(); if (view !== "home") goHome(); } });
 

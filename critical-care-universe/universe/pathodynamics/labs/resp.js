@@ -3,9 +3,9 @@
    Pulmonary embolism has its own lab (./pe.js). Content aligned to the 2024 ATS ARDS guideline and 2024 global ARDS definition, the 2025 ATS community-acquired pneumonia guideline
    (corticosteroids for severe CAP other than influenza) and the 2023 BTS pleural disease guideline (conservative or ambulatory management of minimally symptomatic primary spontaneous
    pneumothorax; needle aspiration or tube drainage otherwise). Checked Nov 2026 against the published summaries. All numbers are illustrative, not patient data. */
-import { THREE } from "../stage.js?v=20261126gi";
-import { toolKit, vessels, mirrorFlows, clamp } from "./common.js?v=20261126gi";
-import { organ, splitLR, fitGeom } from "../anatomy.js?v=20261126gi";
+import { THREE } from "../stage.js?v=20261126gj";
+import { toolKit, vessels, mirrorFlows, clamp } from "./common.js?v=20261126gj";
+import { organ, splitLR, fitGeom } from "../anatomy.js?v=20261126gj";
 
 const TABS = {
   ARDS: { label: "ARDS", sub: "Diffuse alveolar injury",
