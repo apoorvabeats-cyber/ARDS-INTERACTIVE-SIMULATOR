@@ -16,7 +16,7 @@ import { CSS3DRenderer, CSS3DObject } from "./vendor/CSS3DRenderer.js?v=20261124
 import { buildChamber, CH } from "./mdt-chamber.js?v=20261124g";
 import { paintAvail, paintPresent, paintDiscuss, paintConsole, paintPlacard, TAB_LABEL, TAB_ORDER, patientNo } from "./mdt-screens.js?v=20261124g";
 import { paintMachine } from "./nexus-machines.js?v=20261124g";
-import { createOrders, createHud } from "./nexus-orders.js?v=20261124g";
+import { createOrders, createHud } from "./nexus-orders.js?v=20261126d";
 import { SECTIONS, buildSection, paintImage, paintEcg, hotspotAt, labsOf, sofaOf } from "./nexus-sections.js?v=20261124g";
 
 const $ = (s) => document.querySelector(s);
@@ -449,14 +449,16 @@ function scanFeed() {
    the eight scientific sections, the Orders for my role, and the Team (ask, propose, challenge, agree, finalise). */
 const sciSC = () => (SC && blindNow() ? Object.assign({}, maskSC(SC), { name: "Patient " + patientNo(SC) }) : SC);
 const sciCtx = () => ({ P: maskP(P), SC: sciSC(), blind: blindNow(), eq, orders: mdt.orders, busy: mdt.busy, room: mdt.room, labSeries, hist, feed });
-const scr = { el: $("#sci"), obj: null, id: "history", sub: 0, key: "", on: false, elW: 760 };
+/* on a phone or tablet the tilted 3D page cannot be touched (the browser does not hit-test it), so the doctor's screen opens as a flat sheet over the hall */
+const flatSci = () => { if (Q.has("flat")) return Q.get("flat") === "1"; try { return matchMedia("(pointer:coarse)").matches || Math.min(innerWidth, innerHeight) < 600; } catch (e) { return false; } };
+const scr = { el: $("#sci"), obj: null, flat: false, id: "history", sub: 0, key: "", on: false, elW: 760 };
 const LCD_K = 100, ccam = new T.PerspectiveCamera();
 let viewPose = null;
 function screenSize() { const D = chamber.dims, w = cam.aspect < 0.8 ? 420 : 760; scr.elW = w; scr.el.style.setProperty("--sw", w + "px"); scr.el.style.setProperty("--sh", Math.round(w * D.H / D.W) + "px"); if (scr.obj) scr.obj.scale.setScalar(D.W * LCD_K / w); }
 /* each frame the page is laid exactly on my own sloped screen */
 const _p = new V(), _q = new T.Quaternion();
 function placeLcd() {
-  lcdEl.style.display = scr.on ? "" : "none"; if (!scr.on || !scr.obj) return; const st = myStation(); if (!st) return;
+  lcdEl.style.display = scr.on && !scr.flat ? "" : "none"; if (!scr.on || scr.flat || !scr.obj) return; const st = myStation(); if (!st) return;
   st.screen.plane.updateMatrixWorld(true); st.screen.plane.getWorldPosition(_p); st.screen.plane.getWorldQuaternion(_q);
   scr.obj.position.copy(_p).multiplyScalar(LCD_K); scr.obj.quaternion.copy(_q); scr.obj.scale.setScalar(chamber.dims.W * LCD_K / scr.elW); scr.obj.updateMatrixWorld();
   ccam.position.copy(cam.position).multiplyScalar(LCD_K); ccam.quaternion.copy(cam.quaternion); ccam.projectionMatrix.copy(cam.projectionMatrix); ccam.projectionMatrixInverse.copy(cam.projectionMatrixInverse); ccam.updateMatrixWorld(true);
@@ -491,7 +493,7 @@ function teamHtml() {
 }
 function screenHtml() {
   const st = myStation(), it = (st && st.item) || {}, acc = it.accent || "#5fe3ff", tabs = TAB_ORDER.map((id) => { const n = unseen[id] || 0; return `<button type="button" data-id="${id}" data-on="${id === scr.id ? 1 : 0}">${esc(TAB_LABEL[id])}${n > 0 ? `<i>${n}</i>` : ""}</button>`; }).join("");
-  const head = `<header style="--a:${acc}"><span class="rl">${esc(it.label || mySpecLabel())}</span><b>${esc(myName)}</b><span class="lv">● LIVE</span><button class="scix" type="button">Back to table ✕</button></header><nav class="stabs">${tabs}</nav>`;
+  const head = `<header style="--a:${acc}"><span class="rl">${esc(it.label || mySpecLabel())}</span><b>${esc(myName)}</b><span class="lv">● LIVE</span><button class="scix" type="button" aria-label="Close this screen and go back to the table" title="Close">✕</button></header><nav class="stabs">${tabs}</nav>`;
   const sec = SECTIONS.find((x) => x.id === scr.id);
   if (sec) { const g = sec.groups || {}, sub = clamp(scr.sub, 0, sec.subs.length - 1); return head + `<nav class="subs">${sec.subs.map((t, i) => (g[i] ? `<i class="gl">${esc(g[i])}</i>` : "") + `<button type="button" data-i="${i}" data-on="${i === sub ? 1 : 0}">${esc(t)}</button>`).join("")}</nav><div class="sbody"><h3>${esc(sec.subs[sub])}</h3>${P && SC ? buildSection(scr.id, sub, sciCtx()) : `<p class="nt">The case appears here when the shift begins.</p>`}</div>`; }
   return head + (scr.id === "orders" ? ordersHtml() : teamHtml());
@@ -510,22 +512,35 @@ function paintMachines(now) {
   if (!scr.on) return; const cs = []; scr.el.querySelectorAll("canvas.mach").forEach((c) => cs.push(c));
   cs.forEach((c) => { let st = {}; try { st = JSON.parse(c.dataset.st || "{}"); } catch (e) { /* ignore */ } paintMachine(c, c.dataset.k, st, now / 1000); });
 }
-let lastRender = 0;
+let lastRender = 0, scrDown = false, scrTouchAt = 0;
 function renderScreen(force) {
   if (!scr.on) return;
-  const nowR = performance.now(); if (!force && nowR - lastRender < 900) return; const key = JSON.stringify([scr.id, scr.sub, P && [Math.round(P.hr), Math.round(P.map), Math.round(P.spo2), P.hour, (P.results || []).length, (P.log || []).length, P.tube, P.norepi, P.oxygen, P.artLine, P.hdLine, P.dialysis, P.outcome], mdt.busy, mdt.err, mdt.orders && JSON.stringify(mdt.orders.groups.map((g) => g.items.map((i) => (i.ok ? 1 : 0)))), mdt.room && mdt.room.members && mdt.room.members.length, chat.length, unseen]);
+  const nowR = performance.now(); if (!force && (nowR - lastRender < 900 || scrDown || nowR - scrTouchAt < 900)) return; const key = JSON.stringify([scr.id, scr.sub, P && [Math.round(P.hr), Math.round(P.map), Math.round(P.spo2), P.hour, (P.results || []).length, (P.log || []).length, P.tube, P.norepi, P.oxygen, P.artLine, P.hdLine, P.dialysis, P.outcome], mdt.busy, mdt.err, mdt.orders && JSON.stringify(mdt.orders.groups.map((g) => g.items.map((i) => (i.ok ? 1 : 0)))), mdt.room && mdt.room.members && mdt.room.members.length, chat.length, unseen]);
   if (!force && key === scr.key) return; scr.key = key; lastRender = nowR; const el = scr.el, sb = el.querySelector(".sbody"), top = sb ? sb.scrollTop : 0, ns = el.querySelector(".subs"), nl = ns ? ns.scrollLeft : 0, nt = el.querySelector(".stabs"), ntl = nt ? nt.scrollLeft : 0;
-  el.innerHTML = screenHtml(); const nb = el.querySelector(".sbody"); if (nb && !force) nb.scrollTop = top; const n2 = el.querySelector(".subs"); if (n2 && !force) n2.scrollLeft = nl; const n3 = el.querySelector(".stabs"); if (n3) n3.scrollLeft = ntl; sciPaint();
+  { /* swap in only the parts that changed: the tab bars keep their own nodes, so a swipe on them is not torn down by the next update */
+    const tpl = document.createElement("template"); tpl.innerHTML = screenHtml(); const nw = [...tpl.content.children], od = [...el.children];
+    if (force || nw.length !== od.length) el.replaceChildren(...nw); else nw.forEach((n, i) => { if (od[i].outerHTML !== n.outerHTML) od[i].replaceWith(n); });
+  }
+  const nb = el.querySelector(".sbody"); if (nb && !force) nb.scrollTop = top; const n2 = el.querySelector(".subs"); if (n2 && !force) n2.scrollLeft = nl; const n3 = el.querySelector(".stabs"); if (n3) n3.scrollLeft = ntl; sciPaint();
   if (force) { const on = el.querySelector(".stabs [data-on='1']"), sn = el.querySelector(".stabs"); if (on && sn) sn.scrollLeft = on.offsetLeft - (sn.clientWidth - on.offsetWidth) / 2; }
 }
 let lastEnter = 0, lastZoom = 0;
 function enterScreen(id, sub) {
   { const n = performance.now(); if (scr.on && (n - lastEnter < 300 || (id === scr.id && (sub || 0) === scr.sub))) { lastEnter = n; return; } lastEnter = n; }
   if (id) { scr.id = id; scr.sub = sub || 0; } else if (!scr.on && !SECTIONS.some((x) => x.id === scr.id) && scr.id !== "orders" && scr.id !== "team") scr.id = DEFTAB[mySpec] || "history";
-  unseen[scr.id] = 0; if (!scr.obj) { screenSize(); scr.obj = new CSS3DObject(scr.el); scr.el.classList.add("lcd"); lcdScene.add(scr.obj); screenSize(); }
+  unseen[scr.id] = 0; scr.flat = flatSci();
+  if (scr.flat) { if (scr.obj) { lcdScene.remove(scr.obj); scr.obj = null; } if (scr.el.parentElement !== document.body) document.body.appendChild(scr.el); scr.el.classList.remove("lcd"); scr.el.classList.add("flat"); scr.el.style.transform = ""; lcdEl.style.display = "none"; }
+  else { scr.el.classList.remove("flat"); if (scr.obj && scr.el.parentElement === document.body) { lcdScene.remove(scr.obj); scr.obj = null; } if (!scr.obj) { screenSize(); scr.obj = new CSS3DObject(scr.el); scr.el.classList.add("lcd"); lcdScene.add(scr.obj); screenSize(); } }
   scr.on = true; scr.el.hidden = false; document.body.classList.add("using"); $("#card").hidden = true; focus = null; viewPose = null; me.seated = false; renderScreen(true); sfx.unlock(); sfx.beep && sfx.beep({ f: 880, vol: 0.25 });
 }
 function exitScreen() { if (!scr.on) return; scr.on = false; try { paintHeroes(0, 0, true); } catch (e) {} scr.el.hidden = true; lcdEl.style.display = "none"; document.body.classList.remove("using"); retreat = false; const st = myStation(); if (st) { goal = { x: st.x, z: st.z }; me.seated = true; } }
+/* the doctor's screen: swipe, wheel and drag the tab bars sideways; hold the redraw while a finger is on the screen or still gliding */
+scr.el.addEventListener("pointerdown", (e) => { scrDown = true; scrTouchAt = performance.now(); if (e.pointerType === "mouse") { const nv = e.target.closest(".stabs,.subs"); if (nv) scr.drag = { nv, x: e.clientX, l: nv.scrollLeft, moved: 0 }; } }, true);
+addEventListener("pointermove", (e) => { const d = scr.drag; if (!d) return; const dx = e.clientX - d.x; d.moved = Math.max(d.moved, Math.abs(dx)); if (d.moved > 4) d.nv.scrollLeft = d.l - dx; });
+addEventListener("pointerup", () => { scrDown = false; scrTouchAt = performance.now(); setTimeout(() => { scr.drag = null; }, 0); }); addEventListener("pointercancel", () => { scrDown = false; scr.drag = null; });
+scr.el.addEventListener("scroll", () => { scrTouchAt = performance.now(); }, true);
+scr.el.addEventListener("wheel", (e) => { const nv = e.target.closest(".stabs,.subs"); if (nv && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { nv.scrollLeft += e.deltaY; e.preventDefault(); } scrTouchAt = performance.now(); }, { passive: false });
+scr.el.addEventListener("click", (e) => { if (scr.drag && scr.drag.moved > 4) { e.stopPropagation(); e.preventDefault(); return; } }, true);
 scr.el.addEventListener("click", (e) => {
   const t = e.target.closest("button,canvas"); if (!t) return;
   if (t.classList.contains("scix")) return exitScreen();

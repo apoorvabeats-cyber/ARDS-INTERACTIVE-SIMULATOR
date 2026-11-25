@@ -34,6 +34,9 @@ const css = `
 #vchips .ch small{font-weight:500;opacity:.7}
 #vchips .ch button{border:0;background:rgba(255,255,255,.14);border-radius:50%;width:20px;height:20px;line-height:19px;padding:0;font-size:13px;color:#fff}
 #vchips select{background:#06202f;color:#fff;border:1px solid rgba(255,194,74,.7);border-radius:8px;font:inherit;font-size:12px;padding:2px 4px}
+#vchips .ch.pick{padding:5px 6px 5px 12px;gap:8px;flex-wrap:nowrap}
+#vchips .ch.pick select{font-size:15px;padding:6px 8px;min-height:36px;max-width:46vw;min-width:0}
+#vchips .ch.pick button{width:32px;height:32px;line-height:30px;font-size:17px;background:rgba(255,84,104,.3);border:1px solid rgba(255,120,135,.75)}
 #vchips .opt{border:1px solid rgba(255,194,74,.7);background:rgba(90,64,10,.4);border-radius:999px;padding:3px 10px;font-size:12px}
 #vmeta{font-size:12px;color:#9fc3d4;min-height:0}
 #vmeta:empty{display:none}
@@ -103,26 +106,27 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
   document.body.appendChild(root);
   const $ = (s) => root.querySelector(s), mic = $("#mic"), stopB = $("#vstop"), text = $("#vtext"), ans = $("#vans"), spk = $("#vspk"), chips = $("#vchips"), meta = $("#vmeta"), sendB = $("#vsend");
   const SR = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
-  let committing = false, confirmSig = "", rec = null, wantOn = false, listening = false, locked = false, pressAt = 0, finalText = "", parsed = understand("", null), speak = true, removed = new Set(), choice = {}, volume = {}, extra = [], busyMsg = "";
+  let committing = false, confirmSig = "", rec = null, wantOn = false, listening = false, locked = false, pressAt = 0, finalText = "", parsed = understand("", null), speak = true, removed = new Set(), choice = {}, volume = {}, extra = [], busyMsg = "", lastChips = "", lastMeta = "", selHeld = 0;
   const VOLS = [250, 500, 1000, 2000], vtext = (v) => (v >= 1000 ? v / 1000 + " L" : v + " mL"), needsVolume = (o) => o.id === "drug:fluids" && !(o.qty && (o.qty.ml != null || o.qty.rateMl != null)) && !volume[o.id];
 
   /* ---- what was heard, and what it means */
   function refresh() {
     parsed = understand(text.value, getCtx());
     const orders = current();
-    chips.innerHTML = orders.map((o, i) => {
-      if (o.choose) { const sel = choice[o.id] || ""; return `<span class="ch fz" data-i="${i}">${esc(o.chooseWhy || "Choose")} <select data-i="${i}"><option value=""${sel ? "" : " selected"}>Choose…</option>${o.choose.map((c) => `<option value="${esc(c.id)}"${c.id === sel ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select><button type="button" data-rm="${esc(o.id)}" aria-label="Remove">×</button></span>`; }
-      if (needsVolume(o)) return `<span class="ch fz" data-i="${i}">How much ${esc(o.label)}? <select data-vol="${esc(o.id)}"><option value=""${volume[o.id] ? "" : " selected"}>Choose…</option>${VOLS.map((v) => `<option value="${v}"${+volume[o.id] === v ? " selected" : ""}>${v >= 1000 ? v / 1000 + " L" : v + " mL"}</option>`).join("")}</select><button type="button" data-rm="${esc(o.id)}" aria-label="Remove">×</button></span>`;
+    let chHtml = orders.map((o, i) => {
+      if (o.choose) { const sel = choice[o.id] || ""; return `<span class="ch fz pick" data-i="${i}">${esc(o.chooseWhy || "Choose")} <select data-i="${i}"><option value=""${sel ? "" : " selected"}>Choose…</option>${o.choose.map((c) => `<option value="${esc(c.id)}"${c.id === sel ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select><button type="button" data-rm="${esc(o.id)}" aria-label="Close this choice" title="Close">✕</button></span>`; }
+      if (needsVolume(o)) return `<span class="ch fz pick" data-i="${i}">How much ${esc(o.label)}? <select data-vol="${esc(o.id)}"><option value=""${volume[o.id] ? "" : " selected"}>Choose…</option>${VOLS.map((v) => `<option value="${v}"${+volume[o.id] === v ? " selected" : ""}>${v >= 1000 ? v / 1000 + " L" : v + " mL"}</option>`).join("")}</select><button type="button" data-rm="${esc(o.id)}" aria-label="Close this choice" title="Close">✕</button></span>`;
       return `<span class="ch${o.fuzzy ? " fz" : ""}${isHigh(o.id) ? " hi" : ""}" title="heard: ${esc(o.heard || "")}${isHigh(o.id) ? " · high risk: asks to be confirmed" : ""}">${isHigh(o.id) ? "⚠ " : ""}${esc(o.label)}${o.qtyText || (volume[o.id] ? vtext(volume[o.id]) : "") ? " <b>" + esc(o.qtyText || vtext(volume[o.id])) + "</b>" : ""}${o.fuzzy ? " <small>?</small>" : ""}<button type="button" data-rm="${esc(o.id)}" aria-label="Remove ${esc(o.label)}">×</button></span>`;
     }).join("") + parsed.answers.filter((a) => a.id !== "noted").map((a) => `<span class="ch q" title="I will answer this when you press send">Asking: ${esc(a.title)}</span>`).join("") + parsed.clarify.map((c) => `<span class="ch cl">${esc(c.prompt)} ${c.options.map((o) => `<button type="button" class="opt" data-add="${esc(o.id)}">${esc(o.label.replace(/^CT /, ""))}</button>`).join("")}</span>`).join("");
     const bits = [];
-    if (parsed.suggest.length && !orders.length && !parsed.answers.length) chips.innerHTML += `<span class="lead">Did you mean</span>` + parsed.suggest.map((x, i) => `<span class="ch sg" data-sg="${i}">${esc(x.label)}</span>`).join("");
+    if (parsed.suggest.length && !orders.length && !parsed.answers.length) chHtml += `<span class="lead">Did you mean</span>` + parsed.suggest.map((x, i) => `<span class="ch sg" data-sg="${i}">${esc(x.label)}</span>`).join("");
     if (parsed.unknown.length && (orders.length || parsed.answers.length)) bits.push(`Also heard: <b>${esc(parsed.unknown.join(" ").slice(0, 80))}</b>`);
     if (parsed.held && parsed.held.length) bits.push(`Not an order: ${esc([...new Set(parsed.held.map((h) => ({ question: "a question", consider: "a thought", recommend: "a recommendation", hypo: "a what-if", prepare: "preparation", negative: "a negative opinion", prohibit: "a prohibition", reverse: "a reversal", reason: "reasoning" })[h.mode] || h.mode))].join(", "))}`);
     if (parsed.negated.length) bits.push(`Left out as you said no: ${esc(parsed.negated.join(", "))}`);
     if (!SR) bits.push("This browser has no speech recognition. Type the order and press ➤.");
     if (busyMsg) bits.push(esc(busyMsg));
-    meta.innerHTML = bits.join(" · ");
+    /* the case pushes a new state about once a second and calls refresh: rewrite the chips only when they changed, and never while a drop-down is open, or the open list is torn down at once */
+    if (!(selHeld && Date.now() - selHeld < 30000)) { if (chHtml !== lastChips) { chips.innerHTML = chHtml; lastChips = chHtml; } const mHtml = bits.join(" · "); if (mHtml !== lastMeta) { meta.innerHTML = mHtml; lastMeta = mHtml; } }
     sendB.disabled = !text.value.trim();
     return orders;
   }
@@ -139,7 +143,9 @@ export function createOrders({ post, sfx, esc, onSent, say, ctx, open }) {
     if (sg) { const x = parsed.suggest[+sg.dataset.sg]; if (x) { if (x.kind === "order" && x.id && BY_ID[x.id]) { extra.push({ id: x.id, label: BY_ID[x.id].label }); text.value = ""; refresh(); } else { text.value = x.label; refresh(); send(); } } return; }
     if (rm) { removed.add(rm.dataset.rm); refresh(); } else if (add) { const id = add.dataset.add; extra.push({ id, label: BY_ID[id].label }); refresh(); }
   });
-  chips.addEventListener("change", (e) => { const s = e.target.closest("select"); if (s && s.dataset.vol) { volume[s.dataset.vol] = +s.value || 0; refresh(); } else if (s) { choice["abx:any"] = s.value; refresh(); } });
+  chips.addEventListener("focusin", (e) => { if (e.target.closest && e.target.closest("select")) selHeld = Date.now(); });
+  chips.addEventListener("focusout", (e) => { if (selHeld && e.target.closest && e.target.closest("select")) { selHeld = 0; setTimeout(refresh, 0); } });
+  chips.addEventListener("change", (e) => { selHeld = 0; const s = e.target.closest("select"); if (s && s.dataset.vol) { volume[s.dataset.vol] = +s.value || 0; refresh(); } else if (s) { choice["abx:any"] = s.value; refresh(); } });
 
   /* ---- listening */
   const setUi = (on) => { listening = on; mic.dataset.on = on ? "1" : "0"; stopB.hidden = !on; text.classList.toggle("live", on); };
