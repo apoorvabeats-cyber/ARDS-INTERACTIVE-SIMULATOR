@@ -2,7 +2,8 @@
    Pick an occlusion, turn the brain, drag the clot out, and watch perfusion, tissue fate and the whole body respond.
    Teaching model: tissue fate depends on TIME and COLLATERALS; reopening the vessel does not undo tissue that has already infarcted.
    Content aligned to the 2026 AHA/ASA acute ischaemic stroke guideline (checked Nov 2026 against the published summaries); simplified teaching model. Numbers are illustrative ranges, not patient data. */
-import { THREE, C, smooth } from "../stage.js?v=20261124a";
+import { THREE, C, smooth } from "../stage.js?v=20261124b";
+import { organ, splitLR } from "../anatomy.js?v=20261124b";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const BRAIN = { cx: 0.58, rx: 0.56, ry: 0.78, rz: 1.0 };
@@ -49,10 +50,16 @@ export default function create(S, ui) {
   const st = { tab: "M1", side: "R", div: "sup", coll: "mod", t: 2, clot: true, removed: false, reper: 0, rtarget: 0, rAt: null, lysed: false, rec: 0, grab: false, ghost: false };
   const sx = () => (st.side === "R" ? 1 : -1);
   const site = () => SITES[st.tab];
-  let meshes = {}, vessels = {}, tis = [], clot = null, ring = null, tray = null, flowsBy = {}, dirty = true, labelSpr = null, clotHome = new THREE.Vector3();
+  let meshes = {}, vessels = {}, tis = [], clot = null, ring = null, tray = null, flowsBy = {}, dirty = true, labelSpr = null, clotHome = new THREE.Vector3(), HB = null, HMS = null;
+  /* real brain (BodyParts3D) split into its two hemispheres; vessels that run over the surface are laid on it */
+  organ("brain", { frontZ: 1, fit: { c: [0, -0.085, 0], r: [1.14, 0.87, 1.05] } }).then((g) => { const [l, r] = splitLR(g); HB = { [-1]: l, [1]: r }; HMS = { [-1]: new THREE.Mesh(l), [1]: new THREE.Mesh(r) }; HMS[-1].updateMatrixWorld(true); HMS[1].updateMatrixWorld(true); if (meshes.grp) build(); }).catch(() => {});
+  const HRC = new THREE.Raycaster();
 
   /* ---------- geometry ---------- */
-  const surf = (s, ph, th, k) => { k = k || 1.012; return [s * (BRAIN.cx + BRAIN.rx * Math.cos(th) * Math.cos(ph) * k), BRAIN.ry * Math.sin(th) * k, BRAIN.rz * Math.cos(th) * Math.sin(ph) * k]; };
+  const surf = (s, ph, th, k) => {
+    k = k || 1.012; const p = [s * (BRAIN.cx + BRAIN.rx * Math.cos(th) * Math.cos(ph) * k), BRAIN.ry * Math.sin(th) * k, BRAIN.rz * Math.cos(th) * Math.sin(ph) * k]; if (!HMS) return p;
+    const c = new THREE.Vector3(s * BRAIN.cx, 0.05, 0), d = new THREE.Vector3(...p).sub(c).normalize(); HRC.set(c.clone().addScaledVector(d, 3), d.clone().negate()); const h = HRC.intersectObject(HMS[s], false)[0]; return h ? h.point.clone().addScaledVector(d, 0.014).toArray() : p;
+  };
   const arc = (s, a) => a.map(([ph, th]) => surf(s, ph, th));
   function hemi(s) {
     const g = new THREE.SphereGeometry(1, 84, 64), p = g.attributes.position, v = new THREE.Vector3();
@@ -87,8 +94,8 @@ export default function create(S, ui) {
     S.clear(); meshes = {}; vessels = {}; tis = []; flowsBy = {};
     const grp = S.add(new THREE.Group()); meshes.grp = grp;
     [-1, 1].forEach((s) => {
-      const h = S.tissue(hemi(s), 0xd8a9ae, classify(s), { transparent: true, opacity: 0.62, depthWrite: false, side: THREE.DoubleSide }); h.side = s; h.mesh.renderOrder = 2; h.mesh.userData.hemi = s; grp.add(h.mesh); tis.push(h);
-      const cb = ell(0.42, 0.24, 0.4, [s * 0.38, -0.74, -0.9], "cb", 0xc9a08c, 0.3); cb.side = s; cb.mesh.material.transparent = true; cb.mesh.material.opacity = 0.9; grp.add(cb.mesh); tis.push(cb);
+      const cls = classify(s), h = S.tissue(HB ? HB[s].clone() : hemi(s), 0xd8a9ae, HB ? (P) => { const o = cls(P); if (P.y < -0.4 && P.z < -0.45) { o.tag = "cb"; o.rank = 0.3; } return o; } : cls, { transparent: true, opacity: 0.62, depthWrite: false, side: THREE.DoubleSide }); h.side = s; h.mesh.renderOrder = 2; h.mesh.userData.hemi = s; grp.add(h.mesh); tis.push(h);
+      if (!HB) { const cb = ell(0.42, 0.24, 0.4, [s * 0.38, -0.74, -0.9], "cb", 0xc9a08c, 0.3); cb.side = s; cb.mesh.material.transparent = true; cb.mesh.material.opacity = 0.9; grp.add(cb.mesh); tis.push(cb); }
       const bg = ell(0.2, 0.17, 0.24, [s * 0.4, -0.04, 0.16], "deep", 0xc08f95, 0.1); bg.side = s; grp.add(bg.mesh); tis.push(bg);
       const th = ell(0.12, 0.1, 0.17, [s * 0.17, -0.02, -0.12], "thal", 0xb98388, 0.15); th.side = s; grp.add(th.mesh); tis.push(th);
       const ml = ell(0.09, 0.12, 0.09, [s * 0.11, -0.9, -0.44], "medlat", 0xd9bfa4, 0.1); ml.side = s; grp.add(ml.mesh); tis.push(ml);
@@ -321,6 +328,7 @@ export default function create(S, ui) {
     actions: () => [{ id: "lysis", label: "IV THROMBOLYSIS", hint: "Dissolves clot chemically. Often only partial for big clots.", off: st.removed || st.lysed }, { id: "reset", label: "RESET CLOT", hint: "Put the clot back and try another approach.", off: false }],
     dragHint: "Touch the clot and drag it out of the vessel (thrombectomy).",
     views: [{ id: "lat", label: "Lateral", f: () => ({ ry: -1.5708 * (st.tab === "BA" ? 1 : sx()), rx: 0.05, d: 4.2, tx: 0, ty: -0.1 }) }, { id: "base", label: "Base", f: () => ({ ry: 0, rx: -1.45, d: 4.3, tx: 0, ty: -0.45 }) }, { id: "front", label: "Front", f: () => ({ ry: 0, rx: 0.05, d: 4.6, tx: 0, ty: -0.1 }) }, { id: "top", label: "Top", f: () => ({ ry: 3.1416, rx: 1.45, d: 4.4, tx: 0, ty: 0 }) }],
+    credit: "Brain: BodyParts3D © DBCLS, CC BY-SA 2.1 JP. Adapted for teaching.",
     legend: [["#d8a9ae", "Healthy"], ["#ffb347", "At risk (penumbra)"], ["#5b1230", "Infarcted core"], ["#8fe8b0", "Salvaged"]],
     setTab, setOpt, setT, act, build, info, obs, clin, st,
     ghost: (on) => { st.ghost = on; },

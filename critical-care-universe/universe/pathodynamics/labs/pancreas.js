@@ -2,8 +2,9 @@
    From a normal gland to oedematous and necrotising pancreatitis, then the collections (APFC, ANC, WON, infected necrosis)
    and the step-up approach: support and antibiotics, drainage (endoscopic stent or percutaneous drain), then necrosectomy.
    Terms follow the Revised Atlanta Classification. Management content aligned to ACG 2024, the AGA 2020 necrosis update and the Revised Atlanta Classification (checked Nov 2026). Numbers are illustrative.  */
-import { THREE, C, smooth } from "../stage.js?v=20261124a";
-import { clamp } from "./common.js?v=20261124a";
+import { THREE, C, smooth } from "../stage.js?v=20261124b";
+import { clamp } from "./common.js?v=20261124b";
+import { organ } from "../anatomy.js?v=20261124b";
 
 const T = {
   NORMAL: { label: "Normal", sub: "Healthy pancreas", d0: 0, d1: 14, dv: 0,
@@ -41,6 +42,8 @@ export default function create(S, ui) {
   const st = { tab: "WON", day: 35, inf: false, abx: false, support: false, stent: false, perc: false, sess: 0, dr: 0, grab: false, ghost: false, cause: "gallstone", wallLeak: false };
   const cur = () => T[st.tab];
   let M = {}, tis = [], coll = null, lams = null, drain = null, debris = [], gas = [], panGrp = null, dirty = true, accT = 0;
+  let PG = null;
+  organ("pancreas", { fit: { c: [-0.05, 0.04, 0], r: [1.3, 0.6, 0.2] } }).then((g) => { PG = g; if (M.grp) build(); }).catch(() => {});   /* real pancreas (BodyParts3D) */
   const SP = new THREE.Vector3(0.48, 0.3, 0.37), CP = new THREE.Vector3(0.5, 0.27, 0.2);
 
   function lobulate(g, amp, f) { g.computeVertexNormals(); const p = g.attributes.position, n = g.attributes.normal, v = new THREE.Vector3(), nn = new THREE.Vector3(); for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); nn.fromBufferAttribute(n, i); const k = amp * (0.6 * Math.sin(f * v.x + 1) * Math.sin(f * 1.3 * v.y + 2) + 0.4 * Math.sin(f * 1.7 * v.z + v.x * 3)); p.setXYZ(i, v.x + nn.x * k, v.y + nn.y * k, v.z + nn.z * k); } g.computeVertexNormals(); return g; }
@@ -53,8 +56,8 @@ export default function create(S, ui) {
     const path = new THREE.CatmullRomCurve3([[-0.75, -0.2, 0.02], [-0.4, -0.02, 0.1], [0.0, 0.07, 0.12], [0.5, 0.14, 0.05], [1.0, 0.27, -0.03], [1.4, 0.52, -0.1]].map((p) => new THREE.Vector3(p[0] - 0.3, p[1], p[2] - 0.05)));
     const tg = new THREE.TubeGeometry(path, 90, 0.13, 20, false); lobulate(tg, 0.022, 26);
     const cls = (P) => { const x = P.x + 0.3; const tag = x < -0.5 ? "head" : x < 0 ? "neck" : x < 0.9 ? "body" : "tail"; const n = 0.5 + 0.5 * Math.sin(8 * P.x + 3 * P.y) * Math.sin(9 * P.z + 2); return { tag, rank: clamp(Math.abs(x - 0.25) * 0.55 + 0.3 * n, 0, 1), h: n, sh: 0.9 + 0.1 * Math.sin(40 * P.x + 20 * P.y) }; };
-    const body = S.tissue(tg, 0xe3b58d, cls, { shininess: 25 }); panGrp.add(body.mesh); tis.push(body);
-    const hg = new THREE.SphereGeometry(1, 40, 30); hg.scale(0.27, 0.3, 0.2); hg.translate(-0.78 - 0.3, -0.27, 0.02 - 0.05); lobulate(hg, 0.02, 22); const head = S.tissue(hg, 0xe3b58d, cls, { shininess: 25 }); panGrp.add(head.mesh); tis.push(head);
+    const body = S.tissue(PG ? PG.clone() : tg, 0xe3b58d, cls, { shininess: 25 }); panGrp.add(body.mesh); tis.push(body);
+    const hg = new THREE.SphereGeometry(1, 40, 30); hg.scale(0.27, 0.3, 0.2); hg.translate(-0.78 - 0.3, -0.27, 0.02 - 0.05); lobulate(hg, 0.02, 22); if (!PG) { const head = S.tissue(hg, 0xe3b58d, cls, { shininess: 25 }); panGrp.add(head.mesh); tis.push(head); }
     body.mesh.userData.hemi = 1;
     const duo = S.tube([[-0.45, 0.38, 0.05], [-0.98, 0.25, 0.0], [-1.1, -0.35, 0.0], [-0.85, -0.78, 0.05], [-0.2, -0.88, 0.05], [0.45, -0.82, 0.0]], 0.1, 0xc99a6a, { seg: 40 }); grp.add(duo);
     const cbd = S.tube([[-0.62, 0.85, 0.02], [-0.7, 0.4, 0.0], [-0.74, -0.15, 0.0]], 0.04, 0x6ab06a); grp.add(cbd);
@@ -196,6 +199,7 @@ export default function create(S, ui) {
       { id: "reset", label: "RESET", hint: "Start this stage again.", off: false }].filter(Boolean),
     dragHint: "Touch the stent at the stomach wall and drag it into the collection (endoscopic transmural drainage). Best done once the wall has formed.",
     views: [{ id: "front", label: "Front", f: () => ({ ry: 0.2, rx: 0.15, d: 6.2, tx: 0.3, ty: 0.1 }) }, { id: "side", label: "Left side", f: () => ({ ry: -1.2, rx: 0.1, d: 5.6, tx: 0.3, ty: 0.1 }) }, { id: "top", label: "From above", f: () => ({ ry: 0.2, rx: 1.1, d: 5.6, tx: 0.3, ty: 0 }) }, { id: "back", label: "Back", f: () => ({ ry: 3.14, rx: 0.1, d: 6.2, tx: 0.3, ty: 0.1 }) }],
+    credit: "Pancreas: BodyParts3D © DBCLS, CC BY-SA 2.1 JP. Adapted for teaching.",
     legend: [["#e3b58d", "Gland"], ["#5a4034", "Necrosis"], ["#f2d58a", "Fluid"], ["#b5c256", "Pus"]],
     setTab, setOpt, setT, act, info, obs, clin, st, ghost: (on) => { st.ghost = on; }, debug: () => ({ lams, st }), tabLabel: () => cur().label,
   };

@@ -2,8 +2,9 @@
    Pick the blocked coronary, read the ECG territory, drag the thrombus out, balloon and stent, or give fibrinolysis.
    Teaching model: myocardium is lost with TIME and COLLATERALS; reopening the artery does not bring back necrosed muscle.
    Content aligned to the 2025 ACC/AHA/ACEP/NAEMSP/SCAI ACS guideline (checked Nov 2026 against the published summaries). All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261124a";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261124a";
+import { THREE, C } from "../stage.js?v=20261124b";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261124b";
+import { organ } from "../anatomy.js?v=20261124b";
 
 const ROT = 0.4, LVC = [0.22, -0.1, -0.05], LVR = [0.52, 0.86, 0.5], RVC = [-0.42, -0.2, 0.2], RVR = [0.42, 0.66, 0.45];
 const lvPt = (ph, th, k) => { k = k || 1.03; let x = LVR[0] * Math.cos(th) * Math.cos(ph) * k, y = LVR[1] * Math.sin(th) * k, z = LVR[2] * Math.cos(th) * Math.sin(ph) * k; const c = Math.cos(ROT), s = Math.sin(ROT); return [x * c - y * s + LVC[0], x * s + y * c + LVC[1], z + LVC[2]]; };
@@ -46,7 +47,12 @@ const LEADS = ["I", "aVR", "II", "aVL", "III", "aVF", "V1", "V2", "V3", "V4", "V
 export default function create(S, ui) {
   const st = { acs: "stemi", tab: "LAD", coll: "mod", t: 1, removed: false, lysed: false, balloon: false, stent: false, reper: 0, rAt: null, rec: 0, vf: false, ghost: false, pulse: 0 };
   const site = () => SITES[st.tab];
-  let M = {}, V = {}, F = {}, tis = [], kit = null, rings = {}, dirty = true, accT = 0, stentM = null, balM = null, plaque = null, lvm = null;
+  let M = {}, V = {}, F = {}, tis = [], kit = null, rings = {}, dirty = true, accT = 0, stentM = null, balM = null, plaque = null, lvm = null, HG = null, HM = null;
+  /* real heart (BodyParts3D) fitted to the box of the two ventricles the lab was built on; coronaries are laid on its surface */
+  organ("heart", { rot: [0, 0, 0], fit: { c: [-0.1, -0.12, 0], r: [0.85, 0.9, 0.6] } }).then((g) => { HG = g; HM = new THREE.Mesh(g); HM.updateMatrixWorld(true); if (M.grp) build(); }).catch(() => {});
+  const RC = new THREE.Raycaster(), hc = new THREE.Vector3(-0.1, -0.12, 0);
+  function snap(pt, lift) { const p = new THREE.Vector3(...pt), d = p.clone().sub(hc); if (d.lengthSq() < 1e-6) return pt; d.normalize(); RC.set(hc.clone().addScaledVector(d, 3), d.clone().negate()); const h = RC.intersectObject(HM, false)[0]; if (!h) return pt; const n = h.face ? h.face.normal.clone() : d; return h.point.clone().addScaledVector(d, lift).toArray(); }
+  const heartClass = (P) => { const a = Math.hypot((P.x - RVC[0]) / RVR[0], (P.y - RVC[1]) / RVR[1], (P.z - RVC[2]) / RVR[2]), b = Math.hypot((P.x - LVC[0]) / (LVR[0] * 1.15), (P.y - LVC[1]) / LVR[1], (P.z - LVC[2]) / LVR[2]); return a < b * 0.92 && P.x < -0.15 ? { tag: "rv", rank: 0.35, h: 0.4, sh: 0.95 } : classifyLV(P); };
 
   function lvGeom() { const g = new THREE.SphereGeometry(1, 72, 54); g.scale(...LVR); g.rotateZ(ROT); g.translate(...LVC); return g; }
   const unLV = new THREE.Vector3();
@@ -64,8 +70,11 @@ export default function create(S, ui) {
   function build() {
     S.clear(); M = {}; V = {}; F = {}; tis = []; rings = {}; kit = null; stentM = null; balM = null;
     const grp = S.add(new THREE.Group()); M.grp = grp;
+    if (HG) { const hm = S.tissue(HG.clone(), 0x9a3f4b, heartClass, { transparent: true, opacity: 0.9, shininess: 50 }); hm.mesh.userData.hemi = 1; lvm = hm.mesh; grp.add(hm.mesh); tis.push(hm); }
+    else {
     const lv = S.tissue(lvGeom(), 0x9a3f4b, classifyLV, { transparent: true, opacity: 0.9, shininess: 50 }); lv.mesh.userData.hemi = 1; lvm = lv.mesh; grp.add(lv.mesh); tis.push(lv);
     const rg = new THREE.SphereGeometry(1, 48, 36); rg.scale(...RVR); rg.translate(...RVC); const rv = S.tissue(rg, 0xa94d57, () => ({ tag: "rv", rank: 0.35, h: 0.4 }), { transparent: true, opacity: 0.88 }); rv.mesh.userData.hemi = 1; grp.add(rv.mesh); tis.push(rv);
+    }
     const plain = (geo, hex, pos) => { const m = new THREE.Mesh(geo, S.mat(hex)); if (pos) m.position.set(...pos); grp.add(m); return m; };
     plain(new THREE.SphereGeometry(0.2, 24, 18), 0x8a4a58, [0.38, 0.56, -0.12]); plain(new THREE.SphereGeometry(0.26, 24, 18), 0x9a5662, [-0.78, 0.42, 0.05]);
     const ao = S.tube([[-0.03, 0.5, 0.0], [-0.02, 0.95, 0.04], [0.1, 1.32, 0.0], [0.42, 1.36, -0.1], [0.58, 1.0, -0.2]], 0.17, 0xd9b9b0, { emis: 0x201010, seg: 40 }); grp.add(ao);
@@ -80,6 +89,7 @@ export default function create(S, ui) {
       ["RCA", [[-0.12, 0.52, 0.1], rvPt(2.3, 1.0), rvPt(2.75, 0.55), rvPt(3.1, 0.05), rvPt(3.5, -0.4), rvPt(4.0, -0.75), rvPt(4.3, -0.85)], 0.034],
       ["PDA", [rvPt(4.3, -0.85), R(4.6, -0.45), R(4.65, -0.85), R(4.7, -1.2)], 0.026],
     ];
+    if (HG) defs.forEach((d) => { d[1] = d[1].map((q, i) => (i === 0 && (d[0] === "LM" || d[0] === "RCA") ? q : snap(q, d[2] * 0.4))); });
     const vv = vessels(S, grp, defs, 0xff5a46, { dens: 18 }); V = vv.T; F = vv.F;
     Object.keys(V).forEach((n) => { const h = halo(S, grp, V[n], n); rings[n] = h; });
     kit = clotKit(S, grp, ui, { size: 0.05, ring: 0.1, thr: 0.34, color: 0x6b0f1c, onRemoved: () => { st.removed = true; if (st.rAt == null) st.rAt = st.t; ui.refresh("Thrombus retrieved. Flow partly restored; a residual plaque stenosis remains."); } });
@@ -94,7 +104,7 @@ export default function create(S, ui) {
     plaque = new THREE.Mesh(new THREE.TorusGeometry(r * 1.05, r * 0.55, 8, 18), new THREE.MeshPhongMaterial({ color: 0xe8d07a, emissive: 0x403000 })); plaque.position.copy(p); plaque.lookAt(p.clone().add(tg)); M.grp.add(plaque);
     if (stentM) { stentM.parent && stentM.parent.remove(stentM); stentM = null; } if (balM) { balM.parent && balM.parent.remove(balM); balM = null; }
     Object.assign(st, { removed: false, lysed: false, balloon: false, stent: false, reper: 0, rAt: null, rec: 0, vf: false });
-    const kk = site().vessel; S.view({ ry: kk === "RCA" || kk === "PDA" ? 0.5 : kk === "LCX" || kk === "OM" ? -0.9 : -0.2, rx: kk === "PDA" ? -0.9 : 0.15, d: 3.5, tx: 0.05, ty: 0.1, tz: 0 });
+    const kk = site().vessel; S.view({ ry: kk === "RCA" || kk === "PDA" ? 0.5 : kk === "LCX" || kk === "OM" ? -0.9 : -0.2, rx: kk === "PDA" ? -0.9 : 0.15, d: 4.1, tx: 0.05, ty: -0.12, tz: 0 });
   }
 
   /* ---------- time and tissue ---------- */
@@ -222,6 +232,7 @@ export default function create(S, ui) {
   const lab = {
     id: "mi", name: "Heart Attack Lab", tag: "Acute myocardial infarction", icon: "🫀",
     tabs: TABS.map((k) => ({ id: k, label: SITES[k].label, sub: SITES[k].sub })), get tab() { return st.tab; },
+    credit: "Heart: BodyParts3D © DBCLS, CC BY-SA 2.1 JP. Adapted for teaching.",
     selectHint: "Tap a coronary artery in the 3D heart to select it. Start with the LAD.",
     opts: () => [{ id: "acs", label: "Presentation", cur: st.acs, choices: [["stemi", "STEMI (occluded artery)"], ["nstemi", "NSTEMI (subtotal occlusion)"]] }, { id: "coll", label: "Collateral circulation", cur: st.coll, choices: [["poor", "Poor"], ["mod", "Moderate"], ["good", "Good"]] }],
     slider: () => ({ id: "t", label: st.rAt != null ? "Reperfused at (hours from onset)" : "Time from onset of pain (hours)", min: 0.25, max: 12, step: 0.25, v: st.rAt != null ? st.rAt : st.t, locked: st.rAt != null, unit: " h" }),

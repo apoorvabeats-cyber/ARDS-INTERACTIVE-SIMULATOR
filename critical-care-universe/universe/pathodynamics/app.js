@@ -1,11 +1,11 @@
 /* PATHODYNAMICS · Interactive Clinical Pathophysiology
    Every lab follows the same five steps (select, explore, intervene, observe, correlate) and the same three views of a disease
    (anatomical, pathophysiological, interventional), all tied to one whole-body patient model. */
-import { createStage } from "./stage.js?v=20261124a";
-import { bodySVG, paintBody } from "./body.js?v=20261124a";
-import { ecgDraw } from "./charts.js?v=20261124a";
+import { createStage } from "./stage.js?v=20261124b";
+import { bodySVG, paintBody } from "./body.js?v=20261124b";
+import { ecgDraw } from "./charts.js?v=20261124b";
 
-const V = "20261124a", EMBED = /[?&]embed=1/.test(location.search), $ = (s, r) => (r || document).querySelector(s), esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const V = "20261124b", EMBED = /[?&]embed=1/.test(location.search), $ = (s, r) => (r || document).querySelector(s), esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const LABS = [
   { id: "stroke", name: "Stroke Lab", tag: "Acute ischaemic stroke", icon: "🧠", col: "#9b7bff", blurb: "Choose the blocked artery, turn the brain, drag the clot out and watch the penumbra, the deficits and the whole body respond.", mods: "ICA · M1 · M2 · M3 · ACA · PCA · Basilar · Vertebral" },
   { id: "mi", name: "Heart Attack Lab", tag: "Acute myocardial infarction (STEMI and NSTEMI)", icon: "🫀", col: "#ff6b7c", blurb: "Block a coronary artery, read the ECG territory, then open it with a balloon and stent or with lysis.", mods: "STEMI · NSTEMI · RCA · LAD · LCx · Left main · PDA" },
@@ -53,13 +53,13 @@ ${sysBlocks(sysId)}
 async function openLab(id) {
   teardown(); def = LABS.find((l) => l.id === id); if (!def) return home(); step = 1; v3 = "anat"; viewId = "";
   app.innerHTML = `<div class="top"><button class="ib" data-a="home" aria-label="Back">←</button><div class="brand">PATHODYNAMICS · ${esc(def.name.toUpperCase())}</div>${closeBtn()}</div>
-<div class="stagebox"><div class="stage" id="stage"><div class="vbar" id="vbar"></div><div class="rbar" id="rbar"></div><div class="legend" id="legend"></div><div class="hint" id="hint"></div></div>
+<div class="stagebox"><div class="stage" id="stage"><div class="vbar" id="vbar"></div><div class="rbar" id="rbar"></div><div class="legend" id="legend"></div><div class="hint" id="hint"></div><div class="credit" style="position:absolute;right:10px;bottom:5px;max-width:40%;text-align:right;font-size:9px;line-height:1.25;color:#7d8aa6;pointer-events:none" id="credit"></div></div>
 <div class="stepper" id="stepper">${STEPS.map((s) => `<button data-a="step" data-n="${s[0]}"><b>${s[0]}</b>${s[1]}</button>`).join("")}</div></div>
 <div id="panel"><div class="boot"><div class="ring"></div></div></div>`;
   try {
     S = createStage($("#stage"));
     const mod = await import(`./labs/${id}.js?v=${V}`);
-    lab = mod.default(S, { hint, refresh }); window.__patho = { S, lab };
+    lab = mod.default(S, { hint, refresh }); window.__patho = { S, lab }; { const cr = $("#credit"); if (cr) cr.textContent = lab.credit || ""; }
     buildBars(); renderPanel(); tm = setInterval(tick, 350); raf = requestAnimationFrame(loop);
   } catch (e) { console.error(e); $("#panel").innerHTML = `<div class="panel"><h3>COULD NOT START THE 3D VIEW</h3><p>This device could not start the 3D scene (${esc(e.message || e)}). Try reloading, or open the lab in another browser.</p></div>`; }
 }
@@ -67,7 +67,8 @@ function teardown() { clearInterval(tm); cancelAnimationFrame(raf); if (S) { try
 function hint(t, go) { const h = $("#hint"); if (!h) return; h.textContent = t || ""; h.classList.toggle("on", !!t); h.classList.toggle("go", !!go); }
 function buildBars() {
   $("#vbar").innerHTML = (lab.views || []).map((v) => `<button data-a="view" data-id="${v.id}">${v.label}</button>`).join("");
-  $("#rbar").innerHTML = `<button class="sbtn" data-a="auto" title="Auto-rotate">AUTO</button><button class="sbtn" data-a="ghost" title="See-through tissue">X-RAY</button><button class="sbtn" data-a="zin">＋</button><button class="sbtn" data-a="zout">－</button>`;
+  $("#rbar").innerHTML = `<button class="sbtn" data-a="auto" title="Auto-rotate">AUTO</button><button class="sbtn" data-a="ghost" title="See-through tissue">X-RAY</button><button class="sbtn" data-a="cut" title="Cut the organ open">CUT</button><button class="sbtn" data-a="zin">＋</button><button class="sbtn" data-a="zout">－</button>`;
+  S.cut(0);
   $("#legend").innerHTML = (lab.legend || []).map((l) => `<span><i style="background:${l[0]}"></i>${l[1]}</span>`).join("");
 }
 function refresh(msg) { if (msg) toast(msg); if (msg && step < 4 && /retrieved|opened|deployed|restored|drained|relieved|reperfus/i.test(msg)) { setStep(4); return; } renderPanel(); }
@@ -130,6 +131,7 @@ document.addEventListener("click", (e) => {
   else if (a === "view") { const v = lab.views.find((x) => x.id === b.dataset.id); if (v) { viewId = v.id; S.auto(false); S.view(v.f()); document.querySelectorAll(".vbar button").forEach((x) => x.classList.toggle("on", x.dataset.id === viewId)); } }
   else if (a === "auto") { const on = S.auto(); b.classList.toggle("on", on); }
   else if (a === "ghost") { const on = !b.classList.contains("on"); b.classList.toggle("on", on); lab.setOpt("ghost", on ? "1" : "0"); }
+  else if (a === "cut") { const lv = S.cut(), nx = lv < 0.1 ? 0.25 : lv < 0.4 ? 0.5 : lv < 0.65 ? 0.75 : 0; S.cut(nx); b.classList.toggle("on", nx > 0); b.textContent = nx ? "CUT " + (nx < 0.4 ? 1 : nx < 0.65 ? 2 : 3) : "CUT"; }
   else if (a === "zin") S.zoom(0.82); else if (a === "zout") S.zoom(1.2);
 });
 document.addEventListener("input", (e) => { if (e.target.id === "slr" && lab) { lab.setT(+e.target.value); tick(); dyn(false); } });

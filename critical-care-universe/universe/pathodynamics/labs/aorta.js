@@ -3,8 +3,9 @@
    Content aligned to the ACC/AHA 2022 aortic disease guideline (acute aortic syndromes: reduce SBP to below 120 mmHg with a negative inotrope-led, heart-rate-lowering strategy;
    type A: emergency surgery; type B: medical therapy first, TEVAR for complicated disease) and to current ESC pericardial-disease practice (urgent drainage of tamponade).
    Checked Nov 2026 against published summaries. All numbers are illustrative, not patient data. */
-import { THREE } from "../stage.js?v=20261124a";
-import { toolKit, vessels, mirrorFlows, clamp } from "./common.js?v=20261124a";
+import { THREE } from "../stage.js?v=20261124b";
+import { toolKit, vessels, mirrorFlows, clamp } from "./common.js?v=20261124b";
+import { organ } from "../anatomy.js?v=20261124b";
 
 const TABS = {
   DA: { label: "Type A dissection", sub: "Ascending aorta involved",
@@ -33,6 +34,8 @@ export default function create(S, ui) {
   const T = () => TABS[st.tab];
   let M = {}, V = {}, F = {}, kits = [], act_kit = null, sheet = null;
 
+  let HG = null;
+  organ("heart", { flipX: true, fit: { c: [0, 0, 0], r: [0.32, 0.38, 0.3] } }).then((g) => { HG = g; if (M.grp) build(); }).catch(() => {});   /* real heart (BodyParts3D) */
   const ell = (rx, ry, rz, col, op, p, o) => { const g = new THREE.SphereGeometry(1, 28, 20); g.scale(rx, ry, rz); const m = new THREE.Mesh(g, S.mat(col, Object.assign({ transparent: true, opacity: op, depthWrite: false }, o || {}))); if (p) m.position.set(...p); return m; };
   function tubeSub(u0, u1, off, r, col, op, ribs) {
     const n = 18, pts = []; for (let i = 0; i <= n; i++) pts.push(at(u0 + ((u1 - u0) * i) / n).add(new THREE.Vector3(...off)));
@@ -41,7 +44,7 @@ export default function create(S, ui) {
   function build() {
     S.clear(); M = {}; V = {}; F = {}; kits = []; act_kit = null;
     const grp = S.add(new THREE.Group()); grp.scale.x = -1; /* patient's right on the viewer's left in the front view */ M.grp = grp;
-    M.heart = ell(0.32, 0.38, 0.3, 0xb5323c, 0.6, arr(HEART), { emissive: 0x3a0810 }); M.heart.userData.hemi = 1; grp.add(M.heart);
+    M.heart = ell(0.32, 0.38, 0.3, 0xb5323c, 0.6, arr(HEART), { emissive: 0x3a0810 }); if (HG) { M.heart.geometry.dispose(); M.heart.geometry = HG.clone(); } M.heart.userData.hemi = 1; grp.add(M.heart);
     M.ra = ell(0.1, 0.12, 0.1, 0x6fa8ff, 0.9, [0.13, -0.7, 0.3]); M.rv = ell(0.12, 0.17, 0.1, 0x6fa8ff, 0.9, [-0.02, -0.9, 0.36]); grp.add(M.ra, M.rv);
     M.peri = ell(1, 1, 1, 0xffe8b0, 0.2, arr(HEART)); M.peri.renderOrder = 2; grp.add(M.peri); M.eff = ell(1, 1, 1, 0xc23a3a, 0.28, arr(HEART)); M.eff.renderOrder = 2; grp.add(M.eff);
     const br = (n, pts, r) => [n, pts, r], a = (u) => arr(at(u));
@@ -95,7 +98,7 @@ export default function create(S, ui) {
     } else if (st.key !== "T") { st.key = "T"; M.dyn.clear?.call(M.dyn); while (M.dyn.children.length) M.dyn.remove(M.dyn.children[0]); }
     Object.keys(V).forEach((n) => { let q = 1; if (d) { if (n === "CORO" && d.mal.coro) q = 0.2; if (/^(BCT|LCCA)/.test(n) && d.mal.brain) q = 0.25; if (/RENAL|SMA/.test(n) && d.mal.gut) q = 0.25; if (n === "ILIAC_L" && d.mal.limb) q = 0.2; if (n === "AO") q = 1; } const f = F[n]; f.rate += (q - f.rate) * dtk; const dd = 0.55 + 0.45 * q; if (n !== "AO") V[n].material.color.setRGB(0.79 * dd, 0.32 * dd, 0.31 * dd); });
     kits.forEach((k) => k.frame(dt)); act_kit = act_kit && act_kit.grab ? act_kit : null;
-    M.heart.material.opacity += ((st.ghost ? 0.3 : 0.6) - M.heart.material.opacity) * Math.min(1, dt * 4);
+    M.heart.material.opacity += ((st.ghost ? 0.3 : HG ? 0.88 : 0.6) - M.heart.material.opacity) * Math.min(1, dt * 4);
     M.heart.scale.multiplyScalar(1 + 0.012 * Math.sin(S.time() * ((d ? d.hr : p.hr) / 60) * 6.28));
   }
   function rebuildDyn(d) {
@@ -189,6 +192,7 @@ export default function create(S, ui) {
     },
     dragHint: "Drag the stent-graft tip to the entry tear, or the pericardiocentesis needle to the pericardial space (glowing ring).",
     views: [{ id: "front", label: "Front", f: () => ({ ry: 0.2, rx: 0.1, d: st.tab === "TAMP" ? 3.0 : st.tab === "DB" ? 5.6 : 4.6, tx: st.tab === "TAMP" ? 0.15 : -0.3, ty: st.tab === "TAMP" ? -0.78 : st.tab === "DB" ? -0.7 : -0.1 }) }, { id: "side", label: "Side", f: () => ({ ry: 1.57, rx: 0.1, d: st.tab === "DB" ? 5.6 : 4.4, tx: -0.2, ty: st.tab === "DB" ? -0.7 : -0.2 }) }, { id: "top", label: "Top (arch)", f: () => ({ ry: 0.3, rx: 1.2, d: 3.6, tx: -0.2, ty: 0.3 }) }],
+    credit: "Heart: BodyParts3D © DBCLS, CC BY-SA 2.1 JP. Adapted for teaching.",
     legend: [["#5aa9ff", "True lumen"], ["#7a1020", "False lumen"], ["#2ed8c3", "Graft / stent"], ["#c23a3a", "Pericardial fluid"], ["#ffd166", "Entry tear"]],
     setTab, setOpt, setT, act, info, obs, clin, st, ghost: (on) => { st.ghost = on; }, debug: () => ({ st, kit: st.tab === "TAMP" ? M.kitP : M.kitT }), tabLabel: () => T().label,
   };

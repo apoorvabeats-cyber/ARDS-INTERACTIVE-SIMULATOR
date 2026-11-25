@@ -3,8 +3,9 @@
    EVD placement and a stepwise ICP ladder. Teaching model: one intracranial volume budget (Monro-Kellie) drives pressure, perfusion and herniation.
    Content aligned to the 2022 AHA/ASA spontaneous ICH guideline, the 2025 AHA/ACC hypertension guideline (acute ICH blood pressure) and the 2023 AHA/ASA aneurysmal SAH guideline
    (checked Nov 2026 against the published summaries). ICP thresholds follow common neurocritical-care practice. All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261124a";
-import { toolKit, vessels, mirrorFlows, halo, clamp } from "./common.js?v=20261124a";
+import { THREE, C } from "../stage.js?v=20261124b";
+import { toolKit, vessels, mirrorFlows, halo, clamp } from "./common.js?v=20261124b";
+import { organ } from "../anatomy.js?v=20261124b";
 
 const SITES = { ACOM: { label: "Anterior communicating", p: [0, -0.3, 0.63] }, MCA: { label: "MCA bifurcation", p: [0.75, -0.28, 0.4] }, PCOM: { label: "Posterior communicating", p: [0.34, -0.4, 0.05] }, BASI: { label: "Basilar tip", p: [0, -0.42, -0.22] } };
 const LOCS = { deep: { label: "Deep (basal ganglia)", p: [0.45, 0.02, 0.1] }, lobar: { label: "Lobar (temporo-parietal)", p: [0.72, 0.3, -0.2] }, cereb: { label: "Cerebellar", p: [0.25, -0.5, -0.68] } };
@@ -37,12 +38,14 @@ export default function create(S, ui) {
   const T = () => TABS[st.tab];
   let M = {}, V = {}, F = {}, evd = null, dirty = true;
 
+  let BR = null;
+  organ("brain", { frontZ: 1, fit: { c: [0, 0, 0], r: [1.0, 0.82, 1.18] } }).then((g) => { BR = g; if (M.grp) build(); }).catch(() => {});   /* real brain (BodyParts3D) */
   const ell = (rx, ry, rz, col, op, p, o) => { const g = new THREE.SphereGeometry(1, 32, 24); g.scale(rx, ry, rz); const m = new THREE.Mesh(g, S.mat(col, Object.assign({ transparent: true, opacity: op, depthWrite: false }, o || {}))); if (p) m.position.set(...p); return m; };
   function build() {
     S.clear(); M = {}; V = {}; F = {}; evd = null;
     const grp = S.add(new THREE.Group()); grp.scale.x = -1; /* patient's right on the viewer's left in the front view */ M.grp = grp;
-    M.brain = ell(1.0, 0.82, 1.18, 0xe8a3ab, 0.3); M.brain.userData.hemi = 1; M.brain.renderOrder = 1; grp.add(M.brain);
-    const wire = new THREE.Mesh(M.brain.geometry, new THREE.MeshBasicMaterial({ color: 0xffd0d8, wireframe: true, transparent: true, opacity: 0.08, depthWrite: false })); wire.renderOrder = 1; grp.add(wire);
+    M.brain = ell(1.0, 0.82, 1.18, 0xe8a3ab, 0.3); if (BR) { M.brain.geometry.dispose(); M.brain.geometry = BR.clone(); M.brain.material.opacity = 0.5; } M.brain.userData.hemi = 1; M.brain.renderOrder = 1; grp.add(M.brain);
+    const wire = new THREE.Mesh(M.brain.geometry, new THREE.MeshBasicMaterial({ color: 0xffd0d8, wireframe: true, transparent: true, opacity: 0.08, depthWrite: false })); wire.renderOrder = 1; if (!BR) grp.add(wire);
     M.skull = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 20).scale(1.1, 0.92, 1.28), new THREE.MeshBasicMaterial({ color: 0xdfe8f5, wireframe: true, transparent: true, opacity: 0.05, depthWrite: false })); grp.add(M.skull);
     M.falx = new THREE.Mesh(new THREE.BoxGeometry(0.012, 1.3, 1.9), new THREE.MeshBasicMaterial({ color: 0x9fb4ff, transparent: true, opacity: 0.2, depthWrite: false })); M.falx.position.set(0, 0.08, 0); grp.add(M.falx);
     M.tent = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.012, 0.9), new THREE.MeshBasicMaterial({ color: 0x9fb4ff, transparent: true, opacity: 0.16, depthWrite: false })); M.tent.position.set(0, -0.28, -0.55); grp.add(M.tent);
@@ -112,7 +115,7 @@ export default function create(S, ui) {
     Object.keys(V).forEach((n) => { const f = F[n], spm = e.vs * (/MCA|A1|ACA|ICA/.test(n) ? 1 : 0.5); f.rate += ((1 - 0.7 * spm) - f.rate) * Math.min(1, dt * 3); const d = 1 - 0.45 * spm; V[n].material.color.setRGB(0.79 * d, 0.32 * d, 0.31 * d); });
     evd.frame(dt); if (st.evd) { if (!M.drain) { M.drain = S.tube([[0.55, 0.78, 0.95], [0.38, 0.5, 0.7], [0.2, 0.2, 0.42]], 0.012, 0xcfe9ff, { op: 0.9 }); M.grp.add(M.drain); } } else if (M.drain) { M.grp.remove(M.drain); M.drain = null; }
     st.pulse += dt * 4; const sc = 1 + 0.008 * Math.sin(st.pulse) * (1 + e.icp / 25); M.brain.scale.setScalar(sc);
-    M.grp.children.forEach((c) => { if (c.userData.hemi) c.material.opacity += ((st.ghost ? 0.14 : 0.3) - c.material.opacity) * Math.min(1, dt * 5); });
+    M.grp.children.forEach((c) => { if (c.userData.hemi) c.material.opacity += ((st.ghost ? 0.12 : BR ? 0.5 : 0.3) - c.material.opacity) * Math.min(1, dt * 5); });
     M.lab.visible = false;
   }
   S.hooks.push(frame);
@@ -213,6 +216,7 @@ export default function create(S, ui) {
     },
     dragHint: "To place the EVD, drag the catheter tip from the scalp into the right frontal horn (glowing ring). Coiling, clipping and the other treatments use the buttons.",
     views: [{ id: "front", label: "Front", f: () => ({ ry: 0, rx: 0.1, d: 4.4, tx: 0, ty: 0 }) }, { id: "side", label: "Side", f: () => ({ ry: 1.57, rx: 0.1, d: 4.4, tx: 0, ty: 0 }) }, { id: "base", label: "Base (vessels)", f: () => ({ ry: 0.3, rx: -1.2, d: 3.6, tx: 0, ty: -0.2 }) }, { id: "top", label: "Top", f: () => ({ ry: 0, rx: 1.3, d: 4.4, tx: 0, ty: 0 }) }],
+    credit: "Brain: BodyParts3D © DBCLS, CC BY-SA 2.1 JP. Adapted for teaching.",
     legend: [["#e8a3ab", "Brain"], ["#8a0f1e", "Blood / haematoma"], ["#6fb7ff", "Ventricles (CSF)"], ["#ffd27a", "Oedema"], ["#ffe08a", "Coils"]],
     setTab, setOpt, setT, act, info, obs, clin, st, ghost: (on) => { st.ghost = on; }, debug: () => ({ st, evd, kit: evd }), tabLabel: () => T().label,
   };

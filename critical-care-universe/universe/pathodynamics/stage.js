@@ -62,6 +62,13 @@ export function createStage(host) {
     const m = new THREE.Mesh(new THREE.TubeGeometry(curve, o.seg || Math.max(12, points.length * 8), r, o.rad || 10, false), S.mat(hex, { transparent: !!o.op, opacity: o.op || 1, emissive: o.emis || 0x000000 }));
     m.userData.curve = curve; m.userData.r = r; return m;
   };
+  /* cut-section: a plane facing the viewer slices away the near half so the inside of the organ shows. level 0 = off, 1 = cut through the middle */
+  const cutPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0); let cutLevel = 0;
+  S.cut = (v) => {
+    if (v == null) return cutLevel; cutLevel = Math.max(0, Math.min(1, v)); cutPlane.constant = 0.6 - 1.0 * cutLevel; R.clippingPlanes = cutLevel > 0.001 ? [cutPlane] : [];
+    root.traverse((o) => { if (!o.isMesh || !o.material || Array.isArray(o.material)) return; const m = o.material; if (m.userData.side0 == null) m.userData.side0 = m.side; const want = cutLevel > 0.001 && o.userData.hemi ? THREE.DoubleSide : m.userData.side0; if (m.side !== want) { m.side = want; m.needsUpdate = true; } });
+    return cutLevel;
+  };
   S.add = (o, pickable) => { root.add(o); if (pickable) S.pick.push(o); return o; };
   S.clear = () => { while (root.children.length) { const c = root.children[0]; root.remove(c); c.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); }); } }); } S.pick.length = 0; S.flows.length = 0; flowPts = null; };
 
@@ -84,14 +91,20 @@ export function createStage(host) {
 
   /* tissue: a mesh whose vertices carry a tag (which territory) and a rank (how early it is lost). paint() recolours it from a function. */
   S.tissue = (geom, baseHex, classify, matOpts) => {
-    const pos = geom.attributes.position, n = pos.count, tags = new Array(n), rank = new Float32Array(n), h = new Float32Array(n), shade = new Float32Array(n), col = new Float32Array(n * 3), P = new THREE.Vector3();
-    for (let i = 0; i < n; i++) { P.fromBufferAttribute(pos, i); const c = classify(P, i); tags[i] = c.tag; rank[i] = c.rank == null ? 0.5 : c.rank; h[i] = c.h == null ? 0.5 : c.h; shade[i] = c.sh == null ? 1 : c.sh; }
-    geom.setAttribute("color", new THREE.BufferAttribute(col, 3));
     const m = new THREE.Mesh(geom, new THREE.MeshPhongMaterial(Object.assign({ vertexColors: true, shininess: 35, specular: 0x222a33 }, matOpts || {})));
-    const base = C(baseHex), tmp = C(0xffffff);
-    const tis = { mesh: m, tags, rank, h, base, geom, dirty: true,
-      paint(fn) { for (let i = 0; i < n; i++) { tmp.copy(base); fn(tags[i], rank[i], h[i], tmp, i); tmp.multiplyScalar(shade[i]); col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b; } geom.attributes.color.needsUpdate = true; } };
-    tis.paint(() => {}); return tis;
+    const base = C(baseHex), tmp = C(0xffffff), P = new THREE.Vector3();
+    const tis = { mesh: m, base, geom, classify, dirty: true,
+      /* tag every vertex (which territory, how early it is lost) from the geometry it has now. swap() does it again for a better mesh. */
+      init(g) {
+        const pos = g.attributes.position, n = pos.count; this.geom = g; this.n = n; this.tags = new Array(n); this.rank = new Float32Array(n); this.h = new Float32Array(n); this.shade = new Float32Array(n); this.col = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) { P.fromBufferAttribute(pos, i); const c = classify(P, i); this.tags[i] = c.tag; this.rank[i] = c.rank == null ? 0.5 : c.rank; this.h[i] = c.h == null ? 0.5 : c.h; this.shade[i] = c.sh == null ? 1 : c.sh; }
+        g.setAttribute("color", new THREE.BufferAttribute(this.col, 3));
+      },
+      paint(fn) { const n = this.n, col = this.col; for (let i = 0; i < n; i++) { fn(this.tags[i], this.rank[i], this.h[i], tmp.copy(base), i); tmp.multiplyScalar(this.shade[i]); col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b; } this.geom.attributes.color.needsUpdate = true; },
+      swap(g) { const old = m.geometry; this.init(g); m.geometry = g; if (old && old !== g) old.dispose(); this.paint(this.lastFn || (() => {})); },
+    };
+    const paint0 = tis.paint; tis.paint = function (fn) { this.lastFn = fn; paint0.call(this, fn); };
+    tis.init(geom); tis.paint(() => {}); return tis;
   };
 
   /* labels that stay with the model (sprites) */

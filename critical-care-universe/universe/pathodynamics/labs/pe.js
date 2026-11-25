@@ -2,8 +2,9 @@
    Place the clot, watch the right ventricle strain and the oxygen fall, then reperfuse by catheter, lysis or anticoagulation.
    Teaching model: what matters is how much of the pulmonary arterial bed is blocked, how much RV reserve the patient has, and how long it lasts.
    Content aligned to the 2026 AHA/ACC acute PE guideline and its Clinical Categories (checked Nov 2026 against the published summaries). All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261124a";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261124a";
+import { THREE, C } from "../stage.js?v=20261124b";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261124b";
+import { organ } from "../anatomy.js?v=20261124b";
 
 const SITES = {
   SADDLE: { label: "Saddle", sub: "At the PA bifurcation", vessel: "PA", u: 0.97, big: true, tags: { rul: 1, rml: 1, rll: 1, lul: 1, lll: 1 }, burden: 0.62, lysis: 0.7,
@@ -33,17 +34,25 @@ const LOBES = { rul: [[-1.02, 0.6, 0.0], [0.5, 0.46, 0.5]], rml: [[-1.18, 0.02, 
 export default function create(S, ui) {
   const st = { tab: "MAIN", reserve: "normal", t: 4, hep: false, lysed: false, cdt: false, removed: false, reper: 0, rAt: null, rec: 0, ghost: false, pulse: 0, shock: false };
   const site = () => SITES[st.tab];
-  let M = {}, V = {}, F = {}, tis = [], kit = null, rv = null, dirty = true, accT = 0;
+  let M = {}, V = {}, F = {}, tis = [], kit = null, rv = null, dirty = true, accT = 0, LG = null, HT = null;
+  organ("heart", { fit: { c: [0, 0, 0], r: [0.3, 0.37, 0.26] } }).then((g) => { HT = g; if (M.grp) build(); }).catch(() => {});
+  organ("lung", { bigX: -1, fit: { c: [-0.04, -0.05, 0], r: [1.5, 1.17, 0.58] } }).then((g) => { LG = g; if (M.grp) build(); }).catch(() => {});   /* real lungs (BodyParts3D); each vertex takes the lobe it is nearest to */
+  const LOBE = (P, id) => { const [c, r] = LOBES[id]; return Math.hypot((P.x - c[0]) / r[0], (P.y - c[1]) / r[1], (P.z - c[2]) / r[2]); };
 
   function build() {
     S.clear(); M = {}; V = {}; F = {}; tis = []; kit = null;
     const grp = S.add(new THREE.Group()); M.grp = grp;
-    Object.entries(LOBES).forEach(([id, [c, r]]) => {
+    const lobeStyle = (id, c, r) => (P) => { const hx = (P.x - c[0]) / r[0], d = Math.hypot(hx, (P.y - c[1]) / r[1], (P.z - c[2]) / r[2]); return { tag: id, rank: clamp(0.35 + 0.65 * Math.abs(hx) * Math.min(d, 1.4) / 1.4 * 1.4, 0, 1), h: 0.5 + 0.5 * Math.sin(6 * P.x + 3 * P.y) * Math.sin(5 * P.z + 2 * P.y + 1), sh: 0.88 + 0.12 * Math.sin(17 * P.x) * Math.sin(15 * P.y) * Math.sin(13 * P.z) }; };
+    if (LG) {
+      const ids = Object.keys(LOBES), st0 = {}; ids.forEach((id) => (st0[id] = lobeStyle(id, LOBES[id][0], LOBES[id][1])));
+      const t = S.tissue(LG.clone(), 0xe8a3ab, (P) => { let best = ids[0], bd = 1e9; ids.forEach((id) => { const d = LOBE(P, id); if (d < bd) { bd = d; best = id; } }); return st0[best](P); }, { transparent: true, opacity: 0.55, depthWrite: false });
+      t.mesh.userData.hemi = 1; t.mesh.renderOrder = 2; grp.add(t.mesh); tis.push(t);
+    } else Object.entries(LOBES).forEach(([id, [c, r]]) => {
       const g = new THREE.SphereGeometry(1, 40, 30); g.scale(...r); g.translate(...c);
-      const t = S.tissue(g, 0xe8a3ab, (P) => { const d = Math.hypot((P.x - c[0]) / r[0], (P.y - c[1]) / r[1], (P.z - c[2]) / r[2]); const hx = (P.x - c[0]) / r[0]; return { tag: id, rank: clamp(0.35 + 0.65 * Math.abs(hx) * d, 0, 1), h: 0.5 + 0.5 * Math.sin(6 * P.x + 3 * P.y) * Math.sin(5 * P.z + 2 * P.y + 1), sh: 0.88 + 0.12 * Math.sin(17 * P.x) * Math.sin(15 * P.y) * Math.sin(13 * P.z) }; }, { transparent: true, opacity: 0.42, depthWrite: false });
+      const t = S.tissue(g, 0xe8a3ab, lobeStyle(id, c, r), { transparent: true, opacity: 0.42, depthWrite: false });
       t.mesh.userData.hemi = 1; t.mesh.renderOrder = 2; grp.add(t.mesh); tis.push(t);
     });
-    const hg = new THREE.SphereGeometry(1, 36, 28); hg.scale(0.28, 0.34, 0.24); hg.translate(0.05, -0.38, 0.28); rv = new THREE.Mesh(hg, S.mat(0xa94d57)); rv.userData.base = new THREE.Color(0xa94d57); grp.add(rv);
+    const hg = new THREE.SphereGeometry(1, 36, 28); hg.scale(0.28, 0.34, 0.24); hg.translate(0.05, -0.38, 0.28); rv = new THREE.Mesh(HT ? HT.clone() : hg, S.mat(0xa94d57)); if (HT) rv.position.set(0.05, -0.38, 0.28); rv.userData.base = new THREE.Color(0xa94d57); grp.add(rv);
     const trachea = S.tube([[0, 1.25, 0.0], [0, 0.75, 0.0], [0, 0.5, -0.05]], 0.09, 0xcfd8e8, { op: 0.8 }); grp.add(trachea); [[-1, 0.5], [1, 0.5]].forEach(([s]) => grp.add(S.tube([[0, 0.5, -0.05], [s * 0.35, 0.35, -0.05], [s * 0.7, 0.1, -0.05]], 0.05, 0xcfd8e8, { op: 0.8 })));
     const defs = [
       ["PA", [[0.05, -0.05, 0.4], [0.03, 0.2, 0.38], [0.0, 0.48, 0.32]], 0.1],
@@ -93,7 +102,7 @@ export default function create(S, ui) {
     kit.frame(dt, st.lysed && !st.removed ? 1 - 0.7 * clamp(st.reper / k.lysis, 0, 1) : 1);
     accT += dt; if ((dirty || (st.rAt != null && st.rec < 1)) && accT > 0.06) { accT = 0; paintAll(); dirty = false; }
     const sv = strain().s; st.pulse += dt * (1.2 + 1.2 * sv) * 2 * Math.PI; const sc = 1 + 0.4 * sv + 0.03 * Math.max(0, Math.sin(st.pulse)) ** 2; rv.scale.set(sc, sc, sc); rv.material.color.copy(rv.userData.base).lerp(C(0xffb347), clamp((sv - 0.15) * 1.2, 0, 0.75));
-    M.grp.children.forEach((c) => { if (c.userData.hemi) c.material.opacity += ((st.ghost ? 0.18 : 0.42) - c.material.opacity) * Math.min(1, dt * 5); });
+    M.grp.children.forEach((c) => { if (c.userData.hemi) c.material.opacity += ((st.ghost ? 0.16 : LG ? 0.55 : 0.42) - c.material.opacity) * Math.min(1, dt * 5); });
   }
   S.hooks.push(frame);
 
@@ -177,6 +186,7 @@ export default function create(S, ui) {
   const lab = {
     id: "pe", name: "Pulmonary Embolism Lab", tag: "Clot in the pulmonary arteries", icon: "🫁",
     tabs: TABS.map((k) => ({ id: k, label: SITES[k].label, sub: SITES[k].sub })), get tab() { return st.tab; },
+    credit: "Lungs: BodyParts3D © DBCLS, CC BY-SA 2.1 JP. Adapted for teaching.",
     selectHint: "Tap a pulmonary artery in the 3D lungs to move the clot there.",
     opts: () => [{ id: "reserve", label: "Cardiopulmonary reserve", cur: st.reserve, choices: [["normal", "Healthy heart and lungs"], ["limited", "Limited reserve"]] }],
     slider: () => ({ id: "t", label: st.rAt != null ? "Reperfused at (hours from onset)" : "Time since symptom onset (hours)", min: 0.5, max: 48, step: 0.5, v: st.rAt != null ? st.rAt : st.t, locked: st.rAt != null, unit: " h" }),

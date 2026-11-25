@@ -3,8 +3,9 @@
    Pick the cause, set the time, then correct it and watch filtration, creatinine, potassium and urine output respond.
    Teaching model: reversible functional loss turns into structural loss the longer the cause persists.
    Content aligned to KDIGO 2012 (the current final AKI guideline; the 2026 update was still in public review as of Nov 2026). All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261124a";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261124a";
+import { THREE, C } from "../stage.js?v=20261124b";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261124b";
+import { kidney as loadKidney } from "../anatomy.js?v=20261124b";
 
 const T = {
   PRE: { label: "Prerenal", sub: "Hypoperfusion", sev: 0.55, irr0: 0, irrMax: 0.8, tau: 2.5, inj: { glom: 0.15, pct: 0.12 },
@@ -45,7 +46,8 @@ export default function create(S, ui) {
   const isRen = () => isRen0(st.tab);
   const st = { tab: "ATN", t: 3, cause: "hypo", fixed: false, fAt: null, rec: 0, drug: false, steroid: false, immuno: false, pex: false, rrt: false, relief: 0, hint: "", ghost: false, wrong: "" };
   const cur = () => T[st.tab];
-  let M = {}, kit = null, segM = {}, segV = {}, flows = {}, cells = [], casts = [], rbc = [], accT = 0, kmesh = null, pelvis = null, ureter = null;
+  let M = {}, kit = null, segM = {}, segV = {}, flows = {}, cells = [], casts = [], rbc = [], accT = 0, kmesh = null, pelvis = null, ureter = null, KD = null;
+  loadKidney(1.96, Math.PI / 2).then((k) => { KD = k; if (M.kg) build(); }).catch(() => {});   /* real kidney (Human Reference Atlas); the simple shape stays if it cannot load */
 
   const bean = (r, k) => { const g = new THREE.SphereGeometry(1, 56, 42), p = g.attributes.position, v = new THREE.Vector3(); for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); let x = v.x * r[0], y = v.y * r[1], z = v.z * r[2]; if (v.x > 0.45) { const n = (v.x - 0.45) / 0.55, w = Math.max(0, 1 - (v.y / 0.42) ** 2); x -= n * w * 0.5 * r[0]; } p.setXYZ(i, x, y, z); } g.computeVertexNormals(); return g; };
   function build() {
@@ -53,13 +55,16 @@ export default function create(S, ui) {
     const grp = S.add(new THREE.Group()); M.grp = grp;
     /* ----- kidney (left of scene) ----- */
     const kg = new THREE.Group(); kg.position.set(-2.5, 0, 0); grp.add(kg); M.kg = kg;
-    const cort = S.tissue(bean([0.66, 0.98, 0.42]), 0xb8605a, (P) => ({ tag: "cx", rank: 0.5, h: 0, sh: 0.9 + 0.1 * Math.sin(14 * P.x) * Math.sin(12 * P.y) * Math.sin(10 * P.z) }), { transparent: true, opacity: 0.55, depthWrite: false }); cort.mesh.userData.hemi = 1; cort.mesh.renderOrder = 3; kg.add(cort.mesh); M.cort = cort;
-    for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2, cg = new THREE.ConeGeometry(0.15, 0.36, 14); cg.translate(0, 0.18, 0); const m = new THREE.Mesh(cg, S.mat(0x8f3f48)); const rx = 0.28 * Math.cos(a), ry = 0.5 * Math.sin(a); m.position.set(rx, ry, 0); m.rotation.z = Math.atan2(ry, rx) - Math.PI / 2 - Math.PI; m.scale.set(1, 1, 1); kg.add(m); }
-    pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.2, 22, 16), S.mat(0xf0c46a, { transparent: true, opacity: 0.85 })); pelvis.position.set(0.22, 0, 0); kg.add(pelvis);
-    ureter = S.tube([[0.3, -0.05, 0], [0.5, -0.5, 0.02], [0.58, -1.05, 0.05], [0.5, -1.55, 0.08]], 0.04, 0xf0c46a, { seg: 30 }); kg.add(ureter); M.ur = ureter;
+    const cort = S.tissue(KD ? KD.cortex.clone() : bean([0.66, 0.98, 0.42]), KD ? 0xcc7064 : 0xb8605a, (P) => ({ tag: "cx", rank: 0.5, h: 0, sh: 0.9 + 0.1 * Math.sin(14 * P.x) * Math.sin(12 * P.y) * Math.sin(10 * P.z) }), { transparent: true, opacity: KD ? 0.72 : 0.55, depthWrite: false }); cort.mesh.userData.hemi = 1; cort.mesh.renderOrder = 3; kg.add(cort.mesh); M.cort = cort;
+    if (KD) { const py = new THREE.Mesh(KD.pyramids.clone(), S.mat(0x8f3f48)); kg.add(py); M.py = py; }
+    else for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2, cg = new THREE.ConeGeometry(0.15, 0.36, 14); cg.translate(0, 0.18, 0); const m = new THREE.Mesh(cg, S.mat(0x8f3f48)); const rx = 0.28 * Math.cos(a), ry = 0.5 * Math.sin(a); m.position.set(rx, ry, 0); m.rotation.z = Math.atan2(ry, rx) - Math.PI / 2 - Math.PI; m.scale.set(1, 1, 1); kg.add(m); }
+    if (KD) { const pg = KD.pelvis.clone(); pg.translate(-KD.pelvisCentre.x, -KD.pelvisCentre.y, -KD.pelvisCentre.z); pelvis = new THREE.Mesh(pg, S.mat(0xf0c46a, { transparent: true, opacity: 0.85 })); pelvis.position.copy(KD.pelvisCentre); }
+    else { pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.2, 22, 16), S.mat(0xf0c46a, { transparent: true, opacity: 0.85 })); pelvis.position.set(0.22, 0, 0); }
+    kg.add(pelvis);
+    ureter = S.tube(KD ? [[0.3, -0.3, 0.04], [0.42, -0.7, 0.05], [0.5, -1.1, 0.06], [0.46, -1.55, 0.08]] : [[0.3, -0.05, 0], [0.5, -0.5, 0.02], [0.58, -1.05, 0.05], [0.5, -1.55, 0.08]], 0.04, 0xf0c46a, { seg: 30 }); kg.add(ureter); M.ur = ureter;
     const bl = new THREE.Mesh(new THREE.SphereGeometry(0.24, 24, 18), S.mat(0xe8d09a, { transparent: true, opacity: 0.5 })); bl.position.set(0.45, -1.8, 0.08); kg.add(bl);
-    const av = vessels(S, kg, [["RA", [[1.5, 0.35, 0.0], [1.0, 0.3, 0.02], [0.6, 0.2, 0.02], [0.3, 0.12, 0.0]], 0.055]], 0xff5a46, { dens: 14 }); segV.RA = av.T.RA; flows.RA = av.F.RA; halo(S, kg, av.T.RA, "RA");
-    kg.add(S.tube([[1.5, -0.1, -0.05], [1.0, -0.12, -0.05], [0.5, -0.1, -0.02], [0.3, -0.05, 0]], 0.06, 0x5b78e6));
+    const av = vessels(S, kg, [["RA", KD ? [[1.5, 0.35, 0.0], [1.1, 0.3, 0.02], [0.7, 0.2, 0.03], [0.3, 0.14, 0.04]] : [[1.5, 0.35, 0.0], [1.0, 0.3, 0.02], [0.6, 0.2, 0.02], [0.3, 0.12, 0.0]], 0.055]], 0xff5a46, { dens: 14 }); segV.RA = av.T.RA; flows.RA = av.F.RA; halo(S, kg, av.T.RA, "RA");
+    kg.add(S.tube(KD ? [[1.5, -0.1, -0.05], [1.1, -0.12, -0.05], [0.7, -0.08, -0.02], [0.3, -0.04, 0]] : [[1.5, -0.1, -0.05], [1.0, -0.12, -0.05], [0.5, -0.1, -0.02], [0.3, -0.05, 0]], 0.06, 0x5b78e6));
     flows.UR = S.flow(ureter.userData.curve, 10, 0xffe08a, { speed: 0.12, off: -2.5 }); flows.UR.rate = 0;
     kit = clotKit(S, kg, ui, { size: 0.085, ring: 0.15, thr: 0.4, color: st.tab === "OBS" ? 0xe8d9a0 : 0x7a1530, onRemoved: () => { st.relief = 1; setFixed("clot"); ui.refresh(st.tab === "OBS" ? "Stone removed. Obstruction relieved; urine flows." : "Clot retrieved. Renal artery open; blood flow restored."); } });
     kit.mesh.visible = false; kit.ring.visible = false; kit.dead = true;
@@ -115,9 +120,9 @@ export default function create(S, ui) {
     casts.forEach((m, i) => { m.visible = st.tab === "ATN" && M.inj.pct > 0.35 && i < Math.round(14 * M.inj.pct * (1 - (st.fixed ? 0.7 * st.rec : 0))); });
     cells.forEach((m, i) => { m.visible = !!c.cells && i < Math.round(26 * (st.fAt != null ? 1 - 0.7 * st.rec * (st.steroid ? 1 : 0.4) : clamp(st.t / 3, 0.2, 1))); });
     rbc.forEach((m, i) => { m.visible = st.tab === "GN" && i < Math.round(12 * clamp(M.inj.glom, 0, 1)); });
-    const hyd = c.dilate ? (1 + 1.6 * (1 - st.relief * st.rec) * (1 - Math.exp(-(st.fAt != null ? st.fAt : st.t) / 2))) : 1; pelvis.scale.setScalar(hyd); { const us = c.dilate ? 1 + 0.9 * (hyd - 1) / 1.6 : 1; ureter.scale.set(us, 1, us); ureter.position.set(0.5 * (1 - us), 0, 0.03 * (1 - us)); }
+    const hyd = c.dilate ? (1 + 1.6 * (1 - st.relief * st.rec) * (1 - Math.exp(-(st.fAt != null ? st.fAt : st.t) / 2))) : 1; pelvis.scale.setScalar(hyd); { const us = c.dilate ? 1 + 0.9 * (hyd - 1) / 1.6 : 1; ureter.scale.set(us, 1, us); ureter.position.set(0.3 * (1 - us), 0, 0.03 * (1 - us)); }
     M.cort.paint((tag, rank, h, out) => { if (c.art || isRen()) out.lerp(C(0x6a3a5a), 0.45 * (st.fixed ? 1 - st.rec : 1)); else if (c.dilate) out.lerp(C(0xd8b090), 0.25 * (hyd - 1) / 1.6); });
-    if (kit && !kit.dead) kit.frame(dt, 1); M.cort.mesh.material.opacity += ((st.ghost ? 0.2 : 0.55) - M.cort.mesh.material.opacity) * Math.min(1, dt * 5);
+    if (kit && !kit.dead) kit.frame(dt, 1); M.cort.mesh.material.opacity += ((st.ghost ? 0.15 : KD ? 0.72 : 0.55) - M.cort.mesh.material.opacity) * Math.min(1, dt * 5);
     const bad = c.art ? kit.dead ? 0 : 1 : 0; const vc = segV.RA.material.color; vc.setRGB(1 * (bad && !st.fixed ? 0.8 : 1), 0.35, 0.27);
     accT += dt;
   }
@@ -211,6 +216,7 @@ export default function create(S, ui) {
   const lab = {
     id: "aki", name: "Kidney Injury Lab", tag: "Acute kidney injury", icon: "🫘",
     tabs: TABS.map((k) => ({ id: k, label: T[k].label, sub: T[k].sub })), get tab() { return st.tab; },
+    credit: "Kidney: HuBMAP Human Reference Atlas (Browne & Schlehlein), CC BY 4.0. Adapted for teaching.",
     selectHint: "Pick the cause. Use the KIDNEY and NEPHRON views to see the organ and one nephron.",
     opts: () => [st.tab === "PRE" && { id: "cause", label: "Cause of low perfusion", cur: st.cause, choices: [["hypo", "Hypovolaemia"], ["lowco", "Low cardiac output"], ["vaso", "Vasodilatory shock"]] }].filter(Boolean),
     slider: () => ({ id: "t", label: st.fAt != null ? "Corrected at (days from onset)" : "Days from onset to correction", min: 0, max: 14, step: 0.5, v: st.fAt != null ? st.fAt : st.t, locked: st.fAt != null, unit: " d" }),
@@ -224,7 +230,7 @@ export default function create(S, ui) {
       return A.map((a) => Object.assign({ off: (a.id === "steroid" && st.steroid) || (a.id === "pex" && (st.pex || !st.immuno)) || (st.fixed && ["stop", "fluid", "pressor", "cardiac", "immuno", "djs", "pcn", "angio"].includes(a.id)) }, a)).concat([{ id: "rrt", label: "DIALYSIS (RRT)", hint: "Support: K⁺, acid, volume.", off: st.rrt }, { id: "reset", label: "RESET", hint: "Start again.", off: false }]);
     },
     dragHint: "In Obstruction: drag the stone out of the ureter. In Renal artery: drag the clot out of the artery. Otherwise use the treatment buttons.",
-    views: [{ id: "both", label: "Both", f: () => ({ ry: 0, rx: 0.1, d: 7.2, tx: -0.5, ty: 0.1 }) }, { id: "kid", label: "Kidney", f: () => ({ ry: 0, rx: 0.1, d: 4.6, tx: -2.5, ty: -0.2 }) }, { id: "neph", label: "Nephron", f: () => ({ ry: 0, rx: 0.05, d: 4.2, tx: 1.5, ty: 0.05 }) }, { id: "side", label: "Side", f: () => ({ ry: 0.9, rx: 0.1, d: 6.2, tx: -0.3, ty: 0.1 }) }],
+    views: [{ id: "both", label: "Both", f: () => ({ ry: 0, rx: 0.1, d: 7.2, tx: -0.5, ty: 0.1 }) }, { id: "kid", label: "Kidney", f: () => ({ ry: 0, rx: 0.1, d: 5.0, tx: -2.5, ty: -0.5 }) }, { id: "neph", label: "Nephron", f: () => ({ ry: 0, rx: 0.05, d: 4.2, tx: 1.5, ty: 0.05 }) }, { id: "side", label: "Side", f: () => ({ ry: 0.9, rx: 0.1, d: 6.2, tx: -0.3, ty: 0.1 }) }],
     legend: [["#27c9b0", "Healthy tubule"], ["#ffb347", "Injured"], ["#5b1230", "Necrotic / lost"], ["#8fe8b0", "Recovering"]],
     setTab, setOpt, setT, act, info, obs, clin, st, ghost: (on) => { st.ghost = on; }, debug: () => ({ kit, st }), tabLabel: () => cur().label,
   };

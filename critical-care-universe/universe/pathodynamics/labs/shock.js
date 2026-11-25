@@ -4,8 +4,9 @@
    Content aligned to the Surviving Sepsis Campaign adult guidance (2026 update), the 2025 ISTH update on DIC, the 2024 ADA/EASD/JBDS consensus on hyperglycaemic crises,
    and current anaphylaxis guidance (intramuscular adrenaline first). Checked Nov 2026 against published summaries; where a figure could not be confirmed, the wording is general.
    All numbers are illustrative, not patient data. */
-import { THREE } from "../stage.js?v=20261124a";
-import { clamp } from "./common.js?v=20261124a";
+import { THREE } from "../stage.js?v=20261124b";
+import { clamp } from "./common.js?v=20261124b";
+import { organ } from "../anatomy.js?v=20261124b";
 
 const TABS = {
   SEP: { label: "Septic shock", sub: "Infection, vasoplegia, leak",
@@ -40,12 +41,14 @@ export default function create(S, ui) {
   const T = () => TABS[st.tab];
   let M = {}, V = {}, G = {}, bleed = [], thr = [], leak = [], mast = [], hx = [], F = {};
 
+  let HG = null;
+  organ("heart", { flipX: false, fit: { c: [0, 0, 0], r: [0.3, 0.34, 0.26] } }).then((g) => { HG = g; if (M.grp) build(); }).catch(() => {});   /* real heart (BodyParts3D) */
   const ell = (rx, ry, rz, col, op, p, o) => { const g = new THREE.SphereGeometry(1, 20, 14); g.scale(rx, ry, rz); const m = new THREE.Mesh(g, S.mat(col, Object.assign({ transparent: true, opacity: op, depthWrite: false }, o || {}))); if (p) m.position.set(...p); return m; };
   const tubeX = (x0, x1, r, col, op, y, z) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 14, 1, true), S.mat(col, { transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide })); m.rotation.z = Math.PI / 2; m.position.set((x0 + x1) / 2, y || 0, z || 0); m.scale.set(r, x1 - x0, r); m.userData.r = r; return m; };
   function build() {
     S.clear(); M = {}; V = {}; G = {}; bleed = []; thr = []; leak = []; mast = []; hx = []; F = {};
     const grp = S.add(new THREE.Group()); M.grp = grp; grp.scale.x = 1;
-    M.heart = ell(0.3, 0.34, 0.26, 0xc0383f, 0.75, [-1.25, 0, 0], { emissive: 0x3a0810 }); grp.add(M.heart);
+    M.heart = ell(0.3, 0.34, 0.26, 0xc0383f, 0.75, [-1.25, 0, 0], { emissive: 0x3a0810 }); if (HG) { M.heart.geometry.dispose(); M.heart.geometry = HG.clone(); } grp.add(M.heart);
     V.art = tubeX(-1.0, -0.5, 0.075, 0xc9514e, 0.65); V.aol = tubeX(-0.5, -0.12, 0.05, 0xd9605a, 0.7); V.ven = tubeX(0.78, 1.2, 0.08, 0x6a74d8, 0.6); V.vnl = tubeX(0.45, 0.78, 0.05, 0x6a74d8, 0.65); Object.values(V).forEach((m) => grp.add(m));
     M.caps = []; for (let i = 0; i < 7; i++) { const y = -0.42 + i * 0.14, z = ((i % 3) - 1) * 0.07, m = tubeX(-0.12, 0.45, 0.028, 0xd96a64, 0.7, y, z); M.caps.push(m); grp.add(m); }
     const ret = new THREE.CatmullRomCurve3([new THREE.Vector3(1.2, 0, 0), new THREE.Vector3(1.4, -0.4, 0), new THREE.Vector3(0.3, -1.05, 0), new THREE.Vector3(-1.2, -0.9, 0), new THREE.Vector3(-1.25, -0.3, 0)]); M.ret = new THREE.Mesh(new THREE.TubeGeometry(ret, 40, 0.06, 10, false), S.mat(0x6a74d8, { transparent: true, opacity: 0.5, depthWrite: false })); grp.add(M.ret);
@@ -129,7 +132,7 @@ export default function create(S, ui) {
     /* gauges */
     const setG = (g, v, show) => { g.visible = show; g.userData.mk.position.y = -0.65 + 1.3 * clamp(v, 0, 1); }; setG(G.map, (map - 30) / 90, true); setG(G.ph, (ph - 6.8) / 0.8, t === "ACID" || t === "DKA" || t === "HHS"); setG(G.glu, gl / 50, t === "DKA" || t === "HHS");
     M.lab.forEach((l, i) => { if (l) l.visible = [true, t === "ACID" || t === "DKA" || t === "HHS", t === "DKA" || t === "HHS"][i]; });
-    M.heart.scale.setScalar((1 + 0.06 * Math.sin(S.time() * (hrz / 60) * 6.28)) * (0.95 + 0.05 * co)); M.heart.material.opacity += ((st.ghost ? 0.3 : 0.75) - M.heart.material.opacity) * k;
+    M.heart.scale.setScalar((1 + 0.06 * Math.sin(S.time() * (hrz / 60) * 6.28)) * (0.95 + 0.05 * co)); M.heart.material.opacity += ((st.ghost ? 0.3 : HG ? 0.92 : 0.75) - M.heart.material.opacity) * k;
   }
   S.hooks.push(frame); S.onGrab = () => false; S.onDrag = () => {}; S.onDrop = () => {}; S.onTap = () => {};
   const setTab = (k) => { st.tab = k; build(); };
@@ -221,6 +224,7 @@ export default function create(S, ui) {
     },
     dragHint: "No dragging in this lab: choose the treatments with the buttons and watch the capillary bed.",
     views: [{ id: "front", label: "All", f: () => ({ ry: 0.15, rx: 0.1, d: 5.6, tx: -0.3, ty: 0.1 }) }, { id: "bed", label: "Capillary bed", f: () => ({ ry: 0.4, rx: 0.2, d: 2.6, tx: 0.2, ty: 0 }) }, { id: "heart", label: "Heart", f: () => ({ ry: 0.1, rx: 0.1, d: 3.0, tx: -1.1, ty: 0 }) }],
+    credit: "Heart: BodyParts3D © DBCLS, CC BY-SA 2.1 JP. Adapted for teaching.",
     legend: [["#d96a64", "Arterial blood"], ["#6a74d8", "Venous blood"], ["#f8e9b0", "Leaked fluid"], ["#b01020", "Bleeding"], ["#2a1a2a", "Microthrombi"], ["#ffd84d", "Glucose"], ["#c07cff", "Acid (H⁺)"]],
     setTab, setOpt, setT, act, info, obs, clin, st, ghost: (on) => { st.ghost = on; }, debug: () => ({ st }), tabLabel: () => T().label,
   };
