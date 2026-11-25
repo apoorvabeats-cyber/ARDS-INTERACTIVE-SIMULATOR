@@ -605,6 +605,8 @@ export function buildSuite(T, S, P, H, env, opt = {}) {
       }
     });
     pillars.forEach((c) => { const dx = px - c.x, dz = pz - c.z, l = Math.hypot(dx, dz); if (l < c.r) { const k = c.r / (l || 1e-6); px = c.x + (l ? dx * k : c.r); pz = c.z + (l ? dz * k : 0); } });
+    /* outside the building with the door still shut: you stay on the plaza in front of it, you are never drawn through the glass */
+    if (doors.exit.open <= 0.85 && z < -22.4) return out.clamp(x, Math.min(z, -23.2));
     if (doors.exit.open > 0.85 && z < -20.5) { const o = out.clamp(x, z); if ((o[0] - x) ** 2 + (o[1] - z) ** 2 < (px - x) ** 2 + (pz - z) ** 2) return o; }
     return [px, pz];
   }
