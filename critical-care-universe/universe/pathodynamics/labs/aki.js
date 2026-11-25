@@ -3,9 +3,9 @@
    Pick the cause, set the time, then correct it and watch filtration, creatinine, potassium and urine output respond.
    Teaching model: reversible functional loss turns into structural loss the longer the cause persists.
    Content aligned to KDIGO 2012 (the current final AKI guideline; the 2026 update was still in public review as of Nov 2026). All numbers are illustrative, not patient data. */
-import { THREE, C } from "../stage.js?v=20261126gj";
-import { clotKit, vessels, halo, clamp } from "./common.js?v=20261126gj";
-import { kidney as loadKidney } from "../anatomy.js?v=20261126gj";
+import { THREE, C } from "../stage.js?v=20261126gk";
+import { clotKit, vessels, halo, clamp } from "./common.js?v=20261126gk";
+import { kidney as loadKidney } from "../anatomy.js?v=20261126gk";
 
 const T = {
   PRE: { label: "Prerenal", sub: "Hypoperfusion", sev: 0.55, irr0: 0, irrMax: 0.8, tau: 2.5, inj: { glom: 0.15, pct: 0.12 },
@@ -195,22 +195,7 @@ export default function create(S, ui) {
     L.push(["General management", "Treat the cause; keep MAP at about 65 mmHg or higher in shock; give balanced crystalloids rather than excess saline when fluid is indicated; avoid nephrotoxins (NSAIDs, aminoglycosides, contrast when possible); review drug doses; do not use diuretics to treat AKI, only to manage overload; monitor potassium and acid–base."]);
     L.push(["Renal replacement therapy", "Start for refractory hyperkalaemia, severe acidosis, fluid overload not responding to diuretics, uraemic complications (pericarditis, encephalopathy) or dialysable toxins. Trials of earlier (accelerated) initiation in patients without urgent indications have not shown benefit."]);
     L.push(["After the episode", "Follow creatinine and blood pressure at 3 months: AKI raises the risk of CKD, cardiovascular events and recurrent AKI. Reference: KDIGO 2012 AKI guideline. The KDIGO 2026 AKI/AKD update (draft in public review, not yet final) proposes adding serum cystatin C and structural biomarkers to the definition. Follow your local protocol."]);
-    void c; return { lines: L, draw: (el) => drawImaging(el, e) };
-  }
-  function drawImaging(el, e) {
-    const mk = (title, f) => { const d = document.createElement("div"); d.className = "img"; const cv = document.createElement("canvas"); cv.width = 300; cv.height = 300; const t = document.createElement("small"); t.textContent = title; d.append(cv, t); el.append(d); f(cv.getContext("2d")); };
-    mk("Renal ultrasound (schematic)", (g) => { g.fillStyle = "#101010"; g.fillRect(0, 0, 300, 300); const hyd = st.tab === "OBS" && !st.relief; g.fillStyle = st.tab === "ATN" || st.tab === "AIN" || st.tab === "GN" ? "#8a8a8a" : "#6c6c6c"; g.beginPath(); g.ellipse(150, 150, 70, 120, 0, 0, 7); g.fill(); g.fillStyle = "#3b3b3b"; for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28; g.beginPath(); g.ellipse(150 + 28 * Math.cos(a), 150 + 52 * Math.sin(a), 11, 16, a, 0, 7); g.fill(); }
-      g.fillStyle = hyd ? "#050505" : "#c8c8c8"; g.beginPath(); g.ellipse(150, 150, hyd ? 40 : 14, hyd ? 70 : 22, 0, 0, 7); g.fill(); g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText(hyd ? "dilated pelvis (hydronephrosis)" : isRen() && !st.fixed ? (st.tab === "RAS" ? "reduced flow beyond the narrowing" : "no flow on Doppler") : "no hydronephrosis", 8, 292); });
-    mk("Urine microscopy (schematic)", (g) => { g.fillStyle = "#e9eef0"; g.fillRect(0, 0, 300, 300); const rnd = (i) => (Math.sin(i * 91.7) * 0.5 + 0.5); const tag = st.tab;
-      if (tag === "ATN") { g.fillStyle = "#8a6a45"; for (let i = 0; i < 5; i++) { g.beginPath(); g.roundRect(30 + rnd(i) * 160, 40 + i * 48, 90, 22, 10); g.fill(); } }
-      else if (tag === "GN") { g.fillStyle = "#c04050"; for (let i = 0; i < 40; i++) { g.beginPath(); g.arc(rnd(i) * 280 + 10, rnd(i + 50) * 260 + 10, 5, 0, 7); g.fill(); } g.fillStyle = "#e07a86"; g.beginPath(); g.roundRect(80, 120, 130, 26, 8); g.fill(); }
-      else if (tag === "AIN") { g.fillStyle = "#6a7ac0"; for (let i = 0; i < 20; i++) { g.beginPath(); g.arc(rnd(i) * 280 + 10, rnd(i + 20) * 260 + 10, 6, 0, 7); g.fill(); } g.fillStyle = "#ff8a60"; for (let i = 0; i < 6; i++) { g.beginPath(); g.arc(rnd(i + 70) * 280 + 10, rnd(i + 90) * 260 + 10, 7, 0, 7); g.fill(); } }
-      else { g.fillStyle = "#c8d0d6"; for (let i = 0; i < 3; i++) { g.beginPath(); g.roundRect(50 + i * 20, 60 + i * 70, 110, 20, 10); g.fill(); } }
-      g.fillStyle = "#223"; g.font = "600 12px system-ui"; g.fillText(e.sed, 8, 292); });
-    mk("Creatinine over time (illustrative)", (g) => { g.fillStyle = "#0a0f16"; g.fillRect(0, 0, 300, 300); g.strokeStyle = "rgba(255,255,255,.25)"; g.beginPath(); g.moveTo(26, 20); g.lineTo(26, 270); g.lineTo(290, 270); g.stroke(); g.strokeStyle = "#ff8a8a"; g.lineWidth = 2.5; g.beginPath();
-      const c = cur(), f = st.fAt, target = 100 * (1 - 0.9 * c.sev * irr()); for (let x = 0; x <= 260; x++) { const d = (x / 260) * 21; let G; if (f == null || d <= f) G = gfrFall(d); else { const g0 = gfrFall(f); G = g0 + (target - g0) * (1 - Math.exp(-(d - f) / 4)); } const cr = clamp(100 / Math.max(8, G), 1, 12), y = 270 - (cr - 1) / 11 * 240; x ? g.lineTo(26 + x, y) : g.moveTo(26 + x, y); } g.stroke();
-      if (f != null) { g.strokeStyle = "#3dff9a"; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(26 + f / 21 * 260, 20); g.lineTo(26 + f / 21 * 260, 270); g.stroke(); g.setLineDash([]); g.fillStyle = "#3dff9a"; g.font = "600 11px system-ui"; g.fillText("cause corrected", 30 + f / 21 * 260 - 20 > 200 ? 160 : 32 + f / 21 * 260, 34); }
-      g.fillStyle = "#e8e8e8"; g.font = "600 11px system-ui"; g.fillText("0", 26, 284); g.fillText("21 days", 244, 284); g.fillText("creatinine × baseline", 34, 16); });
+    void c; return { lines: L };
   }
 
   const lab = {

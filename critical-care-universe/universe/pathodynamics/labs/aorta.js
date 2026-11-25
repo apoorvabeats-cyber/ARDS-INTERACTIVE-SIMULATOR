@@ -3,9 +3,9 @@
    Content aligned to the ACC/AHA 2022 aortic disease guideline (acute aortic syndromes: reduce SBP to below 120 mmHg with a negative inotrope-led, heart-rate-lowering strategy;
    type A: emergency surgery; type B: medical therapy first, TEVAR for complicated disease) and to current ESC pericardial-disease practice (urgent drainage of tamponade).
    Checked Nov 2026 against published summaries. All numbers are illustrative, not patient data. */
-import { THREE } from "../stage.js?v=20261126gj";
-import { toolKit, vessels, mirrorFlows, clamp } from "./common.js?v=20261126gj";
-import { organ } from "../anatomy.js?v=20261126gj";
+import { THREE } from "../stage.js?v=20261126gk";
+import { toolKit, vessels, mirrorFlows, clamp } from "./common.js?v=20261126gk";
+import { organ } from "../anatomy.js?v=20261126gk";
 
 const TABS = {
   DA: { label: "Type A dissection", sub: "Ascending aorta involved",
@@ -157,19 +157,7 @@ export default function create(S, ui) {
     if (tn === "DB") lines.push(["Type B management (ACC/AHA 2022 aortic disease)", "Uncomplicated: medical therapy with systolic pressure below 120 mmHg and a heart rate of about 60–80, plus surveillance imaging. Complicated (malperfusion, rupture, refractory pain or hypertension, rapid growth): TEVAR is the usual treatment, with open or fenestration procedures for selected patients. Early TEVAR may be considered in selected uncomplicated patients with high-risk features."]);
     if (tn === "TAMP") lines.push(["Tamponade management", "Urgent echo-guided pericardiocentesis for tamponade with haemodynamic compromise; surgical drainage for clotted blood, trauma, post-cardiac-surgery or aortic rupture. Fluid is a short bridge only. Avoid positive-pressure ventilation and sedation before drainage if possible. Send fluid for analysis when the cause is unknown. Look for the cause: malignancy, infection, uraemia, post-procedure, aortic rupture."]);
     lines.push(["Reference", "2022 ACC/AHA guideline for the diagnosis and management of aortic disease; ESC pericardial disease guidance; local aortic-team and cardiac-surgery protocols. Teaching model: numbers are illustrative."]);
-    return { lines, draw: (el) => draw(el) };
-  }
-  function draw(el) {
-    const mk = (title, f) => { const d = document.createElement("div"); d.className = "img"; const c = document.createElement("canvas"); c.width = 300; c.height = 300; const t = document.createElement("small"); t.textContent = title; d.append(c, t); el.append(d); f(c.getContext("2d")); };
-    if (st.tab === "TAMP") {
-      const p = tamp();
-      mk("Echo, four-chamber view (schematic)", (g) => { g.fillStyle = "#050a10"; g.fillRect(0, 0, 300, 300); const e = 6 + 36 * Math.cbrt(st.cur / 300); g.fillStyle = st.cur > 15 ? "#222" : "#050a10"; g.beginPath(); g.ellipse(150, 160, 88 + e, 98 + e, 0, 0, 7); g.fill(); g.fillStyle = "#c9c9c9"; g.beginPath(); g.ellipse(150, 160, 88, 98, 0, 0, 7); g.fill(); g.fillStyle = "#050a10"; const sq = 1 - 0.55 * p.sev; [[110, 120, 26, 34], [190, 120, 28, 36], [112, 205, 32 * sq, 38 * sq], [192, 205, 34 * sq, 42 * sq]].forEach((c) => { g.beginPath(); g.ellipse(c[0], c[1], c[2], c[3], 0, 0, 7); g.fill(); }); g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText("effusion " + Math.round(st.cur) + " mL" + (p.sev > 0.35 ? " · RA/RV collapse" : ""), 8, 292); });
-      mk("Arterial line with breathing (pulsus paradoxus)", (g) => { g.fillStyle = "#0a0f16"; g.fillRect(0, 0, 300, 300); g.strokeStyle = "#ff8a8a"; g.lineWidth = 2; g.beginPath(); for (let x = 0; x < 290; x++) { const insp = Math.sin((x / 290) * 6.283 * 2), amp = 50 - (p.pulsus * 1.1) * Math.max(0, insp * -1), y = 150 - amp * Math.abs(Math.sin(x / 9)) - 30 + 60 * (1 - p.sev) * 0.2; x ? g.lineTo(5 + x, y) : g.moveTo(5 + x, y); } g.stroke(); g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText("systolic falls " + p.pulsus + " mmHg on inspiration" + (p.pulsus > 10 ? " (abnormal: over 10)" : ""), 8, 292); });
-    } else {
-      const d = dis();
-      mk("CT angiography, axial (schematic)", (g) => { g.fillStyle = "#000"; g.fillRect(0, 0, 300, 300); const R = 90; g.fillStyle = "#6a6a6a"; g.beginPath(); g.arc(150, 150, R, 0, 7); g.fill(); g.fillStyle = d.treated ? "#d8d8d8" : "#f0f0f0"; g.beginPath(); g.arc(150, 150, R * 0.5, 0, 7); g.fill(); g.fillStyle = d.treated ? "#3a3a3a" : "#4d4d4d"; g.beginPath(); g.arc(150, 150, R, -1.2, 2.1); g.lineTo(150, 150); g.fill(); g.strokeStyle = "#fff"; g.lineWidth = 2; g.beginPath(); g.moveTo(150 - R * 0.9, 190); g.lineTo(150 + R * 0.75, 100); g.stroke(); g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText(d.treated ? "false lumen thrombosed / sealed" : "true lumen (bright) · false lumen (grey) · flap", 8, 292); });
-      mk("Aorta map", (g) => { g.fillStyle = "#0a0f16"; g.fillRect(0, 0, 300, 300); g.strokeStyle = "#5a6a80"; g.lineWidth = 14; g.lineCap = "round"; g.beginPath(); g.moveTo(80, 270); g.lineTo(80, 100); g.quadraticCurveTo(80, 30, 150, 30); g.quadraticCurveTo(220, 30, 220, 100); g.lineTo(220, 270); g.stroke(); const u0 = st.tab === "DA" ? 0 : 0.5, u1 = u0 + d.ext * (1 - u0); g.strokeStyle = d.treated ? "#6a4a80" : "#c22"; g.lineWidth = 6; g.beginPath(); if (st.tab === "DA") { g.moveTo(80, 270); g.lineTo(80, 270 - (270 - 100) * Math.min(1, d.ext * 1.2)); } else { g.moveTo(220, 100); g.lineTo(220, 100 + 170 * Math.min(1, d.ext)); } g.stroke(); g.fillStyle = "#ffd166"; g.font = "600 12px system-ui"; g.fillText(st.tab === "DA" ? "Stanford A: ascending aorta involved" : "Stanford B: beyond the left subclavian", 8, 292); void u1; });
-    }
+    return { lines };
   }
 
   const lab = {

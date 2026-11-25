@@ -2,9 +2,9 @@
    From a normal gland to oedematous and necrotising pancreatitis, then the collections (APFC, ANC, WON, infected necrosis)
    and the step-up approach: support and antibiotics, drainage (endoscopic stent or percutaneous drain), then necrosectomy.
    Terms follow the Revised Atlanta Classification. Management content aligned to ACG 2024, the AGA 2020 necrosis update and the Revised Atlanta Classification (checked Nov 2026). Numbers are illustrative.  */
-import { THREE, C, smooth } from "../stage.js?v=20261126gj";
-import { clamp } from "./common.js?v=20261126gj";
-import { organ } from "../anatomy.js?v=20261126gj";
+import { THREE, C, smooth } from "../stage.js?v=20261126gk";
+import { clamp } from "./common.js?v=20261126gk";
+import { organ } from "../anatomy.js?v=20261126gk";
 
 const T = {
   NORMAL: { label: "Normal", sub: "Healthy pancreas", d0: 0, d1: 14, dv: 0,

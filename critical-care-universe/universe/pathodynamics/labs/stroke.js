@@ -2,8 +2,8 @@
    Pick an occlusion, turn the brain, drag the clot out, and watch perfusion, tissue fate and the whole body respond.
    Teaching model: tissue fate depends on TIME and COLLATERALS; reopening the vessel does not undo tissue that has already infarcted.
    Content aligned to the 2026 AHA/ASA acute ischaemic stroke guideline (checked Nov 2026 against the published summaries); simplified teaching model. Numbers are illustrative ranges, not patient data. */
-import { THREE, C, smooth } from "../stage.js?v=20261126gj";
-import { organ, splitLR } from "../anatomy.js?v=20261126gj";
+import { THREE, C, smooth } from "../stage.js?v=20261126gk";
+import { organ, splitLR } from "../anatomy.js?v=20261126gk";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const BRAIN = { cx: 0.58, rx: 0.56, ry: 0.78, rz: 1.0 };
@@ -293,26 +293,7 @@ export default function create(S, ui) {
     if (asp != null && asp <= 5 && (st.tab === "ICA" || st.tab === "M1")) evt += " With a large established core (ASPECTS 3–5), recent trials (SELECT2, ANGEL-ASPECT, RESCUE-Japan LIMIT) support thrombectomy in selected patients, and the 2026 guideline widens eligibility for larger cores, with lower expected benefit.";
     lines.push(["Treatment pathways to consider", "At " + hrs.toFixed(1) + " h from onset, " + lys + ". " + evt]);
     lines.push(["Before any treatment", "Glucose, blood pressure (≤ 185/110 mmHg before thrombolysis), anticoagulant history, platelet count and INR where indicated, and airway/swallow safety. After treatment, intensive blood-pressure lowering to below 140 mmHg is not recommended (even with complete reperfusion), nor is intensive glucose control to 80–130 mg/dL. Argatroban or eptifibatide added to thrombolysis is not recommended. Reference: 2026 AHA/ASA guideline for early management of acute ischaemic stroke; follow your local stroke protocol."]);
-    return { lines, draw: (el) => drawImaging(el, e, asp) };
-  }
-  function drawImaging(el, e, asp) {
-    const mk = (title, f) => { const d = document.createElement("div"); d.className = "img"; const c = document.createElement("canvas"); c.width = 300; c.height = 300; const t = document.createElement("small"); t.textContent = title; d.append(c, t); el.append(d); f(c.getContext("2d")); };
-    const side = st.side === "R" ? 1 : -1, hem = ["ICA", "M1", "M2", "M3", "ACA"].includes(st.tab), cf = e.cf, aff = st.tab === "M2" || st.tab === "M3" ? 0.5 : 1;
-    const skull = (g, bg) => { g.fillStyle = "#000"; g.fillRect(0, 0, 300, 300); g.strokeStyle = "#d8d8d8"; g.lineWidth = 9; g.beginPath(); g.ellipse(150, 150, 118, 136, 0, 0, 7); g.stroke(); g.fillStyle = bg; g.beginPath(); g.ellipse(150, 150, 110, 128, 0, 0, 7); g.fill(); };
-    mk("Non-contrast CT (schematic)", (g) => { skull(g, "#8d8d8d"); g.fillStyle = "#3b3b3b"; g.beginPath(); g.ellipse(124, 150, 12, 30, 0.1, 0, 7); g.ellipse(176, 150, 12, 30, -0.1, 0, 7); g.fill();
-      if (hem) { const x = 150 + side * -62, w = 20 + 36 * cf * aff, hgt = 30 + 54 * cf * aff; g.fillStyle = `rgba(55,55,55,${0.25 + 0.55 * cf})`; g.beginPath(); g.ellipse(150 - side * 62, 150, w, hgt, 0, 0, 7); g.fill(); void x; if (st.tab === "M1" && !st.removed) { g.fillStyle = "#f2f2f2"; g.beginPath(); g.arc(150 - side * 36, 160, 4, 0, 7); g.fill(); } }
-      g.fillStyle = "#e8e8e8"; g.font = "600 13px system-ui"; g.fillText("R", 10, 20); g.fillText("L", 280, 20); });
-    mk("CT angiography (schematic)", (g) => { g.fillStyle = "#050a10"; g.fillRect(0, 0, 300, 300); g.strokeStyle = "#e8e8e8"; g.lineWidth = 6; g.lineCap = "round";
-      const line = (a, b, off) => { g.strokeStyle = off ? "rgba(255,90,90,.9)" : "#e8e8e8"; g.beginPath(); g.moveTo(...a); g.lineTo(...b); g.stroke(); };
-      const R = st.tab !== "BA" && st.side === "R", Lc = st.tab !== "BA" && st.side === "L"; line([150, 280], [150, 215], false); line([150, 215], [110, 175], false); line([150, 215], [190, 175], false);
-      const occ = (cond) => (cond && !st.removed ? "x" : false);
-      line([110, 175], [60, 150], occ(R) === "x" && ["ICA", "M1"].includes(st.tab)); line([190, 175], [240, 150], occ(Lc) === "x" && ["ICA", "M1"].includes(st.tab));
-      line([60, 150], [30, 100], false); line([60, 150], [32, 190], false); line([240, 150], [270, 100], false); line([240, 150], [268, 190], false);
-      line([110, 175], [130, 120], false); line([190, 175], [170, 120], false); line([110, 175], [190, 175], false);
-      g.fillStyle = "#ffd166"; g.font = "600 13px system-ui"; g.fillText(st.removed ? "recanalised" : "filling defect: " + site().label, 10, 290); g.fillStyle = "#e8e8e8"; g.fillText("R", 10, 20); g.fillText("L", 280, 20); });
-    mk("CT perfusion (schematic)", (g) => { skull(g, "#10222f"); g.save(); g.beginPath(); g.ellipse(150, 150, 110, 128, 0, 0, 7); g.clip(); if (hem || st.tab === "PCA") { const cx = 150 - side * 62, rr = 44 * aff + 20; const gr = g.createRadialGradient(cx, 150, 5, cx, 150, rr + 24); gr.addColorStop(0, "rgba(40,90,255,.95)"); gr.addColorStop(Math.max(0.05, Math.min(0.9, 0.2 + 0.6 * cf)), "rgba(40,90,255,.7)"); gr.addColorStop(Math.max(0.1, Math.min(0.95, 0.35 + 0.6 * cf)), "rgba(60,220,120,.6)"); gr.addColorStop(1, "rgba(60,220,120,0)"); g.fillStyle = gr; g.beginPath(); g.ellipse(cx, 150, (rr + 24) * 0.9, (rr + 30), 0, 0, 7); g.fill(); }
-      g.restore(); g.fillStyle = "#e8e8e8"; g.font = "600 12px system-ui"; g.fillText("blue = core · green = penumbra (Tmax)", 8, 290); g.fillText("R", 10, 20); g.fillText("L", 280, 20); });
-    void asp;
+    return { lines };
   }
 
   const lab = {
