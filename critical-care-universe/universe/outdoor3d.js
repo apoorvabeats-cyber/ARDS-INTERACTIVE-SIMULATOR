@@ -120,11 +120,29 @@ export function buildOutdoor(T, S, opt = {}) {
 
   /* ---------- the building front ---------- */
   const BW = 40, bx0 = cx - BW / 2;
-  const facadeTex = ctex(2048, 640, (g, w, h) => {
-    const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#dfe3e8"); gr.addColorStop(1, "#aab0b8"); g.fillStyle = gr; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 9000; i++) { const v = 170 + rnd() * 60; g.fillStyle = "rgba(" + v + "," + v + "," + (v + 4) + ",.25)"; g.fillRect(rnd() * w, rnd() * h, 2, 2); }
-    g.strokeStyle = "rgba(60,68,78,.5)"; g.lineWidth = 3; for (let x = 0; x <= w; x += w / 28) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
-    g.fillStyle = "rgba(60,68,78,.55)"; g.fillRect(0, h * 0.455, w, 4); g.fillRect(0, h * 0.062, w, 4);
+  /* a glass curtain wall in dark steel mullions: deep blue glass that brightens towards the ground, hard sky reflections, a few teal and (at night) lit panes.
+     There are no separate windows: the whole front is one sheet of glass. The sign, the door, the steps and the lamps are unchanged. */
+  const facadeTex = ctex(2048, 704, (g, w, h) => {
+    const cTop = "#" + pal.top.clone().lerp(C(0x0a2c63), 0.78).getHexString(), cHor = "#" + pal.hor.clone().lerp(C(0x46bdee), 0.62).getHexString();
+    g.fillStyle = "#0e151d"; g.fillRect(0, 0, w, h);                                           /* the steel frame colour */
+    const cols = 28, cw = w / cols, fasc = h * 0.075, floors = 3, fh = (h - fasc) / floors, lit = night > 0.35;
+    for (let f = 0; f < floors; f++) for (let c = 0; c < cols; c++) {
+      const x0 = c * cw + 3, y0 = fasc + f * fh + 4, pw = cw - 6, ph = fh - 8, sp = 0.46;      /* each bay: a tall light and a lower light under a transom */
+      [[y0, ph * sp - 2], [y0 + ph * sp + 2, ph * (1 - sp) - 2]].forEach(([yy, hh], k) => {
+        const v = rnd(), teal = rnd() < 0.18, dark = rnd() < 0.12, warm = lit && rnd() < 0.3;
+        const gr = g.createLinearGradient(0, yy, 0, yy + hh);
+        if (warm) { gr.addColorStop(0, "#ffd58a"); gr.addColorStop(1, "#ffb25a"); }
+        else if (teal) { gr.addColorStop(0, "#0e7f8c"); gr.addColorStop(1, "#37d0cf"); }
+        else if (dark) { gr.addColorStop(0, "#050f22"); gr.addColorStop(1, "#0d2a52"); }
+        else { gr.addColorStop(0, cTop); gr.addColorStop(1, cHor); }
+        g.fillStyle = gr; g.fillRect(x0, yy, pw, hh);
+        const rg = g.createLinearGradient(x0, yy, x0 + pw, yy + hh); rg.addColorStop(0, "rgba(255,255,255,0)"); rg.addColorStop(0.5, "rgba(255,255,255," + (0.16 + v * 0.22) + ")"); rg.addColorStop(1, "rgba(255,255,255,0)");
+        g.fillStyle = rg; g.beginPath(); g.moveTo(x0, yy + hh); g.lineTo(x0 + pw * 0.5, yy); g.lineTo(x0 + pw * 0.95, yy); g.lineTo(x0 + pw * 0.45, yy + hh); g.fill();        /* a hard diagonal reflection */
+        g.fillStyle = "rgba(190,235,255,.55)"; g.fillRect(x0, yy, pw, 2);                                                                                                 /* bright top edge of each pane */
+      });
+    }
+    g.fillStyle = "#0b1b3a"; g.fillRect(0, 0, w, fasc); g.fillStyle = "#36d6ff"; g.fillRect(0, fasc - 3, w, 3);                       /* the navy fascia with a cyan line */
+    g.fillStyle = "#2a3948"; for (let f = 1; f < floors; f++) { g.fillRect(0, fasc + f * fh - 4, w, 8); g.fillStyle = "rgba(170,210,240,.5)"; g.fillRect(0, fasc + f * fh - 4, w, 1.5); g.fillStyle = "#2a3948"; }   /* floor bands */
   });
   const fMat = BM({ map: facadeTex, color: mix(0xffffff, 1) });
   const wallY0 = GY - 0.05, wallH = HB - wallY0;
@@ -132,19 +150,11 @@ export function buildOutdoor(T, S, opt = {}) {
   fpiece(bx0, cx - OW / 2, wallY0, HB); fpiece(cx + OW / 2, bx0 + BW, wallY0, HB); fpiece(cx - OW / 2, cx + OW / 2, OH, HB); fpiece(cx - OW / 2, cx + OW / 2, wallY0, 0);
   /* the planes face the viewer outside (towards -z), so rotation.y = PI keeps the front texture the right way round */
   /* returns, roof and mass behind */
-  const sideM = BM({ color: mix(0xaab0b8, 0.9) });
+  const sideTex = ctex(256, 512, (g, w, h) => { g.fillStyle = "#14295a"; g.fillRect(0, 0, w, h); for (let y = 10; y < h; y += 27) { g.fillStyle = "rgba(235,240,248,.75)"; g.fillRect(0, y, w, 2); } g.fillStyle = "rgba(255,255,255,.05)"; for (let x = 0; x < w; x += 64) g.fillRect(x, 0, 2, h); });
+  const sideM = BM({ map: sideTex, color: mix(0xffffff, 0.95) });
   [bx0, bx0 + BW].forEach((x, i) => { const m = add(new T.PlaneGeometry(10, wallH), sideM, x, wallY0 + wallH / 2, cz + 5, OUT); m.rotation.y = Math.PI / 2 * (i ? -1 : 1); m.material.side = T.DoubleSide; });
-  const roof = add(new T.BoxGeometry(BW + 0.6, 0.35, 3.4), BM({ color: mix(0x20262e, 1) }), cx, HB + 0.1, cz + 0.8, OUT);
+  const roof = add(new T.BoxGeometry(BW + 0.6, 0.4, 3.4), BM({ color: mix(0xe4e9ef, 1) }), cx, HB + 0.12, cz + 0.8, OUT);
   const roofGlow = add(new T.BoxGeometry(BW + 0.4, 0.06, 0.06), BM({ color: C(0x36d6ff).multiplyScalar(1.6), toneMapped: false }), cx, HB - 0.12, cz - 0.9, OUT);
-  /* glass curtain-wall bays either side of the door: sky reflection by day, warm room light by night */
-  const glassTex = ctex(512, 640, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#" + pal.top.getHexString()); gr.addColorStop(1, "#" + pal.hor.getHexString()); g.fillStyle = gr; g.fillRect(0, 0, w, h); g.fillStyle = "rgba(255,255,255,.12)"; g.beginPath(); g.moveTo(0, h * 0.7); g.lineTo(w * 0.55, 0); g.lineTo(w * 0.75, 0); g.lineTo(0, h * 0.95); g.fill(); g.strokeStyle = "rgba(20,28,36,.85)"; g.lineWidth = 6; g.strokeRect(3, 3, w - 6, h - 6); g.beginPath(); g.moveTo(w / 2, 0); g.lineTo(w / 2, h); g.moveTo(0, h * 0.5); g.lineTo(w, h * 0.5); g.stroke(); });
-  const glowTex = ctex(512, 640, (g, w, h) => { g.fillStyle = "#18120a"; g.fillRect(0, 0, w, h); for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) { g.fillStyle = (r + c) % 3 === 0 ? "#ffd08a" : "#ffe9c0"; g.fillRect(c * 128 + 10, r * 160 + 12, 108, 136); } g.strokeStyle = "rgba(10,12,16,.9)"; g.lineWidth = 6; g.strokeRect(3, 3, w - 6, h - 6); });
-  const bays = [];
-  [-1, 1].forEach((s) => { for (let k = 0; k < 3; k++) {
-    const x = cx + s * (4.6 + k * 4.2), y = 3.0;
-    const gl = add(new T.PlaneGeometry(3.7, 4.6), BM({ map: glassTex, color: mix(0xffffff, 1.0) }), x, y, cz - 0.04, OUT); gl.rotation.y = Math.PI;
-    const wm = add(new T.PlaneGeometry(3.7, 4.6), BM({ map: glowTex, color: new T.Color(0.85, 0.74, 0.55), transparent: true, opacity: Math.min(0.8, night * 1.0), blending: T.AdditiveBlending, depthWrite: false, toneMapped: false }), x, y, cz - 0.05, OUT); wm.rotation.y = Math.PI;
-  } });
   /* door reveal: a lit tunnel through the wall thickness */
   const tun = BM({ color: C(0xcfd6de).multiplyScalar(0.86) });
   [-1, 1].forEach((s) => { const m = add(new T.PlaneGeometry(1.2, OH), tun, cx + s * OW / 2, OH / 2, cz + 0.6, OUT); m.rotation.y = Math.PI / 2; m.material.side = T.DoubleSide; });
@@ -153,8 +163,8 @@ export function buildOutdoor(T, S, opt = {}) {
   add(new T.BoxGeometry(OW + 0.3, 0.14, 0.2), BM({ color: C(0x20262e) }), cx, OH + 0.07, cz - 0.08, OUT);
   [-1, 1].forEach((s) => add(new T.BoxGeometry(0.14, OH + 0.14, 0.2), BM({ color: C(0x20262e) }), cx + s * (OW / 2 + 0.07), OH / 2 + 0.07, cz - 0.08, OUT));
 
-  /* EXIT sign above the door: a slim grey box with white letters, like the reference */
-  const exitTex = ctex(512, 192, (g, w, h) => { g.fillStyle = "#5a6068"; g.fillRect(0, 0, w, h); g.strokeStyle = "#c9ced4"; g.lineWidth = 8; g.strokeRect(6, 6, w - 12, h - 12); g.fillStyle = "#ffffff"; g.font = "700 118px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("EXIT", w / 2, h / 2 + 6); });
+  /* ENTER placard above the door, seen from outside: a slim grey box with white letters */
+  const exitTex = ctex(512, 192, (g, w, h) => { g.fillStyle = "#5a6068"; g.fillRect(0, 0, w, h); g.strokeStyle = "#c9ced4"; g.lineWidth = 8; g.strokeRect(6, 6, w - 12, h - 12); g.fillStyle = "#ffffff"; g.font = "700 104px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("ENTER", w / 2, h / 2 + 6); });
   add(new T.PlaneGeometry(1.9, 0.71), BM({ map: exitTex, color: new T.Color(1.05, 1.05, 1.05), toneMapped: false }), cx, OH + 0.85, cz - 0.1, OUT).rotation.y = Math.PI;
   const exitGlow = add(new T.PlaneGeometry(4.2, 1.8), BM({ map: ctex(64, 64, (g, w, h) => { const r = g.createRadialGradient(32, 32, 1, 32, 32, 32); r.addColorStop(0, "rgba(120,255,190,.5)"); r.addColorStop(1, "rgba(120,255,190,0)"); g.fillStyle = r; g.fillRect(0, 0, 64, 64); }), transparent: true, opacity: 0.25 + night * 0.4, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false }), cx, OH + 0.85, cz - 0.14, OUT); exitGlow.rotation.y = Math.PI;
 

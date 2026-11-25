@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { createSfx } from "./critical-care-universe/universe/sfx.js?v=20261122g";
-import { buildRooms } from "./hub-rooms.js?v=20261123p";
+import { buildRooms } from "./hub-rooms.js?v=20261124a";
 
 const gate = document.getElementById("icu-gate");
 const canvas = document.getElementById("lobby");
@@ -367,7 +367,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   /* The auditorium is its own page, so it is loaded in a frame that sits out of sight while we walk to its door; when the walk ends the
      frame is simply shown, from exactly the place we stand. There is no navigation and no reload, in either direction. */
   let audFrame = null, audReady = false, audWait = 0;
-  const AUD_URL = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&embed=1&v=20261123p";
+  const AUD_URL = "critical-care-universe/index.html?home=1&to=auditorium&from=hub&embed=1&v=20261124a";
   function prepareAud(face) {
     try {
       const along = 7.25, ex = Math.sin(face) * along, ez = Math.cos(face) * along, wx = HUBC.x + ex * HCS + ez * HSN, wz = HUBC.z + (-ex * HSN + ez * HCS);
@@ -380,19 +380,31 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     const f = document.createElement("iframe");
     f.id = "aud-frame"; f.title = "Auditorium"; f.setAttribute("allow", "autoplay; fullscreen; microphone");
     f.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;border:0;background:#050b18;opacity:0;pointer-events:none;z-index:2147482000";
-    f.src = AUD_URL; document.body.appendChild(f); audFrame = f;
+    audFrame = f; showAudPill(true);                     /* the note is painted first: the page behind it then works hard for a few seconds, and without it the screen would look frozen */
+    setTimeout(() => { if (audFrame === f) { f.src = AUD_URL; document.body.appendChild(f); } }, 150);
   }
   function stopHubSound() {
     try { if (window.stopWave) window.stopWave(); } catch (err) {}
     try { document.querySelectorAll("audio").forEach((a) => { a.pause(); }); } catch (err) {}
   }
+  /* while the auditorium is still drawing its first frame, the last picture of the hall stays up; a small note says why, so it never looks stuck */
+  let audPill = null;
+  function showAudPill(on) {
+    if (on && !audPill) {
+      audPill = document.createElement("div"); audPill.id = "aud-pill"; audPill.setAttribute("role", "status");
+      audPill.style.cssText = "position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2147482500;padding:10px 20px;border-radius:999px;background:rgba(5,11,24,.86);border:1px solid rgba(120,200,255,.55);color:#eaf6ff;font:600 14px system-ui,sans-serif;letter-spacing:.02em;pointer-events:none";
+      audPill.textContent = "Opening the auditorium\u2026"; document.body.appendChild(audPill);
+    } else if (!on && audPill) { audPill.remove(); audPill = null; }
+  }
   function revealAud() {
     if (!audFrame) { prepareAud(THETA.aud); }
-    if (!audReady) {                                       /* not drawn yet: hold this last frame a moment, then fall back to a normal page change */
+    if (!audReady) {                                       /* not drawn yet: hold this last frame, say so, and give a slow phone time; only after a long wait fall back to a normal page change */
       mode = "wait"; cancelAnimationFrame(raf); raf = 0;
-      if (!audWait) audWait = setTimeout(() => { audWait = 0; if (!audReady) { keepFrame(); location.href = AUD_URL.replace("&embed=1", ""); } }, 7000);
+      showAudPill(true);
+      if (!audWait) audWait = setTimeout(() => { audWait = 0; if (!audReady) { keepFrame(); location.href = AUD_URL.replace("&embed=1", ""); } }, 24000);
       return;
     }
+    showAudPill(false);
     clearTimeout(audWait); audWait = 0; clearTimeout(leaveTimer);
     mode = "parked"; cancelAnimationFrame(raf); raf = 0;
     stopHubSound();
@@ -401,6 +413,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
   }
   function backFromAud() {
     if (mode !== "parked" && mode !== "wait") return;
+    showAudPill(false);
     const pz = readPose(), face = THETA.aud, d = DOORS.aud;
     const start = pz ? new THREE.Vector3(pz.x, 1.62, pz.z) : new THREE.Vector3(Math.sin(face) * (APO - 2.5), 1.62, Math.cos(face) * (APO - 2.5));
     eye.copy(start); yaw = pz ? pz.yaw : face + Math.PI; pit = 0;
