@@ -5,7 +5,7 @@ import { GLTFLoader } from "../universe/vendor/GLTFLoader.js";
 import { AVATARS, AVATAR_KEYS, avatarThumb, loadAvatar, createRigDoctor } from "../universe/doctor-rig.js?v=20261126m";
 import { createHero } from "./hero-doctor.js?v=3";
 import { createHero as createWaveHero } from "./hero-wave.js?v=3";
-import { liveUpdates } from "../universe/live-updates.js";
+import { liveUpdates } from "../universe/live-updates.js?v=20261126n";
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -439,10 +439,10 @@ addEventListener("keydown", (e) => { if (e.key === "Escape") { closeFly(); close
 const LANEC = { SCCM: "#ff7a8a", ESICM: "#7ab8ff", KDIGO: "#ffc24a", IDSA: "#7dffb8", ATS: "#6fe6ff", ICMR: "#ffa56b", ARDS: "#c9a6ff" };
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const FT = { x: 0, half: 0, em: 16, hover: false, n: -1 }, footTrack = $("#footTrack");
-const fvCard = (it) => `<div class="fv" style="--lc:${LANEC[it.lane] || "#7ab8ff"}"><span class="r1"><span class="lane">${esc(it.lane)}</span>${it.breaking ? '<span class="nw br">NEW</span>' : it.fresh ? '<span class="nw">LATEST</span>' : ""}<em>${esc(it.when || "")}</em></span><b>${esc(it.title)}</b></div>`;
+const fvCard = (it) => `<a class="fv" href="${esc(it.href || "#")}" target="_blank" rel="noopener noreferrer" title="${esc(it.title)}" style="--lc:${LANEC[it.lane] || "#7ab8ff"}"><span class="r1"><span class="lane">${esc(it.lane)}</span>${it.breaking ? '<span class="nw br">NEW</span>' : it.fresh ? '<span class="nw">LATEST</span>' : ""}<em>${esc(it.when || "")}</em></span><b>${esc(it.title)}</b></a>`;
 let LIVE = null; try { LIVE = liveUpdates(); } catch (e) {}
 function renderFoot() {
-  const its = LIVE ? LIVE.items() : []; if (!its.length || its.length === FT.n) return; FT.n = its.length;
+  const its = LIVE ? LIVE.items() : []; const vk = its.length + ":" + (LIVE ? LIVE.version() : 0); if (!its.length || vk === FT.n) return; FT.n = vk;
   const one = its.map(fvCard).join(""); footTrack.innerHTML = one + one;                           /* shown twice, so the loop has no seam */
   FT.half = footTrack.scrollWidth / 2;
 }
