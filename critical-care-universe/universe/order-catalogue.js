@@ -64,7 +64,7 @@ const ROWS = [
   /* ---------------------------------------------------------------- organ support and procedures */
   ["proc:removeline", "Remove the central line", "proc", 0, ["remove the central line", "remove the line", "pull the line", "line removal", "remove line", "take out the line", "remove the cvc", "remove central line", "line out", "remove the catheter", "remove infected line", "remove the infected line", "change the line", "replace the line", "remove the picc", "remove picc"]],
   ["lab:tox", "Paracetamol level / toxicology", "lab", 45, ["paracetamol level", "drug levels", "toxicology", "tox screen", "acetaminophen level", "poison screen", "serum paracetamol", "drug screen", "toxicology screen", "salicylate level"]],
-  ["drug:pcc", "Prothrombin complex concentrate", "drug", 0, ["pcc", "prothrombin complex", "prothrombin complex concentrate", "kcentra", "beriplex", "octaplex", "factor concentrate", "warfarin reversal", "reverse warfarin", "reverse the anticoagulation"]],
+  ["drug:pcc", "Prothrombin complex concentrate", "drug", 0, ["pcc", "prothrombin complex", "prothrombin complex concentrate", "kcentra", "beriplex", "octaplex", "factor concentrate", "warfarin reversal", "reverse warfarin", "reverse the anticoagulation", "four factor pcc", "4 factor pcc", "4f pcc", "four factor prothrombin complex"]],
 
   ["proc:dialysis", "Dialysis / CRRT", "proc", 0, ["dialysis", "hemodialysis", "haemodialysis", "crrt", "cvvhdf", "sled", "sustained low efficiency", "renal replacement", "rrt", "start dialysis", "hd", "urgent dialysis", "emergency dialysis", "cvvh", "renal replacement therapy", "start crrt", "put on dialysis"]],
   ["proc:pericard", "Pericardiocentesis", "proc", 0, ["pericardiocentesis", "pericardial drain", "pericardial tap", "drain the pericardium", "pericardial drainage", "drain the effusion", "pericardial window", "needle pericardium"]],
@@ -81,7 +81,7 @@ const ROWS = [
   ["proc:cooling", "Cooling / temperature control", "proc", 0, ["cooling", "temperature control", "active cooling", "ice packs", "cold saline", "targeted temperature management", "ttm", "cooling blanket", "cool the patient", "antipyretic", "antipyretics"]],
 
   /* ---------------------------------------------------------------- fluids, blood, vasoactive drugs */
-  ["drug:fluids", "IV fluid", "drug", 0, ["fluids", "fluid bolus", "iv fluids", "give fluids", "crystalloid", "normal saline", "saline bolus", "ringer", "ringers lactate", "rl", "ns bolus", "balanced crystalloid", "fluid challenge", "bolus", "plasmalyte", "intravenous fluids", "iv fluid", "fluid resuscitation", "saline", "ns", "ringer lactate", "ringers"]],
+  ["drug:fluids", "IV fluid", "drug", 0, ["fluids", "fluid bolus", "iv fluids", "give fluids", "crystalloid", "normal saline", "saline bolus", "ringer", "ringers lactate", "rl", "ns bolus", "balanced crystalloid", "fluid challenge", "bolus", "plasmalyte", "intravenous fluids", "iv fluid", "fluid resuscitation", "saline", "ns", "ringer lactate", "ringers", "sodium chloride", "isotonic saline", "isotonic crystalloid", "0.9 percent saline", "normal saline 0.9"]],
   ["drug:albumin", "Albumin 20%", "drug", 0, ["albumin", "20 percent albumin", "human albumin", "albumin infusion", "albumin 20", "20% albumin"]],
   ["drug:blood", "Blood (packed red cells)", "drug", 0, ["blood", "prbc", "packed red cells", "transfuse", "transfusion", "packed cells", "blood transfusion", "units of blood", "packed red blood cells", "transfuse blood", "give blood", "red cells", "pRBC", "emergency blood", "o negative blood", "o negative"]],
   ["drug:ffp", "Fresh frozen plasma", "drug", 0, ["ffp", "fresh frozen plasma", "plasma", "frozen plasma"]],
@@ -112,7 +112,7 @@ const ROWS = [
   ["drug:nitrate", "Nitroglycerin infusion", "drug", 0, ["nitroglycerin", "gtn", "glyceryl trinitrate", "nitrates", "isosorbide", "nitrate infusion", "sorbitrate", "nitroglycerine", "nitro", "tng", "isosorbide dinitrate", "gtn infusion", "nitro infusion"]],
   ["drug:heparin", "Heparin (anticoagulation)", "drug", 0, ["heparin", "unfractionated heparin", "ufh", "anticoagulation", "anticoagulate", "enoxaparin", "lmwh", "clexane", "start heparin", "heparin infusion", "anticoagulant", "heparin bolus", "low molecular weight heparin", "fondaparinux", "start anticoagulation"]],
   ["drug:alteplase", "Thrombolysis", "drug", 0, ["thrombolysis", "alteplase", "tpa", "tenecteplase", "streptokinase", "thrombolyse", "lyse the clot", "systemic thrombolysis", "give alteplase", "give tenecteplase", "lyse", "t p a"]],
-  ["drug:antiplatelet", "Antiplatelet loading", "drug", 0, ["aspirin", "dual antiplatelet", "clopidogrel", "ticagrelor", "loading dose antiplatelet", "antiplatelets", "dapt", "give aspirin", "antiplatelet"]],
+  ["drug:antiplatelet", "Antiplatelet loading", "drug", 0, ["aspirin", "dual antiplatelet", "clopidogrel", "ticagrelor", "loading dose antiplatelet", "antiplatelets", "dapt", "give aspirin", "antiplatelet", "prasugrel", "effient"]],
   ["drug:atropine", "Atropine", "drug", 0, ["atropine", "give atropine", "atropine 1 mg", "atropine bolus"]],
   ["drug:amiodarone", "Amiodarone", "drug", 0, ["amiodarone", "cordarone", "amiodarone bolus", "amiodarone infusion", "give amiodarone", "antiarrhythmic", "lignocaine", "lidocaine"]],
   ["drug:betablocker", "Beta-blocker", "drug", 0, ["beta blocker", "metoprolol", "esmolol", "propranolol", "betablocker", "beta blockers", "give metoprolol", "labetalol beta"]],
@@ -120,7 +120,7 @@ const ROWS = [
   ["drug:saline3", "3% hypertonic saline", "drug", 0, ["3% saline", "hypertonic saline", "hypertonic", "3 percent saline", "saline 3", "three percent saline", "3 percent", "hypertonic saline bolus", "23.4 percent saline", "3% nacl", "hyperosmolar therapy", "osmotherapy"]],
   ["drug:levetiracetam", "Levetiracetam", "drug", 0, ["levetiracetam", "keppra", "levipil", "give levetiracetam", "levetiracetam loading", "loading dose levetiracetam", "keppra loading"]],
   ["drug:benzo", "Lorazepam / midazolam", "drug", 0, ["lorazepam", "midazolam", "benzodiazepine", "diazepam", "ativan", "clonazepam", "benzo", "valium", "loraz", "benzodiazepines", "iv lorazepam", "give lorazepam", "give midazolam", "iv midazolam", "clonazepam iv"]],
-  ["drug:antiepileptic", "Second-line antiepileptic", "drug", 0, ["phenytoin", "fosphenytoin", "eptoin", "valproate", "valproic acid", "antiepileptic", "anti epileptic", "antiepileptics", "aed", "lacosamide", "load phenytoin", "loading phenytoin", "second line antiepileptic", "sodium valproate", "anticonvulsant", "anticonvulsants"]],
+  ["drug:antiepileptic", "Second-line antiepileptic", "drug", 0, ["phenytoin", "fosphenytoin", "eptoin", "valproate", "valproic acid", "antiepileptic", "anti epileptic", "antiepileptics", "aed", "lacosamide", "load phenytoin", "loading phenytoin", "second line antiepileptic", "sodium valproate", "anticonvulsant", "anticonvulsants", "phenobarbital", "phenobarbitone", "gardenal"]],
   ["drug:anaesthetic", "Anaesthetic infusion (propofol / thiopentone)", "drug", 0, ["propofol", "anaesthetic infusion", "anesthetic infusion", "thiopentone", "midazolam infusion", "burst suppression", "thiopental", "propofol infusion", "general anaesthesia", "general anesthesia", "ketamine infusion"]],
   ["drug:sedation", "Sedation and analgesia", "drug", 0, ["sedation", "sedate", "analgesia", "analgesics", "painkiller", "fentanyl", "morphine", "paracetamol", "pain relief", "opioid", "ketamine", "analgesic", "give analgesia", "sedate the patient", "fentanyl infusion", "pain control", "paracetamol iv"]],
   ["drug:antihypertensive", "Blood pressure control", "drug", 0, ["labetalol", "nicardipine", "antihypertensive", "control the blood pressure", "lower blood pressure", "blood pressure control", "clevidipine", "nitroprusside", "bp control", "nimodipine", "antihypertensives", "reduce blood pressure", "reduce bp", "lower bp", "labetalol infusion", "hydralazine"]],
@@ -130,6 +130,27 @@ const ROWS = [
   ["drug:txa", "Tranexamic acid", "drug", 0, ["tranexamic acid", "txa", "tranexamic", "tranexamic acid 1 g", "give txa", "tranexamic acid bolus", "cyclokapron"]],
   ["drug:artesunate", "IV artesunate", "drug", 0, ["artesunate", "iv artesunate", "antimalarial", "anti malarial", "artemether", "quinine", "anti-malarial", "malaria treatment", "antimalarials", "start artesunate", "artesunate injection", "treat malaria"]],
   ["drug:thiamine", "Thiamine", "drug", 0, ["thiamine", "vitamin b1", "vitamin b", "thiamin", "iv thiamine", "vitamin b complex"]],
+
+  /* ---------------------------------------------------------------- MDT drug checklist: drugs added so every checklist drug can be ordered by name. No doses here: those come from validated protocols. */
+  ["drug:cisatracurium", "Cisatracurium", "drug", 0, ["cisatracurium", "nimbex", "cis atracurium", "cisatracurium infusion", "atracurium"]],
+  ["drug:rocuronium", "Rocuronium", "drug", 0, ["rocuronium", "esmeron", "rocuronium bromide"]],
+  ["drug:vecuronium", "Vecuronium", "drug", 0, ["vecuronium", "norcuron", "vecuronium bromide"]],
+  ["drug:succinylcholine", "Succinylcholine (suxamethonium)", "drug", 0, ["succinylcholine", "suxamethonium", "sux", "scoline", "anectine", "succinyl choline"]],
+  ["drug:phenylephrine", "Phenylephrine", "drug", 0, ["phenylephrine", "neosynephrine", "phenylephrine infusion", "phenylephrine bolus"]],
+  ["drug:dexmedetomidine", "Dexmedetomidine", "drug", 0, ["dexmedetomidine", "precedex", "dexmed", "dexmedetomidine infusion", "dex medetomidine"]],
+  ["drug:adenosine", "Adenosine", "drug", 0, ["adenosine", "adenocor", "give adenosine", "adenosine bolus"]],
+  ["drug:naloxone", "Naloxone", "drug", 0, ["naloxone", "narcan", "give naloxone", "opioid reversal", "reverse the opioid"]],
+  ["drug:flumazenil", "Flumazenil", "drug", 0, ["flumazenil", "romazicon", "benzodiazepine reversal", "reverse the benzodiazepine"]],
+  ["drug:budesonide", "Budesonide (inhaled)", "drug", 0, ["budesonide", "budecort", "inhaled budesonide", "nebulised budesonide", "budesonide nebulisation", "inhaled steroid"]],
+  ["drug:nitricoxide", "Inhaled nitric oxide", "drug", 0, ["nitric oxide", "inhaled nitric oxide", "inhaled no", "pulmonary vasodilator", "inhaled pulmonary vasodilator"]],
+  ["drug:statin", "Atorvastatin (statin)", "drug", 0, ["atorvastatin", "atorva", "statin", "statins", "high intensity statin", "start a statin", "rosuvastatin"]],
+  ["drug:szc", "Sodium zirconium cyclosilicate", "drug", 0, ["sodium zirconium cyclosilicate", "zirconium cyclosilicate", "lokelma", "szc", "potassium binder"]],
+  ["drug:patiromer", "Patiromer", "drug", 0, ["patiromer", "veltassa"]],
+  ["drug:phosphate", "Phosphate replacement", "drug", 0, ["phosphate", "phosphate replacement", "replace phosphate", "iv phosphate", "potassium phosphate", "sodium phosphate", "phosphate infusion"]],
+  ["drug:aminophylline", "Aminophylline", "drug", 0, ["aminophylline", "theophylline", "iv aminophylline", "give aminophylline", "aminophylline infusion"]],
+  ["drug:tetanus", "Tetanus prophylaxis", "drug", 0, ["tetanus", "tetanus toxoid", "tetanus prophylaxis", "tetanus vaccine", "tetanus injection", "tetanus immunoglobulin"]],
+  ["drug:vteprophylaxis", "VTE prophylaxis (LMWH / UFH)", "drug", 0, ["vte prophylaxis", "dvt prophylaxis", "thromboprophylaxis", "prophylactic heparin", "prophylactic enoxaparin", "prophylactic lmwh", "prophylactic anticoagulation", "clexane prophylaxis"]],
+  ["drug:oac", "Oral anticoagulant (warfarin / DOAC)", "drug", 0, ["start warfarin", "restart warfarin", "switch to warfarin", "warfarin transition", "doac", "doacs", "apixaban", "rivaroxaban", "dabigatran", "edoxaban", "oral anticoagulant", "oral anticoagulation", "eliquis", "xarelto"]],
 
   /* ---------------------------------------------------------------- resuscitation */
   ["cpr", "Chest compressions", "acls", 0, ["cpr", "start cpr", "compressions", "chest compressions", "start compressions", "cardiopulmonary resuscitation", "compress", "begin cpr", "do cpr"]],

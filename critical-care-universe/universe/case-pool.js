@@ -118,7 +118,7 @@ export const CASES = [
     img: { ecg: "Peaked T waves, flat P waves, broad QRS. Rate {hr}/min.", usg: "Both kidneys small and echogenic. No hydronephrosis. Empty bladder.", cxr: "Clear lungs, normal heart size.", echo: "Normal ejection fraction. No effusion." },
     micro: { cultures: "No growth yet (preliminary)." },
     needs: [n("ecg", "ECG", "nephrologist", 60, 1, { any: ["img:ecg"] }), n("ca", "Calcium to protect the heart", "nephrologist", 90, 3, { any: ["drug:calcium"] }), n("labs", "Potassium and renal profile", "nephrologist", 120, 1.5, { any: ["lab:kft", "lab:lyte", "lab:abg"] }), n("shift", "Insulin with dextrose to move potassium", "nephrologist", 180, 2.5, { any: ["drug:insulindex"] }), n("usg", "Kidney ultrasound", "nephrologist", 300, 0.5, { any: ["img:usg"] }), n("hd", "Dialysis catheter and dialysis", "nephrologist", 360, 3, { all: ["proc:hdline", "proc:dialysis"] })],
-    harm: { "drug:kcl": [0.45, "Potassium into a patient who is already hyperkalaemic. The heart will not tolerate this."], "drug:sedation": [0.05, "Sedation in a drowsy, uraemic patient."] },
+    harm: { "drug:succinylcholine": [0.35, "Succinylcholine in a patient who is already hyperkalaemic. The potassium jumps. Use rocuronium."], "drug:kcl": [0.45, "Potassium into a patient who is already hyperkalaemic. The heart will not tolerate this."], "drug:sedation": [0.05, "Sedation in a drowsy, uraemic patient."] },
   },
   {
     id: "mala", dx: "Metformin-associated lactic acidosis with kidney injury", title: "Severe metabolic acidosis", must: ["nephrologist"], fit: [], diff: 3,
@@ -142,7 +142,7 @@ export const CASES = [
     img: { ecg: "Sinus tachycardia, {hr}/min. Peaked T waves.", cxr: "Clear.", usg: "Normal-sized kidneys. No hydronephrosis. Swollen hyperechoic thigh muscles.", echo: "Hyperdynamic. No effusion.", cthead: "No acute abnormality." },
     micro: { ua: "Dark urine, blood positive on the dipstick with no red cells on microscopy. Myoglobin positive.", cultures: "No growth yet (preliminary)." },
     needs: [n("ecg", "ECG", "nephrologist", 90, 1, { any: ["img:ecg"] }), n("vol", "Aggressive fluid resuscitation", "nephrologist", 150, 3, { any: ["drug:fluids"], count: 3 }), n("cool", "Cooling", "intensivist", 180, 2, { any: ["proc:cooling"] }), n("ca", "Calcium for the heart", "nephrologist", 150, 1.5, { any: ["drug:calcium"] }), n("labs", "CPK and renal profile", "nephrologist", 120, 1.5, { any: ["lab:ck", "lab:kft", "lab:lyte"] }), n("hd", "Dialysis for refractory hyperkalaemia", "nephrologist", 420, 2, { all: ["proc:hdline", "proc:dialysis"] })],
-    harm: { "drug:kcl": [0.4, "Potassium into a hyperkalaemic patient."], "drug:sedation": [0.04, "Sedation hides the neurological picture."] },
+    harm: { "drug:succinylcholine": [0.3, "Succinylcholine in a patient with muscle breakdown. The potassium rises sharply. Use rocuronium."], "drug:kcl": [0.4, "Potassium into a hyperkalaemic patient."], "drug:sedation": [0.04, "Sedation hides the neurological picture."] },
   },
 
   /* ============================================================== INFECTION */
@@ -218,7 +218,7 @@ export const CASES = [
     img: { cthead: "Early diffuse cerebral oedema with loss of grey-white differentiation. No haemorrhage.", usg: "Small, bright liver with patent hepatic veins and portal vein. No ascites.", ctabd: "Small liver, no biliary obstruction. No ascites.", cxr: "Clear.", ecg: "Sinus tachycardia, {hr}/min." },
     micro: { tox: "Paracetamol level 38 mg/L (with a late, unreliable time of ingestion). This is a staggered overdose picture.", cultures: "No growth yet (preliminary).", ua: "Bilirubin positive." },
     needs: [n("sugar", "Check the glucose", "intensivist", 60, 1, { any: ["lab:glucose", "lab:abg"] }), n("dex", "Treat the hypoglycaemia", "intensivist", 90, 2.5, { any: ["drug:dextrose"] }), n("nac", "N-acetylcysteine", "gastroenterologist", 150, 3.5, { any: ["drug:nac"] }), n("labs", "Liver, coagulation or ammonia", "gastroenterologist", 150, 1, { any: ["lab:lft", "lab:coag", "lab:nh3", "lab:tox"] }), n("icp", "Treat the raised intracranial pressure", "neurologist", 240, 2, { any: ["drug:mannitol", "drug:saline3"] }), n("air", "Secure the airway", "intensivist", 240, 2, { any: ["proc:intubate"] }), n("ct", "CT head", "neurologist", 300, 1, { any: ["img:cthead"] })],
-    harm: { "drug:sedation": [0.12, "Sedation hides the neurological picture in a patient who is going to deteriorate."], "drug:ffp": [0.06, "Plasma masks the INR, which is the best marker of how the liver is doing."], "drug:benzo": [0.1, "A benzodiazepine worsens encephalopathy and removes the bedside signs."] },
+    harm: { "drug:vteprophylaxis": [0.08, "Heparin prophylaxis during an active variceal bleed. It waits until the bleeding is controlled."], "drug:sedation": [0.12, "Sedation hides the neurological picture in a patient who is going to deteriorate."], "drug:ffp": [0.06, "Plasma masks the INR, which is the best marker of how the liver is doing."], "drug:benzo": [0.1, "A benzodiazepine worsens encephalopathy and removes the bedside signs."] },
   },
   {
     id: "pancreatitis", dx: "Severe acute pancreatitis", title: "Severe epigastric pain with shock", must: [], fit: ["gastroenterologist", "surgeon"], diff: 2,
@@ -295,7 +295,7 @@ export const CASES = [
     img: { cthead: "No acute abnormality.", cxr: "Clear.", ecg: "Sinus tachycardia, {hr}/min.", mri: "No acute lesion." },
     micro: { eeg: "Continuous generalised spike-wave discharges consistent with ongoing status epilepticus.", cultures: "No growth yet (preliminary)." },
     needs: [n("o2", "Oxygen", "intensivist", 60, 1.5, { any: ["proc:oxygen", "proc:hfnc", "proc:intubate", "proc:niv"] }), n("sugar", "Check the glucose", "intensivist", 60, 1, { any: ["lab:glucose", "lab:abg"] }), n("benzo", "A benzodiazepine", "neurologist", 60, 4, { any: ["drug:benzo"] }), n("aed", "A second-line antiepileptic", "neurologist", 240, 3, { any: ["drug:levetiracetam", "drug:antiepileptic"] }), n("ref", "Refractory status: intubate with an anaesthetic infusion", "neurologist", 480, 2.5, { all: ["proc:intubate", "drug:anaesthetic"] }), n("ct", "CT head", "neurologist", 420, 1, { any: ["img:cthead"] }), n("eeg", "EEG", "neurologist", 450, 1, { any: ["proc:eeg"] })],
-    harm: { "drug:betablocker": [0.05, "A beta-blocker does nothing for the seizure."] },
+    harm: { "drug:vteprophylaxis": [0.08, "Heparin prophylaxis while the patient is still bleeding. It waits until the bleeding is controlled."], "drug:betablocker": [0.05, "A beta-blocker does nothing for the seizure."] },
   },
   {
     id: "ich", dx: "Intracerebral haemorrhage on warfarin", title: "Sudden headache and a weak arm", must: [], fit: ["neurologist"], diff: 3,
@@ -333,7 +333,7 @@ export const CASES = [
     img: { cxr: "Hyperinflated lungs. No pneumothorax. No consolidation.", usg: "Lung sliding present on both sides. No pneumothorax. A-line pattern.", ecg: "Sinus tachycardia, {hr}/min.", echo: "Normal LV. Dilated right ventricle from the lung hyperinflation." },
     micro: { cultures: "No growth yet (preliminary).", sputum: "Eosinophils." },
     needs: [n("o2", "Oxygen", "intensivist", 60, 2, { any: ["proc:oxygen", "proc:hfnc", "proc:niv", "proc:intubate"] }), n("bd", "Back-to-back bronchodilator nebulisation", "intensivist", 60, 3.5, { any: ["drug:salbutamol"] }), n("st", "Systemic steroid", "intensivist", 120, 2, { any: ["drug:steroid", "drug:methylpred", "drug:dexa"] }), n("mg", "Magnesium sulphate", "intensivist", 180, 2, { any: ["drug:mgso4"] }), n("gas", "Blood gas", "intensivist", 150, 1, { any: ["lab:abg"] }), n("fail", "Ventilatory support for the failing patient", "pulmonologist", 300, 2, { any: ["proc:niv", "proc:intubate"] })],
-    harm: { "drug:betablocker": [0.4, "A beta-blocker in life-threatening asthma. The bronchospasm tightens."], "drug:sedation": [0.15, "Sedation takes away the drive of a tiring asthmatic."], "drug:benzo": [0.15, "A benzodiazepine takes away the drive of a tiring asthmatic."], "drug:fluids": [0.02, "Fluid is not what she needs."] },
+    harm: { "drug:adenosine": [0.1, "Adenosine can trigger bronchospasm. This chest is already silent."], "drug:betablocker": [0.4, "A beta-blocker in life-threatening asthma. The bronchospasm tightens."], "drug:sedation": [0.15, "Sedation takes away the drive of a tiring asthmatic."], "drug:benzo": [0.15, "A benzodiazepine takes away the drive of a tiring asthmatic."], "drug:fluids": [0.02, "Fluid is not what she needs."] },
   },
 ];
 
