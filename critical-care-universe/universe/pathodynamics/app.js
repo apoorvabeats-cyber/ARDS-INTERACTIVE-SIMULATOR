@@ -32,7 +32,9 @@ const STEPS = [["1", "SELECT"], ["2", "EXPLORE"], ["3", "INTERVENE"], ["4", "OBS
 let S = null, lab = null, def = null, step = 1, v3 = "anat", tm = 0, raf = 0, lastObs = "", viewId = "";
 const app = $("#app"), toastEl = $("#toast");
 function toast(t) { toastEl.textContent = t; toastEl.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => toastEl.classList.remove("on"), 2400); }
-const closeBtn = () => (EMBED ? `<button class="ib" data-a="close" aria-label="Close">✕</button>` : "");
+import { goUniverse } from "../home-link.js?v=20261126q";
+const uniBtn = () => `<button class="ib uni" data-a="universe" aria-label="Back to the Universe home screen"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(-25 12 12)"/></svg><span>Universe</span></button>`;
+const closeBtn = () => uniBtn() + (EMBED ? `<button class="ib" data-a="close" aria-label="Close">✕</button>` : "");
 
 /* ---------------- home ---------------- */
 function sysBlocks(sysId) {
@@ -122,6 +124,7 @@ document.addEventListener("click", (e) => {
   if (a === "open") { location.hash = "/lab/" + b.dataset.id; }
   else if (a === "home") { location.hash = "/"; }
   else if (a === "sys") { location.hash = "/sys/" + b.dataset.id; }
+  else if (a === "universe") { goUniverse(); }
   else if (a === "close") { try { parent.postMessage({ type: "ccpatho-close" }, "*"); } catch (er) { /* ignore */ } }
   else if (a === "step") setStep(+b.dataset.n);
   else if (!lab) return;

@@ -480,18 +480,22 @@ export function mountVideoUI(up, getPos) {
 #vh-grid button.cur{border-color:#fff;box-shadow:0 0 18px rgba(54,214,255,.7)}
 #vh-grid img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#0a2038}
 #vh-grid b{font-size:13px;padding:8px 10px 2px}#vh-grid i{font-style:normal;font-size:11px;color:#8fb6cf;padding:0 10px 9px}
+#vh-uni{position:fixed;right:68px;top:12px;z-index:10;height:44px;padding:0 16px;border-radius:12px;border:1.5px solid #36d6ff;background:linear-gradient(100deg,rgba(54,214,255,.25),#06223d);color:#bff4ff;font:800 12px/1 system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;display:none;box-shadow:0 0 14px -4px #36d6ff}
+#vh-uni:hover,#vh-uni:focus-visible{box-shadow:0 0 18px -2px #36d6ff;outline:0}
 #vh-x{position:fixed;right:14px;top:12px;z-index:10;width:44px;height:44px;border-radius:12px;border:1.5px solid #36d6ff;background:#06223d;color:#fff;font-size:20px;cursor:pointer;display:none}
 #vh-theatre{position:fixed;inset:0;z-index:11;display:none;background:#000;align-items:center;justify-content:center}
 #vh-theatre video{width:100%;height:100%;object-fit:contain}#vh-theatre button{position:absolute;right:14px;top:12px;width:44px;height:44px;border-radius:12px;border:1.5px solid #36d6ff;background:rgba(6,34,61,.9);color:#fff;font-size:20px;z-index:2}`;
   document.head.appendChild(css);
   const el = (h) => { const d = document.createElement("div"); d.innerHTML = h; return d.firstElementChild; };
   const btn = el('<button id="vh-btn" type="button">▶  VIDEO LIBRARY</button>'), bar = el('<div id="vh-bar"><div id="vh-ttl"></div><button id="vh-prev" type="button" aria-label="Previous">◀◀</button><button id="vh-pp" type="button" aria-label="Play or pause">❚❚</button><button id="vh-next" type="button" aria-label="Next">▶▶</button><input id="vh-seek" type="range" min="0" max="1000" value="0" aria-label="Seek"><span id="vh-tm">0:00</span><input id="vh-vol" type="range" min="0" max="100" value="90" aria-label="Volume"><button id="vh-lib" type="button" aria-label="Library">☰</button><button id="vh-th" type="button" aria-label="Theatre">⛶</button></div>');
-  const panel = el('<div id="vh-panel"><h2>VIDEO LIBRARY</h2><p>Critical Care Education · tap a video to play it on the big screen</p><div id="vh-grid"></div></div>'), x = el('<button id="vh-x" type="button" aria-label="Close">✕</button>'), th = el('<div id="vh-theatre"><button type="button" aria-label="Close theatre">✕</button></div>');
-  [btn, bar, panel, x, th].forEach((e) => document.body.appendChild(e));
+  const panel = el('<div id="vh-panel"><h2>VIDEO LIBRARY</h2><p>Critical Care Education · tap a video to play it on the big screen</p><div id="vh-grid"></div></div>'), x = el('<button id="vh-x" type="button" aria-label="Close">✕</button>'), uni = el('<button id="vh-uni" type="button" aria-label="Back to the Universe home screen">Universe</button>'), th = el('<div id="vh-theatre"><button type="button" aria-label="Close theatre">✕</button></div>');
+  [btn, bar, panel, x, uni, th].forEach((e) => document.body.appendChild(e));
   const $ = (id) => document.getElementById(id); let seeking = false, builtN = -1;
   function build() { const g = $("vh-grid"); if (builtN === P.list.length) return; builtN = P.list.length; g.innerHTML = ""; P.list.forEach((v, i) => { const b = document.createElement("button"); b.type = "button"; b.dataset.i = i; b.innerHTML = '<img alt="" src="' + new URL("videos/" + v.poster, import.meta.url).href + '?v=169c"><b>' + (i + 1) + ". " + v.title + "</b><i>" + v.sub + " · " + P.fmt(v.dur) + "</i>"; b.onclick = () => { P.play(i); closeLib(); }; g.appendChild(b); }); }
-  const openLib = () => { build(); [...$("vh-grid").children].forEach((b) => b.classList.toggle("cur", +b.dataset.i === P.i)); panel.style.display = "block"; x.style.display = "block"; };
-  const closeLib = () => { panel.style.display = "none"; x.style.display = "none"; };
+  const openLib = () => { build(); [...$("vh-grid").children].forEach((b) => b.classList.toggle("cur", +b.dataset.i === P.i)); panel.style.display = "block"; x.style.display = "block"; uni.style.display = "block"; };
+  const closeLib = () => { panel.style.display = "none"; x.style.display = "none"; uni.style.display = "none"; };
+  /* the Universe button of the top bar already knows whether to go home itself or hand over to its parent frame */
+  uni.onclick = () => { const h = document.getElementById("home"); if (h) h.click(); else location.href = new URL("../home/index.html?v=20261126q", import.meta.url).href; };
   btn.onclick = openLib; x.onclick = closeLib; $("vh-lib").onclick = openLib;
   $("vh-pp").onclick = () => P.toggle(); $("vh-prev").onclick = () => P.prev(); $("vh-next").onclick = () => P.next();
   $("vh-vol").oninput = (e) => P.setVol(+e.target.value / 100);

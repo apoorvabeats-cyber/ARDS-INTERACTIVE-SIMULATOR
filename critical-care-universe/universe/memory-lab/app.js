@@ -2,6 +2,7 @@
 import { schedule, preview, fmtIv, retrievability } from "./fsrs.js";
 import { drawWave, WAVES, WAVE_Q, hashStr } from "./waves.js";
 import * as DB from "./store.js";
+import { goUniverse } from "../home-link.js?v=20261126q";
 import { Focus } from "./focus.js";
 import { isDicomFile, dcmParse, dcmFrame, dcmDraw, dcmStack, canvasToJpeg, suggestMod, modLabel, windowPresets } from "./dicom.js";
 
@@ -147,7 +148,7 @@ window.addEventListener("popstate", () => { const r = (location.hash || "#/home"
 const deckOf = (id) => A.decks.find((d) => d.id === id);
 
 /* ------------------------------ views ------------------------------ */
-const topBar = (back) => `<div class="top">${back ? `<button class="ib" data-a="home" aria-label="Back">←</button>` : ""}<div class="brand">CRITICAL CARE HUB • MEMORY LAB</div>${EMBED ? `<button class="ib" data-a="close" aria-label="Leave Memory Lab">✕</button>` : ""}</div>`;
+const topBar = (back) => `<div class="top">${back ? `<button class="ib" data-a="home" aria-label="Back">←</button>` : ""}<div class="brand">CRITICAL CARE HUB • MEMORY LAB</div><button class="ib uni" data-a="universe" aria-label="Back to the Universe home screen"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(-25 12 12)"/></svg><span>Universe</span></button>${EMBED ? `<button class="ib" data-a="close" aria-label="Leave Memory Lab">✕</button>` : ""}</div>`;
 const disclaimer = `<div class="foot">Educational use only. <a data-a="info" role="button" tabindex="0">Important information</a> · Your progress is saved on this device only (back it up from Settings).</div>`;
 const deckChip = (d) => { const n = d.list.length, r = d.list.filter((c) => status(c) === "reviewed").length, u = d.list.filter((c) => status(c) === "update").length; if (d.own) return `<span class="chip">YOUR DECK · DRAFT</span>`; if (d.id === "wave") return `<span class="chip">SCHEMATIC ILLUSTRATIONS</span>`; return `<span class="chip ${r === n && n ? "ok" : ""}">${r} reviewed · ${n - r - u} draft${u ? " · " + u + " need update" : ""}</span>`; };
 function vHome() {
@@ -373,6 +374,7 @@ const dl = (name, text) => { const a = document.createElement("a"); a.href = URL
 const val = (id) => ($("#" + id) ? $("#" + id).value : "");
 async function reloadDecks() { await loadDecks(); summary(); render(); }
 const H = {
+  universe: () => goUniverse(),
   home: () => { A.se = null; go("home"); }, close: () => { try { parent.postMessage({ type: "ccmem-close" }, "*"); } catch (e) { /* ignore */ } },
   daily: () => { if (buildQueue(A.cards).length) startSession({ title: "Daily revision", pool: A.cards }); else ahead(A.cards, "Study ahead"); },
   deck: (e) => go("deck:" + e.id), study: (e) => { const d = deckOf(e.id); if (d) studyPool(d.name, d.list); }, ahead: (e) => { const d = deckOf(e.id); if (d) ahead(d.list, d.name + " · ahead"); },
@@ -486,6 +488,6 @@ function routeTo(r) {
   await loadDecks(); summary();
   const r = (location.hash || "#/home").slice(2) || "home";
   if (!A.kv.ack) { A.pending = r === "info" ? "home" : r; A.route = "info"; render(); } else routeTo(r);
-  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js?v=2").catch(() => {});
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js?v=3").catch(() => {});
 })();
 

@@ -20,6 +20,8 @@ const E = {
   lin: (t) => t, out: (t) => 1 - Math.pow(1 - t, 3), in: (t) => t * t * t, io: (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
   back: (t) => { const c = 1.45; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); },
   soft: (t) => t * t * (3 - 2 * t),
+  sine: (t) => -(Math.cos(Math.PI * t) - 1) / 2,                                  // gentle at both ends: the slow, smooth glide used for opening a tile
+  quint: (t) => (t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2),
 };
 let reduced = false;
 function tw(ms, fn, o = {}) {
@@ -68,14 +70,35 @@ function sfx(kind) {
 /* the opening: the rail and the live strip come first, then one section lands on every beat of the music (see seqStart) */
 const SEQ = { t0: 0, run: false, audio: false, tiles: [7.74, 8.44, 9.16, 9.85], b0: 7.05, bp: 0.705, last: -1 };
 const seqTime = () => (clock - SEQ.t0) / 1000;
-function syncAudio() { try { const d = music.duration || 144, t = seqTime() % d; if (Math.abs(music.currentTime - t) > 0.35) music.currentTime = t; } catch (e) { /* ignore */ } }
 const music = $("#music");
+/* the score and the little sound effects share one audio session on a phone; "playback" stops the effects from cutting the score off */
+try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) { /* ignore */ }
 let gestured = false;
-function applyMusic() {
-  music.volume = S.mute ? 0 : Math.min(1, S.music);
-  if (gestured && SEQ.run && !NONAV && music.volume > 0 && music.paused) music.play().then(() => { SEQ.audio = true; syncAudio(); }).catch(() => {});
+const wantMusic = () => !NONAV && S.music > 0 && !S.mute;
+/* The score is NEVER chased with seeks while it plays: every seek on a playing track is an audible break, and the old once-a-second
+   re-sync did exactly that. It starts from the top with the picture; if the picture is already ahead (the browser held the sound back
+   until a tap), it is started level with the picture ONCE, while still paused, so nothing is chopped. After that it simply plays. */
+function playMusic() {
+  if (!wantMusic() || !SEQ.run || !music.paused) return;
+  const d = music.duration || 144, t = seqTime() % d;
+  SEQ.fresh = !(t > 0.4);
+  if (t > 0.4) { try { music.currentTime = t; } catch (e) { /* ignore */ } }
+  const p = music.play();
+  if (p && p.then) p.then(() => { SEQ.audio = true; }).catch(() => { SEQ.audio = false; });
 }
-addEventListener("pointerdown", () => { gestured = true; if (SEQ.audio) return; applyMusic(); if (!NONAV && S.music > 0 && !S.mute && SEQ.run) music.play().then(() => { SEQ.audio = true; syncAudio(); }).catch(() => {}); });
+/* if the music begins a moment after the picture, the picture waits for it (no seek): the whole opening is moved back by that moment */
+let lagFixed = false;
+music.addEventListener("playing", () => {
+  if (lagFixed) return; lagFixed = true;
+  const L = seqTime(); if (!SEQ.run || !SEQ.fresh || L < 0.25 || L > 2.5) return;
+  SEQ.t0 += L * 1000; tweens.forEach((tn) => { tn.t0 += L * 1000; });
+});
+function applyMusic() {
+  music.volume = S.mute ? 0 : Math.min(1, S.music); music.muted = S.mute || S.music <= 0;
+  if (SEQ.run && (gestured || SEQ.audio)) playMusic();
+}
+/* a browser that kept the sound back starts it with the first tap, touch, click or key */
+["pointerdown", "touchend", "click", "keydown"].forEach((ev) => addEventListener(ev, () => { gestured = true; if (!SEQ.audio) playMusic(); }, { passive: true }));
 
 /* ======================================================================== data */
 const IC = {
@@ -100,19 +123,19 @@ const PARENTS = [
   { id: "hub", name: "Hub", sub: "Cases, labs and imaging", c: "#36d6ff", ic: "hub", tag: "ATLAS", slot: "a",
     desc: "Four rooms under one roof: walk the ICU floor, work in the microbiology lab, watch pathophysiology move, or read the scans.",
     kids: [
-      { id: "icu", name: "ICU", sub: "The intensive care floor", ic: "icu", c: "#2fe3c4", href: U + "living-command.html?v=20261126gk&at=icu" },
+      { id: "icu", name: "ICU", sub: "The intensive care floor", ic: "icu", c: "#2fe3c4", href: R + "index.html?open=1&v=20261126q" },
       { id: "micro", name: "Microbiology", sub: "Cultures, stains, antibiograms", ic: "micro", c: "#7bd96a", href: R + "microbiology-lab.html" },
       { id: "path", name: "Pathophysiology", sub: "Disease in motion", ic: "patho", c: "#ff8f5a", href: R + "pathology-live.html" },
       { id: "rad", name: "Radiology", sub: "X-ray, CT, MRI and ultrasound", ic: "radio", c: "#7aa7ff", href: R + "radiology.html" }] },
   { id: "cmd", name: "Command Center", sub: "Six beds, live alarms", c: "#ffc24a", ic: "cmd", tag: "LIVE", slot: "b",
     desc: "Everything the unit is doing right now. Open the live ICU and take the call.",
-    kids: [{ id: "live", name: "ICU (live)", sub: "Six patients, one team", ic: "cmd", c: "#ffc24a", href: U + "living-command.html?v=20261126gk&at=command" }] },
+    kids: [{ id: "live", name: "ICU (live)", sub: "Six patients, one team", ic: "cmd", c: "#ffc24a", href: U + "living-command.html?v=20261126q&at=command" }] },
   { id: "team", name: "Teams", sub: "The multidisciplinary team", c: "#b48cff", ic: "team", tag: "MDT", slot: "c",
     desc: "Your colleagues, standing by. Open the team room to review a patient together.", kids: [] },
   { id: "edu", name: "Education", sub: "Watch, explore, remember", c: "#ff7ad9", ic: "edu", tag: "LEARN", slot: "d",
     desc: "Learn the procedure, see the physiology, then lock it in with spaced recall.",
     kids: [
-      { id: "vid", name: "Video library", sub: "Procedures and bedside skills", ic: "vid", c: "#5b9bff", href: U + "living-command.html?v=20261126gk&at=video" },
+      { id: "vid", name: "Video library", sub: "Procedures and bedside skills", ic: "vid", c: "#5b9bff", href: U + "living-command.html?v=20261126q&at=video" },
       { id: "patho3", name: "Pathodynamics", sub: "Organs that move and respond", ic: "patho", c: "#3dff9a", href: U + "pathodynamics/index.html" },
       { id: "mem", name: "Memory lab", sub: "Spaced-repetition recall", ic: "mem", c: "#ff7ad9", href: U + "memory-lab/index.html" }] },
 ];
@@ -153,11 +176,25 @@ function setRise(el, p) {
 }
 function rise(el, delay = 0, ms = 1000) { el.style.display = ""; setRise(el, 0); return tw(ms, (p) => setRise(el, p), { delay, ease: E.back }); }
 function sink(el, delay = 0, ms = 520) { return tw(ms, (p) => setRise(el, 1 - p), { delay, ease: E.in }).then(() => { el.style.display = "none"; }); }
+/* what lies inside a tile slides in from the RIGHT and, when it is put away, leaves to the LEFT */
+function setSlide(el, p) {
+  const k = 1 - p, g = Math.sin(Math.max(0, Math.min(1, p)) * Math.PI);
+  el.style.opacity = Math.max(0, Math.min(1, p * 2.4)); el.style.transform = p >= 0.999 ? "" : `translate3d(${k * 24}em,${k * 1.2}em,${-k * 8}em) rotateY(${-k * 16}deg)`;
+  const gr = el.firstElementChild; if (gr) gr.style.opacity = Math.max(0, g * 0.95);
+}
+function setSlideOut(el, p) {
+  const g = Math.sin(Math.max(0, Math.min(1, p)) * Math.PI);
+  el.style.opacity = Math.max(0, Math.min(1, 1 - p * 1.5)); el.style.transform = `translate3d(${-p * 20}em,0,${-p * 6}em) rotateY(${p * 14}deg)`;
+  const gr = el.firstElementChild; if (gr) gr.style.opacity = Math.max(0, g * 0.6);
+}
+function slideIn(el, delay = 0, ms = 1300) { el.style.display = ""; setSlide(el, 0); return tw(ms, (p) => setSlide(el, p), { delay, ease: E.sine }); }
+function slideOut(el, delay = 0, ms = 800) { return tw(ms, (p) => setSlideOut(el, p), { delay, ease: E.sine }).then(() => { el.style.display = "none"; }); }
+const spot = (el, p) => { const gr = el.firstElementChild; if (gr) gr.style.opacity = (Math.max(0, Math.min(1, p)) * 0.9).toFixed(3); };   // the light on the floor under the tile
 function boxIn(el, delay = 0, ms = 900) {
   el.style.display = ""; el.style.pointerEvents = "none";
-  return tw(ms, (p) => { const k = 1 - p; el.style.opacity = Math.max(0, Math.min(1, p * 2.6)); el.style.transform = `translate3d(0,${k * 4}em,${-k * 14}em) rotateX(${k * 55}deg)`; }, { delay, ease: E.back }).then(() => { el.style.transform = ""; el.style.pointerEvents = "auto"; });
+  return tw(ms, (p) => { const k = 1 - p; el.style.opacity = Math.max(0, Math.min(1, p * 2.6)); el.style.transform = `translate3d(0,${k * 4}em,${-k * 14}em) rotateX(${k * 55}deg)`; }, { delay, ease: E.out }).then(() => { el.style.transform = ""; el.style.pointerEvents = "auto"; });
 }
-function boxOut(el, ms = 420) { el.style.pointerEvents = "none"; return tw(ms, (p) => { el.style.opacity = 1 - p; el.style.transform = `translate3d(0,${p * 3}em,${-p * 10}em) rotateX(${p * 45}deg)`; }, { ease: E.in }).then(() => { el.style.opacity = 0; el.style.transform = ""; }); }
+function boxOut(el, ms = 700) { el.style.pointerEvents = "none"; return tw(ms, (p) => { el.style.opacity = 1 - p; el.style.transform = `translate3d(0,${p * 3}em,${-p * 10}em) rotateX(${p * 45}deg)`; }, { ease: E.sine }).then(() => { el.style.opacity = 0; el.style.transform = ""; }); }
 
 const parentEl = {}; let kidEls = [];
 PARENTS.forEach((P) => { const el = mkTile(P, P.slot); el.dataset.id = P.id; parentEl[P.id] = el; el.addEventListener("click", () => openParent(P.id)); el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openParent(P.id); } }); });
@@ -282,28 +319,28 @@ const loc = (dx, dy) => (PORT() ? (FLIP() ? { x: -dy, y: dx } : { x: dy, y: -dx 
   if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
     addEventListener("pointerdown", function ask() { removeEventListener("pointerdown", ask); DeviceOrientationEvent.requestPermission().then((r) => { if (r === "granted") start(); }).catch(() => {}); }, { once: true });
   } else start(); }
-const hideHero = () => tw(520, (p) => { const f = $("#heroFrame"); f.style.opacity = 1 - p; f.style.transform = `translate3d(-${p * 3}em,0,0) scale(${1 - p * 0.05})`; }, { ease: E.in }).then(() => { H.shown = false; $("#heroFrame").style.visibility = "hidden"; });
-const showHero = () => { const f = $("#heroFrame"); f.style.visibility = "visible"; H.shown = true; return tw(800, (p) => { f.style.opacity = p; f.style.transform = `translate3d(${(1 - p) * -3}em,0,0) scale(${0.95 + p * 0.05})`; }, { ease: E.out }).then(() => (f.style.transform = "")); };
+const hideHero = () => tw(1000, (p) => { const f = $("#heroFrame"); f.style.opacity = 1 - p; f.style.transform = `translate3d(-${p * 3}em,0,0) scale(${1 - p * 0.05})`; }, { ease: E.sine }).then(() => { H.shown = false; $("#heroFrame").style.visibility = "hidden"; });
+const showHero = () => { const f = $("#heroFrame"); f.style.visibility = "visible"; H.shown = true; return tw(1200, (p) => { f.style.opacity = p; f.style.transform = `translate3d(${(1 - p) * -3}em,0,0) scale(${0.95 + p * 0.05})`; }, { ease: E.sine }).then(() => (f.style.transform = "")); };
 
 async function openParent(id) {
   if (busy || view !== "home") return; busy = true;
   await Promise.all([closeFly(), closeQuick()]);
   const P = PARENTS.find((x) => x.id === id), el = parentEl[id]; sfx("whoosh");
-  Object.values(parentEl).filter((t) => t !== el).forEach((t, i) => sink(t, i * 80, 500));
+  Object.values(parentEl).filter((t) => t !== el).forEach((t, i) => sink(t, i * 160, 1000));
   hideHero();
-  /* 1. the tile zooms up softly towards the viewer */
+  /* 1. the tile comes up out of its place on the right, slowly, towards the middle of the screen */
   const C = stageC(), I = centre(el); el.style.zIndex = 6; el.style.pointerEvents = "none"; el._t.hov = false;
   const { x: dx, y: dy } = loc(C.x - I.x, C.y - I.y);
-  await tw(750, (p) => { el.style.transform = `translate3d(${dx * p}px,${dy * p}px,${p * 9 * C.em}px) scale(${1 + p * 0.55})`; }, { ease: E.out });
-  await wait(260);
-  /* 2. it glides to the left and sticks there */
+  await tw(1700, (p) => { el.style.transform = `translate3d(${dx * p}px,${dy * p}px,${p * 9 * C.em}px) scale(${1 + p * 0.55})`; spot(el, p); }, { ease: E.sine });
+  await wait(750);                                           // it rests there a moment, lit from below, so it can be seen
+  /* 2. then it glides to the left in one long, soft motion and settles */
   const from = centre(el); el.style.transform = ""; place(el, "p"); el.classList.add("stuck"); const to = centre(el); const { x: ddx, y: ddy } = loc(from.x - to.x, from.y - to.y);
-  tw(800, (p) => { const k = 1 - p; el.style.transform = k > 0.001 ? `translate3d(${ddx * k}px,${ddy * k}px,${k * 9 * C.em}px) scale(${1 + k * 0.55})` : ""; }, { ease: E.io });
-  await wait(650);
+  tw(1900, (p) => { const k = 1 - p; el.style.transform = k > 0.0005 ? `translate3d(${ddx * k}px,${ddy * k}px,${k * 9 * C.em}px) scale(${1 + k * 0.55})` : ""; spot(el, k); }, { ease: E.sine });
+  await wait(1500);
   info.innerHTML = `<h3>${P.name}</h3><p>${P.desc}</p><button type="button" class="back" id="infoBack">← Back to home</button>`;
-  $("#infoBack").onclick = goHome; boxIn(info, 0, 800);
+  $("#infoBack").onclick = goHome; boxIn(info, 0, 1300);
   view = id; $("#bHome").classList.remove("on");
-  /* 3. what lies inside rises in the same elevated style */
+  /* 3. what lies inside slides in from the right in the same elevated style */
   if (id === "team") await showTeam();
   else if (id === "cmd") await showCmd(P);
   else await showKids(P);
@@ -312,10 +349,10 @@ async function openParent(id) {
 function showKids(P, slots) {
   const sl = slots || (P.kids.length === 3 ? ["a", "b", "e"] : ["a", "b", "c", "d"]); kidEls = [];
   P.kids.forEach((k, i) => { const el = mkTile(k, sl[i]); el.addEventListener("click", () => openLeaf(k, el)); el.addEventListener("keydown", (e) => { if (e.key === "Enter") openLeaf(k, el); }); kidEls.push(el); if (!i) sfx("whoosh"); });
-  const ps = kidEls.map((el, i) => rise(el, i * 170, 1000)); return Promise.all(ps);
+  const ps = kidEls.map((el, i) => slideIn(el, i * 260, 1400)); return Promise.all(ps);
 }
 async function showCmd(P) {
-  sfx("whoosh"); const ps = [showKids(P, ["a"])]; ps.push(boxIn(live, 180, 950)); ps.push(boxIn($("#cmdImg"), 360, 1000)); await Promise.all(ps);
+  sfx("whoosh"); const ps = [showKids(P, ["a"])]; ps.push(boxIn(live, 300, 1300)); ps.push(boxIn($("#cmdImg"), 560, 1400)); await Promise.all(ps);
 }
 async function showTeam() {
   sfx("whoosh"); await buildTeam(); TV.on = true; TV.lift = 0; const f = $("#teamFrame"); f.style.display = ""; TV.t0 = clock;
@@ -325,28 +362,29 @@ async function showTeam() {
 async function goHome() {
   if (busy || view === "home") return; busy = true; sfx("back");
   const cur = view; const P = PARENTS.find((x) => x.id === cur), el = parentEl[cur];
-  kidEls.forEach((k, i) => sink(k, i * 60, 450).then(() => k.remove())); kidEls = [];
-  boxOut(info); if (cur === "cmd") { boxOut(live); boxOut($("#cmdImg")); }
-  if (cur === "team") { const f = $("#teamFrame"); f.style.pointerEvents = "none"; await tw(450, (p) => { f.style.opacity = 1 - p; f.style.transform = `translate3d(0,${p * 3}em,${-p * 10}em) rotateX(${p * 40}deg)`; }, { ease: E.in }); f.style.display = "none"; f.style.transform = ""; TV.on = false; }
-  else await wait(420);
+  /* what lay inside leaves to the left, slowly */
+  kidEls.forEach((k, i) => slideOut(k, i * 140, 900).then(() => k.remove())); kidEls = [];
+  boxOut(info, 800); if (cur === "cmd") { boxOut(live, 800); boxOut($("#cmdImg"), 800); }
+  if (cur === "team") { const f = $("#teamFrame"); f.style.pointerEvents = "none"; await tw(800, (p) => { f.style.opacity = 1 - p; f.style.transform = `translate3d(${-p * 14}em,0,${-p * 6}em) rotateY(${p * 12}deg)`; }, { ease: E.sine }); f.style.display = "none"; f.style.transform = ""; TV.on = false; }
+  else await wait(850);
   const from = centre(el); place(el, P.slot); el.classList.remove("stuck"); const to = centre(el), C = stageC(), gd = loc(from.x - to.x, from.y - to.y);
-  tw(780, (p) => { const k = 1 - p; el.style.transform = k > 0.001 ? `translate3d(${gd.x * k}px,${gd.y * k}px,0)` : ""; }, { ease: E.io });
-  await wait(600); el.style.zIndex = "";
-  Object.values(parentEl).filter((t) => t !== el).forEach((t, i) => rise(t, i * 130, 950)); sfx("whoosh");
+  tw(1500, (p) => { const k = 1 - p; el.style.transform = k > 0.0005 ? `translate3d(${gd.x * k}px,${gd.y * k}px,0)` : ""; }, { ease: E.sine });
+  await wait(1100); el.style.zIndex = "";
+  Object.values(parentEl).filter((t) => t !== el).forEach((t, i) => rise(t, i * 200, 1300)); sfx("whoosh");
   await showHero(); Object.values(parentEl).forEach((t) => { t.style.pointerEvents = "auto"; setRise(t, 1); });
   view = "home"; $("#bHome").classList.add("on"); busy = false;
 }
 async function openLeaf(k, el) {
   if (busy) return; busy = true; sfx("tick"); el._t.hov = false; const C = stageC(), I = centre(el), od = loc(C.x - I.x, C.y - I.y); el.style.zIndex = 8;
-  kidEls.filter((x) => x !== el).forEach((x) => sink(x, 0, 380));
-  await tw(700, (p) => { el.style.transform = `translate3d(${od.x * p}px,${od.y * p}px,${p * 12 * C.em}px) scale(${1 + p * 0.9})`; el.style.opacity = 1 - p * p * 0.3; }, { ease: E.in });
+  kidEls.filter((x) => x !== el).forEach((x) => slideOut(x, 0, 800));
+  await tw(1500, (p) => { el.style.transform = `translate3d(${od.x * p}px,${od.y * p}px,${p * 12 * C.em}px) scale(${1 + p * 0.9})`; el.style.opacity = 1 - p * p * 0.3; spot(el, p); }, { ease: E.sine });
   await launch(k.name, k.href); busy = false;
   if (NONAV) { el.style.transform = ""; el.style.opacity = 1; el.style.zIndex = ""; kidEls.forEach((x) => { x.style.display = ""; setRise(x, 1); }); }
 }
 async function launch(name, href, img) {
   const L = $("#launch"); $("span", L).textContent = name; L.style.backgroundImage = img ? `linear-gradient(rgba(4,16,40,.25),rgba(4,16,40,.55)),url(${img})` : ""; L.style.backgroundSize = "cover"; L.style.backgroundPosition = "center"; L.classList.toggle("pic", !!img);
-  await tw(550, (p) => { L.style.opacity = p; L.style.transform = `scale(${1.08 - p * 0.08})`; }, { ease: E.out });
-  if (img) await tw(1400, (p) => { L.style.backgroundSize = `${100 + p * 12}% auto`; L.style.backgroundSize = `${100 + p * 12}% ${100 + p * 12}%`; }, { ease: E.lin }); else await wait(450);
+  await tw(900, (p) => { L.style.opacity = p; L.style.transform = `scale(${1.08 - p * 0.08})`; }, { ease: E.sine });
+  if (img) await tw(1400, (p) => { L.style.backgroundSize = `${100 + p * 12}% auto`; L.style.backgroundSize = `${100 + p * 12}% ${100 + p * 12}%`; }, { ease: E.lin }); else await wait(700);
   if (!NONAV) { location.href = href; return; }
   toast("Opens: " + href.replace(/^(\.\.\/)+/, "")); await wait(600);
   await tw(450, (p) => { L.style.opacity = 1 - p; }, { ease: E.in }); L.style.transform = "";
@@ -439,7 +477,7 @@ $("#bProfile").onclick = () => { if (!busy) openFly("profile"); };
 $("#bSet").onclick = () => { if (!busy) openFly("settings"); };
 $("#bQuick").onclick = () => (qOpen ? closeQuick() : openQuick());
 $("#bHome").onclick = async () => { sfx("tick"); await Promise.all([closeFly(), closeQuick()]); goHome(); };
-$("#bGate").onclick = async () => { if (busy) return; busy = true; sfx("tick"); await Promise.all([closeFly(), closeQuick()]); await launch("", "../universe/living-command.html?v=20261126gk&at=gate"); busy = false; };
+$("#bGate").onclick = async () => { if (busy) return; busy = true; sfx("tick"); await Promise.all([closeFly(), closeQuick()]); await launch("", "../universe/living-command.html?v=20261126q&at=gate"); busy = false; };
 $("#teamGo").onclick = () => { if (!busy) { busy = true; launch("Team room", "../index.html?to=team").then(() => (busy = false)); } };
 addEventListener("keydown", (e) => { if (e.key === "Escape") { closeFly(); closeQuick(); if (view !== "home") goHome(); } });
 
@@ -502,7 +540,9 @@ window.__ccu.ready = setHeroSafe(avKey || "default").then(() => Promise.all(AVAT
 Object.values(parentEl).forEach((el) => { el.style.display = "none"; });
 function seqStart() {
   const pre = document.getElementById("pre"); if (pre) pre.remove();
-  SEQ.t0 = clock; SEQ.run = true; SEQ.audio = false; SEQ.last = -1;
+  /* the opening starts NOW (the clock was last set when the file began to load, which can be well before this point) */
+  if (!manual) { const dc = performance.now() - clock; tweens.forEach((tn) => { tn.t0 += dc; }); clock += dc; last = clock; }
+  SEQ.t0 = clock; SEQ.run = true; SEQ.audio = !music.paused; SEQ.fresh = true; SEQ.last = -1;
   const rail = [...$$("#rail > *")], foot = $("#foot");
   rail.forEach((el) => { el.style.opacity = 0; }); foot.style.opacity = 0;
   sfx("whoosh");
@@ -511,17 +551,16 @@ function seqStart() {
   const brand = $("#brand"), hf = $("#heroFrame"); brand.style.opacity = 0; hf.style.opacity = 0;
   tw(450, (p) => { brand.style.opacity = p; hf.style.opacity = p; hf.style.transform = p >= 1 ? "" : `translate3d(${(1 - p) * -3}em,0,0) scale(${0.95 + p * 0.05})`; }, { delay: Math.max(0, SEQ.b0 * 1000 - 60), ease: E.out });
   PARENTS.forEach((P, i) => rise(parentEl[P.id], Math.max(0, SEQ.tiles[i] * 1000 - 130), 520));
-  applyMusic(); music.loop = true; music.preload = "auto"; try { music.currentTime = 0; } catch (e) { /* ignore */ }
-  if (!NONAV && S.music > 0 && !S.mute) music.play().then(() => { SEQ.audio = true; syncAudio(); }).catch(() => {});
+  music.loop = true; music.preload = "auto"; if (music.paused) { try { music.currentTime = 0; } catch (e) { /* ignore */ } }
+  applyMusic(); playMusic();
 }
 const glowEl = document.createElement("div"); glowEl.id = "beatGlow"; $("#stage").insertBefore(glowEl, $("#stage").firstChild);
 function seqFrame() {
-  if (!SEQ.run) return; const d = music.duration || 144, t = seqTime() % d;
+  if (!SEQ.run) return; const d = music.duration || 144, t = SEQ.audio && !music.paused ? music.currentTime : seqTime() % d;   // the glow follows the music itself, so it stays on the beat
   const g = t >= SEQ.b0 - 0.02 ? Math.exp(-(((t - SEQ.b0) % SEQ.bp) / SEQ.bp) * 5.5) : 0;
   glowEl.style.opacity = (g * 0.85).toFixed(3);
-  const s = Math.floor(seqTime()); if (s !== SEQ.last) { SEQ.last = s; if (SEQ.audio) syncAudio(); }
 }
 addEventListener("pageshow", (e) => { if (e.persisted) location.reload(); });
-document.addEventListener("visibilitychange", () => { if (!SEQ.run || NONAV) return; if (document.hidden) music.pause(); else if (gestured || SEQ.audio) music.play().then(() => { SEQ.audio = true; syncAudio(); }).catch(() => {}); });
+document.addEventListener("visibilitychange", () => { if (!SEQ.run || NONAV) return; if (document.hidden) music.pause(); else if (gestured || SEQ.audio) playMusic(); });
 seqStart();
 if (!manual) requestAnimationFrame(loop);
