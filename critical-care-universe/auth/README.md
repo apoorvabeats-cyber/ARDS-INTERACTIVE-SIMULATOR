@@ -118,7 +118,7 @@ To protect assets that really are confidential:
 
 ## Troubleshooting sign-up emails
 - **Confirmation email never seems to arrive:** check Spam, Promotions and Updates, and search for `Confirm your email address`. The sender shows as `...@<number>.brevosend.com` (Brevo's shared sending domain), with your Gmail as Reply-To.
-- **Link says expired or invalid:** each new confirmation email cancels the earlier link, so use only the newest email and tap Resend at most once. Mail scanners (for example Gmail's) can also open the one-time link first; if this keeps happening, turn off click tracking in Brevo (Transactional > Settings) and Resend once.
+- **Link says expired or invalid:** each new confirmation email cancels the earlier link, so use only the newest email and tap Resend at most once. Mail scanners can occasionally open a one-time link first (Brevo has no self-serve switch to turn off click tracking on transactional email); if a link fails, tap Resend once, wait two minutes and use only the newest email.
 - **Admin page says the account is not an administrator:** `ADMIN_EMAILS` must hold exactly your login email (no quotes, spaces or trailing comma). Supabase shows only a SHA-256 fingerprint of a saved secret; the fingerprint of `apoorvabeats@gmail.com` starts with `49f2fa14`.
 
 ## Changelog
