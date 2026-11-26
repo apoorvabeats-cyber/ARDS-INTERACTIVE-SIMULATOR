@@ -451,13 +451,14 @@ function paintSettings() {
   ${sl("sMusic", "Music volume", S.music, 0, 1, 0.05, pct)}${sl("sFx", "Effects volume", S.fx, 0, 1, 0.05, pct)}${tg("sMute", "Mute everything", S.mute)}
   <div class="tg"><span>Graphics quality</span><div class="seg" id="sQ">${["low", "med", "high"].map((q) => `<button type="button" data-q="${q}" class="${S.quality === q ? "on" : ""}">${q}</button>`).join("")}</div></div>
   ${tg("sAnim", "Animated doctor", S.heroAnim)}${tg("sRed", "Reduce motion", S.reduced)}${sl("sBlur", "Background blur", S.blur, 0, 24, 1, (v) => v + "px")}
-  <div class="row"><button class="btn q" id="sReset" type="button">Reset</button></div>`;
+  <div class="row"><button class="btn q" id="sReset" type="button">Reset</button>${window.ccuAuth ? `<button class="btn q" id="sOut" type="button" title="${(window.ccuAuth.email || "").replace(/[<>&"]/g, "")}">Sign out</button>` : ""}</div>`;
   const bind = (id, key, out) => { const i = $("#" + id, pS); i.oninput = () => { S[key] = +i.value; $("#" + id + "o", pS).textContent = out(S[key]); saveS(); applyS(); }; };
   bind("sMusic", "music", pct); bind("sFx", "fx", pct); bind("sBlur", "blur", (v) => v + "px");
   const sw = (id, key) => { const b = $("#" + id, pS); b.onclick = () => { S[key] = !S[key]; b.classList.toggle("on", S[key]); b.setAttribute("aria-checked", S[key]); saveS(); applyS(); }; };
   sw("sMute", "mute"); sw("sAnim", "heroAnim"); sw("sRed", "reduced");
   $$("#sQ button", pS).forEach((b) => (b.onclick = () => { S.quality = b.dataset.q; $$("#sQ button", pS).forEach((x) => x.classList.toggle("on", x === b)); saveS(); applyS(); }));
   $("#sReset", pS).onclick = () => { Object.assign(S, { music: 0.5, fx: 0.7, mute: false, heroAnim: true, quality: "high", reduced: false, blur: 11 }); saveS(); applyS(); paintSettings(); };
+  const so = $("#sOut", pS); if (so) so.onclick = () => { so.disabled = true; so.textContent = "Signing out..."; window.ccuAuth.signOut(); };
   $(".x", pS).onclick = () => closeFly();
 }
 function applyS() { reduced = S.reduced || matchMedia("(prefers-reduced-motion: reduce)").matches; applyMusic(); $(".bgimg").style.filter = `blur(${S.blur}px) saturate(1.15) brightness(.95)`; }
