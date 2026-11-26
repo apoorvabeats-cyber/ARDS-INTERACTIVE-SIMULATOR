@@ -121,9 +121,21 @@ To protect assets that really are confidential:
 - **Link says expired or invalid:** each new confirmation email cancels the earlier link, so use only the newest email and tap Resend at most once. Mail scanners can occasionally open a one-time link first (Brevo has no self-serve switch to turn off click tracking on transactional email); if a link fails, tap Resend once, wait two minutes and use only the newest email.
 - **Admin page says the account is not an administrator:** `ADMIN_EMAILS` must hold exactly your login email (no quotes, spaces or trailing comma). Supabase shows only a SHA-256 fingerprint of a saved secret; the fingerprint of `apoorvabeats@gmail.com` starts with `49f2fa14`.
 
+## Account deletion (delete-account)
+Users can delete their own account in the app (Settings, or the pending / access-not-granted screens). The browser asks for the current password and the word DELETE, then calls the Edge Function `delete-account`, which does the deleting. **Nothing is deployed by this repo: do the steps below yourself, after review.**
+
+- The function identifies the user from the verified sign-in token only (never from the request), refuses administrators (`ADMIN_EMAILS`), re-checks the password on the server, hard-deletes the Auth user, and confirms the Auth user and the `beta_access` row are gone before saying success. `beta_access.user_id` has `ON DELETE CASCADE`, so the row goes with the user. No tables, triggers or SQL are needed.
+- Deploy (dashboard): Supabase > Edge Functions > Deploy a new function > Via Editor > name it `delete-account` > paste `supabase/functions/delete-account/index.ts` > Deploy. Then open the function > Settings > turn **Verify JWT with legacy secret** OFF and Save (it checks the token itself, like `admin-beta`).
+- Deploy (CLI): `supabase functions deploy delete-account --no-verify-jwt`
+- Secrets: nothing new. It reuses `ADMIN_EMAILS` and `ALLOWED_ORIGINS`. If `ADMIN_EMAILS` is empty the function refuses to run.
+- Test with a throwaway account first (sign up, confirm, get approved, delete), never with a real user. Check the Auth user and the `beta_access` row are both gone, and that an admin account is refused.
+- The app shows "Account deletion is not available right now" until the function is deployed.
+- Local cleanup (auth/delete.js) erases only CCU keys (`ccu*`, `ccmem*`, `licu`), the Memory Lab database `ccmem` and its `ccmem-*` cache and service worker. Other site data is left alone.
+
 ## Changelog
 - Added beta login gate (sign up, email verification, login, logout, forgot/reset password, session persistence, expired-session handling) with the Critical Care Universe logo.
 - Added pending and denied screens; approved users enter the existing app unchanged.
 - Added admin page and `admin-beta` Edge Function (pinned supabase-js 2.119.2); added SQL checks/hardening including trigger and constraint verification.
 - Home Settings: Sign out.
 - README: custom-email requirement, iPhone/dashboard-only steps, admin self-approval note.
+- Account deletion: `delete-account` Edge Function, Delete account dialog (Settings and gate screens), local data cleanup, public `legal/delete-account.html`.

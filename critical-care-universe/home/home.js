@@ -451,7 +451,7 @@ function paintSettings() {
   ${sl("sMusic", "Music volume", S.music, 0, 1, 0.05, pct)}${sl("sFx", "Effects volume", S.fx, 0, 1, 0.05, pct)}${tg("sMute", "Mute everything", S.mute)}
   <div class="tg"><span>Graphics quality</span><div class="seg" id="sQ">${["low", "med", "high"].map((q) => `<button type="button" data-q="${q}" class="${S.quality === q ? "on" : ""}">${q}</button>`).join("")}</div></div>
   ${tg("sAnim", "Animated doctor", S.heroAnim)}${tg("sRed", "Reduce motion", S.reduced)}${sl("sBlur", "Background blur", S.blur, 0, 24, 1, (v) => v + "px")}
-  <div class="row"><button class="btn q" id="sReset" type="button">Reset</button>${window.ccuAuth ? `<button class="btn q" id="sOut" type="button" title="${(window.ccuAuth.email || "").replace(/[<>&"]/g, "")}">Sign out</button>` : ""}</div>`;
+  <div class="row"><button class="btn q" id="sReset" type="button">Reset</button>${window.ccuAuth ? `<button class="btn q" id="sOut" type="button" title="${(window.ccuAuth.email || "").replace(/[<>&"]/g, "")}">Sign out</button>` : ""}</div>${window.ccuAuth && window.ccuAuth.deleteAccount ? `<div class="row"><button class="btn q" id="sDel" type="button" style="color:#ffb4b4;border-color:rgba(255,130,130,.55)">Delete account</button></div>` : ""}`;
   pS.insertAdjacentHTML("beforeend", `<p class="sub" style="margin:12px 0 0"><a href="${(window.ccuAuth && window.ccuAuth.base) || "../"}legal/privacy.html" target="_blank" rel="noopener" style="color:inherit">Privacy Policy</a> &middot; <a href="${(window.ccuAuth && window.ccuAuth.base) || "../"}legal/support.html" target="_blank" rel="noopener" style="color:inherit">Support</a></p>`);
   const bind = (id, key, out) => { const i = $("#" + id, pS); i.oninput = () => { S[key] = +i.value; $("#" + id + "o", pS).textContent = out(S[key]); saveS(); applyS(); }; };
   bind("sMusic", "music", pct); bind("sFx", "fx", pct); bind("sBlur", "blur", (v) => v + "px");
@@ -459,6 +459,7 @@ function paintSettings() {
   sw("sMute", "mute"); sw("sAnim", "heroAnim"); sw("sRed", "reduced");
   $$("#sQ button", pS).forEach((b) => (b.onclick = () => { S.quality = b.dataset.q; $$("#sQ button", pS).forEach((x) => x.classList.toggle("on", x === b)); saveS(); applyS(); }));
   $("#sReset", pS).onclick = () => { Object.assign(S, { music: 0.5, fx: 0.7, mute: false, heroAnim: true, quality: "high", reduced: false, blur: 11 }); saveS(); applyS(); paintSettings(); };
+  const sd = $("#sDel", pS); if (sd) sd.onclick = () => window.ccuAuth.deleteAccount();
   const so = $("#sOut", pS); if (so) so.onclick = () => { so.disabled = true; so.textContent = "Signing out..."; window.ccuAuth.signOut(); };
   if (window.ccuAuth && window.ccuAuth.adminInfo) window.ccuAuth.adminInfo().then((a) => {   // administrators only: the server answers, everyone else gets nothing
     if (!a || !pS.isConnected || $("#sAdm", pS)) return;

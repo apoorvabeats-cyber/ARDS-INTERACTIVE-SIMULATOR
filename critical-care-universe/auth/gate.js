@@ -11,7 +11,7 @@
   var WATCH_MS = 120000;                              /* re-check approval while the app is open */
 
   var sb = null, appStarted = false, screenName = "", curUid = null, curEmail = "";
-  var evaluating = false, recovering = false, pollTimer = null, watchTimer = null, cooldownTimer = null;
+  var evaluating = false, recovering = false, deleting = false, pollTimer = null, watchTimer = null, cooldownTimer = null;
   var urlNotice = null;
 
   /* ---------- tiny helpers ---------- */
@@ -103,11 +103,11 @@
     pending: function (o) {
       return '<div class="cg-state">' + ICON.wait + '<h1>Your request is pending</h1><p class="cg-sub">Your email is verified. A team member will review your beta request. You can leave this page open: it enters automatically once you are approved.</p></div>' + MSGBOX +
         '<button class="cg-btn" type="button" id="cgRefresh" data-act="refresh"><span class="cg-lbl">Check status now</span></button>' +
-        '<button class="cg-btn cg-ghost" type="button" data-act="signout">Sign out</button><p class="cg-who">' + esc(o.email) + '</p>';
+        '<button class="cg-btn cg-ghost" type="button" data-act="signout">Sign out</button><div class="cg-links" style="justify-content:center"><button class="cg-link" type="button" data-act="delete">Delete my account</button></div><p class="cg-who">' + esc(o.email) + '</p>';
     },
     denied: function (o) {
       return '<div class="cg-state">' + ICON.lock + '<h1>Access not granted</h1><p class="cg-sub">Thank you for your interest. Beta access has not been approved for this account at this time.</p></div>' +
-        '<button class="cg-btn cg-ghost" type="button" data-act="signout">Sign out</button><p class="cg-who">' + esc(o.email) + '</p>';
+        '<button class="cg-btn cg-ghost" type="button" data-act="signout">Sign out</button><div class="cg-links" style="justify-content:center"><button class="cg-link" type="button" data-act="delete">Delete my account</button></div><p class="cg-who">' + esc(o.email) + '</p>';
     },
     error: function (o) {
       return '<div class="cg-state">' + ICON.warn + '<h1>' + esc(o.title || "Something went wrong") + '</h1><p class="cg-sub">' + esc(o.text || "") + '</p></div>' +
@@ -177,6 +177,7 @@
     window.ccuAuth = {
       email: session.user.email,
       signOut: signOut,
+      deleteAccount: function () { openDelete(session.user.email); },
       base: BASE,
       /* Admin shortcut support: resolves {pending:n} only for an administrator (the server decides; everyone else gets null and sees nothing). */
       adminInfo: async function () {
@@ -206,8 +207,14 @@
     goBase();
   }
 
+  /* Account deletion: the dialog and the server call live in auth/delete.js; the server (Edge Function delete-account) does the deleting. */
+  function openDelete(email) {
+    if (!window.ccuDelete) { return; }
+    window.ccuDelete.open({ sb: sb, cfg: CFG, email: email || curEmail, setBusy: function (b) { deleting = !!b; }, onDone: function () { goBase(); } });
+  }
+
   async function evaluate(session, silent) {
-    if (recovering) return;
+    if (recovering || deleting) return;                 /* account deletion in progress: do not swap screens underneath it */
     if (!session) { if (appStarted) { goBase(); return; } curUid = null; show("login", { email: curEmail }); return; }
     var u = session.user; curEmail = u.email || curEmail;
     if (!u.email_confirmed_at && !u.confirmed_at) { show("verify", { email: u.email }); return; }
@@ -326,6 +333,7 @@
     if (t.hasAttribute("data-go")) { var em = $("#cgEmail"); if (em && em.value) curEmail = em.value.trim(); show(t.getAttribute("data-go"), { email: curEmail }); return; }
     var act = t.getAttribute("data-act");
     if (act === "signout") { t.disabled = true; await signOut(); }
+    else if (act === "delete") { openDelete(curEmail); }
     else if (act === "refresh") { var l = t.querySelector(".cg-lbl"); t.disabled = true; if (l) l.textContent = "Checking"; await recheck(false); t.disabled = false; if (l) l.textContent = "Check status now"; }
     else if (act === "resend") {
       t.disabled = true; var email = (curEmail || "").trim();
@@ -377,7 +385,7 @@
       setTimeout(function () {
         if (event === "PASSWORD_RECOVERY") { recovering = true; show("reset"); return; }
         if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") return;
-        if (event === "SIGNED_OUT") { if (appStarted) goBase(); else if (!recovering) show("login", { email: curEmail }); return; }
+        if (event === "SIGNED_OUT") { if (deleting) return; if (appStarted) goBase(); else if (!recovering) show("login", { email: curEmail }); return; }
         if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
           if (session && session.user.id === curUid && (appStarted || screenName === "pending" || screenName === "denied")) return;   /* tab refocus */
           evaluate(session);
