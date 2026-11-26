@@ -1,6 +1,6 @@
 // Edge Function: admin-beta
 // Lets an ADMIN list beta users and approve / reject them. The service-role key lives ONLY here, as a server-side env var.
-// Deploy (iPhone/dashboard): Supabase > Edge Functions > Deploy a new function > Via Editor > name it admin-beta > paste this file. Keep "Verify JWT" ON.
+// Deploy (iPhone/dashboard): Supabase > Edge Functions > Deploy a new function > Via Editor > name it admin-beta > paste this file. Then Settings > turn "Verify JWT with legacy secret" OFF and Save (this function checks the token itself).
 // Deploy (computer/CLI):    supabase functions deploy admin-beta
 // Secrets (Edge Functions > Secrets, or CLI): ADMIN_EMAILS="you@example.com,other@example.com"  ALLOWED_ORIGINS="https://<user>.github.io"
 // Secret names cannot start with SUPABASE_ (reserved).

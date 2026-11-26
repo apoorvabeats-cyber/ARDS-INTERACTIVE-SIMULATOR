@@ -77,7 +77,7 @@ Exact formats (no quotes):
 Secret names cannot start with `SUPABASE_`. The server key is provided to the function automatically (the function uses `SUPABASE_SECRET_KEYS`, and falls back to the older `SUPABASE_SERVICE_ROLE_KEY`); you never type it anywhere.
 
 ### 5. Deploy the admin function
-Edge Functions > Deploy a new function > **Via Editor**. Name it exactly `admin-beta`. Paste the whole of `supabase/functions/admin-beta/index.ts`. Leave **Verify JWT** on (the admin page sends the signed-in admin's login token; the function also re-checks it itself, so it stays safe even if that switch is turned off). Deploy.
+Edge Functions > Deploy a new function > **Via Editor**. Name it exactly `admin-beta`. Paste the whole of `supabase/functions/admin-beta/index.ts`. After deploying, open the function's **Settings** tab and turn **Verify JWT with legacy secret** OFF, then **Save changes**. On projects using the new API keys that switch accepts only legacy-signed tokens and would reject signed-in admins with a 401. Turning it off is safe: the function validates the caller's token with Supabase Auth, requires a verified email on the `ADMIN_EMAILS` list, and fails closed. Deploy.
 
 (Computer alternative: `supabase functions deploy admin-beta` after `supabase link`.)
 
