@@ -50,10 +50,10 @@ Save changes. Type the SMTP key only into that Supabase field. **Never** put it 
 
 ### 2. Tell Supabase where your site lives
 Authentication > URL Configuration
-- **Site URL**: `https://apoorvabeats-cyber.github.io/ards-interactive-simulator/critical-care-universe/`
+- **Site URL**: `https://apoorvabeats-cyber.github.io/ARDS-INTERACTIVE-SIMULATOR/critical-care-universe/`
 - **Redirect URLs**: add exactly the same address (ending with `/`).
 
-Why this exact address: the login code sends `redirect_to` = the page's own folder (origin + folder path, no `index.html`, no query, no `#`). It does this for signup confirmation, resend, and password reset, and it was checked at this origin and path with the page opened as `/`, `/index.html` and `/?to=auditorium`. Capital and small letters matter.
+Why this exact address: the login code sends `redirect_to` = the page's own folder (origin + folder path, no `index.html`, no query, no `#`). It does this for signup confirmation, resend, and password reset, and it was checked with the page opened as `/`, `/index.html` and `/?to=auditorium`. Capital and small letters matter: the repository part of the address is `ARDS-INTERACTIVE-SIMULATOR` in capitals, and a lowercase version gives a 404.
 
 Authentication > Sign In / Providers > **Email**: open it and make sure **Confirm email** is ON. Keep anonymous sign-ins OFF. Without the redirect entry, the email links will not bring people back to your site.
 
@@ -72,7 +72,7 @@ Edge Functions > Secrets > add:
 
 Exact formats (no quotes):
 - `ADMIN_EMAILS`: `you@example.com` or, for several, `you@example.com,second@example.com`. Not case sensitive. Each admin must have a confirmed account.
-- `ALLOWED_ORIGINS`: `https://apoorvabeats-cyber.github.io` (scheme and host only; no path, no `/ards-interactive-simulator`).
+- `ALLOWED_ORIGINS`: `https://apoorvabeats-cyber.github.io` (scheme and host only; no path, no `/ARDS-INTERACTIVE-SIMULATOR`).
 
 Secret names cannot start with `SUPABASE_`. The server key is provided to the function automatically (the function uses `SUPABASE_SECRET_KEYS`, and falls back to the older `SUPABASE_SERVICE_ROLE_KEY`); you never type it anywhere.
 
@@ -115,6 +115,11 @@ To protect assets that really are confidential:
 2. Add Storage policies that allow `select` only when the caller's `beta_access` row is `approved`.
 3. The app asks Supabase for a short-lived signed URL after login and never ships those files in the Pages bundle.
 4. For whole pages or server logic, host behind something that checks the session before sending bytes (Cloudflare Access, an edge function, or similar).
+
+## Troubleshooting sign-up emails
+- **Confirmation email never seems to arrive:** check Spam, Promotions and Updates, and search for `Confirm your email address`. The sender shows as `...@<number>.brevosend.com` (Brevo's shared sending domain), with your Gmail as Reply-To.
+- **Link says expired or invalid:** each new confirmation email cancels the earlier link, so use only the newest email and tap Resend at most once. Mail scanners (for example Gmail's) can also open the one-time link first; if this keeps happening, turn off click tracking in Brevo (Transactional > Settings) and Resend once.
+- **Admin page says the account is not an administrator:** `ADMIN_EMAILS` must hold exactly your login email (no quotes, spaces or trailing comma). Supabase shows only a SHA-256 fingerprint of a saved secret; the fingerprint of `apoorvabeats@gmail.com` starts with `49f2fa14`.
 
 ## Changelog
 - Added beta login gate (sign up, email verification, login, logout, forgot/reset password, session persistence, expired-session handling) with the Critical Care Universe logo.
