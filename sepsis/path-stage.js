@@ -627,6 +627,139 @@
   const EXTRA = {};
   const KIT = { THREE, V, wet, organic, tube, tag, fbm, noise3, clamp, tissueMaterial, rbcGeo, buildCapillaryClose, buildVessel };
 
+  /* ------------------------------------------------------------------------------------------------------------------
+     STORY: the Play button. One scripted course for every complication, with a voice-over at organ and cell level:
+       normal organ -> normal cells -> disease develops -> established (organ, cut surface, cells) -> treatment -> cells recover -> organ recovers.
+     The script is built from each complication's own text in pathology-models.json (title, views, picks, reversibleText)
+     plus the normal and recovery wording for its organ below. The teaching text is original and needs clinical review.
+     ------------------------------------------------------------------------------------------------------------------ */
+  const PHASES = ["Normal", "Disease develops", "Established disease", "Treatment", "Recovery"];
+  const ORG_STORY = {
+    lung: { noun: "lungs",
+      normalGross: "Both lungs are pink and soft, and they inflate and empty with every breath. Air reaches millions of alveoli, where oxygen passes into the blood and carbon dioxide passes out.",
+      normalCell: "Each alveolus is a thin air sac. Type one cells form a wall only a few cells thick, type two cells make surfactant that keeps the sac open, and the neighbouring capillary carries red cells that take up oxygen across a very thin barrier.",
+      recoverCell: "The capillary seals, the epithelial pumps clear the fluid, type two cells make surfactant again, and the barrier thins back toward normal so that oxygen can cross.",
+      recoverGross: "The lungs re-expand and clear, and gas exchange improves." },
+    heart: { noun: "heart",
+      normalGross: "The healthy heart is a four-chambered muscular pump. Both ventricles fill and contract in turn, sending blood to the lungs and to the body, about once a second at rest.",
+      normalCell: "Each heart muscle cell is packed with sarcomeres and mitochondria and is linked to its neighbours through intercalated discs. Calcium enters with every beat, the cells contract together, and a dense capillary network supplies the oxygen.",
+      recoverCell: "Calcium handling and receptor signalling return, energy stores are rebuilt, and the surviving muscle cells contract in step again.",
+      recoverGross: "The chambers return toward their normal size and the pump recovers its output." },
+    vessel: { noun: "blood vessels",
+      normalGross: "Blood flows smoothly through arteries and veins. The vessel wall keeps the blood fluid and keeps it inside.",
+      normalCell: "The wall is lined by a single layer of endothelial cells with a protective glycocalyx coat. It keeps platelets and clotting proteins quiet, regulates flow, and holds plasma inside the vessel.",
+      recoverCell: "The endothelium repairs, the glycocalyx regrows, leaks close, and clotting returns to balance.",
+      recoverGross: "Flow becomes smooth again and the circulation stabilises." },
+    kidney: { noun: "kidney",
+      normalGross: "The healthy kidney is a smooth, bean-shaped organ with a pale cortex and a darker medulla. It receives about a fifth of the cardiac output to filter the blood and make urine.",
+      normalCell: "Each nephron filters blood at the glomerulus. Proximal tubular cells, with a dense brush border and many mitochondria, then reabsorb most of the filtrate, so the lumen stays open and urine flows.",
+      recoverCell: "Surviving tubular cells divide and spread over the bare basement membrane, brush borders return, and casts wash out.",
+      recoverGross: "Perfusion returns, the swelling settles, and urine output and filtration recover." },
+    pancreas: { noun: "pancreas",
+      normalGross: "The healthy pancreas is a soft, pale, lobulated gland that lies behind the stomach, tucked into the curve of the duodenum. It releases digestive enzymes into a duct and insulin into the blood.",
+      normalCell: "Acinar cells are packed with zymogen granules that store enzymes in an inactive form. The enzymes leave through ducts and only switch on in the gut, and a fine capillary network supplies each lobule.",
+      recoverCell: "The trigger has gone, enzymes stay inactive inside their granules, inflammation fades, and acinar cells regenerate.",
+      recoverGross: "Swelling and fluid settle, and the gland returns toward its normal outline." },
+    bowel: { noun: "bowel",
+      normalGross: "Healthy small bowel is pink and glistening and moves in slow waves. It has a good blood supply from the mesentery.",
+      normalCell: "The wall is lined by villi covered with enterocytes joined by tight junctions. They absorb nutrients and keep bacteria out. Each villus has its own capillary, and the tip lies furthest from the blood supply.",
+      recoverCell: "Blood flow returns, new enterocytes migrate up from the crypts, and the tight junctions seal, so the gut barrier is restored.",
+      recoverGross: "Viable bowel regains its colour and movement. Any segment that has died must be removed surgically." },
+    brain: { noun: "brain",
+      normalGross: "The healthy brain has a smooth cortex with a clear pattern of folds and ventricles of normal size. It uses about a fifth of the body's oxygen.",
+      normalCell: "Neurons fire in organised patterns, supported by astrocytes whose end-feet wrap the capillaries. Tight junctions between the endothelial cells form the blood-brain barrier, and microglia sit quietly, watching.",
+      recoverCell: "The barrier tightens again, astrocytes shrink back to normal, neurons regain their firing pattern, and microglia settle.",
+      recoverGross: "Swelling falls and pressure normalises, and the brain returns toward normal function, although neurons that died do not regrow." },
+    liver: { noun: "liver",
+      normalGross: "The healthy liver is a smooth, dark red-brown organ in the right upper abdomen. It makes proteins and clotting factors, handles glucose and drugs, and makes bile.",
+      normalCell: "Hepatocytes are arranged in plates beside blood-filled sinusoids. Bile leaves through tiny canaliculi, and the cells nearest the central vein are the furthest from oxygen.",
+      recoverCell: "Perfusion returns, bile transport recovers, and surviving hepatocytes regenerate, a special power of the liver.",
+      recoverGross: "The liver recovers its colour and size, and its synthetic function returns over days to weeks if enough cells survived." },
+    bleed: { noun: "tissue and clotting system",
+      normalGross: "Normal tissue has an intact blood supply, and small injuries seal quickly because platelets and clotting factors plug the leak.",
+      normalCell: "At the vessel wall, platelets stick to a break, fibrin builds a mesh over them, and the hole closes, so the red cells stay inside the vessel.",
+      recoverCell: "Clotting factors and platelets are replenished, the trigger is controlled, and the vessel walls can seal again.",
+      recoverGross: "Bleeding stops and the tissue stops oozing." },
+    muscle: { noun: "muscle",
+      normalGross: "Healthy muscle is firm and red, with its fibres in bundles inside a fascial sleeve and a rich blood supply.",
+      normalCell: "Each fibre is a long cell packed with sarcomeres, with its nuclei at the edge. The membrane keeps myoglobin and enzymes inside, and pumps keep calcium low between contractions.",
+      recoverCell: "Energy supply returns, membranes seal, and satellite cells rebuild the damaged fibres over weeks.",
+      recoverGross: "Swelling settles, pressure in the compartment falls, and the muscle regains its bulk and strength." },
+    skin: { noun: "skin",
+      normalGross: "Healthy skin is warm and pink, with a rich plexus of small vessels in the dermis under the epidermis.",
+      normalCell: "Small dermal vessels carry red cells freely. The endothelium stays anticoagulant, so the capillaries do not clot, and nothing leaks into the surrounding tissue.",
+      recoverCell: "The clots in the small vessels dissolve or are cleared, flow returns, and the leaks close.",
+      recoverGross: "Skin that survived regains its colour. Dead skin demarcates and is debrided later." },
+    septic: { noun: "host response to infection",
+      normalGross: "In health the epithelial barrier keeps microbes out, and a few resident immune cells deal with any that get through.",
+      normalCell: "Macrophages detect microbes, neutrophils patrol the blood, and cytokines are released in small amounts, just enough to contain a local infection.",
+      recoverCell: "The balance of inflammatory and anti-inflammatory signals is restored, the endothelium repairs, and the immune cells recover their function.",
+      recoverGross: "The infection is controlled, the organs recover, and the patient comes out of shock." },
+    generic: { noun: "organ",
+      normalGross: "The healthy organ has a normal shape, colour and blood supply, and it does its job without strain.",
+      normalCell: "Its cells are intact, well supplied with oxygen, and working in step with their neighbours.",
+      recoverCell: "Blood flow and oxygen return, the cells repair, and the surviving tissue regenerates.",
+      recoverGross: "The organ returns toward its normal appearance and function." }
+  };
+  /* complications whose data carry no "Helps / Avoid" line */
+  const TREAT = {
+    "sepsis-main": "What helps: early recognition, cultures, broad-spectrum antibiotics within the first hour, source control, balanced crystalloid fluid, and noradrenaline to keep the mean pressure at 65 or more. What to avoid: delay in antibiotics and excess fluid.",
+    ards: "What helps: lung-protective ventilation with low tidal volumes and a limited plateau pressure, a conservative fluid balance, prone positioning in severe disease, and treating the infection. What to avoid: large tidal volumes and fluid overload.",
+    aki: "What helps: restoring perfusion pressure with noradrenaline, giving fluid only while it helps, stopping nephrotoxic drugs, and adjusting antibiotic doses. Dialysis is for refractory hyperkalaemia, acidosis, overload or uraemia. What to avoid: NSAIDs, aminoglycosides, and avoidable contrast.",
+    dic: "What helps: treating the trigger first, then replacing platelets, plasma and cryoprecipitate when there is bleeding or a procedure, not to correct a number. What to avoid: tranexamic acid in thrombotic DIC.",
+    cardiac: "What helps: correcting the shock and the infection. Inotropes such as dobutamine are for persistent low output after pressure and volume are corrected. What to avoid: escalating catecholamines without checking cardiac output.",
+    hepatic: "What helps: restoring perfusion and cardiac output, controlling the source, and stopping hepatotoxic drugs. Follow glucose and the INR. What to avoid: further hepatotoxins.",
+    enceph: "What helps: treating the sepsis, correcting sodium and glucose, minimising sedatives, and choosing dexmedetomidine over benzodiazepines to reduce delirium. What to avoid: benzodiazepines where possible.",
+    shock: "What helps: early antibiotics, source control, balanced fluid, then noradrenaline to a mean pressure of 65, with vasopressin added if needed. What to avoid: excess fluid and delayed vasopressors.",
+    "dka-meta": "What helps: fluids first, then potassium, then an insulin infusion, which switches ketone production off. What to avoid: insulin before the potassium is known to be safe.",
+    "dka-kidney": "What helps: replacing the fluid deficit first, then adding insulin. What to avoid: a rapid fall in osmolality.",
+    "dka-brain": "What helps: mannitol or hypertonic saline if cerebral oedema is suspected, and a slow fall in osmolality. What to avoid: a rapid fall in osmolality."
+  };
+  /* the mechanism line for complications whose data carry no "body" text */
+  const MECH = {
+    "sepsis-main": "A dysregulated response to infection. Microbes breach the barrier, immune cells release a flood of cytokines, the endothelium leaks, and tiny clots form, so organs begin to fail.",
+    ards: "Sepsis injures the lung from the blood side. Neutrophils and cytokines damage the capillary and the alveolar wall, protein-rich fluid floods the alveoli, and oxygen can no longer cross.",
+    aki: "In sepsis the kidney is injured by low flow, inflammation and toxins. Tubular cells lose their brush border and slough off, debris blocks the tubule, and filtration falls.",
+    dic: "Sepsis triggers widespread clotting. Thrombin makes fibrin in small vessels and uses up platelets and clotting factors, so the patient clots and bleeds at the same time.",
+    cardiac: "Cytokines and nitric oxide blunt the heart muscle's response to calcium. The ventricle dilates and ejects less, although the cells are stunned rather than dead.",
+    hepatic: "In sepsis, bile transport falls and fat builds up. In shock the cells around the central vein die from lack of oxygen, so the liver cannot clear bilirubin or make clotting factors.",
+    enceph: "Inflammation opens the blood-brain barrier, astrocytes swell, and neuronal firing slows. The result is delirium and a slow EEG, without a structural injury.",
+    shock: "Mediators relax the arterioles and make the capillaries leak, so blood pressure falls and the tissues are starved of oxygen, even when cardiac output is normal or high.",
+    "dka-meta": "Without insulin the body cannot use glucose. The liver makes ketones and more glucose, the blood turns acidic and hyperglycaemic, and the osmotic diuresis dries the patient out.",
+    "dka-kidney": "Glucose spills into the urine and drags water and electrolytes with it, so the patient loses volume and potassium and the kidney's perfusion falls.",
+    "dka-brain": "Glucose and osmolality shift water across brain cells. If osmolality falls too quickly during treatment, the brain can swell."
+  };
+  function treatSay(spec) {
+    if (TREAT[spec.id]) return TREAT[spec.id];
+    const star = (spec.picks && spec.picks["*"]) || {}, care = star.care || "";
+    const m = care.match(/^Helps:\s*([\s\S]*?)(?:\s*Avoid:\s*([\s\S]*))?$/);
+    if (!m) return care || "Treat the cause and support the organ.";
+    const list = (s) => { const a = s.replace(/\.\s*$/, "").split(/;\s*/).map((x) => x.trim().replace(/^([A-Z])([a-z])/, (m, c, d) => c.toLowerCase() + d)).filter(Boolean), sep = a.some((x) => x.indexOf(",") >= 0) ? "; " : ", "; return a.length > 1 ? a.slice(0, -1).join(sep) + (sep === "; " ? "; and " : " and ") + a[a.length - 1] : (a[0] || ""); };
+    let t = "What helps: " + list(m[1]) + ".";
+    if (m[2] && m[2].trim()) t += " What to avoid: " + list(m[2]) + ".";
+    return t;
+  }
+  const words = (t) => String(t).trim().split(/\s+/).length;
+  function buildStory(spec) {
+    const O = ORG_STORY[spec.organ] || ORG_STORY.generic, V = spec.views || [], by = (i) => V.find((v) => v.id === i);
+    const g = by("organ") || V[0] || { id: "organ", text: "" }, cutv = by("cut") || by("storm"), cellv = by("cells") || V[V.length - 1] || g;
+    const star = (spec.picks && spec.picks["*"]) || {}, title = spec.title || "the disease";
+    const rev = spec.reversible == null ? 0.5 : spec.reversible;
+    const B = [];
+    const add = (ph, view, s0, s1, say) => B.push({ ph, view, s0, s1, say: say.replace(/(^|\.\s+)Tap [^.]*\./g, "$1").replace(/\s+/g, " ").trim() });
+    add(0, g.id, 0, 0, `This is the story of ${title}: the healthy ${O.noun}, the disease, the treatment and the recovery. First, the healthy ${O.noun}. ${O.normalGross}`);
+    add(0, cellv.id, 0, 0, `Now zoom in to the cells. ${O.normalCell}`);
+    add(1, g.id, 0, 0.55, `Now the disease begins. ${MECH[spec.id] || star.body || g.text}`);
+    add(2, g.id, 0.55, 1, `At its worst, this is how it looks. ${g.text}`);
+    if (cutv && cutv.id !== g.id) add(2, cutv.id, 1, 1, `${cutv.id === "cut" ? "Cut the organ open." : "Now look inside the circulation."} ${cutv.text}`);
+    add(2, cellv.id, 1, 1, `At the level of the cells. ${cellv.text}`);
+    add(3, g.id, 1, 0.45, `Now treatment begins. ${treatSay(spec)}`);
+    add(4, cellv.id, 0.45, 0.18, `Back at the cells. ${O.recoverCell}`);
+    add(4, g.id, 0.18, 0, `${O.recoverGross} ${spec.reversibleText || ""} That is the whole course: normal, injured, treated, and recovering.`);
+    B.forEach((b) => { const w = words(b.say); b.min = 3 + 0.28 * w; b.max = 6 + 0.8 * w; b.est = 2 + 0.42 * w; });
+    return B;
+  }
+
   function mount(container, hooks) {
     hooks = hooks || {};
     container.style.position = "relative";
@@ -895,27 +1028,127 @@
       });
     }).catch(() => {});
 
-    let id = hooks.start || "ards", view = "organ", severity = 0.45, shown = 0.45, mode = "live", playing = false, playT = 0;
+    let id = hooks.start || "ards", view = "organ", severity = 0.45, shown = 0.45, mode = "live";
     let yaw = 0.55, pit = 0.25, dist = 4.4, distGoal = 4.4, target = V(0, 0.05, 0);
     const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
     let dragging = false, yawGoal = null, pitGoal = null;
+    /* ---- Story: the Play button (script is built by buildStory above) ---- */
+    const embedded = (() => { try { return parent !== window; } catch (e) { return false; } })();
+    const synth = "speechSynthesis" in window ? window.speechSynthesis : null;
+    const ST = { on: false, done: false, paused: false, beats: [], i: 0, el: 0, tm: 0, sev: 0, speechDone: true, voice: true, sent: -1 };
+    let vid = 0, sVoice = null, lastT = 0;
+    if (synth) {
+      const pickV = () => {
+        const vs = synth.getVoices() || [], female = /female|woman|zira|samantha|karen|victoria|susan|tessa|moira|fiona|veena|heera|priya/i, male = /male|david|mark|daniel|alex|rishi|ravi|aaron|fred|george|james|guy|hemant|prabhat|oliver|arthur/i;
+        const en = vs.filter((v) => /^en/i.test(v.lang || "") && !female.test((v.name || "") + " " + (v.voiceURI || "")));
+        sVoice = en.find((v) => male.test((v.name || "") + " " + (v.voiceURI || ""))) || en[0] || null;
+      };
+      pickV(); if (synth.addEventListener) synth.addEventListener("voiceschanged", pickV);
+    }
+    const onMsg = (e) => { const d = e.data || {}; if (d.vodone && d.vodone === vid) ST.speechDone = true; };
+    window.addEventListener("message", onMsg);
+    /* the voice: here when the page stands alone, or by message when it sits in Pathology Live, which owns the voice and answers "vodone" */
+    function stopSpeech() { vid++; ST.speechDone = true; try { if (embedded) parent.postMessage({ stopvo: 1 }, "*"); else if (synth) synth.cancel(); } catch (e) { /* speech is a bonus */ } }
+    function speak(t) {
+      const my = ++vid; ST.speechDone = false;
+      if (window.__mute) { ST.speechDone = true; return; }
+      try {
+        if (embedded) { parent.postMessage({ vo: t, q: false, vid: my }, "*"); return; }
+        if (!synth || !ST.voice || (window.FlowAid && window.FlowAid.on === false)) { ST.speechDone = true; return; }
+        synth.cancel();
+        const ps = (t.match(/[^.!?]+[.!?]*/g) || [t]).filter((x) => x.trim());
+        ps.forEach((p, i) => {
+          const u = new SpeechSynthesisUtterance(p.trim()); u.rate = 0.88; u.pitch = 0.8; u.volume = 0.85;
+          if (sVoice) { u.voice = sVoice; u.lang = sVoice.lang; }
+          if (i === ps.length - 1) u.onend = u.onerror = () => { if (my === vid) ST.speechDone = true; };
+          synth.speak(u);
+        });
+      } catch (e) { ST.speechDone = true; }
+    }
+    /* the strip over the stage: phases, subtitles, progress and controls */
+    const storyEl = document.createElement("div");
+    storyEl.setAttribute("role", "region"); storyEl.setAttribute("aria-label", "Pathophysiology story");
+    storyEl.style.cssText = "position:absolute;left:8px;right:8px;bottom:30px;z-index:4;display:none;background:rgba(6,12,18,.88);border:1px solid rgba(127,212,230,.42);border-radius:12px;padding:7px 10px 8px;color:#f3efe6;font:500 12.5px/1.4 Figtree,Segoe UI,sans-serif;touch-action:manipulation";
+    const phEl = document.createElement("div"); phEl.style.cssText = "display:flex;gap:3px;flex-wrap:nowrap;overflow:hidden;margin-bottom:5px";
+    const phs = ["Normal", "Develops", "Established", "Treatment", "Recovery"].map((p) => { const s = document.createElement("span"); s.textContent = p; s.style.cssText = "font:700 9px/1 Figtree,sans-serif;letter-spacing:.02em;text-transform:uppercase;padding:4px 5px;border-radius:99px;border:1px solid rgba(243,239,230,.22);color:#b7b1a4"; phEl.appendChild(s); return s; });
+    const capEl = document.createElement("div"); capEl.style.cssText = "min-height:2.8em;color:#f3efe6";
+    const prog = document.createElement("div"); prog.style.cssText = "height:3px;border-radius:3px;background:rgba(243,239,230,.16);margin:6px 0 6px;overflow:hidden";
+    const progI = document.createElement("i"); progI.style.cssText = "display:block;height:100%;width:0;background:#7fd4e6"; prog.appendChild(progI);
+    const ctEl = document.createElement("div"); ctEl.style.cssText = "display:flex;gap:6px;align-items:center;flex-wrap:wrap";
+    const sbtn = (label, title, fn) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.title = title; b.setAttribute("aria-label", title); b.style.cssText = "min-height:30px;min-width:34px;padding:0 10px;border-radius:99px;border:1px solid rgba(243,239,230,.3);background:rgba(8,14,20,.8);color:#f3efe6;font:700 12px/1 Figtree,sans-serif"; b.onpointerdown = (e) => e.stopPropagation(); b.onclick = (e) => { e.stopPropagation(); fn(); }; ctEl.appendChild(b); return b; };
+    const bPrev = sbtn("⏮", "Previous part", () => jump(ST.i - 1));
+    const bPlay = sbtn("⏸", "Pause or resume", () => playToggle());
+    const bNext = sbtn("⏭", "Next part", () => jump(ST.i + 1));
+    const bVoice = !embedded && synth ? sbtn("Voice on", "Voice-over on or off", () => { ST.voice = !ST.voice; bVoice.textContent = ST.voice ? "Voice on" : "Voice off"; if (!ST.voice) stopSpeech(); else if (ST.on && !ST.paused) speak(ST.beats[ST.i].say); }) : null;
+    const bStop = sbtn("✕ Close", "Close the story", () => stopStory());
+    bStop.style.marginLeft = "auto";
+    [phEl, capEl, prog, ctEl].forEach((n) => storyEl.appendChild(n));
+    storyEl.addEventListener("pointerdown", (e) => e.stopPropagation());
+    container.appendChild(storyEl);
+    let capKey = "";
+    function paintStory() {
+      const b = ST.beats[ST.i]; if (!b) return;
+      phs.forEach((s, k) => { const on = k === b.ph, past = k < b.ph; s.style.color = on ? "#06121a" : past ? "#7fd4e6" : "#b7b1a4"; s.style.background = on ? "#7fd4e6" : "transparent"; s.style.borderColor = on ? "#7fd4e6" : past ? "rgba(127,212,230,.5)" : "rgba(243,239,230,.22)"; });
+      const ss = (b.say.match(/[^.!?]+[.!?]*/g) || [b.say]).map((x) => x.trim()).filter(Boolean), cw = ss.map((x) => words(x)), tot = cw.reduce((a, c) => a + c, 0);
+      const p = ST.done ? 1 : Math.min(0.999, ST.tm / b.est); let acc = 0, k = 0; for (; k < ss.length - 1; k++) { acc += cw[k]; if (p * tot < acc) break; }
+      const key = ST.i + ":" + k + ":" + ST.paused; if (key !== capKey) { capKey = key; capEl.textContent = ss[k]; }
+      progI.style.width = Math.round(((ST.i + (ST.done ? 1 : Math.min(1, ST.el / b.est))) / ST.beats.length) * 100) + "%";
+      bPlay.textContent = ST.done ? "↻ Replay" : ST.paused ? "▶ Resume" : "⏸ Pause";
+      bPrev.disabled = ST.i <= 0; bNext.disabled = ST.done || ST.i >= ST.beats.length - 1; bPrev.style.opacity = bPrev.disabled ? 0.4 : 1; bNext.style.opacity = bNext.disabled ? 0.4 : 1;
+    }
+    function paintThermo(s) { const tf = document.getElementById("tf"); if (!tf) return; const e = Math.max(0, Math.min(1, s)); tf.style.height = Math.round(e * 100) + "%"; tf.style.background = "hsl(" + Math.round(55 - 55 * e) + ",75%,58%)"; }
+    function beginBeat(i) {
+      ST.i = Math.max(0, Math.min(ST.beats.length - 1, i)); ST.el = 0; ST.tm = 0; ST.paused = false; ST.done = false; capKey = "";
+      const b = ST.beats[ST.i], changed = b.view !== view;
+      mode = "live"; view = b.view; current = apply();
+      if (changed && hooks.onView) { try { hooks.onView(view); } catch (e) { /* the page's own chips are a bonus */ } }
+      tagEl.textContent = "Story · " + PHASES[b.ph];
+      speak(b.say); paintStory();
+    }
+    function jump(i) { if (!ST.on && !ST.done) return; if (i < 0 || i >= ST.beats.length) return; ST.on = true; const b = ST.beats[i]; const m = models[id]; if (m && b.s0 === 0 && b.s1 === 0) m.peak = 0; beginBeat(i); }
+    function startStory() {
+      const entry = current.entry; ST.beats = buildStory(entry.spec); entry.peak = 0; shown = 0; ST.sev = 0; ST.on = true; storyEl.style.display = ""; beginBeat(0);
+    }
+    function playToggle() {
+      if (ST.done) { startStory(); return; }
+      if (!ST.on) { startStory(); return; }
+      ST.paused = !ST.paused;
+      if (ST.paused) stopSpeech(); else { ST.tm = 0; speak(ST.beats[ST.i].say); }
+      buttons(); paintStory();
+    }
+    function endStory() { ST.on = false; ST.done = true; stopSpeech(); window.__storySev = 0; hooks.onStoryEnd && hooks.onStoryEnd(); buttons(); paintStory(); }
+    function stopStory() {
+      if (!ST.on && !ST.done) return; const was = ST.on; ST.on = false; ST.done = false; ST.paused = false; stopSpeech(); storyEl.style.display = "none"; window.__storySev = null;
+      try { window.__specSync && window.__specSync(); } catch (e) { /* ignore */ }
+      if (was) { current = apply(); }
+    }
+    function storyFrame(dt) {
+      const b = ST.beats[ST.i];
+      if (!ST.paused) {
+        ST.el += dt; ST.tm += dt;
+        if (ST.tm >= b.min && (ST.speechDone || ST.tm >= b.max)) { if (ST.i >= ST.beats.length - 1) { endStory(); return current.targetSev; } beginBeat(ST.i + 1); }
+      }
+      const bb = ST.beats[ST.i], u = Math.max(0, Math.min(1, ST.el / bb.est)), e = u * u * (3 - 2 * u);
+      ST.sev = bb.s0 + (bb.s1 - bb.s0) * e; window.__storySev = ST.sev; paintStory();
+      return ST.sev;
+    }
 
     function buttons() {
       const spec = catalog.find((c) => c.id === id) || catalog[0];
       bar.innerHTML = "";
-      [["live", "Live"], ["normal", "Normal"], ["diseased", "Diseased"], ["play", playing ? "Pause" : "Play"], ["pins", marksOn ? "Pins on" : "Pins off"], ["reset", "Reset"]].forEach(([k, label]) => {
+      [["live", "Live"], ["normal", "Normal"], ["diseased", "Diseased"], ["play", ST.on ? (ST.paused ? "Resume" : "Pause") : "Play"], ["pins", marksOn ? "Pins on" : "Pins off"], ["reset", "Reset"]].forEach(([k, label]) => {
         const b = document.createElement("button");
         b.type = "button";
         b.textContent = label;
         b.style.cssText = "min-height:32px;padding:0 10px;border-radius:999px;border:1px solid rgba(243,239,230,.28);background:rgba(8,14,20,.72);color:#f3efe6;font:600 12px/1 Figtree,sans-serif";
-        if (k === mode || (k === "play" && playing) || (k === "pins" && marksOn)) b.style.borderColor = "#7fd4e6";
+        if (k === mode || (k === "play" && ST.on) || (k === "pins" && marksOn)) b.style.borderColor = "#7fd4e6";
         b.onpointerdown = (e) => e.stopPropagation();
         b.onclick = (e) => {
           e.stopPropagation();
           if (k === "pins") { marksOn = !marksOn; buttons(); return; }
           if (k === "reset") { yawGoal = null; distGoal = frameDist(); pit = 0.25; return; }
-          if (k === "play") { playing = !playing; playT = 0; if (playing) { mode = "live"; current = apply(); } else buttons(); return; }
-          else { mode = k; playing = false; }
+          if (k === "play") { playToggle(); return; }
+          else { stopStory(); mode = k; }
           current = apply(); /* recompute the target severity, otherwise Normal and Diseased only change the caption */
         };
         bar.appendChild(b);
@@ -1055,7 +1288,7 @@
               part:"Title"  cell view: sits on the scene object whose tap title is this
               at:[x,y,z]    cell view: position in the scene }                                             */
     let marksData = { organ: {}, spec: {} }, marksOn = true;
-    fetch(BASE + "marks.json?v=20261119h").then((r) => r.json()).then((d) => { marksData = d || marksData; Object.keys(models).forEach((k) => { (models[k].pins || []).forEach((p) => { if (p.el) p.el.remove(); if (p.line) p.line.remove(); }); models[k].pins = null; }); }).catch(() => {});
+    fetch(BASE + "marks.json?v=20261126s").then((r) => r.json()).then((d) => { marksData = d || marksData; Object.keys(models).forEach((k) => { (models[k].pins || []).forEach((p) => { if (p.el) p.el.remove(); if (p.line) p.line.remove(); }); models[k].pins = null; }); }).catch(() => {});
     const PIN_COL = { lesion: "#ff7a59", part: "#7fd4e6" };
     function ringTex(col) {
       const c = document.createElement("canvas"); c.width = c.height = 96;
@@ -1340,12 +1573,9 @@
       dist += (distGoal - dist) * (1 - Math.exp(-dt * 3));
       if (!dragging && !calm && view === "organ" && !entry.spec.still) yaw += dt * 0.18;
       let targetSev = current.targetSev;
-      if (playing) {
-        playT += dt * 0.28;
-        targetSev = severity * Math.sin(Math.min(playT, 1) * Math.PI);
-        if (playT >= 1) { playing = false; buttons(); }
-      }
+      if (ST.on) { const rt = performance.now() / 1000, rdt = lastT ? Math.min(0.25, rt - lastT) : dt; lastT = rt; targetSev = storyFrame(rdt); } else { lastT = 0; if (ST.done) targetSev = 0; }  /* after the story the organ stays recovered until the story is closed */
       shown += (targetSev - shown) * (1 - Math.exp(-dt * 2.4));
+      if (ST.on || ST.done) paintThermo(shown);
       entry.peak = Math.max(shown, entry.peak * (entry.spec.reversible > 0.85 ? 0.992 : 1));
       const nec = mode === "normal" ? 0 : Math.max(shown, entry.peak * (1 - (entry.spec.reversible == null ? 0.5 : entry.spec.reversible)));
       applyDisease(entry, shown, nec, t, extra);
@@ -1364,10 +1594,11 @@
     return {
       set(opts) {
         opts = opts || {};
+        if (opts.id && opts.id !== id) stopStory();
         if (opts.id && opts.id !== id && models[opts.id]) { id = opts.id; if (models[id]) models[id].peak = Math.max(models[id].peak, severity); }
         else if (opts.id && !models[opts.id]) { const spec = catalog.find((c) => c.id === opts.id); if (spec) { ensure(spec); id = opts.id; } }
         if (opts.view) view = opts.view === "cell" ? "cells" : opts.view;
-        if (opts.severity != null && mode === "live" && !playing) severity = clamp(opts.severity);
+        if (opts.severity != null && mode === "live" && !ST.on) severity = clamp(opts.severity);
         if (opts.extra) extra = opts.extra;
         current = apply();
       },
@@ -1376,7 +1607,8 @@
       focus(i) { const l = pinsFor(current.entry).filter((p) => p.def.view === view); if (l[i]) pickPin(l[i]); },
       pose(y, p, d) { yaw = y; pit = p; if (d) { distGoal = d; dist = d; } },
       debug() { const e = current.entry; return { id, view, mode, shown, targetSev: current.targetSev, organ: e.organ.children.length, cells: e.cells.children.length, cellsVisible: e.cells.visible, glb: !!e.glb, capVisible: e.capMesh.visible, pins: (e.pins || []).filter((p) => p.ring.visible).map((p) => p.def.label), pinState: (e.pins || []).map((p) => [p.def.label, p.def.view, p.placed, +p.a.toFixed(2)]) }; },
-      destroy() { dead = true; ro.disconnect(); renderer.dispose(); }
+      destroy() { dead = true; stopSpeech(); window.removeEventListener("message", onMsg); ro.disconnect(); renderer.dispose(); },
+      story: { start: () => startStory(), stop: () => stopStory(), state: () => ({ on: ST.on, done: ST.done, paused: ST.paused, i: ST.i, n: ST.beats.length, view, sev: ST.sev, say: (ST.beats[ST.i] || {}).say }), jump, build: (sid) => buildStory(catalog.find((c) => c.id === (sid || id))) }
     };
   }
 
@@ -1384,6 +1616,7 @@
     mount,
     register: function (name, def) { EXTRA[name] = def; },
     kit: KIT,
+    buildStory: buildStory,
     catalog: function () { return CATALOG.map((c) => ({ id: c.id, title: c.title, views: c.views })); }
   };
 })();

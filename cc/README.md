@@ -32,14 +32,14 @@ live readout (HUD), a severity thermometer, view chips (Organ / Cut-away / Cells
 - Cut-away is a real cross-section: GLB meshes are sliced at plane `x = entry.cutX` and the loops are triangulated into a cap (`buildCap`).
   The lung is cut through the right lung (`cutX = -0.6`). Cut pins use `cut:[u,v]` as fractions of the cap bounding box (x1.6).
 - Procedural organs (vessel, bleed, pancreas, bowel, muscle, skin) still use the simple disc cut and have organ and cell pins only.
-- Edit pins in cc/src/marks_src.py and regenerate: `cd cc/src && python3 marks_src.py ../../sepsis/marks.json`. Cache-bust string is 20261119h.
+- Edit pins in cc/src/marks_src.py and regenerate: `cd cc/src && python3 marks_src.py ../../sepsis/marks.json`. Cache-bust string is 20261126s.
 
 ## Flow model: particle key and voice-over (cc/flow-aid.js)
 `FlowAid.mount({stage, key, intro, state, stages, outro})` adds three buttons to the flow-model stage: **Key** (a panel that names every coloured particle and shape), **Explain flow** (a male voice-over that walks through the scene, the key rows, the current readings, each camera stage and the drugs) and **Voice on/off**.
 - cc/lab.html: each archetype in `AR.*` returns `key` (rows of `[css colour, "Red dots", "meaning", optional shape class]`) and `say` (one-line scene description). Cell scenes build the key from the scene colours and `scene.kn` in db.json (meanings of inside, outside, leak and toxin particles for that complication). Keep `key` in step with any new particle set.
 - DKA labs (dka/lab-*.html) and sepsis/lab-shock.html pass their own `key` rows to the same mount call.
 - `FlowAid.vo(text, queue)` speaks on a standalone page; inside Pathology Live it posts `{vo, q}` to the parent, which owns the voice. `{stopvo:1}` cancels it.
-- sepsis/lab-shock.html now uses the same shell as the DKA labs (Specimen key `shock`, with fluid slider in the Drugs tab). Cache-bust string is 20261119h.
+- sepsis/lab-shock.html now uses the same shell as the DKA labs (Specimen key `shock`, with fluid slider in the Drugs tab). Cache-bust string is 20261126s.
 
 ## Disease-level labs ("<Disease> itself")
 Every disease tab in Pathology Live also has a lab for the disease itself: a photoreal specimen (Organ / Cut-away / Cells, Normal and Diseased) plus the interactive 3D model.
@@ -54,3 +54,12 @@ Sepsis does not use an organ or a tissue block. `organ: "septic"` is a purpose-b
 - **Cytokine storm** (`storm`): a cut-open venule with TNF-alpha, IL-1 beta, IL-6, IL-8 and IL-10 clouds, activated endothelium, glycocalyx loss, plasma leak, micro clots.
 - **Immune dysregulation** (`cells`): hyperinflammation against immune paralysis (exhausted T cell with PD-1, low HLA-DR monocyte, apoptotic lymphocytes) with a balance beam.
 Severity drives all three. Custom view ids need `still`, `cam` and `dist` per view in the spec (see `d6.py`); `nav` gives the button label. Pins use `part` titles from the scene.
+
+## Play: the full course with voice-over (sepsis/path-stage.js)
+**Play** on the 3D organ stage runs one scripted course for every complication (all 56 specimens, all 12 organ types), with a male voice-over and subtitles:
+normal organ, normal cells, disease develops, established disease (organ, cut surface or cytokine storm, cells), treatment, cells recover, organ recovers.
+- The script is built by `buildStory(spec)` from each entry in `pathology-models.json` (`title`, `views`, `picks["*"].body`, `picks["*"].care` = "Helps: ...; Avoid: ...", `reversibleText`) plus the normal and recovery wording per organ in `ORG_STORY`. Entries without a `picks` line (sepsis labs and the three DKA labs) use `MECH` and `TREAT` by id. A new organ needs one `ORG_STORY` entry; a new complication needs no code.
+- Severity follows the story (0, rises to 1, falls back). The irreversible share (`reversible`) stays visible after treatment, so recovery is honest about what does not come back. The organ holds its recovered state until the story is closed.
+- The strip over the stage has phase chips, subtitles, progress, previous, pause or resume, next, voice on/off (stand-alone pages) and close. Beats wait for the voice to finish; `vodone` is sent back by Pathology Live (`pathology-live.html`) when it owns the voice. Without a voice, beats last as long as the subtitles need.
+- Hooks for pages: `onView(view)` keeps chips in step, `window.__storySev` is the current story severity, `__stage.story.{start,stop,jump,state,build}` is the API. The thermometer `#tf` follows the story.
+- The teaching text is original and needs clinical review. Cache-bust string is 20261126s.

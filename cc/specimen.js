@@ -33,7 +33,8 @@
         stage = window.__stage = PathStage.mount(o.wrap, {
           catalog: [spec], lazy: true, start: spec.id, modelsUrl: false, leader: !!o.leader,
           onPick: (p) => { if (o.onPick) o.onPick(p); },
-          onLabel: (html) => { if (html !== last) { last = html; if (o.onLabel) o.onLabel(html); } }
+          onLabel: (html) => { if (html !== last) { last = html; if (o.onLabel) o.onLabel(html); } },
+          onView: (v) => { curView = v; buttons(); if (o.onView) o.onView(v); }
         });
         stage.set({ id: spec.id, view: curView, severity: sev });
       }

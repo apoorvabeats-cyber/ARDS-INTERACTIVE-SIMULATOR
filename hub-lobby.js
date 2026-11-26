@@ -448,7 +448,7 @@ if (!gate || !canvas || !document.body.classList.contains("icu-gate")) {
     } else if (kind === "micro") {
       location.href = "microbiology.html?v=20261119g";
     } else {
-      location.href = "pathology-live.html?v=20261119g";
+      location.href = "pathology-live.html?v=20261126s";
     }
   }
 

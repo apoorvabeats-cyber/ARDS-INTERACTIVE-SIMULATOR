@@ -104,7 +104,7 @@ body.sepsis #sepsis-lab{display:block}
   </div>
   <p class="soon" id="soon" hidden></p>
 <script>
-const VER = "20261119h";
+const VER = "20261126s";
 const TABS = [["sepsis","Sepsis"],["ards","ARDS"],["dka","DKA / HHS"],["pancreatitis","Acute pancreatitis"],["aki","AKI"],["alf","Acute liver failure"],["ahf","Acute heart failure"],["tbi","Traumatic brain injury"],["status","Status epilepticus"],["dic","DIC"]];
 const MODS = {
  "sepsis": {
@@ -408,13 +408,17 @@ function maleVoice(){
   const en = voices.filter(v=>/^en/i.test(v.lang||"") && !female.test((v.name||"")+" "+(v.voiceURI||"")));
   return en.find(v=>male.test((v.name||"")+" "+(v.voiceURI||""))) || en[0] || null;
 }
-function speak(text, queue){
-  if(!VOICE.on || !text || !window.speechSynthesis) return;
+function speak(text, queue, vid, src){
+  /* a lab that sends a voice id (the Play story) is told when its line has been spoken, or at once when the voice is off */
+  const done = ()=>{ if(vid && src){ try{ src.postMessage({vodone:vid}, "*"); }catch(e){} } };
+  if(!VOICE.on || !text || !window.speechSynthesis){ done(); return; }
   if(!queue) speechSynthesis.cancel();
-  (String(text).match(/[^.!?]+[.!?]*/g) || [text]).forEach(part=>{
+  const parts = (String(text).match(/[^.!?]+[.!?]*/g) || [text]).filter(p=>p.trim());
+  parts.forEach((part,i)=>{
     const u = new SpeechSynthesisUtterance(part.trim());
     u.rate = 0.88; u.pitch = 0.8; u.volume = 0.8;
     const v = maleVoice(); if(v) u.voice = v;
+    if(i === parts.length-1){ u.onend = done; u.onerror = done; }
     speechSynthesis.speak(u);
   });
 }
@@ -429,7 +433,7 @@ $("voice").onclick = ()=>{
 window.addEventListener("message", e=>{
   if(e.source !== frame.contentWindow && e.source !== labf.contentWindow) return;
   const d = e.data || {}, mod = MODS[state.id];
-  if(d.vo) speak(d.vo, d.q);
+  if(d.vo) speak(d.vo, d.q, d.vid, e.source);
   if(d.stopvo && window.speechSynthesis) speechSynthesis.cancel();
   if(d.lab && mod && e.source === frame.contentWindow && mod.labs.some(l=>l[0]===d.lab)){ state.lab = d.lab; render(); }
 });

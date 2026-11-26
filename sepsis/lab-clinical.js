@@ -160,14 +160,22 @@
     const spec = SPECS[id];
     if (!spec || !window.PathStage) return;
     const cv = $("#cv");
+    let shellApi = null;
     const stage = window.__stage = PathStage.mount(cv, {
       leader: true,
+      /* the story (Play) changes the view on its own: keep this page's chips, caption and stage buttons in step, without speaking over it */
+      onView(v) {
+        const i = spec.views.indexOf(v); if (i < 0) return;
+        viewI = i; $("#lbl").innerHTML = `<b>${names[i]}</b>${spec.stageText[i]}`;
+        document.querySelectorAll("[data-s]").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.s === i));
+        if (shellApi) shellApi.setView(i);
+      },
       onLabel(html) { const q = $("#info"); if (q) q.innerHTML = html; },
       onPick(info) {
         $("#info").innerHTML = `<strong>${info.title}</strong><br>${info.body}<br><em>Drugs and care:</em> ${info.care}`;
       }
     });
-    fetch("pathology-models.json?v=20261119h").then((r) => r.json()).then((d) => {
+    fetch("pathology-models.json?v=20261126s").then((r) => r.json()).then((d) => {
       const sp = (d.complications || []).find((c) => c.id === id), host2 = $("#revslot") || $("#stages");
       if (!sp || !sp.reversibleText || !host2) return;
       const pct = Math.round(Math.max(0, Math.min(1, sp.reversible == null ? 0.5 : sp.reversible)) * 100);
@@ -265,7 +273,7 @@
     go(0);
     refresh();
     if (window.LabShell) {
-      const shell = LabShell.attach({ stage, views: spec.views, names: ["Organ", "Cut-away", "Cells"], go });
+      shellApi = LabShell.attach({ stage, views: spec.views, names: ["Organ", "Cut-away", "Cells"], go });
       const g0 = go; /* keep the chips in step when the lab changes view itself */
     }
   }
