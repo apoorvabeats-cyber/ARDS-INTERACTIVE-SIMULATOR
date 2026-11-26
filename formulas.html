@@ -880,92 +880,7 @@ const findEl = document.getElementById("find");
 let mod = "haem";
 let current = "map";
 let query = "";
-let spokenId = "";
-let speakTimer = 0;
 function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return "&#"+c.charCodeAt(0)+";"; }); }
-function sayable(s){
-  return String(s||"")
-    .replace(/PaO₂\/FiO₂/gi,"P to F ratio")
-    .replace(/×/g," times ")
-    .replace(/²/g," squared")
-    .replace(/√/g," square root of ")
-    .replace(/−|–/g," ")
-    .replace(/µ/g," micro")
-    .replace(/≥/g," at least ")
-    .replace(/≤/g," at most ");
-}
-function femaleVoice(){
-  if(!window.speechSynthesis) return null;
-  const voices = speechSynthesis.getVoices() || [];
-  const soft = /samantha|karen|moira|fiona|tessa|serena|victoria|allison|ava|nicky|veena|heera|sonia|catherine|libby|susan|siri|google uk english female|female/i;
-  const male = /\bmale\b|alex|daniel|fred|rishi|aaron|arthur|gordon|oliver|ralph|reed|rocko|\btom\b|david|james|albert|bruce|junior|nathan|lee|ravi/i;
-  function label(voice){ return (voice.name || "") + " " + (voice.voiceURI || ""); }
-  const en = voices.filter(function(voice){ return /^en/i.test(voice.lang || "") && !male.test(label(voice)); });
-  return en.find(function(voice){ return soft.test(label(voice)); })
-    || voices.find(function(voice){ return soft.test(label(voice)) && !male.test(label(voice)); })
-    || en[0]
-    || null;
-}
-function soundAllowed(){
-  try{
-    if(window.parent && window.parent !== window){
-      const btn = window.parent.document.getElementById("sound");
-      if(btn) return btn.getAttribute("aria-pressed") !== "false";
-    }
-  }catch(err){}
-  return true;
-}
-function spokenPoints(rows){
-  if(!rows || !rows.length || (rows.length===1 && rows[0][0]==="No classification")) return "No classification.";
-  const out = [];
-  let i = 0;
-  while(i<rows.length){
-    const bits = [rows[i][1]];
-    let j = i+1;
-    while(j<rows.length && rows[j][0]===rows[i][0]){ bits.push(rows[j][1]); j++; }
-    out.push(rows[i][0]+". "+bits.join(". "));
-    i = j;
-  }
-  return out.join(". ");
-}
-function speakNow(text){
-  if(!soundAllowed() || !text || !window.speechSynthesis) return;
-  const utterance = new SpeechSynthesisUtterance(sayable(text));
-  utterance.rate = 0.9;
-  utterance.pitch = 1.08;
-  const go = function(){
-    const voice = femaleVoice();
-    if(voice){ utterance.voice = voice; utterance.lang = voice.lang || "en-GB"; }
-    else utterance.lang = "en-GB";
-    speechSynthesis.resume();
-    speechSynthesis.speak(utterance);
-  };
-  if(speechSynthesis.speaking || speechSynthesis.pending){
-    speechSynthesis.cancel();
-    setTimeout(go, 80);
-  } else go();
-}
-function speakCard(f){
-  if(!f) return;
-  let text;
-  if(f.kind==="crit"){
-    text = f.name+". Formula. "+spokenPoints(f.formula)+". Diagnostic criteria. "+spokenPoints(f.diagnostic)+". Classification. "+spokenPoints(f.classification)+". Clinical use. "+spokenPoints(f.application)+".";
-  } else {
-    const keys = (f.abbr||[]).map(function(pair){ return pair[0]+" means "+pair[1]; }).join(". ");
-    text = f.name+". "+f.expr+". "+keys;
-  }
-  speakNow(text);
-}
-function queueSpeak(f){
-  clearTimeout(speakTimer);
-  if(window.speechSynthesis) speechSynthesis.cancel();
-  speakTimer = setTimeout(function(){ speakCard(f); }, 400);
-}
-if(window.speechSynthesis){
-  speechSynthesis.getVoices();
-  speechSynthesis.addEventListener("voiceschanged", function(){ speechSynthesis.getVoices(); });
-}
-window.addEventListener("pagehide", function(){ if(window.speechSynthesis) speechSynthesis.cancel(); });
 function pool(){
   return F.filter(function(f){ return mod==="crit" ? f.kind==="crit" : f.kind!=="crit"; });
 }
@@ -1042,7 +957,6 @@ function paintCard(){
       "<div class='sect'><b>Diagnostic criteria</b>"+tableOf(f.diagnostic)+"</div>"+
       "<div class='sect'><b>Classification</b>"+tableOf(f.classification)+"</div>"+
       "<div class='sect'><b>Clinical application</b>"+tableOf(f.application)+"</div>";
-    noteVoice(f);
     return;
   }
   const fields = f.inputs.map(function(inp){
@@ -1063,12 +977,6 @@ function paintCard(){
     el.addEventListener("input", calc);
   });
   calc();
-  noteVoice(f);
-}
-function noteVoice(f){
-  if(!f || spokenId===f.id) return;
-  spokenId = f.id;
-  queueSpeak(f);
 }
 function calc(){
   const f = F.find(function(x){ return x.id===current; });
@@ -1091,21 +999,15 @@ function calc(){
 function openFound(f, now){
   current = f.id;
   if(f.kind!=="crit") mod = f.mod;
-  if(now) spokenId = f.id;
   if(mod!=="crit") paintMods();
   paintList();
   paintCard();
-  if(now){
-    clearTimeout(speakTimer);
-    speakCard(f);
-  }
 }
 mods.onclick = function(e){
   const btn = e.target.closest("[data-mod]");
   if(!btn) return;
   query = "";
   findEl.value = "";
-  spokenId = "";
   mod = btn.getAttribute("data-mod");
   const first = F.find(function(f){ return f.mod===mod; });
   current = first.id;
@@ -1115,7 +1017,6 @@ list.onclick = function(e){
   const btn = e.target.closest("[data-id]");
   if(!btn) return;
   current = btn.getAttribute("data-id");
-  spokenId = "";
   const chosen = F.find(function(f){ return f.id===current; });
   if(chosen && chosen.kind!=="crit") mod = chosen.mod;
   paintList(); paintCard();
