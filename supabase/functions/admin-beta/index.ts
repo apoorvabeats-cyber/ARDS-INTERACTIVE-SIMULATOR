@@ -1,9 +1,12 @@
 // Edge Function: admin-beta
 // Lets an ADMIN list beta users and approve / reject them. The service-role key lives ONLY here, as a server-side env var.
-// Deploy:  supabase functions deploy admin-beta
-// Secrets: supabase secrets set ADMIN_EMAILS="you@example.com,other@example.com" ALLOWED_ORIGINS="https://<user>.github.io"
+// Deploy (iPhone/dashboard): Supabase > Edge Functions > Deploy a new function > Via Editor > name it admin-beta > paste this file. Keep "Verify JWT" ON.
+// Deploy (computer/CLI):    supabase functions deploy admin-beta
+// Secrets (Edge Functions > Secrets, or CLI): ADMIN_EMAILS="you@example.com,other@example.com"  ALLOWED_ORIGINS="https://<user>.github.io"
+// Secret names cannot start with SUPABASE_ (reserved).
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by Supabase automatically. Do not set them by hand, never print them.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// Pinned to an exact version so a new upstream release can never change this function by surprise.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
