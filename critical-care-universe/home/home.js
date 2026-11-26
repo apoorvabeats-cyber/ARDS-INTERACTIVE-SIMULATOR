@@ -532,7 +532,7 @@ function frame(now) {
   }
 }
 function loop() { if (manual) return; requestAnimationFrame(loop); frame(performance.now()); }
-window.__ccu = { step(ms) { clock += ms; frame(clock); }, manual() { manual = true; clock = performance.now(); last = clock; }, heroRate: (r) => { H.rate = r; }, ready: null, heroTime: (t) => H.actor && H.actor.hero && H.actor.hero.setTime(t), heroKind: () => H.kind, view: () => view, setHero: setHeroSafe, S, openQuick, openParent };
+window.__ccu = { step(ms) { clock += ms; frame(clock); }, manual() { manual = true; clock = performance.now(); last = clock; }, heroRate: (r) => { H.rate = r; }, ready: null, heroNow: () => H.actor && H.actor.hero && H.actor.hero.time(), heroTime: (t) => H.actor && H.actor.hero && H.actor.hero.setTime(t), heroKind: () => H.kind, view: () => view, setHero: setHeroSafe, S, openQuick, openParent };
 
 /* ======================================================================== start */
 applyS(); paintProfile(); H.shown = true; $("#teamFrame").style.display = "none";
