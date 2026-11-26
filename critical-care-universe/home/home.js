@@ -452,6 +452,7 @@ function paintSettings() {
   <div class="tg"><span>Graphics quality</span><div class="seg" id="sQ">${["low", "med", "high"].map((q) => `<button type="button" data-q="${q}" class="${S.quality === q ? "on" : ""}">${q}</button>`).join("")}</div></div>
   ${tg("sAnim", "Animated doctor", S.heroAnim)}${tg("sRed", "Reduce motion", S.reduced)}${sl("sBlur", "Background blur", S.blur, 0, 24, 1, (v) => v + "px")}
   <div class="row"><button class="btn q" id="sReset" type="button">Reset</button>${window.ccuAuth ? `<button class="btn q" id="sOut" type="button" title="${(window.ccuAuth.email || "").replace(/[<>&"]/g, "")}">Sign out</button>` : ""}</div>`;
+  pS.insertAdjacentHTML("beforeend", `<p class="sub" style="margin:12px 0 0"><a href="${(window.ccuAuth && window.ccuAuth.base) || "../"}legal/privacy.html" target="_blank" rel="noopener" style="color:inherit">Privacy Policy</a> &middot; <a href="${(window.ccuAuth && window.ccuAuth.base) || "../"}legal/support.html" target="_blank" rel="noopener" style="color:inherit">Support</a></p>`);
   const bind = (id, key, out) => { const i = $("#" + id, pS); i.oninput = () => { S[key] = +i.value; $("#" + id + "o", pS).textContent = out(S[key]); saveS(); applyS(); }; };
   bind("sMusic", "music", pct); bind("sFx", "fx", pct); bind("sBlur", "blur", (v) => v + "px");
   const sw = (id, key) => { const b = $("#" + id, pS); b.onclick = () => { S[key] = !S[key]; b.classList.toggle("on", S[key]); b.setAttribute("aria-checked", S[key]); saveS(); applyS(); }; };

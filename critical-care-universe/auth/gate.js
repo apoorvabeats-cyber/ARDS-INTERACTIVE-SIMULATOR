@@ -47,7 +47,7 @@
         '<span class="cg-chip">Private beta</span>' +
       '</div>' +
       '<div class="cg-card" id="cgCard" aria-live="polite"></div>' +
-      '<p class="cg-foot">Access is granted by approval</p>' +
+      '<p class="cg-foot">Access is granted by approval<br><a href="' + BASE + 'legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a> <span aria-hidden="true">&middot;</span> <a href="' + BASE + 'legal/support.html" target="_blank" rel="noopener">Support</a></p>' +
     '</div>';
 
   function mount() {
