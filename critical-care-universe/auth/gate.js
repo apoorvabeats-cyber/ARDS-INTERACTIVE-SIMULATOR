@@ -96,7 +96,7 @@
         '<div class="cg-meter" aria-hidden="true"><i id="cgMeter"></i></div><div style="height:12px"></div>' + pwField("cgPw2", "Confirm new password", "new-password", "Type it again") + btn("Save password") + '</form>';
     },
     verify: function (o) {
-      return '<div class="cg-state">' + ICON.mail + '<h1>Check your email</h1><p class="cg-sub">We sent a confirmation link to <b>' + esc(o.email) + '</b>. Open it on this device to verify your address. Then you will be placed in the approval queue.</p></div>' + MSGBOX +
+      return '<div class="cg-state">' + ICON.mail + '<h1>Check your email</h1><p class="cg-sub">We sent a confirmation link to <b>' + esc(o.email) + '</b>. Open it on this device to verify your address. Next, your request goes to <b>Pending approval</b> until a team member approves it.</p></div>' + MSGBOX +
         '<button class="cg-btn" type="button" id="cgResend" data-act="resend">Resend email</button>' +
         '<div class="cg-links"><button class="cg-link" type="button" data-go="login">Back to sign in</button></div>';
     },
@@ -128,7 +128,7 @@
     var first = card.querySelector("input");
     if (first && !o.noFocus) { try { first.focus({ preventScroll: true }); } catch (e) {} }
     if (name === "pending") pollTimer = setInterval(function () { recheck(true); }, 15000);
-    if (name === "verify") startCooldown(30);
+    if (name === "verify") startCooldown(60);
     root.scrollTop = 0;
   }
   function setMsg(kind, text) {
