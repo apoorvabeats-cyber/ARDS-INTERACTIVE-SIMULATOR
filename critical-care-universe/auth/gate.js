@@ -176,7 +176,23 @@
     setTimeout(function () { if (root.parentNode) root.parentNode.removeChild(root); }, 380);
     window.ccuAuth = {
       email: session.user.email,
-      signOut: signOut
+      signOut: signOut,
+      base: BASE,
+      /* Admin shortcut support: resolves {pending:n} only for an administrator (the server decides; everyone else gets null and sees nothing). */
+      adminInfo: async function () {
+        try {
+          var g = await sb.auth.getSession(), ss = g.data && g.data.session;
+          if (!ss) return null;
+          var r = await fetch(CFG.supabaseUrl.replace(/\/$/, "") + "/functions/v1/" + (CFG.adminFunction || "admin-beta"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ss.access_token, "apikey": CFG.supabaseAnonKey },
+            body: JSON.stringify({ action: "list" })
+          });
+          if (!r.ok) return null;
+          var j = await r.json();
+          return { pending: (j.users || []).filter(function (u) { return u.access_status === "pending"; }).length };
+        } catch (e) { return null; }
+      }
     };
     var s = document.createElement("script");
     s.src = APP_SRC;                                 /* identical script the page used to load directly */

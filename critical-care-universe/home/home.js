@@ -459,6 +459,12 @@ function paintSettings() {
   $$("#sQ button", pS).forEach((b) => (b.onclick = () => { S.quality = b.dataset.q; $$("#sQ button", pS).forEach((x) => x.classList.toggle("on", x === b)); saveS(); applyS(); }));
   $("#sReset", pS).onclick = () => { Object.assign(S, { music: 0.5, fx: 0.7, mute: false, heroAnim: true, quality: "high", reduced: false, blur: 11 }); saveS(); applyS(); paintSettings(); };
   const so = $("#sOut", pS); if (so) so.onclick = () => { so.disabled = true; so.textContent = "Signing out..."; window.ccuAuth.signOut(); };
+  if (window.ccuAuth && window.ccuAuth.adminInfo) window.ccuAuth.adminInfo().then((a) => {   // administrators only: the server answers, everyone else gets nothing
+    if (!a || !pS.isConnected || $("#sAdm", pS)) return;
+    const row = $("#sReset", pS) && $("#sReset", pS).parentNode; if (!row) return;
+    const l = document.createElement("a"); l.id = "sAdm"; l.className = "btn q"; l.href = (window.ccuAuth.base || "./") + "admin/";
+    l.textContent = a.pending ? "Admin (" + a.pending + " pending)" : "Admin"; l.style.textDecoration = "none"; row.appendChild(l);
+  }).catch(() => {});
   $(".x", pS).onclick = () => closeFly();
 }
 function applyS() { reduced = S.reduced || matchMedia("(prefers-reduced-motion: reduce)").matches; applyMusic(); $(".bgimg").style.filter = `blur(${S.blur}px) saturate(1.15) brightness(.95)`; }
