@@ -4,18 +4,28 @@
 // Deploy (computer/CLI):    supabase functions deploy admin-beta
 // Secrets (Edge Functions > Secrets, or CLI): ADMIN_EMAILS="you@example.com,other@example.com"  ALLOWED_ORIGINS="https://<user>.github.io"
 // Secret names cannot start with SUPABASE_ (reserved).
-// SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by Supabase automatically. Do not set them by hand, never print them.
+// Injected by Supabase automatically (never set them by hand, never print them): SUPABASE_URL, and the server key from
+// SUPABASE_SECRET_KEYS (new projects) or SUPABASE_SERVICE_ROLE_KEY (legacy). Only ADMIN_EMAILS and ALLOWED_ORIGINS are yours to set.
 // Pinned to an exact version so a new upstream release can never change this function by surprise.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.2";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+function pickServiceKey(): string {
+  // New API keys: SUPABASE_SECRET_KEYS is a JSON object of named secret keys. Legacy projects: SUPABASE_SERVICE_ROLE_KEY.
+  try {
+    const all = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}");
+    const v = all.default ?? Object.values(all)[0];
+    if (typeof v === "string" && v) return v;
+  } catch { /* fall back to the legacy variable */ }
+  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+}
+const SERVICE_KEY = pickServiceKey();
 const ADMINS = (Deno.env.get("ADMIN_EMAILS") ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
 const ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "").split(",").map((s) => s.trim().replace(/\/$/, "")).filter(Boolean);
 const STATUSES = ["pending", "approved", "rejected"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+const admin = SUPABASE_URL && SERVICE_KEY ? createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } }) : null;
 
 function cors(req: Request): Record<string, string> {
   const o = req.headers.get("origin") ?? "";
@@ -34,6 +44,7 @@ function json(req: Request, body: unknown, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(req) });
   if (req.method !== "POST") return json(req, { error: "method_not_allowed" }, 405);
+  if (!admin) return json(req, { error: "server_misconfigured" }, 500);   // no server key available: fail closed, reveal nothing
 
   // 1. Who is calling? Validate the JWT with Supabase Auth (never trust a client-sent email).
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");

@@ -50,8 +50,10 @@ Save changes. Type the SMTP key only into that Supabase field. **Never** put it 
 
 ### 2. Tell Supabase where your site lives
 Authentication > URL Configuration
-- **Site URL**: your site folder, ending with `/`. Probably `https://apoorvabeats-cyber.github.io/ards-interactive-simulator/critical-care-universe/` (open your live site to confirm the exact address).
-- **Redirect URLs**: add the same address.
+- **Site URL**: `https://apoorvabeats-cyber.github.io/ards-interactive-simulator/critical-care-universe/`
+- **Redirect URLs**: add exactly the same address (ending with `/`).
+
+Why this exact address: the login code sends `redirect_to` = the page's own folder (origin + folder path, no `index.html`, no query, no `#`). It does this for signup confirmation, resend, and password reset, and it was checked at this origin and path with the page opened as `/`, `/index.html` and `/?to=auditorium`. Capital and small letters matter.
 
 Authentication > Sign In / Providers > **Email**: open it and make sure **Confirm email** is ON. Keep anonymous sign-ins OFF. Without the redirect entry, the email links will not bring people back to your site.
 
@@ -68,10 +70,14 @@ Edge Functions > Secrets > add:
 - `ADMIN_EMAILS` = your email (several: separate with commas)
 - `ALLOWED_ORIGINS` = `https://apoorvabeats-cyber.github.io` (no path, no trailing slash)
 
-Secret names cannot start with `SUPABASE_`. The service-role key is already available to the function automatically; you never type it anywhere.
+Exact formats (no quotes):
+- `ADMIN_EMAILS`: `you@example.com` or, for several, `you@example.com,second@example.com`. Not case sensitive. Each admin must have a confirmed account.
+- `ALLOWED_ORIGINS`: `https://apoorvabeats-cyber.github.io` (scheme and host only; no path, no `/ards-interactive-simulator`).
+
+Secret names cannot start with `SUPABASE_`. The server key is provided to the function automatically (the function uses `SUPABASE_SECRET_KEYS`, and falls back to the older `SUPABASE_SERVICE_ROLE_KEY`); you never type it anywhere.
 
 ### 5. Deploy the admin function
-Edge Functions > Deploy a new function > **Via Editor**. Name it exactly `admin-beta`. Paste the whole of `supabase/functions/admin-beta/index.ts`. Leave **Verify JWT** on. Deploy.
+Edge Functions > Deploy a new function > **Via Editor**. Name it exactly `admin-beta`. Paste the whole of `supabase/functions/admin-beta/index.ts`. Leave **Verify JWT** on (the admin page sends the signed-in admin's login token; the function also re-checks it itself, so it stays safe even if that switch is turned off). Deploy.
 
 (Computer alternative: `supabase functions deploy admin-beta` after `supabase link`.)
 
