@@ -8,7 +8,10 @@
 
   var SUPPORT = "criticalcareuniverse@gmail.com";
   var TIMEOUT_MS = 30000;
+  var HOLD_MS = 60000;          /* after an unconfirmed result, wait this long before a new attempt can be sent */
   var open_ = false;
+  var holdUntil = 0;
+  var UNSURE = { uncertain: 1, timeout: 1, network: 1 };   /* results where we cannot tell whether the account was deleted */
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 
@@ -65,11 +68,25 @@
       case "rate_limited": return "Too many attempts. Please wait a few minutes and try again. Your account has not been deleted.";
       case "unauthenticated": return "Your session is no longer valid. If you already deleted this account, nothing more is needed. Otherwise sign in again and retry.";
       case "forbidden": return "This account is not allowed to use self-service deletion. Email " + SUPPORT + " for help.";
-      case "network": return "We could not confirm the result. Check your connection and try again. If it keeps failing, email " + SUPPORT + ".";
-      case "timeout": return "The request took too long, so we cannot tell whether it finished. Try signing in: if that works, the account still exists and you can try again.";
-      case "unavailable": return "Account deletion is not available right now. Please email " + SUPPORT + " and we will do it for you.";
-      default: return "Something went wrong and your account was not deleted. Please try again, or email " + SUPPORT + ".";
+      case "offline": return "You appear to be offline, so nothing was sent and your account has not been deleted. Reconnect and try again.";
+      case "not_deleted": return "We tried, but your account was not deleted. It is still active, so you can try again. If it keeps failing, email " + SUPPORT + ".";
+      case "auth_unavailable": return "Our sign-in service did not respond, so nothing was deleted. Please try again in a few minutes.";
+      case "reauth_unavailable": return "We could not check your password right now, so nothing was deleted. Please try again in a few minutes.";
+      case "hold": return "Please wait a minute before trying again, so the earlier request has time to finish.";
+      case "unavailable": case "server_misconfigured": return "Account deletion is not available right now. Please email " + SUPPORT + " and we will do it for you.";
+      default: return "Something went wrong. We have no sign that your account was deleted, but please try again, or email " + SUPPORT + ".";
     }
+  }
+  /* Result could not be confirmed: say exactly that. Never "deleted", never "not deleted". */
+  function unsureParas(kind) {
+    var first = kind === "timeout" ? "The request took too long, so we cannot tell whether it finished."
+              : kind === "network" ? "We lost contact with the server, so we cannot tell whether the deletion happened."
+              : "Our server could not confirm whether the deletion happened.";
+    return [
+      first + " Your account may or may not have been deleted.",
+      "Please do not send the request again straight away. Wait a minute, then try signing in with your email and password: if sign-in fails, the account is gone; if it works, the account still exists and you can try again from Settings.",
+      'If you are unsure, email <a class="cd-link" href="mailto:' + SUPPORT + '">' + SUPPORT + '</a> from your registered address.'
+    ];
   }
 
   var ICON_OK = '<svg class="cd-ico" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="29" fill="none" stroke="#5be6a8" stroke-width="2"/><path d="M20 33l8 8 17-18" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -91,6 +108,7 @@
     root.className = "cd";
     root.innerHTML =
       '<div class="cd-box" role="dialog" aria-modal="true" aria-labelledby="cdTitle" aria-describedby="cdLead" tabindex="-1">' +
+        '<div id="cdLive" class="cd-sr" role="status" aria-live="polite" aria-atomic="true"></div>' +
         '<div id="cdForm">' +
           '<h2 id="cdTitle">Delete your account</h2>' +
           '<p class="cd-who">' + esc(o.email || "") + '</p>' +
@@ -105,7 +123,7 @@
           '<label class="cd-check" for="cdAck"><input type="checkbox" id="cdAck"><span>I understand that deleting my account is permanent.</span></label>' +
           '<div class="cd-field cd-pw"><label for="cdPw">Current password</label><input type="password" id="cdPw" autocomplete="current-password" autocapitalize="none" spellcheck="false"><button type="button" class="cd-eye" id="cdEye" aria-controls="cdPw" aria-label="Show password">Show</button></div>' +
           '<div class="cd-field"><label for="cdTyped">Type DELETE to confirm</label><input type="text" id="cdTyped" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" aria-describedby="cdTypedHint"><span id="cdTypedHint" class="cd-sr">Type the word DELETE in capital letters.</span></div>' +
-          '<div class="cd-msg" id="cdMsg" role="alert" hidden></div>' +
+          '<div class="cd-msg" id="cdMsg" role="alert" aria-atomic="true"></div>' +
           '<div class="cd-row"><button type="button" class="cd-btn" id="cdCancel">Cancel</button><button type="button" class="cd-btn danger" id="cdGo" disabled>Delete my account</button></div>' +
         '</div>' +
         '<div id="cdDone" hidden></div>' +
@@ -113,11 +131,17 @@
     document.documentElement.appendChild(root);
 
     var box = root.querySelector(".cd-box"), $ = function (id) { return root.querySelector("#" + id); };
+    var live = $("cdLive");
     var ack = $("cdAck"), pw = $("cdPw"), typed = $("cdTyped"), go = $("cdGo"), cancel = $("cdCancel"), msg = $("cdMsg"), eye = $("cdEye");
 
-    function ready() { return ack.checked && pw.value.length > 0 && typed.value === "DELETE"; }
-    function refresh() { go.disabled = submitting || !ready(); }
-    function say(t) { msg.textContent = t || ""; msg.hidden = !t; }
+    function ready() { return ack.checked && pw.value.length > 0 && typed.value === "DELETE" && Date.now() >= holdUntil; }
+    /* While a request runs the button stays focusable (aria-disabled, not disabled) so keyboard and screen-reader focus is not dropped. */
+    function refresh() { go.disabled = !submitting && !ready(); if (submitting) go.setAttribute("aria-disabled", "true"); else go.removeAttribute("aria-disabled"); }
+    /* Polite status line for progress and success; the error line below is the assertive one. Each is cleared first so an identical message is announced again. */
+    var liveT = null, msgT = null;   /* a newer message always cancels an older one that has not appeared yet, so a stale line can never show up late */
+    function announce(t) { live.textContent = ""; clearTimeout(liveT); if (t) liveT = setTimeout(function () { if (root.parentNode) live.textContent = t; }, 50); }
+    function say(t) { msg.textContent = ""; clearTimeout(msgT); if (t) msgT = setTimeout(function () { if (root.parentNode) msg.textContent = t; }, 60); }
+    function holdTimer() { var w = holdUntil - Date.now(); if (w > 0) setTimeout(function () { if (root.parentNode && !submitting) refresh(); }, w + 50); }
     function lockInputs(v) { [ack, pw, typed, eye, cancel].forEach(function (e) { e.disabled = v; }); }
     function close() {
       if (submitting || finished) return;
@@ -133,6 +157,19 @@
       d.innerHTML = '<div class="cd-state">' + icon + '<h2 id="cdTitle2" tabindex="-1">' + esc(title) + '</h2>' + paras.map(function (p) { return '<p>' + p + '</p>'; }).join("") + '</div><div class="cd-row"><button type="button" class="cd-btn" id="cdFin">Done</button></div>';
       box.setAttribute("aria-labelledby", "cdTitle2"); box.removeAttribute("aria-describedby");
       var fin = $("cdFin"); fin.addEventListener("click", function () { open_ = false; if (root.parentNode) root.parentNode.removeChild(root); if (o.onDone) o.onDone(); });
+      announce(title + ". " + paras.map(function (p) { return String(p).replace(/<[^>]*>/g, ""); }).join(" "));
+      try { fin.focus(); } catch (e) {}
+    }
+    /* The result could not be confirmed. Nothing is wiped (the account may still exist), the dialog can be closed, and a new attempt is held for a minute. */
+    function unsureScreen(kind) {
+      finished = true; open_ = true;
+      $("cdForm").hidden = true;
+      var d = $("cdDone"); d.hidden = false;
+      d.innerHTML = '<div class="cd-state">' + ICON_WARN + '<h2 id="cdTitle2" tabindex="-1">We could not confirm the result</h2>' + unsureParas(kind).map(function (p) { return '<p>' + p + '</p>'; }).join("") + '</div><div class="cd-row"><button type="button" class="cd-btn" id="cdFin">Close</button></div>';
+      box.setAttribute("aria-labelledby", "cdTitle2"); box.removeAttribute("aria-describedby");
+      var fin = $("cdFin");
+      fin.addEventListener("click", function () { open_ = false; if (root.parentNode) root.parentNode.removeChild(root); if (o.setBusy) o.setBusy(false); if (o.onClose) try { o.onClose(); } catch (e) {} try { if (opener && opener.focus) opener.focus(); } catch (e) {} });
+      announce("We could not confirm the result. " + unsureParas(kind).slice(0, 2).join(" "));
       try { fin.focus(); } catch (e) {}
     }
 
@@ -154,8 +191,10 @@
 
     go.addEventListener("click", async function () {
       if (submitting || !ready()) return;          /* one submission at a time; the button is also disabled while it runs */
+      if (typeof navigator !== "undefined" && navigator.onLine === false) { say(problem("offline")); return; }   /* nothing sent, so say so */
       submitting = true; refresh(); lockInputs(true); say("");
       go.classList.add("busy"); go.innerHTML = '<span class="cd-spin" aria-hidden="true"></span><span>Deleting...</span>'; go.setAttribute("aria-busy", "true");
+      announce("Deleting your account. Please wait.");
       if (o.setBusy) o.setBusy(true);
       var password = pw.value, outcome = "error", ctl = null, timer = null;
       pw.value = "";                                // the password is never kept in the page after it is read
@@ -176,6 +215,9 @@
           else if (j && j.error === "partial" && j.auth_deleted === true) outcome = "partial";
           else if (r.status === 404) outcome = "unavailable";            /* the function is not deployed yet */
           else if (j && typeof j.error === "string") outcome = j.error;
+          else if (r.status === 429) outcome = "rate_limited";
+          else if (r.status === 401) outcome = "unauthenticated";
+          else if (r.ok || r.status >= 500) outcome = "uncertain";      /* an unreadable answer, or a gateway error: the function may have run */
           else outcome = "error";
         }
       } catch (e) { outcome = e && e.name === "AbortError" ? "timeout" : "network"; }
@@ -202,14 +244,22 @@
         return;                                       /* gate checks stay paused: the page returns to sign-in when Done is pressed */
       }
 
-      /* not deleted: say so plainly, let the person fix it and retry */
-      submitting = false; lockInputs(false);
+      /* result could not be confirmed: do not claim either outcome, do not wipe anything, hold new attempts */
+      if (UNSURE[outcome]) {
+        holdUntil = Date.now() + HOLD_MS; submitting = false;
+        unsureScreen(outcome);
+        return;                                      /* gate checks stay paused until Close is pressed */
+      }
+
+      /* confirmed not deleted (or never attempted): say so plainly, let the person fix it and retry */
+      submitting = false; lockInputs(false); announce("");
       go.classList.remove("busy"); go.removeAttribute("aria-busy"); go.textContent = "Delete my account";
-      say(problem(outcome)); refresh();
+      refresh(); say(problem(outcome));
       if (o.setBusy) o.setBusy(false);
       try { pw.focus(); } catch (e) {}
     });
 
+    if (Date.now() < holdUntil) { say(problem("hold")); holdTimer(); }
     try { box.focus(); } catch (e) {}
   }
 
