@@ -21,17 +21,41 @@ Until `auth/config.js` holds your real URL and anon key, the gate shows "Beta lo
 
 ## Setup, step by step (works entirely on an iPhone in Safari)
 
-### 1. Make Supabase able to email your testers (required)
-Supabase's built-in email sender only delivers to members of your Supabase organization, and only about 2 emails per hour. Anyone else gets "Email address not authorized", so signups would never receive the confirmation link.
+### 1. Make Supabase able to email your testers (required): Brevo SMTP
+Supabase's built-in email sender only delivers to members of your Supabase organization, and only about 2 emails per hour. Anyone else gets "Email address not authorized", so signups would never receive the confirmation link. Fix it with custom SMTP.
 
-Fix: Supabase > Authentication > Emails > SMTP Settings > turn on **Enable custom SMTP**, and enter the details from an email-sending service (for example Brevo or Resend, both have free plans). Use a sender address on a domain you control. Save.
+**1a. Brevo: a verified sender.** Brevo only sends from an address you have verified.
+- Brevo > top-right account menu > **Senders, Domains & Dedicated IPs** > **Senders** > **Add a sender**. Enter a name (for example "Critical Care Universe") and the email address, then open the verification message Brevo sends to that address and confirm it.
+- Best deliverability: use an address on a domain you own (for example `no-reply@yourdomain.com`) and authenticate the domain under the **Domains** tab by adding the SPF and DKIM records Brevo shows you at your domain registrar (can take up to 24 to 48 hours). Free-mail senders (Gmail, Yahoo) often land in spam or are rejected.
+- The sender email you enter in Supabase must exactly match a verified Brevo sender.
+
+**1b. Brevo: find your SMTP details.** Brevo > gear icon (Settings) > **SMTP & API** > **SMTP** tab. You need the **Login** shown there and your **SMTP key** (the one you generated; an API key will not work).
+
+**1c. Supabase: turn it on.** Supabase > Authentication > Emails > **SMTP Settings** > **Enable custom SMTP**, then enter:
+| Field | Value |
+|---|---|
+| Sender email address | your verified Brevo sender |
+| Sender name | Critical Care Universe |
+| Host | `smtp-relay.brevo.com` |
+| Port | `587` |
+| Username | the **Login** shown on Brevo's SMTP tab (if none is shown, your Brevo account email) |
+| Password | your Brevo **SMTP key** |
+| Minimum interval per user | leave at 60 seconds |
+
+Save changes. Type the SMTP key only into that Supabase field. **Never** put it in GitHub, in this repo, in `config.js`, or in chat.
+
+**1d. Email limits.** With custom SMTP the default is 30 auth emails per hour. Authentication > Rate Limits lets you change it; keep it within your Brevo plan's daily sending limit.
+
+**1e. Test.** Sign up on the live site with an email that is NOT on your Supabase team. The confirmation email should arrive (check spam). In Brevo, Transactional > Logs shows each message and whether it was delivered.
 
 ### 2. Tell Supabase where your site lives
 Authentication > URL Configuration
 - **Site URL**: your site folder, ending with `/`. Probably `https://apoorvabeats-cyber.github.io/ards-interactive-simulator/critical-care-universe/` (open your live site to confirm the exact address).
 - **Redirect URLs**: add the same address.
 
-Authentication > Sign In / Providers > Email: keep **Confirm email** ON. Keep anonymous sign-ins OFF. Without the redirect entry, the email links will not bring people back to your site.
+Authentication > Sign In / Providers > **Email**: open it and make sure **Confirm email** is ON. Keep anonymous sign-ins OFF. Without the redirect entry, the email links will not bring people back to your site.
+
+The address must match the live site exactly. Open your live site in Safari, go to the Critical Care Universe folder, and copy the address bar up to and including the final `/` (capital and small letters matter). If an email link ever drops people on the wrong page, add `https://apoorvabeats-cyber.github.io/**` as an extra Redirect URL (it covers only your own GitHub Pages address).
 
 ### 3. Check and harden the database
 SQL Editor > paste `supabase/sql/beta-access-hardening.sql` (open it on GitHub on the `beta-login` branch, tap Raw, select all, copy).
