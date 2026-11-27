@@ -6,7 +6,7 @@
   "use strict";
 
   var CFG = window.CCU_AUTH_CONFIG || {};
-  var APP_SRC = "./assets/startup.js?v=20261126q";   /* the original, unchanged startup script */
+  var APP_SRC = "./assets/startup.js?v=20261127g";   /* the original, unchanged startup script */
   var MIN_PW = 8;
   var WATCH_MS = 120000;                              /* re-check approval while the app is open */
 
@@ -43,7 +43,7 @@
     '<svg class="cg-ecg" viewBox="0 0 1200 90" preserveAspectRatio="none" aria-hidden="true"><path d="M0 50H300l14-2 10-26 14 56 14-72 12 44 10-4h60l14-2 10-22 14 48 14-62 12 38 10-4H1200"/></svg>' +
     '<div class="cg-wrap">' +
       '<div class="cg-brand">' +
-        '<img class="cg-logoimg" src="./auth/logo.jpg?v=20261127d" width="640" height="624" alt="Critical Care Universe" decoding="async">' +
+        '<img class="cg-logoimg" src="./auth/logo-wide.webp?v=20261127f" width="1020" height="312" alt="Critical Care Universe" decoding="async" onerror="this.onerror=null;this.src=\'./auth/logo-wide.jpg?v=20261127f\'">' +
         '<span class="cg-chip">Private beta</span>' +
       '</div>' +
       '<div class="cg-card" id="cgCard" aria-live="polite"></div>' +

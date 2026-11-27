@@ -157,7 +157,7 @@
     var b = base();
     return '<svg class="cw-ecg" viewBox="0 0 1200 90" preserveAspectRatio="none" aria-hidden="true"><path d="M0 50H300l14-2 10-26 14 56 14-72 12 44 10-4h60l14-2 10-22 14 48 14-62 12 38 10-4H1200"/></svg>' +
       '<div class="cw-wrap">' +
-        '<img class="cw-logo" src="./auth/logo.jpg?v=20261127d" width="640" height="624" alt="Critical Care Universe" decoding="async">' +
+        '<img class="cw-logo" src="./auth/logo-wide.webp?v=20261127f" width="1020" height="312" alt="Critical Care Universe" decoding="async" onerror="this.onerror=null;this.src=\'./auth/logo-wide.jpg?v=20261127f\'">' +
         '<span class="cw-chip">Private beta</span>' +
         '<h1 class="cw-h1" id="cwTitle" tabindex="-1">Welcome to the private beta</h1>' +
         '<p class="cw-tag">Learn it. Practise it. Lead the unit.</p>' +

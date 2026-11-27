@@ -135,10 +135,24 @@
     const lag = logoElapsed() / 1000;
     try { if (lag > 0.3 && Math.abs(audio.currentTime - lag) > 0.3 && audio.duration > lag) audio.currentTime = lag; } catch (err) {}
   };
-  const runLogo = () => {
+  const runSvgLogo = () => {
     const list = logo.getAnimations({ subtree: true });
     list.forEach((animation) => { try { animation.pause(); animation.currentTime = 0; animation.play(); } catch (err) {} });
     window.setTimeout(() => { if (!loading) openHint.hidden = false; loadApp(); }, 8000);
+  };
+  /* The logo shot: a silent video of the new logo build (13 s), in step with the score. Anything wrong with the video and the
+     drawn logo runs instead, exactly as before. */
+  const video = startup.querySelector(".startup-video");
+  const runLogo = () => {
+    let fell = false;
+    const fallBack = () => { if (fell) return; fell = true; try { video.pause(); } catch (err) {} startup.classList.add("is-svg-logo"); runSvgLogo(); };
+    if (!video || video.error || video.readyState < 3) { fallBack(); return; }
+    video.addEventListener("error", fallBack, { once: true });
+    video.addEventListener("ended", () => { if (!fell && !loading) openHint.hidden = false; if (!fell) loadApp(); }, { once: true });
+    try { video.currentTime = 0; } catch (err) {}
+    const playing = video.play();
+    if (playing && playing.catch) playing.catch(fallBack);
+    window.setTimeout(() => { if (!fell && !loading) { openHint.hidden = false; loadApp(); } }, 15000);   /* never stuck on the logo */
   };
 
   const startMusic = async () => {
