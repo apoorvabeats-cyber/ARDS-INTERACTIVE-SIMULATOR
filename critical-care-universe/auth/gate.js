@@ -68,6 +68,16 @@
   function emailField(val) {
     return '<div class="cg-field"><label for="cgEmail">Email</label><input id="cgEmail" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@hospital.org" required autocapitalize="off" autocorrect="off" spellcheck="false" value="' + esc(val || "") + '"></div>';
   }
+  /* Display name (Supabase Auth user metadata `full_name`): 2 to 40 characters, no control or direction-override characters. Always shown with textContent. */
+  var NAME_MIN = 2, NAME_MAX = 40;
+  function cleanName(v) {
+    return String(v == null ? "" : v).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, " ").replace(/\s+/g, " ").trim();
+  }
+  function nameOk(n) { var len = Array.from(n).length; return len >= NAME_MIN && len <= NAME_MAX; }
+  function nameOf(user) { var m = user && user.user_metadata, n = cleanName(m && typeof m.full_name === "string" ? m.full_name : ""); return nameOk(n) ? n : ""; }
+  function nameField() {
+    return '<div class="cg-field"><label for="cgName">Your name</label><input id="cgName" name="full_name" type="text" autocomplete="name" placeholder="Dr. Your name" required minlength="' + NAME_MIN + '" maxlength="' + NAME_MAX + '" autocapitalize="words" autocorrect="off" spellcheck="false"></div>';
+  }
   var MSGBOX = '<div class="cg-msg" id="cgMsg" role="alert" hidden></div>';
   function btn(label, id) { return '<button class="cg-btn" type="submit" id="' + (id || "cgGo") + '"><span class="cg-lbl">' + label + '</span></button>'; }
 
@@ -80,7 +90,7 @@
     },
     signup: function (o) {
       return '<h1>Request beta access</h1><p class="cg-sub">Create an account. You will confirm your email, then wait for approval.</p>' + MSGBOX +
-        '<form data-form="signup" novalidate>' + emailField(o.email) + pwField("cgPw", "Password", "new-password", "At least " + MIN_PW + " characters") +
+        '<form data-form="signup" novalidate>' + nameField() + emailField(o.email) + pwField("cgPw", "Password", "new-password", "At least " + MIN_PW + " characters") +
         '<div class="cg-meter" aria-hidden="true"><i id="cgMeter"></i></div><p class="cg-hint" id="cgHint">Use ' + MIN_PW + '+ characters. A mix of letters, numbers and symbols is stronger.</p>' +
         '<div style="height:10px"></div>' + pwField("cgPw2", "Confirm password", "new-password", "Type it again") + btn("Create account") + '</form>' +
         '<div class="cg-links"><button class="cg-link" type="button" data-go="login">I already have an account</button></div>';
@@ -176,6 +186,18 @@
     setTimeout(function () { if (root.parentNode) root.parentNode.removeChild(root); }, 380);
     window.ccuAuth = {
       email: session.user.email,
+      name: nameOf(session.user),                    /* display name from the account (Auth user metadata); "" when none is stored */
+      /* Saves the display name to the signed-in account's metadata. Resolves {ok:true,name} or {ok:false,error}. */
+      setName: async function (v) {
+        var n = cleanName(v);
+        if (!nameOk(n)) return { ok: false, error: "Enter your name (" + NAME_MIN + " to " + NAME_MAX + " characters)." };
+        try {
+          var r = await sb.auth.updateUser({ data: { full_name: n } });
+          if (r.error) return { ok: false, error: "Could not save your name. Check your connection and try again." };
+          window.ccuAuth.name = n;
+          return { ok: true, name: n };
+        } catch (e) { return { ok: false, error: "Could not save your name. Check your connection and try again." }; }
+      },
       signOut: signOut,
       deleteAccount: function () { openDelete(session.user.email); },
       base: BASE,
@@ -266,12 +288,13 @@
       /* onAuthStateChange(SIGNED_IN) continues from here */
     },
     signup: async function (f) {
-      var email = f.email.value.trim(), pw = f.cgPw.value, pw2 = f.cgPw2.value; curEmail = email;
+      var email = f.email.value.trim(), pw = f.cgPw.value, pw2 = f.cgPw2.value, name = cleanName(f.full_name.value); curEmail = email;
+      if (!nameOk(name)) return setMsg("err", "Enter your name (" + NAME_MIN + " to " + NAME_MAX + " characters).");
       if (!email) return setMsg("err", "Enter your email address.");
       if (pw.length < MIN_PW) return setMsg("err", "Your password needs at least " + MIN_PW + " characters.");
       if (pw !== pw2) return setMsg("err", "The two passwords do not match.");
       busy(f, true, "Creating account");
-      var r = await sb.auth.signUp({ email: email, password: pw, options: { emailRedirectTo: baseUrl() } });
+      var r = await sb.auth.signUp({ email: email, password: pw, options: { emailRedirectTo: baseUrl(), data: { full_name: name } } });
       if (r.error) { busy(f, false); return setMsg("err", friendly(r.error)); }
       var u = r.data && r.data.user;
       if (u && Array.isArray(u.identities) && u.identities.length === 0) {

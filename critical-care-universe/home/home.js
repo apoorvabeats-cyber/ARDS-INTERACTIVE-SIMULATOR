@@ -427,18 +427,30 @@ async function closeQuick() {
 /* ======================================================================== profile and settings flyouts */
 const pP = $("#pProfile"), pS = $("#pSettings");
 function paintProfile() {
-  $("#railName").textContent = prof.name || "Doctor"; $("#railId").textContent = prof.id || "Tap to sign in";
+  const A = window.ccuAuth;   // signed in: the name comes from the account (never from the browser-only profile, never the email)
+  const shown = A ? (A.name || "My Account") : (prof.name || "Doctor");
+  $("#railName").textContent = shown; $("#railName").title = shown; $("#railId").textContent = A ? "Signed in" : (prof.id || "Tap to sign in");
   $("#railAv").src = HEROES[avKey] ? heroThumb(avKey) : avKey ? avatarThumb(avKey) : new URL("./hero.jpg", import.meta.url).href;
-  $("#heroName").textContent = prof.name ? "Welcome, " + prof.name : "Welcome, Doctor"; $("#heroRole").textContent = HEROES[avKey] ? HEROES[avKey].label : avKey ? AVATARS[avKey].label : "Your doctor";
+  const who = A ? A.name : prof.name; $("#heroName").textContent = who ? "Welcome, " + who : "Welcome, Doctor"; $("#heroRole").textContent = HEROES[avKey] ? HEROES[avKey].label : avKey ? AVATARS[avKey].label : "Your doctor";
   $$(".avb", pP).forEach((b) => b.classList.toggle("on", b.dataset.k === avKey));
 }
 pP.innerHTML = `<button class="x" type="button" aria-label="Close">✕</button><h2>Profile</h2><p class="sub">Your sign-in and your doctor. Both are kept on this device.</p>
 <label for="pfName">Name</label><input id="pfName" type="text" maxlength="40" autocomplete="name" placeholder="Dr. Your name">
+<p class="sub" id="pfMsg" role="alert" hidden style="margin:6px 0 0;color:#ffb4b4"></p>
 <label for="pfId">Login ID</label><input id="pfId" type="email" maxlength="60" autocomplete="username" placeholder="you@hospital.org">
 <label>Choose your doctor</label><div class="avs">${AVATAR_KEYS.map((k) => { const hk = Object.keys(HEROES).find((x) => HEROES[x].replaces === k); return hk ? `<button class="avb" type="button" data-k="${hk}" aria-label="Doctor"><img src="${heroThumb(hk)}" alt=""></button>` : `<button class="avb" type="button" data-k="${k}" aria-label="${AVATARS[k].label}"><img src="${avatarThumb(k)}" alt=""></button>`; }).join("")}</div>
 <div class="row"><button class="btn" id="pfSave" type="button">Save</button><button class="btn q" id="pfDef" type="button">Use default doctor</button><button class="btn q" id="pfOut" type="button">Sign out</button></div>`;
 $$(".avb", pP).forEach((b) => b.addEventListener("click", () => { avKey = b.dataset.k; try { localStorage.setItem("ccu.doctorAvatar", avKey); } catch (e) { /* ignore */ } sfx("tick"); paintProfile(); setHeroSafe(avKey); }));
-$("#pfSave").onclick = () => { prof = { name: $("#pfName").value.trim(), id: $("#pfId").value.trim() }; store.set("ccu.profile", prof); sfx("tick"); paintProfile(); closeFly(); };
+$("#pfSave").onclick = async () => {
+  const A = window.ccuAuth;
+  if (A && A.setName) {   // signed in: the name is saved to the account, so it follows the user to any device
+    const msg = $("#pfMsg"), b = $("#pfSave"); msg.hidden = true; b.disabled = true;
+    const r = await A.setName($("#pfName").value); b.disabled = false;
+    if (!r.ok) { msg.textContent = r.error; msg.hidden = false; return; }
+    sfx("tick"); paintProfile(); closeFly(); return;
+  }
+  prof = { name: $("#pfName").value.trim(), id: $("#pfId").value.trim() }; store.set("ccu.profile", prof); sfx("tick"); paintProfile(); closeFly();
+};
 $("#pfDef").onclick = () => { avKey = ""; try { localStorage.removeItem("ccu.doctorAvatar"); } catch (e) { /* ignore */ } paintProfile(); setHeroSafe("default"); };
 $("#pfOut").onclick = () => { prof = { name: "", id: "" }; store.set("ccu.profile", prof); $("#pfName").value = $("#pfId").value = ""; paintProfile(); };
 $(".x", pP).onclick = () => closeFly();
@@ -472,7 +484,13 @@ function paintSettings() {
 function applyS() { reduced = S.reduced || matchMedia("(prefers-reduced-motion: reduce)").matches; applyMusic(); $(".bgimg").style.filter = `blur(${S.blur}px) saturate(1.15) brightness(.95)`; }
 async function openFly(which) {
   if (fly === which) return closeFly(); await closeQuick(); if (fly) await closeFly();
-  const el = which === "profile" ? pP : pS; if (which === "profile") { $("#pfName").value = prof.name; $("#pfId").value = prof.id; paintProfile(); } else paintSettings();
+  const el = which === "profile" ? pP : pS; if (which === "profile") {
+    const A = window.ccuAuth;
+    $("#pfName").value = A ? A.name : prof.name; $("#pfId").value = A ? "" : prof.id; $("#pfMsg").hidden = true;
+    $$("label[for=pfId], #pfId", pP).forEach((n) => { n.style.display = A ? "none" : ""; });   // signed in: no stale local login ID from another user
+    if (A) $(".sub", pP).textContent = "Your name is saved to your account. Your doctor is kept on this device.";
+    paintProfile();
+  } else paintSettings();
   fly = which; el.hidden = false; $("#bProfile").classList.toggle("on", which === "profile"); $("#bSet").classList.toggle("on", which === "settings"); sfx("tick");
   await tw(650, (p) => { el.style.opacity = Math.min(1, p * 2); el.style.transform = `translate3d(${-(1 - p) * 2}em,${(1 - p) * 1.4}em,0) scale(${0.94 + 0.06 * p})`; }, { ease: E.back });
 }
