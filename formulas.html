@@ -10,7 +10,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--fg);font-family:Figtree,ui-sans-serif,sans-serif;font-size:16px}
 button,input,select{font:inherit;color:inherit}
-button{cursor:pointer;background:#102028;border:1px solid var(--line);border-radius:999px;min-height:40px;padding:0 12px}
+button{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;background:#102028;border:1px solid var(--line);border-radius:999px;min-height:40px;padding:0 12px}
 button.on{border-color:var(--warm);color:#fff8ee;background:#2a2118}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--warm);outline-offset:2px}
 header{padding:12px 14px 0}
@@ -20,6 +20,11 @@ h1{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:28px;letter-spac
 .find input{margin:0}
 .mods,.list{display:flex;gap:8px;overflow:auto;padding:10px 14px;-webkit-overflow-scrolling:touch}
 .mods button,.list button{flex:none;font-size:14px;text-align:left}
+.mods[hidden]{display:none}
+.kind{display:flex;gap:8px;padding:10px 14px 0}
+.kind[hidden]{display:none}
+.kind button{flex:1}
+.kind button.back{flex:none;padding:0 14px}
 .card{margin:0 14px 18px;padding:12px;border:1px solid var(--line);border-radius:16px;background:#0c141c}
 .card h2{font-family:Fraunces,Georgia,serif;font-weight:520;font-size:22px;margin:0 0 6px;letter-spacing:-.02em}
 .expr{margin:0 0 8px;color:var(--cool);font-size:17px;line-height:1.35}
@@ -46,6 +51,7 @@ table.grid th{width:34%;color:var(--cool);font-weight:650;border-right:1px solid
   <h1>Formulas</h1>
   <p class="lede">Enter the values from the case, or your own. The result, the reading, and the abbreviations update together.</p>
 </header>
+<div class="kind" id="kind" hidden><button type="button" class="back" id="kBack">Back</button><button type="button" data-kind="formulas" class="on">Formulas</button><button type="button" data-kind="criteria">Criterias</button></div>
 <div class="find"><input id="find" type="search" placeholder="Search a formula" autocomplete="off" enterkeyhint="search"></div>
 <div class="mods" id="mods"></div>
 <div class="list" id="list"></div>
@@ -1003,24 +1009,45 @@ function openFound(f, now){
   paintList();
   paintCard();
 }
-mods.onclick = function(e){
-  const btn = e.target.closest("[data-mod]");
-  if(!btn) return;
+function pickMod(btn){
   query = "";
   findEl.value = "";
   mod = btn.getAttribute("data-mod");
   const first = F.find(function(f){ return f.mod===mod; });
   current = first.id;
   paintMods(); paintList(); paintCard();
-};
-list.onclick = function(e){
-  const btn = e.target.closest("[data-id]");
-  if(!btn) return;
+}
+function pickItem(btn){
   current = btn.getAttribute("data-id");
   const chosen = F.find(function(f){ return f.id===current; });
   if(chosen && chosen.kind!=="crit") mod = chosen.mod;
   paintList(); paintCard();
-};
+}
+/* Taps on the sideways-scrolling rows: the normal click does the work. On a touch screen, if the click never arrives
+   (some phones drop it inside a scrolling strip), the finger-up of a real tap does it instead. A swipe fires pointercancel, not pointerup. */
+function tapRow(host, attr, act){
+  let fired = false, last = null;
+  host.addEventListener("click", function(e){
+    const btn = e.target.closest("["+attr+"]");
+    if(!btn) return;
+    fired = true;
+    act(btn);
+  });
+  host.addEventListener("pointerup", function(e){
+    if(e.pointerType==="mouse") return;
+    const btn = e.target.closest("["+attr+"]");
+    if(!btn) return;
+    fired = false; last = btn;
+    setTimeout(function(){
+      if(fired || !last || !last.isConnected) return;
+      const again = host.querySelector("["+attr+"='"+last.getAttribute(attr)+"']");
+      last = null;
+      if(again) act(again);
+    }, 350);
+  });
+}
+tapRow(mods, "data-mod", pickMod);
+tapRow(list, "data-id", pickItem);
 findEl.addEventListener("input", function(){
   query = findEl.value;
   const rows = ranked(query);
@@ -1043,7 +1070,28 @@ findEl.addEventListener("keydown", function(e){
   const rows = ranked(query);
   if(rows[0]) openFound(rows[0], true);
 });
-const asked = new URLSearchParams(location.search).get("mod");
+const params = new URLSearchParams(location.search);
+const embedded = params.get("embed")==="1";
+const kindEl = document.getElementById("kind");
+function setKind(kind){
+  if(kind==="criteria"){
+    mod = "crit";
+    current = F.find(function(f){ return f.mod==="crit"; }).id;
+    document.querySelector("h1").textContent = "Criterias";
+    document.querySelector(".lede").textContent = "Choose a score. The cut-offs are in the table.";
+    findEl.placeholder = "Search a criteria";
+  } else {
+    mod = "haem";
+    current = F.find(function(f){ return f.mod==="haem"; }).id;
+    document.querySelector("h1").textContent = "Formulas";
+    document.querySelector(".lede").textContent = "Enter the values from the case, or your own. The result, the reading, and the abbreviations update together.";
+    findEl.placeholder = "Search a formula";
+  }
+  query = ""; findEl.value = "";
+  kindEl.querySelectorAll("[data-kind]").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-kind")===kind); });
+  paintMods(); paintList(); paintCard();
+}
+const asked = params.get("mod");
 if(asked && F.some(function(f){ return f.mod===asked; })){
   mod = asked;
   current = F.find(function(f){ return f.mod===mod; }).id;
@@ -1052,6 +1100,14 @@ if(asked && F.some(function(f){ return f.mod===asked; })){
     document.querySelector(".lede").textContent = "Choose a score. The cut-offs are in the table.";
     findEl.placeholder = "Search a criteria";
   }
+}
+if(!embedded){   /* opened on its own (the Home tile): a way back, and both Formulas and Criterias */
+  kindEl.hidden = false;
+  kindEl.querySelectorAll("[data-kind]").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-kind")===(mod==="crit" ? "criteria" : "formulas")); });
+  tapRow(kindEl, "data-kind", function(b){ setKind(b.getAttribute("data-kind")); });
+  document.getElementById("kBack").onclick = function(){
+    if(document.referrer && history.length>1) history.back(); else location.href = "./critical-care-universe/";
+  };
 }
 paintMods(); paintList(); paintCard();
 </script>
