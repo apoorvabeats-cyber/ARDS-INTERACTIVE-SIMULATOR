@@ -33,11 +33,8 @@
   /* The welcome screen is for people opening the app for the first time on this browser. It never shows for email links
      (confirmation, password reset, errors), deep links, an existing sign-in, or an installed Home Screen app. */
   function shouldShow() {
-    var w = q.get("welcome");
-    if (w === "0") return false;
     if (/(^|[#&])(access_token|refresh_token|token_hash|error|error_code|error_description|type)=/.test(String(location.hash || ""))) return false;
     if (q.has("to") || q.has("old") || q.has("home")) return false;
-    if (w === "1") return true;                      /* review switch: shows the welcome screen regardless of history */
     if (isStandalone()) return false;
     if (lsGet(SESSION_KEY)) return false;
     if (lsGet(FLAG) || ssGet(FLAG)) return false;
