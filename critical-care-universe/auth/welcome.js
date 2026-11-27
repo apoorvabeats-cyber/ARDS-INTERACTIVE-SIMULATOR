@@ -36,7 +36,7 @@
     if (/(^|[#&])(access_token|refresh_token|token_hash|error|error_code|error_description|type)=/.test(String(location.hash || ""))) return false;
     if (q.has("to") || q.has("old") || q.has("home")) return false;
     if (isStandalone()) return false;
-    if (lsGet(SESSION_KEY)) return false;
+    if (lsGet(SESSION_KEY)) { setFlag(); return false; }   /* already signed in: remember it, so signing out later does not show the first-time welcome */
     if (lsGet(FLAG) || ssGet(FLAG)) return false;
     return true;
   }
